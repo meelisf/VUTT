@@ -6,11 +6,13 @@ import { Link, useNavigate } from 'react-router-dom';
 
 interface WorkCardProps {
   work: Work;
-  workStatus?: WorkStatus;
 }
 
-const WorkCard: React.FC<WorkCardProps> = ({ work, workStatus }) => {
+const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
   const navigate = useNavigate();
+  
+  // Kasuta denormaliseeritud teose staatust (work.work_status)
+  const workStatus = work.work_status || 'Toores';
 
   // Staatuse badge stiilid
   const getStatusStyle = (status?: WorkStatus) => {
@@ -82,9 +84,16 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, workStatus }) => {
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusStyle(workStatus)}`}>
-            {workStatus || 'Toores'}
-          </span>
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(`/?status=${encodeURIComponent(workStatus)}`);
+            }}
+            className={`text-xs font-medium px-2 py-1 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 transition-all ${getStatusStyle(workStatus)}`}
+            title={`Filtreeri staatuse "${workStatus}" järgi`}
+          >
+            {workStatus}
+          </button>
           <Link
             to={`/work/${work.id}/1`}
             className="text-sm font-medium text-primary-600 hover:text-primary-800"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { searchWorks, getWorkStatuses } from '../services/meiliService';
+import { searchWorks } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
@@ -18,11 +18,11 @@ const Dashboard: React.FC = () => {
   const yearEndParam = searchParams.get('ye');
   const sortParam = searchParams.get('sort') || 'recent';
   const authorParam = searchParams.get('author') || '';
+  const statusParam = searchParams.get('status') as WorkStatus | null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
-  const [workStatuses, setWorkStatuses] = useState<Map<string, WorkStatus>>(new Map());
   const [currentPage, setCurrentPage] = useState(pageParam);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,15 +91,15 @@ const Dashboard: React.FC = () => {
         const start = parseInt(yearStart) || undefined;
         const end = parseInt(yearEnd) || undefined;
 
-        // Pass filter options to the API
+        // Pass filter options to the API (including status filter - server-side)
         const results = await searchWorks(queryParam, {
           yearStart: start,
           yearEnd: end,
           sort: sort,
-          author: authorParam || undefined
+          author: authorParam || undefined,
+          workStatus: statusParam || undefined
         });
         setWorks(results);
-        setWorkStatuses(new Map()); // Tühjendame staatused, laeme hiljem
         
         // Reset to page 1 when filters change (but not when page param changes)
         if (currentPage !== 1 && !searchParams.get('page')) {
@@ -118,30 +118,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam]);
-
-  // Pärime staatused ainult praegusel lehel kuvatavate teoste jaoks (efektiivsem)
-  useEffect(() => {
-    const fetchStatuses = async () => {
-      if (works.length === 0) return;
-      
-      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-      const endIndex = startIndex + ITEMS_PER_PAGE;
-      const currentWorks = works.slice(startIndex, endIndex);
-      
-      if (currentWorks.length > 0) {
-        const workIds = currentWorks.map(w => w.id);
-        const statuses = await getWorkStatuses(workIds);
-        setWorkStatuses(prev => {
-          const newMap = new Map(prev);
-          statuses.forEach((value, key) => newMap.set(key, value));
-          return newMap;
-        });
-      }
-    };
-    
-    fetchStatuses();
-  }, [works, currentPage]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam, statusParam]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
@@ -275,8 +252,30 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* Status Filter Badge */}
+                {statusParam && (
+                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${
+                    statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
+                    statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    <span>{statusParam}</span>
+                    <button
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('status');
+                        setSearchParams(newParams);
+                      }}
+                      className="ml-1 hover:bg-white/50 rounded p-0.5"
+                      title="Eemalda staatuse filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Reset Filters Button */}
-                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam) && (
+                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || statusParam) && (
                   <button
                     onClick={() => {
                       setInputValue('');
@@ -316,6 +315,7 @@ const Dashboard: React.FC = () => {
           {/* Results Grid */}
           <div className="max-w-7xl mx-auto">
             {(() => {
+              // Server-side filtreerimine - works on juba filtreeritud teose_staatus järgi
               const totalPages = Math.ceil(works.length / ITEMS_PER_PAGE);
               const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
               const endIndex = startIndex + ITEMS_PER_PAGE;
@@ -356,7 +356,7 @@ const Dashboard: React.FC = () => {
                   <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
                     <h2 className="text-xl font-bold text-gray-800">Raamaturiiul</h2>
                     <span className="text-sm text-gray-500">
-                      {works.length} teost kokku {totalPages > 1 && `• Lk ${currentPage}/${totalPages}`}
+                      {works.length} teost {statusParam && 'filtreeritud'} {totalPages > 1 && `• Lk ${currentPage}/${totalPages}`}
                     </span>
                   </div>
 
@@ -371,7 +371,7 @@ const Dashboard: React.FC = () => {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {currentWorks.map(work => (
-                          <WorkCard key={work.id} work={work} workStatus={workStatuses.get(work.id)} />
+                          <WorkCard key={work.id} work={work} />
                         ))}
                       </div>
 

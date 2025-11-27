@@ -34,6 +34,7 @@ Documents represent individual pages with fields:
 - `lehekylje_tekst` (page text), `lehekylje_pilt` (image path)
 - `pealkiri`, `autor`, `respondens`, `aasta`, `originaal_kataloog` (metadata)
 - `tags`, `comments`, `status`, `history`, `last_modified` (annotations)
+- `teose_staatus` (denormalized work-level status: 'Toores' | 'Töös' | 'Valmis')
 
 ## Development
 
@@ -95,7 +96,7 @@ type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 // Logic: All pages Valmis → Valmis, All pages Toores → Toores, otherwise → Töös
 ```
 
-Dashboard displays `WorkStatus` per work via `getWorkStatuses()` which queries all pages for visible works.
+Work status is denormalized: `teose_staatus` is stored on every page document for fast filtering. When a page is saved, `savePage()` recalculates and updates `teose_staatus` on all pages of that work.
 
 ## File Structure
 
@@ -103,6 +104,7 @@ Dashboard displays `WorkStatus` per work via `getWorkStatuses()` which queries a
 - `/components/` - Reusable UI (ImageViewer, TextEditor, WorkCard, LoginModal)
 - `/services/` - API/data layer (meiliService.ts is the primary one)
 - `/contexts/` - React Context providers
+- `/scripts/` - Migration and utility scripts
 - `*.py` - Backend servers (simple http.server based)
 - `1-1_consolidate_data.py`, `2-1_upload_to_meili.py` - Data pipeline scripts
 

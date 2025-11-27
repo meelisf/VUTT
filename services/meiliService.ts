@@ -36,10 +36,12 @@ const fixIndexSettings = async () => {
   try {
     let currentSettings: string[] | null = null;
     let sortableSettings: string[] | null = null;
+    let filterableSettings: string[] | null = null;
     let currentDistinct: string | null = null;
     try {
       currentSettings = await index.getSearchableAttributes();
       sortableSettings = await index.getSortableAttributes();
+      filterableSettings = await index.getFilterableAttributes();
       currentDistinct = await index.getDistinctAttribute();
     } catch (e) {
       // Indeksit ei pruugi veel eksisteerida
@@ -47,12 +49,14 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
+    const requiredFilter = ['teose_staatus']; // Uus filtreeritav väli
 
     const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
     const needsSortUpdate = !sortableSettings || requiredSort.some(r => !sortableSettings.includes(r));
+    const needsFilterUpdate = !filterableSettings || requiredFilter.some(r => !filterableSettings.includes(r));
     const needsDistinctReset = currentDistinct !== null; // Eemaldame globaalse distinct seadistuse
 
-    if (!needsSearchUpdate && !needsSortUpdate && !needsDistinctReset) {
+    if (!needsSearchUpdate && !needsSortUpdate && !needsFilterUpdate && !needsDistinctReset) {
       console.log("Indeksi seadistused on juba korras.");
       return true;
     }
@@ -66,7 +70,8 @@ const fixIndexSettings = async () => {
       'lehekylje_number',
       'originaal_kataloog',
       'tags',  // Vajalik facet'ide jaoks (märksõnade autocomplete)
-      'status' // Vajalik teose koondstaatuse arvutamiseks
+      'status', // Lehekülje staatus
+      'teose_staatus' // Teose koondstaatus (Toores/Töös/Valmis)
     ]);
 
     await index.updateSortableAttributes([
@@ -123,6 +128,7 @@ interface DashboardSearchOptions {
   yearEnd?: number;
   sort?: string;
   author?: string;
+  workStatus?: WorkStatus; // Teose koondstaatuse filter
 }
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
@@ -200,10 +206,13 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.author) {
       filter.push(`autor = "${options.author}"`);
     }
+    if (options?.workStatus) {
+      filter.push(`teose_staatus = "${options.workStatus}"`);
+    }
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter,
       distinct: 'teose_id' // Return only one hit per work
@@ -244,7 +253,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       year: parseInt(hit.aasta) || 0,
       publisher: '',
       page_count: hit.teose_lehekylgede_arv || 0,
-      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
+      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
+      work_status: hit.teose_staatus || undefined
     }));
 
     return works;
@@ -330,6 +340,39 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
   }
 };
 
+// Abifunktsioon: Arvutab teose staatuse ja uuendab selle kõigil lehekülgedel
+// (denormaliseeritud väli kiireks filtreerimiseks)
+const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
+  try {
+    // 1. Päri kõik teose leheküljed
+    const response = await index.search('', {
+      filter: [`teose_id = "${workId}"`],
+      attributesToRetrieve: ['id', 'status'],
+      limit: 500 // Piisav kõigile lehekülgedele
+    });
+
+    if (response.hits.length === 0) return;
+
+    // 2. Arvuta teose koondstaatus
+    const statuses = response.hits.map((hit: any) => hit.status || PageStatus.RAW);
+    const newWorkStatus = calculateWorkStatus(statuses);
+
+    // 3. Uuenda teose_staatus kõigil lehekülgedel
+    const updates = response.hits.map((hit: any) => ({
+      id: hit.id,
+      teose_staatus: newWorkStatus
+    }));
+
+    const task = await index.updateDocuments(updates);
+    await index.waitForTask(task.taskUid);
+
+    console.log(`Updated teose_staatus to '${newWorkStatus}' for ${updates.length} pages of work ${workId}`);
+  } catch (error) {
+    console.error(`Failed to update teose_staatus for work ${workId}:`, error);
+    // Ei viska viga edasi, sest see on sekundaarne operatsioon
+  }
+};
+
 // Töölaud: Salvesta muudatused
 export const savePage = async (page: Page, actionDescription: string = 'Muutis andmeid', userName: string = 'Anonüümne'): Promise<Page> => {
   try {
@@ -361,6 +404,9 @@ export const savePage = async (page: Page, actionDescription: string = 'Muutis a
 
     const task = await index.updateDocuments([meiliPayload]);
     await index.waitForTask(task.taskUid);
+
+    // Uuenda teose_staatus kõigil teose lehekülgedel (denormaliseeritud väli)
+    await updateWorkStatusOnAllPages(page.work_id);
 
     if (page.original_path && page.image_url) {
       await saveToFileSystem(pageToSave, page.original_path, page.image_url);
