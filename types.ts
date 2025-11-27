@@ -13,6 +13,7 @@ export interface Work {
   catalog_name: string; // originaal_kataloog
   title: string; // pealkiri
   author: string; // autor
+  respondens?: string; // respondens (disputatsioonide puhul)
   year: number; // aasta
   publisher: string; // Hetkel puudub Meilisearchist, võib jätta tühjaks
   page_count: number; // Seda peame eraldi lugema või hinnanguliselt panema

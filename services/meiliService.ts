@@ -121,7 +121,12 @@ const fixIndexSettings = async () => {
     await index.updateSettings({
       faceting: {
         maxValuesPerFacet: 5000
-      }
+      },
+      pagination: {
+        maxTotalHits: 10000
+      },
+      // Enable distinct to get one result per work
+      distinctAttribute: 'teose_id'
     });
 
     console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
@@ -146,6 +151,7 @@ interface DashboardSearchOptions {
   yearStart?: number;
   yearEnd?: number;
   sort?: string;
+  author?: string;
 }
 
 // Dashboardi otsing: otsib teoseid
@@ -163,12 +169,15 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.yearEnd) {
       filter.push(`aasta <= ${options.yearEnd}`);
     }
+    if (options?.author) {
+      filter.push(`autor = "${options.author}"`);
+    }
 
     const searchParams: any = {
-      limit: 1000,
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified'],
-      facets: ['teose_id'],
-      filter: filter
+      limit: 2000, // Enough for all works (~1200)
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv'],
+      filter: filter,
+      distinct: 'teose_id' // Return only one hit per work
     };
 
     // Sorting logic
@@ -193,37 +202,21 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     }
 
     const response = await index.search(query, searchParams);
-    const facets = response.facetDistribution?.['teose_id'] || {};
-    const uniqueWorks = new Map<string, Work>();
+    
+    // With distinct='teose_id', each hit represents a unique work
+    const works: Work[] = response.hits.map((hit: any) => ({
+      id: hit.teose_id,
+      catalog_name: hit.originaal_kataloog || 'Unknown',
+      title: hit.pealkiri || 'Pealkiri puudub',
+      author: hit.autor || 'Teadmata autor',
+      respondens: hit.respondens || undefined,
+      year: parseInt(hit.aasta) || 0,
+      publisher: '',
+      page_count: hit.teose_lehekylgede_arv || 0,
+      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
+    }));
 
-    for (const hit of response.hits) {
-      const h = hit as any;
-
-      // Since hits might be sorted by last_modified (newest first), 
-      // the first time we see a work ID, it represents the most recent state/hit of that work.
-      if (!uniqueWorks.has(h.teose_id)) {
-        uniqueWorks.set(h.teose_id, {
-          id: h.teose_id,
-          catalog_name: h.originaal_kataloog || 'Unknown',
-          title: h.pealkiri || 'Pealkiri puudub',
-          author: Array.isArray(h.autor) ? h.autor[0] : (h.autor || 'Teadmata autor'),
-          year: parseInt(h.aasta) || 0,
-          publisher: '',
-          page_count: facets[h.teose_id] || 0,
-          thumbnail_url: getFullImageUrl(h.lehekylje_pilt)
-        });
-      } else {
-        // Update thumbnail if we found the actual cover page (page 1)
-        // unless we are strictly prioritizing the "latest modified" image. 
-        // Standard practice: Keep usage of page 1 as thumbnail if found.
-        if (parseInt(h.lehekylje_number) === 1) {
-          const existing = uniqueWorks.get(h.teose_id)!;
-          existing.thumbnail_url = getFullImageUrl(h.lehekylje_pilt);
-        }
-      }
-    }
-
-    return Array.from(uniqueWorks.values());
+    return works;
 
   } catch (error: any) {
     console.error("Meilisearch error:", error);

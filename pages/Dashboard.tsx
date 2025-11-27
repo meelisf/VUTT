@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { searchWorks, updateApiKey, getCurrentKeyType } from '../services/meiliService';
 import { Work } from '../types';
 import WorkCard from '../components/WorkCard';
-import { Search, BarChart3, AlertTriangle, Settings, Key, FileText, ArrowUpDown } from 'lucide-react';
+import { Search, AlertTriangle, Settings, Key, ArrowUpDown, X, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+
+const ITEMS_PER_PAGE = 12;
 
 const Dashboard: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -11,9 +13,12 @@ const Dashboard: React.FC = () => {
   const yearStartParam = searchParams.get('ys');
   const yearEndParam = searchParams.get('ye');
   const sortParam = searchParams.get('sort') || 'recent';
+  const authorParam = searchParams.get('author') || '';
+  const pageParam = parseInt(searchParams.get('page') || '1', 10);
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
+  const [currentPage, setCurrentPage] = useState(pageParam);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,7 +35,8 @@ const Dashboard: React.FC = () => {
     if (yearStartParam) setYearStart(yearStartParam);
     if (yearEndParam) setYearEnd(yearEndParam);
     if (sortParam) setSort(sortParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam]);
+    setCurrentPage(pageParam);
+  }, [queryParam, yearStartParam, yearEndParam, sortParam, pageParam]);
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -84,9 +90,14 @@ const Dashboard: React.FC = () => {
         const results = await searchWorks(queryParam, {
           yearStart: start,
           yearEnd: end,
-          sort: sort
+          sort: sort,
+          author: authorParam || undefined
         });
         setWorks(results);
+        // Reset to page 1 when filters change (but not when page param changes)
+        if (currentPage !== 1 && !searchParams.get('page')) {
+          setCurrentPage(1);
+        }
       } catch (e: any) {
         console.error("Search failed", e);
         setError(e.message || "Tundmatu viga ühendamisel.");
@@ -100,7 +111,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam]);
 
   const handleSettings = async () => {
     const currentType = getCurrentKeyType();
@@ -131,11 +142,11 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
           <Link
-            to="/stats"
-            className="hidden sm:flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-primary-50 px-3 py-1.5 rounded-lg transition-colors"
+            to="/search"
+            className="hidden sm:flex items-center gap-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
           >
-            <BarChart3 size={18} />
-            Vaata statistikat
+            <Search size={18} />
+            Täisteksti otsing
           </Link>
         </div>
         <div className="flex items-center gap-4">
@@ -217,6 +228,45 @@ const Dashboard: React.FC = () => {
 
                 <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
 
+                {/* Author Filter Badge */}
+                {authorParam && (
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-md text-sm font-medium">
+                    <User size={14} />
+                    <span className="truncate max-w-32">{authorParam}</span>
+                    <button
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('author');
+                        setSearchParams(newParams);
+                      }}
+                      className="ml-1 hover:bg-primary-100 rounded p-0.5"
+                      title="Eemalda autori filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Reset Filters Button */}
+                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam) && (
+                  <button
+                    onClick={() => {
+                      setInputValue('');
+                      setYearStart('1630');
+                      setYearEnd('1710');
+                      setSort('recent');
+                      setSearchParams({});
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
+                    title="Tühista kõik filtrid"
+                  >
+                    <X size={14} />
+                    Tühista
+                  </button>
+                )}
+
+                <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
+
                 {/* Sort Control */}
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <ArrowUpDown size={16} className="text-gray-400" />
@@ -231,65 +281,140 @@ const Dashboard: React.FC = () => {
                     <option value="az">A-Z (Pealkiri)</option>
                   </select>
                 </div>
-
-                <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
-
-                {/* Action Button */}
-                <button
-                  onClick={() => navigate('/search')}
-                  className="w-full sm:w-auto px-4 py-2 bg-primary-50 text-primary-700 hover:bg-primary-100 rounded-md font-bold text-sm transition-colors flex items-center justify-center gap-2"
-                >
-                  <FileText size={16} />
-                  Ava täisteksti otsing
-                </button>
               </div>
             </div>
           </div>
 
           {/* Results Grid */}
           <div className="max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
-              <h2 className="text-xl font-bold text-gray-800">Raamaturiiul</h2>
-              <span className="text-sm text-gray-500">
-                {works.length} teost nähtaval
-              </span>
-            </div>
+            {(() => {
+              const totalPages = Math.ceil(works.length / ITEMS_PER_PAGE);
+              const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+              const endIndex = startIndex + ITEMS_PER_PAGE;
+              const currentWorks = works.slice(startIndex, endIndex);
 
-            {loading ? (
-              <div className="flex justify-center py-20">
-                <div className="flex flex-col items-center gap-2">
-                  <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                  <span className="text-gray-400 text-sm">Laen riiulit...</span>
-                </div>
-              </div>
-            ) : works.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {works.map(work => (
-                  <WorkCard key={work.id} work={work} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
-                <p className="text-gray-400 text-lg">Valitud kriteeriumitele vastavaid teoseid ei leitud.</p>
-                {!error && (
-                  <div className="mt-2 text-sm text-gray-400">
-                    Kontrolli, kas Meilisearchis on andmeid ja kas aastaarvud on õiged.
+              const handlePageChange = (newPage: number) => {
+                setCurrentPage(newPage);
+                const newParams = new URLSearchParams(searchParams);
+                if (newPage === 1) {
+                  newParams.delete('page');
+                } else {
+                  newParams.set('page', newPage.toString());
+                }
+                setSearchParams(newParams, { replace: true });
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              };
+
+              // Generate page numbers to show
+              const getPageNumbers = () => {
+                const pages: (number | string)[] = [];
+                if (totalPages <= 7) {
+                  for (let i = 1; i <= totalPages; i++) pages.push(i);
+                } else {
+                  pages.push(1);
+                  if (currentPage > 3) pages.push('...');
+                  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                    pages.push(i);
+                  }
+                  if (currentPage < totalPages - 2) pages.push('...');
+                  pages.push(totalPages);
+                }
+                return pages;
+              };
+
+              return (
+                <>
+                  <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
+                    <h2 className="text-xl font-bold text-gray-800">Raamaturiiul</h2>
+                    <span className="text-sm text-gray-500">
+                      {works.length} teost kokku {totalPages > 1 && `• Lk ${currentPage}/${totalPages}`}
+                    </span>
                   </div>
-                )}
-                <button
-                  onClick={() => {
-                    setInputValue('');
-                    setYearStart('1630');
-                    setYearEnd('1710');
-                    setSort('recent');
-                    setSearchParams({});
-                  }}
-                  className="mt-4 text-primary-600 font-medium hover:underline"
-                >
-                  Taasta vaikeseaded
-                </button>
-              </div>
-            )}
+
+                  {loading ? (
+                    <div className="flex justify-center py-20">
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                        <span className="text-gray-400 text-sm">Laen riiulit...</span>
+                      </div>
+                    </div>
+                  ) : works.length > 0 ? (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {currentWorks.map(work => (
+                          <WorkCard key={work.id} work={work} />
+                        ))}
+                      </div>
+
+                      {/* Pagination */}
+                      {totalPages > 1 && (
+                        <div className="flex justify-center items-center gap-2 mt-10 pt-6 border-t border-gray-200">
+                          <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ChevronLeft size={18} />
+                            Eelmine
+                          </button>
+
+                          <div className="flex items-center gap-1 mx-2">
+                            {getPageNumbers().map((page, idx) => (
+                              page === '...' ? (
+                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
+                              ) : (
+                                <button
+                                  key={page}
+                                  onClick={() => handlePageChange(page as number)}
+                                  className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                                    currentPage === page
+                                      ? 'bg-primary-600 text-white'
+                                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                  }`}
+                                >
+                                  {page}
+                                </button>
+                              )
+                            ))}
+                          </div>
+
+                          <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Järgmine
+                            <ChevronRight size={18} />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
+                      <p className="text-gray-400 text-lg">Valitud kriteeriumitele vastavaid teoseid ei leitud.</p>
+                      {!error && (
+                        <div className="mt-2 text-sm text-gray-400">
+                          Kontrolli, kas Meilisearchis on andmeid ja kas aastaarvud on õiged.
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setInputValue('');
+                          setYearStart('1630');
+                          setYearEnd('1710');
+                          setSort('recent');
+                          setSearchParams({});
+                        }}
+                        className="mt-4 text-primary-600 font-medium hover:underline"
+                      >
+                        Taasta vaikeseaded
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
       </div>

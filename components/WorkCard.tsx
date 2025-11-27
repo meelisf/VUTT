@@ -37,14 +37,17 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
           <button
             onClick={(e) => {
               e.preventDefault();
-              // Navigate to dashboard with author query
-              navigate(`/?q=${encodeURIComponent(work.author)}`);
+              // Navigate to dashboard with author filter (exact match)
+              navigate(`/?author=${encodeURIComponent(work.author)}`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
             title="Filtreeri autori järgi"
           >
             <User size={14} />
-            <span className="truncate">{work.author}</span>
+            <span className="truncate">
+              {work.author}
+              {work.respondens && <span className="text-gray-400 font-normal"> / {work.respondens}</span>}
+            </span>
           </button>
           <button
             onClick={(e) => {

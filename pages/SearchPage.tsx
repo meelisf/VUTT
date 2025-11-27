@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { searchContent } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { ArrowLeft, Search, Loader2, AlertTriangle, ExternalLink, ChevronDown, ChevronUp, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, ExternalLink, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 
 const SearchPage: React.FC = () => {
@@ -554,29 +554,69 @@ const SearchPage: React.FC = () => {
                     )}
 
                     {/* Pagination */}
-                    {results && results.totalPages > 1 && (
-                        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mt-10 mb-8 pt-8 border-t border-gray-200">
-                            <button
-                                onClick={() => handlePageChange(results.page - 1)}
-                                disabled={results.page === 1}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                            >
-                                ← Eelmine
-                            </button>
+                    {results && results.totalPages > 1 && (() => {
+                        // Generate page numbers to show
+                        const getPageNumbers = () => {
+                            const pages: (number | string)[] = [];
+                            const totalPages = results.totalPages;
+                            const currentPage = results.page;
+                            
+                            if (totalPages <= 7) {
+                                for (let i = 1; i <= totalPages; i++) pages.push(i);
+                            } else {
+                                pages.push(1);
+                                if (currentPage > 3) pages.push('...');
+                                for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                                    pages.push(i);
+                                }
+                                if (currentPage < totalPages - 2) pages.push('...');
+                                pages.push(totalPages);
+                            }
+                            return pages;
+                        };
 
-                            <span className="text-base font-bold text-gray-600 italic px-4">
-                                {results.page} / {results.totalPages}
-                            </span>
+                        return (
+                            <div className="flex justify-center items-center gap-2 mt-10 pt-6 border-t border-gray-200">
+                                <button
+                                    onClick={() => handlePageChange(results.page - 1)}
+                                    disabled={results.page === 1}
+                                    className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft size={18} />
+                                    Eelmine
+                                </button>
 
-                            <button
-                                onClick={() => handlePageChange(results.page + 1)}
-                                disabled={results.page === results.totalPages}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-bold hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95"
-                            >
-                                Järgmine →
-                            </button>
-                        </div>
-                    )}
+                                <div className="flex items-center gap-1 mx-2">
+                                    {getPageNumbers().map((page, idx) => (
+                                        page === '...' ? (
+                                            <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
+                                        ) : (
+                                            <button
+                                                key={page}
+                                                onClick={() => handlePageChange(page as number)}
+                                                className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                                                    results.page === page
+                                                        ? 'bg-primary-600 text-white'
+                                                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                {page}
+                                            </button>
+                                        )
+                                    ))}
+                                </div>
+
+                                <button
+                                    onClick={() => handlePageChange(results.page + 1)}
+                                    disabled={results.page === results.totalPages}
+                                    className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Järgmine
+                                    <ChevronRight size={18} />
+                                </button>
+                            </div>
+                        );
+                    })()}
                 </main>
             </div>
         </div>
