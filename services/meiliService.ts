@@ -1,6 +1,6 @@
 
 import { MeiliSearch } from 'meilisearch';
-import { Page, Work, PageStatus, ContentSearchResponse, ContentSearchOptions, HistoryEntry } from '../types';
+import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, HistoryEntry } from '../types';
 import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX, IMAGE_BASE_URL, FILE_API_URL } from '../config';
 
 // Initialize Meilisearch client
@@ -36,9 +36,11 @@ const fixIndexSettings = async () => {
   try {
     let currentSettings: string[] | null = null;
     let sortableSettings: string[] | null = null;
+    let currentDistinct: string | null = null;
     try {
       currentSettings = await index.getSearchableAttributes();
       sortableSettings = await index.getSortableAttributes();
+      currentDistinct = await index.getDistinctAttribute();
     } catch (e) {
       // Indeksit ei pruugi veel eksisteerida
     }
@@ -48,8 +50,9 @@ const fixIndexSettings = async () => {
 
     const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
     const needsSortUpdate = !sortableSettings || requiredSort.some(r => !sortableSettings.includes(r));
+    const needsDistinctReset = currentDistinct !== null; // Eemaldame globaalse distinct seadistuse
 
-    if (!needsSearchUpdate && !needsSortUpdate) {
+    if (!needsSearchUpdate && !needsSortUpdate && !needsDistinctReset) {
       console.log("Indeksi seadistused on juba korras.");
       return true;
     }
@@ -62,7 +65,8 @@ const fixIndexSettings = async () => {
       'teose_id',
       'lehekylje_number',
       'originaal_kataloog',
-      'tags'  // Vajalik facet'ide jaoks (märksõnade autocomplete)
+      'tags',  // Vajalik facet'ide jaoks (märksõnade autocomplete)
+      'status' // Vajalik teose koondstaatuse arvutamiseks
     ]);
 
     await index.updateSortableAttributes([
@@ -92,8 +96,8 @@ const fixIndexSettings = async () => {
       pagination: {
         maxTotalHits: 10000
       },
-      // Enable distinct to get one result per work
-      distinctAttribute: 'teose_id'
+      // Eemaldame globaalse distinct seadistuse (kasutame ainult päringutes kus vaja)
+      distinctAttribute: null
     });
 
     console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
@@ -120,6 +124,63 @@ interface DashboardSearchOptions {
   sort?: string;
   author?: string;
 }
+
+// Arvutab teose koondstaatuse lehekülgede staatuste põhjal
+// Loogika: Kõik Valmis → Valmis, Kõik Toores → Toores, muidu → Töös
+const calculateWorkStatus = (statuses: string[]): WorkStatus => {
+  if (statuses.length === 0) return 'Toores';
+  
+  const allDone = statuses.every(s => s === PageStatus.DONE);
+  if (allDone) return 'Valmis';
+  
+  const allRaw = statuses.every(s => s === PageStatus.RAW || !s);
+  if (allRaw) return 'Toores';
+  
+  return 'Töös';
+};
+
+// Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)
+// NB: Kuna indeksil on distinct='teose_id', peame tegema eraldi päringud iga teose jaoks
+export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, WorkStatus>> => {
+  const statusMap = new Map<string, WorkStatus>();
+  
+  if (workIds.length === 0) return statusMap;
+  
+  try {
+    // Teeme paralleelsed päringud iga teose jaoks
+    // See on vajalik, kuna indeksi distinct seadistus ei lase meil
+    // ühes päringus saada kõiki lehekülgi erinevatest teostest
+    const promises = workIds.map(async (workId) => {
+      const response = await index.search('', {
+        filter: [`teose_id = "${workId}"`],
+        attributesToRetrieve: ['teose_id', 'status', 'lehekylje_number'],
+        limit: 500  // Piisav ühe teose kõigile lehekülgedele
+      });
+      
+      const statuses = response.hits.map((hit: any) => hit.status || PageStatus.RAW);
+      return { workId, statuses };
+    });
+    
+    const results = await Promise.all(promises);
+    
+    // Debug log
+    console.log('getWorkStatuses: processed', results.length, 'works');
+    if (results.length > 0) {
+      const sample = results[0];
+      console.log('Sample work', sample.workId, ':', sample.statuses.length, 'pages, statuses:', sample.statuses);
+    }
+    
+    // Arvutame koondstaatuse igale teosele
+    for (const { workId, statuses } of results) {
+      statusMap.set(workId, calculateWorkStatus(statuses));
+    }
+    
+    return statusMap;
+  } catch (error) {
+    console.error("getWorkStatuses error:", error);
+    return statusMap;
+  }
+};
 
 // Dashboardi otsing: otsib teoseid
 export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<Work[]> => {

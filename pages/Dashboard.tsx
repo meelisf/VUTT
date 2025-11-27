@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { searchWorks } from '../services/meiliService';
-import { Work } from '../types';
+import { searchWorks, getWorkStatuses } from '../services/meiliService';
+import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
 import { useUser } from '../contexts/UserContext';
@@ -22,6 +22,7 @@ const Dashboard: React.FC = () => {
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
+  const [workStatuses, setWorkStatuses] = useState<Map<string, WorkStatus>>(new Map());
   const [currentPage, setCurrentPage] = useState(pageParam);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +99,8 @@ const Dashboard: React.FC = () => {
           author: authorParam || undefined
         });
         setWorks(results);
+        setWorkStatuses(new Map()); // Tühjendame staatused, laeme hiljem
+        
         // Reset to page 1 when filters change (but not when page param changes)
         if (currentPage !== 1 && !searchParams.get('page')) {
           setCurrentPage(1);
@@ -116,6 +119,29 @@ const Dashboard: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [queryParam, yearStart, yearEnd, sort, authorParam]);
+
+  // Pärime staatused ainult praegusel lehel kuvatavate teoste jaoks (efektiivsem)
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      if (works.length === 0) return;
+      
+      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+      const endIndex = startIndex + ITEMS_PER_PAGE;
+      const currentWorks = works.slice(startIndex, endIndex);
+      
+      if (currentWorks.length > 0) {
+        const workIds = currentWorks.map(w => w.id);
+        const statuses = await getWorkStatuses(workIds);
+        setWorkStatuses(prev => {
+          const newMap = new Map(prev);
+          statuses.forEach((value, key) => newMap.set(key, value));
+          return newMap;
+        });
+      }
+    };
+    
+    fetchStatuses();
+  }, [works, currentPage]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
@@ -345,7 +371,7 @@ const Dashboard: React.FC = () => {
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {currentWorks.map(work => (
-                          <WorkCard key={work.id} work={work} />
+                          <WorkCard key={work.id} work={work} workStatus={workStatuses.get(work.id)} />
                         ))}
                       </div>
 

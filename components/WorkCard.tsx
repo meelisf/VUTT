@@ -1,15 +1,29 @@
 
 import React from 'react';
-import { Work } from '../types';
+import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface WorkCardProps {
   work: Work;
+  workStatus?: WorkStatus;
 }
 
-const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
+const WorkCard: React.FC<WorkCardProps> = ({ work, workStatus }) => {
   const navigate = useNavigate();
+
+  // Staatuse badge stiilid
+  const getStatusStyle = (status?: WorkStatus) => {
+    switch (status) {
+      case 'Valmis':
+        return 'text-green-600 bg-green-50';
+      case 'Töös':
+        return 'text-amber-600 bg-amber-50';
+      case 'Toores':
+      default:
+        return 'text-gray-500 bg-gray-50';
+    }
+  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col overflow-hidden">
@@ -68,8 +82,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-          <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full">
-            Indekseeritud
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${getStatusStyle(workStatus)}`}>
+            {workStatus || 'Toores'}
           </span>
           <Link
             to={`/work/${work.id}/1`}

@@ -7,6 +7,9 @@ export enum PageStatus {
   DONE = 'Valmis'
 }
 
+// Teose koondstaatus dashboardi jaoks
+export type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
+
 // See vastab struktuurile, mis tuleb Meilisearchist (lehekylje_number=1 päringuga)
 export interface Work {
   id: string; // See on teose_id (nt "1632-1")
@@ -18,6 +21,7 @@ export interface Work {
   publisher: string; // Hetkel puudub Meilisearchist, võib jätta tühjaks
   page_count: number; // Seda peame eraldi lugema või hinnanguliselt panema
   thumbnail_url: string; // lehekylje_pilt esimeselt lehelt
+  work_status?: WorkStatus; // Teose koondstaatus (arvutatakse lehekülgede staatustest)
 }
 
 export interface Annotation {
