@@ -1,0 +1,24 @@
+/* Tailwind directives removed as they are handled by the CDN script in index.html */
+
+body {
+  background-color: #f9fafb; /* bg-gray-50 fallback */
+  color: #111827; /* text-gray-900 fallback */
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Custom scrollbar override */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1; 
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #999; 
+}

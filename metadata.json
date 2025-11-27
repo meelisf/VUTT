@@ -1,0 +1,5 @@
+{
+  "name": "VUTT - Early Modern Text Workbench",
+  "description": "A digital workspace for researchers to manage, search, correct, and annotate early modern texts (17th century). Features split-view editing, OCR correction, and semantic annotation.",
+  "requestFramePermissions": []
+}
