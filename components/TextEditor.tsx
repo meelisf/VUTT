@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search } from 'lucide-react';
 
 interface TextEditorProps {
   page: Page;
@@ -16,6 +17,7 @@ type TabType = 'edit' | 'annotate' | 'history';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusChange, onUnsavedChanges }) => {
   const { user } = useUser();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   
   const [text, setText] = useState(page.text_content);
@@ -410,8 +412,15 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                     <div className="flex flex-wrap gap-2 mb-4">
                         {tags.length === 0 && <span className="text-sm text-gray-400 italic">Märksõnad puuduvad</span>}
                         {tags.map(tag => (
-                            <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800">
-                                {tag}
+                            <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group">
+                                <button 
+                                    onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}&scope=annotation`)}
+                                    className="hover:text-primary-600 hover:underline flex items-center gap-1"
+                                    title="Otsi seda märksõna kogu korpusest"
+                                >
+                                    {tag}
+                                    <Search size={12} className="opacity-0 group-hover:opacity-50" />
+                                </button>
                                 <button onClick={() => removeTag(tag)} className="ml-1.5 text-primary-400 hover:text-red-500">
                                     <X size={14} />
                                 </button>
