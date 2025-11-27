@@ -43,7 +43,7 @@ const fixIndexSettings = async () => {
       // Indeksit ei pruugi veel eksisteerida
     }
 
-    const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst'];
+    const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
 
     const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
@@ -75,6 +75,7 @@ const fixIndexSettings = async () => {
     const searchTask = await index.updateSearchableAttributes([
       'pealkiri',
       'autor',
+      'respondens',
       'aasta',
       'teose_id',
       'originaal_kataloog',
@@ -142,6 +143,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
       attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv'],
+      attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter,
       distinct: 'teose_id' // Return only one hit per work
     };

@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import hashlib
+import glob
 from datetime import datetime
 
 # =========================================================
@@ -126,6 +127,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     backup_path = f"{txt_path}.backup.{timestamp}"
                     shutil.copy2(txt_path, backup_path)
+                    
+                    # Piirame varukoopiate arvu (max 10 faili kohta)
+                    existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
+                    if len(existing_backups) > 10:
+                        for old_backup in existing_backups[:-10]:
+                            os.remove(old_backup)
+                            print(f"Kustutatud vana varukoopia: {os.path.basename(old_backup)}")
                 
                 # Kirjutame teksti
                 with open(txt_path, 'w', encoding='utf-8') as f:
