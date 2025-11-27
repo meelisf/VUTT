@@ -232,10 +232,10 @@ const SearchPage: React.FC = () => {
                         >
                             <ArrowLeft size={20} />
                         </button>
-                        <div>
+                        <Link to="/" className="hover:opacity-80 transition-opacity">
                             <h1 className="text-xl font-bold text-primary-900 leading-none">VUTT Otsing</h1>
                             <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">Täisteksti otsingumootor</p>
-                        </div>
+                        </Link>
                     </div>
 
                     <form onSubmit={handleSearch} className="flex gap-2 relative">

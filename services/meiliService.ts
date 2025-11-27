@@ -3,48 +3,13 @@ import { MeiliSearch } from 'meilisearch';
 import { Page, Work, PageStatus, ContentSearchResponse, ContentSearchOptions, HistoryEntry } from '../types';
 import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX, IMAGE_BASE_URL, FILE_API_URL } from '../config';
 
-// Key for localStorage
-const STORAGE_KEY = 'vutt_meili_master_key';
-
-// Helper to get the best available key
-const getApiKey = () => {
-  return localStorage.getItem(STORAGE_KEY) || MEILI_API_KEY;
-};
-
-// Initialize client with a function to allow re-initialization
-let client = new MeiliSearch({
+// Initialize Meilisearch client
+const client = new MeiliSearch({
   host: MEILI_HOST,
-  apiKey: getApiKey(),
+  apiKey: MEILI_API_KEY,
 });
 
-let index = client.index(MEILI_INDEX);
-
-// Function to update the API Key at runtime
-export const updateApiKey = (newKey: string) => {
-  if (newKey) {
-    localStorage.setItem(STORAGE_KEY, newKey);
-    console.log("API Key uuendatud localStorage-is.");
-  } else {
-    localStorage.removeItem(STORAGE_KEY);
-    console.log("API Key eemaldatud, kasutatakse vaikeväärtust.");
-  }
-
-  // Re-initialize client
-  client = new MeiliSearch({
-    host: MEILI_HOST,
-    apiKey: getApiKey(),
-  });
-  index = client.index(MEILI_INDEX);
-
-  // Force a connection check
-  return index.getStats();
-};
-
-export const getCurrentKeyType = () => {
-  const key = getApiKey();
-  if (key === MEILI_API_KEY) return 'default';
-  return 'custom';
-};
+const index = client.index(MEILI_INDEX);
 
 // Abifunktsioon pildi URL-i ehitamiseks
 const getFullImageUrl = (imagePath: string): string => {
@@ -96,7 +61,8 @@ const fixIndexSettings = async () => {
       'autor',
       'teose_id',
       'lehekylje_number',
-      'originaal_kataloog'
+      'originaal_kataloog',
+      'tags'  // Vajalik facet'ide jaoks (märksõnade autocomplete)
     ]);
 
     await index.updateSortableAttributes([
@@ -201,7 +167,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       searchParams.sort = ['last_modified:desc'];
     }
 
+    console.log('searchWorks params:', { query, filter, searchParams });
     const response = await index.search(query, searchParams);
+    console.log('searchWorks response hits:', response.hits.length);
     
     // With distinct='teose_id', each hit represents a unique work
     const works: Work[] = response.hits.map((hit: any) => ({
@@ -417,5 +385,24 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
     }
     throw e;
+  }
+};
+
+// Märksõnade autocomplete: saa kõik unikaalsed märksõnad kasutades facet'e
+export const getAllTags = async (): Promise<string[]> => {
+  checkMixedContent();
+  try {
+    // Kasutame facet'e, et saada kõik unikaalsed märksõnad
+    // See on palju efektiivsem kui kõikide dokumentide läbivaatamine
+    const response = await index.search('', {
+      limit: 0, // Me ei vaja tulemusi, ainult facet'e
+      facets: ['tags']
+    });
+
+    const tagFacets = response.facetDistribution?.['tags'] || {};
+    return Object.keys(tagFacets).sort((a, b) => a.localeCompare(b, 'et'));
+  } catch (e) {
+    console.error("Failed to fetch tags:", e);
+    return [];
   }
 };

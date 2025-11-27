@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Page, PageStatus, Annotation, Work } from '../types';
+import { getAllTags } from '../services/meiliService';
+import { useUser } from '../contexts/UserContext';
 import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X } from 'lucide-react';
 
 interface TextEditorProps {
@@ -12,6 +14,7 @@ interface TextEditorProps {
 type TabType = 'edit' | 'annotate' | 'history';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusChange }) => {
+  const { user } = useUser();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   
   const [text, setText] = useState(page.text_content);
@@ -20,6 +23,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
   const [tags, setTags] = useState<string[]>(page.tags);
   const [newTag, setNewTag] = useState('');
   const [newComment, setNewComment] = useState('');
+  
+  // Autocomplete state
+  const [allAvailableTags, setAllAvailableTags] = useState<string[]>([]);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   
   const [isSaving, setIsSaving] = useState(false);
 
@@ -34,6 +44,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
     setTags(page.tags);
   }, [page]);
 
+  // Load all available tags for autocomplete
+  useEffect(() => {
+    const loadTags = async () => {
+      const fetchedTags = await getAllTags();
+      setAllAvailableTags(fetchedTags);
+    };
+    loadTags();
+  }, []);
+
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (tagInputRef.current && !tagInputRef.current.contains(e.target as Node) &&
+          suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
+        setShowTagSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSave = async () => {
     setIsSaving(true);
     const updatedPage: Page = {
@@ -46,6 +77,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
     
     try {
         await onSave(updatedPage);
+        // Refresh available tags after save to include newly added ones
+        const refreshedTags = await getAllTags();
+        setAllAvailableTags(refreshedTags);
     } catch (e: any) {
         console.error("Save error:", e);
         alert(`Viga salvestamisel: ${e.message || "Tundmatu viga"}`);
@@ -83,14 +117,50 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
     }
   };
 
-  const addTag = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newTag.trim()) {
-      e.preventDefault();
-      if (!tags.includes(newTag.trim())) {
-        setTags([...tags, newTag.trim()]);
+  // Filter suggestions based on input
+  const filteredSuggestions = allAvailableTags.filter(
+    tag => tag.toLowerCase().includes(newTag.toLowerCase()) && !tags.includes(tag)
+  );
+
+  const addTagFromInput = (tagValue: string) => {
+    const trimmed = tagValue.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags([...tags, trimmed]);
+      // Also add to available tags locally so it appears in suggestions immediately
+      if (!allAvailableTags.includes(trimmed)) {
+        setAllAvailableTags(prev => [...prev, trimmed].sort((a, b) => a.localeCompare(b, 'et')));
       }
-      setNewTag('');
     }
+    setNewTag('');
+    setShowTagSuggestions(false);
+    setSelectedSuggestionIndex(0);
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (showTagSuggestions && filteredSuggestions.length > 0) {
+        addTagFromInput(filteredSuggestions[selectedSuggestionIndex]);
+      } else if (newTag.trim()) {
+        addTagFromInput(newTag);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => 
+        Math.min(prev + 1, filteredSuggestions.length - 1)
+      );
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
+    } else if (e.key === 'Escape') {
+      setShowTagSuggestions(false);
+    }
+  };
+
+  const handleTagInputChange = (value: string) => {
+    setNewTag(value);
+    setShowTagSuggestions(value.length > 0);
+    setSelectedSuggestionIndex(0);
   };
 
   const removeTag = (tagToRemove: string) => {
@@ -102,7 +172,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
     const comment: Annotation = {
       id: Date.now().toString(),
       text: newComment,
-      author: 'Mina', 
+      author: user?.name || 'Anonüümne', 
       created_at: new Date().toISOString()
     };
     setComments([...comments, comment]);
@@ -253,14 +323,45 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                             </span>
                         ))}
                     </div>
-                    <input
-                        type="text"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={addTag}
-                        placeholder="+ Lisa silt ja vajuta Enter"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none transition-shadow"
-                    />
+                    <div className="relative">
+                      <input
+                          ref={tagInputRef}
+                          type="text"
+                          value={newTag}
+                          onChange={(e) => handleTagInputChange(e.target.value)}
+                          onKeyDown={handleTagKeyDown}
+                          onFocus={() => newTag.length > 0 && setShowTagSuggestions(true)}
+                          placeholder="+ Lisa märksõna..."
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none transition-shadow"
+                      />
+                      {/* Autocomplete dropdown */}
+                      {showTagSuggestions && filteredSuggestions.length > 0 && (
+                        <div 
+                          ref={suggestionsRef}
+                          className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                        >
+                          {filteredSuggestions.slice(0, 10).map((suggestion, idx) => (
+                            <button
+                              key={suggestion}
+                              type="button"
+                              onClick={() => addTagFromInput(suggestion)}
+                              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                idx === selectedSuggestionIndex 
+                                  ? 'bg-primary-50 text-primary-700' 
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {suggestion}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showTagSuggestions && newTag.length > 0 && filteredSuggestions.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500">
+                          Vajuta Enter, et lisada uus märksõna: <strong className="text-primary-600">{newTag}</strong>
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                 {/* Comments */}

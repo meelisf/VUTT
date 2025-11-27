@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPage, savePage, getWorkMetadata, updateApiKey, getCurrentKeyType } from '../services/meiliService';
+import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
-import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, Settings, Key } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const Workspace: React.FC = () => {
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
@@ -66,25 +66,6 @@ const Workspace: React.FC = () => {
     const tempPage = { ...page, status: newStatus };
     const savedPage = await savePage(tempPage, `Muutis staatuse: ${page.status} -> ${newStatus}`);
     setPage(savedPage);
-  };
-
-  const handleSettings = async () => {
-    const currentType = getCurrentKeyType();
-    const newKey = window.prompt(
-      `Sisesta Meilisearch Master Key (Admin API Key).\n\nHetkel kasutusel: ${currentType === 'default' ? 'Avalik võti (Config)' : 'Sinu isiklik võti (LocalStorage)'}.\n\nJäta tühjaks, et eemaldada isiklik võti ja kasutada vaikeväärtust.`,
-      ''
-    );
-
-    if (newKey !== null) {
-      try {
-        await updateApiKey(newKey.trim());
-        alert("Võti uuendatud! Proovi nüüd uuesti salvestada.");
-        // We don't reload here so the user doesn't lose their current edit, 
-        // but we might want to re-fetch if needed. Usually just updating the client is enough.
-      } catch (e: any) {
-        alert("Viga võtme seadistamisel: " + e.message);
-      }
-    }
   };
 
   const navigatePage = (delta: number) => {
@@ -181,14 +162,6 @@ const Workspace: React.FC = () => {
             }`}>
             {page.status}
           </span>
-          <div className="h-6 w-px bg-gray-300 mx-1"></div>
-          <button
-            onClick={handleSettings}
-            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-            title="Seaded / API Võti"
-          >
-            <Settings size={18} />
-          </button>
         </div>
       </div>
 

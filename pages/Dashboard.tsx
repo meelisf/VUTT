@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { searchWorks, updateApiKey, getCurrentKeyType } from '../services/meiliService';
+import { searchWorks } from '../services/meiliService';
 import { Work } from '../types';
 import WorkCard from '../components/WorkCard';
-import { Search, AlertTriangle, Settings, Key, ArrowUpDown, X, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import LoginModal from '../components/LoginModal';
+import { useUser } from '../contexts/UserContext';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
 
 const Dashboard: React.FC = () => {
+  const { user, logout, isLoading: userLoading } = useUser();
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
   const yearStartParam = searchParams.get('ys');
@@ -113,33 +117,15 @@ const Dashboard: React.FC = () => {
     return () => clearTimeout(timer);
   }, [queryParam, yearStart, yearEnd, sort, authorParam]);
 
-  const handleSettings = async () => {
-    const currentType = getCurrentKeyType();
-    const newKey = window.prompt(
-      `Sisesta Meilisearch Master Key (Admin API Key).\n\nHetkel kasutusel: ${currentType === 'default' ? 'Avalik võti (Config)' : 'Sinu isiklik võti (LocalStorage)'}.\n\nJäta tühjaks, et eemaldada isiklik võti ja kasutada vaikeväärtust.`,
-      ''
-    );
-
-    if (newKey !== null) {
-      try {
-        await updateApiKey(newKey.trim());
-        alert("Võti uuendatud! Palun värskenda lehte (F5), et muudatused kindlasti rakenduksid.");
-        window.location.reload();
-      } catch (e: any) {
-        alert("Viga võtme seadistamisel: " + e.message);
-      }
-    }
-  };
-
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-6">
-          <div>
+          <Link to="/" className="hover:opacity-80 transition-opacity">
             <h1 className="text-2xl font-bold text-primary-900 tracking-tight">VUTT</h1>
             <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Varauusaegsete tekstide töölaud</p>
-          </div>
+          </Link>
           <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
           <Link
             to="/search"
@@ -150,24 +136,40 @@ const Dashboard: React.FC = () => {
           </Link>
         </div>
         <div className="flex items-center gap-4">
-          <button
-            onClick={handleSettings}
-            className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2"
-            title="Seaded / API Võti"
-          >
-            <Settings size={20} />
-            {getCurrentKeyType() === 'custom' && <Key size={12} className="text-green-600" />}
-          </button>
-          <div className="h-6 w-px bg-gray-200"></div>
-          <div className="text-right">
-            <p className="text-sm font-semibold text-gray-900">Dr. Mari Maasikas</p>
-            <p className="text-xs text-gray-500">Uurija</p>
-          </div>
-          <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
-            MM
-          </div>
+          {user ? (
+            <>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                <p className="text-xs text-gray-500">{user.role === 'admin' ? 'Administraator' : 'Kasutaja'}</p>
+              </div>
+              <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
+                {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+              <button
+                onClick={logout}
+                className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
+                title="Logi välja"
+              >
+                <LogOut size={18} />
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium text-sm transition-colors"
+            >
+              <LogIn size={18} />
+              Logi sisse
+            </button>
+          )}
         </div>
       </header>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onClose={() => setShowLoginModal(false)} 
+      />
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">

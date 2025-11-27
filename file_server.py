@@ -2,14 +2,50 @@ import http.server
 import json
 import os
 import shutil
+import hashlib
 from datetime import datetime
 
 # =========================================================
 # KONFIGURATSIOON
 BASE_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/" 
+USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json")
 # =========================================================
 
 PORT = 8002
+
+def load_users():
+    """Laeb kasutajad JSON failist. Loob faili kui ei eksisteeri."""
+    if not os.path.exists(USERS_FILE):
+        # Loome vaikimisi admin kasutaja (parool: admin123)
+        default_users = {
+            "admin": {
+                "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+                "name": "Administraator",
+                "role": "admin"
+            }
+        }
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(default_users, f, ensure_ascii=False, indent=2)
+        print(f"Loodud vaikimisi kasutajate fail: {USERS_FILE}")
+        return default_users
+    
+    with open(USERS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def verify_user(username, password):
+    """Kontrollib kasutajanime ja parooli."""
+    users = load_users()
+    if username not in users:
+        return None
+    
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    if users[username]["password_hash"] == password_hash:
+        return {
+            "username": username,
+            "name": users[username]["name"],
+            "role": users[username].get("role", "user")
+        }
+    return None
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -20,7 +56,34 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        if self.path == '/save':
+        if self.path == '/login':
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                username = data.get('username', '').strip()
+                password = data.get('password', '')
+                
+                user = verify_user(username, password)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                if user:
+                    response = {"status": "success", "user": user}
+                else:
+                    response = {"status": "error", "message": "Vale kasutajanimi või parool"}
+                
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"LOGIN VIGA: {e}")
+                self.send_error(500, str(e))
+                
+        elif self.path == '/save':
             try:
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)

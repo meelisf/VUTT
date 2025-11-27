@@ -14,6 +14,8 @@ data.ms/
 # System files
 .DS_Store
 .env
+.env.local
+.env*.local
 
 # Project specific
 *.backup.*
