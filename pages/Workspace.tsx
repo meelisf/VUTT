@@ -14,36 +14,36 @@ const Workspace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<Page | null>(null);
   const [work, setWork] = useState<Work | undefined>(undefined);
-  
+
   const currentPageNum = parseInt(pageNum || '1', 10);
 
   useEffect(() => {
     const loadData = async () => {
       if (!workId) {
-          setError("Töö ID on puudu.");
-          setLoading(false);
-          return;
+        setError("Töö ID on puudu.");
+        setLoading(false);
+        return;
       }
       setLoading(true);
       setError(null);
       try {
         const [pageData, workData] = await Promise.all([
-             getPage(workId, currentPageNum),
-             getWorkMetadata(workId)
+          getPage(workId, currentPageNum),
+          getWorkMetadata(workId)
         ]);
-        
+
         if (!pageData) {
-            setError("Lehekülge ei leitud. Kontrolli, kas Meilisearchis on andmed olemas.");
+          setError("Lehekülge ei leitud. Kontrolli, kas Meilisearchis on andmed olemas.");
         } else {
-            setPage(pageData);
-            if (workData) setWork(workData);
-            
-            // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
-            // update the URL to reflect reality.
-            if (pageData.page_number !== currentPageNum) {
-                console.log(`Redirecting from requested page ${currentPageNum} to found page ${pageData.page_number}`);
-                navigate(`/work/${workId}/${pageData.page_number}`, { replace: true });
-            }
+          setPage(pageData);
+          if (workData) setWork(workData);
+
+          // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
+          // update the URL to reflect reality.
+          if (pageData.page_number !== currentPageNum) {
+            console.log(`Redirecting from requested page ${currentPageNum} to found page ${pageData.page_number}`);
+            navigate(`/work/${workId}/${pageData.page_number}`, { replace: true });
+          }
         }
       } catch (e: any) {
         console.error("Failed to load page", e);
@@ -71,27 +71,31 @@ const Workspace: React.FC = () => {
   const handleSettings = async () => {
     const currentType = getCurrentKeyType();
     const newKey = window.prompt(
-        `Sisesta Meilisearch Master Key (Admin API Key).\n\nHetkel kasutusel: ${currentType === 'default' ? 'Avalik võti (Config)' : 'Sinu isiklik võti (LocalStorage)'}.\n\nJäta tühjaks, et eemaldada isiklik võti ja kasutada vaikeväärtust.`,
-        ''
+      `Sisesta Meilisearch Master Key (Admin API Key).\n\nHetkel kasutusel: ${currentType === 'default' ? 'Avalik võti (Config)' : 'Sinu isiklik võti (LocalStorage)'}.\n\nJäta tühjaks, et eemaldada isiklik võti ja kasutada vaikeväärtust.`,
+      ''
     );
 
     if (newKey !== null) {
-        try {
-            await updateApiKey(newKey.trim());
-            alert("Võti uuendatud! Proovi nüüd uuesti salvestada.");
-            // We don't reload here so the user doesn't lose their current edit, 
-            // but we might want to re-fetch if needed. Usually just updating the client is enough.
-        } catch (e: any) {
-            alert("Viga võtme seadistamisel: " + e.message);
-        }
+      try {
+        await updateApiKey(newKey.trim());
+        alert("Võti uuendatud! Proovi nüüd uuesti salvestada.");
+        // We don't reload here so the user doesn't lose their current edit, 
+        // but we might want to re-fetch if needed. Usually just updating the client is enough.
+      } catch (e: any) {
+        alert("Viga võtme seadistamisel: " + e.message);
+      }
     }
-};
+  };
 
   const navigatePage = (delta: number) => {
     if (!workId) return;
-    // Don't allow going below 1, but otherwise assume standard pagination
-    // Ideally we should check if the next page exists, but naive navigation works for now
-    const newPage = Math.max(1, currentPageNum + delta);
+
+    const newPage = currentPageNum + delta;
+
+    // Validate bounds
+    if (newPage < 1) return;
+    if (work?.page_count && newPage > work.page_count) return;
+
     navigate(`/work/${workId}/${newPage}`);
   };
 
@@ -107,24 +111,24 @@ const Workspace: React.FC = () => {
   }
 
   if (error || !page) {
-      return (
-        <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
-            <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-sm border border-gray-200">
-                <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle size={48} /></div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">Midagi läks valesti</h2>
-                <p className="text-gray-600 mb-6">{error || "Tundmatu viga."}</p>
-                <div className="text-xs bg-gray-100 p-2 rounded mb-4 text-left font-mono overflow-auto max-h-32">
-                    Debug: WorkID: {workId}, Page: {currentPageNum}
-                </div>
-                <button 
-                    onClick={() => navigate('/')}
-                    className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-                >
-                    Tagasi avalehele
-                </button>
-            </div>
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle size={48} /></div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Midagi läks valesti</h2>
+          <p className="text-gray-600 mb-6">{error || "Tundmatu viga."}</p>
+          <div className="text-xs bg-gray-100 p-2 rounded mb-4 text-left font-mono overflow-auto max-h-32">
+            Debug: WorkID: {workId}, Page: {currentPageNum}
+          </div>
+          <button
+            onClick={() => navigate('/')}
+            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+          >
+            Tagasi avalehele
+          </button>
         </div>
-      );
+      </div>
+    );
   }
 
   return (
@@ -132,8 +136,8 @@ const Workspace: React.FC = () => {
       {/* Top Navigation Bar */}
       <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate(-1)} 
+          <button
+            onClick={() => navigate(-1)}
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-2"
             title="Tagasi"
           >
@@ -142,49 +146,49 @@ const Workspace: React.FC = () => {
           </button>
           <div className="h-6 w-px bg-gray-300"></div>
           <div className="flex items-center gap-2 text-sm">
-             <span className="text-gray-500">ID:</span>
-             <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">
-                {workId}
-             </span>
+            <span className="text-gray-500">ID:</span>
+            <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+              {workId}
+            </span>
           </div>
         </div>
 
         {/* Pagination Controls */}
         <div className="flex items-center gap-2">
-           <button 
-             onClick={() => navigatePage(-1)}
-             disabled={currentPageNum <= 1}
-             className="p-1.5 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 transition-all"
-           >
-             <ChevronLeft size={20} />
-           </button>
-           <span className="text-sm font-medium w-32 text-center text-gray-700 select-none">
-             Lk {page.page_number} {work?.page_count ? `/ ${work.page_count}` : ''}
-           </span>
-           <button 
-             onClick={() => navigatePage(1)}
-             className="p-1.5 hover:bg-gray-100 rounded text-gray-600 transition-all"
-           >
-             <ChevronRight size={20} />
-           </button>
+          <button
+            onClick={() => navigatePage(-1)}
+            disabled={currentPageNum <= 1}
+            className="p-1.5 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 transition-all"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <span className="text-sm font-medium w-32 text-center text-gray-700 select-none">
+            Lk {page.page_number} {work?.page_count ? `/ ${work.page_count}` : ''}
+          </span>
+          <button
+            onClick={() => navigatePage(1)}
+            disabled={work?.page_count ? currentPageNum >= work.page_count : false}
+            className="p-1.5 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 transition-all"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
 
         <div className="flex items-center gap-3">
-             <span className={`text-xs font-bold px-2.5 py-1 rounded-full border select-none ${
-               page.status === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' : 
-               page.status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
-               'bg-gray-50 text-gray-600 border-gray-200'
-             }`}>
-               {page.status}
-             </span>
-             <div className="h-6 w-px bg-gray-300 mx-1"></div>
-             <button 
-                onClick={handleSettings}
-                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
-                title="Seaded / API Võti"
-            >
-                <Settings size={18} />
-             </button>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border select-none ${page.status === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
+              page.status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                'bg-gray-50 text-gray-600 border-gray-200'
+            }`}>
+            {page.status}
+          </span>
+          <div className="h-6 w-px bg-gray-300 mx-1"></div>
+          <button
+            onClick={handleSettings}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+            title="Seaded / API Võti"
+          >
+            <Settings size={18} />
+          </button>
         </div>
       </div>
 
@@ -192,22 +196,22 @@ const Workspace: React.FC = () => {
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Image Viewer */}
         <div className="w-1/2 h-full border-r border-gray-300 relative bg-slate-900">
-            {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
-            {page.image_url ? (
-               <ImageViewer src={page.image_url} />
-            ) : (
-                <div className="flex items-center justify-center h-full text-white/50">
-                    Pilt puudub
-                </div>
-            )}
+          {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
+          {page.image_url ? (
+            <ImageViewer src={page.image_url} />
+          ) : (
+            <div className="flex items-center justify-center h-full text-white/50">
+              Pilt puudub
+            </div>
+          )}
         </div>
 
         {/* Right: Text Editor */}
         <div className="w-1/2 h-full bg-white relative">
-          <TextEditor 
+          <TextEditor
             page={page}
-            work={work} 
-            onSave={handleSave} 
+            work={work}
+            onSave={handleSave}
             onStatusChange={handleStatusChange}
           />
         </div>

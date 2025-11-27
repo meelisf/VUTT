@@ -117,6 +117,13 @@ const fixIndexSettings = async () => {
       'comments.text'
     ]);
 
+    // Increase max values per facet to ensure we get page counts for all works
+    await index.updateSettings({
+      faceting: {
+        maxValuesPerFacet: 5000
+      }
+    });
+
     console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
     await index.waitForTask(searchTask.taskUid);
     console.log("Indeksi seadistused edukalt uuendatud.");
