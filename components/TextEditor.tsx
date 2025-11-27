@@ -1,19 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle } from 'lucide-react';
 
 interface TextEditorProps {
   page: Page;
   work?: Work;
   onSave: (updatedPage: Page) => Promise<void>;
   onStatusChange: (status: PageStatus) => void;
+  onUnsavedChanges?: (hasChanges: boolean) => void;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusChange }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusChange, onUnsavedChanges }) => {
   const { user } = useUser();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   
@@ -32,17 +33,59 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
   const suggestionsRef = useRef<HTMLDivElement>(null);
   
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Salvestamata muudatuste jälgimine
+  const [savedState, setSavedState] = useState({
+    text: page.text_content,
+    status: page.status,
+    comments: page.comments,
+    tags: page.tags
+  });
 
   // Refs for sync scrolling
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  
+  // Arvutame kas on salvestamata muudatusi
+  const hasUnsavedChanges = 
+    text !== savedState.text ||
+    status !== savedState.status ||
+    JSON.stringify(comments) !== JSON.stringify(savedState.comments) ||
+    JSON.stringify(tags) !== JSON.stringify(savedState.tags);
 
   useEffect(() => {
     setText(page.text_content);
     setStatus(page.status);
     setComments(page.comments);
     setTags(page.tags);
+    // Uuendame ka salvestatud olekut uue lehe laadimisel
+    setSavedState({
+      text: page.text_content,
+      status: page.status,
+      comments: page.comments,
+      tags: page.tags
+    });
   }, [page]);
+
+  // Hoiatus brauseri sulgemise/refreshi korral
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        // Mõned brauserid nõuavad returnValue seadistamist
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Teavitame parent komponenti muudatuste olekust
+  useEffect(() => {
+    onUnsavedChanges?.(hasUnsavedChanges);
+  }, [hasUnsavedChanges, onUnsavedChanges]);
 
   // Load all available tags for autocomplete
   useEffect(() => {
@@ -77,6 +120,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
     
     try {
         await onSave(updatedPage);
+        // Uuendame salvestatud olekut
+        setSavedState({
+          text: text,
+          status: status,
+          comments: comments,
+          tags: tags
+        });
         // Refresh available tags after save to include newly added ones
         const refreshedTags = await getAllTags();
         setAllAvailableTags(refreshedTags);
@@ -230,14 +280,26 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                 </button>
             </div>
             
-            <button 
-                onClick={handleSave}
-                disabled={isSaving}
-                className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded shadow-sm transition-colors disabled:opacity-50"
-            >
-                {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-                {isSaving ? 'Salvestan...' : 'Salvesta'}
-            </button>
+            <div className="flex items-center gap-3">
+              {hasUnsavedChanges && (
+                <span className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertTriangle size={14} />
+                  Salvestamata muudatused
+                </span>
+              )}
+              <button 
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white rounded shadow-sm transition-colors disabled:opacity-50 ${
+                    hasUnsavedChanges 
+                      ? 'bg-amber-500 hover:bg-amber-600' 
+                      : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
+              >
+                  {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                  {isSaving ? 'Salvestan...' : 'Salvesta'}
+              </button>
+            </div>
         </div>
       </div>
 

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
@@ -16,6 +16,7 @@ const Workspace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<Page | null>(null);
   const [work, setWork] = useState<Work | undefined>(undefined);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -78,6 +79,12 @@ const Workspace: React.FC = () => {
     // Validate bounds
     if (newPage < 1) return;
     if (work?.page_count && newPage > work.page_count) return;
+    
+    // Hoiatus salvestamata muudatuste korral
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
+      if (!confirmed) return;
+    }
 
     navigate(`/work/${workId}/${newPage}`);
   };
@@ -114,13 +121,22 @@ const Workspace: React.FC = () => {
     );
   }
 
+  // Navigeerimine tagasi koos hoiatusega
+  const handleNavigateBack = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
+      if (!confirmed) return;
+    }
+    navigate(-1);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Top Navigation Bar */}
       <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleNavigateBack}
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-2"
             title="Tagasi"
           >
@@ -188,6 +204,7 @@ const Workspace: React.FC = () => {
             work={work}
             onSave={handleSave}
             onStatusChange={handleStatusChange}
+            onUnsavedChanges={setHasUnsavedChanges}
           />
         </div>
       </div>

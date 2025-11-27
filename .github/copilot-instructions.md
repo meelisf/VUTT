@@ -20,9 +20,13 @@ Frontend (Vite + React 19)
 - Each work is a folder containing `.txt` (OCR text), `.jpg` (scans), and `.json` (annotations/metadata)
 
 ### Key Data Flow
-1. **Dashboard** (`pages/Dashboard.tsx`) - Lists all works from Meilisearch using `distinct: 'teose_id'`
+1. **Dashboard** (`pages/Dashboard.tsx`) - Lists works, uses `distinct: 'teose_id'` per-query (not global)
 2. **Workspace** (`pages/Workspace.tsx`) - Split view: image left, text editor right
 3. **Saving**: `meiliService.savePage()` → updates Meilisearch → calls `file_server.py` to persist `.txt` and `.json` files
+
+### Meilisearch Configuration
+- **No global `distinctAttribute`** - use `distinct: 'teose_id'` in individual queries where needed
+- `getWorkStatuses()` requires querying all pages per work, so distinct must NOT be set globally
 
 ### Meilisearch Schema (index: `teosed`)
 Documents represent individual pages with fields:
@@ -85,7 +89,13 @@ enum PageStatus {
   ANNOTATED = 'Annoteeritud',
   DONE = 'Valmis'       // Complete
 }
+
+// Work-level status (computed from page statuses)
+type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
+// Logic: All pages Valmis → Valmis, All pages Toores → Toores, otherwise → Töös
 ```
+
+Dashboard displays `WorkStatus` per work via `getWorkStatuses()` which queries all pages for visible works.
 
 ## File Structure
 
