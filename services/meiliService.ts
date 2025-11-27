@@ -319,21 +319,22 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
   try {
     const response = await index.search('', {
       filter: [`teose_id = "${workId}"`],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv'],
       limit: 1
     });
 
     if (response.hits.length === 0) return undefined;
     const hit: any = response.hits[0];
-    const totalPages = response.estimatedTotalHits || 0;
 
     return {
       id: hit.teose_id,
       catalog_name: hit.originaal_kataloog,
       title: hit.pealkiri,
       author: hit.autor,
+      respondens: hit.respondens || undefined,
       year: parseInt(hit.aasta),
       publisher: '',
-      page_count: totalPages,
+      page_count: hit.teose_lehekylgede_arv || 0,
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
     };
   } catch (e) {

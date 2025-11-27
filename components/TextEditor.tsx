@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen } from 'lucide-react';
 
 interface TextEditorProps {
   page: Page;
@@ -306,6 +306,39 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
         {/* ANNOTATIONS TAB */}
         {activeTab === 'annotate' && (
             <div className="h-full flex flex-col bg-gray-50 p-6 overflow-y-auto">
+                
+                {/* Work Info */}
+                {work && (
+                  <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
+                    <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
+                        <BookOpen size={18} className="text-primary-600" />
+                        <h4 className="font-bold">Teose andmed</h4>
+                    </div>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Pealkiri</span>
+                        <p className="text-gray-900 font-medium">{work.title}</p>
+                      </div>
+                      <div className="flex gap-6">
+                        <div className="flex-1">
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Autor</span>
+                          <p className="text-gray-900">{work.author}</p>
+                        </div>
+                        {work.respondens && (
+                          <div className="flex-1">
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Respondens</span>
+                            <p className="text-gray-900">{work.respondens}</p>
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Aasta</span>
+                          <p className="text-gray-900">{work.year}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tags */}
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                     <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
