@@ -268,11 +268,11 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
 };
 
 // Töölaud: Salvesta muudatused
-export const savePage = async (page: Page, actionDescription: string = 'Muutis andmeid'): Promise<Page> => {
+export const savePage = async (page: Page, actionDescription: string = 'Muutis andmeid', userName: string = 'Anonüümne'): Promise<Page> => {
   try {
     const newHistoryEntry: HistoryEntry = {
       id: Date.now().toString(),
-      user: 'Dr. Mari Maasikas',
+      user: userName,
       action: actionDescription.includes('staatus') ? 'status_change' : 'text_edit',
       timestamp: new Date().toISOString(),
       description: actionDescription

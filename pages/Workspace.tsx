@@ -5,9 +5,11 @@ import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
+import { useUser } from '../contexts/UserContext';
 import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const Workspace: React.FC = () => {
+  const { user } = useUser();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -57,14 +59,14 @@ const Workspace: React.FC = () => {
 
   const handleSave = async (updatedPage: Page) => {
     // Salvestame ja saame tagasi uuendatud lehe (koos uue ajalooga)
-    const savedPage = await savePage(updatedPage, 'Salvestas muudatused');
+    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user?.name || 'Anonüümne');
     setPage(savedPage);
   };
 
   const handleStatusChange = async (newStatus: PageStatus) => {
     if (!page) return;
     const tempPage = { ...page, status: newStatus };
-    const savedPage = await savePage(tempPage, `Muutis staatuse: ${page.status} -> ${newStatus}`);
+    const savedPage = await savePage(tempPage, `Muutis staatuse: ${page.status} -> ${newStatus}`, user?.name || 'Anonüümne');
     setPage(savedPage);
   };
 
