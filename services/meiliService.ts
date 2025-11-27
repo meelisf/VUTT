@@ -28,22 +28,22 @@ export const updateApiKey = (newKey: string) => {
     localStorage.removeItem(STORAGE_KEY);
     console.log("API Key eemaldatud, kasutatakse vaikeväärtust.");
   }
-  
+
   // Re-initialize client
   client = new MeiliSearch({
     host: MEILI_HOST,
     apiKey: getApiKey(),
   });
   index = client.index(MEILI_INDEX);
-  
+
   // Force a connection check
   return index.getStats();
 };
 
 export const getCurrentKeyType = () => {
-    const key = getApiKey();
-    if (key === MEILI_API_KEY) return 'default';
-    return 'custom';
+  const key = getApiKey();
+  if (key === MEILI_API_KEY) return 'default';
+  return 'custom';
 };
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -72,48 +72,49 @@ const fixIndexSettings = async () => {
     let currentSettings: string[] | null = null;
     let sortableSettings: string[] | null = null;
     try {
-        currentSettings = await index.getSearchableAttributes();
-        sortableSettings = await index.getSortableAttributes();
+      currentSettings = await index.getSearchableAttributes();
+      sortableSettings = await index.getSortableAttributes();
     } catch (e) {
-        // Indeksit ei pruugi veel eksisteerida
+      // Indeksit ei pruugi veel eksisteerida
     }
 
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst'];
     const requiredSort = ['last_modified'];
-    
+
     const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
     const needsSortUpdate = !sortableSettings || requiredSort.some(r => !sortableSettings.includes(r));
 
     if (!needsSearchUpdate && !needsSortUpdate) {
-        console.log("Indeksi seadistused on juba korras.");
-        return true;
+      console.log("Indeksi seadistused on juba korras.");
+      return true;
     }
 
     console.log("Algatan indeksi seadistuste uuendamise...");
 
     await index.updateFilterableAttributes([
-      'aasta', 
-      'autor', 
-      'teose_id', 
-      'lehekylje_number', 
+      'aasta',
+      'autor',
+      'teose_id',
+      'lehekylje_number',
       'originaal_kataloog'
     ]);
-    
+
     await index.updateSortableAttributes([
       'aasta',
       'lehekylje_number',
-      'last_modified' // Added for "Recently Modified" sorting
+      'last_modified',
+      'pealkiri'
     ]);
 
     const searchTask = await index.updateSearchableAttributes([
-        'pealkiri',
-        'autor',
-        'aasta',
-        'teose_id',
-        'originaal_kataloog',
-        'lehekylje_tekst',
-        'tags',
-        'comments.text'
+      'pealkiri',
+      'autor',
+      'aasta',
+      'teose_id',
+      'originaal_kataloog',
+      'lehekylje_tekst',
+      'tags',
+      'comments.text'
     ]);
 
     console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
@@ -127,16 +128,17 @@ const fixIndexSettings = async () => {
 };
 
 const ensureSettings = () => {
-    if (!settingsPromise) {
-        settingsPromise = fixIndexSettings();
-    }
-    return settingsPromise;
+  if (!settingsPromise) {
+    settingsPromise = fixIndexSettings();
+  }
+  return settingsPromise;
 };
 
 // Interface for dashboard search options
 interface DashboardSearchOptions {
-    yearStart?: number;
-    yearEnd?: number;
+  yearStart?: number;
+  yearEnd?: number;
+  sort?: string;
 }
 
 // Dashboardi otsing: otsib teoseid
@@ -146,13 +148,13 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
   try {
     const filter: string[] = [];
-    
+
     // Apply server-side filters if provided
     if (options?.yearStart) {
-        filter.push(`aasta >= ${options.yearStart}`);
+      filter.push(`aasta >= ${options.yearStart}`);
     }
     if (options?.yearEnd) {
-        filter.push(`aasta <= ${options.yearEnd}`);
+      filter.push(`aasta <= ${options.yearEnd}`);
     }
 
     const searchParams: any = {
@@ -162,9 +164,25 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter: filter
     };
 
-    // If no text query is provided, sort by last_modified to show recent work
-    if (!query.trim()) {
-        searchParams.sort = ['last_modified:desc'];
+    // Sorting logic
+    if (options?.sort) {
+      switch (options.sort) {
+        case 'year_asc':
+          searchParams.sort = ['aasta:asc'];
+          break;
+        case 'year_desc':
+          searchParams.sort = ['aasta:desc'];
+          break;
+        case 'az':
+          searchParams.sort = ['pealkiri:asc'];
+          break;
+        case 'recent':
+        default:
+          searchParams.sort = ['last_modified:desc'];
+          break;
+      }
+    } else if (!query.trim()) {
+      searchParams.sort = ['last_modified:desc'];
     }
 
     const response = await index.search(query, searchParams);
@@ -172,32 +190,32 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const uniqueWorks = new Map<string, Work>();
 
     for (const hit of response.hits) {
-        const h = hit as any;
-        
-        // Since hits might be sorted by last_modified (newest first), 
-        // the first time we see a work ID, it represents the most recent state/hit of that work.
-        if (!uniqueWorks.has(h.teose_id)) {
-            uniqueWorks.set(h.teose_id, {
-                id: h.teose_id,
-                catalog_name: h.originaal_kataloog || 'Unknown',
-                title: h.pealkiri || 'Pealkiri puudub',
-                author: h.autor || 'Teadmata autor',
-                year: parseInt(h.aasta) || 0,
-                publisher: '',
-                page_count: facets[h.teose_id] || 0,
-                thumbnail_url: getFullImageUrl(h.lehekylje_pilt)
-            });
-        } else {
-            // Update thumbnail if we found the actual cover page (page 1)
-            // unless we are strictly prioritizing the "latest modified" image. 
-            // Standard practice: Keep usage of page 1 as thumbnail if found.
-            if (parseInt(h.lehekylje_number) === 1) {
-                const existing = uniqueWorks.get(h.teose_id)!;
-                existing.thumbnail_url = getFullImageUrl(h.lehekylje_pilt);
-            }
+      const h = hit as any;
+
+      // Since hits might be sorted by last_modified (newest first), 
+      // the first time we see a work ID, it represents the most recent state/hit of that work.
+      if (!uniqueWorks.has(h.teose_id)) {
+        uniqueWorks.set(h.teose_id, {
+          id: h.teose_id,
+          catalog_name: h.originaal_kataloog || 'Unknown',
+          title: h.pealkiri || 'Pealkiri puudub',
+          author: Array.isArray(h.autor) ? h.autor[0] : (h.autor || 'Teadmata autor'),
+          year: parseInt(h.aasta) || 0,
+          publisher: '',
+          page_count: facets[h.teose_id] || 0,
+          thumbnail_url: getFullImageUrl(h.lehekylje_pilt)
+        });
+      } else {
+        // Update thumbnail if we found the actual cover page (page 1)
+        // unless we are strictly prioritizing the "latest modified" image. 
+        // Standard practice: Keep usage of page 1 as thumbnail if found.
+        if (parseInt(h.lehekylje_number) === 1) {
+          const existing = uniqueWorks.get(h.teose_id)!;
+          existing.thumbnail_url = getFullImageUrl(h.lehekylje_pilt);
         }
+      }
     }
-    
+
     return Array.from(uniqueWorks.values());
 
   } catch (error: any) {
@@ -217,7 +235,7 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
 
     if (response.hits.length === 0) return null;
     const hit: any = response.hits[0];
-    
+
     return {
       id: hit.id,
       work_id: hit.teose_id,
@@ -238,66 +256,66 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
 
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string): Promise<boolean> => {
-    try {
-        const imageFilename = image_url.split('/').pop() || '';
-        const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
+  try {
+    const imageFilename = image_url.split('/').pop() || '';
+    const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
 
-        if (!textFilename) {
-            console.error("Ei suutnud tuletada failinime pildi URL-ist:", image_url);
-            return false;
-        }
-
-        const metaContent = {
-            status: page.status,
-            tags: page.tags,
-            comments: page.comments,
-            history: page.history,
-            work_id: page.work_id,
-            page_number: page.page_number,
-            updated_at: new Date().toISOString()
-        };
-
-        const payload = {
-            text_content: page.text_content,
-            meta_content: metaContent,
-            original_path: original_catalog,
-            file_name: textFilename, 
-            work_id: page.work_id,
-            page_number: page.page_number
-        };
-
-        const response = await fetch(`${FILE_API_URL}/save`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) throw new Error(`File server error: ${response.status}`);
-        return true;
-    } catch (e) {
-        console.error("Failed to save to file system:", e);
-        alert("Hoiatus: Muudatused salvestati andmebaasi, aga failisüsteemi kirjutamine ebaõnnestus.");
-        return false;
+    if (!textFilename) {
+      console.error("Ei suutnud tuletada failinime pildi URL-ist:", image_url);
+      return false;
     }
+
+    const metaContent = {
+      status: page.status,
+      tags: page.tags,
+      comments: page.comments,
+      history: page.history,
+      work_id: page.work_id,
+      page_number: page.page_number,
+      updated_at: new Date().toISOString()
+    };
+
+    const payload = {
+      text_content: page.text_content,
+      meta_content: metaContent,
+      original_path: original_catalog,
+      file_name: textFilename,
+      work_id: page.work_id,
+      page_number: page.page_number
+    };
+
+    const response = await fetch(`${FILE_API_URL}/save`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(`File server error: ${response.status}`);
+    return true;
+  } catch (e) {
+    console.error("Failed to save to file system:", e);
+    alert("Hoiatus: Muudatused salvestati andmebaasi, aga failisüsteemi kirjutamine ebaõnnestus.");
+    return false;
+  }
 };
 
 // Töölaud: Salvesta muudatused
 export const savePage = async (page: Page, actionDescription: string = 'Muutis andmeid'): Promise<Page> => {
   try {
     const newHistoryEntry: HistoryEntry = {
-        id: Date.now().toString(),
-        user: 'Dr. Mari Maasikas', 
-        action: actionDescription.includes('staatus') ? 'status_change' : 'text_edit',
-        timestamp: new Date().toISOString(),
-        description: actionDescription
+      id: Date.now().toString(),
+      user: 'Dr. Mari Maasikas',
+      action: actionDescription.includes('staatus') ? 'status_change' : 'text_edit',
+      timestamp: new Date().toISOString(),
+      description: actionDescription
     };
 
     const updatedHistory = [newHistoryEntry, ...(page.history || [])];
     const nowTimestamp = Date.now();
 
     const pageToSave = {
-        ...page,
-        history: updatedHistory
+      ...page,
+      history: updatedHistory
     };
 
     const meiliPayload = {
@@ -314,9 +332,9 @@ export const savePage = async (page: Page, actionDescription: string = 'Muutis a
     await index.waitForTask(task.taskUid);
 
     if (page.original_path && page.image_url) {
-        await saveToFileSystem(pageToSave, page.original_path, page.image_url);
+      await saveToFileSystem(pageToSave, page.original_path, page.image_url);
     } else {
-        console.warn("Ei saa faili salvestada: puudub original_path või image_url");
+      console.warn("Ei saa faili salvestada: puudub original_path või image_url");
     }
 
     return pageToSave;
@@ -328,76 +346,76 @@ export const savePage = async (page: Page, actionDescription: string = 'Muutis a
 
 // Töölaud: Saa teose metaandmed
 export const getWorkMetadata = async (workId: string): Promise<Work | undefined> => {
-   try {
-     const response = await index.search('', {
-        filter: [`teose_id = "${workId}"`],
-        limit: 1
-     });
+  try {
+    const response = await index.search('', {
+      filter: [`teose_id = "${workId}"`],
+      limit: 1
+    });
 
-     if (response.hits.length === 0) return undefined;
-     const hit: any = response.hits[0];
-     const totalPages = response.estimatedTotalHits || 0;
+    if (response.hits.length === 0) return undefined;
+    const hit: any = response.hits[0];
+    const totalPages = response.estimatedTotalHits || 0;
 
-     return {
-        id: hit.teose_id,
-        catalog_name: hit.originaal_kataloog,
-        title: hit.pealkiri,
-        author: hit.autor,
-        year: parseInt(hit.aasta),
-        publisher: '',
-        page_count: totalPages, 
-        thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
-     };
-   } catch (e) {
-     console.error("Work Metadata Error:", e);
-     return undefined;
-   }
+    return {
+      id: hit.teose_id,
+      catalog_name: hit.originaal_kataloog,
+      title: hit.pealkiri,
+      author: hit.autor,
+      year: parseInt(hit.aasta),
+      publisher: '',
+      page_count: totalPages,
+      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
+    };
+  } catch (e) {
+    console.error("Work Metadata Error:", e);
+    return undefined;
+  }
 };
 
 // Täisteksti otsing
 export const searchContent = async (query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
-    checkMixedContent();
-    await ensureSettings();
-    
-    const limit = 20;
-    const offset = (page - 1) * limit;
-    const filter: string[] = [];
-    
-    if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
-    if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
-    if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
+  checkMixedContent();
+  await ensureSettings();
 
-    let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
-    if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
-    else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
+  const limit = 20;
+  const offset = (page - 1) * limit;
+  const filter: string[] = [];
 
-    try {
-        const response = await index.search(query, {
-            offset,
-            limit,
-            filter,
-            attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
-            attributesToCrop: ['lehekylje_tekst', 'comments.text'], 
-            cropLength: 35, 
-            attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
-            highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
-            highlightPostTag: '</em>',
-            facets: ['originaal_kataloog', 'teose_id'], 
-            attributesToSearchOn: attributesToSearchOn
-        });
+  if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
+  if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
+  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
-        return {
-            hits: response.hits as any,
-            totalHits: response.estimatedTotalHits,
-            totalPages: Math.ceil(response.estimatedTotalHits / limit),
-            page,
-            processingTimeMs: response.processingTimeMs,
-            facetDistribution: response.facetDistribution
-        };
-    } catch (e: any) {
-        if (e.message && e.message.includes('not searchable')) {
-            throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
-        }
-        throw e;
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
+  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
+  else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
+
+  try {
+    const response = await index.search(query, {
+      offset,
+      limit,
+      filter,
+      attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+      attributesToCrop: ['lehekylje_tekst', 'comments.text'],
+      cropLength: 35,
+      attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+      highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
+      highlightPostTag: '</em>',
+      facets: ['originaal_kataloog', 'teose_id'],
+      attributesToSearchOn: attributesToSearchOn
+    });
+
+    return {
+      hits: response.hits as any,
+      totalHits: response.estimatedTotalHits,
+      totalPages: Math.ceil(response.estimatedTotalHits / limit),
+      page,
+      processingTimeMs: response.processingTimeMs,
+      facetDistribution: response.facetDistribution
+    };
+  } catch (e: any) {
+    if (e.message && e.message.includes('not searchable')) {
+      throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
     }
+    throw e;
+  }
 };
