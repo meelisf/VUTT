@@ -48,6 +48,33 @@ def verify_user(username, password):
         }
     return None
 
+def require_auth(data, min_role=None):
+    """
+    Kontrollib autentimist päringus.
+    Tagastab (user, error_response) tuple.
+    Kui autentimine õnnestub, on error_response None.
+    min_role: 'viewer', 'editor', 'admin' - minimaalne nõutav roll
+    """
+    username = data.get('auth_user', '').strip()
+    password = data.get('auth_pass', '')
+    
+    if not username or not password:
+        return None, {"status": "error", "message": "Autentimine nõutud"}
+    
+    user = verify_user(username, password)
+    if not user:
+        return None, {"status": "error", "message": "Vale kasutajanimi või parool"}
+    
+    # Rollide hierarhia kontroll
+    if min_role:
+        role_hierarchy = {'viewer': 0, 'editor': 1, 'admin': 2}
+        user_level = role_hierarchy.get(user['role'], 0)
+        required_level = role_hierarchy.get(min_role, 0)
+        if user_level < required_level:
+            return None, {"status": "error", "message": f"Vajab vähemalt '{min_role}' õigusi"}
+    
+    return user, None
+
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200, "ok")
@@ -89,6 +116,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
+                
+                # Autentimise kontroll - nõuab vähemalt 'editor' õigusi
+                user, auth_error = require_auth(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+                
+                print(f"SAVE: Kasutaja '{user['username']}' ({user['role']})")
                 
                 # Andmed frontendist
                 text_content = data.get('text_content')
@@ -183,6 +222,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
                 
+                # Autentimise kontroll - nõuab vähemalt 'admin' õigusi
+                user, auth_error = require_auth(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+                
                 original_catalog = data.get('original_path')
                 target_filename = data.get('file_name')
                 
@@ -242,20 +291,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
                 
-                original_catalog = data.get('original_path')
-                target_filename = data.get('file_name')
-                backup_filename = data.get('backup_filename')
-                user_role = data.get('user_role', '')
-                
-                # Ainult admin saab taastada
-                if user_role != 'admin':
-                    self.send_response(403)
+                # Autentimise kontroll - nõuab 'admin' õigusi (serveripoolne kontroll!)
+                user, auth_error = require_auth(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
                     self.send_header('Content-type', 'application/json')
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
-                    response = {"status": "error", "message": "Ainult admin saab versioone taastada"}
-                    self.wfile.write(json.dumps(response).encode('utf-8'))
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
                     return
+                
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+                backup_filename = data.get('backup_filename')
+                
+                # Turvakontroll: backup_filename peab olema ainult failinimi
+                backup_filename = os.path.basename(backup_filename) if backup_filename else ''
                 
                 if not original_catalog or not target_filename or not backup_filename:
                     self.send_error(400, "Puudub 'original_path', 'file_name' või 'backup_filename'")

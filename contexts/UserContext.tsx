@@ -7,8 +7,15 @@ interface User {
   role: string;
 }
 
+// Autentimisandmed API päringute jaoks (ei salvestata localStorage'i)
+interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
 interface UserContextType {
   user: User | null;
+  authCredentials: AuthCredentials | null;  // Lisatud API autentimiseks
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
@@ -20,14 +27,17 @@ const STORAGE_KEY = 'vutt_user';
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [authCredentials, setAuthCredentials] = useState<AuthCredentials | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load user from localStorage on mount
+  // NB: Parooli ei laeta localStorage'ist turvakaalutlustel
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         setUser(JSON.parse(stored));
+        // Kasutaja peab uuesti sisse logima, et saada API ligipääs
       } catch (e) {
         localStorage.removeItem(STORAGE_KEY);
       }
@@ -47,6 +57,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       if (data.status === 'success' && data.user) {
         setUser(data.user);
+        // Salvestame autentimisandmed mällu (API päringute jaoks)
+        setAuthCredentials({ username, password });
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         return { success: true };
       } else {
@@ -60,11 +72,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
+    setAuthCredentials(null);  // Kustutame ka autentimisandmed
     localStorage.removeItem(STORAGE_KEY);
   };
 
   return (
-    <UserContext.Provider value={{ user, login, logout, isLoading }}>
+    <UserContext.Provider value={{ user, authCredentials, login, logout, isLoading }}>
       {children}
     </UserContext.Provider>
   );

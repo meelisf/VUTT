@@ -295,8 +295,14 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
   }
 };
 
+// Autentimisandmete tüüp API päringute jaoks
+interface AuthCredentials {
+  username: string;
+  password: string;
+}
+
 // Abifunktsioon failisüsteemi salvestamiseks
-const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string): Promise<boolean> => {
+const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, auth?: AuthCredentials): Promise<boolean> => {
   try {
     const imageFilename = image_url.split('/').pop() || '';
     const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
@@ -316,7 +322,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       updated_at: new Date().toISOString()
     };
 
-    const payload = {
+    const payload: any = {
       text_content: page.text_content,
       meta_content: metaContent,
       original_path: original_catalog,
@@ -325,17 +331,29 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       page_number: page.page_number
     };
 
+    // Lisa autentimisandmed kui olemas
+    if (auth) {
+      payload.auth_user = auth.username;
+      payload.auth_pass = auth.password;
+    }
+
     const response = await fetch(`${FILE_API_URL}/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) throw new Error(`File server error: ${response.status}`);
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      if (errorData.message?.includes('Autentimine') || response.status === 401) {
+        throw new Error('Autentimine ebaõnnestus. Palun logi välja ja uuesti sisse.');
+      }
+      throw new Error(`File server error: ${response.status}`);
+    }
     return true;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Failed to save to file system:", e);
-    alert("Hoiatus: Muudatused salvestati andmebaasi, aga failisüsteemi kirjutamine ebaõnnestus.");
+    alert(`Hoiatus: ${e.message || 'Failisüsteemi kirjutamine ebaõnnestus.'}`);
     return false;
   }
 };
@@ -374,7 +392,12 @@ const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
 };
 
 // Töölaud: Salvesta muudatused
-export const savePage = async (page: Page, actionDescription: string = 'Muutis andmeid', userName: string = 'Anonüümne'): Promise<Page> => {
+export const savePage = async (
+  page: Page, 
+  actionDescription: string = 'Muutis andmeid', 
+  userName: string = 'Anonüümne',
+  auth?: AuthCredentials
+): Promise<Page> => {
   try {
     const newHistoryEntry: HistoryEntry = {
       id: Date.now().toString(),
@@ -409,7 +432,7 @@ export const savePage = async (page: Page, actionDescription: string = 'Muutis a
     await updateWorkStatusOnAllPages(page.work_id);
 
     if (page.original_path && page.image_url) {
-      await saveToFileSystem(pageToSave, page.original_path, page.image_url);
+      await saveToFileSystem(pageToSave, page.original_path, page.image_url, auth);
     } else {
       console.warn("Ei saa faili salvestada: puudub original_path või image_url");
     }

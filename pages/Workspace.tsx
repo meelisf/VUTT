@@ -9,7 +9,7 @@ import { useUser } from '../contexts/UserContext';
 import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 
 const Workspace: React.FC = () => {
-  const { user } = useUser();
+  const { user, authCredentials } = useUser();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -64,8 +64,13 @@ const Workspace: React.FC = () => {
       alert('Salvestamiseks pead olema sisse logitud.');
       return;
     }
+    // Kontrolli autentimisandmeid
+    if (!authCredentials) {
+      alert('Salvestamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.');
+      return;
+    }
     // Salvestame ja saame tagasi uuendatud lehe (koos uue ajalooga)
-    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user.name);
+    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user.name, authCredentials);
     setPage(savedPage);
   };
 

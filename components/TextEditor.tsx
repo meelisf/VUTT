@@ -25,7 +25,7 @@ interface TextEditorProps {
 type TabType = 'edit' | 'annotate' | 'history';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, readOnly = false }) => {
-  const { user } = useUser();
+  const { user, authCredentials } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   
@@ -161,6 +161,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
+    if (!authCredentials) {
+      alert("Varukoopiate laadimiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
+      return;
+    }
+
     setIsLoadingBackups(true);
     try {
       // Tuletame failinime image_url-ist (sama loogika mis savePage's)
@@ -172,7 +177,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           original_path: page.original_path,
-          file_name: txtFilename
+          file_name: txtFilename,
+          auth_user: authCredentials.username,
+          auth_pass: authCredentials.password
         })
       });
 
@@ -181,6 +188,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         setBackups(data.backups || []);
       } else {
         console.error("Varukoopiate laadimine ebaõnnestus:", data.message);
+        if (data.message?.includes('Autentimine') || data.message?.includes('parool')) {
+          alert("Autentimine ebaõnnestus. Palun logi välja ja uuesti sisse.");
+        }
       }
     } catch (e) {
       console.error("Varukoopiate laadimine ebaõnnestus:", e);
@@ -193,6 +203,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const handleRestore = async (backup: BackupEntry) => {
     if (!page.original_path || !page.image_url) {
       alert("Taastamine ebaõnnestus: puudub vajalik info");
+      return;
+    }
+
+    if (!authCredentials) {
+      alert("Taastamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
       return;
     }
 
@@ -212,7 +227,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           original_path: page.original_path,
           file_name: txtFilename,
           backup_filename: backup.filename,
-          user_role: user?.role || ''
+          auth_user: authCredentials.username,
+          auth_pass: authCredentials.password
         })
       });
 
