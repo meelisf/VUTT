@@ -30,7 +30,7 @@ Veebirakendus ajalooliste (varauusaegsete) dokumentide transkriptsioonide vaatam
 │   Meilisearch   │  │  Image Server   │  │  File Server    │
 │   (port 7700)   │  │  (port 8001)    │  │  (port 8002)    │
 │                 │  │                 │  │                 │
-│ - Täistekstotsing│  │ - JPG failid   │  │ - Salvestamine  │
+│ - Otsing        │  │ - JPG failid    │  │ - Salvestamine  │
 │ - Metaandmed    │  │ - CORS enabled  │  │ - Autentimine   │
 │ - Indekseerimine│  │                 │  │ - Varukoopiad   │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
