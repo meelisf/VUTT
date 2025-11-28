@@ -94,11 +94,58 @@ export const FILE_API_URL = 'http://SERVER_IP:8002';
 ```
 
 ### 3. Andmete ettevalmistamine
-```bash
-# Genereeri Meilisearchi andmed failisüsteemist
-python3 1-1_consolidate_data.py
 
-# Laadi andmed Meilisearchi
+#### Andmete struktuur
+
+```
+data/
+├── jaanson.tsv                          # Metaandmete fail (TSV)
+└── 04_sorditud_dokumendid/              # Skaneeritud dokumendid
+    ├── 1692-6-Pealkiri/                 # Kataloogi nimi = ID
+    │   ├── 1692-6-Pealkiri_001.jpg      # Skaneeritud pilt
+    │   ├── 1692-6-Pealkiri_001.txt      # OCR tekst (sama nimi!)
+    │   ├── 1692-6-Pealkiri_001.json     # Metaandmed (automaatne)
+    │   ├── 1692-6-Pealkiri_002.jpg
+    │   ├── 1692-6-Pealkiri_002.txt
+    │   └── ...
+    └── 1693-12-Teine/
+        └── ...
+```
+
+#### Nõuded andmetele
+
+1. **`jaanson.tsv`** - metaandmete fail:
+   - Peab sisaldama veergu `fields_r_acad_code` kujul `R Acad. Dorp. 1692:6`
+   - See teisendatakse katalooginime prefiksiks: `1692:6` → `1692-6`
+   - Muud veerud: `pealkiri`, `autor`, `respondens`, `aasta`
+
+2. **Kataloogide nimetamine**:
+   - Algab ID-ga kujul `AAAA-N-` (nt `1692-6-`)
+   - ID peab vastama `jaanson.tsv` väärtusele (koolon → sidekriips)
+   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6-Mingi-Pealkiri/`
+
+3. **Failide paarid** (OLULINE!):
+   - Iga lehekülje kohta peab olema **sama nimega** `.jpg` ja `.txt` fail
+   - Näide: `dokument_001.jpg` + `dokument_001.txt`
+   - Kui pilt puudub, lehekülge ei kuvata
+   - Kui tekst puudub, lehekülge ei indekseerita
+
+#### Piltide vahetamine
+
+Skännide uuendamiseks (nt parema kvaliteediga):
+1. Asenda `.jpg` failid uutega (**sama failinimi!**)
+2. `.txt` ja `.json` failid jäävad samaks
+3. Meilisearchi uuesti indekseerima ei pea (pildid serveeritakse otse)
+4. Brauseris võib olla vaja cache tühjendada (Ctrl+Shift+R)
+
+#### Andmete genereerimine
+
+```bash
+# 1. Genereeri Meilisearchi andmed failisüsteemist
+python3 1-1_consolidate_data.py
+# Väljund: output/meilisearch_data_per_page.jsonl
+
+# 2. Laadi andmed Meilisearchi (vajab .env faili)
 python3 2-1_upload_to_meili.py
 ```
 
