@@ -2,7 +2,7 @@
 
 Veebirakendus ajalooliste (varauusaegsete) dokumentide transkriptsioonide vaatamiseks ja toimetamiseks. Rakendus kuvab skaneeritud dokumendi pilti ja OCR-iga tuvastatud teksti kõrvuti, võimaldades teksti parandada ja annoteerida.
 
-![VUTT Screenshot](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
+<img width="1882" height="607" alt="VUTT screenshot" src="https://github.com/user-attachments/assets/a4456258-a02f-4d2b-a12f-1d9f2d8767ec" />
 
 ## Funktsionaalsus
 
