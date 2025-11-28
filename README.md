@@ -1,20 +1,188 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# VUTT - Varauusaegsete Tekstide Töölaud
 
-# Run and deploy your AI Studio app
+Veebirakendus ajalooliste (varauusaegsete) dokumentide transkriptsioonide vaatamiseks ja toimetamiseks. Rakendus kuvab skaneeritud dokumendi pilti ja OCR-iga tuvastatud teksti kõrvuti, võimaldades teksti parandada ja annoteerida.
 
-This contains everything you need to run your app locally.
+![VUTT Screenshot](https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6)
 
-View your app in AI Studio: https://ai.studio/apps/drive/18LMYvc1oW_GaGKoGyReFmlH6gcp8Uti-
+## Funktsionaalsus
 
-## Run Locally
+- 📖 **Dokumentide sirvimine** - Teoste loend koos otsingu ja filtreerimisega
+- 🔍 **Täistekstotsing** - Otsing läbi kõigi transkriptsioonide
+- ✏️ **Teksti redigeerimine** - OCR-teksti parandamine koos originaalpildi vaatega
+- 🏷️ **Annoteerimine** - Märksõnade ja kommentaaride lisamine
+- 📊 **Staatuse jälgimine** - Töövoog: Toores → Töös → Valmis
+- 👥 **Kasutajahaldus** - Rollipõhine ligipääs (viewer/editor/admin)
+- 💾 **Versioonihaldus** - Automaatsed varukoopiad, originaali kaitse
 
-**Prerequisites:**  Node.js
+## Arhitektuur
 
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Frontend (React SPA)                      │
+│                    - Vite + React 19                         │
+│                    - TypeScript                              │
+│                    - Tailwind CSS                            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          ▼                   ▼                   ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│   Meilisearch   │  │  Image Server   │  │  File Server    │
+│   (port 7700)   │  │  (port 8001)    │  │  (port 8002)    │
+│                 │  │                 │  │                 │
+│ - Täistekstotsing│  │ - JPG failid   │  │ - Salvestamine  │
+│ - Metaandmed    │  │ - CORS enabled  │  │ - Autentimine   │
+│ - Indekseerimine│  │                 │  │ - Varukoopiad   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+          │                   │                   │
+          └───────────────────┴───────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────┐
+              │      Failisüsteem (NAS/SSD)   │
+              │                               │
+              │  /data/                       │
+              │    ├── kataloog1/             │
+              │    │   ├── lk1.jpg            │
+              │    │   ├── lk1.txt            │
+              │    │   └── lk1.json           │
+              │    └── kataloog2/             │
+              │        └── ...                │
+              └───────────────────────────────┘
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Tehnoloogiad
+
+| Komponent | Tehnoloogia | Versioon |
+|-----------|-------------|----------|
+| Frontend | React + TypeScript | 19.x |
+| Bundler | Vite | 6.x |
+| CSS | Tailwind CSS | 3.x |
+| Otsimootor | Meilisearch | 1.x |
+| Backend | Python http.server | 3.8+ |
+| Ikoonid | Lucide React | - |
+
+## Ressursivajadus
+
+| Ressurss | Minimaalne | Soovituslik |
+|----------|------------|-------------|
+| RAM | 4 GB | 8 GB |
+| Kettaruum | 100 GB | 200 GB |
+| CPU | 1 tuum | 2+ tuuma |
+| OS | Ubuntu 20.04+ | Ubuntu 22.04 |
+
+**Märkus:** Praegune andmemaht on ~25 GB (pildid + tekstid). Varukoopiad võivad lisada kuni 10x txt failide mahtu.
+
+## Paigaldamine
+
+### Eeldused
+- Node.js 18+
+- Python 3.8+
+- Meilisearch 1.x
+
+### 1. Sõltuvused
+```bash
+npm install
+```
+
+### 2. Konfiguratsioon
+Muuda `config.ts` failis serverite aadressid:
+```typescript
+export const MEILI_HOST = 'http://SERVER_IP:7700';
+export const IMAGE_BASE_URL = 'http://SERVER_IP:8001';
+export const FILE_API_URL = 'http://SERVER_IP:8002';
+```
+
+### 3. Andmete ettevalmistamine
+```bash
+# Genereeri Meilisearchi andmed failisüsteemist
+python3 1-1_consolidate_data.py
+
+# Laadi andmed Meilisearchi
+python3 2-1_upload_to_meili.py
+```
+
+### 4. Käivitamine
+```bash
+# Kõik teenused korraga
+./start_services.sh
+
+# Või eraldi:
+# Terminal 1: Meilisearch
+./meilisearch --master-key="SINU_VÕTI"
+
+# Terminal 2: Pildiserver
+python3 image_server.py
+
+# Terminal 3: Failiserver
+python3 file_server.py
+
+# Terminal 4: Frontend (arenduseks)
+npm run dev
+
+# Või tootmiseks:
+npm run build  # → dist/ kaust
+```
+
+## Kasutajahaldus
+
+Kasutajad on defineeritud `users.json` failis:
+```json
+{
+  "kasutajanimi": {
+    "password_hash": "<SHA-256 hash>",
+    "name": "Kuvatav Nimi",
+    "role": "admin|editor|viewer"
+  }
+}
+```
+
+**Rollid:**
+- `viewer` - Ainult vaatamine
+- `editor` - Dokumentide redigeerimine
+- `admin` - + versioonide taastamine
+
+**Parooli hash:**
+```bash
+echo -n "parool" | sha256sum
+```
+
+## Turvalisus
+
+- ✅ Serveripoolne autentimine API endpointidel
+- ✅ Rollipõhine ligipääsukontroll
+- ✅ Path traversal kaitse
+- ⚠️ HTTP (mitte HTTPS) - sobib sisevõrku
+- ⚠️ SHA-256 ilma salt'ita - põhiline kaitse
+
+**Soovitus tootmises:** Kasutada reverse proxy't (nginx/Caddy) HTTPS-i jaoks.
+
+## Failide struktuur
+
+```
+VUTT/
+├── components/          # React komponendid
+│   ├── ImageViewer.tsx  # Pildi vaataja (zoom, pan)
+│   ├── TextEditor.tsx   # Teksti redaktor + ajalugu
+│   └── ...
+├── pages/               # Lehekülje komponendid
+│   ├── Dashboard.tsx    # Teoste loend
+│   ├── Workspace.tsx    # Töölaud (pilt + tekst)
+│   └── SearchPage.tsx   # Täistekstotsing
+├── services/
+│   └── meiliService.ts  # Meilisearch API
+├── contexts/
+│   └── UserContext.tsx  # Kasutaja sessioon
+├── file_server.py       # Failide salvestamine
+├── image_server.py      # Piltide serveerimine
+├── config.ts            # Serverite konfiguratsioon
+└── users.json           # Kasutajate andmebaas
+```
+
+## Litsents
+
+MIT
+
+## Kontakt
+
+[Lisa siia kontaktinfo]
