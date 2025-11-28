@@ -129,11 +129,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     shutil.copy2(txt_path, backup_path)
                     
                     # Piirame varukoopiate arvu (max 10 faili kohta)
+                    # Kõige esimene (vanim) varukoopia on alati kaitstud - see on originaal
                     existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
                     if len(existing_backups) > 10:
-                        for old_backup in existing_backups[:-10]:
+                        # Jätame esimese (originaal) ja 9 uuemat alles, kustutame vahelt
+                        original_backup = existing_backups[0]  # Kõige vanem = originaal
+                        newer_backups = existing_backups[1:]   # Kõik peale originaali
+                        # Kustutame vanemad vaheversioonid, jätame 9 uuemat
+                        for old_backup in newer_backups[:-9]:
                             os.remove(old_backup)
                             print(f"Kustutatud vana varukoopia: {os.path.basename(old_backup)}")
+                        print(f"Originaal kaitstud: {os.path.basename(original_backup)}")
                 
                 # Kirjutame teksti
                 with open(txt_path, 'w', encoding='utf-8') as f:
@@ -170,6 +176,141 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"VIGA SERVERIS: {e}")
                 self.send_error(500, str(e))
+        elif self.path == '/backups':
+            # Varukoopiate loetelu päring
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+                
+                if not original_catalog or not target_filename:
+                    self.send_error(400, "Puudub 'original_path' või 'file_name'")
+                    return
+                
+                safe_catalog = os.path.basename(original_catalog)
+                safe_filename = os.path.basename(target_filename)
+                txt_path = os.path.join(BASE_DIR, safe_catalog, safe_filename)
+                
+                # Leiame kõik varukoopiad
+                backups = sorted(glob.glob(f"{txt_path}.backup.*"), reverse=True)
+                
+                backup_list = []
+                for backup_path in backups:
+                    # Eraldame timestampi failinimest
+                    parts = backup_path.rsplit('.backup.', 1)
+                    if len(parts) == 2:
+                        timestamp_str = parts[1]
+                        try:
+                            dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+                            backup_list.append({
+                                "filename": os.path.basename(backup_path),
+                                "timestamp": timestamp_str,
+                                "formatted_date": dt.strftime("%d.%m.%Y %H:%M:%S"),
+                                "is_original": False
+                            })
+                        except ValueError:
+                            pass
+                
+                # Lisame ka originaalfaili (versioon 0 - kõige vanem backup või algne fail)
+                # Esimene versioon on alati kaitstud
+                if backup_list:
+                    backup_list[-1]["is_original"] = True  # Kõige vanem backup on "originaal"
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "status": "success",
+                    "backups": backup_list,
+                    "total": len(backup_list)
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"BACKUPS VIGA: {e}")
+                self.send_error(500, str(e))
+                
+        elif self.path == '/restore':
+            # Varukoopia taastamine
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+                backup_filename = data.get('backup_filename')
+                user_role = data.get('user_role', '')
+                
+                # Ainult admin saab taastada
+                if user_role != 'admin':
+                    self.send_response(403)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    response = {"status": "error", "message": "Ainult admin saab versioone taastada"}
+                    self.wfile.write(json.dumps(response).encode('utf-8'))
+                    return
+                
+                if not original_catalog or not target_filename or not backup_filename:
+                    self.send_error(400, "Puudub 'original_path', 'file_name' või 'backup_filename'")
+                    return
+                
+                safe_catalog = os.path.basename(original_catalog)
+                safe_filename = os.path.basename(target_filename)
+                txt_path = os.path.join(BASE_DIR, safe_catalog, safe_filename)
+                backup_path = os.path.join(BASE_DIR, safe_catalog, backup_filename)
+                
+                # Kontrollime, et backup fail eksisteerib
+                if not os.path.exists(backup_path):
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    response = {"status": "error", "message": "Varukoopiat ei leitud"}
+                    self.wfile.write(json.dumps(response).encode('utf-8'))
+                    return
+                
+                # NB: Originaali SAAB taastada, lihtsalt ei kustutata seda kunagi
+                
+                # Loeme taastamise faili sisu
+                with open(backup_path, 'r', encoding='utf-8') as f:
+                    restored_content = f.read()
+                
+                # Teeme praegusest versioonist varukoopia enne taastamist
+                if os.path.exists(txt_path):
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    pre_restore_backup = f"{txt_path}.backup.{timestamp}"
+                    shutil.copy2(txt_path, pre_restore_backup)
+                    print(f"Loodud varukoopia enne taastamist: {pre_restore_backup}")
+                
+                # Kirjutame taastatud sisu
+                with open(txt_path, 'w', encoding='utf-8') as f:
+                    f.write(restored_content)
+                
+                print(f"Taastatud versioon: {backup_filename} -> {safe_filename}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "status": "success",
+                    "message": "Versioon taastatud",
+                    "restored_content": restored_content
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"RESTORE VIGA: {e}")
+                self.send_error(500, str(e))
+                
         else:
             self.send_error(404)
 

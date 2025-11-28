@@ -3,7 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search } from 'lucide-react';
+import { FILE_API_URL } from '../config';
+import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield } from 'lucide-react';
+
+// Varukoopia tüüp
+interface BackupEntry {
+  filename: string;
+  timestamp: string;
+  formatted_date: string;
+  is_original: boolean;
+}
 
 interface TextEditorProps {
   page: Page;
@@ -35,6 +44,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const suggestionsRef = useRef<HTMLDivElement>(null);
   
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Varukoopiate state
+  const [backups, setBackups] = useState<BackupEntry[]>([]);
+  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   
   // Salvestamata muudatuste jälgimine
   const [savedState, setSavedState] = useState({
@@ -137,6 +151,88 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         alert(`Viga salvestamisel: ${e.message || "Tundmatu viga"}`);
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  // Varukoopiate laadimine failiserverist
+  const loadBackups = async () => {
+    if (!page.original_path || !page.image_url) {
+      console.warn("Ei saa varukoopiad laadida: puudub original_path või image_url");
+      return;
+    }
+
+    setIsLoadingBackups(true);
+    try {
+      // Tuletame failinime image_url-ist (sama loogika mis savePage's)
+      const imagePath = page.image_url.split('/').pop() || '';
+      const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
+
+      const response = await fetch(`${FILE_API_URL}/backups`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          original_path: page.original_path,
+          file_name: txtFilename
+        })
+      });
+
+      const data = await response.json();
+      if (data.status === 'success') {
+        setBackups(data.backups || []);
+      } else {
+        console.error("Varukoopiate laadimine ebaõnnestus:", data.message);
+      }
+    } catch (e) {
+      console.error("Varukoopiate laadimine ebaõnnestus:", e);
+    } finally {
+      setIsLoadingBackups(false);
+    }
+  };
+
+  // Varukoopia taastamine (laeb teksti editorisse, kasutaja peab salvestama)
+  const handleRestore = async (backup: BackupEntry) => {
+    if (!page.original_path || !page.image_url) {
+      alert("Taastamine ebaõnnestus: puudub vajalik info");
+      return;
+    }
+
+    if (!confirm(`Kas soovid taastada versiooni ${backup.formatted_date}?\n\nTekst laaditakse redaktorisse. Muudatuste salvestamiseks pead vajutama "Salvesta".`)) {
+      return;
+    }
+
+    setIsRestoring(true);
+    try {
+      const imagePath = page.image_url.split('/').pop() || '';
+      const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
+
+      const response = await fetch(`${FILE_API_URL}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          original_path: page.original_path,
+          file_name: txtFilename,
+          backup_filename: backup.filename,
+          user_role: user?.role || ''
+        })
+      });
+
+      const data = await response.json();
+      if (data.status === 'success' && data.restored_content !== undefined) {
+        // Laeme taastatud teksti editorisse
+        setText(data.restored_content);
+        // Lülitume "Redigeeri" vaatesse, et kasutaja näeks muutust
+        setActiveTab('edit');
+        alert(`Versioon ${backup.formatted_date} laaditud redaktorisse.\n\nSalvestamiseks vajuta "Salvesta" nuppu.`);
+        // Värskendame varukoopiate loendit
+        loadBackups();
+      } else {
+        alert(`Taastamine ebaõnnestus: ${data.message || 'Tundmatu viga'}`);
+      }
+    } catch (e: any) {
+      console.error("Taastamine ebaõnnestus:", e);
+      alert(`Taastamine ebaõnnestus: ${e.message || 'Võrgu viga'}`);
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -538,7 +634,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
             <div className="h-full bg-gray-50 p-6 overflow-y-auto">
-                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                 {/* Muudatuste ajalugu (Meilisearchist) */}
+                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                     <div className="flex items-center gap-2 mb-6 text-gray-800 border-b border-gray-100 pb-2">
                         <History size={18} className="text-primary-600" />
                         <h4 className="font-bold">Muudatuste ajalugu</h4>
@@ -569,11 +666,98 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     </div>
                  </div>
                  
-                 <div className="mt-6 text-center">
-                    <button className="text-sm text-red-600 hover:text-red-800 underline decoration-dotted">
-                        Taasta eelmine versioon (Rollback)
-                    </button>
-                 </div>
+                 {/* Varukoopiad failisüsteemist (ainult admin näeb) */}
+                 {user?.role === 'admin' && (
+                   <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
+                      <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
+                        <div className="flex items-center gap-2 text-gray-800">
+                          <RotateCcw size={18} className="text-amber-600" />
+                          <h4 className="font-bold">Varukoopiad</h4>
+                        </div>
+                        <button
+                          onClick={loadBackups}
+                          disabled={isLoadingBackups}
+                          className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
+                        >
+                          {isLoadingBackups ? 'Laadin...' : 'Värskenda'}
+                        </button>
+                      </div>
+                      
+                      {backups.length === 0 && !isLoadingBackups && (
+                        <p className="text-sm text-gray-400 text-center py-4">Varukoopiad puuduvad või vajuta "Värskenda"</p>
+                      )}
+                      
+                      {backups.length > 0 && (
+                        <div className="space-y-2">
+                          {backups.map((backup, idx) => (
+                            <div 
+                              key={backup.filename} 
+                              className={`flex items-center justify-between p-3 rounded-lg border ${
+                                backup.is_original 
+                                  ? 'bg-amber-50 border-amber-200' 
+                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {backup.is_original && (
+                                  <Shield size={16} className="text-amber-600" title="Originaal - kaitstud" />
+                                )}
+                                <div>
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {backup.formatted_date}
+                                  </span>
+                                  {backup.is_original && (
+                                    <span className="ml-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
+                                      Originaal
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              {!backup.is_original ? (
+                                <button
+                                  onClick={() => handleRestore(backup)}
+                                  disabled={isRestoring || readOnly}
+                                  className="text-xs px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1"
+                                >
+                                  {isRestoring ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <RotateCcw size={12} />
+                                  )}
+                                  Taasta
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleRestore(backup)}
+                                  disabled={isRestoring || readOnly}
+                                  className="text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1"
+                                >
+                                  {isRestoring ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <RotateCcw size={12} />
+                                  )}
+                                  Taasta originaal
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <p className="mt-4 text-xs text-gray-500">
+                        <AlertTriangle size={12} className="inline mr-1" />
+                        Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta "Salvesta".
+                      </p>
+                   </div>
+                 )}
+                 
+                 {user && user.role !== 'admin' && (
+                   <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500">
+                     Varukoopiate taastamine on saadaval ainult administraatoritele.
+                   </div>
+                 )}
             </div>
         )}
 
