@@ -101,14 +101,14 @@ export const FILE_API_URL = 'http://SERVER_IP:8002';
 data/
 ├── jaanson.tsv                          # Metaandmete fail (TSV)
 └── 04_sorditud_dokumendid/              # Skaneeritud dokumendid
-    ├── 1692-6-Pealkiri/                 # Kataloogi nimi = ID
-    │   ├── 1692-6-Pealkiri_001.jpg      # Skaneeritud pilt
-    │   ├── 1692-6-Pealkiri_001.txt      # OCR tekst (sama nimi!)
-    │   ├── 1692-6-Pealkiri_001.json     # Metaandmed (automaatne)
-    │   ├── 1692-6-Pealkiri_002.jpg
-    │   ├── 1692-6-Pealkiri_002.txt
+    ├── 1692-6-Suvaline-Nimi/            # Algab ID-ga (1692-6)
+    │   ├── scan_001.jpg                 # Skaneeritud pilt
+    │   ├── scan_001.txt                 # OCR tekst (SAMA NIMI!)
+    │   ├── scan_001.json                # Metaandmed (automaatne)
+    │   ├── scan_002.jpg
+    │   ├── scan_002.txt
     │   └── ...
-    └── 1693-12-Teine/
+    └── 1693-12-Teine-Kataloog/
         └── ...
 ```
 
@@ -120,13 +120,16 @@ data/
    - Muud veerud: `pealkiri`, `autor`, `respondens`, `aasta`
 
 2. **Kataloogide nimetamine**:
-   - Algab ID-ga kujul `AAAA-N-` (nt `1692-6-`)
+   - Peab **algama** ID-ga kujul `AAAA-N-` (nt `1692-6-`)
    - ID peab vastama `jaanson.tsv` väärtusele (koolon → sidekriips)
-   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6-Mingi-Pealkiri/`
+   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6-Suvaline-Nimi/`
+   - Kataloogi ülejäänud nimi on vaba (nt `1692-6-Disputatio-De-Anima/`)
 
 3. **Failide paarid** (OLULINE!):
    - Iga lehekülje kohta peab olema **sama nimega** `.jpg` ja `.txt` fail
-   - Näide: `dokument_001.jpg` + `dokument_001.txt`
+   - Näide: `scan_001.jpg` + `scan_001.txt` ✅
+   - Näide: `pilt_001.jpg` + `tekst_001.txt` ❌ (ei tööta!)
+   - Failinimed ei pea sisaldama kataloogi nime
    - Kui pilt puudub, lehekülge ei kuvata
    - Kui tekst puudub, lehekülge ei indekseerita
 
