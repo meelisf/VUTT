@@ -119,13 +119,15 @@ const Workspace: React.FC = () => {
     );
   }
 
-  // Navigeerimine tagasi koos hoiatusega
+  // Navigeerimine tagasi dashboardile (säilitab otsingu/filtri parameetrid)
   const handleNavigateBack = () => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
       if (!confirmed) return;
     }
-    navigate(-1);
+    // Kasuta salvestatud dashboard URL-i või vaikimisi '/'
+    const savedUrl = sessionStorage.getItem('vutt_dashboard_url') || '/';
+    navigate(savedUrl);
   };
 
   return (

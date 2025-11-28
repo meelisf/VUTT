@@ -2,7 +2,7 @@
 import React from 'react';
 import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface WorkCardProps {
   work: Work;
@@ -10,9 +10,19 @@ interface WorkCardProps {
 
 const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
+
+  // Salvesta praegune asukoht ja navigeeri töölaudale
+  const handleOpenWorkspace = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Salvesta dashboard URL koos query parameetritega
+    const currentUrl = location.pathname + location.search;
+    sessionStorage.setItem('vutt_dashboard_url', currentUrl);
+    navigate(`/work/${work.id}/1`);
+  };
 
   // Staatuse badge stiilid
   const getStatusStyle = (status?: WorkStatus) => {
@@ -44,9 +54,13 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
 
       <div className="p-4 flex-1 flex flex-col">
         <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight line-clamp-2">
-          <Link to={`/work/${work.id}/1`} className="hover:text-primary-600 transition-colors">
+          <a 
+            href={`/work/${work.id}/1`}
+            onClick={handleOpenWorkspace}
+            className="hover:text-primary-600 transition-colors cursor-pointer"
+          >
             {work.title}
-          </Link>
+          </a>
         </h3>
 
         <div className="mt-2 space-y-2 text-sm text-gray-600 flex-1">
@@ -94,12 +108,13 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
           >
             {workStatus}
           </button>
-          <Link
-            to={`/work/${work.id}/1`}
-            className="text-sm font-medium text-primary-600 hover:text-primary-800"
+          <a
+            href={`/work/${work.id}/1`}
+            onClick={handleOpenWorkspace}
+            className="text-sm font-medium text-primary-600 hover:text-primary-800 cursor-pointer"
           >
             Ava töölaud &rarr;
-          </Link>
+          </a>
         </div>
       </div >
     </div >
