@@ -78,8 +78,10 @@ python3 2-1_upload_to_meili.py    # Recreates 'teosed' index
 ### Authentication & Access Control
 - SHA-256 password hashing (see `users.json` structure)
 - Login handled by `file_server.py /login` endpoint
-- User session stored in `localStorage` key `vutt_user`
-- **Auth credentials** stored in memory via `UserContext.authCredentials` (not in localStorage for security)
+- **Token-based authentication**: Login returns a session token (UUID)
+- User session stored in `localStorage`: `vutt_user` (user info) + `vutt_token` (auth token)
+- Token verified on page load via `/verify-token` endpoint
+- Sessions expire after 24 hours
 
 #### Role Hierarchy
 ```
@@ -90,12 +92,13 @@ viewer < editor < admin
 - `admin` - Can restore backups, manage versions
 
 #### API Authentication
-All write endpoints require `auth_user` + `auth_pass` in request body:
+All write endpoints require `auth_token` in request body:
 - `/save` - requires `editor` role minimum
 - `/backups` - requires `admin` role
 - `/restore` - requires `admin` role
+- `/verify-token` - validates token and returns user info
 
-**Important**: After page refresh, user must re-login for API calls to work (credentials are kept in memory only).
+Token is stored in localStorage and persists across page refreshes.
 
 ### Backup & Version Control
 - On each save, `file_server.py` creates `.backup.YYYYMMDD_HHMMSS` files

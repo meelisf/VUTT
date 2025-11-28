@@ -25,7 +25,7 @@ interface TextEditorProps {
 type TabType = 'edit' | 'annotate' | 'history';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, readOnly = false }) => {
-  const { user, authCredentials } = useUser();
+  const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   
@@ -161,7 +161,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
-    if (!authCredentials) {
+    if (!authToken) {
       alert("Varukoopiate laadimiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
       return;
     }
@@ -178,8 +178,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         body: JSON.stringify({
           original_path: page.original_path,
           file_name: txtFilename,
-          auth_user: authCredentials.username,
-          auth_pass: authCredentials.password
+          auth_token: authToken
         })
       });
 
@@ -206,7 +205,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
-    if (!authCredentials) {
+    if (!authToken) {
       alert("Taastamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
       return;
     }
@@ -227,8 +226,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           original_path: page.original_path,
           file_name: txtFilename,
           backup_filename: backup.filename,
-          auth_user: authCredentials.username,
-          auth_pass: authCredentials.password
+          auth_token: authToken
         })
       });
 

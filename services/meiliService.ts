@@ -295,14 +295,13 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
   }
 };
 
-// Autentimisandmete tüüp API päringute jaoks
-interface AuthCredentials {
-  username: string;
-  password: string;
+// Autentimisandmete tüüp API päringute jaoks (tõendipõhine)
+interface AuthToken {
+  token: string;
 }
 
 // Abifunktsioon failisüsteemi salvestamiseks
-const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, auth?: AuthCredentials): Promise<boolean> => {
+const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, auth?: AuthToken): Promise<boolean> => {
   try {
     const imageFilename = image_url.split('/').pop() || '';
     const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
@@ -331,10 +330,9 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       page_number: page.page_number
     };
 
-    // Lisa autentimisandmed kui olemas
+    // Lisa autentimistõend kui olemas
     if (auth) {
-      payload.auth_user = auth.username;
-      payload.auth_pass = auth.password;
+      payload.auth_token = auth.token;
     }
 
     const response = await fetch(`${FILE_API_URL}/save`, {
@@ -396,7 +394,7 @@ export const savePage = async (
   page: Page, 
   actionDescription: string = 'Muutis andmeid', 
   userName: string = 'Anonüümne',
-  auth?: AuthCredentials
+  auth?: AuthToken
 ): Promise<Page> => {
   try {
     const newHistoryEntry: HistoryEntry = {

@@ -4,6 +4,7 @@ import os
 import shutil
 import hashlib
 import glob
+import uuid
 from datetime import datetime
 
 # =========================================================
@@ -13,6 +14,10 @@ USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.jso
 # =========================================================
 
 PORT = 8002
+
+# Sessioonide hoidla (token -> user info)
+# NB: Serveri restart kustutab kõik sessioonid
+sessions = {}
 
 def load_users():
     """Laeb kasutajad JSON failist. Loob faili kui ei eksisteeri."""
@@ -48,22 +53,33 @@ def verify_user(username, password):
         }
     return None
 
-def require_auth(data, min_role=None):
+def create_session(user):
+    """Loob uue sessiooni ja tagastab tokeni."""
+    token = str(uuid.uuid4())
+    sessions[token] = {
+        "user": user,
+        "created_at": datetime.now().isoformat()
+    }
+    print(f"Uus sessioon loodud: {user['username']} (aktiivseid sessioone: {len(sessions)})")
+    return token
+
+def require_token(data, min_role=None):
     """
-    Kontrollib autentimist päringus.
+    Kontrollib tokenit päringus.
     Tagastab (user, error_response) tuple.
     Kui autentimine õnnestub, on error_response None.
     min_role: 'viewer', 'editor', 'admin' - minimaalne nõutav roll
     """
-    username = data.get('auth_user', '').strip()
-    password = data.get('auth_pass', '')
+    token = data.get('auth_token', '').strip()
     
-    if not username or not password:
-        return None, {"status": "error", "message": "Autentimine nõutud"}
+    if not token:
+        return None, {"status": "error", "message": "Autentimine nõutud (token puudub)"}
     
-    user = verify_user(username, password)
-    if not user:
-        return None, {"status": "error", "message": "Vale kasutajanimi või parool"}
+    session = sessions.get(token)
+    if not session:
+        return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
+    
+    user = session["user"]
     
     # Rollide hierarhia kontroll
     if min_role:
@@ -74,6 +90,11 @@ def require_auth(data, min_role=None):
             return None, {"status": "error", "message": f"Vajab vähemalt '{min_role}' õigusi"}
     
     return user, None
+
+# Vana funktsioon tagasiühilduvuseks (eemaldatakse tulevikus)
+def require_auth(data, min_role=None):
+    """DEPRECATED: Kasuta require_token() asemel."""
+    return require_token(data, min_role)
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -101,7 +122,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 
                 if user:
-                    response = {"status": "success", "user": user}
+                    # Loome sessiooni ja tagastame tokeni
+                    token = create_session(user)
+                    response = {"status": "success", "user": user, "token": token}
                 else:
                     response = {"status": "error", "message": "Vale kasutajanimi või parool"}
                 
@@ -109,6 +132,32 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
             except Exception as e:
                 print(f"LOGIN VIGA: {e}")
+                self.send_error(500, str(e))
+        
+        elif self.path == '/verify-token':
+            # Tokeni kehtivuse kontroll (lehe laadimisel)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                token = data.get('token', '').strip()
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                session = sessions.get(token)
+                if session:
+                    response = {"status": "success", "user": session["user"], "valid": True}
+                else:
+                    response = {"status": "error", "valid": False, "message": "Token aegunud"}
+                
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"VERIFY-TOKEN VIGA: {e}")
                 self.send_error(500, str(e))
                 
         elif self.path == '/save':
@@ -118,7 +167,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(post_data)
                 
                 # Autentimise kontroll - nõuab vähemalt 'editor' õigusi
-                user, auth_error = require_auth(data, min_role='editor')
+                user, auth_error = require_token(data, min_role='editor')
                 if auth_error:
                     self.send_response(401)
                     self.send_header('Content-type', 'application/json')
@@ -223,7 +272,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(post_data)
                 
                 # Autentimise kontroll - nõuab vähemalt 'admin' õigusi
-                user, auth_error = require_auth(data, min_role='admin')
+                user, auth_error = require_token(data, min_role='admin')
                 if auth_error:
                     self.send_response(401)
                     self.send_header('Content-type', 'application/json')
@@ -263,10 +312,23 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         except ValueError:
                             pass
                 
-                # Lisame ka originaalfaili (versioon 0 - kõige vanem backup või algne fail)
-                # Esimene versioon on alati kaitstud
-                if backup_list:
-                    backup_list[-1]["is_original"] = True  # Kõige vanem backup on "originaal"
+                # Originaalfaili käsitlemine:
+                # 1. Kui originaal .txt fail eksisteerib → näita seda kui "Originaal (OCR)"
+                # 2. Kui .txt faili pole → kõige vanem backup on originaal
+                if os.path.exists(txt_path):
+                    # Originaal .txt fail on olemas - lisa see nimekirja lõppu (kõige vanem)
+                    file_mtime = os.path.getmtime(txt_path)
+                    file_dt = datetime.fromtimestamp(file_mtime)
+                    backup_list.append({
+                        "filename": safe_filename,  # Originaalfaili nimi (ilma .backup)
+                        "timestamp": "original",
+                        "formatted_date": f"Originaal (OCR) - {file_dt.strftime('%d.%m.%Y')}",
+                        "is_original": True
+                    })
+                elif backup_list:
+                    # Originaal .txt faili pole, aga on varukoopiad
+                    # Kõige vanem backup on "originaal" (kustutamatu)
+                    backup_list[-1]["is_original"] = True
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -292,7 +354,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 data = json.loads(post_data)
                 
                 # Autentimise kontroll - nõuab 'admin' õigusi (serveripoolne kontroll!)
-                user, auth_error = require_auth(data, min_role='admin')
+                user, auth_error = require_token(data, min_role='admin')
                 if auth_error:
                     self.send_response(401)
                     self.send_header('Content-type', 'application/json')
@@ -315,7 +377,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 safe_catalog = os.path.basename(original_catalog)
                 safe_filename = os.path.basename(target_filename)
                 txt_path = os.path.join(BASE_DIR, safe_catalog, safe_filename)
-                backup_path = os.path.join(BASE_DIR, safe_catalog, backup_filename)
+                
+                # Kui backup_filename on sama mis safe_filename, siis tahetakse taastada originaali
+                # (st praegust .txt faili, mitte .backup.* faili)
+                if backup_filename == safe_filename:
+                    # Originaali taastamine - lihtsalt loeme praeguse faili sisu
+                    if not os.path.exists(txt_path):
+                        self.send_response(404)
+                        self.send_header('Content-type', 'application/json')
+                        self.send_header('Access-Control-Allow-Origin', '*')
+                        self.end_headers()
+                        response = {"status": "error", "message": "Originaalfaili ei leitud"}
+                        self.wfile.write(json.dumps(response).encode('utf-8'))
+                        return
+                    backup_path = txt_path
+                else:
+                    backup_path = os.path.join(BASE_DIR, safe_catalog, backup_filename)
                 
                 # Kontrollime, et backup fail eksisteerib
                 if not os.path.exists(backup_path):

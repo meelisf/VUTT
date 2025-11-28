@@ -7,15 +7,9 @@ interface User {
   role: string;
 }
 
-// Autentimisandmed API päringute jaoks (ei salvestata localStorage'i)
-interface AuthCredentials {
-  username: string;
-  password: string;
-}
-
 interface UserContextType {
   user: User | null;
-  authCredentials: AuthCredentials | null;  // Lisatud API autentimiseks
+  authToken: string | null;  // Sessioonitõend API päringute jaoks
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
@@ -24,25 +18,53 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'vutt_user';
+const TOKEN_KEY = 'vutt_token';
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [authCredentials, setAuthCredentials] = useState<AuthCredentials | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
-  // NB: Parooli ei laeta localStorage'ist turvakaalutlustel
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-        // Kasutaja peab uuesti sisse logima, et saada API ligipääs
-      } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
+  // Tokeni verifitseerimine serverist
+  const verifyToken = async (token: string): Promise<User | null> => {
+    try {
+      const response = await fetch(`${FILE_API_URL}/verify-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await response.json();
+      if (data.status === 'success' && data.valid && data.user) {
+        return data.user;
       }
+      return null;
+    } catch (e) {
+      console.error('Token verification failed:', e);
+      return null;
     }
-    setIsLoading(false);
+  };
+
+  // Lae kasutaja ja token localStorage'ist ning verifitseeri
+  useEffect(() => {
+    const initAuth = async () => {
+      const storedToken = localStorage.getItem(TOKEN_KEY);
+      const storedUser = localStorage.getItem(STORAGE_KEY);
+      
+      if (storedToken && storedUser) {
+        // Kontrolli, kas token on veel kehtiv
+        const verifiedUser = await verifyToken(storedToken);
+        if (verifiedUser) {
+          setUser(verifiedUser);
+          setAuthToken(storedToken);
+        } else {
+          // Token aegunud, kustuta localStorage
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      }
+      setIsLoading(false);
+    };
+    initAuth();
   }, []);
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
@@ -55,11 +77,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       const data = await response.json();
       
-      if (data.status === 'success' && data.user) {
+      if (data.status === 'success' && data.user && data.token) {
         setUser(data.user);
-        // Salvestame autentimisandmed mällu (API päringute jaoks)
-        setAuthCredentials({ username, password });
+        setAuthToken(data.token);
+        // Salvestame tokeni localStorage'i (mitte parooli!)
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
+        localStorage.setItem(TOKEN_KEY, data.token);
         return { success: true };
       } else {
         return { success: false, error: data.message || 'Sisselogimine ebaõnnestus' };
@@ -72,12 +95,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     setUser(null);
-    setAuthCredentials(null);  // Kustutame ka autentimisandmed
+    setAuthToken(null);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(TOKEN_KEY);
   };
 
   return (
-    <UserContext.Provider value={{ user, authCredentials, login, logout, isLoading }}>
+    <UserContext.Provider value={{ user, authToken, login, logout, isLoading }}>
       {children}
     </UserContext.Provider>
   );

@@ -126,7 +126,7 @@ npm run build  # → dist/ kaust
 
 ## Kasutajahaldus
 
-Kasutajad on defineeritud `users.json` failis:
+Kasutajad on defineeritud `users.json` failis (sama kataloog kus `file_server.py`):
 ```json
 {
   "kasutajanimi": {
@@ -147,15 +147,134 @@ Kasutajad on defineeritud `users.json` failis:
 echo -n "parool" | sha256sum
 ```
 
+## Serveri seadistamine (uus masin)
+
+### Vajalikud failid serveris
+
+```
+/path/to/vutt-server/
+├── file_server.py       # Failiserver (port 8002)
+├── image_server.py      # Pildiserver (port 8001)
+├── users.json           # Kasutajate andmebaas (KOHUSTUSLIK!)
+├── meilisearch          # Meilisearch binary
+└── start_services.sh    # Teenuste käivitamine
+
+/path/to/data/           # Dokumentide andmed (BASE_DIR)
+├── kataloog1/
+│   ├── dokument1.jpg
+│   ├── dokument1.txt
+│   └── dokument1.json   # Metaandmed (automaatne)
+└── kataloog2/
+    └── ...
+```
+
+### Konfiguratsioon
+
+**1. `file_server.py`** - muuda BASE_DIR:
+```python
+BASE_DIR = "/path/to/data"  # Sinu andmete kaust
+PORT = 8002
+```
+
+**2. `image_server.py`** - muuda BASE_DIR:
+```python
+BASE_DIR = "/path/to/data"  # Sama mis file_server.py
+PORT = 8001
+```
+
+**3. `.env`** (andmete üleslaadimisel):
+```bash
+MEILISEARCH_URL=http://localhost:7700
+MEILISEARCH_MASTER_KEY=sinu_võti
+```
+
+**4. `config.ts`** (frontend):
+```typescript
+export const MEILI_HOST = 'http://SERVER_IP:7700';
+export const MEILI_API_KEY = 'sinu_võti';
+export const IMAGE_BASE_URL = 'http://SERVER_IP:8001';
+export const FILE_API_URL = 'http://SERVER_IP:8002';
+```
+
+### Käivitamine
+
+```bash
+# 1. Meilisearch (andmebaas)
+./meilisearch --master-key="SINU_VÕTI" &
+
+# 2. Pildiserver
+python3 image_server.py &
+
+# 3. Failiserver (autentimine, salvestamine)
+python3 file_server.py &
+
+# 4. Frontend serveeritakse nt nginx/Apache kaudu dist/ kaustast
+```
+
+### Automaatne käivitamine (systemd)
+
+Näide `file_server.service`:
+```ini
+[Unit]
+Description=VUTT File Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/path/to/vutt-server
+ExecStart=/usr/bin/python3 /path/to/vutt-server/file_server.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Kontroll-loend uue serveri jaoks
+
+- [ ] `users.json` on olemas ja õiges kohas
+- [ ] BASE_DIR viitab õigele andmekaustale
+- [ ] Meilisearch töötab ja on indekseeritud
+- [ ] Pordid 7700, 8001, 8002 on avatud
+- [ ] `config.ts` IP-aadressid on õiged
+- [ ] Frontend on builditud (`npm run build`)
+
 ## Turvalisus
 
 - ✅ Serveripoolne autentimine API endpointidel
+- ✅ Tõendipõhine sessioon (24h kehtivus)
 - ✅ Rollipõhine ligipääsukontroll
 - ✅ Path traversal kaitse
 - ⚠️ HTTP (mitte HTTPS) - sobib sisevõrku
 - ⚠️ SHA-256 ilma salt'ita - põhiline kaitse
 
 **Soovitus tootmises:** Kasutada reverse proxy't (nginx/Caddy) HTTPS-i jaoks.
+
+## Varukoopiad ja versioonihaldus
+
+### Automaatsed varukoopiad
+
+Iga salvestamisega luuakse automaatne varukoopia:
+```
+dokument.txt                    # Praegune versioon
+dokument.txt.backup.20241128_143052  # Varukoopia (kuupäev_kellaaeg)
+dokument.txt.backup.20241127_091523  # Vanem varukoopia
+```
+
+### Varukoopiate poliitika
+
+- **Max 10 varukoopiat** faili kohta
+- **Originaal on kaitstud** - kõige esimest versiooni ei kustutata kunagi
+- Kui faili pole veel muudetud, näidatakse algset `.txt` faili kui "Originaal (OCR)"
+- Vanemad vaheversioonid kustutatakse automaatselt (v.a originaal)
+
+### Taastamine
+
+1. Admin logib sisse
+2. Avab dokumendi → "Ajalugu" sakk
+3. Vajutab "Värskenda" varukoopiate nägemiseks
+4. Valib versiooni → "Taasta"
+5. Tekst laetakse editorisse → **vajuta "Salvesta"** kinnitamiseks
 
 ## Failide struktuur
 
