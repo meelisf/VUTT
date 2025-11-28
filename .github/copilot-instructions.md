@@ -79,7 +79,30 @@ python3 2-1_upload_to_meili.py    # Recreates 'teosed' index
 - SHA-256 password hashing (see `users.json` structure)
 - Login handled by `file_server.py /login` endpoint
 - User session stored in `localStorage` key `vutt_user`
-- **Current model**: Anonymous users can view, logged-in users can edit (role enforcement planned)
+- **Auth credentials** stored in memory via `UserContext.authCredentials` (not in localStorage for security)
+
+#### Role Hierarchy
+```
+viewer < editor < admin
+```
+- `viewer` - Can view documents (read-only)
+- `editor` - Can save/edit documents
+- `admin` - Can restore backups, manage versions
+
+#### API Authentication
+All write endpoints require `auth_user` + `auth_pass` in request body:
+- `/save` - requires `editor` role minimum
+- `/backups` - requires `admin` role
+- `/restore` - requires `admin` role
+
+**Important**: After page refresh, user must re-login for API calls to work (credentials are kept in memory only).
+
+### Backup & Version Control
+- On each save, `file_server.py` creates `.backup.YYYYMMDD_HHMMSS` files
+- Maximum 10 backups per file: 1 original (oldest, protected) + 9 recent
+- Original version is never deleted (protection against data loss)
+- Admin can restore any backup via "Ajalugu" tab in TextEditor
+- Restore loads text into editor; user must click "Salvesta" to persist
 
 ### Page Status Workflow
 ```typescript
