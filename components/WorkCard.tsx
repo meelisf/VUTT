@@ -21,6 +21,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
     // Salvesta dashboard URL koos query parameetritega
     const currentUrl = location.pathname + location.search;
     sessionStorage.setItem('vutt_dashboard_url', currentUrl);
+    // Kustuta otsingu URL, sest kasutaja tuleb Dashboard'ilt
+    sessionStorage.removeItem('vutt_search_url');
     navigate(`/work/${work.id}/1`);
   };
 
