@@ -59,15 +59,13 @@ const Workspace: React.FC = () => {
   }, [workId, currentPageNum, navigate]);
 
   const handleSave = async (updatedPage: Page) => {
+    // Kontrolli, kas kasutaja on sisse logitud
+    if (!user) {
+      alert('Salvestamiseks pead olema sisse logitud.');
+      return;
+    }
     // Salvestame ja saame tagasi uuendatud lehe (koos uue ajalooga)
-    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user?.name || 'Anonüümne');
-    setPage(savedPage);
-  };
-
-  const handleStatusChange = async (newStatus: PageStatus) => {
-    if (!page) return;
-    const tempPage = { ...page, status: newStatus };
-    const savedPage = await savePage(tempPage, `Muutis staatuse: ${page.status} -> ${newStatus}`, user?.name || 'Anonüümne');
+    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user.name);
     setPage(savedPage);
   };
 
@@ -203,8 +201,8 @@ const Workspace: React.FC = () => {
             page={page}
             work={work}
             onSave={handleSave}
-            onStatusChange={handleStatusChange}
             onUnsavedChanges={setHasUnsavedChanges}
+            readOnly={!user}
           />
         </div>
       </div>

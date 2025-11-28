@@ -9,13 +9,13 @@ interface TextEditorProps {
   page: Page;
   work?: Work;
   onSave: (updatedPage: Page) => Promise<void>;
-  onStatusChange: (status: PageStatus) => void;
   onUnsavedChanges?: (hasChanges: boolean) => void;
+  readOnly?: boolean;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusChange, onUnsavedChanges }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, readOnly = false }) => {
   const { user } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
@@ -283,7 +283,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
             </div>
             
             <div className="flex items-center gap-3">
-              {hasUnsavedChanges && (
+              {readOnly && (
+                <span className="text-xs text-gray-500 flex items-center gap-1 bg-gray-100 px-2 py-1 rounded">
+                  Ainult lugemiseks
+                </span>
+              )}
+              {hasUnsavedChanges && !readOnly && (
                 <span className="text-xs text-amber-600 flex items-center gap-1">
                   <AlertTriangle size={14} />
                   Salvestamata muudatused
@@ -291,12 +296,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
               )}
               <button 
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || readOnly}
                   className={`flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium text-white rounded shadow-sm transition-colors disabled:opacity-50 ${
-                    hasUnsavedChanges 
+                    hasUnsavedChanges && !readOnly
                       ? 'bg-amber-500 hover:bg-amber-600' 
                       : 'bg-primary-600 hover:bg-primary-700'
                   }`}
+                  title={readOnly ? 'Salvestamiseks logi sisse' : ''}
               >
                   {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
                   {isSaving ? 'Salvestan...' : 'Salvesta'}
@@ -316,11 +322,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                         <span className="text-xs font-semibold text-gray-500 uppercase">Staatus:</span>
                         <select 
                             value={status}
-                            onChange={(e) => {
-                                setStatus(e.target.value as PageStatus);
-                                onStatusChange(e.target.value as PageStatus);
-                            }}
-                            className={`text-sm font-medium px-2 py-1 rounded border outline-none ${
+                            onChange={(e) => setStatus(e.target.value as PageStatus)}
+                            disabled={readOnly}
+                            className={`text-sm font-medium px-2 py-1 rounded border outline-none disabled:cursor-not-allowed ${
                                 status === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
                                 status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                 'bg-gray-50 text-gray-700 border-gray-200'
@@ -359,7 +363,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         onScroll={handleScroll}
-                        className="flex-1 w-full p-6 bg-white outline-none font-serif text-lg leading-relaxed text-gray-800 resize-none whitespace-pre overflow-auto"
+                        readOnly={readOnly}
+                        className={`flex-1 w-full p-6 bg-white outline-none font-serif text-lg leading-relaxed text-gray-800 resize-none whitespace-pre overflow-auto ${readOnly ? 'cursor-default' : ''}`}
                         placeholder="Tekst puudub..."
                         spellCheck={false}
                     />
@@ -421,51 +426,55 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                                     {tag}
                                     <Search size={12} className="opacity-0 group-hover:opacity-50" />
                                 </button>
-                                <button onClick={() => removeTag(tag)} className="ml-1.5 text-primary-400 hover:text-red-500">
-                                    <X size={14} />
-                                </button>
+                                {!readOnly && (
+                                  <button onClick={() => removeTag(tag)} className="ml-1.5 text-primary-400 hover:text-red-500">
+                                      <X size={14} />
+                                  </button>
+                                )}
                             </span>
                         ))}
                     </div>
-                    <div className="relative">
-                      <input
-                          ref={tagInputRef}
-                          type="text"
-                          value={newTag}
-                          onChange={(e) => handleTagInputChange(e.target.value)}
-                          onKeyDown={handleTagKeyDown}
-                          onFocus={() => newTag.length > 0 && setShowTagSuggestions(true)}
-                          placeholder="+ Lisa märksõna..."
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none transition-shadow"
-                      />
-                      {/* Autocomplete dropdown */}
-                      {showTagSuggestions && filteredSuggestions.length > 0 && (
-                        <div 
-                          ref={suggestionsRef}
-                          className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                        >
-                          {filteredSuggestions.slice(0, 10).map((suggestion, idx) => (
-                            <button
-                              key={suggestion}
-                              type="button"
-                              onClick={() => addTagFromInput(suggestion)}
-                              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                                idx === selectedSuggestionIndex 
-                                  ? 'bg-primary-50 text-primary-700' 
-                                  : 'text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              {suggestion}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {showTagSuggestions && newTag.length > 0 && filteredSuggestions.length === 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500">
-                          Vajuta Enter, et lisada uus märksõna: <strong className="text-primary-600">{newTag}</strong>
-                        </div>
-                      )}
-                    </div>
+                    {!readOnly && (
+                      <div className="relative">
+                        <input
+                            ref={tagInputRef}
+                            type="text"
+                            value={newTag}
+                            onChange={(e) => handleTagInputChange(e.target.value)}
+                            onKeyDown={handleTagKeyDown}
+                            onFocus={() => newTag.length > 0 && setShowTagSuggestions(true)}
+                            placeholder="+ Lisa märksõna..."
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none transition-shadow"
+                        />
+                        {/* Autocomplete dropdown */}
+                        {showTagSuggestions && filteredSuggestions.length > 0 && (
+                          <div 
+                            ref={suggestionsRef}
+                            className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
+                          >
+                            {filteredSuggestions.slice(0, 10).map((suggestion, idx) => (
+                              <button
+                                key={suggestion}
+                                type="button"
+                                onClick={() => addTagFromInput(suggestion)}
+                                className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                                  idx === selectedSuggestionIndex 
+                                    ? 'bg-primary-50 text-primary-700' 
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {showTagSuggestions && newTag.length > 0 && filteredSuggestions.length === 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500">
+                            Vajuta Enter, et lisada uus märksõna: <strong className="text-primary-600">{newTag}</strong>
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
 
                 {/* Comments */}
@@ -488,32 +497,40 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onStatusCha
                                     <span className="font-semibold text-primary-700">{comment.author}</span>
                                     <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
                                 </div>
-                                <button 
-                                    onClick={() => removeComment(comment.id)}
-                                    className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white"
-                                    title="Kustuta kommentaar"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
+                                {!readOnly && (
+                                  <button 
+                                      onClick={() => removeComment(comment.id)}
+                                      className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white"
+                                      title="Kustuta kommentaar"
+                                  >
+                                      <Trash2 size={14} />
+                                  </button>
+                                )}
                             </div>
                         ))}
                     </div>
 
-                    <div className="mt-auto">
-                        <textarea
-                            value={newComment}
-                            onChange={(e) => setNewComment(e.target.value)}
-                            placeholder="Kirjuta siia..."
-                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
-                        />
-                        <button 
-                            onClick={addComment}
-                            disabled={!newComment.trim()}
-                            className="w-full py-2 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                        >
-                            Lisa Kommentaar
-                        </button>
-                    </div>
+                    {!readOnly ? (
+                      <div className="mt-auto">
+                          <textarea
+                              value={newComment}
+                              onChange={(e) => setNewComment(e.target.value)}
+                              placeholder="Kirjuta siia..."
+                              className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
+                          />
+                          <button 
+                              onClick={addComment}
+                              disabled={!newComment.trim()}
+                              className="w-full py-2 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
+                          >
+                              Lisa Kommentaar
+                          </button>
+                      </div>
+                    ) : (
+                      <div className="mt-auto text-center py-4 text-sm text-gray-400">
+                        Kommentaaride lisamiseks logi sisse
+                      </div>
+                    )}
                 </div>
             </div>
         )}
