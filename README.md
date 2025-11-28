@@ -182,7 +182,3 @@ VUTT/
 ## Litsents
 
 MIT
-
-## Kontakt
-
-[Lisa siia kontaktinfo]
