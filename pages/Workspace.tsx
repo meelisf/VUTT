@@ -6,7 +6,7 @@ import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
 import { useUser } from '../contexts/UserContext';
-import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, AlertTriangle, Search, Home } from 'lucide-react';
 
 const Workspace: React.FC = () => {
   const { user, authToken } = useUser();
@@ -135,18 +135,49 @@ const Workspace: React.FC = () => {
     navigate(savedUrl);
   };
 
+  // Navigeerimine tagasi otsingusse
+  const handleNavigateToSearch = () => {
+    if (hasUnsavedChanges) {
+      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
+      if (!confirmed) return;
+    }
+    const searchUrl = sessionStorage.getItem('vutt_search_url');
+    if (searchUrl) {
+      navigate(searchUrl);
+    } else {
+      // Fallback: kui otsingu URL puudub, mine otsingu avalehele
+      navigate('/search');
+    }
+  };
+
+  // Kas kasutaja tuli otsingust? (loe iga renderiga uuesti)
+  const searchUrl = sessionStorage.getItem('vutt_search_url');
+  const hasSearchHistory = !!searchUrl;
+
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Top Navigation Bar */}
       <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-10">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          {/* Tagasi otsingusse (kui tuli otsingust) */}
+          {hasSearchHistory && (
+            <button
+              onClick={handleNavigateToSearch}
+              className="p-1.5 hover:bg-primary-50 rounded-md text-primary-600 transition-colors flex items-center gap-1.5 text-sm"
+              title="Tagasi otsingusse"
+            >
+              <Search size={16} />
+              <span className="hidden sm:inline">← Otsing</span>
+            </button>
+          )}
+          {/* Avaleht */}
           <button
             onClick={handleNavigateBack}
-            className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-2"
-            title="Tagasi"
+            className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
+            title="Avaleht"
           >
-            <ArrowLeft size={18} />
-            <span className="font-bold text-gray-800 tracking-tight">VUTT</span>
+            <Home size={16} />
+            <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">VUTT</span>
           </button>
           <div className="h-6 w-px bg-gray-300"></div>
           <div className="flex items-center gap-2 text-sm">

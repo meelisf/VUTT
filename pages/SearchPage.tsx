@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { searchContent } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { ArrowLeft, Search, Loader2, AlertTriangle, ExternalLink, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare } from 'lucide-react';
-import { IMAGE_BASE_URL } from '../config';
+import { ArrowLeft, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare } from 'lucide-react';
 
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
+    const location = useLocation();  // React Router location (töötab MemoryRouter'iga)
     const [searchParams, setSearchParams] = useSearchParams();
 
     // URL params control the actual search
@@ -140,33 +140,31 @@ const SearchPage: React.FC = () => {
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
         const snippet = hit._formatted?.lehekylje_tekst || hit.lehekylje_tekst;
-        const filename = hit.lehekylje_pilt
-            ? hit.lehekylje_pilt.split('/').pop()
-            : `Lk ${hit.lehekylje_number}`;
-        const fullImageUrl = hit.lehekylje_pilt ? `${IMAGE_BASE_URL}/${encodeURI(hit.lehekylje_pilt)}` : '#';
 
         // Helper to find relevant tags/comments (those containing highlight marks)
         const hasHighlightedTags = hit._formatted?.tags?.some(t => t.includes('<em'));
         const highlightedComments = hit._formatted?.comments?.filter(c => c.text.includes('<em'));
 
+        // Salvesta otsingu URL sessionStorage'i enne töölauasse minemist
+        const saveSearchAndNavigate = () => {
+            // Kasuta React Router location'it (MemoryRouter ei muuda window.location)
+            const fullUrl = location.pathname + location.search;
+            sessionStorage.setItem('vutt_search_url', fullUrl);
+            navigate(`/work/${hit.teose_id}/${hit.lehekylje_number}`);
+        };
+
         return (
             <div key={hit.id} className={`flex flex-col gap-2 p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
                 <div className="flex items-center gap-3">
-                    <a
-                        href={fullImageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-mono text-primary-600 hover:underline flex items-center gap-1"
-                        title="Ava originaalpilt uues aknas"
-                    >
-                        {filename} <ExternalLink size={10} />
-                    </a>
+                    <span className="text-xs font-mono text-gray-500">
+                        Lk {hit.lehekylje_number}
+                    </span>
                     <span className="text-gray-300">|</span>
                     <button
-                        onClick={() => navigate(`/work/${hit.teose_id}/${hit.lehekylje_number}`)}
-                        className="text-xs font-bold text-gray-700 hover:text-primary-700 hover:underline"
+                        onClick={saveSearchAndNavigate}
+                        className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline"
                     >
-                        Ava töölaud (Lk {hit.lehekylje_number})
+                        Ava töölaud →
                     </button>
                 </div>
 
