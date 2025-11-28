@@ -43,6 +43,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
         <img
           src={work.thumbnail_url}
           alt={work.title}
+          loading="lazy"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">

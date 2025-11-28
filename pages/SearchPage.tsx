@@ -3,7 +3,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { searchContent } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { ArrowLeft, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
+import { IMAGE_BASE_URL } from '../config';
+
+// Abifunktsioon pildi URL-i ehitamiseks
+const getImageUrl = (imagePath: string): string => {
+    if (!imagePath) return '';
+    const cleanPath = imagePath.startsWith('/') ? imagePath.slice(1) : imagePath;
+    return `${IMAGE_BASE_URL}/${encodeURI(cleanPath)}`;
+};
 
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
@@ -154,8 +162,9 @@ const SearchPage: React.FC = () => {
         };
 
         return (
-            <div key={hit.id} className={`flex flex-col gap-2 p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
-                <div className="flex items-center gap-3">
+            <div key={hit.id} className={`p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
+                {/* Header rida: lk nr + töölaud link */}
+                <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs font-mono text-gray-500">
                         Lk {hit.lehekylje_number}
                     </span>
@@ -168,46 +177,69 @@ const SearchPage: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Main Text Snippet */}
-                {(selectedScope === 'all' || selectedScope === 'original') && snippet && (
-                    <div
-                        className="text-sm text-gray-800 leading-relaxed font-serif bg-white p-2 rounded border border-gray-100 shadow-sm"
-                        dangerouslySetInnerHTML={{
-                            __html: snippet.replace(/\n/g, '<br>')
-                        }}
-                    />
-                )}
+                {/* Tekstikast + pilt kõrvuti */}
+                <div className="flex gap-3">
+                    {/* Main Text Snippet */}
+                    <div className="flex-1 min-w-0">
+                        {(selectedScope === 'all' || selectedScope === 'original') && snippet && (
+                            <div
+                                className="text-sm text-gray-800 leading-relaxed font-serif bg-white p-2 rounded border border-gray-100 shadow-sm"
+                                dangerouslySetInnerHTML={{
+                                    __html: snippet.replace(/\n/g, '<br>')
+                                }}
+                            />
+                        )}
 
-                {/* Matched Tags */}
-                {hasHighlightedTags && (
-                    <div className="flex flex-wrap gap-2 mt-1">
-                        {hit._formatted?.tags?.filter(t => t.includes('<em')).map((tagHtml, idx) => (
-                            <span
-                                key={idx}
-                                className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full"
-                            >
-                                <Tag size={10} />
-                                <span dangerouslySetInnerHTML={{ __html: tagHtml }} />
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                {/* Matched Comments */}
-                {highlightedComments && highlightedComments.length > 0 && (
-                    <div className="space-y-2 mt-1">
-                        {highlightedComments.map((comment, idx) => (
-                            <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-gray-800">
-                                <div className="flex items-center gap-1 mb-1 font-bold text-yellow-800">
-                                    <MessageSquare size={12} />
-                                    <span>Kommentaar ({comment.author})</span>
-                                </div>
-                                <div dangerouslySetInnerHTML={{ __html: comment.text }} />
+                        {/* Matched Tags */}
+                        {hasHighlightedTags && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {hit._formatted?.tags?.filter(t => t.includes('<em')).map((tagHtml, idx) => (
+                                    <span
+                                        key={idx}
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full"
+                                    >
+                                        <Tag size={10} />
+                                        <span dangerouslySetInnerHTML={{ __html: tagHtml }} />
+                                    </span>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
+                        )}
 
+                        {/* Matched Comments */}
+                        {highlightedComments && highlightedComments.length > 0 && (
+                            <div className="space-y-2 mt-2">
+                                {highlightedComments.map((comment, idx) => (
+                                    <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-gray-800">
+                                        <div className="flex items-center gap-1 mb-1 font-bold text-yellow-800">
+                                            <MessageSquare size={12} />
+                                            <span>Kommentaar ({comment.author})</span>
+                                        </div>
+                                        <div dangerouslySetInnerHTML={{ __html: comment.text }} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Thumbnail paremal - samal tasemel tekstikastiga */}
+                    {hit.lehekylje_pilt && (
+                        <button
+                            onClick={saveSearchAndNavigate}
+                            className="shrink-0 w-20 h-28 bg-gray-100 rounded overflow-hidden hidden sm:block hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer self-start"
+                            title="Ava töölaud"
+                        >
+                            <img
+                                src={getImageUrl(hit.lehekylje_pilt)}
+                                alt=""
+                                loading="lazy"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).parentElement!.style.display = 'none';
+                                }}
+                            />
+                        </button>
+                    )}
+                </div>
             </div>
         );
     };
@@ -467,7 +499,7 @@ const SearchPage: React.FC = () => {
                                     <article key={workId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                                         {/* Work Header */}
                                         <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
-                                            <div>
+                                            <div className="flex-1 min-w-0">
                                                 <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
                                                     {firstHit.pealkiri || 'Pealkiri puudub'}
                                                 </h2>
@@ -513,7 +545,7 @@ const SearchPage: React.FC = () => {
                                                     <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
                                                 </div>
                                             </div>
-                                            <div className="shrink-0">
+                                            <div className="shrink-0 text-right">
                                                 <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600">
                                                     {workId}
                                                 </span>
