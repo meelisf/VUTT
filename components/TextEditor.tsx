@@ -14,6 +14,14 @@ interface BackupEntry {
   is_original: boolean;
 }
 
+// Erimärgi tüüp
+interface SpecialCharacter {
+  row: number;
+  character: string;
+  name?: string;
+  keyboard_code?: number | null;
+}
+
 interface TextEditorProps {
   page: Page;
   work?: Work;
@@ -49,6 +57,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [backups, setBackups] = useState<BackupEntry[]>([]);
   const [isLoadingBackups, setIsLoadingBackups] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  
+  // Erimärkide state
+  const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
+  const [showCharPanel, setShowCharPanel] = useState(true);
   
   // Salvestamata muudatuste jälgimine
   const [savedState, setSavedState] = useState({
@@ -111,6 +123,41 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     };
     loadTags();
   }, []);
+
+  // Laadime erimärgid JSON failist
+  useEffect(() => {
+    const loadSpecialCharacters = async () => {
+      try {
+        const response = await fetch('/special_characters.json');
+        if (response.ok) {
+          const data = await response.json();
+          setSpecialCharacters(data.characters || []);
+        }
+      } catch (e) {
+        console.warn('Erimärkide laadimine ebaõnnestus:', e);
+      }
+    };
+    loadSpecialCharacters();
+  }, []);
+
+  // Erimärgi sisestamine kursori kohale
+  const insertCharacter = useCallback((char: string) => {
+    if (!textareaRef.current || readOnly) return;
+    
+    const textarea = textareaRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    // Sisestame märgi kursori kohale (või asendame valitud teksti)
+    const newText = text.substring(0, start) + char + text.substring(end);
+    setText(newText);
+    
+    // Taastame kursori positsiooni pärast märgi sisestamist
+    setTimeout(() => {
+      textarea.focus();
+      textarea.selectionStart = textarea.selectionEnd = start + char.length;
+    }, 0);
+  }, [text, readOnly]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -479,6 +526,40 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         spellCheck={false}
                     />
                 </div>
+
+                {/* Erimärkide paneel */}
+                {specialCharacters.length > 0 && (
+                  <div className="mt-3 shrink-0">
+                    <button
+                      onClick={() => setShowCharPanel(!showCharPanel)}
+                      className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
+                    >
+                      {showCharPanel ? '▼' : '▶'} Erimärgid
+                    </button>
+                    {showCharPanel && (
+                      <div className="flex flex-wrap gap-1 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+                        {/* Grupeerime read */}
+                        {Array.from(new Set(specialCharacters.map(c => c.row))).sort().map(row => (
+                          <div key={row} className="flex gap-1 mr-3">
+                            {specialCharacters
+                              .filter(c => c.row === row)
+                              .map((char, idx) => (
+                                <button
+                                  key={`${row}-${idx}`}
+                                  onClick={() => insertCharacter(char.character)}
+                                  disabled={readOnly}
+                                  title={char.name || char.character}
+                                  className="w-8 h-8 flex items-center justify-center text-lg font-serif bg-white border border-gray-300 rounded hover:bg-primary-50 hover:border-primary-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                  {char.character}
+                                </button>
+                              ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
             </div>
         )}
 

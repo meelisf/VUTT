@@ -1,0 +1,61 @@
+{
+  "name": "Varauusaegsed erimärgid",
+  "description": "Tüpograafilised märgid varauusaegsete tekstide transkribeerimiseks",
+  "characters": [
+    {
+      "row": 0,
+      "character": "ſ",
+      "name": "Pikk s"
+    },
+    {
+      "row": 0,
+      "character": "¬",
+      "name": "Poolitusmärk (negation)"
+    },
+    {
+      "row": 0,
+      "character": "⸗",
+      "name": "Poolitusmärk (two-em dash)"
+    },
+    {
+      "row": 0,
+      "character": "ß",
+      "name": "Saksa terav s"
+    },
+    {
+      "row": 1,
+      "character": "Æ",
+      "name": "AE ligatuur (suur)"
+    },
+    {
+      "row": 1,
+      "character": "æ",
+      "name": "AE ligatuur (väike)"
+    },
+    {
+      "row": 1,
+      "character": "Œ",
+      "name": "OE ligatuur (suur)"
+    },
+    {
+      "row": 1,
+      "character": "œ",
+      "name": "OE ligatuur (väike)"
+    },
+        {
+      "row": 2,
+      "character": "§",
+      "name": "Paragrahv"
+    },
+    {
+      "row": 2,
+      "character": "·",
+      "name": "Keskpunkt"
+    },
+    {
+      "row": 2,
+      "character": "â",
+      "name": "a-circumflex"
+    }
+  ]
+}

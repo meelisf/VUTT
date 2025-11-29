@@ -212,22 +212,37 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Teeme varukoopia kui fail juba eksisteerib
                 backup_path = ""
                 if os.path.exists(txt_path):
+                    # ORIGINAALI KAITSE: Kui .backup.ORIGINAL ei eksisteeri, loome selle
+                    # See on ALGNE OCR-tekst, mida ei kustutata kunagi
+                    original_backup_path = f"{txt_path}.backup.ORIGINAL"
+                    if not os.path.exists(original_backup_path):
+                        # Kontrollime, kas on olemas vanemaid varukoopiad
+                        existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
+                        if existing_backups:
+                            # Vanemad backupid olemas - kõige vanem on originaal
+                            # Nimetame selle ümber .backup.ORIGINAL nimeks
+                            oldest_backup = existing_backups[0]
+                            shutil.copy2(oldest_backup, original_backup_path)
+                            print(f"Originaal kaitstud (kopeeritud vanemast): {os.path.basename(original_backup_path)}")
+                        else:
+                            # Pole ühtegi backupi - praegune .txt ON originaal
+                            shutil.copy2(txt_path, original_backup_path)
+                            print(f"Originaal kaitstud (esimene salvestus): {os.path.basename(original_backup_path)}")
+                    
+                    # Tavaline varukoopia praegusest versioonist
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     backup_path = f"{txt_path}.backup.{timestamp}"
                     shutil.copy2(txt_path, backup_path)
                     
-                    # Piirame varukoopiate arvu (max 10 faili kohta)
-                    # Kõige esimene (vanim) varukoopia on alati kaitstud - see on originaal
+                    # Piirame varukoopiate arvu (max 10 faili kohta, v.a ORIGINAL)
                     existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
+                    # Eemaldame ORIGINAL loendist - seda ei arvestata limiidi hulka
+                    existing_backups = [b for b in existing_backups if not b.endswith('.backup.ORIGINAL')]
                     if len(existing_backups) > 10:
-                        # Jätame esimese (originaal) ja 9 uuemat alles, kustutame vahelt
-                        original_backup = existing_backups[0]  # Kõige vanem = originaal
-                        newer_backups = existing_backups[1:]   # Kõik peale originaali
-                        # Kustutame vanemad vaheversioonid, jätame 9 uuemat
-                        for old_backup in newer_backups[:-9]:
+                        # Kustutame vanemad vaheversioonid, jätame 10 uuemat
+                        for old_backup in existing_backups[:-10]:
                             os.remove(old_backup)
                             print(f"Kustutatud vana varukoopia: {os.path.basename(old_backup)}")
-                        print(f"Originaal kaitstud: {os.path.basename(original_backup)}")
                 
                 # Kirjutame teksti
                 with open(txt_path, 'w', encoding='utf-8') as f:
@@ -296,7 +311,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 backups = sorted(glob.glob(f"{txt_path}.backup.*"), reverse=True)
                 
                 backup_list = []
+                original_backup_path = f"{txt_path}.backup.ORIGINAL"
+                has_original_backup = os.path.exists(original_backup_path)
+                
                 for backup_path in backups:
+                    # ORIGINAL käsitleme eraldi lõpus
+                    if backup_path.endswith('.backup.ORIGINAL'):
+                        continue
+                        
                     # Eraldame timestampi failinimest
                     parts = backup_path.rsplit('.backup.', 1)
                     if len(parts) == 2:
@@ -312,23 +334,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         except ValueError:
                             pass
                 
-                # Originaalfaili käsitlemine:
-                # 1. Kui originaal .txt fail eksisteerib → näita seda kui "Originaal (OCR)"
-                # 2. Kui .txt faili pole → kõige vanem backup on originaal
-                if os.path.exists(txt_path):
-                    # Originaal .txt fail on olemas - lisa see nimekirja lõppu (kõige vanem)
+                # Originaali käsitlemine - nüüd kasutame .backup.ORIGINAL faili
+                if has_original_backup:
+                    # .backup.ORIGINAL on olemas - see on tõeline originaal
+                    file_mtime = os.path.getmtime(original_backup_path)
+                    file_dt = datetime.fromtimestamp(file_mtime)
+                    backup_list.append({
+                        "filename": os.path.basename(original_backup_path),
+                        "timestamp": "ORIGINAL",
+                        "formatted_date": f"Originaal (OCR) - {file_dt.strftime('%d.%m.%Y')}",
+                        "is_original": True
+                    })
+                elif os.path.exists(txt_path) and not backup_list:
+                    # Pole ühtegi backupi - praegune .txt ON originaal (pole veel muudetud)
                     file_mtime = os.path.getmtime(txt_path)
                     file_dt = datetime.fromtimestamp(file_mtime)
                     backup_list.append({
-                        "filename": safe_filename,  # Originaalfaili nimi (ilma .backup)
+                        "filename": safe_filename,
                         "timestamp": "original",
                         "formatted_date": f"Originaal (OCR) - {file_dt.strftime('%d.%m.%Y')}",
                         "is_original": True
                     })
-                elif backup_list:
-                    # Originaal .txt faili pole, aga on varukoopiad
-                    # Kõige vanem backup on "originaal" (kustutamatu)
-                    backup_list[-1]["is_original"] = True
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
