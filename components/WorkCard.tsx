@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface WorkCardProps {
@@ -48,11 +47,32 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
           loading="lazy"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-          <span className="text-white font-serif text-sm bg-black/30 px-2 py-1 rounded backdrop-blur-sm">
-            {work.catalog_name}
-          </span>
-        </div>
+        {/* Tagid pildi peal */}
+        {work.tags && work.tags.length > 0 && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+            <div className="flex flex-wrap gap-1">
+              {work.tags.slice(0, 3).map((tag, idx) => (
+                <button
+                  key={idx}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    // Navigeeri otsingusse selle tagiga
+                    sessionStorage.setItem('vutt_dashboard_url', location.pathname + location.search);
+                    navigate(`/search?q=${encodeURIComponent(tag)}`);
+                  }}
+                  className="text-xs text-white bg-black/40 hover:bg-primary-600 px-2 py-0.5 rounded backdrop-blur-sm transition-colors"
+                  title={`Otsi: ${tag}`}
+                >
+                  {tag}
+                </button>
+              ))}
+              {work.tags.length > 3 && (
+                <span className="text-xs text-white/70 px-1">+{work.tags.length - 3}</span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="p-4 flex-1 flex flex-col">

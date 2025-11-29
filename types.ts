@@ -22,6 +22,7 @@ export interface Work {
   page_count: number; // Seda peame eraldi lugema või hinnanguliselt panema
   thumbnail_url: string; // lehekylje_pilt esimeselt lehelt
   work_status?: WorkStatus; // Teose koondstaatus (arvutatakse lehekülgede staatustest)
+  tags?: string[]; // Esimese lehekülje tagid (dashboardil kuvamiseks)
 }
 
 export interface Annotation {

@@ -212,7 +212,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'tags'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter,
       distinct: 'teose_id' // Return only one hit per work
@@ -254,7 +254,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       publisher: '',
       page_count: hit.teose_lehekylgede_arv || 0,
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
-      work_status: hit.teose_staatus || undefined
+      work_status: hit.teose_staatus || undefined,
+      tags: hit.tags || []
     }));
 
     return works;
