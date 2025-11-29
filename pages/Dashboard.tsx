@@ -12,6 +12,8 @@ const ITEMS_PER_PAGE = 12;
 const Dashboard: React.FC = () => {
   const { user, logout, isLoading: userLoading } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showAboutModal, setShowAboutModal] = useState(false);
+  const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
   const yearStartParam = searchParams.get('ys');
@@ -33,6 +35,26 @@ const Dashboard: React.FC = () => {
   const [sort, setSort] = useState<string>(sortParam);
 
   const navigate = useNavigate();
+
+  // Laadime "Projektist" HTML faili
+  useEffect(() => {
+    const loadAbout = async () => {
+      try {
+        const response = await fetch('/about.html');
+        if (response.ok) {
+          const html = await response.text();
+          const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+          const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+          const styleTag = styleMatch ? `<style>${styleMatch[1]}</style>` : '';
+          const bodyContent = bodyMatch ? bodyMatch[1] : html;
+          setAboutHtml(styleTag + bodyContent);
+        }
+      } catch (e) {
+        console.warn('About laadimine ebaõnnestus:', e);
+      }
+    };
+    loadAbout();
+  }, []);
 
   // Sync state with URL params (e.g. back button, or navigation from WorkCard)
   useEffect(() => {
@@ -446,6 +468,49 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200 bg-gray-50 py-4 px-8 shrink-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowAboutModal(true)}
+              className="hover:text-primary-600 transition-colors"
+            >
+              Projektist
+            </button>
+            <span className="text-gray-300">|</span>
+            <a 
+              href="https://utlib.ut.ee/et" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-primary-600 transition-colors"
+            >
+              TÜ Raamatukogu
+            </a>
+          </div>
+          <div className="text-gray-400 text-xs">
+            © 2025 Tartu Ülikool
+          </div>
+        </div>
+      </footer>
+
+      {/* About Modal */}
+      {showAboutModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAboutModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <button onClick={() => setShowAboutModal(false)} className="ml-auto text-gray-500 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <div 
+              className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
+              dangerouslySetInnerHTML={{ __html: aboutHtml || '<p>Laadimine...</p>' }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
