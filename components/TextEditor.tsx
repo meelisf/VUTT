@@ -61,6 +61,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // Erimärkide state
   const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
   const [showCharPanel, setShowCharPanel] = useState(true);
+  const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
+  const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
   
   // Salvestamata muudatuste jälgimine
   const [savedState, setSavedState] = useState({
@@ -138,6 +140,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     };
     loadSpecialCharacters();
+  }, []);
+
+  // Laadime transkribeerimise juhendi HTML failist
+  useEffect(() => {
+    const loadTranscriptionGuide = async () => {
+      try {
+        const response = await fetch('/transcription_guide.html');
+        if (response.ok) {
+          const html = await response.text();
+          // Võtame välja nii <style> kui <body> sisu
+          const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+          const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+          const styleTag = styleMatch ? `<style>${styleMatch[1]}</style>` : '';
+          const bodyContent = bodyMatch ? bodyMatch[1] : html;
+          setTranscriptionGuideHtml(styleTag + bodyContent);
+        }
+      } catch (e) {
+        console.warn('Transkribeerimise juhendi laadimine ebaõnnestus:', e);
+      }
+    };
+    loadTranscriptionGuide();
   }, []);
 
   // Erimärgi sisestamine kursori kohale
@@ -530,12 +553,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 {/* Erimärkide paneel */}
                 {specialCharacters.length > 0 && (
                   <div className="mt-3 shrink-0">
-                    <button
-                      onClick={() => setShowCharPanel(!showCharPanel)}
-                      className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1 mb-2"
-                    >
-                      {showCharPanel ? '▼' : '▶'} Erimärgid
-                    </button>
+                    <div className="flex items-center gap-3 mb-2">
+                      <button
+                        onClick={() => setShowCharPanel(!showCharPanel)}
+                        className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
+                      >
+                        {showCharPanel ? '▼' : '▶'} Erimärgid
+                      </button>
+                      <span className="text-gray-300">|</span>
+                      <button
+                        onClick={() => setShowTranscriptionGuide(true)}
+                        className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
+                      >
+                        Transkribeerimise juhend
+                      </button>
+                    </div>
                     {showCharPanel && (
                       <div className="flex flex-wrap gap-1 p-2 bg-gray-50 border border-gray-200 rounded-lg">
                         {/* Grupeerime read */}
@@ -558,6 +590,24 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         ))}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Transkribeerimise juhendi modaal */}
+                {showTranscriptionGuide && (
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
+                    <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                        <h2 className="text-lg font-bold text-gray-800">Transkribeerimise juhend</h2>
+                        <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
+                          <X size={20} />
+                        </button>
+                      </div>
+                      <div 
+                        className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
+                        dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || '<p>Juhendi laadimine...</p>' }}
+                      />
+                    </div>
                   </div>
                 )}
             </div>

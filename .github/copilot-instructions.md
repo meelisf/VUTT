@@ -104,10 +104,22 @@ Token is stored in localStorage and persists across page refreshes.
 
 ### Backup & Version Control
 - On each save, `file_server.py` creates `.backup.YYYYMMDD_HHMMSS` files
-- Maximum 10 backups per file: 1 original (oldest, protected) + 9 recent
-- Original version is never deleted (protection against data loss)
+- **Original protection**: `.backup.ORIGINAL` preserves the first version (OCR output) forever
+- Maximum 10 timestamped backups per file (ORIGINAL doesn't count toward limit)
 - Admin can restore any backup via "Ajalugu" tab in TextEditor
 - Restore loads text into editor; user must click "Salvesta" to persist
+- Migration script: `scripts/create_original_backups.py` creates ORIGINAL backups for existing files
+
+### Special Characters & Transcription Guide
+- **`public/special_characters.json`** - configurable character palette for text editor
+- **`public/transcription_guide.html`** - transcription rules (loaded dynamically, editable without code changes)
+- TextEditor shows "Erimärgid | Transkribeerimise juhend" below the text area
+- Clicking a character inserts it at cursor position
+
+#### Hyphenation marks in Meilisearch
+- `-` (hyphen) and `⸗` (two-em dash) work correctly for search across line breaks
+- `¬` (negation sign) does NOT work - Meilisearch treats it as a word separator
+- Use `scripts/replace_negation_sign.py` to convert `¬` → `-` in corpus
 
 ### Page Status Workflow
 ```typescript
@@ -133,6 +145,7 @@ Work status is denormalized: `teose_staatus` is stored on every page document fo
 - `/services/` - API/data layer (meiliService.ts is the primary one)
 - `/contexts/` - React Context providers
 - `/scripts/` - Migration and utility scripts
+- `/public/` - Static assets (special_characters.json, transcription_guide.html)
 - `*.py` - Backend servers (simple http.server based)
 - `1-1_consolidate_data.py`, `2-1_upload_to_meili.py` - Data pipeline scripts
 
