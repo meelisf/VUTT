@@ -37,6 +37,30 @@ This is necessary because Meilisearch `distinct` returns whichever document matc
 
 The second query is batched (100 work IDs per request) and executed in parallel for performance.
 
+#### Full-Text Search (`pages/SearchPage.tsx`)
+The `searchContent()` function supports two modes:
+
+**Grouped mode** (default): Shows 10 works per page with accordions
+- Two parallel queries: facets query (limit=0) + distinct query
+- Each work shows first hit, accordion expands to show up to 10 more hits
+- `hitCount` from facets shows total matches per work
+- "Otsi kõik X vastet sellest teosest" link for works with >10 hits
+
+**Work filter mode** (`workId` parameter): Shows all hits from one work
+- Single query without `distinct`, 20 hits per page
+- Detailed work info in status bar (title, author, year, ID)
+- Same UI, just filtered to one work
+
+**Sidebar filters**:
+- Otsingu ulatus (scope): all / original text only / annotations only
+- Ajavahemik (year range): start/end year inputs
+- Teos (work): radio buttons with hit counts, sorted by relevance
+
+**UX details**:
+- Accordion toggle preserves scroll position (saves scrollTop before state change, restores after DOM update)
+- "Tühjenda filtrid" button appears when any filter is active
+- Work filter integrates with URL params (`?work=teose_id`)
+
 ### Meilisearch Schema (index: `teosed`)
 Documents represent individual pages with fields:
 - `id`, `teose_id` (work ID), `lehekylje_number` (page number), `teose_lehekylgede_arv` (total pages)
