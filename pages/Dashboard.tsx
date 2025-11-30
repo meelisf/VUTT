@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { searchWorks } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
@@ -8,11 +8,13 @@ import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOu
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
+const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 
 const Dashboard: React.FC = () => {
   const { user, logout, isLoading: userLoading } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
@@ -54,6 +56,43 @@ const Dashboard: React.FC = () => {
       }
     };
     loadAbout();
+  }, []);
+
+  // Taasta scroll positsioon pärast teoste laadimist
+  useEffect(() => {
+    if (!loading && works.length > 0 && scrollContainerRef.current) {
+      const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
+      if (savedScroll) {
+        const scrollY = parseInt(savedScroll, 10);
+        // Kasuta setTimeout, et DOM jõuaks uuenduda
+        setTimeout(() => {
+          scrollContainerRef.current?.scrollTo(0, scrollY);
+        }, 50);
+      }
+    }
+  }, [loading, works]);
+
+  // Salvesta scroll positsioon jooksvalt scrollimise ajal
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      sessionStorage.setItem(SCROLL_STORAGE_KEY, container.scrollTop.toString());
+    };
+
+    // Kasuta throttle'it, et mitte liiga tihti salvestada
+    let timeout: ReturnType<typeof setTimeout>;
+    const throttledScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(handleScroll, 100);
+    };
+
+    container.addEventListener('scroll', throttledScroll);
+    return () => {
+      container.removeEventListener('scroll', throttledScroll);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Sync state with URL params (e.g. back button, or navigation from WorkCard)
@@ -196,7 +235,7 @@ const Dashboard: React.FC = () => {
         onClose={() => setShowLoginModal(false)} 
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">
 
           {/* Error Banner */}
