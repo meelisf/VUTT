@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { searchContent, searchWorkHits } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText, X } from 'lucide-react';
+import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -15,7 +15,6 @@ const getImageUrl = (imagePath: string): string => {
 
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();  // React Router location
     const [searchParams, setSearchParams] = useSearchParams();
 
     // URL params control the actual search
@@ -26,14 +25,12 @@ const SearchPage: React.FC = () => {
     // Filter params from URL
     const yearStartParam = searchParams.get('ys') ? parseInt(searchParams.get('ys')!) : undefined;
     const yearEndParam = searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined;
-    const catalogParam = searchParams.get('cat') || 'all';
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
 
     // Local state for input fields
     const [inputValue, setInputValue] = useState(queryParam);
     const [yearStart, setYearStart] = useState<string>(yearStartParam?.toString() || '1630');
     const [yearEnd, setYearEnd] = useState<string>(yearEndParam?.toString() || '1710');
-    const [selectedCatalog, setSelectedCatalog] = useState<string>(catalogParam);
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
     const [selectedWork, setSelectedWork] = useState<string>(workIdParam); // Teose filter
     const [selectedWorkInfo, setSelectedWorkInfo] = useState<{title: string, year?: string | number, author?: string} | null>(null); // Valitud teose info
@@ -68,7 +65,6 @@ const SearchPage: React.FC = () => {
                 prev.delete('p');
                 prev.delete('ys');
                 prev.delete('ye');
-                prev.delete('cat');
                 prev.delete('scope');
                 prev.delete('work');
             } else {
@@ -77,7 +73,6 @@ const SearchPage: React.FC = () => {
 
                 if (yearStart) prev.set('ys', yearStart); else prev.delete('ys');
                 if (yearEnd) prev.set('ye', yearEnd); else prev.delete('ye');
-                if (selectedCatalog && selectedCatalog !== 'all') prev.set('cat', selectedCatalog); else prev.delete('cat');
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
             }
@@ -94,7 +89,6 @@ const SearchPage: React.FC = () => {
             const options: ContentSearchOptions = {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
-                catalog: catalogParam,
                 scope: scopeParam,
                 workId: workIdParam || undefined  // Lisa workId filter
             };
@@ -103,7 +97,7 @@ const SearchPage: React.FC = () => {
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, catalogParam, scopeParam]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -154,7 +148,6 @@ const SearchPage: React.FC = () => {
                     const hits = await searchWorkHits(queryParam, workId, {
                         yearStart: yearStartParam,
                         yearEnd: yearEndParam,
-                        catalog: catalogParam !== 'all' ? catalogParam : undefined,
                         scope: scopeParam !== 'all' ? scopeParam : undefined
                     });
                     setWorkHits(prev => new Map(prev).set(workId, hits));
@@ -193,10 +186,7 @@ const SearchPage: React.FC = () => {
         }, {} as Record<string, ContentSearchHit[]>);
     };
 
-    // Extract catalog facets if available
-    const availableCatalogs = results?.facetDistribution?.['originaal_kataloog']
-        ? Object.entries(results.facetDistribution['originaal_kataloog'])
-        : [];
+
 
     // Extract work facets - järjestatud relevantsi järgi (sama järjekord mis otsingutulemustel)
     // NB: Kui juba ollakse teose piires otsingus VÕI laadib VÕI on ainult 1 teos, ei näita teose filtrit
@@ -523,19 +513,17 @@ const SearchPage: React.FC = () => {
                             >
                                 Rakenda filtrid
                             </button>
-                            {(yearStart || yearEnd || selectedCatalog !== 'all' || selectedScope !== 'all' || selectedWork) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork) && (
                                 <button
                                     onClick={() => {
                                         setYearStart('');
                                         setYearEnd('');
-                                        setSelectedCatalog('all');
                                         setSelectedScope('all');
                                         setSelectedWork('');
                                         setSelectedWorkInfo(null);
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');
-                                            prev.delete('cat');
                                             prev.delete('scope');
                                             prev.delete('work');
                                             prev.set('p', '1');
