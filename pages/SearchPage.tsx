@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { searchContent } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { ArrowLeft, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
+import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -153,11 +153,8 @@ const SearchPage: React.FC = () => {
         const hasHighlightedTags = hit._formatted?.tags?.some(t => t.includes('<em'));
         const highlightedComments = hit._formatted?.comments?.filter(c => c.text.includes('<em'));
 
-        // Salvesta otsingu URL sessionStorage'i enne töölauasse minemist
-        const saveSearchAndNavigate = () => {
-            // Kasuta React Router location'it (MemoryRouter ei muuda window.location)
-            const fullUrl = location.pathname + location.search;
-            sessionStorage.setItem('vutt_search_url', fullUrl);
+        // Navigeeri töölauasse
+        const navigateToWorkspace = () => {
             navigate(`/work/${hit.teose_id}/${hit.lehekylje_number}`);
         };
 
@@ -170,7 +167,7 @@ const SearchPage: React.FC = () => {
                     </span>
                     <span className="text-gray-300">|</span>
                     <button
-                        onClick={saveSearchAndNavigate}
+                        onClick={navigateToWorkspace}
                         className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline"
                     >
                         Ava töölaud →
@@ -224,7 +221,7 @@ const SearchPage: React.FC = () => {
                     {/* Thumbnail paremal - samal tasemel tekstikastiga */}
                     {hit.lehekylje_pilt && (
                         <button
-                            onClick={saveSearchAndNavigate}
+                            onClick={navigateToWorkspace}
                             className="shrink-0 w-20 h-28 bg-gray-100 rounded overflow-hidden hidden sm:block hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer self-start"
                             title="Ava töölaud"
                         >
@@ -257,15 +254,14 @@ const SearchPage: React.FC = () => {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate('/')}
-                            className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
-                            title="Tagasi avalehele"
+                            className="p-2 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
+                            title="Avaleht"
                         >
-                            <ArrowLeft size={20} />
+                            <Home size={18} />
+                            <span className="font-bold text-gray-800 tracking-tight">VUTT</span>
                         </button>
-                        <Link to="/" className="hover:opacity-80 transition-opacity">
-                            <h1 className="text-xl font-bold text-primary-900 leading-none">VUTT Otsing</h1>
-                            <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">Täisteksti otsingumootor</p>
-                        </Link>
+                        <div className="h-6 w-px bg-gray-300"></div>
+                        <h1 className="text-xl font-bold text-primary-900 leading-none">Otsing</h1>
                     </div>
 
                     <form onSubmit={handleSearch} className="flex gap-2 relative">

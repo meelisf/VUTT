@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';

@@ -14,14 +14,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
 
-  // Salvesta praegune asukoht ja navigeeri töölaudale
+  // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Salvesta dashboard URL koos query parameetritega
-    const currentUrl = location.pathname + location.search;
-    sessionStorage.setItem('vutt_dashboard_url', currentUrl);
-    // Kustuta otsingu URL, sest kasutaja tuleb Dashboard'ilt
-    sessionStorage.removeItem('vutt_search_url');
     navigate(`/work/${work.id}/1`);
   };
 
@@ -58,7 +53,6 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
                     e.preventDefault();
                     e.stopPropagation();
                     // Navigeeri otsingusse selle tagiga
-                    sessionStorage.setItem('vutt_dashboard_url', location.pathname + location.search);
                     navigate(`/search?q=${encodeURIComponent(tag)}`);
                   }}
                   className="text-xs text-white bg-black/40 hover:bg-primary-600 px-2 py-0.5 rounded backdrop-blur-sm transition-colors"

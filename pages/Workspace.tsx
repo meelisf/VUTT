@@ -124,52 +124,29 @@ const Workspace: React.FC = () => {
     );
   }
 
-  // Navigeerimine tagasi dashboardile (säilitab otsingu/filtri parameetrid)
+  // Navigeerimine tagasi dashboardile
   const handleNavigateBack = () => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
       if (!confirmed) return;
     }
-    // Kasuta salvestatud dashboard URL-i või vaikimisi '/'
-    const savedUrl = sessionStorage.getItem('vutt_dashboard_url') || '/';
-    navigate(savedUrl);
+    navigate('/');
   };
 
-  // Navigeerimine tagasi otsingusse
+  // Navigeerimine otsingusse
   const handleNavigateToSearch = () => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
       if (!confirmed) return;
     }
-    const searchUrl = sessionStorage.getItem('vutt_search_url');
-    if (searchUrl) {
-      navigate(searchUrl);
-    } else {
-      // Fallback: kui otsingu URL puudub, mine otsingu avalehele
-      navigate('/search');
-    }
+    navigate('/search');
   };
-
-  // Kas kasutaja tuli otsingust? (loe iga renderiga uuesti)
-  const searchUrl = sessionStorage.getItem('vutt_search_url');
-  const hasSearchHistory = !!searchUrl;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* Top Navigation Bar */}
       <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-10">
         <div className="flex items-center gap-2">
-          {/* Tagasi otsingusse (kui tuli otsingust) */}
-          {hasSearchHistory && (
-            <button
-              onClick={handleNavigateToSearch}
-              className="p-1.5 hover:bg-primary-50 rounded-md text-primary-600 transition-colors flex items-center gap-1.5 text-sm"
-              title="Tagasi otsingusse"
-            >
-              <Search size={16} />
-              <span className="hidden sm:inline">← Otsing</span>
-            </button>
-          )}
           {/* Avaleht */}
           <button
             onClick={handleNavigateBack}
@@ -178,6 +155,15 @@ const Workspace: React.FC = () => {
           >
             <Home size={16} />
             <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">VUTT</span>
+          </button>
+          {/* Otsing */}
+          <button
+            onClick={handleNavigateToSearch}
+            className="p-1.5 hover:bg-primary-50 rounded-md text-primary-600 transition-colors flex items-center gap-1.5 text-sm"
+            title="Otsing"
+          >
+            <Search size={16} />
+            <span className="hidden sm:inline">Otsing</span>
           </button>
           <div className="h-6 w-px bg-gray-300"></div>
           <div className="flex items-center gap-2 text-sm">

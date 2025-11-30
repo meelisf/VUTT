@@ -74,9 +74,7 @@ python3 2-1_upload_to_meili.py    # Recreates 'teosed' index
 ### TypeScript/React Patterns
 - Functional components with hooks, no class components
 - State management via React Context (`UserContext.tsx`)
-- React Router with `MemoryRouter` (not BrowserRouter)
-  - **IMPORTANT**: `window.location` always shows `/` - use `useLocation()` hook for current path
-  - Navigation history stored in `sessionStorage` (`vutt_search_url`, `vutt_dashboard_url`)
+- React Router with `BrowserRouter` - supports browser back/forward buttons
 - Icons from `lucide-react`
 - Styling: Tailwind CSS with custom `primary-*` color palette
 
