@@ -67,6 +67,7 @@ export interface ContentSearchOptions {
   yearStart?: number;
   yearEnd?: number;
   catalog?: string;
+  workId?: string;  // Filter ühe teose piires
   scope?: 'all' | 'annotation' | 'original';
 }
 
@@ -88,11 +89,14 @@ export interface ContentSearchHit {
     tags?: string[];
     comments?: Annotation[];
   };
+  // Vastete arv selles teoses (distinct päringu puhul)
+  hitCount?: number;
 }
 
 export interface ContentSearchResponse {
   hits: ContentSearchHit[];
-  totalHits: number;
+  totalHits: number;        // Kokku lehekülgi/vasteid
+  totalWorks?: number;      // Kokku teoseid (distinct päringu puhul)
   totalPages: number;
   page: number;
   processingTimeMs: number;

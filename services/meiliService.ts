@@ -1,6 +1,6 @@
 
 import { MeiliSearch } from 'meilisearch';
-import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, HistoryEntry } from '../types';
+import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, ContentSearchHit, HistoryEntry } from '../types';
 import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX, IMAGE_BASE_URL, FILE_API_URL } from '../config';
 
 // Initialize Meilisearch client
@@ -520,13 +520,118 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 };
 
 // Täisteksti otsing
+// Kui workId on määratud - otsib ainult sellest teosest (kõik vasted, ilma distinct'ita)
+// Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
 export const searchContent = async (query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
   checkMixedContent();
   await ensureSettings();
 
-  const limit = 20;
+  const limit = options.workId ? 20 : 10; // Teose piires rohkem vasteid lehel
   const offset = (page - 1) * limit;
   const filter: string[] = [];
+
+  if (options.workId) filter.push(`teose_id = "${options.workId}"`);
+  if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
+  if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
+  if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
+
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
+  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
+  else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
+
+  try {
+    // Kui otsime ühe teose piires, ei vaja distinct'i
+    if (options.workId) {
+      const response = await index.search(query, {
+        offset,
+        limit,
+        filter,
+        facets: ['originaal_kataloog', 'teose_id'],
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+        attributesToCrop: ['lehekylje_tekst', 'comments.text'],
+        cropLength: 35,
+        attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+        highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
+        highlightPostTag: '</em>',
+        attributesToSearchOn: attributesToSearchOn
+      });
+
+      const totalHits = response.estimatedTotalHits || 0;
+
+      return {
+        hits: response.hits as any,
+        totalHits: totalHits,
+        totalWorks: 1,
+        totalPages: Math.ceil(totalHits / limit),
+        page,
+        processingTimeMs: response.processingTimeMs,
+        facetDistribution: response.facetDistribution
+      };
+    }
+
+    // Tavaline otsing: kaks päringut paralleelselt
+    // 1. Ilma distinct'ita - saame facet'id õigete vastete arvudega
+    // 2. Distinct'iga - saame 10 erinevat teost
+    const [facetResponse, distinctResponse] = await Promise.all([
+      // Päring 1: ainult facet'ide jaoks (limit=0)
+      index.search(query, {
+        filter,
+        limit: 0,
+        facets: ['originaal_kataloog', 'teose_id'],
+        attributesToSearchOn: attributesToSearchOn
+      }),
+      // Päring 2: distinct teosed
+      index.search(query, {
+        offset,
+        limit,
+        filter,
+        distinct: 'teose_id',
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+        attributesToCrop: ['lehekylje_tekst', 'comments.text'],
+        cropLength: 35,
+        attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+        highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
+        highlightPostTag: '</em>',
+        attributesToSearchOn: attributesToSearchOn
+      })
+    ]);
+
+    // Loe facetDistribution'ist iga teose vastete arv (ilma distinct'ita päringust)
+    const workHitCounts = facetResponse.facetDistribution?.['teose_id'] || {};
+    
+    // Lisa igale hitile vastete arv
+    const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
+      ...hit,
+      hitCount: workHitCounts[hit.teose_id] || 1
+    }));
+
+    // Koguvastete arv ja teoste arv
+    const totalHits = facetResponse.estimatedTotalHits || 0;
+    const totalWorks = distinctResponse.estimatedTotalHits || 0;
+
+    return {
+      hits: hitsWithCounts as any,
+      totalHits: totalHits,
+      totalWorks: totalWorks,
+      totalPages: Math.ceil(totalWorks / limit),
+      page,
+      processingTimeMs: distinctResponse.processingTimeMs,
+      facetDistribution: facetResponse.facetDistribution
+    };
+  } catch (e: any) {
+    if (e.message && e.message.includes('not searchable')) {
+      throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
+    }
+    throw e;
+  }
+};
+
+// Laadi ühe teose kõik otsingutulemused (akordioni avamiseks)
+export const searchWorkHits = async (query: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
+  checkMixedContent();
+  await ensureSettings();
+
+  const filter: string[] = [`teose_id = "${workId}"`];
 
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
@@ -538,31 +643,21 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 
   try {
     const response = await index.search(query, {
-      offset,
-      limit,
       filter,
+      limit: 500, // Piisav ühele teosele
       attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
       highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
       highlightPostTag: '</em>',
-      facets: ['originaal_kataloog', 'teose_id'],
+      sort: ['lehekylje_number:asc'],
       attributesToSearchOn: attributesToSearchOn
     });
 
-    return {
-      hits: response.hits as any,
-      totalHits: response.estimatedTotalHits,
-      totalPages: Math.ceil(response.estimatedTotalHits / limit),
-      page,
-      processingTimeMs: response.processingTimeMs,
-      facetDistribution: response.facetDistribution
-    };
+    return response.hits as ContentSearchHit[];
   } catch (e: any) {
-    if (e.message && e.message.includes('not searchable')) {
-      throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
-    }
+    console.error('searchWorkHits error:', e);
     throw e;
   }
 };

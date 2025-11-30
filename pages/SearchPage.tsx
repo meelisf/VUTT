@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { searchContent } from '../services/meiliService';
+import { searchContent, searchWorkHits } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
+import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, FolderOpen, Layers, Tag, MessageSquare, FileText, X } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -15,12 +15,13 @@ const getImageUrl = (imagePath: string): string => {
 
 const SearchPage: React.FC = () => {
     const navigate = useNavigate();
-    const location = useLocation();  // React Router location (töötab MemoryRouter'iga)
+    const location = useLocation();  // React Router location
     const [searchParams, setSearchParams] = useSearchParams();
 
     // URL params control the actual search
     const queryParam = searchParams.get('q') || '';
     const pageParam = parseInt(searchParams.get('p') || '1', 10);
+    const workIdParam = searchParams.get('work') || ''; // Teose piires otsing
 
     // Filter params from URL
     const yearStartParam = searchParams.get('ys') ? parseInt(searchParams.get('ys')!) : undefined;
@@ -34,12 +35,17 @@ const SearchPage: React.FC = () => {
     const [yearEnd, setYearEnd] = useState<string>(yearEndParam?.toString() || '1710');
     const [selectedCatalog, setSelectedCatalog] = useState<string>(catalogParam);
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
+    const [selectedWork, setSelectedWork] = useState<string>(workIdParam); // Teose filter
 
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+    
+    // Lazy-loaded hits for expanded works (max 10 akordioni sees)
+    const [workHits, setWorkHits] = useState<Map<string, ContentSearchHit[]>>(new Map());
+    const [loadingWorkHits, setLoadingWorkHits] = useState<Set<string>>(new Set());
 
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +53,8 @@ const SearchPage: React.FC = () => {
     useEffect(() => {
         setInputValue(queryParam);
         if (scopeParam) setSelectedScope(scopeParam);
-    }, [queryParam, scopeParam]);
+        setSelectedWork(workIdParam);
+    }, [queryParam, scopeParam, workIdParam]);
 
     // Handle Search Submission
     const handleSearch = (e?: React.FormEvent) => {
@@ -62,6 +69,7 @@ const SearchPage: React.FC = () => {
                 prev.delete('ye');
                 prev.delete('cat');
                 prev.delete('scope');
+                prev.delete('work');
             } else {
                 prev.set('q', inputValue);
                 prev.set('p', '1'); // Reset page
@@ -70,6 +78,7 @@ const SearchPage: React.FC = () => {
                 if (yearEnd) prev.set('ye', yearEnd); else prev.delete('ye');
                 if (selectedCatalog && selectedCatalog !== 'all') prev.set('cat', selectedCatalog); else prev.delete('cat');
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
+                if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
             }
             return prev;
         });
@@ -85,13 +94,15 @@ const SearchPage: React.FC = () => {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
                 catalog: catalogParam,
-                scope: scopeParam
+                scope: scopeParam,
+                workId: workIdParam || undefined  // Lisa workId filter
             };
+            
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, yearStartParam, yearEndParam, catalogParam, scopeParam]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, catalogParam, scopeParam]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -99,8 +110,8 @@ const SearchPage: React.FC = () => {
         try {
             const data = await searchContent(searchQuery, page, options);
             setResults(data);
-            // Only reset expanded groups if it's a new query (page 1)
-            if (page === 1) setExpandedGroups(new Set());
+            // Only reset expanded groups if it's a new query (page 1) and not filtering by work
+            if (page === 1 && !options.workId) setExpandedGroups(new Set());
 
             // Scroll to top
             if (contentRef.current) {
@@ -121,18 +132,58 @@ const SearchPage: React.FC = () => {
         });
     };
 
-    const toggleGroup = (workId: string) => {
+    // Toggle akordion ja laadi vajadusel teose täpsed tulemused
+    // Säilitab scroll positsiooni, et akordion ei "hüppaks" sulgemisel
+    const toggleGroup = async (workId: string) => {
+        // Salvesta scroll positsioon enne muudatust
+        const scrollTop = contentRef.current?.scrollTop || 0;
+        
         const newSet = new Set(expandedGroups);
-        if (newSet.has(workId)) {
+        const isClosing = newSet.has(workId);
+        
+        if (isClosing) {
             newSet.delete(workId);
         } else {
             newSet.add(workId);
+            
+            // Laadi teose tulemused kui pole veel laetud
+            if (!workHits.has(workId) && queryParam) {
+                setLoadingWorkHits(prev => new Set(prev).add(workId));
+                try {
+                    const hits = await searchWorkHits(queryParam, workId, {
+                        yearStart: yearStartParam,
+                        yearEnd: yearEndParam,
+                        catalog: catalogParam !== 'all' ? catalogParam : undefined,
+                        scope: scopeParam !== 'all' ? scopeParam : undefined
+                    });
+                    setWorkHits(prev => new Map(prev).set(workId, hits));
+                } catch (e) {
+                    console.error('Failed to load work hits:', e);
+                } finally {
+                    setLoadingWorkHits(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(workId);
+                        return newSet;
+                    });
+                }
+            }
         }
         setExpandedGroups(newSet);
+        
+        // Taasta scroll positsioon pärast DOM uuendust (sulgemisel)
+        if (isClosing) {
+            requestAnimationFrame(() => {
+                if (contentRef.current) {
+                    contentRef.current.scrollTop = scrollTop;
+                }
+            });
+        }
     };
 
+    // Grupeeri tulemused teose kaupa (distinct annab ühe hiti teose kohta)
     const getGroupedResults = () => {
         if (!results) return {};
+        // Iga hit on üks teos (distinct: teose_id), hitCount näitab vastete arvu
         return results.hits.reduce((acc, hit) => {
             const key = hit.teose_id;
             if (!acc[key]) acc[key] = [];
@@ -144,6 +195,11 @@ const SearchPage: React.FC = () => {
     // Extract catalog facets if available
     const availableCatalogs = results?.facetDistribution?.['originaal_kataloog']
         ? Object.entries(results.facetDistribution['originaal_kataloog'])
+        : [];
+
+    // Extract work facets (teosed koos vastete arvuga)
+    const availableWorks = results?.facetDistribution?.['teose_id']
+        ? Object.entries(results.facetDistribution['teose_id']).sort((a, b) => b[1] - a[1]) // Sorteeri vastete arvu järgi
         : [];
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
@@ -376,67 +432,92 @@ const SearchPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Catalog Filter */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <FolderOpen size={14} /> Kataloog / Kogu
-                            </h3>
-                            <div className="space-y-2">
-                                <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                    <input
-                                        type="radio"
-                                        name="catalog"
-                                        value="all"
-                                        checked={selectedCatalog === 'all'}
-                                        onChange={() => setSelectedCatalog('all')}
-                                        className="text-primary-600 focus:ring-primary-500"
-                                    />
-                                    <span className="text-sm text-gray-700">Kõik kogud</span>
-                                </label>
-
-                                {availableCatalogs.map(([catName, count]) => (
-                                    <label key={catName} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                        {/* Work Filter - teose valik */}
+                        {(availableWorks.length > 0 || selectedWork) && (
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <FileText size={14} /> Teos
+                                </h3>
+                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                         <input
                                             type="radio"
-                                            name="catalog"
-                                            value={catName}
-                                            checked={selectedCatalog === catName}
-                                            onChange={() => setSelectedCatalog(catName)}
+                                            name="work"
+                                            value=""
+                                            checked={!selectedWork}
+                                            onChange={() => setSelectedWork('')}
                                             className="text-primary-600 focus:ring-primary-500"
                                         />
-                                        <span className="text-sm text-gray-700 flex-1 truncate" title={catName}>
-                                            {catName}
-                                        </span>
-                                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full">{count}</span>
+                                        <span className="text-sm text-gray-700">Kõik teosed</span>
                                     </label>
-                                ))}
 
-                                {availableCatalogs.length === 0 && !loading && selectedCatalog === 'all' && (
-                                    <p className="text-xs text-gray-400 italic pl-1">Tee otsing, et näha katalooge.</p>
-                                )}
-                                {selectedCatalog !== 'all' && !availableCatalogs.find(([c]) => c === selectedCatalog) && (
-                                    <label className="flex items-center gap-2 cursor-pointer bg-primary-50 p-1 rounded">
-                                        <input
-                                            type="radio"
-                                            name="catalog"
-                                            value={selectedCatalog}
-                                            checked
-                                            readOnly
-                                            className="text-primary-600"
-                                        />
-                                        <span className="text-sm text-gray-700 font-medium">{selectedCatalog}</span>
-                                    </label>
-                                )}
+                                    {availableWorks.map(([workId, count]) => (
+                                        <label key={workId} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                            <input
+                                                type="radio"
+                                                name="work"
+                                                value={workId}
+                                                checked={selectedWork === workId}
+                                                onChange={() => setSelectedWork(workId)}
+                                                className="text-primary-600 focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-gray-700 flex-1 truncate" title={workId}>
+                                                {workId}
+                                            </span>
+                                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full">{count}</span>
+                                        </label>
+                                    ))}
+
+                                    {/* Näita valitud teost kui seda pole facetis */}
+                                    {selectedWork && !availableWorks.find(([w]) => w === selectedWork) && (
+                                        <label className="flex items-center gap-2 cursor-pointer bg-primary-50 p-1 rounded">
+                                            <input
+                                                type="radio"
+                                                name="work"
+                                                value={selectedWork}
+                                                checked
+                                                readOnly
+                                                className="text-primary-600"
+                                            />
+                                            <span className="text-sm text-gray-700 font-medium truncate" title={selectedWork}>
+                                                {selectedWork}
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        <div className="pt-4 border-t border-gray-100">
+                        <div className="pt-4 border-t border-gray-100 space-y-2">
                             <button
                                 onClick={(e) => handleSearch(e)}
                                 className="w-full py-2 bg-gray-900 text-white rounded text-sm font-bold shadow hover:bg-gray-800 transition-colors"
                             >
                                 Rakenda filtrid
                             </button>
+                            {(yearStart || yearEnd || selectedCatalog !== 'all' || selectedScope !== 'all' || selectedWork) && (
+                                <button
+                                    onClick={() => {
+                                        setYearStart('');
+                                        setYearEnd('');
+                                        setSelectedCatalog('all');
+                                        setSelectedScope('all');
+                                        setSelectedWork('');
+                                        setSearchParams(prev => {
+                                            prev.delete('ys');
+                                            prev.delete('ye');
+                                            prev.delete('cat');
+                                            prev.delete('scope');
+                                            prev.delete('work');
+                                            prev.set('p', '1');
+                                            return prev;
+                                        });
+                                    }}
+                                    className="w-full py-2 bg-white border border-gray-300 text-gray-600 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                                >
+                                    Tühjenda filtrid
+                                </button>
+                            )}
                         </div>
                     </div>
                 </aside>
@@ -462,7 +543,37 @@ const SearchPage: React.FC = () => {
                                     <span className="block text-lg font-medium text-gray-900 mb-1">Otsingule ei leitud ühtegi vastet.</span>
                                     <span className="text-gray-500">Proovi teisi märksõnu või laienda filtreid.</span>
                                 </div>
+                            ) : workIdParam && results.hits.length > 0 ? (
+                                // Teose piires otsing - näita kogu teose info
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                    <div className="flex items-start justify-between gap-4 mb-3">
+                                        <span className="text-sm">
+                                            Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet teosest:
+                                        </span>
+                                        <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded shrink-0">
+                                            Lk {results.page} / {results.totalPages}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-base font-bold text-gray-900 leading-snug mb-2">
+                                        {results.hits[0]?.pealkiri || 'Pealkiri puudub'}
+                                    </h2>
+                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                                        <span>
+                                            <span className="text-gray-400">Autor:</span>{' '}
+                                            <span className="font-medium">{Array.isArray(results.hits[0]?.autor) ? results.hits[0].autor[0] : (results.hits[0]?.autor || 'Teadmata')}</span>
+                                        </span>
+                                        <span>
+                                            <span className="text-gray-400">Aasta:</span>{' '}
+                                            <span className="font-medium">{results.hits[0]?.aasta || '...'}</span>
+                                        </span>
+                                        <span>
+                                            <span className="text-gray-400">ID:</span>{' '}
+                                            <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{workIdParam}</span>
+                                        </span>
+                                    </div>
+                                </div>
                             ) : (
+                                // Tavaline otsing
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                                     <span>
                                         Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet{' '}
@@ -485,11 +596,22 @@ const SearchPage: React.FC = () => {
                     {/* Results */}
                     {results && (
                         <div className="space-y-6">
-                            {Object.keys(groupedResults).map(workId => {
+                            {/* Teose piires otsing - näita vasted lihtsalt loeteluna */}
+                            {workIdParam ? (
+                                <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                                    {results.hits.map(hit => renderHit(hit, false))}
+                                </div>
+                            ) : (
+                                /* Tavaline otsing - grupeeritud teostena */
+                                <>
+                                {Object.keys(groupedResults).map(workId => {
                                 const hits = groupedResults[workId];
                                 const firstHit = hits[0];
-                                const hasMore = hits.length > 1;
+                                const hitCount = firstHit.hitCount || 1;
+                                const hasMore = hitCount > 1;
                                 const isExpanded = expandedGroups.has(workId);
+                                const isLoadingHits = loadingWorkHits.has(workId);
+                                const loadedHits = workHits.get(workId);
 
                                 return (
                                     <article key={workId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
@@ -548,34 +670,71 @@ const SearchPage: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* First Hit */}
+                                        {/* Esimene vaste - alati nähtav */}
                                         <div className="p-1">
                                             {renderHit(firstHit)}
                                         </div>
 
-                                        {/* Collapsible Hits */}
-                                        {hasMore && (
-                                            <>
-                                                {isExpanded && (
-                                                    <div className="border-t border-gray-100 animate-in fade-in slide-in-from-top-1 bg-gray-50/50">
-                                                        {hits.slice(1).map(hit => renderHit(hit, true))}
-                                                    </div>
-                                                )}
-                                                <button
-                                                    onClick={() => toggleGroup(workId)}
-                                                    className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-primary-700 text-xs font-bold uppercase tracking-wide border-t border-gray-200 flex items-center justify-center gap-2 transition-colors"
-                                                >
-                                                    {isExpanded ? (
-                                                        <>Peida lisavasted <ChevronUp size={14} /></>
-                                                    ) : (
-                                                        <>Näita veel {hits.length - 1} vastet samast teosest <ChevronDown size={14} /></>
+                                        {/* Akordion rohkemate vastete jaoks - lazy loaded, max 10 vastet */}
+                                        {hasMore && (() => {
+                                            const MAX_ACCORDION_HITS = 10;
+                                            const remainingHits = hitCount - 1; // peale esimest
+                                            const showSearchAllLink = hitCount > MAX_ACCORDION_HITS;
+                                            
+                                            return (
+                                                <>
+                                                    {isExpanded && (
+                                                        <div className="border-t border-gray-100 animate-in fade-in slide-in-from-top-1 bg-gray-50/50">
+                                                            {isLoadingHits ? (
+                                                                <div className="flex items-center justify-center gap-2 py-8 text-primary-600">
+                                                                    <Loader2 className="animate-spin" size={20} />
+                                                                    <span className="text-sm">Laadin tulemusi...</span>
+                                                                </div>
+                                                            ) : loadedHits ? (
+                                                                <>
+                                                                    {/* Näita max 9 lisavastet (esimene on juba ülal, kokku max 10) */}
+                                                                    {loadedHits.slice(1, MAX_ACCORDION_HITS).map(hit => renderHit(hit, true))}
+                                                                    
+                                                                    {/* Kui on rohkem kui 10 vastet, näita linki teose piires otsinguks */}
+                                                                    {showSearchAllLink && (
+                                                                        <div className="py-3 px-4 text-center border-t border-gray-200">
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setSearchParams(prev => {
+                                                                                        prev.set('work', workId);
+                                                                                        prev.set('p', '1');
+                                                                                        return prev;
+                                                                                    });
+                                                                                }}
+                                                                                className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-800 font-medium text-sm hover:underline"
+                                                                            >
+                                                                                <Search size={14} />
+                                                                                Otsi kõik {hitCount} vastet sellest teosest →
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </>
+                                                            ) : null}
+                                                        </div>
                                                     )}
-                                                </button>
-                                            </>
-                                        )}
+                                                    <button
+                                                        onClick={() => toggleGroup(workId)}
+                                                        className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-primary-700 text-xs font-bold uppercase tracking-wide border-t border-gray-200 flex items-center justify-center gap-2 transition-colors"
+                                                    >
+                                                        {isExpanded ? (
+                                                            <>Peida lisavasted <ChevronUp size={14} /></>
+                                                        ) : (
+                                                            <>Näita veel {Math.min(remainingHits, MAX_ACCORDION_HITS - 1)} vastet{remainingHits > MAX_ACCORDION_HITS - 1 ? ` (${remainingHits} kokku)` : ''} <ChevronDown size={14} /></>
+                                                        )}
+                                                    </button>
+                                                </>
+                                            );
+                                        })()}
                                     </article>
                                 );
                             })}
+                                </>
+                            )}
                         </div>
                     )}
 

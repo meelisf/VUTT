@@ -46,7 +46,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
         {work.tags && work.tags.length > 0 && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
             <div className="flex flex-wrap gap-1">
-              {work.tags.slice(0, 3).map((tag, idx) => (
+              {work.tags.slice(0, 6).map((tag, idx) => (
                 <button
                   key={idx}
                   onClick={(e) => {
@@ -61,8 +61,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
                   {tag}
                 </button>
               ))}
-              {work.tags.length > 3 && (
-                <span className="text-xs text-white/70 px-1">+{work.tags.length - 3}</span>
+              {work.tags.length > 6 && (
+                <span className="text-xs text-white/70 px-1">+{work.tags.length - 6}</span>
               )}
             </div>
           </div>
