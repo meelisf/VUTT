@@ -52,11 +52,11 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Navigeeri otsingusse selle tagiga
-                    navigate(`/search?q=${encodeURIComponent(tag)}`);
+                    // Navigeeri otsingusse selle tagiga (otsi ainult annotatsoonidest)
+                    navigate(`/search?q=${encodeURIComponent(tag)}&scope=annotation`);
                   }}
                   className="text-xs text-white bg-black/40 hover:bg-primary-600 px-2 py-0.5 rounded backdrop-blur-sm transition-colors"
-                  title={`Otsi: ${tag}`}
+                  title={`Otsi märksõna: ${tag}`}
                 >
                   {tag}
                 </button>
