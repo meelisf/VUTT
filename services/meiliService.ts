@@ -196,6 +196,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
   try {
     const filter: string[] = [];
 
+    // ALATI filtreeri esimese lehekülje järgi - tagab õige thumbnail ja tagid
+    filter.push('lehekylje_number = 1');
+
     // Apply server-side filters if provided
     if (options?.yearStart) {
       filter.push(`aasta >= ${options.yearStart}`);
@@ -212,7 +215,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'tags'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter,
       distinct: 'teose_id' // Return only one hit per work
@@ -244,19 +247,63 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     console.log('searchWorks response hits:', response.hits.length);
     
     // With distinct='teose_id', each hit represents a unique work
-    const works: Work[] = response.hits.map((hit: any) => ({
-      id: hit.teose_id,
-      catalog_name: hit.originaal_kataloog || 'Unknown',
-      title: hit.pealkiri || 'Pealkiri puudub',
-      author: hit.autor || 'Teadmata autor',
-      respondens: hit.respondens || undefined,
-      year: parseInt(hit.aasta) || 0,
-      publisher: '',
-      page_count: hit.teose_lehekylgede_arv || 0,
-      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
-      work_status: hit.teose_staatus || undefined,
-      tags: hit.tags || []
-    }));
+    // But distinct might not return the first page, so we need to fetch first pages separately
+    const workIds = response.hits.map((hit: any) => hit.teose_id);
+    
+    // Fetch first page data (thumbnail, tags) for all works
+    const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[] }>();
+    
+    if (workIds.length > 0) {
+      // Batch the requests to avoid too-long filters (max ~100 IDs per batch)
+      const BATCH_SIZE = 100;
+      const batches: string[][] = [];
+      for (let i = 0; i < workIds.length; i += BATCH_SIZE) {
+        batches.push(workIds.slice(i, i + BATCH_SIZE));
+      }
+      
+      // Execute batch queries in parallel
+      const batchPromises = batches.map(async (batchIds) => {
+        const batchResponse = await index.search('', {
+          filter: batchIds.map(id => `teose_id = "${id}"`).join(' OR '),
+          limit: batchIds.length * 20, // Max 20 pages per work
+          sort: ['lehekylje_number:asc'],
+          attributesToRetrieve: ['teose_id', 'lehekylje_pilt', 'lehekylje_number', 'tags']
+        });
+        return batchResponse.hits;
+      });
+      
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Process all results - take first (lowest page number) for each work
+      for (const hits of batchResults) {
+        for (const hit of hits as any[]) {
+          if (!firstPagesMap.has(hit.teose_id)) {
+            firstPagesMap.set(hit.teose_id, {
+              thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
+              tags: hit.tags || []
+            });
+          }
+        }
+      }
+    }
+    
+    const works: Work[] = response.hits.map((hit: any) => {
+      const firstPageData = firstPagesMap.get(hit.teose_id);
+      return {
+        id: hit.teose_id,
+        catalog_name: hit.originaal_kataloog || 'Unknown',
+        title: hit.pealkiri || 'Pealkiri puudub',
+        author: hit.autor || 'Teadmata autor',
+        respondens: hit.respondens || undefined,
+        year: parseInt(hit.aasta) || 0,
+        publisher: '',
+        page_count: hit.teose_lehekylgede_arv || 0,
+        // Use first page data if available, otherwise fall back to the hit's data
+        thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
+        work_status: hit.teose_staatus || undefined,
+        tags: firstPageData?.tags || hit.tags || []
+      };
+    });
 
     return works;
 
