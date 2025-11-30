@@ -225,6 +225,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.sort) {
       switch (options.sort) {
         case 'year_asc':
+        default:
           searchParams.sort = ['aasta:asc'];
           break;
         case 'year_desc':
@@ -234,12 +235,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           searchParams.sort = ['pealkiri:asc'];
           break;
         case 'recent':
-        default:
           searchParams.sort = ['last_modified:desc'];
           break;
       }
     } else if (!query.trim()) {
-      searchParams.sort = ['last_modified:desc'];
+      searchParams.sort = ['aasta:asc'];
     }
 
     console.log('searchWorks params:', { query, filter, searchParams });

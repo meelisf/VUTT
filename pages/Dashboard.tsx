@@ -20,7 +20,7 @@ const Dashboard: React.FC = () => {
   const queryParam = searchParams.get('q') || '';
   const yearStartParam = searchParams.get('ys');
   const yearEndParam = searchParams.get('ye');
-  const sortParam = searchParams.get('sort') || 'recent';
+  const sortParam = searchParams.get('sort') || 'year_asc';
   const authorParam = searchParams.get('author') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
@@ -109,11 +109,13 @@ const Dashboard: React.FC = () => {
     const timer = setTimeout(() => {
       const newParams = new URLSearchParams(searchParams);
       let changed = false;
+      let resetPage = false;
 
       if (inputValue !== queryParam) {
         if (inputValue) newParams.set('q', inputValue);
         else newParams.delete('q');
         changed = true;
+        resetPage = true; // Otsingu muutmisel lähtesta leht
       }
 
       // Only sync year if it's different from default OR if it was already in params
@@ -121,19 +123,31 @@ const Dashboard: React.FC = () => {
       const defaultStart = '1630';
       const defaultEnd = '1710';
 
-      if (yearStart !== defaultStart || yearStartParam) {
+      if (yearStart !== (yearStartParam || defaultStart)) {
         newParams.set('ys', yearStart);
         changed = true;
+        resetPage = true; // Aasta muutmisel lähtesta leht
+      } else if (yearStart !== defaultStart || yearStartParam) {
+        newParams.set('ys', yearStart);
       }
 
-      if (yearEnd !== defaultEnd || yearEndParam) {
+      if (yearEnd !== (yearEndParam || defaultEnd)) {
         newParams.set('ye', yearEnd);
         changed = true;
+        resetPage = true; // Aasta muutmisel lähtesta leht
+      } else if (yearEnd !== defaultEnd || yearEndParam) {
+        newParams.set('ye', yearEnd);
       }
 
       if (sort !== sortParam) {
         newParams.set('sort', sort);
         changed = true;
+      }
+
+      // Lähtesta leht 1-le kui filtrid muutusid
+      if (resetPage && pageParam > 1) {
+        newParams.delete('page');
+        setCurrentPage(1);
       }
 
       if (changed) {
