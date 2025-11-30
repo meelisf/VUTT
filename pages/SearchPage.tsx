@@ -36,6 +36,7 @@ const SearchPage: React.FC = () => {
     const [selectedCatalog, setSelectedCatalog] = useState<string>(catalogParam);
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
     const [selectedWork, setSelectedWork] = useState<string>(workIdParam); // Teose filter
+    const [selectedWorkInfo, setSelectedWorkInfo] = useState<{title: string, year?: string | number, author?: string} | null>(null); // Valitud teose info
 
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -197,9 +198,18 @@ const SearchPage: React.FC = () => {
         ? Object.entries(results.facetDistribution['originaal_kataloog'])
         : [];
 
-    // Extract work facets (teosed koos vastete arvuga)
-    const availableWorks = results?.facetDistribution?.['teose_id']
-        ? Object.entries(results.facetDistribution['teose_id']).sort((a, b) => b[1] - a[1]) // Sorteeri vastete arvu järgi
+    // Extract work facets - järjestatud relevantsi järgi (sama järjekord mis otsingutulemustel)
+    // NB: Kui juba ollakse teose piires otsingus VÕI laadib VÕI on ainult 1 teos, ei näita teose filtrit
+    const workHitCounts = results?.facetDistribution?.['teose_id'] || {};
+    const uniqueWorkIds = new Set(results?.hits?.map(h => h.teose_id) || []);
+    const availableWorks = (results?.hits && !workIdParam && !loading && uniqueWorkIds.size > 1)
+        ? results.hits.map(hit => ({
+            id: hit.teose_id,
+            title: hit.pealkiri || hit.teose_id,
+            year: hit.aasta,
+            author: Array.isArray(hit.autor) ? hit.autor[0] : hit.autor,
+            count: workHitCounts[hit.teose_id] || 1
+        }))
         : [];
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
@@ -445,31 +455,42 @@ const SearchPage: React.FC = () => {
                                             name="work"
                                             value=""
                                             checked={!selectedWork}
-                                            onChange={() => setSelectedWork('')}
+                                            onChange={() => {
+                                                setSelectedWork('');
+                                                setSelectedWorkInfo(null);
+                                            }}
                                             className="text-primary-600 focus:ring-primary-500"
                                         />
                                         <span className="text-sm text-gray-700">Kõik teosed</span>
                                     </label>
 
-                                    {availableWorks.map(([workId, count]) => (
-                                        <label key={workId} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                    {availableWorks.map((work) => (
+                                        <label key={work.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                             <input
                                                 type="radio"
                                                 name="work"
-                                                value={workId}
-                                                checked={selectedWork === workId}
-                                                onChange={() => setSelectedWork(workId)}
-                                                className="text-primary-600 focus:ring-primary-500"
+                                                value={work.id}
+                                                checked={selectedWork === work.id}
+                                                onChange={() => {
+                                                    setSelectedWork(work.id);
+                                                    setSelectedWorkInfo({ title: work.title, year: work.year, author: work.author });
+                                                }}
+                                                className="text-primary-600 focus:ring-primary-500 shrink-0"
                                             />
-                                            <span className="text-sm text-gray-700 flex-1 truncate" title={workId}>
-                                                {workId}
-                                            </span>
-                                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full">{count}</span>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-sm text-gray-700 block truncate" title={work.title}>
+                                                    {work.title}
+                                                </span>
+                                                <span className="text-xs text-gray-400">
+                                                    {work.year}{work.author ? ` · ${work.author}` : ''}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full shrink-0">{work.count}</span>
                                         </label>
                                     ))}
 
                                     {/* Näita valitud teost kui seda pole facetis */}
-                                    {selectedWork && !availableWorks.find(([w]) => w === selectedWork) && (
+                                    {selectedWork && !availableWorks.find((w) => w.id === selectedWork) && (
                                         <label className="flex items-center gap-2 cursor-pointer bg-primary-50 p-1 rounded">
                                             <input
                                                 type="radio"
@@ -479,9 +500,16 @@ const SearchPage: React.FC = () => {
                                                 readOnly
                                                 className="text-primary-600"
                                             />
-                                            <span className="text-sm text-gray-700 font-medium truncate" title={selectedWork}>
-                                                {selectedWork}
-                                            </span>
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-sm text-gray-700 font-medium block truncate" title={selectedWorkInfo?.title || selectedWork}>
+                                                    {selectedWorkInfo?.title || selectedWork}
+                                                </span>
+                                                {selectedWorkInfo && (
+                                                    <span className="text-xs text-gray-400">
+                                                        {selectedWorkInfo.year}{selectedWorkInfo.author ? ` · ${selectedWorkInfo.author}` : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </label>
                                     )}
                                 </div>
@@ -503,6 +531,7 @@ const SearchPage: React.FC = () => {
                                         setSelectedCatalog('all');
                                         setSelectedScope('all');
                                         setSelectedWork('');
+                                        setSelectedWorkInfo(null);
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');
@@ -700,6 +729,12 @@ const SearchPage: React.FC = () => {
                                                                         <div className="py-3 px-4 text-center border-t border-gray-200">
                                                                             <button
                                                                                 onClick={() => {
+                                                                                    setSelectedWork(workId);
+                                                                                    setSelectedWorkInfo({
+                                                                                        title: firstHit.pealkiri || workId,
+                                                                                        year: firstHit.aasta,
+                                                                                        author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
+                                                                                    });
                                                                                     setSearchParams(prev => {
                                                                                         prev.set('work', workId);
                                                                                         prev.set('p', '1');
