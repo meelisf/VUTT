@@ -28,6 +28,15 @@ Frontend (Vite + React 19)
 - **No global `distinctAttribute`** - use `distinct: 'teose_id'` in individual queries where needed
 - `getWorkStatuses()` requires querying all pages per work, so distinct must NOT be set globally
 
+#### Dashboard First Page Fetching
+The `searchWorks()` function uses a two-step approach:
+1. **First query**: Find works with `distinct: 'teose_id'`, sorted by user preference (recent/year/az)
+2. **Second query**: Fetch first page data (thumbnail, tags) for each work, sorted by `lehekylje_number:asc`
+
+This is necessary because Meilisearch `distinct` returns whichever document matches the sort order first - if sorting by `last_modified:desc`, it returns the most recently edited page, not the first page. The second query ensures Dashboard always shows the first page's thumbnail and tags regardless of which page was last modified.
+
+The second query is batched (100 work IDs per request) and executed in parallel for performance.
+
 ### Meilisearch Schema (index: `teosed`)
 Documents represent individual pages with fields:
 - `id`, `teose_id` (work ID), `lehekylje_number` (page number), `teose_lehekylgede_arv` (total pages)
