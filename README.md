@@ -120,10 +120,10 @@ data/
    - Muud veerud: `pealkiri`, `autor`, `respondens`, `aasta`
 
 2. **Kataloogide nimetamine**:
-   - Peab **algama** ID-ga kujul `AAAA-N-` (nt `1692-6-`)
+   - Peab **algama** ID-ga kujul `AAAA-N` (nt `1692-6` või `1692-6-`)
    - ID peab vastama `jaanson.tsv` väärtusele (koolon → sidekriips)
-   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6-Suvaline-Nimi/`
-   - Kataloogi ülejäänud nimi on vaba (nt `1692-6-Disputatio-De-Anima/`)
+   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6/` või `1692-6-Disputatio-De-Anima/`
+   - Kataloogi ülejäänud nimi on vaba - võib olla ka ainult ID
 
 3. **Failide paarid** (OLULINE!):
    - Iga lehekülje kohta peab olema **sama nimega** `.jpg` ja `.txt` fail
