@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { searchContent, searchWorkHits } from '../services/meiliService';
+import { searchContent, searchWorkHits, getWorkMetadata } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
 import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
@@ -53,6 +53,23 @@ const SearchPage: React.FC = () => {
         if (scopeParam) setSelectedScope(scopeParam);
         setSelectedWork(workIdParam);
     }, [queryParam, scopeParam, workIdParam]);
+
+    // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
+    useEffect(() => {
+        if (workIdParam && !selectedWorkInfo) {
+            getWorkMetadata(workIdParam).then(work => {
+                if (work) {
+                    setSelectedWorkInfo({
+                        title: work.title,
+                        year: work.year,
+                        author: work.author
+                    });
+                }
+            });
+        } else if (!workIdParam) {
+            setSelectedWorkInfo(null);
+        }
+    }, [workIdParam]);
 
     // Handle Search Submission
     const handleSearch = (e?: React.FormEvent) => {

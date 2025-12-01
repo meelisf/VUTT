@@ -133,13 +133,13 @@ const Workspace: React.FC = () => {
     navigate('/');
   };
 
-  // Navigeerimine otsingusse
+  // Navigeerimine otsingusse (selle teose piires)
   const handleNavigateToSearch = () => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
       if (!confirmed) return;
     }
-    navigate('/search');
+    navigate(`/search?work=${workId}`);
   };
 
   return (

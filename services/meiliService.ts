@@ -540,7 +540,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
 
   try {
-    // Kui otsime ühe teose piires, näitame leheküljed
+    // Kui otsime ühe teose piires, näitame kogu lehekülje teksti kõigi highlight'idega
     if (options.workId) {
       const response = await index.search(query, {
         offset,
@@ -548,8 +548,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         filter,
         facets: ['originaal_kataloog', 'teose_id'],
         attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
-        attributesToCrop: ['lehekylje_tekst', 'comments.text'],
-        cropLength: 35,
+        // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',

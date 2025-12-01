@@ -65,28 +65,36 @@ def create_meilisearch_data_per_page():
         if not doc_metadata:
             continue
 
-        txt_files = sorted([f for f in os.listdir(doc_path) if f.endswith('.txt')])
-        if not txt_files:
+        # Lähtume PILTIDEST (jpg), mitte txt failidest
+        # See tagab, et kui pilte kustutati või järjekorda muudeti, kajastub see ka andmetes
+        jpg_files = sorted([f for f in os.listdir(doc_path) if f.endswith('.jpg')])
+        if not jpg_files:
             continue
 
         # UUED VÄLJAD: eraldi autor ja respondens + lehekülgede arv
         autor = doc_metadata.get('autor', '')
         respondens = doc_metadata.get('respondens', '')
-        teose_lehekylgede_arv = len(txt_files)  # Lehekülgede arv = txt failide arv
+        teose_lehekylgede_arv = len(jpg_files)  # Lehekülgede arv = jpg failide arv
 
         pages = []
-        for page_index, txt_filename in enumerate(txt_files):
+        for page_index, jpg_filename in enumerate(jpg_files):
             page_id = f"{lookup_key}-{page_index + 1}"
             
-            # 1. Loeme teksti
-            try:
-                with open(os.path.join(doc_path, txt_filename), 'r', encoding='utf-8') as f:
-                    page_text = f.read()
-            except Exception:
-                page_text = ""
+            # Txt fail on sama nimega kui jpg
+            txt_filename = jpg_filename.replace('.jpg', '.txt')
+            txt_path = os.path.join(doc_path, txt_filename)
             
-            # 2. Otsime metaandmeid (JSON failist, mis on sama nimega nagu txt)
-            json_filename = txt_filename.replace('.txt', '.json')
+            # 1. Loeme teksti (kui txt fail eksisteerib)
+            page_text = ""
+            if os.path.exists(txt_path):
+                try:
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        page_text = f.read()
+                except Exception:
+                    page_text = ""
+            
+            # 2. Otsime metaandmeid (JSON failist, mis on sama nimega nagu jpg/txt)
+            json_filename = jpg_filename.replace('.jpg', '.json')
             json_path = os.path.join(doc_path, json_filename)
             
             extra_data = {
@@ -112,8 +120,13 @@ def create_meilisearch_data_per_page():
                 except Exception as e:
                     print(f"Viga JSON lugemisel {json_path}: {e}")
 
-            jpg_filename = txt_filename.replace('.txt', '.jpg')
             image_path = os.path.join(dir_name, jpg_filename)
+            
+            # last_modified: kasutame txt faili muutmisaega kui eksisteerib, muidu jpg
+            if os.path.exists(txt_path):
+                last_mod = int(os.path.getmtime(txt_path) * 1000)
+            else:
+                last_mod = int(os.path.getmtime(os.path.join(doc_path, jpg_filename)) * 1000)
         
             # Koostame Meilisearch dokumendi (ilma teose_staatus'eta, lisame hiljem)
             meili_doc = {
@@ -132,7 +145,7 @@ def create_meilisearch_data_per_page():
                 'comments': extra_data['comments'],
                 'status': extra_data['status'],
                 'history': extra_data['history'],
-                'last_modified': int(os.path.getmtime(os.path.join(doc_path, txt_filename)) * 1000)
+                'last_modified': last_mod
             }
             
             pages.append(meili_doc)
