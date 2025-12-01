@@ -540,7 +540,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
 
   try {
-    // Kui otsime ühe teose piires, ei vaja distinct'i
+    // Kui otsime ühe teose piires, näitame leheküljed
     if (options.workId) {
       const response = await index.search(query, {
         offset,

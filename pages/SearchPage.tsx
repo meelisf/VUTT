@@ -216,7 +216,7 @@ const SearchPage: React.FC = () => {
 
         return (
             <div key={hit.id} className={`p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
-                {/* Header rida: lk nr + töölaud link */}
+                {/* Header rida: lk nr + vastete arv + töölaud link */}
                 <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs font-mono text-gray-500">
                         Lk {hit.lehekylje_number}
@@ -712,28 +712,12 @@ const SearchPage: React.FC = () => {
                                                                     {/* Näita max 9 lisavastet (esimene on juba ülal, kokku max 10) */}
                                                                     {loadedHits.slice(1, MAX_ACCORDION_HITS).map(hit => renderHit(hit, true))}
                                                                     
-                                                                    {/* Kui on rohkem kui 10 vastet, näita linki teose piires otsinguks */}
+                                                                    {/* Kui on rohkem kui 10 vastet, näita info */}
                                                                     {showSearchAllLink && (
                                                                         <div className="py-3 px-4 text-center border-t border-gray-200">
-                                                                            <button
-                                                                                onClick={() => {
-                                                                                    setSelectedWork(workId);
-                                                                                    setSelectedWorkInfo({
-                                                                                        title: firstHit.pealkiri || workId,
-                                                                                        year: firstHit.aasta,
-                                                                                        author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
-                                                                                    });
-                                                                                    setSearchParams(prev => {
-                                                                                        prev.set('work', workId);
-                                                                                        prev.set('p', '1');
-                                                                                        return prev;
-                                                                                    });
-                                                                                }}
-                                                                                className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-800 font-medium text-sm hover:underline"
-                                                                            >
-                                                                                <Search size={14} />
-                                                                                Otsi kõik {hitCount} vastet sellest teosest →
-                                                                            </button>
+                                                                            <span className="text-gray-500 text-sm">
+                                                                                Sellest teosest leiti {hitCount} vastet
+                                                                            </span>
                                                                         </div>
                                                                     )}
                                                                 </>
@@ -753,6 +737,29 @@ const SearchPage: React.FC = () => {
                                                 </>
                                             );
                                         })()}
+
+                                        {/* Otsi sellest teosest link - alati nähtav */}
+                                        <div className="py-2 px-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedWork(workId);
+                                                    setSelectedWorkInfo({
+                                                        title: firstHit.pealkiri || workId,
+                                                        year: firstHit.aasta,
+                                                        author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
+                                                    });
+                                                    setSearchParams(prev => {
+                                                        prev.set('work', workId);
+                                                        prev.set('p', '1');
+                                                        return prev;
+                                                    });
+                                                }}
+                                                className="inline-flex items-center gap-1.5 text-gray-500 hover:text-primary-700 text-xs font-medium hover:underline"
+                                            >
+                                                <Search size={12} />
+                                                Otsi sellest teosest
+                                            </button>
+                                        </div>
                                     </article>
                                 );
                             })}
