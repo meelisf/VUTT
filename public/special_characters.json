@@ -61,6 +61,11 @@
       "row": 2,
       "character": "â",
       "name": "a-circumflex"
+    },
+    {
+      "row": 2,
+      "character": "ô",
+      "name": "o-circumflex"
     }
   ]
 }
