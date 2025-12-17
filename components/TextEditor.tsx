@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
-import { getAllTags } from '../services/meiliService';
+import { getAllTags, getWorkFullText } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield } from 'lucide-react';
@@ -644,6 +644,36 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Aasta</span>
                           <p className="text-gray-900">{work.year}</p>
                         </div>
+                      </div>
+                      {/* Download full text button */}
+                      <div className="mt-4 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const { text, title, author, year } = await getWorkFullText(work.id);
+                              // Loome faili sisu päisega
+                              const header = `${title}\n${author}${year ? `, ${year}` : ''}\n\n`;
+                              const fullContent = header + text;
+                              // Genereerime faili ja pakume allalaadimiseks
+                              const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `${work.id}.txt`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            } catch (err) {
+                              console.error('Download error:', err);
+                              alert('Viga teksti allalaadimisel');
+                            }
+                          }}
+                          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
+                        >
+                          <Download size={16} />
+                          Lae alla kogu teose tekst
+                        </button>
                       </div>
                     </div>
                   </div>
