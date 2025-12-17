@@ -20,7 +20,8 @@ const Dashboard: React.FC = () => {
   const queryParam = searchParams.get('q') || '';
   const yearStartParam = searchParams.get('ys');
   const yearEndParam = searchParams.get('ye');
-  const sortParam = searchParams.get('sort') || 'year_asc';
+  const defaultSort = searchParams.get('q') ? 'relevance' : 'year_asc';
+  const sortParam = searchParams.get('sort') || defaultSort;
   const authorParam = searchParams.get('author') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
@@ -113,7 +114,14 @@ const Dashboard: React.FC = () => {
 
       if (inputValue !== queryParam) {
         if (inputValue) newParams.set('q', inputValue);
-        else newParams.delete('q');
+        else {
+          newParams.delete('q');
+          // Kui otsing tühjendatakse ja sort on relevantsus, muuda aasta järgi
+          if (sort === 'relevance') {
+            setSort('year_asc');
+            newParams.set('sort', 'year_asc');
+          }
+        }
         changed = true;
         resetPage = true; // Otsingu muutmisel lähtesta leht
       }
@@ -377,10 +385,11 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setSort(e.target.value)}
                     className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-transparent cursor-pointer hover:bg-gray-50"
                   >
-                    <option value="recent">Viimati muudetud</option>
+                    {queryParam && <option value="relevance">Relevantsus</option>}
                     <option value="year_asc">Aasta (kasvav)</option>
                     <option value="year_desc">Aasta (kahanev)</option>
                     <option value="az">A-Z (Pealkiri)</option>
+                    <option value="recent">Viimati muudetud</option>
                   </select>
                 </div>
               </div>

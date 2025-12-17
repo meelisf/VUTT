@@ -38,11 +38,13 @@ const fixIndexSettings = async () => {
     let sortableSettings: string[] | null = null;
     let filterableSettings: string[] | null = null;
     let currentDistinct: string | null = null;
+    let currentRankingRules: string[] | null = null;
     try {
       currentSettings = await index.getSearchableAttributes();
       sortableSettings = await index.getSortableAttributes();
       filterableSettings = await index.getFilterableAttributes();
       currentDistinct = await index.getDistinctAttribute();
+      currentRankingRules = await index.getRankingRules();
     } catch (e) {
       // Indeksit ei pruugi veel eksisteerida
     }
@@ -50,18 +52,23 @@ const fixIndexSettings = async () => {
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
     const requiredFilter = ['teose_staatus']; // Uus filtreeritav väli
+    // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
+    const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
     const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
     const needsSortUpdate = !sortableSettings || requiredSort.some(r => !sortableSettings.includes(r));
     const needsFilterUpdate = !filterableSettings || requiredFilter.some(r => !filterableSettings.includes(r));
     const needsDistinctReset = currentDistinct !== null; // Eemaldame globaalse distinct seadistuse
 
-    if (!needsSearchUpdate && !needsSortUpdate && !needsFilterUpdate && !needsDistinctReset) {
+    if (!needsSearchUpdate && !needsSortUpdate && !needsFilterUpdate && !needsDistinctReset && !needsRankingUpdate) {
       console.log("Indeksi seadistused on juba korras.");
       return true;
     }
 
     console.log("Algatan indeksi seadistuste uuendamise...");
+    if (needsRankingUpdate) {
+      console.log("Uuendan ranking rules (exactness esimeseks)...");
+    }
 
     await index.updateFilterableAttributes([
       'aasta',
@@ -102,7 +109,19 @@ const fixIndexSettings = async () => {
         maxTotalHits: 10000
       },
       // Eemaldame globaalse distinct seadistuse (kasutame ainult päringutes kus vaja)
-      distinctAttribute: null
+      distinctAttribute: null,
+      // Ranking rules: exactness kõrgemal, et täpsed vasted tuleksid enne
+      // Vaikimisi: ["words", "typo", "proximity", "attribute", "sort", "exactness"]
+      // Muudame: exactness enne words, et "Oratio de liberatione urbis Rigae" 
+      // tuleks enne teksti, kus on "Riga" mitu korda mainitud
+      rankingRules: [
+        "exactness",  // Täpne vaste kõige olulisem
+        "words",      // Mitu otsingusõna vastab
+        "typo",       // Kirjavead
+        "proximity",  // Sõnade lähedus
+        "attribute",  // Välja prioriteet (pealkiri > autor > respondens)
+        "sort"        // Kasutaja sorteerimine
+      ]
     });
 
     console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
@@ -217,15 +236,23 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       limit: 2000, // Enough for all works (~1200)
       attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
-      filter: filter,
-      distinct: 'teose_id' // Return only one hit per work
+      filter: filter
     };
+
+    // Relevantsuse puhul EI kasuta distinct, et säilitada Meilisearchi relevantsuse järjekord
+    // Muul juhul kasutame distinct, et saada üks tulemus teose kohta
+    const useDistinct = options?.sort !== 'relevance';
+    if (useDistinct) {
+      searchParams.distinct = 'teose_id';
+    }
 
     // Sorting logic
     if (options?.sort) {
       switch (options.sort) {
+        case 'relevance':
+          // Meilisearch kasutab relevantsust kui sort pole määratud
+          break;
         case 'year_asc':
-        default:
           searchParams.sort = ['aasta:asc'];
           break;
         case 'year_desc':
@@ -237,10 +264,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         case 'recent':
           searchParams.sort = ['last_modified:desc'];
           break;
+        default:
+          searchParams.sort = ['aasta:asc'];
+          break;
       }
     } else {
-      // Vaikimisi sorteeri aasta järgi kasvavalt (ka otsinguga)
-      // Dashboard otsib pealkirjadest, seega relevantsus pole nii oluline
+      // Vaikimisi sorteeri aasta järgi kasvavalt (kui sort pole määratud)
       searchParams.sort = ['aasta:asc'];
     }
 
@@ -248,9 +277,23 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const response = await index.search(query, searchParams);
     console.log('searchWorks response hits:', response.hits.length);
     
-    // With distinct='teose_id', each hit represents a unique work
-    // But distinct might not return the first page, so we need to fetch first pages separately
-    const workIds = response.hits.map((hit: any) => hit.teose_id);
+    // Kui kasutame distinct, siis iga hit on unikaalne teos
+    // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
+    let uniqueHits = response.hits;
+    if (!useDistinct) {
+      // Grupeeri teose_id järgi, võttes ainult esimese (kõrgeima relevantsusega) tulemuse
+      const seenWorkIds = new Set<string>();
+      uniqueHits = response.hits.filter((hit: any) => {
+        if (seenWorkIds.has(hit.teose_id)) {
+          return false;
+        }
+        seenWorkIds.add(hit.teose_id);
+        return true;
+      });
+      console.log('After deduplication:', uniqueHits.length, 'unique works');
+    }
+    
+    const workIds = uniqueHits.map((hit: any) => hit.teose_id);
     
     // Fetch first page data (thumbnail, tags) for all works
     const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[] }>();
@@ -289,7 +332,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       }
     }
     
-    const works: Work[] = response.hits.map((hit: any) => {
+    const works: Work[] = uniqueHits.map((hit: any) => {
       const firstPageData = firstPagesMap.get(hit.teose_id);
       return {
         id: hit.teose_id,
@@ -308,22 +351,24 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     });
 
     // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
-    // seega sorteerime frontendis uuesti
+    // seega sorteerime frontendis uuesti (v.a. relevance, kus säilitame Meilisearchi järjekorra)
     const sortKey = options?.sort || 'year_asc';
-    works.sort((a, b) => {
-      switch (sortKey) {
-        case 'year_desc':
-          return b.year - a.year;
-        case 'az':
-          return a.title.localeCompare(b.title, 'et');
-        case 'recent':
-          // recent sorteerimine jääb Meilisearchi peale (last_modified pole Work objektis)
-          return 0;
-        case 'year_asc':
-        default:
-          return a.year - b.year;
-      }
-    });
+    if (sortKey !== 'relevance') {
+      works.sort((a, b) => {
+        switch (sortKey) {
+          case 'year_desc':
+            return b.year - a.year;
+          case 'az':
+            return a.title.localeCompare(b.title, 'et');
+          case 'recent':
+            // recent sorteerimine jääb Meilisearchi peale (last_modified pole Work objektis)
+            return 0;
+          case 'year_asc':
+          default:
+            return a.year - b.year;
+        }
+      });
+    }
 
     return works;
 
