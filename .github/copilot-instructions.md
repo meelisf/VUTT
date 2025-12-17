@@ -27,6 +27,16 @@ Frontend (Vite + React 19)
 ### Meilisearch Configuration
 - **No global `distinctAttribute`** - use `distinct: 'teose_id'` in individual queries where needed
 - `getWorkStatuses()` requires querying all pages per work, so distinct must NOT be set globally
+- **Ranking rules**: `exactness` is first (not default) to prioritize exact matches over frequency
+
+#### Dashboard Search & Sorting
+The `searchWorks()` function supports multiple sort options:
+- **Relevantsus** (relevance): Uses Meilisearch's native relevance ranking WITHOUT `distinct` to preserve order. Results are deduplicated in frontend while maintaining relevance order.
+- **Aasta (kasvav/kahanev)**: Sort by year ascending/descending
+- **A-Z**: Alphabetical by title
+- **Viimati muudetud**: Sort by last modification time
+
+**Important**: `distinct` parameter interferes with Meilisearch's relevance ranking. For relevance sorting, we skip `distinct` and deduplicate manually in frontend to get accurate relevance-based results.
 
 #### Dashboard First Page Fetching
 The `searchWorks()` function uses a two-step approach:
@@ -107,6 +117,7 @@ python3 2-1_upload_to_meili.py    # Recreates 'teosed' index
 - Uses lazy settings initialization (`ensureSettings()`)
 - Image URLs built with `getFullImageUrl()` helper
 - Mixed content (HTTPS/HTTP) validation at runtime
+- `getWorkFullText(teoseId)` - downloads entire work's text as single file (used in Workspace "Info" tab)
 
 ### Authentication & Access Control
 - SHA-256 password hashing (see `users.json` structure)
