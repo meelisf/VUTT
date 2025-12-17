@@ -238,7 +238,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           searchParams.sort = ['last_modified:desc'];
           break;
       }
-    } else if (!query.trim()) {
+    } else {
+      // Vaikimisi sorteeri aasta järgi kasvavalt (ka otsinguga)
+      // Dashboard otsib pealkirjadest, seega relevantsus pole nii oluline
       searchParams.sort = ['aasta:asc'];
     }
 
@@ -303,6 +305,24 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         work_status: hit.teose_staatus || undefined,
         tags: firstPageData?.tags || hit.tags || []
       };
+    });
+
+    // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
+    // seega sorteerime frontendis uuesti
+    const sortKey = options?.sort || 'year_asc';
+    works.sort((a, b) => {
+      switch (sortKey) {
+        case 'year_desc':
+          return b.year - a.year;
+        case 'az':
+          return a.title.localeCompare(b.title, 'et');
+        case 'recent':
+          // recent sorteerimine jääb Meilisearchi peale (last_modified pole Work objektis)
+          return 0;
+        case 'year_asc':
+        default:
+          return a.year - b.year;
+      }
     });
 
     return works;
