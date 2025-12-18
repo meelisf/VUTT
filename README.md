@@ -151,16 +151,17 @@ Skännide uuendamiseks (nt parema kvaliteediga):
 3. Meilisearchi uuesti indekseerima ei pea (pildid serveeritakse otse)
 4. Brauseris võib olla vaja cache tühjendada (Ctrl+Shift+R)
 
-#### Andmete genereerimine
+#### Automaatne taustal indekseerimine (UUS)
 
-```bash
-# 1. Genereeri Meilisearchi andmed failisüsteemist
-python3 1-1_consolidate_data.py
-# Väljund: output/meilisearch_data_per_page.jsonl
+`file_server.py` sisaldab taustal töötavat jälgijat, mis kontrollib andmekaustas (`BASE_DIR`) uusi katalooge:
+1. Kui leitakse uus kataloog, kus on pilte aga puudub `_metadata.json`:
+2. Genereeritakse automaatselt `_metadata.json` kataloogi nime põhjal.
+3. Teos indekseeritakse automaatselt Meilisearchis (koos kõigi piltidega).
+4. See tähendab, et uute andmete lisamiseks piisab vaid kataloogi kopeerimisest serverisse.
 
-# 2. Laadi andmed Meilisearchi (vajab .env faili)
-python3 2-1_upload_to_meili.py
-```
+---
+
+#### Andmete käsitsi genereerimine
 
 ### 4. Käivitamine
 ```bash

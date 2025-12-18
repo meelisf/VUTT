@@ -8,6 +8,10 @@ import uuid
 from datetime import datetime
 import re
 import unicodedata
+import threading
+import time
+import urllib.request
+import urllib.parse
 
 # =========================================================
 # KONFIGURATSIOON
@@ -20,6 +24,52 @@ PORT = 8002
 # Sessioonide hoidla (token -> user info)
 # NB: Serveri restart kustutab kõik sessioonid
 sessions = {}
+
+# Meilisearchi konfig (laetakse .env failist)
+MEILI_URL = "http://127.0.0.1:7700"
+MEILI_KEY = ""
+INDEX_NAME = "teosed"
+
+def load_env():
+    """Laeb .env failist Meilisearchi andmed."""
+    global MEILI_URL, MEILI_KEY
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    value = value.strip('"').strip("'")
+                    if key == "MEILISEARCH_URL":
+                        MEILI_URL = value
+                    elif key == "MEILISEARCH_MASTER_KEY":
+                        MEILI_KEY = value
+                    elif key == "MEILI_SEARCH_API_KEY" and not MEILI_KEY:
+                        MEILI_KEY = value
+    print(f"Meilisearch URL: {MEILI_URL}")
+
+load_env()
+
+def send_to_meilisearch(documents):
+    """Saadab dokumendid Meilisearchi kasutades urllib-i."""
+    if not MEILI_KEY:
+        print("HOIATUS: Meilisearchi võti puudub, ei saa indekseerida.")
+        return False
+    
+    url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents"
+    try:
+        data = json.dumps(documents).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+        
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            print(f"Meilisearch vastus: {res_data}")
+            return True
+    except Exception as e:
+        print(f"Viga Meilisearchi saatmisel: {e}")
+        return False
 
 def load_users():
     """Laeb kasutajad JSON failist. Loob faili kui ei eksisteeri."""
@@ -133,6 +183,120 @@ def find_directory_by_id(target_id):
             if sanitize_id(entry.name) == target_id:
                 return entry.path
     return None
+
+def generate_default_metadata(dir_name):
+    """Genereerib vaike-metaandmed kataloogi nime põhjal."""
+    teose_id = sanitize_id(dir_name)
+    
+    # Pealkiri kataloogi nimest (eemaldame aastaarvu ja ID osa kui võimalik)
+    # Sama loogika mis 1-1_consolidate_data.py skriptis
+    clean_title = re.sub(r'^\d{4}[-_]\d+[-_]?', '', dir_name)
+    if clean_title == dir_name:
+        clean_title = re.sub(r'^\d{4}[-_]?', '', dir_name)
+    
+    title = clean_title.replace('-', ' ').replace('_', ' ').strip().capitalize() if clean_title else "Pealkiri puudub"
+    
+    # Proovi leida aasta
+    year = 0
+    year_match = re.match(r'^(\d{4})', dir_name)
+    if year_match:
+        year = int(year_match.group(1))
+
+    return {
+        "teose_id": teose_id,
+        "pealkiri": title,
+        "autor": "",
+        "respondens": "",
+        "aasta": year,
+        "teose_tags": [],
+        "ester_id": None,
+        "external_url": None
+    }
+
+def index_new_work(dir_name, metadata):
+    """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
+    dir_path = os.path.join(BASE_DIR, dir_name)
+    teose_id = metadata['teose_id']
+    
+    # Leiame pildid
+    images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+    if not images:
+        return
+    
+    documents = []
+    for i, img_name in enumerate(images):
+        page_num = i + 1
+        page_id = f"{teose_id}-{page_num}"
+        
+        doc = {
+            "id": page_id,
+            "teose_id": teose_id,
+            "pealkiri": metadata['pealkiri'],
+            "autor": metadata.get('autor', ''),
+            "respondens": metadata.get('respondens', ''),
+            "aasta": metadata.get('aasta', 0),
+            "lehekylje_number": page_num,
+            "teose_lehekylgede_arv": len(images),
+            "lehekylje_tekst": "",
+            "lehekylje_pilt": os.path.join(dir_name, img_name),
+            "originaal_kataloog": dir_name,
+            "status": "Toores",
+            "teose_staatus": "Toores",
+            "tags": [],
+            "comments": [],
+            "history": [],
+            "last_modified": int(time.time() * 1000),
+            "teose_tags": metadata.get('teose_tags', [])
+        }
+        
+        if metadata.get('ester_id'):
+            doc['ester_id'] = metadata['ester_id']
+        if metadata.get('external_url'):
+            doc['external_url'] = metadata['external_url']
+            
+        documents.append(doc)
+    
+    if documents:
+        print(f"Indekseerin {len(documents)} lehekülge teosele {teose_id}...")
+        send_to_meilisearch(documents)
+
+def metadata_watcher_loop():
+    """Taustalõim, mis otsib uusi kaustu ja loob neile metaandmed."""
+    print(f"Metaandmete jälgija käivitatud (kataloog: {BASE_DIR})")
+    while True:
+        try:
+            if not os.path.exists(BASE_DIR):
+                time.sleep(60)
+                continue
+
+            for entry in os.scandir(BASE_DIR):
+                if entry.is_dir():
+                    meta_path = os.path.join(entry.path, '_metadata.json')
+                    if not os.path.exists(meta_path):
+                        # Kontrollime kas on pilte
+                        has_images = False
+                        for f in os.listdir(entry.path):
+                            if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                                has_images = True
+                                break
+                        
+                        if has_images:
+                            try:
+                                metadata = generate_default_metadata(entry.name)
+                                with open(meta_path, 'w', encoding='utf-8') as f:
+                                    json.dump(metadata, f, ensure_ascii=False, indent=2)
+                                print(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
+                                
+                                # Indekseeri kohe Meilisearchis
+                                index_new_work(entry.name, metadata)
+                            except Exception as e:
+                                print(f"Viga metaandmete loomisel ({entry.name}): {e}")
+            
+            # Oota 30 sekundit järgmise skannimiseni
+            time.sleep(30)
+        except Exception as e:
+            print(f"Jälgija viga: {e}")
+            time.sleep(60)
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -685,6 +849,11 @@ print(f"Jälgitav juurkaust: {BASE_DIR}")
 
 import socketserver
 socketserver.TCPServer.allow_reuse_address = True
+
+# Käivita metaandmete jälgija taustal
+watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
+watcher_thread.start()
+
 server = http.server.HTTPServer(('0.0.0.0', PORT), RequestHandler)
 try:
     server.serve_forever()

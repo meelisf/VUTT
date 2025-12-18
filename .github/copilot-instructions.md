@@ -11,7 +11,7 @@ Frontend (Vite + React 19)
     ↓
 ├── Meilisearch (port 7700) - Full-text search & document storage
 ├── Image Server (port 8001) - Serves scanned document images  
-└── File Server (port 8002) - Persists edits to filesystem + user auth
+└── File Server (port 8002) - Persists edits to filesystem + user auth + **Background metadata watcher**
 ```
 
 ### Data Storage
@@ -136,6 +136,16 @@ Configure server IPs in `config.ts`. Start all services:
 
 ### Data Initialization
 To rebuild Meilisearch index from source files:
+```bash
+# 1. Automatic Background Indexing (Preferred)
+The `file_server.py` runs a background thread (`metadata_watcher_loop`) that:
+- Periodically scans `BASE_DIR` for folders without `_metadata.json`.
+- If images are present, generates default `_metadata.json`.
+- Automatically indexes all pages of the new work into Meilisearch.
+
+# 2. Legacy/Manual Re-indexing
+To rebuild Meilisearch index from source files manually:
+
 ```bash
 # 1. Generate JSONL from filesystem (reads data/ folder structure)
 python3 1-1_consolidate_data.py   # Output: output/meilisearch_data_per_page.jsonl
