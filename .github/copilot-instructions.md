@@ -64,12 +64,51 @@ The `searchContent()` function supports two modes:
 **Sidebar filters**:
 - Otsingu ulatus (scope): all / original text only / annotations only
 - Ajavahemik (year range): start/end year inputs
+- Žanr (teose_tags): checkboxes with counts, AND logic
 - Teos (work): radio buttons with hit counts, sorted by relevance
 
 **UX details**:
 - Accordion toggle preserves scroll position (saves scrollTop before state change, restores after DOM update)
 - "Tühjenda filtrid" button appears when any filter is active
 - Work filter integrates with URL params (`?work=teose_id`)
+
+### Teose märksõnad (teose_tags) / Genre Filter
+Work-level tags for filtering by document genre (disputatsioon, oratsioon, etc.).
+
+**Data sources** (priority order):
+1. `_metadata.json` in work folder (new system)
+2. Auto-detected from title via regex (Disputatio → disputatsioon, etc.)
+3. `jaanson.tsv` (legacy system, no teose_tags)
+
+**Implementation**:
+- `1-1_consolidate_data.py`: reads `_metadata.json` from work folders, auto-detects tags from title
+- `meiliService.ts`: `getTeoseTagsFacets()` returns all tags with counts
+- Dashboard: chip-based filter (toggle buttons)
+- SearchPage: sidebar checkbox filter
+- Filter logic: AND (must match ALL selected tags)
+- URL param: `?teoseTags=disputatsioon,oratsioon`
+
+**`_metadata.json` structure**:
+```json
+{
+  "teose_id": "custom-id",
+  "pealkiri": "Title",
+  "autor": "Author",
+  "respondens": "Respondent",
+  "aasta": 1650,
+  "teose_tags": ["disputatsioon"],
+  "ester_id": "b12345",
+  "external_url": "https://example.com"
+}
+```
+
+**Auto-detection patterns**:
+- `Disputatio...` → `disputatsioon`
+- `Oratio...` → `oratsioon`
+- `Carmen...` → `carmen`
+- `Programma...` → `programm`
+- `Theses...` → `teesid`
+- `Dissertatio...` → `dissertatsioon`
 
 ### Meilisearch Schema (index: `teosed`)
 Documents represent individual pages with fields:
@@ -78,6 +117,8 @@ Documents represent individual pages with fields:
 - `pealkiri`, `autor`, `respondens`, `aasta`, `originaal_kataloog` (metadata)
 - `tags`, `comments`, `status`, `history`, `last_modified` (annotations)
 - `teose_staatus` (denormalized work-level status: 'Toores' | 'Töös' | 'Valmis')
+- `teose_tags` (work-level genre tags: string[], e.g. ['disputatsioon'])
+- `ester_id`, `external_url` (optional external links)
 
 ## Development
 

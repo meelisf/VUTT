@@ -23,6 +23,9 @@ export interface Work {
   thumbnail_url: string; // lehekylje_pilt esimeselt lehelt
   work_status?: WorkStatus; // Teose koondstaatus (arvutatakse lehekülgede staatustest)
   tags?: string[]; // Esimese lehekülje tagid (dashboardil kuvamiseks)
+  teose_tags?: string[]; // Teose-tasemel märksõnad/kollektsioonid (admin saab muuta)
+  ester_id?: string; // ESTER kataloogi ID (nt "b1510692")
+  external_url?: string; // Väline kataloogilink (kui pole ESTERis)
 }
 
 export interface Annotation {
@@ -69,6 +72,7 @@ export interface ContentSearchOptions {
   catalog?: string;
   workId?: string;  // Filter ühe teose piires
   scope?: 'all' | 'annotation' | 'original';
+  teoseTags?: string[];  // Teose märksõnade filter (AND loogika)
 }
 
 // Full Text Search specific types

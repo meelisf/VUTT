@@ -6,6 +6,8 @@ import hashlib
 import glob
 import uuid
 from datetime import datetime
+import re
+import unicodedata
 
 # =========================================================
 # KONFIGURATSIOON
@@ -95,6 +97,42 @@ def require_token(data, min_role=None):
 def require_auth(data, min_role=None):
     """DEPRECATED: Kasuta require_token() asemel."""
     return require_token(data, min_role)
+
+def sanitize_id(text):
+    """Puhastab teksti, et see sobiks ID-ks (sama loogika mis 1-1 skriptis)."""
+    if not text: return ""
+    # Eemalda diakriitikud
+    normalized = unicodedata.normalize('NFD', text)
+    ascii_text = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
+    # Asenda kõik mitte-lubatud märgid alakriipsuga
+    sanitized = re.sub(r'[^a-zA-Z0-9_-]', '_', ascii_text)
+    # Eemalda mitu järjestikust alakriipsu
+    sanitized = re.sub(r'_+', '_', sanitized)
+    # Eemalda algus- ja lõpukriipsud
+    sanitized = sanitized.strip('_-')
+    return sanitized
+
+def find_directory_by_id(target_id):
+    """Leiab failisüsteemist kausta teose ID järgi."""
+    if not target_id: return None
+    
+    for entry in os.scandir(BASE_DIR):
+        if entry.is_dir():
+            # 1. Kontrolli _metadata.json faili sisu
+            meta_path = os.path.join(entry.path, '_metadata.json')
+            if os.path.exists(meta_path):
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                        if meta.get('teose_id') == target_id:
+                            return entry.path
+                except:
+                    pass
+            
+            # 2. Kontrolli kausta nime (sanitiseeritult)
+            if sanitize_id(entry.name) == target_id:
+                return entry.path
+    return None
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -463,6 +501,180 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
             except Exception as e:
                 print(f"RESTORE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/update-work-metadata':
+            # Teose üldiste metaandmete (_metadata.json) uuendamine
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                # Autentimise kontroll - ainult admin saab muuta üldisi metaandmeid
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+                
+                original_catalog = data.get('original_path')
+                work_id = data.get('work_id')
+                new_metadata = data.get('metadata') # Sõnastik uute andmetega
+                
+                if (not original_catalog and not work_id) or not new_metadata:
+                    self.send_response(400)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Puudub 'original_path'/'work_id' või 'metadata'"}).encode('utf-8'))
+                    return
+                
+                if original_catalog:
+                    safe_catalog = os.path.basename(original_catalog)
+                    metadata_path = os.path.join(BASE_DIR, safe_catalog, '_metadata.json')
+                else:
+                    # Fallback: otsime kausta ID järgi
+                    found_path = find_directory_by_id(work_id)
+                    if not found_path:
+                        raise Exception(f"Ei leidnud kausta ID-ga: {work_id}")
+                    metadata_path = os.path.join(found_path, '_metadata.json')
+                
+                # Loeme olemasoleva faili (et säilitada välju, mida me ei muuda)
+                current_meta = {}
+                if os.path.exists(metadata_path):
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        current_meta = json.load(f)
+                
+                # Uuendame andmed
+                current_meta.update(new_metadata)
+                
+                # Salvestame
+                with open(metadata_path, 'w', encoding='utf-8') as f:
+                    json.dump(current_meta, f, ensure_ascii=False, indent=2)
+                
+                print(f"Admin '{user['username']}' uuendas metaandmeid: {metadata_path}")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "success", "message": "Metaandmed salvestatud"}).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"METADATA UPDATE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/get-work-metadata':
+            # Tagastab teose _metadata.json sisu otse failisüsteemist
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                # Nõuab vähemalt editori õigusi
+                user, auth_error = require_token(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+                
+                original_catalog = data.get('original_path')
+                work_id = data.get('work_id')
+                
+                if not original_catalog and not work_id:
+                    self.send_response(400)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Puudub 'original_path' või 'work_id'"}).encode('utf-8'))
+                    return
+
+                if original_catalog:
+                    safe_catalog = os.path.basename(original_catalog)
+                    metadata_path = os.path.join(BASE_DIR, safe_catalog, '_metadata.json')
+                else:
+                    # Fallback: otsime kausta ID järgi
+                    found_path = find_directory_by_id(work_id)
+                    if not found_path:
+                        # Kui ei leia, tagastame tühja objekti (mitte vea), et UI ei jookseks kokku
+                        metadata_path = "" 
+                    else:
+                        metadata_path = os.path.join(found_path, '_metadata.json')
+                
+                metadata = {}
+                if metadata_path and os.path.exists(metadata_path):
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "status": "success",
+                    "metadata": metadata
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"GET METADATA VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/get-metadata-suggestions':
+            # Tagastab unikaalsed autorid ja žanrid (tagid) soovitusteks
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+                
+                # Nõuab vähemalt editori õigusi
+                user, auth_error = require_token(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+                
+                authors = set()
+                tags = set()
+                
+                # Käime läbi kõik kataloogid ja kogume andmeid
+                for entry in os.scandir(BASE_DIR):
+                    if entry.is_dir():
+                        meta_path = os.path.join(entry.path, '_metadata.json')
+                        if os.path.exists(meta_path):
+                            try:
+                                with open(meta_path, 'r', encoding='utf-8') as f:
+                                    meta = json.load(f)
+                                    if meta.get('autor'):
+                                        authors.add(meta['autor'].strip())
+                                    if meta.get('respondens'):
+                                        authors.add(meta['respondens'].strip())
+                                    for t in meta.get('teose_tags', []):
+                                        tags.add(t.strip())
+                            except:
+                                continue
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                response = {
+                    "status": "success",
+                    "authors": sorted(list(authors)),
+                    "tags": sorted(list(tags))
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"SUGGESTIONS VIGA: {e}")
                 self.send_error(500, str(e))
                 
         else:

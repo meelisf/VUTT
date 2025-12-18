@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { searchWorks } from '../services/meiliService';
+import { searchWorks, getTeoseTagsFacets } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
 import { useUser } from '../contexts/UserContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
@@ -24,6 +24,7 @@ const Dashboard: React.FC = () => {
   const sortParam = searchParams.get('sort') || defaultSort;
   const authorParam = searchParams.get('author') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
+  const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
 
   const [inputValue, setInputValue] = useState(queryParam);
@@ -36,8 +37,25 @@ const Dashboard: React.FC = () => {
   const [yearStart, setYearStart] = useState<string>(yearStartParam || '1630');
   const [yearEnd, setYearEnd] = useState<string>(yearEndParam || '1710');
   const [sort, setSort] = useState<string>(sortParam);
+  
+  // Teose märksõnade filter
+  const [availableTags, setAvailableTags] = useState<{ tag: string; count: number }[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>(teoseTagsParam);
 
   const navigate = useNavigate();
+
+  // Laadi teose märksõnade facets alguses
+  useEffect(() => {
+    const loadTags = async () => {
+      try {
+        const tags = await getTeoseTagsFacets();
+        setAvailableTags(tags);
+      } catch (e) {
+        console.warn('Teose märksõnade laadimine ebaõnnestus:', e);
+      }
+    };
+    loadTags();
+  }, []);
 
   // Laadime "Projektist" HTML faili
   useEffect(() => {
@@ -102,8 +120,9 @@ const Dashboard: React.FC = () => {
     if (yearStartParam) setYearStart(yearStartParam);
     if (yearEndParam) setYearEnd(yearEndParam);
     if (sortParam) setSort(sortParam);
+    setSelectedTags(teoseTagsParam);
     setCurrentPage(pageParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam, pageParam]);
+  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), pageParam]);
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -151,6 +170,19 @@ const Dashboard: React.FC = () => {
         newParams.set('sort', sort);
         changed = true;
       }
+      
+      // Teose märksõnad
+      const currentTagsParam = searchParams.get('teoseTags') || '';
+      const newTagsParam = selectedTags.join(',');
+      if (newTagsParam !== currentTagsParam) {
+        if (newTagsParam) {
+          newParams.set('teoseTags', newTagsParam);
+        } else {
+          newParams.delete('teoseTags');
+        }
+        changed = true;
+        resetPage = true;
+      }
 
       // Lähtesta leht 1-le kui filtrid muutusid
       if (resetPage && pageParam > 1) {
@@ -163,7 +195,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam]);
+  }, [inputValue, yearStart, yearEnd, sort, selectedTags, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam]);
 
   // Perform search when params change
   useEffect(() => {
@@ -180,7 +212,8 @@ const Dashboard: React.FC = () => {
           yearEnd: end,
           sort: sort,
           author: authorParam || undefined,
-          workStatus: statusParam || undefined
+          workStatus: statusParam || undefined,
+          teoseTags: selectedTags.length > 0 ? selectedTags : undefined
         });
         setWorks(results);
         
@@ -201,7 +234,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam, statusParam]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam, statusParam, selectedTags]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
@@ -358,13 +391,14 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Reset Filters Button */}
-                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || statusParam) && (
+                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || statusParam || selectedTags.length > 0) && (
                   <button
                     onClick={() => {
                       setInputValue('');
                       setYearStart('1630');
                       setYearEnd('1710');
                       setSort('recent');
+                      setSelectedTags([]);
                       setSearchParams({});
                     }}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
@@ -393,6 +427,38 @@ const Dashboard: React.FC = () => {
                   </select>
                 </div>
               </div>
+
+              {/* Teose märksõnade filter (chip-based) */}
+              {availableTags.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 bg-white/50 p-2 rounded-lg">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+                    <Tag size={12} />
+                    Žanr:
+                  </span>
+                  {availableTags.map(({ tag, count }) => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedTags(selectedTags.filter(t => t !== tag));
+                          } else {
+                            setSelectedTags([...selectedTags, tag]);
+                          }
+                        }}
+                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {tag} <span className="opacity-60">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

@@ -51,7 +51,7 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['teose_staatus']; // Uus filtreeritav väli
+    const requiredFilter = ['teose_staatus', 'teose_tags']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
@@ -78,7 +78,8 @@ const fixIndexSettings = async () => {
       'originaal_kataloog',
       'tags',  // Vajalik facet'ide jaoks (märksõnade autocomplete)
       'status', // Lehekülje staatus
-      'teose_staatus' // Teose koondstaatus (Toores/Töös/Valmis)
+      'teose_staatus', // Teose koondstaatus (Toores/Töös/Valmis)
+      'teose_tags' // Teose märksõnad (disputatsioon, oratsioon jne)
     ]);
 
     await index.updateSortableAttributes([
@@ -148,6 +149,7 @@ interface DashboardSearchOptions {
   sort?: string;
   author?: string;
   workStatus?: WorkStatus; // Teose koondstaatuse filter
+  teoseTags?: string[]; // Teose märksõnad (AND loogika)
 }
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
@@ -207,6 +209,34 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
   }
 };
 
+// Saab kõik teose märksõnad (teose_tags) koos loendiga - facet query
+export const getTeoseTagsFacets = async (): Promise<{ tag: string; count: number }[]> => {
+  checkMixedContent();
+  await ensureSettings();
+  
+  try {
+    // Kasutame facet päringut, et saada kõik unikaalsed teose_tags väärtused koos loendiga
+    const response = await index.search('', {
+      filter: ['lehekylje_number = 1'], // Ainult esimesed lehed, et vältida korduvat loendamist
+      limit: 0, // Ei vaja tulemusi, ainult facet'e
+      facets: ['teose_tags']
+    });
+    
+    const facetDistribution = response.facetDistribution?.teose_tags || {};
+    
+    // Teisenda objektist massiiviks ja sorteeri loendi järgi kahanevalt
+    const result = Object.entries(facetDistribution)
+      .map(([tag, count]) => ({ tag, count: count as number }))
+      .sort((a, b) => b.count - a.count);
+    
+    console.log('getTeoseTagsFacets:', result.length, 'unique tags found');
+    return result;
+  } catch (error) {
+    console.error("getTeoseTagsFacets error:", error);
+    return [];
+  }
+};
+
 // Dashboardi otsing: otsib teoseid
 export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<Work[]> => {
   checkMixedContent();
@@ -231,10 +261,16 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
     }
+    // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
+    if (options?.teoseTags && options.teoseTags.length > 0) {
+      for (const tag of options.teoseTags) {
+        filter.push(`teose_tags = "${tag}"`);
+      }
+    }
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'teose_tags', 'ester_id', 'external_url'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter
     };
@@ -346,7 +382,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         // Use first page data if available, otherwise fall back to the hit's data
         thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
         work_status: hit.teose_staatus || undefined,
-        tags: firstPageData?.tags || hit.tags || []
+        tags: firstPageData?.tags || hit.tags || [],
+        teose_tags: hit.teose_tags || [],
+        ester_id: hit.ester_id || undefined,
+        external_url: hit.external_url || undefined
       };
     });
 
@@ -560,7 +599,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
   try {
     const response = await index.search('', {
       filter: [`teose_id = "${workId}"`],
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url'],
       limit: 1
     });
 
@@ -576,7 +615,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       year: parseInt(hit.aasta),
       publisher: '',
       page_count: hit.teose_lehekylgede_arv || 0,
-      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt)
+      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
+      ester_id: hit.ester_id || undefined,
+      external_url: hit.external_url || undefined
     };
   } catch (e) {
     console.error("Work Metadata Error:", e);
@@ -599,6 +640,12 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
+  // Teose märksõnade filter (AND loogika)
+  if (options.teoseTags && options.teoseTags.length > 0) {
+    for (const tag of options.teoseTags) {
+      filter.push(`teose_tags = "${tag}"`);
+    }
+  }
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];

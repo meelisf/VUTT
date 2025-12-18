@@ -4,7 +4,7 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags, getWorkFullText } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink } from 'lucide-react';
 
 // Varukoopia tüüp
 interface BackupEntry {
@@ -645,8 +645,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           <p className="text-gray-900">{work.year}</p>
                         </div>
                       </div>
-                      {/* Download full text button */}
-                      <div className="mt-4 pt-3 border-t border-gray-100">
+                      
+                      {/* Links and Actions */}
+                      <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">
+                        {work.ester_id && (
+                           <a 
+                             href={`https://www.ester.ee/record=${work.ester_id}*est`}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
+                             title="Ava ESTER-i kirje"
+                           >
+                             <ExternalLink size={16} />
+                             Vaata ESTER-is
+                           </a>
+                        )}
+
                         <button
                           onClick={async () => {
                             try {

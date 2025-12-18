@@ -4,6 +4,13 @@
 # VUTT TEENUSTE KÄIVITAJA
 # ============================================
 
+# 0. Peata vanad teenused, et vältida pordikonflikte
+echo "Peatan vanad teenused..."
+pkill -f "meilisearch" 2>/dev/null
+pkill -f "image_server.py" 2>/dev/null
+pkill -f "file_server.py" 2>/dev/null
+sleep 1
+
 # 1. Logide kaust
 mkdir -p logs
 

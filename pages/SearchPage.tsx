@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { searchContent, searchWorkHits, getWorkMetadata } from '../services/meiliService';
+import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText } from 'lucide-react';
+import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -26,6 +26,7 @@ const SearchPage: React.FC = () => {
     const yearStartParam = searchParams.get('ys') ? parseInt(searchParams.get('ys')!) : undefined;
     const yearEndParam = searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined;
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
+    const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
 
     // Local state for input fields
     const [inputValue, setInputValue] = useState(queryParam);
@@ -34,6 +35,10 @@ const SearchPage: React.FC = () => {
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
     const [selectedWork, setSelectedWork] = useState<string>(workIdParam); // Teose filter
     const [selectedWorkInfo, setSelectedWorkInfo] = useState<{title: string, year?: string | number, author?: string} | null>(null); // Valitud teose info
+    
+    // Teose märksõnade filter
+    const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
+    const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
 
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
@@ -47,12 +52,26 @@ const SearchPage: React.FC = () => {
 
     const contentRef = useRef<HTMLDivElement>(null);
 
+    // Laadi teose märksõnade facets alguses
+    useEffect(() => {
+        const loadTags = async () => {
+            try {
+                const tags = await getTeoseTagsFacets();
+                setAvailableTeoseTags(tags);
+            } catch (e) {
+                console.warn('Teose märksõnade laadimine ebaõnnestus:', e);
+            }
+        };
+        loadTags();
+    }, []);
+
     // Sync local input with URL param when URL changes (e.g. back button)
     useEffect(() => {
         setInputValue(queryParam);
         if (scopeParam) setSelectedScope(scopeParam);
         setSelectedWork(workIdParam);
-    }, [queryParam, scopeParam, workIdParam]);
+        setSelectedTeoseTags(teoseTagsParam);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(',')]);
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
@@ -84,6 +103,7 @@ const SearchPage: React.FC = () => {
                 prev.delete('ye');
                 prev.delete('scope');
                 prev.delete('work');
+                prev.delete('teoseTags');
             } else {
                 prev.set('q', inputValue);
                 prev.set('p', '1'); // Reset page
@@ -92,6 +112,7 @@ const SearchPage: React.FC = () => {
                 if (yearEnd) prev.set('ye', yearEnd); else prev.delete('ye');
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
+                if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
             }
             return prev;
         });
@@ -107,14 +128,15 @@ const SearchPage: React.FC = () => {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
                 scope: scopeParam,
-                workId: workIdParam || undefined  // Lisa workId filter
+                workId: workIdParam || undefined,  // Lisa workId filter
+                teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined
             };
             
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(',')]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -422,6 +444,38 @@ const SearchPage: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Teose märksõnade filter (Žanr) */}
+                        {availableTeoseTags.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                    <BookOpen size={14} /> Žanr
+                                </h3>
+                                <div className="space-y-1">
+                                    {availableTeoseTags.map(({ tag, count }) => {
+                                        const isSelected = selectedTeoseTags.includes(tag);
+                                        return (
+                                            <label key={tag} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        if (isSelected) {
+                                                            setSelectedTeoseTags(selectedTeoseTags.filter(t => t !== tag));
+                                                        } else {
+                                                            setSelectedTeoseTags([...selectedTeoseTags, tag]);
+                                                        }
+                                                    }}
+                                                    className="text-primary-600 focus:ring-primary-500 rounded"
+                                                />
+                                                <span className="text-sm text-gray-700 flex-1">{tag}</span>
+                                                <span className="text-xs text-gray-400">({count})</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         {/* Year Filter */}
                         <div>
                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -530,7 +584,7 @@ const SearchPage: React.FC = () => {
                             >
                                 Rakenda filtrid
                             </button>
-                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0) && (
                                 <button
                                     onClick={() => {
                                         setYearStart('');
@@ -538,11 +592,13 @@ const SearchPage: React.FC = () => {
                                         setSelectedScope('all');
                                         setSelectedWork('');
                                         setSelectedWorkInfo(null);
+                                        setSelectedTeoseTags([]);
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');
                                             prev.delete('scope');
                                             prev.delete('work');
+                                            prev.delete('teoseTags');
                                             prev.set('p', '1');
                                             return prev;
                                         });

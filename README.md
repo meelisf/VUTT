@@ -102,7 +102,17 @@ data/
 ├── jaanson.tsv                          # Metaandmete fail (TSV)
 └── 04_sorditud_dokumendid/              # Skaneeritud dokumendid
     ├── 1692-6-Suvaline-Nimi/            # Algab ID-ga (1692-6)
-    │   ├── scan_001.jpg                 # Skaneeritud pilt
+   │   ├── scan_001.jpg                 # Skaneeritud pilt
+   ### Märkus žanrite kohta
+
+   Järgmised žanrid loetakse samaks ja normaliseeritakse väärtuseks **disputatsioon**:
+
+   - dissertatsioon
+   - disputatsioon
+   - exercitatio
+   - teesid
+
+   Seega kõik need märksõnad (ka automaatselt tuvastatud või _metadata.json-is_) salvestatakse ja filtreeritakse kui `disputatsioon`.
     │   ├── scan_001.txt                 # OCR tekst (SAMA NIMI!)
     │   ├── scan_001.json                # Metaandmed (automaatne)
     │   ├── scan_002.jpg
@@ -126,8 +136,8 @@ data/
    - Kataloogi ülejäänud nimi on vaba - võib olla ka ainult ID
 
 3. **Failide paarid** (OLULINE!):
-   - Iga lehekülje kohta peab olema **sama nimega** `.jpg` ja `.txt` fail
-   - Näide: `scan_001.jpg` + `scan_001.txt` ✅
+   - Iga lehekülje kohta peab olema **sama nimega** pildi (`.jpg`, `.jpeg`, `.png`) ja `.txt` fail
+   - Näide: `scan_001.jpg` + `scan_001.txt` või `scan_001.png` + `scan_001.txt` ✅
    - Näide: `pilt_001.jpg` + `tekst_001.txt` ❌ (ei tööta!)
    - Failinimed ei pea sisaldama kataloogi nime
    - Kui pilt puudub, lehekülge ei kuvata
