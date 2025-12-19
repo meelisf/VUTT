@@ -4,7 +4,7 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags, getWorkFullText } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
-import { Save, Tag, MessageSquare, Loader2, History, FileText, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 
 // Varukoopia tüüp

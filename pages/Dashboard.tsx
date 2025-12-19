@@ -242,9 +242,12 @@ const Dashboard: React.FC = () => {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-6">
-          <Link to="/" className="hover:opacity-80 transition-opacity">
-            <h1 className="text-2xl font-bold text-primary-900 tracking-tight">VUTT</h1>
-            <p className="text-xs text-gray-500 font-medium tracking-wide uppercase">Varauusaegsete tekstide töölaud</p>
+          <Link to="/" className="hover:opacity-80 transition-opacity flex items-center gap-3">
+            <img src="/logo.png" alt="VUTT Logo" className="h-10 w-auto" />
+            <div>
+              <h1 className="text-2xl font-bold text-primary-900 tracking-tight leading-none">VUTT</h1>
+              <p className="text-xs text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">Varauusaegsete tekstide töölaud</p>
+            </div>
           </Link>
           <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
           <Link
@@ -372,8 +375,8 @@ const Dashboard: React.FC = () => {
                 {/* Status Filter Badge */}
                 {statusParam && (
                   <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
-                      statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
-                        'bg-gray-100 text-gray-700'
+                    statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
+                      'bg-gray-100 text-gray-700'
                     }`}>
                     <span>{statusParam}</span>
                     <button
@@ -448,8 +451,8 @@ const Dashboard: React.FC = () => {
                           }
                         }}
                         className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${isSelected
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                       >
                         {tag} <span className="opacity-60">({count})</span>
@@ -545,8 +548,8 @@ const Dashboard: React.FC = () => {
                                   key={page}
                                   onClick={() => handlePageChange(page as number)}
                                   className={`w-10 h-10 rounded-lg font-medium transition-colors ${currentPage === page
-                                      ? 'bg-primary-600 text-white'
-                                      : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                    ? 'bg-primary-600 text-white'
+                                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
                                     }`}
                                 >
                                   {page}

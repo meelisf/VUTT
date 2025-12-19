@@ -53,12 +53,6 @@ body {
   padding: 0 1px;
 }
 
-.marginalia-marker {
-  color: #dc2626;
-  /* red-600 */
-  display: none;
-  /* Hide the old asterisk if present */
-}
 
 .marginalia-highlight {
   background-color: #fef9c3;

@@ -58,6 +58,8 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
     ];
 
     // Main render logic
+    // We iterate through lines to ensure strict 1-to-1 mapping with line numbers.
+    // However, we maintain activeStyles (Set) to support styling that spans multiple lines.
     const renderedLines = useMemo(() => {
         const rawLines = content.split('\n');
         const outputLines: { html: string, className: string }[] = [];
