@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
@@ -16,7 +16,15 @@ const Workspace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<Page | null>(null);
   const [work, setWork] = useState<Work | undefined>(undefined);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [editorChanges, setEditorChanges] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<PageStatus | null>(null);
+  const statusDirty = page && currentStatus ? currentStatus !== page.status : false;
+  const hasUnsavedChanges = editorChanges || statusDirty;
+
+  // Sünkroniseeri olekud kui leht vahetub
+  useEffect(() => {
+    setEditorChanges(false);
+  }, [pageNum]);
 
   // Metaandmete muutmise olekud
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
@@ -43,6 +51,36 @@ const Workspace: React.FC = () => {
     setInputPage(pageNum || '1');
   }, [pageNum]);
 
+  // Browser level prevent-unload (refresh, close, external links)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = ''; // Trigger browser prompt
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // React Router level blocker (internal navigation, back button)
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  // Kui blocker on aktiivne, näitame dialoogi
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      const confirmed = window.confirm("Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?");
+      if (confirmed) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
   const handlePageInputSubmit = () => {
     if (!workId) return;
     const newPage = parseInt(inputPage, 10);
@@ -51,13 +89,6 @@ const Workspace: React.FC = () => {
     // Kontrollime, et number oleks valiidne ja piires (kui lehekülgede arv on teada)
     if (!isNaN(newPage) && newPage >= 1 && (totalPages === 0 || newPage <= totalPages)) {
       if (newPage !== currentPageNum) {
-        if (hasUnsavedChanges) {
-          const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
-          if (!confirmed) {
-            setInputPage(currentPageNum.toString());
-            return;
-          }
-        }
         navigate(`/work/${workId}/${newPage}`);
       }
     } else {
@@ -85,8 +116,8 @@ const Workspace: React.FC = () => {
           setError("Lehekülge ei leitud. Kontrolli, kas Meilisearchis on andmed olemas.");
         } else {
           setPage(pageData);
+          setCurrentStatus(pageData.status);
           if (workData) setWork(workData);
-
           // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
           // update the URL to reflect reality.
           if (pageData.page_number !== currentPageNum) {
@@ -280,8 +311,12 @@ const Workspace: React.FC = () => {
       return;
     }
     // Salvestame ja saame tagasi uuendatud lehe (koos uue ajalooga)
-    const savedPage = await savePage(updatedPage, 'Salvestas muudatused', user.name, { token: authToken });
+    // Lisame juurde ka staatuse, mis võib olla muudetud päises
+    const pageWithStatus = { ...updatedPage, status: currentStatus || updatedPage.status };
+    const savedPage = await savePage(pageWithStatus, 'Salvestas muudatused', user.name, { token: authToken });
     setPage(savedPage);
+    setCurrentStatus(savedPage.status);
+    setEditorChanges(false);
   };
 
   const navigatePage = (delta: number) => {
@@ -423,12 +458,23 @@ const Workspace: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border select-none ${page.status === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
-            page.status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
-              'bg-gray-50 text-gray-600 border-gray-200'
-            }`}>
-            {page.status}
-          </span>
+          <select
+            value={currentStatus || page.status}
+            onChange={(e) => {
+              setCurrentStatus(e.target.value as PageStatus);
+            }}
+            disabled={!user}
+            className={`text-xs font-bold uppercase px-3 py-1.5 rounded-full border outline-none transition-all shadow-sm ${!user ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
+                (currentStatus || page.status) === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer' :
+                  (currentStatus || page.status) === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer' :
+                    (currentStatus || page.status) === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer' :
+                      'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 cursor-pointer'
+              }`}
+          >
+            {Object.values(PageStatus).map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -452,9 +498,10 @@ const Workspace: React.FC = () => {
             page={page}
             work={work}
             onSave={handleSave}
-            onUnsavedChanges={setHasUnsavedChanges}
+            onUnsavedChanges={setEditorChanges}
             onOpenMetaModal={user?.role === 'admin' ? openMetaModal : undefined}
             readOnly={!user}
+            statusDirty={statusDirty}
           />
         </div>
       </div>

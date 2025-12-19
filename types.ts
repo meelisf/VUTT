@@ -54,8 +54,16 @@ export interface Page {
   comments: Annotation[];
   tags: string[];
   history: HistoryEntry[];
-  
-  // Meilisearchi spetsiifilised väljad
+
+  // Meilisearchi spetsiifilised väljad (metadata, mis on lehekülje dokumendi küljes)
+  pealkiri?: string;
+  autor?: string;
+  respondens?: string;
+  aasta?: number;
+  teose_tags?: string[];
+  originaal_kataloog?: string;
+  ester_id?: string;
+  external_url?: string;
   original_path?: string;
 }
 

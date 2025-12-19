@@ -150,6 +150,7 @@ interface DashboardSearchOptions {
   author?: string;
   workStatus?: WorkStatus; // Teose koondstaatuse filter
   teoseTags?: string[]; // Teose märksõnad (AND loogika)
+  onlyFirstPage?: boolean;
 }
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
@@ -246,7 +247,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const filter: string[] = [];
 
     // ALATI filtreeri esimese lehekülje järgi - tagab õige thumbnail ja tagid
-    filter.push('lehekylje_number = 1');
+    // V.A. kui otsime viimati muudetuid (siis tahame näha mis tahes lehte mis muutus)
+    if (options?.onlyFirstPage !== false) {
+      filter.push('lehekylje_number = 1');
+    }
 
     // Apply server-side filters if provided
     if (options?.yearStart) {
@@ -385,7 +389,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         tags: firstPageData?.tags || hit.tags || [],
         teose_tags: hit.teose_tags || [],
         ester_id: hit.ester_id || undefined,
-        external_url: hit.external_url || undefined
+        external_url: hit.external_url || undefined,
+        last_modified: hit.last_modified // Hoidke ajutine väli sorteerimiseks
       };
     });
 
@@ -400,8 +405,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           case 'az':
             return a.title.localeCompare(b.title, 'et');
           case 'recent':
-            // recent sorteerimine jääb Meilisearchi peale (last_modified pole Work objektis)
-            return 0;
+            // Sorteerime last_modified järgi kahanevalt
+            return (b as any).last_modified - (a as any).last_modified;
           case 'year_asc':
           default:
             return a.year - b.year;

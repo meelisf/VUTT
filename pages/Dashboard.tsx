@@ -37,7 +37,7 @@ const Dashboard: React.FC = () => {
   const [yearStart, setYearStart] = useState<string>(yearStartParam || '1630');
   const [yearEnd, setYearEnd] = useState<string>(yearEndParam || '1710');
   const [sort, setSort] = useState<string>(sortParam);
-  
+
   // Teose märksõnade filter
   const [availableTags, setAvailableTags] = useState<{ tag: string; count: number }[]>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>(teoseTagsParam);
@@ -170,7 +170,7 @@ const Dashboard: React.FC = () => {
         newParams.set('sort', sort);
         changed = true;
       }
-      
+
       // Teose märksõnad
       const currentTagsParam = searchParams.get('teoseTags') || '';
       const newTagsParam = selectedTags.join(',');
@@ -213,10 +213,11 @@ const Dashboard: React.FC = () => {
           sort: sort,
           author: authorParam || undefined,
           workStatus: statusParam || undefined,
-          teoseTags: selectedTags.length > 0 ? selectedTags : undefined
+          teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
+          onlyFirstPage: sort !== 'recent' // CUSTOM: If sorting by recent, we want to see ANY page that was modified
         });
         setWorks(results);
-        
+
         // Reset to page 1 when filters change (but not when page param changes)
         if (currentPage !== 1 && !searchParams.get('page')) {
           setCurrentPage(1);
@@ -285,9 +286,9 @@ const Dashboard: React.FC = () => {
       </header>
 
       {/* Login Modal */}
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
       />
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
@@ -370,11 +371,10 @@ const Dashboard: React.FC = () => {
 
                 {/* Status Filter Badge */}
                 {statusParam && (
-                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${
-                    statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
-                    statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
+                  <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
+                      statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
+                        'bg-gray-100 text-gray-700'
+                    }`}>
                     <span>{statusParam}</span>
                     <button
                       onClick={() => {
@@ -447,11 +447,10 @@ const Dashboard: React.FC = () => {
                             setSelectedTags([...selectedTags, tag]);
                           }
                         }}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                          isSelected
+                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${isSelected
                             ? 'bg-primary-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                          }`}
                       >
                         {tag} <span className="opacity-60">({count})</span>
                       </button>
@@ -545,11 +544,10 @@ const Dashboard: React.FC = () => {
                                 <button
                                   key={page}
                                   onClick={() => handlePageChange(page as number)}
-                                  className={`w-10 h-10 rounded-lg font-medium transition-colors ${
-                                    currentPage === page
+                                  className={`w-10 h-10 rounded-lg font-medium transition-colors ${currentPage === page
                                       ? 'bg-primary-600 text-white'
                                       : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                                  }`}
+                                    }`}
                                 >
                                   {page}
                                 </button>
@@ -601,16 +599,16 @@ const Dashboard: React.FC = () => {
       <footer className="border-t border-gray-200 bg-gray-50 py-4 px-8 shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setShowAboutModal(true)}
               className="hover:text-primary-600 transition-colors"
             >
               Projektist
             </button>
             <span className="text-gray-300">|</span>
-            <a 
-              href="https://utlib.ut.ee/et" 
-              target="_blank" 
+            <a
+              href="https://utlib.ut.ee/et"
+              target="_blank"
               rel="noopener noreferrer"
               className="hover:text-primary-600 transition-colors"
             >
@@ -632,7 +630,7 @@ const Dashboard: React.FC = () => {
                 <X size={20} />
               </button>
             </div>
-            <div 
+            <div
               className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
               dangerouslySetInnerHTML={{ __html: aboutHtml || '<p>Laadimine...</p>' }}
             />

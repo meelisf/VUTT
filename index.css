@@ -1,8 +1,10 @@
 /* Tailwind directives removed as they are handled by the CDN script in index.html */
 
 body {
-  background-color: #f9fafb; /* bg-gray-50 fallback */
-  color: #111827; /* text-gray-900 fallback */
+  background-color: #f9fafb;
+  /* bg-gray-50 fallback */
+  color: #111827;
+  /* text-gray-900 fallback */
   height: 100vh;
   overflow: hidden;
 }
@@ -12,13 +14,119 @@ body {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #f1f1f1; 
+  background: #f1f1f1;
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #ccc; 
+  background: #ccc;
   border-radius: 4px;
 }
+
+/* ... existing scrollbar styles ... */
 ::-webkit-scrollbar-thumb:hover {
-  background: #999; 
+  background: #999;
+}
+
+/* --- Digital Edition / Markdown Styles --- */
+
+/* 1. Koodivahetus (Code Switching) - e.g. Fraktur vs Antiqua */
+.code-switch {
+  /* No special font here, just highlight background as requested */
+  color: inherit;
+  background-color: #f1f5f9;
+  /* slate-100, very subtle gray */
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* 2. Ääremärkus (Marginalia) */
+/* We need a layout that allows marginalia to sit on the side. 
+   For now, we use a simple approach: reveal on hover or simple float if screen allows. 
+   A robust "side-by-side" layout requires changing the parent container to Grid.
+   Here we implemented a "tooltip" style or inline marker. */
+.marginalia-container {
+  display: inline;
+  position: relative;
+  cursor: help;
+  padding: 0 1px;
+}
+
+.marginalia-marker {
+  color: #dc2626;
+  /* red-600 */
+  display: none;
+  /* Hide the old asterisk if present */
+}
+
+.marginalia-highlight {
+  background-color: #fef9c3;
+  /* yellow-100 */
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+.footnote-marker {
+  color: #0284c7;
+  /* primary-600 */
+  font-weight: bold;
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  top: -0.4em;
+  vertical-align: baseline;
+  margin-left: 1px;
+  user-select: none;
+}
+
+/* Footnote definitions (lines identifying as footnotes) */
+.footnote-definition {
+  color: #4b5563;
+  /* gray-600 */
+  font-size: 0.9em;
+}
+
+.footnote-def-number {
+  color: #0284c7;
+  /* primary-600 */
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+/* Visual separator for the first footnote definition */
+.footnote-separator {
+  border-top: 1px solid #cbd5e1;
+  /* slate-300 */
+  margin-top: -1px;
+  /* collapse border into line height */
+  padding-top: 0;
+}
+
+/* 3. Lehekülje vahetus */
+/* 3. Lehekülje vahetus - Strict Reader Compatible */
+hr.page-break {
+  border: 0;
+  height: 1.7em;
+  /* Fill the line exactly */
+  background: transparent;
+  margin: 0;
+  position: relative;
+  width: 100%;
+}
+
+hr.page-break::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #cbd5e1;
+  /* slate-300 */
+}
+
+
+/* 4. General Reader Typography */
+.markdown-preview p {
+  margin-bottom: 1rem;
 }

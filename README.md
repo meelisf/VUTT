@@ -14,6 +14,24 @@ Veebirakendus ajalooliste (varauusaegsete) dokumentide transkriptsioonide vaatam
 - 👥 **Kasutajahaldus** - Rollipõhine ligipääs (viewer/editor/admin)
 - 💾 **Versioonihaldus** - Automaatsed varukoopiad, originaali kaitse
 
+## Uuendused (Detsember 2025) - Tekstitoimeti Arhitektuur
+
+### Line-by-Line Strict Renderer
+Tekstitoimeti "Loe" vaade (`MarkdownPreview.tsx`) kirjutati täielikult ümber, et tagada **1:1 joondus** reanumbritega.
+-   **Printsiip**: Sisu tükeldatakse rangelt reavahetuste (`\n`) järgi.
+-   **Teostus**: Iga rida renderdatakse fikseeritud kõrgusega (`1.7em`) konteinerisse.
+-   **Eesmärk**: Tagada, et transkriptsiooni read püsiksid alati sünkroonis vasakpoolse reanumbrite tulbaga, sõltumata sisust.
+
+### Stateful Style Parser
+Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasutusel **Stateful Parser**.
+-   Parser peab meeles aktiivseid stiile (bold, italic, marginalia) ridade vahel.
+-   Kui stiil algab real 1 ja lõppeb real 5, on kõik vahepealsed read korrektselt vormindatud, säilitades samal ajal range reastruktuuri.
+-   **Marginalia**: `[[m: ...]]` kuvatakse nüüd teksti sees kollase taustaga (`inline`), mitte peidetud hüpikaknana.
+
+### Töölaua tööriistad
+-   **Ühtne disain**: Töölaua staatuse värvid (Toores/Töös/Valmis) on ühtlustatud Dashboardiga.
+-   **Õigused**: Sisselogimata kasutajatel on muutmine (sh staatuse muutmine) keelatud.
+
 ## Arhitektuur
 
 ```
