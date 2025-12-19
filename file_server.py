@@ -213,52 +213,156 @@ def generate_default_metadata(dir_name):
         "external_url": None
     }
 
-def index_new_work(dir_name, metadata):
-    """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
-    dir_path = os.path.join(BASE_DIR, dir_name)
-    teose_id = metadata['teose_id']
+def normalize_genre(tag):
+    """Normaliseerib žanri väärtuse 'disputatsioon'-iks, kui see on üks sünonüümidest."""
+    synonyms = ["dissertatsioon", "exercitatio", "teesid", "dissertatio", "theses", "disputatio"]
+    if tag and tag.strip().lower() in synonyms:
+        return "disputatsioon"
+    return tag.strip().lower() if tag else tag
+
+def calculate_work_status(page_statuses):
+    """Arvutab teose koondstaatuse lehekülgede staatuste põhjal.
     
-    # Leiame pildid
+    Loogika: Kõik Valmis → Valmis, Kõik Toores/Leidmata → Toores, muidu → Töös
+    """
+    if not page_statuses: return 'Toores'
+    
+    # Valmis / Tehtud (Frontendis näib olevat DONE või Tehtud)
+    done_aliases = ['Valmis', 'Tehtud', 'DONE']
+    # Toores / Algne
+    raw_aliases = ['Toores', 'Algne', 'RAW', '']
+    
+    is_all_done = all(s in done_aliases for s in page_statuses)
+    if is_all_done: return 'Valmis'
+    
+    is_all_raw = all(s in raw_aliases or s is None for s in page_statuses)
+    if is_all_raw: return 'Toores'
+    
+    return 'Töös'
+
+def sync_work_to_meilisearch(dir_name):
+    """
+    Sünkroonib ühe teose kõik leheküljed Meilisearchi.
+    Loeb andmed failisüsteemist (_metadata.json, pildid, .txt, .json).
+    """
+    dir_path = os.path.join(BASE_DIR, dir_name)
+    if not os.path.exists(dir_path):
+        print(f"SÜNK: Kausta ei leitud: {dir_path}")
+        return False
+
+    # 1. Lae teose metaandmed
+    meta_path = os.path.join(dir_path, '_metadata.json')
+    metadata = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        except Exception as e:
+            print(f"SÜNK: Viga metaandmete lugemisel: {e}")
+            return False
+    
+    if not metadata:
+        metadata = generate_default_metadata(dir_name)
+        
+    teose_id = metadata.get('teose_id', sanitize_id(dir_name))
+    pealkiri = metadata.get('pealkiri', 'Pealkiri puudub')
+    autor = metadata.get('autor', '')
+    respondens = metadata.get('respondens', '')
+    aasta = metadata.get('aasta', 0)
+    teose_tags = metadata.get('teose_tags', [])
+    if isinstance(teose_tags, list):
+        teose_tags = [normalize_genre(t) for t in teose_tags]
+    
+    ester_id = metadata.get('ester_id')
+    external_url = metadata.get('external_url')
+
+    # 2. Leia leheküljed (pildid)
     images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
     if not images:
-        return
+        print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
+        return False
     
     documents = []
+    page_statuses = []
+    
     for i, img_name in enumerate(images):
         page_num = i + 1
         page_id = f"{teose_id}-{page_num}"
+        base_name = os.path.splitext(img_name)[0]
+        
+        # Tekst
+        txt_path = os.path.join(dir_path, base_name + '.txt')
+        page_text = ""
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    page_text = f.read()
+            except: pass
+            
+        # Lehekülje meta (status, tags, comments)
+        json_path = os.path.join(dir_path, base_name + '.json')
+        page_meta = {
+            'status': 'Toores',
+            'tags': [],
+            'comments': [],
+            'history': []
+        }
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    p_data = json.load(f)
+                    # Toeta nii vana kui uut formaati (meta_content wrapper)
+                    source = p_data.get('meta_content', p_data)
+                    page_meta['status'] = source.get('status', 'Toores')
+                    page_meta['tags'] = source.get('tags', [])
+                    page_meta['comments'] = source.get('comments', [])
+                    page_meta['history'] = source.get('history', [])
+                    # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
+                    if not page_text and 'text_content' in p_data:
+                        page_text = p_data['text_content']
+            except: pass
+            
+        page_statuses.append(page_meta['status'])
         
         doc = {
             "id": page_id,
             "teose_id": teose_id,
-            "pealkiri": metadata['pealkiri'],
-            "autor": metadata.get('autor', ''),
-            "respondens": metadata.get('respondens', ''),
-            "aasta": metadata.get('aasta', 0),
+            "pealkiri": pealkiri,
+            "autor": autor,
+            "respondens": respondens,
+            "aasta": aasta,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": "",
+            "lehekylje_tekst": page_text,
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
-            "status": "Toores",
-            "teose_staatus": "Toores",
-            "tags": [],
-            "comments": [],
-            "history": [],
-            "last_modified": int(time.time() * 1000),
-            "teose_tags": metadata.get('teose_tags', [])
+            "status": page_meta['status'],
+            "tags": [t.lower() for t in page_meta['tags']],
+            "comments": page_meta['comments'],
+            "history": page_meta['history'],
+            "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
+            "teose_tags": teose_tags
         }
         
-        if metadata.get('ester_id'):
-            doc['ester_id'] = metadata['ester_id']
-        if metadata.get('external_url'):
-            doc['external_url'] = metadata['external_url']
-            
+        if ester_id: doc['ester_id'] = ester_id
+        if external_url: doc['external_url'] = external_url
+        
         documents.append(doc)
     
+    # 3. Arvuta teose koondstaatus
+    teose_staatus = calculate_work_status(page_statuses)
+    for doc in documents:
+        doc['teose_staatus'] = teose_staatus
+        
+    # 4. Saada Meilisearchi
     if documents:
-        print(f"Indekseerin {len(documents)} lehekülge teosele {teose_id}...")
-        send_to_meilisearch(documents)
+        print(f"AUTOMAATNE SÜNK: Teos {teose_id} ({len(documents)} lk), staatus: {teose_staatus}")
+        return send_to_meilisearch(documents)
+    return False
+
+def index_new_work(dir_name, metadata):
+    """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
+    return sync_work_to_meilisearch(dir_name)
 
 def metadata_watcher_loop():
     """Taustalõim, mis otsib uusi kaustu ja loob neile metaandmed."""
@@ -477,6 +581,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     "json_created": json_saved
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+                # Sünkrooni Meilisearchiga (taustal või kohe, siin teeme kohe kuna on kiire)
+                sync_work_to_meilisearch(safe_catalog)
                 
             except Exception as e:
                 print(f"VIGA SERVERIS: {e}")
@@ -726,6 +833,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({"status": "success", "message": "Metaandmed salvestatud"}).encode('utf-8'))
                 
+                # Sünkrooni Meilisearchiga
+                sync_work_to_meilisearch(os.path.basename(os.path.dirname(metadata_path)))
+                
             except Exception as e:
                 print(f"METADATA UPDATE VIGA: {e}")
                 self.send_error(500, str(e))
@@ -821,7 +931,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                     if meta.get('respondens'):
                                         authors.add(meta['respondens'].strip())
                                     for t in meta.get('teose_tags', []):
-                                        tags.add(t.strip())
+                                        tags.add(t.strip().lower())
                             except:
                                 continue
                 

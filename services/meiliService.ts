@@ -156,13 +156,13 @@ interface DashboardSearchOptions {
 // Loogika: Kõik Valmis → Valmis, Kõik Toores → Toores, muidu → Töös
 const calculateWorkStatus = (statuses: string[]): WorkStatus => {
   if (statuses.length === 0) return 'Toores';
-  
+
   const allDone = statuses.every(s => s === PageStatus.DONE);
   if (allDone) return 'Valmis';
-  
+
   const allRaw = statuses.every(s => s === PageStatus.RAW || !s);
   if (allRaw) return 'Toores';
-  
+
   return 'Töös';
 };
 
@@ -170,9 +170,9 @@ const calculateWorkStatus = (statuses: string[]): WorkStatus => {
 // NB: Kuna indeksil on distinct='teose_id', peame tegema eraldi päringud iga teose jaoks
 export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, WorkStatus>> => {
   const statusMap = new Map<string, WorkStatus>();
-  
+
   if (workIds.length === 0) return statusMap;
-  
+
   try {
     // Teeme paralleelsed päringud iga teose jaoks
     // See on vajalik, kuna indeksi distinct seadistus ei lase meil
@@ -183,25 +183,25 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
         attributesToRetrieve: ['teose_id', 'status', 'lehekylje_number'],
         limit: 500  // Piisav ühe teose kõigile lehekülgedele
       });
-      
+
       const statuses = response.hits.map((hit: any) => hit.status || PageStatus.RAW);
       return { workId, statuses };
     });
-    
+
     const results = await Promise.all(promises);
-    
+
     // Debug log
     console.log('getWorkStatuses: processed', results.length, 'works');
     if (results.length > 0) {
       const sample = results[0];
       console.log('Sample work', sample.workId, ':', sample.statuses.length, 'pages, statuses:', sample.statuses);
     }
-    
+
     // Arvutame koondstaatuse igale teosele
     for (const { workId, statuses } of results) {
       statusMap.set(workId, calculateWorkStatus(statuses));
     }
-    
+
     return statusMap;
   } catch (error) {
     console.error("getWorkStatuses error:", error);
@@ -213,7 +213,7 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
 export const getTeoseTagsFacets = async (): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
-  
+
   try {
     // Kasutame facet päringut, et saada kõik unikaalsed teose_tags väärtused koos loendiga
     const response = await index.search('', {
@@ -221,14 +221,14 @@ export const getTeoseTagsFacets = async (): Promise<{ tag: string; count: number
       limit: 0, // Ei vaja tulemusi, ainult facet'e
       facets: ['teose_tags']
     });
-    
+
     const facetDistribution = response.facetDistribution?.teose_tags || {};
-    
+
     // Teisenda objektist massiiviks ja sorteeri loendi järgi kahanevalt
     const result = Object.entries(facetDistribution)
       .map(([tag, count]) => ({ tag, count: count as number }))
       .sort((a, b) => b.count - a.count);
-    
+
     console.log('getTeoseTagsFacets:', result.length, 'unique tags found');
     return result;
   } catch (error) {
@@ -312,7 +312,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     console.log('searchWorks params:', { query, filter, searchParams });
     const response = await index.search(query, searchParams);
     console.log('searchWorks response hits:', response.hits.length);
-    
+
     // Kui kasutame distinct, siis iga hit on unikaalne teos
     // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
     let uniqueHits = response.hits;
@@ -328,12 +328,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       });
       console.log('After deduplication:', uniqueHits.length, 'unique works');
     }
-    
+
     const workIds = uniqueHits.map((hit: any) => hit.teose_id);
-    
+
     // Fetch first page data (thumbnail, tags) for all works
     const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[] }>();
-    
+
     if (workIds.length > 0) {
       // Batch the requests to avoid too-long filters (max ~100 IDs per batch)
       const BATCH_SIZE = 100;
@@ -341,7 +341,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       for (let i = 0; i < workIds.length; i += BATCH_SIZE) {
         batches.push(workIds.slice(i, i + BATCH_SIZE));
       }
-      
+
       // Execute batch queries in parallel
       const batchPromises = batches.map(async (batchIds) => {
         const batchResponse = await index.search('', {
@@ -352,9 +352,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         });
         return batchResponse.hits;
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
-      
+
       // Process all results - take first (lowest page number) for each work
       for (const hits of batchResults) {
         for (const hit of hits as any[]) {
@@ -367,7 +367,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         }
       }
     }
-    
+
     const works: Work[] = uniqueHits.map((hit: any) => {
       const firstPageData = firstPagesMap.get(hit.teose_id);
       return {
@@ -437,7 +437,7 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       image_url: getFullImageUrl(hit.lehekylje_pilt),
       status: hit.status || PageStatus.RAW,
       comments: hit.comments || [],
-      tags: hit.tags || [],
+      tags: Array.from(new Set((hit.tags || []).map((t: string) => t.toLowerCase()))),
       history: hit.history || [],
       original_path: hit.originaal_kataloog
     };
@@ -543,8 +543,8 @@ const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
 
 // Töölaud: Salvesta muudatused
 export const savePage = async (
-  page: Page, 
-  actionDescription: string = 'Muutis andmeid', 
+  page: Page,
+  actionDescription: string = 'Muutis andmeid',
   userName: string = 'Anonüümne',
   auth?: AuthToken
 ): Promise<Page> => {
@@ -599,7 +599,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
   try {
     const response = await index.search('', {
       filter: [`teose_id = "${workId}"`],
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url', 'teose_tags'],
       limit: 1
     });
 
@@ -616,6 +616,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       publisher: '',
       page_count: hit.teose_lehekylgede_arv || 0,
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
+      teose_tags: Array.from(new Set((hit.teose_tags || []).map((t: string) => t.toLowerCase()))),
       ester_id: hit.ester_id || undefined,
       external_url: hit.external_url || undefined
     };
@@ -709,7 +710,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 
     // Loe facetDistribution'ist iga teose vastete arv (ilma distinct'ita päringust)
     const workHitCounts = facetResponse.facetDistribution?.['teose_id'] || {};
-    
+
     // Lisa igale hitile vastete arv
     const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
       ...hit,
@@ -785,7 +786,8 @@ export const getAllTags = async (): Promise<string[]> => {
     });
 
     const tagFacets = response.facetDistribution?.['tags'] || {};
-    return Object.keys(tagFacets).sort((a, b) => a.localeCompare(b, 'et'));
+    const normalizedTags = Array.from(new Set(Object.keys(tagFacets).map(t => t.toLowerCase())));
+    return normalizedTags.sort((a, b) => a.localeCompare(b, 'et'));
   } catch (e) {
     console.error("Failed to fetch tags:", e);
     return [];

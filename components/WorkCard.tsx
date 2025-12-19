@@ -10,7 +10,7 @@ interface WorkCardProps {
 const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
 
@@ -42,27 +42,27 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
           loading="lazy"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
-        {/* Tagid pildi peal */}
-        {work.tags && work.tags.length > 0 && (
+        {/* Žanrid pildi peal */}
+        {work.teose_tags && work.teose_tags.length > 0 && (
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
             <div className="flex flex-wrap gap-1">
-              {work.tags.slice(0, 6).map((tag, idx) => (
+              {work.teose_tags.slice(0, 6).map((tag, idx) => (
                 <button
                   key={idx}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    // Navigeeri otsingusse selle tagiga (otsi ainult annotatsoonidest)
-                    navigate(`/search?q=${encodeURIComponent(tag)}&scope=annotation`);
+                    // Navigeeri otsingusse selle žanriga
+                    navigate(`/search?teoseTags=${encodeURIComponent(tag)}`);
                   }}
-                  className="text-xs text-white bg-black/40 hover:bg-primary-600 px-2 py-0.5 rounded backdrop-blur-sm transition-colors"
-                  title={`Otsi märksõna: ${tag}`}
+                  className="text-[10px] font-bold text-white bg-slate-900/40 hover:bg-green-700/50 px-2 py-0.5 rounded border border-gray-500/30 backdrop-blur-sm transition-colors uppercase tracking-wider"
+                  title={`Otsi žanrit: ${tag}`}
                 >
-                  {tag}
+                  {tag.toLowerCase()}
                 </button>
               ))}
-              {work.tags.length > 6 && (
-                <span className="text-xs text-white/70 px-1">+{work.tags.length - 6}</span>
+              {work.teose_tags.length > 6 && (
+                <span className="text-xs text-white/70 px-1">+{work.teose_tags.length - 6}</span>
               )}
             </div>
           </div>
@@ -71,7 +71,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
 
       <div className="p-4 flex-1 flex flex-col">
         <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight line-clamp-2">
-          <a 
+          <a
             href={`/work/${work.id}/1`}
             onClick={handleOpenWorkspace}
             className="hover:text-primary-600 transition-colors cursor-pointer"

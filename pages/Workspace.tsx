@@ -30,6 +30,8 @@ const Workspace: React.FC = () => {
     external_url: ''
   });
   const [suggestions, setSuggestions] = useState<{ authors: string[], tags: string[] }>({ authors: [], tags: [] });
+  const [isSavingMeta, setIsSavingMeta] = useState(false);
+  const [saveMetaStatus, setSaveMetaStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -112,7 +114,8 @@ const Workspace: React.FC = () => {
       });
       const data = await response.json();
       if (data.status === 'success') {
-        setSuggestions({ authors: data.authors, tags: data.tags });
+        const normalizedTags = (data.tags || []).map((t: string) => t.toLowerCase());
+        setSuggestions({ authors: data.authors, tags: normalizedTags });
       }
     } catch (e) {
       console.error("Viga soovituste laadimisel", e);
@@ -121,7 +124,7 @@ const Workspace: React.FC = () => {
 
   const openMetaModal = async () => {
     if (!page) return;
-    
+
     const initialForm = {
       pealkiri: work?.title || page.pealkiri || '',
       autor: work?.author || page.autor || '',
@@ -151,9 +154,9 @@ const Workspace: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
       const data = await response.json();
-      
+
       if (data.status === 'success' && data.metadata) {
         const m = data.metadata;
         console.log("Serverist laetud metadata:", m);
@@ -178,11 +181,13 @@ const Workspace: React.FC = () => {
 
   const handleSaveMetadata = async () => {
     if (!page || !authToken) return;
+    setIsSavingMeta(true);
+    setSaveMetaStatus('idle');
 
     try {
       const tagsArray = metaForm.teose_tags
         .split(',')
-        .map(t => t.trim())
+        .map(t => t.trim().toLowerCase())
         .filter(t => t !== '');
 
       // ESTER ID puhastamine: toetame nii puhast ID-d kui ka täispikka URL-i
@@ -239,18 +244,27 @@ const Workspace: React.FC = () => {
             author: metaForm.autor,
             respondens: metaForm.respondens,
             year: metaForm.aasta,
+            teose_tags: tagsArray,
             ester_id: cleanEsterId || undefined,
+            external_url: metaForm.external_url.trim() || undefined
           });
         }
 
-        setIsMetaModalOpen(false);
-        alert('Teose andmed salvestatud! Muudatuste nägemiseks otsingus käivita serveris consolidate skript.');
+        setSaveMetaStatus('success');
+        setTimeout(() => {
+          setIsMetaModalOpen(false);
+          setSaveMetaStatus('idle');
+        }, 1500);
       } else {
+        setSaveMetaStatus('error');
         alert('Viga salvestamisel: ' + data.message);
       }
     } catch (e) {
       console.error("Metadata save failed", e);
+      setSaveMetaStatus('error');
       alert('Serveri viga andmete salvestamisel.');
+    } finally {
+      setIsSavingMeta(false);
     }
   };
 
@@ -278,7 +292,7 @@ const Workspace: React.FC = () => {
     // Validate bounds
     if (newPage < 1) return;
     if (work?.page_count && newPage > work.page_count) return;
-    
+
     // Hoiatus salvestamata muudatuste korral
     if (hasUnsavedChanges) {
       const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
@@ -410,22 +424,11 @@ const Workspace: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <span className={`text-xs font-bold px-2.5 py-1 rounded-full border select-none ${page.status === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
-              page.status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                'bg-gray-50 text-gray-600 border-gray-200'
+            page.status === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
+              'bg-gray-50 text-gray-600 border-gray-200'
             }`}>
             {page.status}
           </span>
-          {/* Admini muutmise nupp - liigutatud paremale poole */}
-          {user?.role === 'admin' && (
-            <button
-              onClick={openMetaModal}
-              className="p-1.5 hover:bg-amber-50 rounded-md text-amber-600 transition-colors flex items-center gap-1 text-xs font-medium border border-amber-100 bg-amber-50/30"
-              title="Muuda teose metaandmeid"
-            >
-              <Edit3 size={14} />
-              <span className="hidden md:inline">Muuda metaandmeid</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -450,6 +453,7 @@ const Workspace: React.FC = () => {
             work={work}
             onSave={handleSave}
             onUnsavedChanges={setHasUnsavedChanges}
+            onOpenMetaModal={user?.role === 'admin' ? openMetaModal : undefined}
             readOnly={!user}
           />
         </div>
@@ -559,10 +563,26 @@ const Workspace: React.FC = () => {
               </button>
               <button
                 onClick={handleSaveMetadata}
-                className="px-4 py-2 bg-amber-600 text-white rounded text-sm font-medium hover:bg-amber-700 flex items-center gap-2"
+                disabled={isSavingMeta}
+                className={`px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-all min-w-[120px] justify-center ${saveMetaStatus === 'success'
+                  ? 'bg-green-600 text-white'
+                  : saveMetaStatus === 'error'
+                    ? 'bg-red-600 text-white'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                  } disabled:opacity-70`}
               >
-                <Save size={16} />
-                Salvesta muudatused
+                {isSavingMeta ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                ) : saveMetaStatus === 'success' ? (
+                  <>Valmis!</>
+                ) : saveMetaStatus === 'error' ? (
+                  <>Viga!</>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Salvesta
+                  </>
+                )}
               </button>
             </div>
           </div>

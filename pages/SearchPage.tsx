@@ -34,8 +34,8 @@ const SearchPage: React.FC = () => {
     const [yearEnd, setYearEnd] = useState<string>(yearEndParam?.toString() || '1710');
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
     const [selectedWork, setSelectedWork] = useState<string>(workIdParam); // Teose filter
-    const [selectedWorkInfo, setSelectedWorkInfo] = useState<{title: string, year?: string | number, author?: string} | null>(null); // Valitud teose info
-    
+    const [selectedWorkInfo, setSelectedWorkInfo] = useState<{ title: string, year?: string | number, author?: string } | null>(null); // Valitud teose info
+
     // Teose märksõnade filter
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
@@ -45,7 +45,7 @@ const SearchPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
-    
+
     // Lazy-loaded hits for expanded works (max 10 akordioni sees)
     const [workHits, setWorkHits] = useState<Map<string, ContentSearchHit[]>>(new Map());
     const [loadingWorkHits, setLoadingWorkHits] = useState<Set<string>>(new Set());
@@ -123,7 +123,7 @@ const SearchPage: React.FC = () => {
 
     // Perform search when URL params change
     useEffect(() => {
-        if (queryParam) {
+        if (queryParam || teoseTagsParam.length > 0) {
             const options: ContentSearchOptions = {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
@@ -131,7 +131,7 @@ const SearchPage: React.FC = () => {
                 workId: workIdParam || undefined,  // Lisa workId filter
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined
             };
-            
+
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
@@ -171,15 +171,15 @@ const SearchPage: React.FC = () => {
     const toggleGroup = async (workId: string) => {
         // Salvesta scroll positsioon enne muudatust
         const scrollTop = contentRef.current?.scrollTop || 0;
-        
+
         const newSet = new Set(expandedGroups);
         const isClosing = newSet.has(workId);
-        
+
         if (isClosing) {
             newSet.delete(workId);
         } else {
             newSet.add(workId);
-            
+
             // Laadi teose tulemused kui pole veel laetud
             if (!workHits.has(workId) && queryParam) {
                 setLoadingWorkHits(prev => new Set(prev).add(workId));
@@ -202,7 +202,7 @@ const SearchPage: React.FC = () => {
             }
         }
         setExpandedGroups(newSet);
-        
+
         // Taasta scroll positsioon pärast DOM uuendust (sulgemisel)
         if (isClosing) {
             requestAnimationFrame(() => {
@@ -666,8 +666,15 @@ const SearchPage: React.FC = () => {
                                 // Tavaline otsing
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                                     <span>
-                                        Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet{' '}
-                                        <strong className="text-gray-900">{uniqueWorksCount}</strong> erinevast teosest.
+                                        {queryParam ? (
+                                            <>
+                                                Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet <strong className="text-gray-900">{uniqueWorksCount}</strong> erinevast teosest.
+                                            </>
+                                        ) : (
+                                            <>
+                                                Leiti <strong className="text-gray-900 text-base">{uniqueWorksCount}</strong> teost.
+                                            </>
+                                        )}
                                     </span>
                                     <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                                         Lk {results.page} / {results.totalPages}
@@ -694,148 +701,148 @@ const SearchPage: React.FC = () => {
                             ) : (
                                 /* Tavaline otsing - grupeeritud teostena */
                                 <>
-                                {Object.keys(groupedResults).map(workId => {
-                                const hits = groupedResults[workId];
-                                const firstHit = hits[0];
-                                const hitCount = firstHit.hitCount || 1;
-                                const hasMore = hitCount > 1;
-                                const isExpanded = expandedGroups.has(workId);
-                                const isLoadingHits = loadingWorkHits.has(workId);
-                                const loadedHits = workHits.get(workId);
+                                    {Object.keys(groupedResults).map(workId => {
+                                        const hits = groupedResults[workId];
+                                        const firstHit = hits[0];
+                                        const hitCount = firstHit.hitCount || 1;
+                                        const hasMore = hitCount > 1;
+                                        const isExpanded = expandedGroups.has(workId);
+                                        const isLoadingHits = loadingWorkHits.has(workId);
+                                        const loadedHits = workHits.get(workId);
 
-                                return (
-                                    <article key={workId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                                        {/* Work Header */}
-                                        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
-                                            <div className="flex-1 min-w-0">
-                                                <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
-                                                    {firstHit.pealkiri || 'Pealkiri puudub'}
-                                                </h2>
-                                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
+                                        return (
+                                            <article key={workId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                                                {/* Work Header */}
+                                                <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
+                                                    <div className="flex-1 min-w-0">
+                                                        <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
+                                                            {firstHit.pealkiri || 'Pealkiri puudub'}
+                                                        </h2>
+                                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
+                                                            <button
+                                                                onClick={() => {
+                                                                    const authorName = Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || '');
+                                                                    setInputValue(authorName);
+                                                                    setSearchParams(prev => {
+                                                                        prev.set('q', authorName);
+                                                                        prev.set('p', '1');
+                                                                        return prev;
+                                                                    });
+                                                                }}
+                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
+                                                                title="Otsi selle autori teoseid"
+                                                            >
+                                                                <span className="uppercase text-gray-400 text-[10px]">Autor:</span>
+                                                                {Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || 'Teadmata')}
+                                                            </button>
+                                                            <span className="text-gray-300">❧</span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const year = firstHit.aasta?.toString();
+                                                                    if (year) {
+                                                                        setYearStart(year);
+                                                                        setYearEnd(year);
+                                                                        setSearchParams(prev => {
+                                                                            prev.set('ys', year);
+                                                                            prev.set('ye', year);
+                                                                            prev.set('p', '1');
+                                                                            return prev;
+                                                                        });
+                                                                    }
+                                                                }}
+                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
+                                                                title="Otsi selle aasta teoseid"
+                                                            >
+                                                                <span className="uppercase text-gray-400 text-[10px]">Aasta:</span>
+                                                                {firstHit.aasta || '...'}
+                                                            </button>
+                                                            <span className="text-gray-300">❧</span>
+                                                            <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="shrink-0 text-right">
+                                                        <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600">
+                                                            {workId}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Esimene vaste - alati nähtav */}
+                                                <div className="p-1">
+                                                    {renderHit(firstHit)}
+                                                </div>
+
+                                                {/* Akordion rohkemate vastete jaoks - lazy loaded, max 10 vastet */}
+                                                {hasMore && (() => {
+                                                    const MAX_ACCORDION_HITS = 10;
+                                                    const remainingHits = hitCount - 1; // peale esimest
+                                                    const showSearchAllLink = hitCount > MAX_ACCORDION_HITS;
+
+                                                    return (
+                                                        <>
+                                                            {isExpanded && (
+                                                                <div className="border-t border-gray-100 animate-in fade-in slide-in-from-top-1 bg-gray-50/50">
+                                                                    {isLoadingHits ? (
+                                                                        <div className="flex items-center justify-center gap-2 py-8 text-primary-600">
+                                                                            <Loader2 className="animate-spin" size={20} />
+                                                                            <span className="text-sm">Laadin tulemusi...</span>
+                                                                        </div>
+                                                                    ) : loadedHits ? (
+                                                                        <>
+                                                                            {/* Näita max 9 lisavastet (esimene on juba ülal, kokku max 10) */}
+                                                                            {loadedHits.slice(1, MAX_ACCORDION_HITS).map(hit => renderHit(hit, true))}
+
+                                                                            {/* Kui on rohkem kui 10 vastet, näita info */}
+                                                                            {showSearchAllLink && (
+                                                                                <div className="py-3 px-4 text-center border-t border-gray-200">
+                                                                                    <span className="text-gray-500 text-sm">
+                                                                                        Sellest teosest leiti {hitCount} vastet
+                                                                                    </span>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
+                                                            )}
+                                                            <button
+                                                                onClick={() => toggleGroup(workId)}
+                                                                className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-primary-700 text-xs font-bold uppercase tracking-wide border-t border-gray-200 flex items-center justify-center gap-2 transition-colors"
+                                                            >
+                                                                {isExpanded ? (
+                                                                    <>Peida lisavasted <ChevronUp size={14} /></>
+                                                                ) : (
+                                                                    <>Näita veel {Math.min(remainingHits, MAX_ACCORDION_HITS - 1)} vastet{remainingHits > MAX_ACCORDION_HITS - 1 ? ` (${remainingHits} kokku)` : ''} <ChevronDown size={14} /></>
+                                                                )}
+                                                            </button>
+                                                        </>
+                                                    );
+                                                })()}
+
+                                                {/* Otsi sellest teosest link - alati nähtav */}
+                                                <div className="py-2 px-3 bg-gray-50 border-t border-gray-200 flex justify-end">
                                                     <button
                                                         onClick={() => {
-                                                            const authorName = Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || '');
-                                                            setInputValue(authorName);
+                                                            setSelectedWork(workId);
+                                                            setSelectedWorkInfo({
+                                                                title: firstHit.pealkiri || workId,
+                                                                year: firstHit.aasta,
+                                                                author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
+                                                            });
                                                             setSearchParams(prev => {
-                                                                prev.set('q', authorName);
+                                                                prev.set('work', workId);
                                                                 prev.set('p', '1');
                                                                 return prev;
                                                             });
                                                         }}
-                                                        className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
-                                                        title="Otsi selle autori teoseid"
+                                                        className="inline-flex items-center gap-1.5 text-gray-500 hover:text-primary-700 text-xs font-medium hover:underline"
                                                     >
-                                                        <span className="uppercase text-gray-400 text-[10px]">Autor:</span>
-                                                        {Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || 'Teadmata')}
+                                                        <Search size={12} />
+                                                        Otsi sellest teosest
                                                     </button>
-                                                    <span className="text-gray-300">❧</span>
-                                                    <button
-                                                        onClick={() => {
-                                                            const year = firstHit.aasta?.toString();
-                                                            if (year) {
-                                                                setYearStart(year);
-                                                                setYearEnd(year);
-                                                                setSearchParams(prev => {
-                                                                    prev.set('ys', year);
-                                                                    prev.set('ye', year);
-                                                                    prev.set('p', '1');
-                                                                    return prev;
-                                                                });
-                                                            }
-                                                        }}
-                                                        className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
-                                                        title="Otsi selle aasta teoseid"
-                                                    >
-                                                        <span className="uppercase text-gray-400 text-[10px]">Aasta:</span>
-                                                        {firstHit.aasta || '...'}
-                                                    </button>
-                                                    <span className="text-gray-300">❧</span>
-                                                    <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
                                                 </div>
-                                            </div>
-                                            <div className="shrink-0 text-right">
-                                                <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600">
-                                                    {workId}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        {/* Esimene vaste - alati nähtav */}
-                                        <div className="p-1">
-                                            {renderHit(firstHit)}
-                                        </div>
-
-                                        {/* Akordion rohkemate vastete jaoks - lazy loaded, max 10 vastet */}
-                                        {hasMore && (() => {
-                                            const MAX_ACCORDION_HITS = 10;
-                                            const remainingHits = hitCount - 1; // peale esimest
-                                            const showSearchAllLink = hitCount > MAX_ACCORDION_HITS;
-                                            
-                                            return (
-                                                <>
-                                                    {isExpanded && (
-                                                        <div className="border-t border-gray-100 animate-in fade-in slide-in-from-top-1 bg-gray-50/50">
-                                                            {isLoadingHits ? (
-                                                                <div className="flex items-center justify-center gap-2 py-8 text-primary-600">
-                                                                    <Loader2 className="animate-spin" size={20} />
-                                                                    <span className="text-sm">Laadin tulemusi...</span>
-                                                                </div>
-                                                            ) : loadedHits ? (
-                                                                <>
-                                                                    {/* Näita max 9 lisavastet (esimene on juba ülal, kokku max 10) */}
-                                                                    {loadedHits.slice(1, MAX_ACCORDION_HITS).map(hit => renderHit(hit, true))}
-                                                                    
-                                                                    {/* Kui on rohkem kui 10 vastet, näita info */}
-                                                                    {showSearchAllLink && (
-                                                                        <div className="py-3 px-4 text-center border-t border-gray-200">
-                                                                            <span className="text-gray-500 text-sm">
-                                                                                Sellest teosest leiti {hitCount} vastet
-                                                                            </span>
-                                                                        </div>
-                                                                    )}
-                                                                </>
-                                                            ) : null}
-                                                        </div>
-                                                    )}
-                                                    <button
-                                                        onClick={() => toggleGroup(workId)}
-                                                        className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-primary-700 text-xs font-bold uppercase tracking-wide border-t border-gray-200 flex items-center justify-center gap-2 transition-colors"
-                                                    >
-                                                        {isExpanded ? (
-                                                            <>Peida lisavasted <ChevronUp size={14} /></>
-                                                        ) : (
-                                                            <>Näita veel {Math.min(remainingHits, MAX_ACCORDION_HITS - 1)} vastet{remainingHits > MAX_ACCORDION_HITS - 1 ? ` (${remainingHits} kokku)` : ''} <ChevronDown size={14} /></>
-                                                        )}
-                                                    </button>
-                                                </>
-                                            );
-                                        })()}
-
-                                        {/* Otsi sellest teosest link - alati nähtav */}
-                                        <div className="py-2 px-3 bg-gray-50 border-t border-gray-200 flex justify-end">
-                                            <button
-                                                onClick={() => {
-                                                    setSelectedWork(workId);
-                                                    setSelectedWorkInfo({
-                                                        title: firstHit.pealkiri || workId,
-                                                        year: firstHit.aasta,
-                                                        author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
-                                                    });
-                                                    setSearchParams(prev => {
-                                                        prev.set('work', workId);
-                                                        prev.set('p', '1');
-                                                        return prev;
-                                                    });
-                                                }}
-                                                className="inline-flex items-center gap-1.5 text-gray-500 hover:text-primary-700 text-xs font-medium hover:underline"
-                                            >
-                                                <Search size={12} />
-                                                Otsi sellest teosest
-                                            </button>
-                                        </div>
-                                    </article>
-                                );
-                            })}
+                                            </article>
+                                        );
+                                    })}
                                 </>
                             )}
                         </div>
@@ -848,7 +855,7 @@ const SearchPage: React.FC = () => {
                             const pages: (number | string)[] = [];
                             const totalPages = results.totalPages;
                             const currentPage = results.page;
-                            
+
                             if (totalPages <= 7) {
                                 for (let i = 1; i <= totalPages; i++) pages.push(i);
                             } else {
@@ -882,11 +889,10 @@ const SearchPage: React.FC = () => {
                                             <button
                                                 key={page}
                                                 onClick={() => handlePageChange(page as number)}
-                                                className={`w-10 h-10 rounded-lg font-medium transition-colors ${
-                                                    results.page === page
-                                                        ? 'bg-primary-600 text-white'
-                                                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-                                                }`}
+                                                className={`w-10 h-10 rounded-lg font-medium transition-colors ${results.page === page
+                                                    ? 'bg-primary-600 text-white'
+                                                    : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                                                    }`}
                                             >
                                                 {page}
                                             </button>
