@@ -629,7 +629,8 @@ const Dashboard: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAboutModal(false)}>
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <button onClick={() => setShowAboutModal(false)} className="ml-auto text-gray-500 hover:text-gray-700">
+              <img src="/logo.png" alt="VUTT" className="h-8 w-auto" />
+              <button onClick={() => setShowAboutModal(false)} className="text-gray-500 hover:text-gray-700">
                 <X size={20} />
               </button>
             </div>

@@ -1,92 +1,152 @@
 <!DOCTYPE html>
 <html lang="et">
+
 <head>
   <meta charset="UTF-8">
   <style>
-    .about-content { font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.7; color: #374151; }
-    .about-content h2 { font-size: 18px; font-weight: 600; margin: 1.5rem 0 0.75rem 0; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }
-    .about-content h3 { font-size: 15px; font-weight: 600; margin: 1.25rem 0 0.5rem 0; color: #1f2937; }
-    .about-content p { margin: 0.75rem 0; }
-    .about-content ul { margin: 0.5rem 0; padding-left: 1.5rem; }
-    .about-content li { margin-bottom: 0.375rem; }
-    .about-content a { color: #7c3aed; text-decoration: none; }
-    .about-content a:hover { text-decoration: underline; }
-    .about-content .highlight { background: #f5f3ff; padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; border-left: 3px solid #7c3aed; }
-    .about-content .team { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; }
-    .about-content .team span { background: #f3f4f6; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 13px; }
+    .about-content {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.7;
+      color: #374151;
+    }
+
+    .about-content h2 {
+      font-size: 18px;
+      font-weight: 600;
+      margin: 1.5rem 0 0.75rem 0;
+      color: #1f2937;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 0.5rem;
+    }
+
+    .about-content h3 {
+      font-size: 15px;
+      font-weight: 600;
+      margin: 1.25rem 0 0.5rem 0;
+      color: #1f2937;
+    }
+
+    .about-content p {
+      margin: 0.75rem 0;
+    }
+
+    .about-content ul {
+      margin: 0.5rem 0;
+      padding-left: 1.5rem;
+    }
+
+    .about-content li {
+      margin-bottom: 0.375rem;
+    }
+
+    .about-content a {
+      color: #7c3aed;
+      text-decoration: none;
+    }
+
+    .about-content a:hover {
+      text-decoration: underline;
+    }
+
+    .about-content .highlight {
+      background: #f5f3ff;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin: 1rem 0;
+      border-left: 3px solid #7c3aed;
+    }
+
+    .about-content .team {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+    }
+
+    .about-content .team span {
+      background: #f3f4f6;
+      padding: 0.25rem 0.75rem;
+      border-radius: 1rem;
+      font-size: 13px;
+    }
   </style>
 </head>
+
 <body>
-<div class="about-content">
+  <div class="about-content">
 
-<h2>Projekti kirjeldus</h2>
+    <h2>Projekti kirjeldus</h2>
 
-<p>
-  <strong>VUTT</strong> (VaraUusaegsete Tekstide Töölaud) on veebirakendus ajalooliste dokumentide 
-  transkriptsioonide vaatamiseks ja toimetamiseks. Rakendus kuvab skaneeritud dokumendi pilti ja 
-  LLM-iga tuvastatud teksti kõrvuti, võimaldades teksti parandada ja annoteerida.
-</p>
+    <p>
+      <strong>VUTT</strong> (VaraUusaegsete Tekstide Töölaud) on veebirakendus ajalooliste dokumentide
+      transkriptsioonide vaatamiseks ja toimetamiseks. Rakendus kuvab skaneeritud dokumendi pilti ja
+      LLM-iga tuvastatud teksti kõrvuti, võimaldades teksti parandada ja annoteerida.
+    </p>
 
-<div class="highlight">
-  Projekti eesmärk on muuta kättesaadavaks ja otsitavaks varauusaegse Tartu Ülikooli 
-  trükikoja tekstid (disputatsioonid, oratsioonid jm).
-</div>
+    <div class="highlight">
+      Projekti eesmärk on muuta kättesaadavaks ja otsitavaks varauusaegse Tartu Ülikooli
+      trükikoja tekstid (disputatsioonid, oratsioonid jm).
+    </div>
 
-<h2>Korpus</h2>
+    <h2>Korpus</h2>
 
-<p>
-  Praegune korpus sisaldab Tartu Akadeemia (Academia Gustaviana / Academia Gustavo-Carolina) 
-  trükiseid aastatest 1632–1710. Tekstid on pärit <a href="https://utlib.ut.ee/et" target="_blank">TÜ Raamatukogu</a> 
-  digiteeritud kogudest ja põhinevad suuresti Ene-Lille Jaanson, koost., <i>Tartu Ülikooli trükikoda 1632-1710: 
-  Ajalugu ja trükiste bibliograafia = Druckerei der Universität Dorpat 1632-1710: Geschichte und Bibliographie der
-  Druckschriften</i>, koos. Mare Rand et al. (Tartu Ülikooli Raamatukogu, 2000) kogutud trükiste koopiatele.
-</p>
+    <p>
+      Praegune korpus sisaldab Tartu Akadeemia (Academia Gustaviana / Academia Gustavo-Carolina)
+      trükiseid aastatest 1632–1710. Tekstid on pärit <a href="https://utlib.ut.ee/et" target="_blank">TÜ
+        Raamatukogu</a>
+      digiteeritud kogudest ja põhinevad suuresti Ene-Lille Jaanson, koost., <i>Tartu Ülikooli trükikoda 1632-1710:
+        Ajalugu ja trükiste bibliograafia = Druckerei der Universität Dorpat 1632-1710: Geschichte und Bibliographie der
+        Druckschriften</i>, koos. Mare Rand et al. (Tartu Ülikooli Raamatukogu, 2000) kogutud trükiste koopiatele.
+    </p>
 
-<p>
-Tuvastusmudel on treenitud TÜ Raamatukogu teaduskeskuses tehtud transkriptsioonide baasil. Transkriptsioonide autorid (tähestikulises järjekorras):
-</p>
-<ul>
-  <li>Ove Averin</li>
-  <li>Meelis Friedenthal</li>
-  <li>Jaana Jurtsenkova</li>
-  <li>Hant Mikkit Kolk</li>
-  <li>Pärtel Piirimäe</li>
-  <li>Anni Polding</li>
-  <li>Janika Päll</li>
-  <li>Kaarina Rein</li>
-  <li>Rahel Toomik</li>
-</ul>
+    <p>
+      Tuvastusmudel on treenitud TÜ Raamatukogu teaduskeskuses tehtud transkriptsioonide baasil. Transkriptsioonide
+      autorid (tähestikulises järjekorras):
+    </p>
+    <ul>
+      <li>Ove Averin</li>
+      <li>Meelis Friedenthal</li>
+      <li>Jaana Jurtsenkova</li>
+      <li>Hant Mikkit Kolk</li>
+      <li>Pärtel Piirimäe</li>
+      <li>Anni Polding</li>
+      <li>Janika Päll</li>
+      <li>Kaarina Rein</li>
+      <li>Rahel Toomik</li>
+    </ul>
 
-<h3>Numbrid</h3>
-<ul>
-  <li>1160 teost</li>
-  <li>ca 14000 lehekülge</li>
-  <li>Keeled: ladina, saksa, rootsi, kreeka, heebrea</li>
-</ul>
+    <h3>Numbrid</h3>
+    <ul>
+      <li>1160 teost</li>
+      <li>ca 14000 lehekülge</li>
+      <li>Keeled: ladina, saksa, rootsi, kreeka, heebrea</li>
+    </ul>
 
-<h2>Tehnoloogia</h2>
+    <h2>Tehnoloogia</h2>
 
-<ul>
-  <li><strong>Frontend:</strong> React + TypeScript + Tailwind CSS</li>
-  <li><strong>Otsimootor:</strong> Meilisearch</li>
-  <li><strong>OCR:</strong> peenhäälestatud Qwen3 VL 8B mudel</li>
-</ul>
+    <ul>
+      <li><strong>Frontend:</strong> React + TypeScript + Tailwind CSS</li>
+      <li><strong>Otsimootor:</strong> Meilisearch</li>
+      <li><strong>OCR:</strong> peenhäälestatud Qwen3 VL 8B mudel</li>
+    </ul>
 
 
-<h2>Kontakt</h2>
+    <h2>Kontakt</h2>
 
-<p>
-  Küsimuste ja ettepanekute korral võta ühendust: 
-  <a href="mailto:">link siia</a>
-</p>
+    <p>
+      Küsimuste ja ettepanekute korral võta ühendust:
+      <a href="mailto:">link siia</a>
+    </p>
 
-<h2>Litsents</h2>
+    <h2>Litsents</h2>
 
-<p>
-  Tarkvara: MIT litsents<br>
-  Tekstid ja pildid: vastavalt TÜ Raamatukogu kasutustingimustele
-</p>
+    <p>
+      Tarkvara: MIT litsents<br>
+      Tekstid ja pildid: vastavalt TÜ Raamatukogu kasutustingimustele
+    </p>
 
-</div>
+  </div>
 </body>
+
 </html>
