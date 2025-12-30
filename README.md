@@ -41,15 +41,21 @@ Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasu
 │                    - TypeScript                             │
 │                    - Tailwind CSS                           │
 └─────────────────────────────────────────────────────────────┘
+                               │
+                              ▼
+              ┌───────────────────────────────┐
+              │      Nginx Reverse Proxy      │
+              │      (port 80 / 443)          │
+              └───────────────┬───────────────┘
                               │
           ┌───────────────────┼───────────────────┐
           ▼                   ▼                   ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
 │   Meilisearch   │  │  Image Server   │  │  File Server    │
-│   (port 7700)   │  │  (port 8001)    │  │  (port 8002)    │
+│   (sisemine)    │  │  (sisemine)     │  │  (sisemine)     │
 │                 │  │                 │  │                 │
 │ - Otsing        │  │ - JPG failid    │  │ - Salvestamine  │
-│ - Metaandmed    │  │ - CORS enabled  │  │ - Autentimine   │
+│ - Metaandmed    │  │ - CORS          │  │ - Autentimine   │
 │ - Indekseerimine│  │                 │  │ - Varukoopiad   │
 └─────────────────┘  └─────────────────┘  └─────────────────┘
           │                   │                   │
