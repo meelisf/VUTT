@@ -15,7 +15,9 @@ import urllib.parse
 
 # =========================================================
 # KONFIGURATSIOON
-BASE_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/" 
+# VUTT_DATA_DIR env variable allows overriding the path for Docker/Production
+DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR) 
 USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json")
 # =========================================================
 
@@ -161,6 +163,8 @@ def sanitize_id(text):
     # Eemalda algus- ja lõpukriipsud
     sanitized = sanitized.strip('_-')
     return sanitized
+
+
 
 def find_directory_by_id(target_id):
     """Leiab failisüsteemist kausta teose ID järgi."""

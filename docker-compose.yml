@@ -1,0 +1,49 @@
+services:
+  # Backend: Python serverid (File Server + Image Server)
+  backend:
+    build: .
+    container_name: vutt-backend
+    restart: always
+    environment:
+      - VUTT_DATA_DIR=/data
+      - MEILISEARCH_URL=http://meilisearch:7700
+      - MEILISEARCH_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+    volumes:
+      # Mountime andmed hostilt konteinerisse
+      - ./data:/data
+    # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
+    # Kui tahad otse ligi pääseda ilma nginxita, siis uncommenti
+    # ports:
+    #   - "8001:8001"
+    #   - "8002:8002"
+
+  # Otsingumootor
+  meilisearch:
+    image: getmeili/meilisearch:v1
+    container_name: vutt-meili
+    restart: always
+    environment:
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+      - MEILI_NO_ANALYTICS=true
+    volumes:
+      - meili_data:/meili_data
+    # Sama siin - meilisearchile pääseb ligi läbi nginxi /meili/
+    # ports:
+    #   - "7700:7700"
+
+  # Frontend ja Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: vutt-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+      - meilisearch
+
+volumes:
+  meili_data:

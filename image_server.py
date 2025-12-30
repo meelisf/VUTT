@@ -6,7 +6,9 @@ import os
 # KONFIGURATSIOON
 # =========================================================
 PORT = 8001
-DIRECTORY = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+# VUTT_DATA_DIR env variable allows overriding the path for Docker/Production
+DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+DIRECTORY = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 # =========================================================
 
 class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
