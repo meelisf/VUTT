@@ -36,10 +36,10 @@ Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasu
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React SPA)                      │
-│                    - Vite + React 19                         │
-│                    - TypeScript                              │
-│                    - Tailwind CSS                            │
+│                    Frontend (React SPA)                     │
+│                    - Vite + React 19                        │
+│                    - TypeScript                             │
+│                    - Tailwind CSS                           │
 └─────────────────────────────────────────────────────────────┘
                               │
           ┌───────────────────┼───────────────────┐
@@ -167,14 +167,15 @@ data/
    - Muud veerud: `pealkiri`, `autor`, `respondens`, `aasta`
 
 2. **Kataloogide nimetamine**:
-   - Peab **algama** ID-ga kujul `AAAA-N` (nt `1692-6` või `1692-6-`)
-   - ID peab vastama `jaanson.tsv` väärtusele (koolon → sidekriips)
-   - Näide: `R Acad. Dorp. 1692:6` → kataloog `1692-6/` või `1692-6-Disputatio-De-Anima/`
-   - Kataloogi ülejäänud nimi on vaba - võib olla ka ainult ID
+   - Toetatud on kaks formaati:
+     1. **Range ID:** `AAAA-N` (nt `1692-6` või `1692-6-Pealkiri`) - seostub `jaanson.tsv` andmetega.
+     2. **Lihtne:** `AAAA-Pealkiri` (nt `1635-virginius-manipulus`) - töötab ilma eelneva metaandmete failita.
+   - Süsteem tuvastab automaatselt aastaarvu (4 esimest numbrit) ja pealkirja.
+   - Failid kausta sees peavad siiski olema paaris (`.jpg` + `.txt`).
 
 3. **Failide paarid** (OLULINE!):
    - Iga lehekülje kohta peab olema **sama nimega** pildi (`.jpg`, `.jpeg`, `.png`) ja `.txt` fail
-   - Näide: `scan_001.jpg` + `scan_001.txt` või `scan_001.png` + `scan_001.txt` ✅
+   - Näide: `scan_001.jpg` + `scan_001.txt` või `pilt_001.png` + `pilt_001.txt` ✅
    - Näide: `pilt_001.jpg` + `tekst_001.txt` ❌ (ei tööta!)
    - Failinimed ei pea sisaldama kataloogi nime
    - Kui pilt puudub, lehekülge ei kuvata
