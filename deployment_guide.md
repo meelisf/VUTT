@@ -53,3 +53,47 @@ Pärast käivitamist on VUTT kättesaadav serveri IP-aadressil pordil 80 (ehk li
 ## Probleemide korral
 - `docker compose logs -f` - näitab logisid
 - `docker compose restart` - taaskäivitab teenused
+
+## 5. HTTPS Seadistamine (SSL)
+
+Praegu töötab lahendus HTTP peal (port 80). Turvalisuse huvides (eriti sisselogimisel) on soovitatav kasutada HTTPS-i.
+
+### Vajalik
+1. **Domeeninimi** (nt `vutt.ut.ee` või `ajalugu.ee/vutt`). IP-aadressiga on HTTPS keeruline (v.a self-signed).
+2. **SSL Sertifikaat** (nt Let's Encrypt - tasuta).
+
+### Seadistamine (Certbot + Nginx)
+
+1. Muuda `docker-compose.yml`:
+   ```yaml
+   nginx:
+     ports:
+       - "80:80"
+       - "443:443"  <-- Ava HTTPS port
+     volumes:
+       - ./certs:/etc/nginx/certs:ro <-- Sertifikaatide kaust
+   ```
+
+2. Muuda `nginx.conf`:
+   ```nginx
+   server {
+       listen 443 ssl;
+       server_name sinu.domeen.ee;
+
+       ssl_certificate /etc/nginx/certs/fullchain.pem;
+       ssl_certificate_key /etc/nginx/certs/privkey.pem;
+
+       # ... (sama sisu mis enne: location / ja location /api ...)
+   }
+   
+   # Suuna HTTP -> HTTPS
+   server {
+       listen 80;
+       server_name sinu.domeen.ee;
+       return 301 https://$host$request_uri;
+   }
+   ```
+
+3. Sertifikaatide saamine (serveris):
+   Võid kasutada `certbot` tööriista otse host-masinas või eraldi konteineris, et genereerida failid kausta `./certs`.
+
