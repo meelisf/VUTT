@@ -41,7 +41,7 @@ Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasu
 │                    - TypeScript                             │
 │                    - Tailwind CSS                           │
 └─────────────────────────────────────────────────────────────┘
-                               │
+                              │
                               ▼
               ┌───────────────────────────────┐
               │      Nginx Reverse Proxy      │

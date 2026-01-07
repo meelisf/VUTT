@@ -59,7 +59,7 @@ Pärast käivitamist on VUTT kättesaadav serveri IP-aadressil pordil 80 (ehk li
 Praegu töötab lahendus HTTP peal (port 80). Turvalisuse huvides (eriti sisselogimisel) on soovitatav kasutada HTTPS-i.
 
 ### Vajalik
-1. **Domeeninimi** (nt `vutt.ut.ee` või `ajalugu.ee/vutt`). IP-aadressiga on HTTPS keeruline (v.a self-signed).
+1. **Domeeninimi** (nt `vutt.ut.ee` või `midagi.ee/vutt`). IP-aadressiga on HTTPS keeruline (v.a self-signed).
 2. **SSL Sertifikaat** (nt Let's Encrypt - tasuta).
 
 ### Seadistamine (Certbot + Nginx)
