@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
+import ConfirmModal from '../components/ConfirmModal';
 import { useUser } from '../contexts/UserContext';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, Edit3, X, Save } from 'lucide-react';
 import { FILE_API_URL } from '../config';
@@ -41,6 +42,9 @@ const Workspace: React.FC = () => {
   const [isSavingMeta, setIsSavingMeta] = useState(false);
   const [saveMetaStatus, setSaveMetaStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
+  // Salvestamata muudatuste kinnitusdialoogi olek
+  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
   const currentPageNum = parseInt(pageNum || '1', 10);
 
   // Lehekülje numbri sisestamise olek
@@ -69,17 +73,8 @@ const Workspace: React.FC = () => {
       hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
   );
 
-  // Kui blocker on aktiivne, näitame dialoogi
-  useEffect(() => {
-    if (blocker.state === "blocked") {
-      const confirmed = window.confirm("Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?");
-      if (confirmed) {
-        blocker.proceed();
-      } else {
-        blocker.reset();
-      }
-    }
-  }, [blocker]);
+  // Kontrolli kas blocker on aktiivne (kasutatakse modaali kuvamiseks)
+  const isBlockerActive = blocker.state === "blocked";
 
   const handlePageInputSubmit = () => {
     if (!workId) return;
@@ -319,7 +314,7 @@ const Workspace: React.FC = () => {
     setEditorChanges(false);
   };
 
-  const navigatePage = (delta: number) => {
+  const navigatePage = useCallback((delta: number) => {
     if (!workId) return;
 
     const newPage = currentPageNum + delta;
@@ -330,12 +325,12 @@ const Workspace: React.FC = () => {
 
     // Hoiatus salvestamata muudatuste korral
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
-      if (!confirmed) return;
+      setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`));
+      return;
     }
 
     navigate(`/work/${workId}/${newPage}`);
-  };
+  }, [workId, currentPageNum, work?.page_count, hasUnsavedChanges, navigate]);
 
   if (loading) {
     return (
@@ -372,8 +367,8 @@ const Workspace: React.FC = () => {
   // Navigeerimine tagasi dashboardile
   const handleNavigateBack = () => {
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
-      if (!confirmed) return;
+      setPendingNavigation(() => () => navigate('/'));
+      return;
     }
     navigate('/');
   };
@@ -381,11 +376,31 @@ const Workspace: React.FC = () => {
   // Navigeerimine otsingusse (selle teose piires)
   const handleNavigateToSearch = () => {
     if (hasUnsavedChanges) {
-      const confirmed = window.confirm('Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?');
-      if (!confirmed) return;
+      setPendingNavigation(() => () => navigate(`/search?work=${workId}`));
+      return;
     }
     navigate(`/search?work=${workId}`);
   };
+
+  // Kinnitusdialoogi käsitlejad
+  const handleConfirmLeave = () => {
+    if (isBlockerActive) {
+      blocker.proceed();
+    } else if (pendingNavigation) {
+      pendingNavigation();
+      setPendingNavigation(null);
+    }
+  };
+
+  const handleCancelLeave = () => {
+    if (isBlockerActive) {
+      blocker.reset();
+    } else {
+      setPendingNavigation(null);
+    }
+  };
+
+  const showLeaveConfirm = isBlockerActive || pendingNavigation !== null;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
@@ -635,6 +650,18 @@ const Workspace: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Salvestamata muudatuste kinnitusdialoog */}
+      <ConfirmModal
+        isOpen={showLeaveConfirm}
+        title="Salvestamata muudatused"
+        message="Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?"
+        confirmText="Lahku"
+        cancelText="Jää lehele"
+        onConfirm={handleConfirmLeave}
+        onCancel={handleCancelLeave}
+        variant="warning"
+      />
     </div>
   );
 };

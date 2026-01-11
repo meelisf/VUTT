@@ -1,24 +1,29 @@
-
 // Konfiguratsioon
 
-// Meilisearchi aadress
-// PROD (Nginx): '/meili' (suunatakse nginxist)
-// DEV (npm run dev): 'http://LOCALHOST:7700' (või sinu serveri IP)
-const IS_PROD = import.meta.env.PROD; // Vite automaatne muutuja
+// PROD = builditud versioon, DEV = npm run dev
+const IS_PROD = import.meta.env.PROD;
 
-// Kui oleme productionis (builditud), eeldame et Nginx proxy-b päringud
-// Kui oleme dev modes, kasutame otse IP-sid (muuda need vastavalt oma võrgule kui vaja)
-const DEV_IP = '172.17.120.146'; // Sinu arvuti IP arenduses
+// ========================================
+// DEPLOYMENT MODE - muuda vastavalt serverile
+// ========================================
+// 'nginx'  = HTTPS/production, Nginx proxy suunab /meili jne backendidele
+// 'direct' = HTTP/sisevõrk, otse backendi portidele (7700, 8001, 8002)
+const DEPLOYMENT_MODE: 'nginx' | 'direct' = 'direct';
 
-export const MEILI_HOST = IS_PROD ? '/meili' : `http://${DEV_IP}:7700`;
+// Dünaamiline hostname (direct mode jaoks)
+const getServerHost = () => {
+  if (typeof window !== 'undefined') {
+    return window.location.hostname;
+  }
+  return 'localhost';
+};
 
-// API võtmed
+// API URL-id
+const useProxy = !IS_PROD || DEPLOYMENT_MODE === 'nginx';
+
+export const MEILI_HOST = useProxy ? '/meili' : `http://${getServerHost()}:7700`;
 export const MEILI_API_KEY = import.meta.env.VITE_MEILI_API_KEY || '';
-
-// Pildiserver
-export const IMAGE_BASE_URL = IS_PROD ? '/api/images' : `http://${DEV_IP}:8001`;
-
-// Failiserver
-export const FILE_API_URL = IS_PROD ? '/api/files' : `http://${DEV_IP}:8002`;
+export const IMAGE_BASE_URL = useProxy ? '/api/images' : `http://${getServerHost()}:8001`;
+export const FILE_API_URL = useProxy ? '/api/files' : `http://${getServerHost()}:8002`;
 
 export const MEILI_INDEX = 'teosed';
