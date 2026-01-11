@@ -26,6 +26,8 @@ export interface Work {
   teose_tags?: string[]; // Teose-tasemel märksõnad/kollektsioonid (admin saab muuta)
   ester_id?: string; // ESTER kataloogi ID (nt "b1510692")
   external_url?: string; // Väline kataloogilink (kui pole ESTERis)
+  koht?: string; // Trükikoht (Tartu / Pärnu)
+  trükkal?: string; // Trükkal (printer)
 }
 
 export interface Annotation {
@@ -65,6 +67,8 @@ export interface Page {
   ester_id?: string;
   external_url?: string;
   original_path?: string;
+  koht?: string; // Trükikoht (Tartu / Pärnu)
+  trükkal?: string; // Trükkal (printer)
 }
 
 export interface SearchFilters {

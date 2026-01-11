@@ -693,6 +693,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         <p className="text-gray-900">{work.year}</p>
                       </div>
                     </div>
+                    {(work.koht || work.trükkal) && (
+                      <div className="flex gap-6">
+                        {work.koht && (
+                          <div className="flex-1">
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
+                            <p className="text-gray-900">{work.koht}</p>
+                          </div>
+                        )}
+                        {work.trükkal && (
+                          <div className="flex-1">
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
+                            <p className="text-gray-900">{work.trükkal}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* Links and Actions */}
                     <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">

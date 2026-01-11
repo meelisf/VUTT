@@ -55,15 +55,15 @@ def normalize_genre(tag):
 
 def derive_teose_tags_from_title(title):
     """Tuletab teose märksõnad pealkirjast (automaatne).
-    
+
     Näide: "Disputatio de anima..." → ['disputatsioon']
     """
     if not title:
         return []
-    
+
     title_lower = title.lower().strip()
     tags = []
-    
+
     # Žanri tuletamine pealkirja alguse järgi
     genre_patterns = [
         (r'^disputatio\b', 'disputatsioon'),
@@ -75,13 +75,48 @@ def derive_teose_tags_from_title(title):
         (r'^exercitatio\b', 'disputatsioon'),
         (r'^dissertatio\b', 'disputatsioon'),
     ]
-    
+
     for pattern, tag in genre_patterns:
         if re.match(pattern, title_lower):
             tags.append(tag)
             break  # Ainult üks žanr
-    
+
     return tags
+
+
+def derive_place(year):
+    """Tuletab trükikoha aasta järgi.
+
+    < 1699: Tartu
+    >= 1699: Pärnu
+    """
+    if not year:
+        return "Tartu"
+    if year >= 1699:
+        return "Pärnu"
+    return "Tartu"
+
+
+def derive_printer(year):
+    """Tuletab trükkali aasta järgi.
+
+    1632–1635: Jacob Becker (Pistorius)
+    1636–1641: Typis Academicis
+    1642–1656: Johann Vogel (Vogelius)
+    1657–1689: Typis Academicis
+    1690–1710: Johann Brendeken
+    Muu: Typis Academicis
+    """
+    if not year:
+        return "Typis Academicis"
+    if 1632 <= year <= 1635:
+        return "Jacob Becker (Pistorius)"
+    elif 1642 <= year <= 1656:
+        return "Johann Vogel (Vogelius)"
+    elif 1690 <= year <= 1710:
+        return "Johann Brendeken"
+    else:
+        return "Typis Academicis"
 
 def get_work_metadata(doc_path, dir_name):
     """Saab teose metaandmed:
@@ -101,6 +136,8 @@ def get_work_metadata(doc_path, dir_name):
         'teose_tags': [],
         'ester_id': None,
         'external_url': None,
+        'koht': None,
+        'trükkal': None,
     }
     teose_id = sanitize_id(dir_name)  # Vaikimisi kataloogi nimi (sanitiseeritud)
 
@@ -123,6 +160,10 @@ def get_work_metadata(doc_path, dir_name):
                 result['teose_tags'] = normalized_tags
                 result['ester_id'] = meta.get('ester_id')
                 result['external_url'] = meta.get('external_url')
+
+                # Koht ja trükkal - loe failist või tuleta aasta järgi
+                result['koht'] = meta.get('koht') or derive_place(result['aasta'])
+                result['trükkal'] = meta.get('trükkal') or derive_printer(result['aasta'])
 
                 # Kui tagid muutusid normaliseerimise käigus, uuendame faili
                 if raw_tags != normalized_tags:
@@ -160,6 +201,10 @@ def get_work_metadata(doc_path, dir_name):
     # Automaatne tagide tuletamine pealkirjast
     if result['pealkiri'] != 'Pealkiri puudub':
         result['teose_tags'] = derive_teose_tags_from_title(result['pealkiri'])
+
+    # Koht ja trükkal aasta järgi
+    result['koht'] = derive_place(result['aasta'])
+    result['trükkal'] = derive_printer(result['aasta'])
 
     # Loo _metadata.json automaatselt
     try:
@@ -207,6 +252,8 @@ def create_meilisearch_data_per_page():
         teose_tags = doc_metadata.get('teose_tags', [])
         ester_id = doc_metadata.get('ester_id')
         external_url = doc_metadata.get('external_url')
+        koht = doc_metadata.get('koht')
+        trykkal = doc_metadata.get('trükkal')
 
         pages = []
         for page_index, jpg_filename in enumerate(jpg_files):
@@ -282,12 +329,16 @@ def create_meilisearch_data_per_page():
                 'teose_tags': teose_tags,
             }
             
-            # Lisa ESTER väljad ainult kui need on olemas
+            # Lisa lisaväljad ainult kui need on olemas
             if ester_id:
                 meili_doc['ester_id'] = ester_id
             if external_url:
                 meili_doc['external_url'] = external_url
-            
+            if koht:
+                meili_doc['koht'] = koht
+            if trykkal:
+                meili_doc['trükkal'] = trykkal
+
             pages.append(meili_doc)
         
         works_data[teose_id] = pages

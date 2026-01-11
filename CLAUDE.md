@@ -68,8 +68,30 @@ Each Meilisearch document is a **page** with fields:
 - `lehekylje_tekst` (text), `lehekylje_pilt` (image path)
 - `teose_staatus` (denormalized work status: 'Toores' | 'Töös' | 'Valmis')
 - `teose_tags` (work-level genre tags: string[])
+- `koht` (printing place: Tartu / Pärnu), `trükkal` (printer name)
 
 Work status is recalculated on every page save and propagated to all pages of that work.
+
+### Metadata Modal (Admin)
+Admin users can edit work metadata via the pencil icon in Workspace:
+
+**Bibliographic fields:**
+- Pealkiri, Autor, Respondens, Aasta
+- Koht (printing place), Trükkal (printer)
+  - Auto-suggested: Tartu/Pärnu for places; historical printers by year
+
+**Classification & links:**
+- Žanrid/Tagid (genre tags, comma-separated)
+- ESTER ID, External URL
+
+The modal saves to `_metadata.json` and syncs to Meilisearch.
+
+### COinS (Zotero Integration)
+Workspace includes hidden COinS metadata for Zotero browser connector:
+- `rft.au` = author (praeses)
+- `rft.contributor` = respondens
+- `rft.place` = printing place (koht)
+- `rft.pub` = printer (trükkal)
 
 ## File Structure
 

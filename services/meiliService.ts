@@ -444,7 +444,13 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       comments: hit.comments || [],
       tags: Array.from(new Set((hit.tags || []).map((t: string) => t.toLowerCase()))),
       history: hit.history || [],
-      original_path: hit.originaal_kataloog
+      original_path: hit.originaal_kataloog,
+      // Metaandmed COinS jaoks
+      pealkiri: hit.pealkiri,
+      autor: hit.autor,
+      aasta: hit.aasta,
+      koht: hit.koht,
+      trükkal: hit.trükkal,
     };
   } catch (error) {
     console.error("Get Page Error:", error);
@@ -604,7 +610,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
   try {
     const response = await index.search('', {
       filter: [`teose_id = "${workId}"`],
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url', 'teose_tags'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url', 'teose_tags', 'koht', 'trükkal'],
       limit: 1
     });
 
@@ -623,7 +629,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
       teose_tags: Array.from(new Set((hit.teose_tags || []).map((t: string) => t.toLowerCase()))),
       ester_id: hit.ester_id || undefined,
-      external_url: hit.external_url || undefined
+      external_url: hit.external_url || undefined,
+      koht: hit.koht || undefined,
+      trükkal: hit.trükkal || undefined
     };
   } catch (e) {
     console.error("Work Metadata Error:", e);

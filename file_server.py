@@ -904,7 +904,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
 
         elif self.path == '/get-metadata-suggestions':
-            # Tagastab unikaalsed autorid ja žanrid (tagid) soovitusteks
+            # Tagastab unikaalsed autorid, žanrid, kohad ja trükkalid soovitusteks
             try:
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
@@ -921,6 +921,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 authors = set()
                 tags = set()
+                places = set()
+                printers = set()
                 
                 # Käime läbi kõik kataloogid ja kogume andmeid
                 for entry in os.scandir(BASE_DIR):
@@ -936,8 +938,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                         authors.add(meta['respondens'].strip())
                                     for t in meta.get('teose_tags', []):
                                         tags.add(t.strip().lower())
+                                    if meta.get('koht'):
+                                        places.add(meta['koht'].strip())
+                                    if meta.get('trükkal'):
+                                        printers.add(meta['trükkal'].strip())
                             except:
                                 continue
+                
+                # Lisa vaikimisi kohad ja trükkalid kui neid pole veel
+                places.update(['Tartu', 'Pärnu'])
+                printers.update(['Typis Academicis', 'Jacob Becker (Pistorius)', 'Johann Vogel (Vogelius)', 'Johann Brendeken'])
                 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -947,7 +957,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 response = {
                     "status": "success",
                     "authors": sorted(list(authors)),
-                    "tags": sorted(list(tags))
+                    "tags": sorted(list(tags)),
+                    "places": sorted(list(places)),
+                    "printers": sorted(list(printers))
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
                 
