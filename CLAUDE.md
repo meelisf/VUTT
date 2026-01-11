@@ -24,7 +24,11 @@ docker compose up meilisearch   # Meilisearch on port 7700
 python3 file_server.py          # File server on port 8002
 python3 image_server.py         # Image server on port 8001
 
-# Data indexing (manual re-index if needed)
+# Data management
+python3 scripts/sync_meilisearch.py          # Compare Meilisearch with filesystem (dry-run)
+python3 scripts/sync_meilisearch.py --apply  # Apply sync changes
+
+# Full re-indexing (if needed)
 python3 1-1_consolidate_data.py  # Generate JSONL from filesystem
 python3 2-1_upload_to_meili.py   # Upload to Meilisearch
 
@@ -76,7 +80,7 @@ Work status is recalculated on every page save and propagated to all pages of th
 - `/scripts/` - Migration and utility scripts
 - `file_server.py` - File persistence + auth + auto-indexing background thread
 - `image_server.py` - Image serving with CORS
-- `config.ts` - Server URLs (dev uses `DEV_IP`, production uses relative paths)
+- `config.ts` - Server URLs with `DEPLOYMENT_MODE`: 'nginx' (HTTPS) or 'direct' (HTTP internal)
 
 ## Key Patterns
 
@@ -99,8 +103,19 @@ The text viewer uses a stateful parser for 1:1 line alignment with line numbers:
 - Admin restores via "Ajalugu" tab (loads into editor, must save to persist)
 
 ### Genre Tags (teose_tags)
-Priority order: `_metadata.json` → auto-detect from title → `jaanson.tsv`
+Source: `_metadata.json` in each work folder (auto-created if missing, with tags derived from title).
 Auto-detection: `Disputatio...` → `disputatsioon`, `Oratio...` → `oratsioon`, etc.
+
+### Adding New Works
+Simply copy the folder to the data directory. The `file_server.py` background watcher will:
+1. Detect new folders without `_metadata.json`
+2. Auto-generate `_metadata.json` from folder name
+3. Index all pages into Meilisearch
+
+For manual file reorganization (moving pages between works), run:
+```bash
+python3 scripts/sync_meilisearch.py --apply
+```
 
 ### Dashboard Search
 - Two-step fetch: first query finds works (distinct), second fetches first-page thumbnails

@@ -1,5 +1,4 @@
 import os
-import csv
 import json
 import re
 import unicodedata
@@ -7,9 +6,7 @@ from tqdm import tqdm
 
 # --- SEADISTUS ---
 DATA_ROOT_DIR = 'data/04_sorditud_dokumendid'
-METADATA_FILE = 'data/jaanson.tsv'
 OUTPUT_FILE = 'output/meilisearch_data_per_page.jsonl'
-METADATA_ID_COLUMN = 'fields_r_acad_code'
 # --- LÕPP ---
 
 def sanitize_id(text):
@@ -32,26 +29,6 @@ def sanitize_id(text):
     sanitized = sanitized.strip('_-')
     
     return sanitized
-
-def load_metadata(filepath):
-    """Laeb TSV failist metaandmed."""
-    metadata = {}
-    if not os.path.exists(filepath):
-        print(f"Hoiatus: Metaandmete fail '{filepath}' puudub, jätkan ilma.")
-        return metadata
-    with open(filepath, mode='r', encoding='utf-8') as f:
-        reader = csv.DictReader(f, delimiter='\t')
-        for row in reader:
-            raw_id = row.get(METADATA_ID_COLUMN, "").strip()
-            if not raw_id:
-                continue
-            try:
-                key_part = raw_id.split(' ')[-1]
-                lookup_key = key_part.replace(':', '-')
-                metadata[lookup_key] = row
-            except IndexError:
-                continue
-    return metadata
 
 def calculate_work_status(page_statuses):
     """Arvutab teose koondstaatuse lehekülgede staatuste põhjal.
@@ -106,16 +83,15 @@ def derive_teose_tags_from_title(title):
     
     return tags
 
-def get_work_metadata(doc_path, dir_name, tsv_metadata):
-    """Saab teose metaandmed prioriteedi järgi:
+def get_work_metadata(doc_path, dir_name):
+    """Saab teose metaandmed:
     1. _metadata.json (kui olemas)
-    2. jaanson.tsv (vana süsteem)
-    3. Vaikeväärtused katalooginimest
-    
+    2. Vaikeväärtused katalooginimest (ja loob automaatselt _metadata.json)
+
     Tagastab: (teose_id, metadata_dict)
     """
     metadata_json_path = os.path.join(doc_path, '_metadata.json')
-    
+
     # Vaikeväärtused
     result = {
         'pealkiri': 'Pealkiri puudub',
@@ -127,10 +103,9 @@ def get_work_metadata(doc_path, dir_name, tsv_metadata):
         'external_url': None,
     }
     teose_id = sanitize_id(dir_name)  # Vaikimisi kataloogi nimi (sanitiseeritud)
-    
-    # 1. Proovi _metadata.json (kõrgeim prioriteet)
-    metadata_exists = os.path.exists(metadata_json_path)
-    if metadata_exists:
+
+    # 1. Proovi _metadata.json
+    if os.path.exists(metadata_json_path):
         try:
             with open(metadata_json_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
@@ -139,17 +114,17 @@ def get_work_metadata(doc_path, dir_name, tsv_metadata):
                 result['autor'] = meta.get('autor', result['autor'])
                 result['respondens'] = meta.get('respondens', result['respondens'])
                 result['aasta'] = int(meta.get('aasta', 0)) if meta.get('aasta') else 0
-                
+
                 raw_tags = meta.get('teose_tags', [])
                 if not isinstance(raw_tags, list):
                     raw_tags = [raw_tags] if raw_tags else []
-                
+
                 normalized_tags = sorted(list(set([normalize_genre(t) for t in raw_tags])))
                 result['teose_tags'] = normalized_tags
                 result['ester_id'] = meta.get('ester_id')
                 result['external_url'] = meta.get('external_url')
-                
-                # Kui tagid muutusid normaliseerimise käigus, uuendame faili, et "ground truth" oleks puhas
+
+                # Kui tagid muutusid normaliseerimise käigus, uuendame faili
                 if raw_tags != normalized_tags:
                     meta['teose_tags'] = normalized_tags
                     try:
@@ -166,62 +141,41 @@ def get_work_metadata(doc_path, dir_name, tsv_metadata):
             return teose_id, result
         except Exception as e:
             print(f"Viga _metadata.json lugemisel {metadata_json_path}: {e}")
-            # Kui fail on olemas aga vigane, tagastame vaikeväärtused aga EI liigu edasi legacy koodi juurde
             return teose_id, result
-    
-    # 2. Kui ground truth puudub, proovi legacy allikaid (jaanson.tsv)
-    if not metadata_exists:
-        found_in_tsv = False
-        try:
-            # Otsime vastet TSV-st (AAAA-N formaat)
-            for lookup_key, doc_meta in tsv_metadata.items():
-                if dir_name.startswith(lookup_key):
-                    teose_id = sanitize_id(lookup_key)
-                    result['pealkiri'] = doc_meta.get('pealkiri', result['pealkiri'])
-                    result['autor'] = doc_meta.get('autor', result['autor'])
-                    result['respondens'] = doc_meta.get('respondens', result['respondens'])
-                    result['aasta'] = int(doc_meta.get('aasta', 0)) if doc_meta.get('aasta') else 0
-                    found_in_tsv = True
-                    break
-        except (IndexError, ValueError):
-            pass
 
-        # 3. Kui TSV-st ei leitud, tuletame andmed kataloogi nimest
-        if not found_in_tsv:
-            # Pealkiri kataloogi nimest (eemaldame aastaarvu ja ID osa)
-            clean_title = re.sub(r'^\d{4}[-_]\d+[-_]?', '', dir_name) # AAAA-N-
-            if clean_title == dir_name:
-                clean_title = re.sub(r'^\d{4}[-_]?', '', dir_name) # AAAA-
-            
-            if clean_title:
-                result['pealkiri'] = clean_title.replace('-', ' ').replace('_', ' ').strip().capitalize()
-            
-            if result['aasta'] == 0:
-                year_match = re.match(r'^(\d{4})', dir_name)
-                if year_match:
-                    result['aasta'] = int(year_match.group(1))
+    # 2. _metadata.json puudub - tuletame andmed kataloogi nimest
+    # Pealkiri kataloogi nimest (eemaldame aastaarvu ja ID osa)
+    clean_title = re.sub(r'^\d{4}[-_]\d+[-_]?', '', dir_name)  # AAAA-N-
+    if clean_title == dir_name:
+        clean_title = re.sub(r'^\d{4}[-_]?', '', dir_name)  # AAAA-
 
-        # Automaatne tagide tuletamine (kui neid veel pole)
-        if not result['teose_tags'] and result['pealkiri'] != 'Pealkiri puudub':
-            result['teose_tags'] = derive_teose_tags_from_title(result['pealkiri'])
+    if clean_title:
+        result['pealkiri'] = clean_title.replace('-', ' ').replace('_', ' ').strip().capitalize()
 
-        # --- AUTOMAATNE SALVESTAMINE (AINULT ESMAKORDSELT) ---
-        try:
-            save_data = result.copy()
-            save_data['teose_id'] = teose_id
-            # Normaliseerime tagid ka salvestamisel, et esimene fail oleks puhas
-            save_data['teose_tags'] = sorted(list(set([normalize_genre(t) for t in save_data['teose_tags']])))
-            
-            with open(metadata_json_path, 'w', encoding='utf-8') as f:
-                json.dump(save_data, f, ensure_ascii=False, indent=2)
-            print(f"Loodud uus ground truth: {metadata_json_path}")
-        except Exception as e:
-            print(f"Viga _metadata.json loomisel {metadata_json_path}: {e}")
+    # Aasta katalooginimest
+    year_match = re.match(r'^(\d{4})', dir_name)
+    if year_match:
+        result['aasta'] = int(year_match.group(1))
+
+    # Automaatne tagide tuletamine pealkirjast
+    if result['pealkiri'] != 'Pealkiri puudub':
+        result['teose_tags'] = derive_teose_tags_from_title(result['pealkiri'])
+
+    # Loo _metadata.json automaatselt
+    try:
+        save_data = result.copy()
+        save_data['teose_id'] = teose_id
+        save_data['teose_tags'] = sorted(list(set([normalize_genre(t) for t in save_data['teose_tags']])))
+
+        with open(metadata_json_path, 'w', encoding='utf-8') as f:
+            json.dump(save_data, f, ensure_ascii=False, indent=2)
+        print(f"Loodud uus _metadata.json: {metadata_json_path}")
+    except Exception as e:
+        print(f"Viga _metadata.json loomisel {metadata_json_path}: {e}")
 
     return teose_id, result
 
 def create_meilisearch_data_per_page():
-    metadata_db = load_metadata(METADATA_FILE)
     if not os.path.exists(DATA_ROOT_DIR):
         print(f"VIGA: Andmete juurkausta '{DATA_ROOT_DIR}' ei leitud!")
         return
@@ -237,9 +191,8 @@ def create_meilisearch_data_per_page():
     for dir_name in tqdm(doc_dirs, desc="Teoste töötlemine"):
         doc_path = os.path.join(DATA_ROOT_DIR, dir_name)
         
-        # Kasuta uut metaandmete hankimise funktsiooni
-        # Prioriteet: _metadata.json → jaanson.tsv → vaikeväärtused
-        teose_id, doc_metadata = get_work_metadata(doc_path, dir_name, metadata_db)
+        # Hangi metaandmed _metadata.json failist (või loo see automaatselt)
+        teose_id, doc_metadata = get_work_metadata(doc_path, dir_name)
 
         # Lähtume PILTIDEST (jpg/png), mitte txt failidest
         # See tagab, et kui pilte kustutati või järjekorda muudeti, kajastub see ka andmetes
