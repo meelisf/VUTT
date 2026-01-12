@@ -233,3 +233,17 @@ curl -X PATCH 'http://HOST:7700/indexes/teosed/settings' \
 ### Dashboard Filters
 Supports URL parameters: `?author=`, `?respondens=`, `?printer=`, `?status=`, `?teoseTags=`
 Clickable links in Workspace "Info ja annotatsioonid" tab navigate to filtered Dashboard.
+
+## Future Ideas
+
+### ESTER Integration (TODO)
+Currently `ester_id` is manually added. Planned improvement:
+- Add "Search ESTER" button in admin metadata modal
+- Query ESTER API (SRU?) by year + title keywords
+- Show candidates, admin picks correct match
+- Save `ester_id` to `_metadata.json`
+
+**NB:** ESTER data doesn't map 1:1 to VUTT:
+- Names spelled differently (Menius vs Mein)
+- ESTER lists respondens as author (not praeses)
+- Consider these differences when displaying ESTER links
