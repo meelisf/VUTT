@@ -4,7 +4,7 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags, getWorkFullText } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
-import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye } from 'lucide-react';
+import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye, User } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 
 // Varukoopia tüüp
@@ -677,38 +677,69 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Pealkiri</span>
                       <p className="text-gray-900 font-medium">{work.title}</p>
                     </div>
-                    <div className="flex gap-6">
-                      <div className="flex-1">
+                    <div className="grid grid-cols-3 gap-6">
+                      {/* Rida 1: Autor, Respondens, Aasta */}
+                      <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Autor</span>
-                        <p className="text-gray-900">{work.author}</p>
+                        <button
+                          onClick={() => navigate(`/?author=${encodeURIComponent(work.author)}`)}
+                          className="flex items-center gap-1.5 text-gray-900 hover:text-primary-600 transition-colors group"
+                          title="Filtreeri autori järgi"
+                        >
+                          <User size={14} className="text-gray-400 group-hover:text-primary-500" />
+                          <span>{work.author}</span>
+                        </button>
                       </div>
-                      {work.respondens && (
-                        <div className="flex-1">
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Respondens</span>
-                          <p className="text-gray-900">{work.respondens}</p>
-                        </div>
-                      )}
+                      <div>
+                        {work.respondens && (
+                          <>
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Respondens</span>
+                            <button
+                              onClick={() => navigate(`/?respondens=${encodeURIComponent(work.respondens!)}`)}
+                              className="flex items-center gap-1.5 text-gray-900 hover:text-indigo-600 transition-colors group"
+                              title="Filtreeri respondendi järgi"
+                            >
+                              <User size={14} className="text-gray-400 group-hover:text-indigo-500" />
+                              <span>{work.respondens}</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
                       <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Aasta</span>
                         <p className="text-gray-900">{work.year}</p>
                       </div>
+
+                      {/* Rida 2: Trükikoht, Trükkal (joondatud Autor ja Respondensiga) */}
+                      {(work.koht || work.trükkal) && (
+                        <>
+                          <div>
+                            {work.koht && (
+                              <>
+                                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
+                                <p className="text-gray-900">{work.koht}</p>
+                              </>
+                            )}
+                          </div>
+                          <div>
+                            {work.trükkal && (
+                              <>
+                                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
+                                <button
+                                  onClick={() => navigate(`/?printer=${encodeURIComponent(work.trükkal!)}`)}
+                                  className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
+                                  title="Filtreeri trükkali järgi"
+                                >
+                                  <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
+                                  <span>{work.trükkal}</span>
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          <div></div>
+                        </>
+                      )}
                     </div>
-                    {(work.koht || work.trükkal) && (
-                      <div className="flex gap-6">
-                        {work.koht && (
-                          <div className="flex-1">
-                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
-                            <p className="text-gray-900">{work.koht}</p>
-                          </div>
-                        )}
-                        {work.trükkal && (
-                          <div className="flex-1">
-                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
-                            <p className="text-gray-900">{work.trükkal}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {/* Links and Actions */}
                     <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">

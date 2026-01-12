@@ -243,13 +243,17 @@ Serveri seadistamise (sh Nginx, HTTPS ja andmete varundamine) kohta vaata **[dep
 ## Turvalisus
 
 - ✅ Serveripoolne autentimine API endpointidel
-- ✅ Tõendipõhine sessioon (24h kehtivus)
+- ✅ Tõendipõhine sessioon (24h kehtivus, automaatne aegumine)
 - ✅ Rollipõhine ligipääsukontroll
-- ✅ Path traversal kaitse
+- ✅ Path traversal kaitse (`os.path.basename()`)
+- ✅ UUID tokenid (krüptograafiliselt juhuslikud)
 - ⚠️ HTTP (mitte HTTPS) - sobib sisevõrku
 - ⚠️ SHA-256 ilma salt'ita - põhiline kaitse
+- ⚠️ CORS avatud (`*`) - piirata pärast domeeni saamist
 
-**Soovitus tootmises:** Kasutada reverse proxy't (nginx/Caddy) HTTPS-i jaoks.
+**NB:** `users.json` fail on kohustuslik - ilma selleta ei saa keegi sisse logida.
+
+**Soovitus tootmises:** Kasutada HTTPS-i (vt [deployment_guide.md](deployment_guide.md)).
 
 ## Varukoopiad ja versioonihaldus
 

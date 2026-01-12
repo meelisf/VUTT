@@ -51,7 +51,7 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['teose_staatus', 'teose_tags']; // Filtreeritavad väljad
+    const requiredFilter = ['teose_staatus', 'teose_tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
@@ -73,6 +73,8 @@ const fixIndexSettings = async () => {
     await index.updateFilterableAttributes([
       'aasta',
       'autor',
+      'respondens',
+      'trükkal',
       'teose_id',
       'lehekylje_number',
       'originaal_kataloog',
@@ -148,6 +150,8 @@ interface DashboardSearchOptions {
   yearEnd?: number;
   sort?: string;
   author?: string;
+  respondens?: string;
+  printer?: string; // trükkal
   workStatus?: WorkStatus; // Teose koondstaatuse filter
   teoseTags?: string[]; // Teose märksõnad (AND loogika)
   onlyFirstPage?: boolean;
@@ -262,6 +266,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.author) {
       filter.push(`autor = "${options.author}"`);
     }
+    if (options?.respondens) {
+      filter.push(`respondens = "${options.respondens}"`);
+    }
+    if (options?.printer) {
+      filter.push(`trükkal = "${options.printer}"`);
+    }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
     }
@@ -274,7 +284,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'teose_tags', 'ester_id', 'external_url'],
+      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'teose_tags', 'ester_id', 'external_url', 'koht', 'trükkal'],
       attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
       filter: filter
     };
@@ -390,6 +400,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         teose_tags: hit.teose_tags || [],
         ester_id: hit.ester_id || undefined,
         external_url: hit.external_url || undefined,
+        koht: hit.koht || undefined,
+        trükkal: hit.trükkal || undefined,
         last_modified: hit.last_modified // Hoidke ajutine väli sorteerimiseks
       };
     });

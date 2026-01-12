@@ -23,6 +23,8 @@ const Dashboard: React.FC = () => {
   const defaultSort = searchParams.get('q') ? 'relevance' : 'year_asc';
   const sortParam = searchParams.get('sort') || defaultSort;
   const authorParam = searchParams.get('author') || '';
+  const respondensParam = searchParams.get('respondens') || '';
+  const printerParam = searchParams.get('printer') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
   const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
@@ -212,6 +214,8 @@ const Dashboard: React.FC = () => {
           yearEnd: end,
           sort: sort,
           author: authorParam || undefined,
+          respondens: respondensParam || undefined,
+          printer: printerParam || undefined,
           workStatus: statusParam || undefined,
           teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
           onlyFirstPage: sort !== 'recent' // CUSTOM: If sorting by recent, we want to see ANY page that was modified
@@ -235,7 +239,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam, statusParam, selectedTags]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags]);
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
@@ -372,6 +376,45 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
 
+                {/* Respondens Filter Badge */}
+                {respondensParam && (
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-md text-sm font-medium">
+                    <User size={14} />
+                    <span className="text-xs text-indigo-500 mr-0.5">resp:</span>
+                    <span className="truncate max-w-32">{respondensParam}</span>
+                    <button
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('respondens');
+                        setSearchParams(newParams);
+                      }}
+                      className="ml-1 hover:bg-indigo-100 rounded p-0.5"
+                      title="Eemalda respondendi filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Printer Filter Badge */}
+                {printerParam && (
+                  <div className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium">
+                    <span className="font-serif">¶</span>
+                    <span className="truncate max-w-32">{printerParam}</span>
+                    <button
+                      onClick={() => {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete('printer');
+                        setSearchParams(newParams);
+                      }}
+                      className="ml-1 hover:bg-amber-100 rounded p-0.5"
+                      title="Eemalda trükkali filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+
                 {/* Status Filter Badge */}
                 {statusParam && (
                   <div className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium ${statusParam === 'Valmis' ? 'bg-green-50 text-green-700' :
@@ -394,7 +437,7 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Reset Filters Button */}
-                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || statusParam || selectedTags.length > 0) && (
+                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || respondensParam || printerParam || statusParam || selectedTags.length > 0) && (
                   <button
                     onClick={() => {
                       setInputValue('');

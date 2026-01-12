@@ -5,7 +5,7 @@ import shutil
 import hashlib
 import glob
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import unicodedata
 import threading
@@ -26,6 +26,9 @@ PORT = 8002
 # Sessioonide hoidla (token -> user info)
 # NB: Serveri restart kustutab kõik sessioonid
 sessions = {}
+
+# Sessiooni kehtivusaeg (24 tundi)
+SESSION_DURATION = timedelta(hours=24)
 
 # Meilisearchi konfig (laetakse .env failist)
 MEILI_URL = "http://127.0.0.1:7700"
@@ -74,21 +77,14 @@ def send_to_meilisearch(documents):
         return False
 
 def load_users():
-    """Laeb kasutajad JSON failist. Loob faili kui ei eksisteeri."""
+    """Laeb kasutajad JSON failist."""
     if not os.path.exists(USERS_FILE):
-        # Loome vaikimisi admin kasutaja (parool: admin123)
-        default_users = {
-            "admin": {
-                "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
-                "name": "Administraator",
-                "role": "admin"
-            }
-        }
-        with open(USERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(default_users, f, ensure_ascii=False, indent=2)
-        print(f"Loodud vaikimisi kasutajate fail: {USERS_FILE}")
-        return default_users
-    
+        print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
+        print("Loo users.json fail koos kasutajatega. Näide:")
+        print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
+        print("Parooli hashi saad: echo -n 'parool' | sha256sum")
+        return {}
+
     with open(USERS_FILE, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -125,16 +121,23 @@ def require_token(data, min_role=None):
     min_role: 'viewer', 'editor', 'admin' - minimaalne nõutav roll
     """
     token = data.get('auth_token', '').strip()
-    
+
     if not token:
         return None, {"status": "error", "message": "Autentimine nõutud (token puudub)"}
-    
+
     session = sessions.get(token)
     if not session:
         return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
-    
+
+    # Kontrolli sessiooni aegumist (24h)
+    created_at = datetime.fromisoformat(session["created_at"])
+    if datetime.now() - created_at > SESSION_DURATION:
+        # Eemalda aegunud sessioon
+        del sessions[token]
+        return None, {"status": "error", "message": "Sessioon aegunud (24h), palun logi uuesti sisse"}
+
     user = session["user"]
-    
+
     # Rollide hierarhia kontroll
     if min_role:
         role_hierarchy = {'viewer': 0, 'editor': 1, 'admin': 2}
@@ -142,7 +145,7 @@ def require_token(data, min_role=None):
         required_level = role_hierarchy.get(min_role, 0)
         if user_level < required_level:
             return None, {"status": "error", "message": f"Vajab vähemalt '{min_role}' õigusi"}
-    
+
     return user, None
 
 # Vana funktsioon tagasiühilduvuseks (eemaldatakse tulevikus)
@@ -279,6 +282,8 @@ def sync_work_to_meilisearch(dir_name):
     
     ester_id = metadata.get('ester_id')
     external_url = metadata.get('external_url')
+    koht = metadata.get('koht')
+    trükkal = metadata.get('trükkal')
 
     # 2. Leia leheküljed (pildid)
     images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
@@ -350,7 +355,9 @@ def sync_work_to_meilisearch(dir_name):
         
         if ester_id: doc['ester_id'] = ester_id
         if external_url: doc['external_url'] = external_url
-        
+        if koht: doc['koht'] = koht
+        if trükkal: doc['trükkal'] = trükkal
+
         documents.append(doc)
     
     # 3. Arvuta teose koondstaatus
@@ -407,6 +414,10 @@ def metadata_watcher_loop():
             time.sleep(60)
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
+    # TODO: Pärast kindla domeeni saamist piirata CORS lubatud domeenidele
+    # Praegu '*' lubab päringuid igalt poolt (sisevõrgus OK, avalikus mitte)
+    # Näide: allowed_origins = ['https://vutt.ut.ee', 'http://localhost:5173']
+
     def do_OPTIONS(self):
         self.send_response(200, "ok")
         self.send_header('Access-Control-Allow-Origin', '*')
@@ -450,22 +461,28 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
-                
+
                 token = data.get('token', '').strip()
-                
+
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                
+
                 session = sessions.get(token)
                 if session:
-                    response = {"status": "success", "user": session["user"], "valid": True}
+                    # Kontrolli sessiooni aegumist (24h)
+                    created_at = datetime.fromisoformat(session["created_at"])
+                    if datetime.now() - created_at > SESSION_DURATION:
+                        del sessions[token]
+                        response = {"status": "error", "valid": False, "message": "Sessioon aegunud (24h)"}
+                    else:
+                        response = {"status": "success", "user": session["user"], "valid": True}
                 else:
                     response = {"status": "error", "valid": False, "message": "Token aegunud"}
-                
+
                 self.wfile.write(json.dumps(response).encode('utf-8'))
-                
+
             except Exception as e:
                 print(f"VERIFY-TOKEN VIGA: {e}")
                 self.send_error(500, str(e))
