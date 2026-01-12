@@ -172,3 +172,64 @@ Edit `users.json` with SHA-256 hashed password:
 - `-` and `⸗` work for cross-line search
 - `¬` does NOT work (Meilisearch treats as word separator)
 - Use `scripts/replace_negation_sign.py` to convert
+
+## Security
+
+### Current Implementation
+- **Session tokens**: UUID-based, 24h expiry (checked in `require_token()`)
+- **Password hashing**: SHA-256 (no salt) - adequate for internal use
+- **Role hierarchy**: viewer (0) < editor (1) < admin (2)
+- **Path traversal protection**: `os.path.basename()` on all file paths
+- **No default users**: `users.json` must exist, no auto-creation
+
+### Production Checklist (see `deployment_guide.md`)
+- [ ] HTTPS enabled (domain: `vutt.utlib.ut.ee`)
+- [ ] Backend ports (7700, 8001, 8002) closed from outside
+- [ ] CORS restricted to specific domain in `file_server.py`
+- [ ] Strong passwords in `users.json`
+- [ ] Meilisearch master key in `.env`
+
+### CORS TODO
+When domain is finalized, update `file_server.py` class `RequestHandler`:
+```python
+allowed_origins = ['https://vutt.utlib.ut.ee']
+origin = self.headers.get('Origin')
+if origin in allowed_origins:
+    self.send_header('Access-Control-Allow-Origin', origin)
+```
+
+### Meilisearch Index Settings
+If adding new filterable fields, update `meiliService.ts`:
+1. Add to `filterableAttributes` in `fixIndexSettings()`
+2. Add to `requiredFilter` array (triggers auto-update check)
+3. After deploy: settings update on page load, or manually via curl:
+```bash
+curl -X PATCH 'http://HOST:7700/indexes/teosed/settings' \
+  -H 'Content-Type: application/json' \
+  --data '{"filterableAttributes": ["aasta","autor","respondens","trükkal",...]}'
+```
+
+## Deployment
+
+### Target: vutt.utlib.ut.ee
+- Production server managed by UT Library
+- Docker Compose deployment (Nginx + Meilisearch + Python backends)
+- Data folder: `./data/` mounted as `/data` in container
+
+### Key Files for Deployment
+- `docker-compose.yml` - Service definitions
+- `nginx.conf` - Reverse proxy config
+- `Dockerfile` - Python backend image
+- `users.json` - User credentials (not in git!)
+- `.env` - Meilisearch key (not in git!)
+- `dist/` - Built frontend (run `npm run build` first)
+
+### Backups
+- Images (~25GB): One-time copy, rarely changes
+- Text/JSON: Incremental rsync nightly
+- Meilisearch: No backup needed - rebuilds from files
+- App creates `.backup.*` files automatically (max 10 + original)
+
+### Dashboard Filters
+Supports URL parameters: `?author=`, `?respondens=`, `?printer=`, `?status=`, `?teoseTags=`
+Clickable links in Workspace "Info ja annotatsioonid" tab navigate to filtered Dashboard.
