@@ -110,6 +110,8 @@ See on lihtsaim viis VUTT-i käivitamiseks serveris või oma arvutis.
    ```
 3. **Kasutamine:** Ava brauseris `http://localhost`.
 
+**Serverisse paigaldamine (HTTPS):**
+Tootmiskeskkonnas (`vutt.utlib.ut.ee`) kasutab rakendus Nginxi reverse proxy-t ja HTTPS-i.
 Täpsemat infot uude serverisse paigaldamise, andmete kolimise ja HTTPS-i seadistamise kohta loe failist **[deployment_guide.md](deployment_guide.md)**.
 
 ### Arendus (Manuaalne paigaldus)
@@ -247,13 +249,13 @@ Serveri seadistamise (sh Nginx, HTTPS ja andmete varundamine) kohta vaata **[dep
 - ✅ Rollipõhine ligipääsukontroll
 - ✅ Path traversal kaitse (`os.path.basename()`)
 - ✅ UUID tokenid (krüptograafiliselt juhuslikud)
-- ⚠️ HTTP (mitte HTTPS) - sobib sisevõrku
+- ✅ HTTPS (ülikooli sisevõrgus / VPN) - `vutt.utlib.ut.ee`
 - ⚠️ SHA-256 ilma salt'ita - põhiline kaitse
-- ⚠️ CORS avatud (`*`) - piirata pärast domeeni saamist
+- ⚠️ CORS - piiratud tootmises
 
 **NB:** `users.json` fail on kohustuslik - ilma selleta ei saa keegi sisse logida.
 
-**Soovitus tootmises:** Kasutada HTTPS-i (vt [deployment_guide.md](deployment_guide.md)).
+**Tootmises:** Rakendus on seadistatud töötama HTTPS-i peal aadressil `https://vutt.utlib.ut.ee`. (Vt [deployment_guide.md](deployment_guide.md)).
 
 ## Varukoopiad ja versioonihaldus
 
