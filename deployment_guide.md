@@ -54,48 +54,81 @@ Pärast käivitamist on VUTT kättesaadav serveri IP-aadressil pordil 80 (ehk li
 - `docker compose logs -f` - näitab logisid
 - `docker compose restart` - taaskäivitab teenused
 
-## 5. HTTPS Seadistamine (SSL)
+## 5. HTTPS Seadistamine (vutt.utlib.ut.ee)
 
-Praegu töötab lahendus HTTP peal (port 80). Turvalisuse huvides (eriti sisselogimisel) on soovitatav kasutada HTTPS-i.
+> [!IMPORTANT]
+> **Meilisearch SDK nõue**: Meilisearch JavaScript SDK **ei toeta suhtelisi URL-e** (nt `/meili`). `config.ts` failis peab `MEILI_HOST` olema absoluutne URL: `${window.location.origin}/meili`. Pildid ja failid (`/api/images`, `/api/files`) töötavad suhteliste URL-idega.
 
-### Vajalik
-1. **Domeeninimi** (nt `vutt.utlib.ut.ee` või `midagi.ee/vutt`). IP-aadressiga on HTTPS keeruline (v.a self-signed).
-2. **SSL Sertifikaat** (nt Let's Encrypt - tasuta).
+### Praegune töötav konfiguratsioon
 
-### Seadistamine (Certbot + Nginx)
+**Sertifikaadid**: `/etc/nginx/certs/vutt/`
+- `vutt_utlib_ut_ee_bundle.pem`
+- `vutt_utlib_ut_ee.key`
 
-1. Muuda `docker-compose.yml`:
-   ```yaml
-   nginx:
-     ports:
-       - "80:80"
-       - "443:443"  <-- Ava HTTPS port
-     volumes:
-       - ./certs:/etc/nginx/certs:ro <-- Sertifikaatide kaust
-   ```
+**Nginx konfiguratsioonifail**: `/etc/nginx/sites-available/vutt`
 
-2. Muuda `nginx.conf`:
-   ```nginx
-   server {
-       listen 443 ssl;
-       server_name sinu.domeen.ee;
+```nginx
+server {
+    listen 80;
+    server_name vutt.utlib.ut.ee;
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
 
-       ssl_certificate /etc/nginx/certs/fullchain.pem;
-       ssl_certificate_key /etc/nginx/certs/privkey.pem;
+server {
+    listen 443 ssl;
+    server_name vutt.utlib.ut.ee;
 
-       # ... (sama sisu mis enne: location / ja location /api ...)
-   }
-   
-   # Suuna HTTP -> HTTPS
-   server {
-       listen 80;
-       server_name sinu.domeen.ee;
-       return 301 https://$host$request_uri;
-   }
-   ```
+    ssl_certificate /etc/nginx/certs/vutt/vutt_utlib_ut_ee_bundle.pem;
+    ssl_certificate_key /etc/nginx/certs/vutt/vutt_utlib_ut_ee.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
 
-3. Sertifikaatide saamine (serveris):
-   Võid kasutada `certbot` tööriista otse host-masinas või eraldi konteineris, et genereerida failid kausta `./certs`.
+    root /var/www/vutt;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/files/ {
+        proxy_pass http://127.0.0.1:8002/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /api/images/ {
+        proxy_pass http://127.0.0.1:8001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /meili/ {
+        proxy_pass http://127.0.0.1:7700/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Frontend uuendamine
+```bash
+npm run build
+# Kopeeri dist/ sisu serverisse /var/www/vutt/
+```
+
+### Taustateenused (mitte-Docker variant)
+```bash
+cd /home/mf/Dokumendid/LLM/tartu-acad
+./start_services.sh
+```
 
 ## 6. Turvalisuse Checklist (Tootmisserver)
 
