@@ -14,10 +14,14 @@
     .about-content h2 {
       font-size: 18px;
       font-weight: 600;
-      margin: 1.5rem 0 0.75rem 0;
+      margin: 1.5rem 0 1.5rem 0;
       color: #1f2937;
       border-bottom: 1px solid #e5e7eb;
       padding-bottom: 0.5rem;
+    }
+
+    .about-content h2:first-of-type {
+      margin-top: 0;
     }
 
     .about-content h3 {
@@ -41,8 +45,13 @@
     }
 
     .about-content a {
-      color: #7c3aed;
+      color: #0284c7;
+      /* Tailwind primary-600 */
       text-decoration: none;
+    }
+
+    .about-content a:visited {
+      color: #0284c7;
     }
 
     .about-content a:hover {
@@ -50,11 +59,12 @@
     }
 
     .about-content .highlight {
-      background: #f5f3ff;
+      background: #f0fdfa;
+      /* Teal-50 to match VUTT theme slightly better or keep neutral */
       padding: 1rem;
       border-radius: 0.5rem;
       margin: 1rem 0;
-      border-left: 3px solid #7c3aed;
+      border-left: 3px solid #2563eb;
     }
 
     .about-content .team {
@@ -69,6 +79,38 @@
       padding: 0.25rem 0.75rem;
       border-radius: 1rem;
       font-size: 13px;
+    }
+
+    .about-content .github-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .github-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #374151 !important;
+      font-weight: 500;
+      background-color: #f3f4f6;
+      padding: 4px 10px;
+      border-radius: 6px;
+      transition: all 0.2s;
+      border: 1px solid #e5e7eb;
+    }
+
+    .github-link:hover {
+      color: #111827 !important;
+      background-color: #e5e7eb;
+      text-decoration: none !important;
+    }
+
+    .license-info {
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
     }
   </style>
 </head>
@@ -97,7 +139,8 @@
         Raamatukogu</a>
       digiteeritud kogudest ja põhinevad suuresti Ene-Lille Jaanson, koost., <i>Tartu Ülikooli trükikoda 1632-1710:
         Ajalugu ja trükiste bibliograafia = Druckerei der Universität Dorpat 1632-1710: Geschichte und Bibliographie der
-        Druckschriften</i>, koos. Mare Rand et al. (Tartu Ülikooli Raamatukogu, 2000) kogutud trükiste koopiatele.
+        Druckschriften</i>, koos. Mare Rand et al. (Tartu Ülikooli Raamatukogu, 2000) koostamise käigus kogutud trükiste
+      koopiatel.
     </p>
 
     <p>
@@ -118,8 +161,8 @@
 
     <h3>Numbrid</h3>
     <ul>
-      <li>1160 teost</li>
-      <li>ca 14000 lehekülge</li>
+      <li>1187 teost</li>
+      <li>ca 20 000 lehekülge</li>
       <li>Keeled: ladina, saksa, rootsi, kreeka, heebrea</li>
     </ul>
 
@@ -130,21 +173,39 @@
       <li><strong>Otsimootor:</strong> Meilisearch</li>
       <li><strong>OCR:</strong> peenhäälestatud Qwen3 VL 8B mudel</li>
     </ul>
+    <p>
 
-
+      VUTT on arendatud <a href="https://utlib.ut.ee/et" target="_blank">TÜ raamatukogus</a>. Logo soovitas Rahel Toomik
+      ja see pärineb jutluse <a href="https://vutt.utlib.ut.ee/work/1642-6/1">Een kort och enfaldigh Lijkpredikan
+        ... Dorpt: J. Vogel, 1642</a> tiitellehe ehisraamist.
+    </p>
     <h2>Kontakt</h2>
 
     <p>
       Küsimuste ja ettepanekute korral võta ühendust:
-      <a href="mailto:">link siia</a>
+      <a href="mailto:meelis.friedenthal@ut.ee">Meelis Friedenthal </a>
     </p>
 
     <h2>Litsents</h2>
 
-    <p>
-      Tarkvara: MIT litsents<br>
-      Tekstid ja pildid: vastavalt TÜ Raamatukogu kasutustingimustele
-    </p>
+    <div class="license-info">
+      <div class="github-wrapper">
+        <span>Tarkvara:</span>
+        <a href="https://github.com/meelisf/VUTT" target="_blank" class="github-link">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path
+              d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+            </path>
+          </svg>
+          GitHub: meelisf/VUTT
+        </a>
+        <span style="color: #6b7280; font-size: 13px;">(MIT litsents)</span>
+      </div>
+      <div>
+        Tekstid ja pildid: vastavalt TÜ Raamatukogu kasutustingimustele
+      </div>
+    </div>
 
   </div>
 </body>
