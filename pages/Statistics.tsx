@@ -1,9 +1,12 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const Statistics: React.FC = () => {
+  const { t } = useTranslation(['statistics', 'common']);
   const navigate = useNavigate();
 
   // Mock data for charts
@@ -15,13 +18,13 @@ const Statistics: React.FC = () => {
   ];
 
   const activityData = [
-    { name: 'E', pages: 45 },
-    { name: 'T', pages: 72 },
-    { name: 'K', pages: 58 },
-    { name: 'N', pages: 90 },
-    { name: 'R', pages: 34 },
-    { name: 'L', pages: 12 },
-    { name: 'P', pages: 5 },
+    { name: t('days.mon'), pages: 45 },
+    { name: t('days.tue'), pages: 72 },
+    { name: t('days.wed'), pages: 58 },
+    { name: t('days.thu'), pages: 90 },
+    { name: t('days.fri'), pages: 34 },
+    { name: t('days.sat'), pages: 12 },
+    { name: t('days.sun'), pages: 5 },
   ];
 
   const totalPages = statusData.reduce((acc, curr) => acc + curr.value, 0);
@@ -32,17 +35,22 @@ const Statistics: React.FC = () => {
     <div className="min-h-screen bg-gray-50 font-sans">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-4 shadow-sm sticky top-0 z-10">
-        <button 
-            onClick={() => navigate('/')} 
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-2"
-        >
-            <ArrowLeft size={18} />
-            <span className="font-medium">Tagasi avalehele</span>
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <BarChart3 className="text-primary-600" />
-            Projekti Statistika
-        </h1>
+        <div className="flex justify-between items-start">
+          <div>
+            <button
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-2"
+            >
+                <ArrowLeft size={18} />
+                <span className="font-medium">{t('header.backToHome')}</span>
+            </button>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <BarChart3 className="text-primary-600" />
+                {t('header.title')}
+            </h1>
+          </div>
+          <LanguageSwitcher />
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
@@ -50,16 +58,16 @@ const Statistics: React.FC = () => {
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Kogumaht</h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-lg text-gray-400 font-normal">lk</span></p>
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.totalVolume')}</h3>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-lg text-gray-400 font-normal">{t('kpi.pages')}</span></p>
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Valmisolek</h3>
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.readiness')}</h3>
                 <p className="text-3xl font-bold text-green-600 mt-2">{progressPercentage}%</p>
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Nädala parim päev</h3>
-                <p className="text-3xl font-bold text-primary-600 mt-2">Neljapäev <span className="text-lg text-gray-400 font-normal">(90 lk)</span></p>
+                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.bestDay')}</h3>
+                <p className="text-3xl font-bold text-primary-600 mt-2">{t('days.thursday')} <span className="text-lg text-gray-400 font-normal">(90 {t('kpi.pages')})</span></p>
             </div>
         </div>
 
@@ -68,7 +76,7 @@ const Statistics: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col min-h-[400px]">
                 <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <PieChartIcon size={20} className="text-gray-400"/>
-                    Lehekülgede staatus
+                    {t('charts.pageStatus')}
                 </h2>
                 <div className="flex-1">
                     <ResponsiveContainer width="100%" height="100%">
@@ -81,7 +89,7 @@ const Statistics: React.FC = () => {
                         outerRadius={120}
                         paddingAngle={5}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => `${t(`common:status.${name}`)} ${(percent * 100).toFixed(0)}%`}
                         >
                         {statusData.map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
@@ -95,7 +103,7 @@ const Statistics: React.FC = () => {
                     {statusData.map(item => (
                     <div key={item.name} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
                         <span className="w-3 h-3 rounded-full" style={{backgroundColor: item.color}}></span>
-                        {item.name}: {item.value}
+                        {t(`common:status.${item.name}`)}: {item.value}
                     </div>
                     ))}
                 </div>
@@ -105,7 +113,7 @@ const Statistics: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col min-h-[400px]">
                 <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
                     <BarChart3 size={20} className="text-gray-400"/>
-                    Nädala aktiivsus
+                    {t('charts.weeklyActivity')}
                 </h2>
                 <div className="flex-1">
                     <ResponsiveContainer width="100%" height="100%">
@@ -118,7 +126,7 @@ const Statistics: React.FC = () => {
                     </BarChart>
                     </ResponsiveContainer>
                 </div>
-                <p className="text-center text-sm text-gray-500 mt-4">Töödeldud lehekülgi päevade lõikes</p>
+                <p className="text-center text-sm text-gray-500 mt-4">{t('charts.processedByDay')}</p>
             </div>
         </div>
       </div>

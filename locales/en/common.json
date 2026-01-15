@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "VUTT",
+    "subtitle": "Early Modern Text Workbench"
+  },
+  "buttons": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "confirm": "Yes",
+    "deny": "No",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "download": "Download",
+    "restore": "Restore",
+    "refresh": "Refresh",
+    "apply": "Apply",
+    "clear": "Clear",
+    "search": "Search",
+    "edit": "Edit",
+    "delete": "Delete",
+    "reset": "Reset"
+  },
+  "status": {
+    "Toores": "Raw",
+    "Töös": "In Progress",
+    "Parandatud": "Corrected",
+    "Annoteeritud": "Annotated",
+    "Valmis": "Done"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "editor": "Editor",
+    "viewer": "Viewer"
+  },
+  "labels": {
+    "page": "Page",
+    "pages": "pages",
+    "year": "Year",
+    "author": "Author",
+    "respondens": "Respondent",
+    "title": "Title",
+    "printer": "Printer",
+    "place": "Place",
+    "genre": "Genre",
+    "tags": "Tags",
+    "loading": "Loading..."
+  },
+  "errors": {
+    "connectionFailed": "Failed to connect to server",
+    "unknownError": "Unknown error",
+    "loginFailed": "Login failed"
+  },
+  "language": {
+    "switchTo": "Switch language to {{lang}}",
+    "et": "Eesti",
+    "en": "English"
+  },
+  "confirmation": {
+    "title": "Confirmation"
+  }
+}

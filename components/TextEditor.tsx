@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags, getWorkFullText } from '../services/meiliService';
@@ -37,6 +38,7 @@ type TabType = 'edit' | 'annotate' | 'history';
 type ViewMode = 'edit' | 'read';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false }) => {
+  const { t } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('edit');
@@ -483,19 +485,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               onClick={() => setActiveTab('edit')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'edit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              TEKST
+              {t('tabs.edit').toUpperCase()}
             </button>
             <button
               onClick={() => setActiveTab('annotate')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'annotate' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              INFO JA ANNOTATSIOONID
+              {t('tabs.info').toUpperCase()}
             </button>
             <button
               onClick={() => setActiveTab('history')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              AJALUGU
+              {t('tabs.history').toUpperCase()}
             </button>
           </div>
 

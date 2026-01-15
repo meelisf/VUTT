@@ -1,0 +1,27 @@
+{
+  "header": {
+    "title": "Projekti Statistika",
+    "backToHome": "Tagasi avalehele"
+  },
+  "kpi": {
+    "totalVolume": "Kogumaht",
+    "readiness": "Valmisolek",
+    "bestDay": "Nädala parim päev",
+    "pages": "lk"
+  },
+  "charts": {
+    "pageStatus": "Lehekülgede staatus",
+    "weeklyActivity": "Nädala aktiivsus",
+    "processedByDay": "Töödeldud lehekülgi päevade lõikes"
+  },
+  "days": {
+    "mon": "E",
+    "tue": "T",
+    "wed": "K",
+    "thu": "N",
+    "fri": "R",
+    "sat": "L",
+    "sun": "P",
+    "thursday": "Neljapäev"
+  }
+}

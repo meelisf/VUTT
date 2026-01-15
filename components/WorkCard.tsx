@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User, Tag } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -8,6 +9,7 @@ interface WorkCardProps {
 }
 
 const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
+  const { t } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -56,7 +58,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
                     navigate(`/search?teoseTags=${encodeURIComponent(tag)}`);
                   }}
                   className="text-[10px] font-bold text-white bg-slate-900/40 hover:bg-green-700/50 px-2 py-0.5 rounded border border-gray-500/30 backdrop-blur-sm transition-colors uppercase tracking-wider"
-                  title={`Otsi žanrit: ${tag}`}
+                  title={t('workCard.searchGenre', { genre: tag })}
                 >
                   {tag.toLowerCase()}
                 </button>
@@ -88,7 +90,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
               navigate(`/?author=${encodeURIComponent(work.author)}`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
-            title="Filtreeri autori järgi"
+            title={t('workCard.filterByAuthor')}
           >
             <User size={14} />
             <span className="truncate">
@@ -103,14 +105,14 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
               navigate(`/?ys=${work.year}&ye=${work.year}`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
-            title="Filtreeri aasta järgi"
+            title={t('workCard.filterByYear')}
           >
             <Calendar size={14} />
             <span>{work.year}</span>
           </button>
           <div className="flex items-center gap-2">
             <BookOpen size={14} />
-            <span>{work.page_count} lk</span>
+            <span>{work.page_count} {t('common:labels.pages')}</span>
           </div>
         </div>
 
@@ -121,16 +123,16 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
               navigate(`/?status=${encodeURIComponent(workStatus)}`);
             }}
             className={`text-xs font-medium px-2 py-1 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 transition-all ${getStatusStyle(workStatus)}`}
-            title={`Filtreeri staatuse "${workStatus}" järgi`}
+            title={t('workCard.filterByStatus', { status: t(`common:status.${workStatus}`) })}
           >
-            {workStatus}
+            {t(`common:status.${workStatus}`)}
           </button>
           <a
             href={`/work/${work.id}/1`}
             onClick={handleOpenWorkspace}
             className="text-sm font-medium text-primary-600 hover:text-primary-800 cursor-pointer"
           >
-            Ava töölaud &rarr;
+            {t('workCard.openWorkspace')} &rarr;
           </a>
         </div>
       </div >

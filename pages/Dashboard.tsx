@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { searchWorks, getTeoseTagsFacets } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -11,6 +13,7 @@ const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 
 const Dashboard: React.FC = () => {
+  const { t } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, logout, isLoading: userLoading } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -249,8 +252,8 @@ const Dashboard: React.FC = () => {
           <Link to="/" className="hover:opacity-80 transition-opacity flex items-center gap-3">
             <img src="/logo.png" alt="VUTT Logo" className="h-10 w-auto" />
             <div>
-              <h1 className="text-2xl font-bold text-primary-900 tracking-tight leading-none">VUTT</h1>
-              <p className="text-xs text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">Varauusaegsete tekstide töölaud</p>
+              <h1 className="text-2xl font-bold text-primary-900 tracking-tight leading-none">{t('common:app.name')}</h1>
+              <p className="text-xs text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">{t('common:app.subtitle')}</p>
             </div>
           </Link>
           <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
@@ -259,15 +262,16 @@ const Dashboard: React.FC = () => {
             className="hidden sm:flex items-center gap-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
           >
             <Search size={18} />
-            Täisteksti otsing
+            {t('header.fullTextSearch')}
           </Link>
         </div>
         <div className="flex items-center gap-4">
+          <LanguageSwitcher />
           {user ? (
             <>
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.role === 'admin' ? 'Administraator' : 'Kasutaja'}</p>
+                <p className="text-xs text-gray-500">{user.role === 'admin' ? t('common:roles.admin') : t('auth:user.role')}</p>
               </div>
               <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
                 {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -275,7 +279,7 @@ const Dashboard: React.FC = () => {
               <button
                 onClick={logout}
                 className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
-                title="Logi välja"
+                title={t('auth:login.logout')}
               >
                 <LogOut size={18} />
               </button>
@@ -286,7 +290,7 @@ const Dashboard: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium text-sm transition-colors"
             >
               <LogIn size={18} />
-              Logi sisse
+              {t('auth:login.title')}
             </button>
           )}
         </div>
@@ -306,11 +310,10 @@ const Dashboard: React.FC = () => {
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r shadow-sm flex items-start gap-3">
               <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
               <div>
-                <h3 className="font-bold text-red-800">Ühenduse viga</h3>
+                <h3 className="font-bold text-red-800">{t('error.connectionError')}</h3>
                 <p className="text-sm text-red-700 mt-1">{error}</p>
                 <p className="text-xs text-red-600 mt-2">
-                  Kui kasutad eelvaadet HTTPS-iga, aga server on HTTP (172.x.x.x), siis brauser blokeerib selle.
-                  Proovi avada rakendus lokaalselt või HTTP kaudu.
+                  {t('error.httpsWarning')}
                 </p>
               </div>
             </div>
@@ -324,7 +327,7 @@ const Dashboard: React.FC = () => {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
                   type="text"
-                  placeholder="Otsi teost pealkirja või autori järgi..."
+                  placeholder={t('search.placeholder')}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-shadow text-lg"
@@ -335,7 +338,7 @@ const Dashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                 {/* Year Filter */}
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">Ajavahemik:</span>
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -369,7 +372,7 @@ const Dashboard: React.FC = () => {
                         setSearchParams(newParams);
                       }}
                       className="ml-1 hover:bg-primary-100 rounded p-0.5"
-                      title="Eemalda autori filter"
+                      title={t('search.removeAuthorFilter')}
                     >
                       <X size={12} />
                     </button>
@@ -389,7 +392,7 @@ const Dashboard: React.FC = () => {
                         setSearchParams(newParams);
                       }}
                       className="ml-1 hover:bg-indigo-100 rounded p-0.5"
-                      title="Eemalda respondendi filter"
+                      title={t('search.removeRespondensFilter')}
                     >
                       <X size={12} />
                     </button>
@@ -408,7 +411,7 @@ const Dashboard: React.FC = () => {
                         setSearchParams(newParams);
                       }}
                       className="ml-1 hover:bg-amber-100 rounded p-0.5"
-                      title="Eemalda trükkali filter"
+                      title={t('search.removePrinterFilter')}
                     >
                       <X size={12} />
                     </button>
@@ -421,7 +424,7 @@ const Dashboard: React.FC = () => {
                     statusParam === 'Töös' ? 'bg-amber-50 text-amber-700' :
                       'bg-gray-100 text-gray-700'
                     }`}>
-                    <span>{statusParam}</span>
+                    <span>{t(`common:status.${statusParam}`)}</span>
                     <button
                       onClick={() => {
                         const newParams = new URLSearchParams(searchParams);
@@ -429,7 +432,7 @@ const Dashboard: React.FC = () => {
                         setSearchParams(newParams);
                       }}
                       className="ml-1 hover:bg-white/50 rounded p-0.5"
-                      title="Eemalda staatuse filter"
+                      title={t('search.removeStatusFilter')}
                     >
                       <X size={12} />
                     </button>
@@ -448,10 +451,10 @@ const Dashboard: React.FC = () => {
                       setSearchParams({});
                     }}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
-                    title="Tühista kõik filtrid"
+                    title={t('search.clearAll')}
                   >
                     <X size={14} />
-                    Tühista
+                    {t('common:buttons.cancel')}
                   </button>
                 )}
 
@@ -465,11 +468,11 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setSort(e.target.value)}
                     className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-transparent cursor-pointer hover:bg-gray-50"
                   >
-                    {queryParam && <option value="relevance">Relevantsus</option>}
-                    <option value="year_asc">Aasta (kasvav)</option>
-                    <option value="year_desc">Aasta (kahanev)</option>
-                    <option value="az">A-Z (Pealkiri)</option>
-                    <option value="recent">Viimati muudetud</option>
+                    {queryParam && <option value="relevance">{t('sort.relevance')}</option>}
+                    <option value="year_asc">{t('sort.yearAsc')}</option>
+                    <option value="year_desc">{t('sort.yearDesc')}</option>
+                    <option value="az">{t('sort.az')}</option>
+                    <option value="recent">{t('sort.recent')}</option>
                   </select>
                 </div>
               </div>
@@ -479,7 +482,7 @@ const Dashboard: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2 bg-white/50 p-2 rounded-lg">
                   <span className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
                     <Tag size={12} />
-                    Žanr:
+                    {t('search.genre')}
                   </span>
                   {availableTags.map(({ tag, count }) => {
                     const isSelected = selectedTags.includes(tag);
@@ -549,9 +552,9 @@ const Dashboard: React.FC = () => {
               return (
                 <>
                   <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
-                    <h2 className="text-xl font-bold text-gray-800">Raamaturiiul</h2>
+                    <h2 className="text-xl font-bold text-gray-800">{t('results.bookshelf')}</h2>
                     <span className="text-sm text-gray-500">
-                      {works.length} teost {statusParam && 'filtreeritud'} {totalPages > 1 && `• Lk ${currentPage}/${totalPages}`}
+                      {t('results.worksCount', { count: works.length })} {statusParam && t('results.filtered')} {totalPages > 1 && `• ${t('results.pageOf', { current: currentPage, total: totalPages })}`}
                     </span>
                   </div>
 
@@ -559,7 +562,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex justify-center py-20">
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
-                        <span className="text-gray-400 text-sm">Laen riiulit...</span>
+                        <span className="text-gray-400 text-sm">{t('results.loadingShelf')}</span>
                       </div>
                     </div>
                   ) : works.length > 0 ? (
@@ -579,7 +582,7 @@ const Dashboard: React.FC = () => {
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             <ChevronLeft size={18} />
-                            Eelmine
+                            {t('common:buttons.previous')}
                           </button>
 
                           <div className="flex items-center gap-1 mx-2">
@@ -606,7 +609,7 @@ const Dashboard: React.FC = () => {
                             disabled={currentPage === totalPages}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            Järgmine
+                            {t('common:buttons.next')}
                             <ChevronRight size={18} />
                           </button>
                         </div>
@@ -614,10 +617,10 @@ const Dashboard: React.FC = () => {
                     </>
                   ) : (
                     <div className="text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
-                      <p className="text-gray-400 text-lg">Valitud kriteeriumitele vastavaid teoseid ei leitud.</p>
+                      <p className="text-gray-400 text-lg">{t('results.noResults')}</p>
                       {!error && (
                         <div className="mt-2 text-sm text-gray-400">
-                          Kontrolli, kas Meilisearchis on andmeid ja kas aastaarvud on õiged.
+                          {t('results.checkData')}
                         </div>
                       )}
                       <button
@@ -630,7 +633,7 @@ const Dashboard: React.FC = () => {
                         }}
                         className="mt-4 text-primary-600 font-medium hover:underline"
                       >
-                        Taasta vaikeseaded
+                        {t('results.restoreDefaults')}
                       </button>
                     </div>
                   )}
@@ -649,7 +652,7 @@ const Dashboard: React.FC = () => {
               onClick={() => setShowAboutModal(true)}
               className="hover:text-primary-600 transition-colors"
             >
-              Projektist
+              {t('footer.aboutProject')}
             </button>
             <span className="text-gray-300">|</span>
             <a
@@ -658,11 +661,11 @@ const Dashboard: React.FC = () => {
               rel="noopener noreferrer"
               className="hover:text-primary-600 transition-colors"
             >
-              TÜ Raamatukogu
+              {t('footer.library')}
             </a>
           </div>
           <div className="text-gray-400 text-xs">
-            © 2025 Tartu Ülikool
+            {t('footer.copyright')}
           </div>
         </div>
       </footer>
@@ -679,7 +682,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div
               className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-              dangerouslySetInnerHTML={{ __html: aboutHtml || '<p>Laadimine...</p>' }}
+              dangerouslySetInnerHTML={{ __html: aboutHtml || `<p>${t('common:labels.loading')}</p>` }}
             />
           </div>
         </div>

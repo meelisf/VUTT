@@ -1,0 +1,27 @@
+{
+  "header": {
+    "title": "Project Statistics",
+    "backToHome": "Back to home"
+  },
+  "kpi": {
+    "totalVolume": "Total volume",
+    "readiness": "Readiness",
+    "bestDay": "Best day of the week",
+    "pages": "pages"
+  },
+  "charts": {
+    "pageStatus": "Page status",
+    "weeklyActivity": "Weekly activity",
+    "processedByDay": "Processed pages by day"
+  },
+  "days": {
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "sat": "Sat",
+    "sun": "Sun",
+    "thursday": "Thursday"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "header": {
+    "fullTextSearch": "Täisteksti otsing"
+  },
+  "search": {
+    "placeholder": "Otsi teost pealkirja või autori järgi...",
+    "timeRange": "Ajavahemik:",
+    "genre": "Žanr:",
+    "removeAuthorFilter": "Eemalda autori filter",
+    "removeRespondensFilter": "Eemalda respondendi filter",
+    "removePrinterFilter": "Eemalda trükkali filter",
+    "removeStatusFilter": "Eemalda staatuse filter",
+    "clearAll": "Tühista kõik filtrid"
+  },
+  "sort": {
+    "relevance": "Relevantsus",
+    "yearAsc": "Aasta (kasvav)",
+    "yearDesc": "Aasta (kahanev)",
+    "az": "A-Z (Pealkiri)",
+    "recent": "Viimati muudetud"
+  },
+  "results": {
+    "bookshelf": "Raamaturiiul",
+    "worksCount": "{{count}} teost",
+    "filtered": "filtreeritud",
+    "pageOf": "Lk {{current}}/{{total}}",
+    "noResults": "Valitud kriteeriumitele vastavaid teoseid ei leitud.",
+    "checkData": "Kontrolli, kas Meilisearchis on andmeid ja kas aastaarvud on õiged.",
+    "restoreDefaults": "Taasta vaikeseaded",
+    "loadingShelf": "Laen riiulit..."
+  },
+  "error": {
+    "connectionError": "Ühenduse viga",
+    "httpsWarning": "Kui kasutad eelvaadet HTTPS-iga, aga server on HTTP (172.x.x.x), siis brauser blokeerib selle. Proovi avada rakendus lokaalselt või HTTP kaudu."
+  },
+  "footer": {
+    "aboutProject": "Projektist",
+    "library": "TÜ Raamatukogu",
+    "copyright": "© 2025 Tartu Ülikool"
+  },
+  "workCard": {
+    "filterByAuthor": "Filtreeri autori järgi",
+    "filterByYear": "Filtreeri aasta järgi",
+    "filterByStatus": "Filtreeri staatuse \"{{status}}\" järgi",
+    "searchGenre": "Otsi žanrit: {{genre}}",
+    "openWorkspace": "Ava töölaud"
+  }
+}

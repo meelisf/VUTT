@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -14,14 +15,20 @@ interface ConfirmModalProps {
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
-  title = 'Kinnitus',
+  title,
   message,
-  confirmText = 'Jah',
-  cancelText = 'Ei',
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
   variant = 'warning'
 }) => {
+  const { t } = useTranslation('common');
+
+  const resolvedTitle = title ?? t('confirmation.title');
+  const resolvedConfirmText = confirmText ?? t('buttons.confirm');
+  const resolvedCancelText = cancelText ?? t('buttons.deny');
+
   if (!isOpen) return null;
 
   const confirmButtonClass = variant === 'danger'
@@ -36,7 +43,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <div className="p-2 bg-amber-100 rounded-full">
             <AlertTriangle className="text-amber-600" size={24} />
           </div>
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{resolvedTitle}</h2>
         </div>
 
         {/* Content */}
@@ -51,14 +58,14 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             onClick={onCancel}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
           >
-            {cancelText}
+            {resolvedCancelText}
           </button>
           <button
             type="button"
             onClick={onConfirm}
             className={`px-4 py-2 rounded-lg font-medium transition-colors ${confirmButtonClass}`}
           >
-            {confirmText}
+            {resolvedConfirmText}
           </button>
         </div>
       </div>

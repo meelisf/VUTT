@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUser } from '../contexts/UserContext';
 import { LogIn, Loader2, AlertCircle } from 'lucide-react';
 
@@ -9,6 +10,7 @@ interface LoginModalProps {
 }
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = true }) => {
+  const { t } = useTranslation(['auth', 'common']);
   const { login } = useUser();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -23,15 +25,15 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
     setIsLoading(true);
 
     const result = await login(username, password);
-    
+
     setIsLoading(false);
-    
+
     if (result.success) {
       setUsername('');
       setPassword('');
       onClose?.();
     } else {
-      setError(result.error || 'Sisselogimine ebaõnnestus');
+      setError(result.error || t('common:errors.loginFailed'));
     }
   };
 
@@ -42,9 +44,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
         <div className="bg-primary-600 px-6 py-4">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <LogIn size={24} />
-            Logi sisse
+            {t('login.title')}
           </h2>
-          <p className="text-primary-100 text-sm mt-1">VUTT - Varauusaegsete tekstide töölaud</p>
+          <p className="text-primary-100 text-sm mt-1">{t('common:app.name')} - {t('common:app.subtitle')}</p>
         </div>
 
         {/* Form */}
@@ -58,7 +60,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
 
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-              Kasutajanimi
+              {t('login.username')}
             </label>
             <input
               type="text"
@@ -66,7 +68,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-primary-500 outline-none transition-shadow"
-              placeholder="Sisesta kasutajanimi"
+              placeholder={t('login.usernamePlaceholder')}
               required
               autoFocus
             />
@@ -74,7 +76,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Parool
+              {t('login.password')}
             </label>
             <input
               type="password"
@@ -82,7 +84,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-primary-500 outline-none transition-shadow"
-              placeholder="Sisesta parool"
+              placeholder={t('login.passwordPlaceholder')}
               required
             />
           </div>
@@ -94,7 +96,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
                 onClick={onClose}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
               >
-                Tühista
+                {t('common:buttons.cancel')}
               </button>
             )}
             <button
@@ -105,12 +107,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
               {isLoading ? (
                 <>
                   <Loader2 className="animate-spin" size={18} />
-                  Laadin...
+                  {t('login.loading')}
                 </>
               ) : (
                 <>
                   <LogIn size={18} />
-                  Logi sisse
+                  {t('login.submit')}
                 </>
               )}
             </button>

@@ -1,0 +1,48 @@
+{
+  "header": {
+    "fullTextSearch": "Full-text search"
+  },
+  "search": {
+    "placeholder": "Search works by title or author...",
+    "timeRange": "Time range:",
+    "genre": "Genre:",
+    "removeAuthorFilter": "Remove author filter",
+    "removeRespondensFilter": "Remove respondent filter",
+    "removePrinterFilter": "Remove printer filter",
+    "removeStatusFilter": "Remove status filter",
+    "clearAll": "Clear all filters"
+  },
+  "sort": {
+    "relevance": "Relevance",
+    "yearAsc": "Year (ascending)",
+    "yearDesc": "Year (descending)",
+    "az": "A-Z (Title)",
+    "recent": "Recently modified"
+  },
+  "results": {
+    "bookshelf": "Bookshelf",
+    "worksCount": "{{count}} works",
+    "filtered": "filtered",
+    "pageOf": "Page {{current}}/{{total}}",
+    "noResults": "No works found matching the selected criteria.",
+    "checkData": "Check if Meilisearch has data and if the year range is correct.",
+    "restoreDefaults": "Restore defaults",
+    "loadingShelf": "Loading bookshelf..."
+  },
+  "error": {
+    "connectionError": "Connection error",
+    "httpsWarning": "If you're using HTTPS preview but the server is HTTP (172.x.x.x), the browser will block it. Try opening the app locally or via HTTP."
+  },
+  "footer": {
+    "aboutProject": "About the project",
+    "library": "UT Library",
+    "copyright": "© 2025 University of Tartu"
+  },
+  "workCard": {
+    "filterByAuthor": "Filter by author",
+    "filterByYear": "Filter by year",
+    "filterByStatus": "Filter by status \"{{status}}\"",
+    "searchGenre": "Search genre: {{genre}}",
+    "openWorkspace": "Open workspace"
+  }
+}

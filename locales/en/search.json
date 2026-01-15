@@ -1,0 +1,63 @@
+{
+  "header": {
+    "title": "Search",
+    "home": "Home"
+  },
+  "form": {
+    "searchPlaceholder": "Enter search term (searches text, comments and tags)...",
+    "search": "Search"
+  },
+  "filters": {
+    "title": "Filters",
+    "close": "Close",
+    "scope": "Search scope",
+    "scopeAll": "Entire document",
+    "scopeOriginal": "Original text only",
+    "scopeAnnotation": "Annotations only",
+    "genre": "Genre",
+    "timeRange": "Time period",
+    "from": "From",
+    "until": "Until",
+    "work": "Work",
+    "allWorks": "All works",
+    "applyFilters": "Apply filters",
+    "clearFilters": "Clear filters"
+  },
+  "status": {
+    "searching": "Searching for results...",
+    "noResults": "No results found for your search.",
+    "tryDifferent": "Try different keywords or expand the filters.",
+    "foundMatchesInWork": "Found <strong>{{count}}</strong> matches in work:",
+    "titleMissing": "Title missing",
+    "unknown": "Unknown",
+    "foundInWorks": "Found <strong>{{hits}}</strong> matches in <strong>{{works}}</strong> different works.",
+    "foundWorks": "Found <strong>{{count}}</strong> works.",
+    "enterSearchTerm": "Enter a search term.",
+    "searchesContent": "Searches text content, comments and tags.",
+    "connectionError": "Error connecting to database."
+  },
+  "results": {
+    "page": "Page",
+    "pageOf": "Page {{current}} / {{total}}",
+    "openWorkspace": "Open workspace →",
+    "openWorkspaceTitle": "Open workspace",
+    "comment": "Comment ({{author}})",
+    "searchAuthorWorks": "Search this author's works",
+    "searchYearWorks": "Search works from this year",
+    "loadingResults": "Loading results...",
+    "foundMatchesInThisWork": "Found {{count}} matches in this work",
+    "hideMore": "Hide additional matches",
+    "showMore": "Show {{count}} more matches",
+    "showMoreTotal": "Show {{count}} more matches ({{total}} total)",
+    "searchInWork": "Search in this work"
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "labels": {
+    "author": "Author:",
+    "year": "Year:",
+    "id": "ID:"
+  }
+}

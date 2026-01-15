@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-VUTT (Varauusaegsete Tekstide Töölaud) is an Estonian early modern text transcription workbench. It's a React/TypeScript SPA for viewing scanned historical documents and editing their OCR-transcribed text. **The UI and code comments are in Estonian.**
+VUTT (Varauusaegsete Tekstide Töölaud) is an Estonian early modern text transcription workbench. It's a React/TypeScript SPA for viewing scanned historical documents and editing their OCR-transcribed text. **The UI supports Estonian and English; code comments are in Estonian.**
 
 **Development workflow**: Development happens on a local laptop. For testing, code is manually copied to the server.
 
@@ -124,6 +124,28 @@ The text viewer uses a stateful parser for 1:1 line alignment with line numbers:
 - Max 10 timestamped backups per file
 - Admin restores via "Ajalugu" tab (loads into editor, must save to persist)
 
+### Internationalization (i18n)
+Uses `react-i18next` with translations bundled directly (no HTTP backend).
+
+**Files:**
+- `i18n.ts` - Configuration, imports all translation JSONs
+- `components/LanguageSwitcher.tsx` - Toggle button (Lucide Languages icon + language name)
+- `locales/{et,en}/*.json` - Translation files by namespace
+
+**Namespaces:** `common`, `auth`, `dashboard`, `workspace`, `search`, `statistics`
+
+**Usage pattern:**
+```tsx
+const { t } = useTranslation(['workspace', 'common']);
+// Use: t('tabs.edit'), t('common:status.Valmis')
+```
+
+**Key details:**
+- Default language: Estonian (`et`)
+- Language stored in `localStorage` key `vutt_language`
+- Status enum values stay in Estonian (DB keys), translated at display: `t('common:status.${status}')`
+- LanguageSwitcher placed consistently in top-right corner of all pages
+
 ### Genre Tags (teose_tags)
 Source: `_metadata.json` in each work folder (auto-created if missing, with tags derived from title).
 Auto-detection: `Disputatio...` → `disputatsioon`, `Oratio...` → `oratsioon`, etc.
@@ -167,6 +189,11 @@ Edit `users.json` with SHA-256 hashed password:
   }
 }
 ```
+
+### Adding translations
+1. Add keys to both `locales/et/{namespace}.json` and `locales/en/{namespace}.json`
+2. Use `t('key')` or `t('namespace:key')` in component
+3. For interpolation: `t('greeting', { name: 'John' })` with `"greeting": "Hello {{name}}"`
 
 ### Hyphenation in search
 - `-` and `⸗` work for cross-line search

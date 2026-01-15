@@ -1,0 +1,63 @@
+{
+  "header": {
+    "title": "Otsing",
+    "home": "Avaleht"
+  },
+  "form": {
+    "searchPlaceholder": "Sisesta otsisõna (otsib tekstist, kommentaaridest ja märksõnadest)...",
+    "search": "Otsi"
+  },
+  "filters": {
+    "title": "Filtrid",
+    "close": "Sulge",
+    "scope": "Otsingu ulatus",
+    "scopeAll": "Terve dokument",
+    "scopeOriginal": "Ainult originaaltekst",
+    "scopeAnnotation": "Ainult annotatsioonid",
+    "genre": "Žanr",
+    "timeRange": "Ajavahemik",
+    "from": "Alates",
+    "until": "Kuni",
+    "work": "Teos",
+    "allWorks": "Kõik teosed",
+    "applyFilters": "Rakenda filtrid",
+    "clearFilters": "Tühjenda filtrid"
+  },
+  "status": {
+    "searching": "Otsin vastuseid...",
+    "noResults": "Otsingule ei leitud ühtegi vastet.",
+    "tryDifferent": "Proovi teisi märksõnu või laienda filtreid.",
+    "foundMatchesInWork": "Leiti <strong>{{count}}</strong> vastet teosest:",
+    "titleMissing": "Pealkiri puudub",
+    "unknown": "Teadmata",
+    "foundInWorks": "Leiti <strong>{{hits}}</strong> vastet <strong>{{works}}</strong> erinevast teosest.",
+    "foundWorks": "Leiti <strong>{{count}}</strong> teost.",
+    "enterSearchTerm": "Sisesta otsisõna.",
+    "searchesContent": "Otsib teksti sisust, kommentaaridest ja märksõnadest.",
+    "connectionError": "Viga andmebaasiga ühendamisel."
+  },
+  "results": {
+    "page": "Lk",
+    "pageOf": "Lk {{current}} / {{total}}",
+    "openWorkspace": "Ava töölaud →",
+    "openWorkspaceTitle": "Ava töölaud",
+    "comment": "Kommentaar ({{author}})",
+    "searchAuthorWorks": "Otsi selle autori teoseid",
+    "searchYearWorks": "Otsi selle aasta teoseid",
+    "loadingResults": "Laadin tulemusi...",
+    "foundMatchesInThisWork": "Sellest teosest leiti {{count}} vastet",
+    "hideMore": "Peida lisavasted",
+    "showMore": "Näita veel {{count}} vastet",
+    "showMoreTotal": "Näita veel {{count}} vastet ({{total}} kokku)",
+    "searchInWork": "Otsi sellest teosest"
+  },
+  "pagination": {
+    "previous": "Eelmine",
+    "next": "Järgmine"
+  },
+  "labels": {
+    "author": "Autor:",
+    "year": "Aasta:",
+    "id": "ID:"
+  }
+}

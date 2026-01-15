@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
 import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 // Abifunktsioon pildi URL-i ehitamiseks
 const getImageUrl = (imagePath: string): string => {
@@ -14,6 +16,7 @@ const getImageUrl = (imagePath: string): string => {
 };
 
 const SearchPage: React.FC = () => {
+    const { t } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -153,7 +156,7 @@ const SearchPage: React.FC = () => {
             }
         } catch (e: any) {
             console.error(e);
-            setError(e.message || "Viga andmebaasiga ühendamisel.");
+            setError(e.message || t('status.connectionError'));
         } finally {
             setLoading(false);
         }
@@ -258,14 +261,14 @@ const SearchPage: React.FC = () => {
                 {/* Header rida: lk nr + vastete arv + töölaud link */}
                 <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs font-mono text-gray-500">
-                        Lk {hit.lehekylje_number}
+                        {t('results.page')} {hit.lehekylje_number}
                     </span>
                     <span className="text-gray-300">|</span>
                     <button
                         onClick={navigateToWorkspace}
                         className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline"
                     >
-                        Ava töölaud →
+                        {t('results.openWorkspace')}
                     </button>
                 </div>
 
@@ -304,7 +307,7 @@ const SearchPage: React.FC = () => {
                                     <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-yellow-800">
                                             <MessageSquare size={12} />
-                                            <span>Kommentaar ({comment.author})</span>
+                                            <span>{t('results.comment', { author: comment.author })}</span>
                                         </div>
                                         <div dangerouslySetInnerHTML={{ __html: comment.text }} />
                                     </div>
@@ -318,7 +321,7 @@ const SearchPage: React.FC = () => {
                         <button
                             onClick={navigateToWorkspace}
                             className="shrink-0 w-20 h-28 bg-gray-100 rounded overflow-hidden hidden sm:block hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer self-start"
-                            title="Ava töölaud"
+                            title={t('results.openWorkspaceTitle')}
                         >
                             <img
                                 src={getImageUrl(hit.lehekylje_pilt)}
@@ -344,27 +347,31 @@ const SearchPage: React.FC = () => {
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
             {/* Header */}
-            <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm z-20 shrink-0">
-                <div className="max-w-7xl mx-auto flex flex-col gap-4">
+            <header className="bg-white border-b border-gray-200 shadow-sm z-20 shrink-0">
+                {/* Ülemine riba - nav + keelevahetaja */}
+                <div className="px-6 py-3 flex items-center justify-between border-b border-gray-100">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => navigate('/')}
                             className="p-2 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
-                            title="Avaleht"
+                            title={t('header.home')}
                         >
                             <Home size={18} />
                             <span className="font-bold text-gray-800 tracking-tight">VUTT</span>
                         </button>
                         <div className="h-6 w-px bg-gray-300"></div>
-                        <h1 className="text-xl font-bold text-primary-900 leading-none">Otsing</h1>
+                        <h1 className="text-xl font-bold text-primary-900 leading-none">{t('header.title')}</h1>
                     </div>
-
+                    <LanguageSwitcher />
+                </div>
+                {/* Otsingu vorm */}
+                <div className="max-w-7xl mx-auto px-6 py-4">
                     <form onSubmit={handleSearch} className="flex gap-2 relative">
                         <div className="relative flex-1">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                             <input
                                 type="search"
-                                placeholder="Sisesta otsisõna (otsib tekstist, kommentaaridest ja märksõnadest)..."
+                                placeholder={t('form.searchPlaceholder')}
                                 value={inputValue}
                                 onChange={(e) => setInputValue(e.target.value)}
                                 className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none text-lg"
@@ -375,7 +382,7 @@ const SearchPage: React.FC = () => {
                             type="submit"
                             className="bg-primary-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-primary-700 transition-colors shadow-sm"
                         >
-                            Otsi
+                            {t('form.search')}
                         </button>
                         <button
                             type="button"
@@ -396,8 +403,8 @@ const SearchPage: React.FC = () => {
             ${showFiltersMobile ? 'absolute inset-0 z-30 flex flex-col' : 'hidden'}
           `}>
                     <div className="flex justify-between items-center mb-6 md:hidden">
-                        <h3 className="font-bold text-lg">Filtrid</h3>
-                        <button onClick={() => setShowFiltersMobile(false)}>Sulge</button>
+                        <h3 className="font-bold text-lg">{t('filters.title')}</h3>
+                        <button onClick={() => setShowFiltersMobile(false)}>{t('filters.close')}</button>
                     </div>
 
                     <div className="space-y-6">
@@ -405,7 +412,7 @@ const SearchPage: React.FC = () => {
                         {/* Search Scope */}
                         <div>
                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Layers size={14} /> Otsingu ulatus
+                                <Layers size={14} /> {t('filters.scope')}
                             </h3>
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
@@ -417,7 +424,7 @@ const SearchPage: React.FC = () => {
                                         onChange={() => setSelectedScope('all')}
                                         className="text-primary-600 focus:ring-primary-500"
                                     />
-                                    <span className="text-sm text-gray-700">Terve dokument</span>
+                                    <span className="text-sm text-gray-700">{t('filters.scopeAll')}</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                     <input
@@ -428,7 +435,7 @@ const SearchPage: React.FC = () => {
                                         onChange={() => setSelectedScope('original')}
                                         className="text-primary-600 focus:ring-primary-500"
                                     />
-                                    <span className="text-sm text-gray-700">Ainult originaaltekst</span>
+                                    <span className="text-sm text-gray-700">{t('filters.scopeOriginal')}</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                     <input
@@ -439,7 +446,7 @@ const SearchPage: React.FC = () => {
                                         onChange={() => setSelectedScope('annotation')}
                                         className="text-primary-600 focus:ring-primary-500"
                                     />
-                                    <span className="text-sm text-gray-700">Ainult annotatsioonid</span>
+                                    <span className="text-sm text-gray-700">{t('filters.scopeAnnotation')}</span>
                                 </label>
                             </div>
                         </div>
@@ -448,7 +455,7 @@ const SearchPage: React.FC = () => {
                         {availableTeoseTags.length > 0 && (
                             <div>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <BookOpen size={14} /> Žanr
+                                    <BookOpen size={14} /> {t('filters.genre')}
                                 </h3>
                                 <div className="space-y-1">
                                     {availableTeoseTags.map(({ tag, count }) => {
@@ -479,11 +486,11 @@ const SearchPage: React.FC = () => {
                         {/* Year Filter */}
                         <div>
                             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Calendar size={14} /> Ajavahemik
+                                <Calendar size={14} /> {t('filters.timeRange')}
                             </h3>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Alates</label>
+                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.from')}</label>
                                     <input
                                         type="number"
                                         value={yearStart}
@@ -492,7 +499,7 @@ const SearchPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Kuni</label>
+                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.until')}</label>
                                     <input
                                         type="number"
                                         value={yearEnd}
@@ -507,7 +514,7 @@ const SearchPage: React.FC = () => {
                         {(availableWorks.length > 0 || selectedWork) && (
                             <div>
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <FileText size={14} /> Teos
+                                    <FileText size={14} /> {t('filters.work')}
                                 </h3>
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                     <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
@@ -522,7 +529,7 @@ const SearchPage: React.FC = () => {
                                             }}
                                             className="text-primary-600 focus:ring-primary-500"
                                         />
-                                        <span className="text-sm text-gray-700">Kõik teosed</span>
+                                        <span className="text-sm text-gray-700">{t('filters.allWorks')}</span>
                                     </label>
 
                                     {availableWorks.map((work) => (
@@ -582,7 +589,7 @@ const SearchPage: React.FC = () => {
                                 onClick={(e) => handleSearch(e)}
                                 className="w-full py-2 bg-gray-900 text-white rounded text-sm font-bold shadow hover:bg-gray-800 transition-colors"
                             >
-                                Rakenda filtrid
+                                {t('filters.applyFilters')}
                             </button>
                             {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0) && (
                                 <button
@@ -605,7 +612,7 @@ const SearchPage: React.FC = () => {
                                     }}
                                     className="w-full py-2 bg-white border border-gray-300 text-gray-600 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
                                 >
-                                    Tühjenda filtrid
+                                    {t('filters.clearFilters')}
                                 </button>
                             )}
                         </div>
@@ -621,7 +628,7 @@ const SearchPage: React.FC = () => {
                     <div className="min-h-[2rem] mb-6 text-sm text-gray-600" aria-live="polite">
                         {loading ? (
                             <div className="flex items-center gap-2 text-primary-600">
-                                <Loader2 className="animate-spin" size={16} /> Otsin vastuseid...
+                                <Loader2 className="animate-spin" size={16} /> {t('status.searching')}
                             </div>
                         ) : error ? (
                             <div className="flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded border border-red-200">
@@ -630,34 +637,32 @@ const SearchPage: React.FC = () => {
                         ) : results ? (
                             results.totalHits === 0 ? (
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 text-center">
-                                    <span className="block text-lg font-medium text-gray-900 mb-1">Otsingule ei leitud ühtegi vastet.</span>
-                                    <span className="text-gray-500">Proovi teisi märksõnu või laienda filtreid.</span>
+                                    <span className="block text-lg font-medium text-gray-900 mb-1">{t('status.noResults')}</span>
+                                    <span className="text-gray-500">{t('status.tryDifferent')}</span>
                                 </div>
                             ) : workIdParam && results.hits.length > 0 ? (
                                 // Teose piires otsing - näita kogu teose info
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                     <div className="flex items-start justify-between gap-4 mb-3">
-                                        <span className="text-sm">
-                                            Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet teosest:
-                                        </span>
+                                        <span className="text-sm" dangerouslySetInnerHTML={{ __html: t('status.foundMatchesInWork', { count: results.totalHits }) }} />
                                         <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded shrink-0">
-                                            Lk {results.page} / {results.totalPages}
+                                            {t('results.pageOf', { current: results.page, total: results.totalPages })}
                                         </span>
                                     </div>
                                     <h2 className="text-base font-bold text-gray-900 leading-snug mb-2">
-                                        {results.hits[0]?.pealkiri || 'Pealkiri puudub'}
+                                        {results.hits[0]?.pealkiri || t('status.titleMissing')}
                                     </h2>
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                         <span>
-                                            <span className="text-gray-400">Autor:</span>{' '}
-                                            <span className="font-medium">{Array.isArray(results.hits[0]?.autor) ? results.hits[0].autor[0] : (results.hits[0]?.autor || 'Teadmata')}</span>
+                                            <span className="text-gray-400">{t('labels.author')}</span>{' '}
+                                            <span className="font-medium">{Array.isArray(results.hits[0]?.autor) ? results.hits[0].autor[0] : (results.hits[0]?.autor || t('status.unknown'))}</span>
                                         </span>
                                         <span>
-                                            <span className="text-gray-400">Aasta:</span>{' '}
+                                            <span className="text-gray-400">{t('labels.year')}</span>{' '}
                                             <span className="font-medium">{results.hits[0]?.aasta || '...'}</span>
                                         </span>
                                         <span>
-                                            <span className="text-gray-400">ID:</span>{' '}
+                                            <span className="text-gray-400">{t('labels.id')}</span>{' '}
                                             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded">{workIdParam}</span>
                                         </span>
                                     </div>
@@ -665,27 +670,21 @@ const SearchPage: React.FC = () => {
                             ) : (
                                 // Tavaline otsing
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                                    <span>
-                                        {queryParam ? (
-                                            <>
-                                                Leiti <strong className="text-gray-900 text-base">{results.totalHits}</strong> vastet <strong className="text-gray-900">{uniqueWorksCount}</strong> erinevast teosest.
-                                            </>
-                                        ) : (
-                                            <>
-                                                Leiti <strong className="text-gray-900 text-base">{uniqueWorksCount}</strong> teost.
-                                            </>
-                                        )}
-                                    </span>
+                                    <span dangerouslySetInnerHTML={{
+                                        __html: queryParam
+                                            ? t('status.foundInWorks', { hits: results.totalHits, works: uniqueWorksCount })
+                                            : t('status.foundWorks', { count: uniqueWorksCount })
+                                    }} />
                                     <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                                        Lk {results.page} / {results.totalPages}
+                                        {t('results.pageOf', { current: results.page, total: results.totalPages })}
                                     </span>
                                 </div>
                             )
                         ) : (
                             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                                 <Search size={48} className="mb-4 opacity-20" />
-                                <p className="text-lg">Sisesta otsisõna.</p>
-                                <p className="text-sm mt-2 opacity-60">Otsib teksti sisust, kommentaaridest ja märksõnadest.</p>
+                                <p className="text-lg">{t('status.enterSearchTerm')}</p>
+                                <p className="text-sm mt-2 opacity-60">{t('status.searchesContent')}</p>
                             </div>
                         )}
                     </div>
@@ -716,7 +715,7 @@ const SearchPage: React.FC = () => {
                                                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
                                                     <div className="flex-1 min-w-0">
                                                         <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
-                                                            {firstHit.pealkiri || 'Pealkiri puudub'}
+                                                            {firstHit.pealkiri || t('status.titleMissing')}
                                                         </h2>
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
                                                             <button
@@ -730,10 +729,10 @@ const SearchPage: React.FC = () => {
                                                                     });
                                                                 }}
                                                                 className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
-                                                                title="Otsi selle autori teoseid"
+                                                                title={t('results.searchAuthorWorks')}
                                                             >
-                                                                <span className="uppercase text-gray-400 text-[10px]">Autor:</span>
-                                                                {Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || 'Teadmata')}
+                                                                <span className="uppercase text-gray-400 text-[10px]">{t('labels.author')}</span>
+                                                                {Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || t('status.unknown'))}
                                                             </button>
                                                             <span className="text-gray-300">❧</span>
                                                             <button
@@ -751,9 +750,9 @@ const SearchPage: React.FC = () => {
                                                                     }
                                                                 }}
                                                                 className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
-                                                                title="Otsi selle aasta teoseid"
+                                                                title={t('results.searchYearWorks')}
                                                             >
-                                                                <span className="uppercase text-gray-400 text-[10px]">Aasta:</span>
+                                                                <span className="uppercase text-gray-400 text-[10px]">{t('labels.year')}</span>
                                                                 {firstHit.aasta || '...'}
                                                             </button>
                                                             <span className="text-gray-300">❧</span>
@@ -785,7 +784,7 @@ const SearchPage: React.FC = () => {
                                                                     {isLoadingHits ? (
                                                                         <div className="flex items-center justify-center gap-2 py-8 text-primary-600">
                                                                             <Loader2 className="animate-spin" size={20} />
-                                                                            <span className="text-sm">Laadin tulemusi...</span>
+                                                                            <span className="text-sm">{t('results.loadingResults')}</span>
                                                                         </div>
                                                                     ) : loadedHits ? (
                                                                         <>
@@ -796,7 +795,7 @@ const SearchPage: React.FC = () => {
                                                                             {showSearchAllLink && (
                                                                                 <div className="py-3 px-4 text-center border-t border-gray-200">
                                                                                     <span className="text-gray-500 text-sm">
-                                                                                        Sellest teosest leiti {hitCount} vastet
+                                                                                        {t('results.foundMatchesInThisWork', { count: hitCount })}
                                                                                     </span>
                                                                                 </div>
                                                                             )}
@@ -809,9 +808,14 @@ const SearchPage: React.FC = () => {
                                                                 className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-primary-700 text-xs font-bold uppercase tracking-wide border-t border-gray-200 flex items-center justify-center gap-2 transition-colors"
                                                             >
                                                                 {isExpanded ? (
-                                                                    <>Peida lisavasted <ChevronUp size={14} /></>
+                                                                    <>{t('results.hideMore')} <ChevronUp size={14} /></>
                                                                 ) : (
-                                                                    <>Näita veel {Math.min(remainingHits, MAX_ACCORDION_HITS - 1)} vastet{remainingHits > MAX_ACCORDION_HITS - 1 ? ` (${remainingHits} kokku)` : ''} <ChevronDown size={14} /></>
+                                                                    <>
+                                                                        {remainingHits > MAX_ACCORDION_HITS - 1
+                                                                            ? t('results.showMoreTotal', { count: Math.min(remainingHits, MAX_ACCORDION_HITS - 1), total: remainingHits })
+                                                                            : t('results.showMore', { count: Math.min(remainingHits, MAX_ACCORDION_HITS - 1) })
+                                                                        } <ChevronDown size={14} />
+                                                                    </>
                                                                 )}
                                                             </button>
                                                         </>
@@ -837,7 +841,7 @@ const SearchPage: React.FC = () => {
                                                         className="inline-flex items-center gap-1.5 text-gray-500 hover:text-primary-700 text-xs font-medium hover:underline"
                                                     >
                                                         <Search size={12} />
-                                                        Otsi sellest teosest
+                                                        {t('results.searchInWork')}
                                                     </button>
                                                 </div>
                                             </article>
@@ -878,7 +882,7 @@ const SearchPage: React.FC = () => {
                                     className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     <ChevronLeft size={18} />
-                                    Eelmine
+                                    {t('pagination.previous')}
                                 </button>
 
                                 <div className="flex items-center gap-1 mx-2">
@@ -905,7 +909,7 @@ const SearchPage: React.FC = () => {
                                     disabled={results.page === results.totalPages}
                                     className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    Järgmine
+                                    {t('pagination.next')}
                                     <ChevronRight size={18} />
                                 </button>
                             </div>

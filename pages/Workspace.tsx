@@ -1,15 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
 import ConfirmModal from '../components/ConfirmModal';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, Edit3, X, Save } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 
 const Workspace: React.FC = () => {
+  const { t } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
@@ -354,7 +357,7 @@ const Workspace: React.FC = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 font-medium">Laen töölauda Meilisearchist...</p>
+          <p className="text-gray-500 font-medium">{t('common:labels.loading')}</p>
         </div>
       </div>
     );
@@ -365,8 +368,8 @@ const Workspace: React.FC = () => {
       <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle size={48} /></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">Midagi läks valesti</h2>
-          <p className="text-gray-600 mb-6">{error || "Tundmatu viga."}</p>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">{t('common:errors.unknownError')}</h2>
+          <p className="text-gray-600 mb-6">{error || t('common:errors.unknownError')}</p>
           <div className="text-xs bg-gray-100 p-2 rounded mb-4 text-left font-mono overflow-auto max-h-32">
             Debug: WorkID: {workId}, Page: {currentPageNum}
           </div>
@@ -374,7 +377,7 @@ const Workspace: React.FC = () => {
             onClick={() => navigate('/')}
             className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
           >
-            Tagasi avalehele
+            {t('navigation.backToDashboard')}
           </button>
         </div>
       </div>
@@ -456,19 +459,19 @@ const Workspace: React.FC = () => {
           <button
             onClick={handleNavigateBack}
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
-            title="Avaleht"
+            title={t('navigation.backToDashboard')}
           >
             <Home size={16} />
-            <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">VUTT</span>
+            <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">{t('common:app.name')}</span>
           </button>
           {/* Otsing */}
           <button
             onClick={handleNavigateToSearch}
             className="p-1.5 hover:bg-primary-50 rounded-md text-primary-600 transition-colors flex items-center gap-1.5 text-sm"
-            title="Otsing"
+            title={t('common:buttons.search')}
           >
             <Search size={16} />
-            <span className="hidden sm:inline">Otsing</span>
+            <span className="hidden sm:inline">{t('common:buttons.search')}</span>
           </button>
           <div className="h-6 w-px bg-gray-300"></div>
           <div className="flex items-center gap-1 text-sm">
@@ -489,7 +492,7 @@ const Workspace: React.FC = () => {
             <ChevronLeft size={20} />
           </button>
           <div className="flex items-center gap-1.5 mx-1">
-            <span className="text-sm font-medium text-gray-600">Lk</span>
+            <span className="text-sm font-medium text-gray-600">{t('navigation.page')}</span>
             <input
               className="w-12 text-center text-sm font-medium border border-gray-300 rounded px-1 py-0.5 focus:ring-2 focus:ring-primary-500 outline-none text-gray-700"
               value={inputPage}
@@ -532,9 +535,10 @@ const Workspace: React.FC = () => {
               }`}
           >
             {Object.values(PageStatus).map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{t(`common:status.${s}`)}</option>
             ))}
           </select>
+          <LanguageSwitcher />
         </div>
       </div>
 
@@ -573,7 +577,7 @@ const Workspace: React.FC = () => {
             <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
                 <Edit3 size={18} className="text-amber-600" />
-                Teose metaandmed
+                {t('metadata.title')}
               </h3>
               <button onClick={() => setIsMetaModalOpen(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={20} />
@@ -582,7 +586,7 @@ const Workspace: React.FC = () => {
             <div className="p-4 space-y-4">
               {/* Pealkiri */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pealkiri</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.workTitle')}</label>
                 <textarea
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
                   rows={3}
@@ -701,7 +705,7 @@ const Workspace: React.FC = () => {
                 onClick={() => setIsMetaModalOpen(false)}
                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
-                Tühista
+                {t('common:buttons.cancel')}
               </button>
               <button
                 onClick={handleSaveMetadata}
@@ -716,13 +720,13 @@ const Workspace: React.FC = () => {
                 {isSavingMeta ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
                 ) : saveMetaStatus === 'success' ? (
-                  <>Valmis!</>
+                  <>{t('metadata.saveSuccess')}</>
                 ) : saveMetaStatus === 'error' ? (
-                  <>Viga!</>
+                  <>{t('metadata.saveError')}</>
                 ) : (
                   <>
                     <Save size={16} />
-                    Salvesta
+                    {t('metadata.save')}
                   </>
                 )}
               </button>
@@ -734,10 +738,8 @@ const Workspace: React.FC = () => {
       {/* Salvestamata muudatuste kinnitusdialoog */}
       <ConfirmModal
         isOpen={showLeaveConfirm}
-        title="Salvestamata muudatused"
-        message="Sul on salvestamata muudatused. Kas soovid kindlasti lahkuda?"
-        confirmText="Lahku"
-        cancelText="Jää lehele"
+        title={t('editor.unsavedChanges')}
+        message={t('confirm.unsavedChanges')}
         onConfirm={handleConfirmLeave}
         onCancel={handleCancelLeave}
         variant="warning"

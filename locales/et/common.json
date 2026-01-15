@@ -1,0 +1,63 @@
+{
+  "app": {
+    "name": "VUTT",
+    "subtitle": "Varauusaegsete tekstide töölaud"
+  },
+  "buttons": {
+    "save": "Salvesta",
+    "cancel": "Tühista",
+    "close": "Sulge",
+    "confirm": "Jah",
+    "deny": "Ei",
+    "back": "Tagasi",
+    "next": "Järgmine",
+    "previous": "Eelmine",
+    "download": "Lae alla",
+    "restore": "Taasta",
+    "refresh": "Värskenda",
+    "apply": "Rakenda",
+    "clear": "Tühjenda",
+    "search": "Otsi",
+    "edit": "Muuda",
+    "delete": "Kustuta",
+    "reset": "Lähtesta"
+  },
+  "status": {
+    "Toores": "Toores",
+    "Töös": "Töös",
+    "Parandatud": "Parandatud",
+    "Annoteeritud": "Annoteeritud",
+    "Valmis": "Valmis"
+  },
+  "roles": {
+    "admin": "Administraator",
+    "editor": "Toimetaja",
+    "viewer": "Vaataja"
+  },
+  "labels": {
+    "page": "Lk",
+    "pages": "lk",
+    "year": "Aasta",
+    "author": "Autor",
+    "respondens": "Respondens",
+    "title": "Pealkiri",
+    "printer": "Trükkal",
+    "place": "Trükikoht",
+    "genre": "Žanr",
+    "tags": "Märksõnad",
+    "loading": "Laadin..."
+  },
+  "errors": {
+    "connectionFailed": "Serveriga ühendamine ebaõnnestus",
+    "unknownError": "Tundmatu viga",
+    "loginFailed": "Sisselogimine ebaõnnestus"
+  },
+  "language": {
+    "switchTo": "Vaheta keeleks {{lang}}",
+    "et": "Eesti",
+    "en": "English"
+  },
+  "confirmation": {
+    "title": "Kinnitus"
+  }
+}

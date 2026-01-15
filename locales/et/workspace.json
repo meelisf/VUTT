@@ -1,0 +1,73 @@
+{
+  "navigation": {
+    "backToDashboard": "Tagasi avalehele",
+    "page": "Lk",
+    "of": "/",
+    "goToPage": "Mine lehele"
+  },
+  "tabs": {
+    "edit": "Muuda",
+    "annotations": "Annotatsioonid",
+    "info": "Info ja annotatsioonid",
+    "history": "Ajalugu"
+  },
+  "editor": {
+    "placeholder": "Tekst puudub...",
+    "unsavedChanges": "Salvestamata muudatused",
+    "saving": "Salvestan...",
+    "saved": "Salvestatud",
+    "saveError": "Salvestamine ebaõnnestus",
+    "save": "Salvesta",
+    "lastModified": "Viimati muudetud",
+    "by": "muutja",
+    "readOnly": "Ainult lugemine",
+    "readOnlyHint": "Logi sisse, et teksti muuta"
+  },
+  "history": {
+    "title": "Varasemate versioonide ajalugu",
+    "original": "Algne OCR",
+    "backup": "Varukoopia",
+    "restore": "Taasta",
+    "restoreConfirm": "Kas oled kindel, et soovid selle versiooni taastada? Praegune tekst asendatakse.",
+    "noBackups": "Varasemaid versioone pole",
+    "loadError": "Ajaloo laadimine ebaõnnestus"
+  },
+  "metadata": {
+    "title": "Metaandmed",
+    "editMetadata": "Muuda metaandmeid",
+    "workTitle": "Pealkiri",
+    "author": "Autor (praeses)",
+    "respondens": "Respondens",
+    "year": "Aasta",
+    "place": "Trükikoht",
+    "printer": "Trükkal",
+    "tags": "Žanrid / Tagid",
+    "tagsHint": "Eraldage komaga",
+    "esterId": "ESTER ID",
+    "externalUrl": "Väline URL",
+    "save": "Salvesta metaandmed",
+    "saving": "Salvestan...",
+    "saveSuccess": "Metaandmed salvestatud",
+    "saveError": "Metaandmete salvestamine ebaõnnestus"
+  },
+  "info": {
+    "workInfo": "Teose info",
+    "pages": "Lehekülgi",
+    "status": "Staatus",
+    "viewInEster": "Vaata ESTERis",
+    "viewExternal": "Vaata välist linki",
+    "filterByAuthor": "Filtreeri autori järgi",
+    "filterByRespondens": "Filtreeri respondendi järgi",
+    "filterByPrinter": "Filtreeri trükkali järgi",
+    "pageAnnotations": "Lehekülje märkmed",
+    "noAnnotations": "Märkmeid pole lisatud",
+    "addAnnotation": "Lisa märge",
+    "annotationPlaceholder": "Kirjuta märge siia..."
+  },
+  "zotero": {
+    "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
+  },
+  "confirm": {
+    "unsavedChanges": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?"
+  }
+}

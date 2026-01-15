@@ -1,0 +1,73 @@
+{
+  "navigation": {
+    "backToDashboard": "Back to home",
+    "page": "Page",
+    "of": "/",
+    "goToPage": "Go to page"
+  },
+  "tabs": {
+    "edit": "Edit",
+    "annotations": "Annotations",
+    "info": "Info & Annotations",
+    "history": "History"
+  },
+  "editor": {
+    "placeholder": "No text...",
+    "unsavedChanges": "Unsaved changes",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveError": "Save failed",
+    "save": "Save",
+    "lastModified": "Last modified",
+    "by": "by",
+    "readOnly": "Read only",
+    "readOnlyHint": "Log in to edit text"
+  },
+  "history": {
+    "title": "Previous versions history",
+    "original": "Original OCR",
+    "backup": "Backup",
+    "restore": "Restore",
+    "restoreConfirm": "Are you sure you want to restore this version? Current text will be replaced.",
+    "noBackups": "No previous versions",
+    "loadError": "Failed to load history"
+  },
+  "metadata": {
+    "title": "Metadata",
+    "editMetadata": "Edit metadata",
+    "workTitle": "Title",
+    "author": "Author (praeses)",
+    "respondens": "Respondent",
+    "year": "Year",
+    "place": "Printing place",
+    "printer": "Printer",
+    "tags": "Genres / Tags",
+    "tagsHint": "Separate with comma",
+    "esterId": "ESTER ID",
+    "externalUrl": "External URL",
+    "save": "Save metadata",
+    "saving": "Saving...",
+    "saveSuccess": "Metadata saved",
+    "saveError": "Failed to save metadata"
+  },
+  "info": {
+    "workInfo": "Work info",
+    "pages": "Pages",
+    "status": "Status",
+    "viewInEster": "View in ESTER",
+    "viewExternal": "View external link",
+    "filterByAuthor": "Filter by author",
+    "filterByRespondens": "Filter by respondent",
+    "filterByPrinter": "Filter by printer",
+    "pageAnnotations": "Page notes",
+    "noAnnotations": "No notes added",
+    "addAnnotation": "Add note",
+    "annotationPlaceholder": "Write a note here..."
+  },
+  "zotero": {
+    "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
+  },
+  "confirm": {
+    "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?"
+  }
+}
