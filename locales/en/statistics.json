@@ -4,24 +4,16 @@
     "backToHome": "Back to home"
   },
   "kpi": {
-    "totalVolume": "Total volume",
+    "totalWorks": "Works",
+    "totalVolume": "Pages",
     "readiness": "Readiness",
-    "bestDay": "Best day of the week",
+    "avgPages": "Average",
+    "perWork": "pg/work",
     "pages": "pages"
   },
   "charts": {
-    "pageStatus": "Page status",
-    "weeklyActivity": "Weekly activity",
-    "processedByDay": "Processed pages by day"
-  },
-  "days": {
-    "mon": "Mon",
-    "tue": "Tue",
-    "wed": "Wed",
-    "thu": "Thu",
-    "fri": "Fri",
-    "sat": "Sat",
-    "sun": "Sun",
-    "thursday": "Thursday"
+    "pageStatus": "Works by status",
+    "byYear": "Pages by year",
+    "pagesByYear": "Page distribution by printing year"
   }
 }

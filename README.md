@@ -56,7 +56,7 @@ Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasu
 │                 │  │                 │  │                 │
 │ - Otsing        │  │ - JPG failid    │  │ - Salvestamine  │
 │ - Metaandmed    │  │ - CORS          │  │ - Autentimine   │
-│ - Indekseerimine│  │                 │  │ - Varukoopiad   │
+│ - Indekseerimine│  │                 │  │ - Git versioonid│
 └─────────────────┘  └─────────────────┘  └─────────────────┘
           │                   │                   │
           └───────────────────┴───────────────────┘
@@ -95,7 +95,7 @@ Multi-line stiilide (nt kaldkiri, mis ulatub üle mitme rea) toetamiseks on kasu
 | CPU | 1 tuum | 2+ tuuma |
 | OS | Ubuntu 20.04+ | Ubuntu 22.04 |
 
-**Märkus:** Praegune andmemaht on ~25 GB (pildid + tekstid). Varukoopiad võivad lisada kuni 10x txt failide mahtu.
+**Märkus:** Praegune andmemaht on ~25 GB (pildid + tekstid). Git versioonihaldus salvestab ainult muudatused (deltad), seega lisakulu on minimaalne.
 
 ## Paigaldamine ja Kasutamine
 
@@ -257,31 +257,71 @@ Serveri seadistamise (sh Nginx, HTTPS ja andmete varundamine) kohta vaata **[dep
 
 **Tootmises:** Rakendus on seadistatud töötama HTTPS-i peal aadressil `https://vutt.utlib.ut.ee`. (Vt [deployment_guide.md](deployment_guide.md)).
 
-## Varukoopiad ja versioonihaldus
+## Versioonihaldus (Git)
 
-### Automaatsed varukoopiad
+### Kuidas töötab
 
-Iga salvestamisega luuakse automaatne varukoopia:
+Rakendus kasutab **Git**-i tekstifailide versioonihalduseks:
+- Iga salvestus loob Git commiti kasutaja nimega
+- Esimene commit iga faili jaoks = **originaal OCR** (alati taastatav)
+- Kogu ajalugu on säilitatud ja jälgitav
+
 ```
-dokument.txt                    # Praegune versioon
-dokument.txt.backup.20241128_143052  # Varukoopia (kuupäev_kellaaeg)
-dokument.txt.backup.20241127_091523  # Vanem varukoopia
+data/04_sorditud_dokumendid/
+├── .git/                    # Git repo (versiooniajalugu)
+├── .gitignore               # Ignoreerib pildid, JSON-id
+├── 1692-6-teos/
+│   └── leht1.txt            # Jälgitav fail
+└── ...
 ```
 
-### Varukoopiate poliitika
-
-- **Max 10 varukoopiat** faili kohta
-- **Originaal on kaitstud** - kõige esimest versiooni ei kustutata kunagi
-- Kui faili pole veel muudetud, näidatakse algset `.txt` faili kui "Originaal (OCR)"
-- Vanemad vaheversioonid kustutatakse automaatselt (v.a originaal)
-
-### Taastamine
+### Taastamine (Admin)
 
 1. Admin logib sisse
 2. Avab dokumendi → "Ajalugu" sakk
-3. Vajutab "Värskenda" varukoopiate nägemiseks
-4. Valib versiooni → "Taasta"
-5. Tekst laetakse editorisse → **vajuta "Salvesta"** kinnitamiseks
+3. Vajutab "Värskenda" versiooniajaloo nägemiseks
+4. Näeb: kuupäev, autor, commit hash
+5. Valib versiooni → "Taasta"
+6. Tekst laetakse editorisse → **vajuta "Salvesta"** kinnitamiseks
+
+### Failide liigutamine kaustade vahel
+
+Kui on vaja faile ümber tõsta (nt pilt kuulub teise teose juurde):
+
+```bash
+cd ~/data/04_sorditud_dokumendid
+
+# 1. Liiguta failid
+mv vana_kaust/leht5.txt uus_kaust/
+mv vana_kaust/leht5.jpg uus_kaust/
+
+# 2. Registreeri muudatus Gitis
+git add -A
+git commit -m "Liiguta leht5 kausta uus_kaust"
+
+# 3. Uuenda Meilisearch indeks
+python3 scripts/sync_meilisearch.py --apply
+```
+
+**NB:** Git tuvastab faili liikumise automaatselt, kui sisu jääb samaks.
+
+### Käsurea tööriistad
+
+```bash
+cd ~/data/04_sorditud_dokumendid
+
+# Viimased muudatused
+git log --oneline -20
+
+# Kindla faili ajalugu
+git log --oneline -- "1692-6-teos/leht1.txt"
+
+# Vana versiooni vaatamine
+git show abc1234:1692-6-teos/leht1.txt
+
+# Kes mida muutis
+git log --format="%h %an %s" -20
+```
 
 ## Failide struktuur
 

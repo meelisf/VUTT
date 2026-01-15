@@ -1,0 +1,2 @@
+# VUTT Backend dependencies
+GitPython>=3.1.40

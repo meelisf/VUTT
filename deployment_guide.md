@@ -192,7 +192,7 @@ Enne avalikku kasutamist veendu, et kõik punktid on täidetud:
   0 3 * * * rsync -av --delete /opt/vutt/data/ /backup/vutt-data/
   ```
 
-  NB: Rakendus loob automaatselt `.backup.*` faile iga salvestusega (max 10 versiooni + originaal).
+  NB: Rakendus kasutab Git versioonihaldust (iga salvestus = commit). Originaal OCR on esimene commit.
 
 - [ ] **Logide monitooring** - Jälgi kahtlast tegevust
   ```bash
@@ -209,6 +209,60 @@ Enne avalikku kasutamist veendu, et kõik punktid on täidetud:
 4. **Kas HTTPS?** - Jah, Let's Encrypt / ülikooli sertifikaat
 5. **Kas andmed on tundlikud?** - Ajaloolised tekstid, pole isikuandmeid
 6. **Kes haldab?** - Meelis Friedenthal meelis.friedenthal@ut.ee
+
+## 7. Git Versioonihaldus
+
+Rakendus kasutab Git-i tekstifailide versioonihalduseks (asendab vana `.backup.*` süsteemi).
+
+### Kuidas töötab
+- Andmekaustas (`/opt/vutt/data/` või `VUTT_DATA_DIR`) on Git repo
+- Iga tekstifaili salvestus loob uue commiti kasutaja nimega
+- Esimene commit iga faili jaoks = originaal OCR (alati taastatav)
+- Admin näeb "Ajalugu" tabis kõiki versioone koos autoritega
+
+### Vanade backup-failide migratsioon
+Kui serveris on veel vanu `.backup.*` faile:
+```bash
+cd /opt/vutt/data
+python3 /opt/vutt/scripts/migrate_backups_to_git.py --dry-run  # Vaata ette
+python3 /opt/vutt/scripts/migrate_backups_to_git.py            # Käivita
+python3 /opt/vutt/scripts/migrate_backups_to_git.py --delete-backups  # Kustuta vanad
+```
+
+### Git repo serveris
+```bash
+cd /opt/vutt/data
+git log --oneline -20          # Viimased 20 muudatust
+git log --oneline -- "*.txt"   # Ainult tekstifailid
+git show abc1234:teos/leht.txt # Kindla versiooni vaatamine
+git log --format="%h %an %s"   # Kes mida muutis
+```
+
+### Failide liigutamine kaustade vahel
+
+Kui on vaja faile käsitsi ümber tõsta (nt pilt kuulub teise teose juurde):
+
+```bash
+cd /opt/vutt/data
+
+# 1. Liiguta failid (txt + jpg)
+mv vana_kaust/leht5.txt uus_kaust/
+mv vana_kaust/leht5.jpg uus_kaust/
+
+# 2. Registreeri muudatus Gitis
+git add -A
+git commit -m "Liiguta leht5 kausta uus_kaust"
+
+# 3. Uuenda Meilisearch indeks
+python3 /opt/vutt/scripts/sync_meilisearch.py --apply
+```
+
+**Miks see töötab:**
+- Git tuvastab faili liikumise automaatselt (kui sisu on sama)
+- Faili ajalugu säilib ka pärast liigutamist
+- `sync_meilisearch.py` uuendab otsinguindeksi
+
+**NB:** Vanad `.backup.*` failid pole enam vajalikud - Git hoiab kogu ajalugu.
 
 ### Kiire turvakontroll
 

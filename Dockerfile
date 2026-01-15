@@ -2,12 +2,12 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-# Install system dependencies if any (none strictly needed for current scripts, but good practice)
-# RUN apt-get update && apt-get install -y --no-install-recommends ...
+# Install git (required for GitPython)
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements if we had them. Since we use stdlib, we just copy scripts.
-# COPY requirements.txt .
-# RUN pip install -r requirements.txt
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY file_server.py .

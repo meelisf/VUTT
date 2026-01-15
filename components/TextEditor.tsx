@@ -8,11 +8,14 @@ import { FILE_API_URL } from '../config';
 import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye, User } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 
-// Varukoopia tüüp
-interface BackupEntry {
-  filename: string;
-  timestamp: string;
+// Git ajaloo kirje tüüp
+interface GitHistoryEntry {
+  hash: string;
+  full_hash: string;
+  author: string;
+  date: string;
   formatted_date: string;
+  message: string;
   is_original: boolean;
 }
 
@@ -61,9 +64,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Varukoopiate state
-  const [backups, setBackups] = useState<BackupEntry[]>([]);
-  const [isLoadingBackups, setIsLoadingBackups] = useState(false);
+  // Git ajaloo state
+  const [gitHistory, setGitHistory] = useState<GitHistoryEntry[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
 
   // Erimärkide state
@@ -263,23 +266,23 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   };
 
-  const loadBackups = async () => {
+  const loadGitHistory = async () => {
     if (!page.original_path || !page.image_url) {
-      console.warn("Ei saa varukoopiad laadida: puudub original_path või image_url");
+      console.warn("Ei saa Git ajalugu laadida: puudub original_path või image_url");
       return;
     }
 
     if (!authToken) {
-      alert("Varukoopiate laadimiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
+      alert("Ajaloo laadimiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
       return;
     }
 
-    setIsLoadingBackups(true);
+    setIsLoadingHistory(true);
     try {
       const imagePath = page.image_url.split('/').pop() || '';
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
-      const response = await fetch(`${FILE_API_URL}/backups`, {
+      const response = await fetch(`${FILE_API_URL}/git-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -291,21 +294,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       const data = await response.json();
       if (data.status === 'success') {
-        setBackups(data.backups || []);
+        setGitHistory(data.history || []);
       } else {
-        console.error("Varukoopiate laadimine ebaõnnestus:", data.message);
+        console.error("Git ajaloo laadimine ebaõnnestus:", data.message);
         if (data.message?.includes('Autentimine') || data.message?.includes('parool')) {
           alert("Autentimine ebaõnnestus. Palun logi välja ja uuesti sisse.");
         }
       }
     } catch (e) {
-      console.error("Varukoopiate laadimine ebaõnnestus:", e);
+      console.error("Git ajaloo laadimine ebaõnnestus:", e);
     } finally {
-      setIsLoadingBackups(false);
+      setIsLoadingHistory(false);
     }
   };
 
-  const handleRestore = async (backup: BackupEntry) => {
+  const handleGitRestore = async (entry: GitHistoryEntry) => {
     if (!page.original_path || !page.image_url) {
       alert("Taastamine ebaõnnestus: puudub vajalik info");
       return;
@@ -316,7 +319,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
-    if (!confirm(`Kas soovid taastada versiooni ${backup.formatted_date}?\n\nTekst laaditakse redaktorisse. Muudatuste salvestamiseks pead vajutama "Salvesta".`)) {
+    const confirmMsg = entry.is_original
+      ? `Kas soovid taastada ORIGINAAL OCR versiooni?\n\nAutor: ${entry.author}\nKuupäev: ${entry.formatted_date}`
+      : `Kas soovid taastada versiooni?\n\nAutor: ${entry.author}\nKuupäev: ${entry.formatted_date}\n\nTekst laaditakse redaktorisse. Muudatuste salvestamiseks pead vajutama "Salvesta".`;
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
@@ -325,13 +332,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const imagePath = page.image_url.split('/').pop() || '';
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
-      const response = await fetch(`${FILE_API_URL}/restore`, {
+      const response = await fetch(`${FILE_API_URL}/git-restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           original_path: page.original_path,
           file_name: txtFilename,
-          backup_filename: backup.filename,
+          commit_hash: entry.full_hash,
           auth_token: authToken
         })
       });
@@ -340,8 +347,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       if (data.status === 'success' && data.restored_content !== undefined) {
         setText(data.restored_content);
         setActiveTab('edit');
-        alert(`Versioon ${backup.formatted_date} laaditud redaktorisse.\n\nSalvestamiseks vajuta "Salvesta" nuppu.`);
-        loadBackups();
+        alert(`Versioon ${entry.formatted_date} (${entry.author}) laaditud redaktorisse.\n\nSalvestamiseks vajuta "Salvesta" nuppu.`);
+        loadGitHistory();
       } else {
         alert(`Taastamine ebaõnnestus: ${data.message || 'Tundmatu viga'}`);
       }
@@ -986,82 +993,79 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 </div>
               </div>
 
-              {/* Varukoopiad failisüsteemist (ainult admin näeb) */}
+              {/* Git versiooniajalugu (ainult admin näeb) */}
               {user?.role === 'admin' && (
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
                   <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                     <div className="flex items-center gap-2 text-gray-800">
                       <RotateCcw size={18} className="text-amber-600" />
-                      <h4 className="font-bold">Varukoopiad</h4>
+                      <h4 className="font-bold">Versiooniajalugu (Git)</h4>
                     </div>
                     <button
-                      onClick={loadBackups}
-                      disabled={isLoadingBackups}
+                      onClick={loadGitHistory}
+                      disabled={isLoadingHistory}
                       className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
                     >
-                      {isLoadingBackups ? 'Laadin...' : 'Värskenda'}
+                      {isLoadingHistory ? 'Laadin...' : 'Värskenda'}
                     </button>
                   </div>
 
-                  {backups.length === 0 && !isLoadingBackups && (
-                    <p className="text-sm text-gray-400 text-center py-4">Varukoopiad puuduvad või vajuta "Värskenda"</p>
+                  {gitHistory.length === 0 && !isLoadingHistory && (
+                    <p className="text-sm text-gray-400 text-center py-4">Versiooniajalugu puudub või vajuta "Värskenda"</p>
                   )}
 
-                  {backups.length > 0 && (
+                  {gitHistory.length > 0 && (
                     <div className="space-y-2">
-                      {backups.map((backup, idx) => (
+                      {gitHistory.map((entry) => (
                         <div
-                          key={backup.filename}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${backup.is_original
-                            ? 'bg-amber-50 border-amber-200'
+                          key={entry.full_hash}
+                          className={`flex items-center justify-between p-3 rounded-lg border ${entry.is_original
+                            ? 'bg-green-50 border-green-200'
                             : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                             }`}
                         >
-                          <div className="flex items-center gap-3">
-                            {backup.is_original && (
-                              <div title="Originaal - kaitstud">
-                                <Shield size={16} className="text-amber-600" />
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {entry.is_original && (
+                              <div title="Originaal OCR - esimene versioon">
+                                <Shield size={16} className="text-green-600" />
                               </div>
                             )}
-                            <div>
-                              <span className="text-sm font-medium text-gray-900">
-                                {backup.formatted_date}
-                              </span>
-                              {backup.is_original && (
-                                <span className="ml-2 text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded">
-                                  Originaal
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-medium text-gray-900">
+                                  {entry.formatted_date}
                                 </span>
-                              )}
+                                <span className="text-xs text-gray-500 font-mono">
+                                  {entry.hash}
+                                </span>
+                                {entry.is_original && (
+                                  <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                                    Originaal OCR
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                                <User size={10} />
+                                <span>{entry.author}</span>
+                              </div>
                             </div>
                           </div>
 
-                          {!backup.is_original ? (
-                            <button
-                              onClick={() => handleRestore(backup)}
-                              disabled={isRestoring || readOnly}
-                              className="text-xs px-3 py-1.5 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1"
-                            >
-                              {isRestoring ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <RotateCcw size={12} />
-                              )}
-                              Taasta
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleRestore(backup)}
-                              disabled={isRestoring || readOnly}
-                              className="text-xs px-3 py-1.5 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1"
-                            >
-                              {isRestoring ? (
-                                <Loader2 size={12} className="animate-spin" />
-                              ) : (
-                                <RotateCcw size={12} />
-                              )}
-                              Taasta originaal
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleGitRestore(entry)}
+                            disabled={isRestoring || readOnly}
+                            className={`text-xs px-3 py-1.5 ${entry.is_original
+                              ? 'bg-green-600 hover:bg-green-700'
+                              : 'bg-primary-600 hover:bg-primary-700'
+                              } disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1 shrink-0 ml-2`}
+                          >
+                            {isRestoring ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <RotateCcw size={12} />
+                            )}
+                            {entry.is_original ? 'Taasta originaal' : 'Taasta'}
+                          </button>
                         </div>
                       ))}
                     </div>

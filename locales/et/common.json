@@ -45,7 +45,8 @@
     "place": "Trükikoht",
     "genre": "Žanr",
     "tags": "Märksõnad",
-    "loading": "Laadin..."
+    "loading": "Laadin...",
+    "noData": "Andmed puuduvad"
   },
   "errors": {
     "connectionFailed": "Serveriga ühendamine ebaõnnestus",

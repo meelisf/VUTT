@@ -13,6 +13,10 @@ import time
 import urllib.request
 import urllib.parse
 
+# Git versioonihaldus
+from git import Repo, Actor
+from git.exc import InvalidGitRepositoryError, GitCommandError
+
 # =========================================================
 # KONFIGURATSIOON
 # VUTT_DATA_DIR env variable allows overriding the path for Docker/Production
@@ -54,6 +58,182 @@ def load_env():
     print(f"Meilisearch URL: {MEILI_URL}")
 
 load_env()
+
+# =========================================================
+# GIT VERSIOONIHALDUS
+# =========================================================
+
+# Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
+_git_repo = None
+
+def get_or_init_repo():
+    """
+    Tagastab Git repo objekti andmekausta jaoks.
+    Initsialiseerib repo, kui see puudub.
+    """
+    global _git_repo
+
+    if _git_repo is not None:
+        return _git_repo
+
+    try:
+        _git_repo = Repo(BASE_DIR)
+        print(f"Git repo leitud: {BASE_DIR}")
+    except InvalidGitRepositoryError:
+        _git_repo = Repo.init(BASE_DIR)
+        print(f"Git repo initsialiseeritud: {BASE_DIR}")
+
+        # Loome .gitignore, et ignoreerida pilte ja muid suuri faile
+        gitignore_path = os.path.join(BASE_DIR, '.gitignore')
+        if not os.path.exists(gitignore_path):
+            with open(gitignore_path, 'w') as f:
+                f.write("# VUTT Git versioonihaldus\n")
+                f.write("# Jälgime ainult .txt faile\n")
+                f.write("*.jpg\n")
+                f.write("*.jpeg\n")
+                f.write("*.png\n")
+                f.write("*.backup.*\n")  # Vanad backup failid
+                f.write("_metadata.json\n")  # Metaandmed eraldi
+                f.write("*.json\n")  # Lehekülje metaandmed
+            print("Loodud .gitignore")
+
+    return _git_repo
+
+def save_with_git(filepath, content, username, message=None):
+    """
+    Salvestab faili ja teeb Git commiti.
+
+    Args:
+        filepath: Absoluutne tee failini
+        content: Faili sisu
+        username: Kasutajanimi (commit author)
+        message: Commit sõnum (valikuline, genereeritakse automaatselt)
+
+    Returns:
+        dict: {"success": bool, "commit_hash": str, "is_first_commit": bool}
+    """
+    repo = get_or_init_repo()
+    relative_path = os.path.relpath(filepath, BASE_DIR)
+
+    # Kontrolli, kas see fail on juba repos (st kas on esimene commit)
+    is_first_commit = True
+    try:
+        # Kui faili ajalugu on olemas, pole esimene commit
+        list(repo.iter_commits(paths=relative_path, max_count=1))
+        is_first_commit = False
+    except:
+        is_first_commit = True
+
+    # Kirjuta fail
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+    # Lisa fail indeksisse
+    repo.index.add([relative_path])
+
+    # Genereeri commit sõnum
+    if not message:
+        if is_first_commit:
+            message = f"Originaal OCR: {relative_path}"
+        else:
+            message = f"Muuda: {relative_path}"
+
+    # Tee commit
+    author = Actor(username, f"{username}@vutt.local")
+    try:
+        commit = repo.index.commit(
+            message,
+            author=author,
+            committer=author
+        )
+        print(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
+        return {
+            "success": True,
+            "commit_hash": commit.hexsha,
+            "is_first_commit": is_first_commit
+        }
+    except GitCommandError as e:
+        print(f"Git commit viga: {e}")
+        return {"success": False, "error": str(e)}
+
+def get_file_git_history(relative_path, max_count=50):
+    """
+    Tagastab faili Git ajaloo.
+
+    Args:
+        relative_path: Suhteline tee failini (BASE_DIR suhtes)
+        max_count: Maksimaalne commitide arv
+
+    Returns:
+        list: Commitide nimekiri, iga element on dict
+    """
+    repo = get_or_init_repo()
+
+    try:
+        commits = list(repo.iter_commits(paths=relative_path, max_count=max_count))
+    except:
+        return []
+
+    if not commits:
+        return []
+
+    # Esimene commit (kõige vanem) on originaal
+    original_hash = commits[-1].hexsha if commits else None
+
+    history = []
+    for commit in commits:
+        history.append({
+            "hash": commit.hexsha[:8],
+            "full_hash": commit.hexsha,
+            "author": commit.author.name,
+            "date": commit.committed_datetime.isoformat(),
+            "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
+            "message": commit.message.strip(),
+            "is_original": commit.hexsha == original_hash
+        })
+
+    return history
+
+def get_file_at_commit(relative_path, commit_hash):
+    """
+    Tagastab faili sisu kindlas commitist.
+
+    Args:
+        relative_path: Suhteline tee failini
+        commit_hash: Commiti hash (lühike või täispikk)
+
+    Returns:
+        str: Faili sisu või None kui ei leidnud
+    """
+    repo = get_or_init_repo()
+
+    try:
+        content = repo.git.show(f"{commit_hash}:{relative_path}")
+        return content
+    except GitCommandError as e:
+        print(f"Git show viga: {e}")
+        return None
+
+def get_file_diff(relative_path, hash1, hash2):
+    """
+    Tagastab diff kahe commiti vahel.
+
+    Args:
+        relative_path: Suhteline tee failini
+        hash1: Esimene commit hash
+        hash2: Teine commit hash
+
+    Returns:
+        str: Diff tekst
+    """
+    repo = get_or_init_repo()
+
+    try:
+        diff = repo.git.diff(hash1, hash2, '--', relative_path)
+        return diff
+    except GitCommandError as e:
+        print(f"Git diff viga: {e}")
+        return None
 
 def send_to_meilisearch(documents):
     """Saadab dokumendid Meilisearchi kasutades urllib-i."""
@@ -375,6 +555,38 @@ def index_new_work(dir_name, metadata):
     """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
     return sync_work_to_meilisearch(dir_name)
 
+def commit_new_work_to_git(dir_name):
+    """Lisab uue teose txt failid Git reposse originaal-OCR commitina."""
+    try:
+        repo = get_or_init_repo()
+        dir_path = os.path.join(BASE_DIR, dir_name)
+
+        # Leia kõik txt failid kaustas
+        txt_files = []
+        for f in os.listdir(dir_path):
+            if f.endswith('.txt'):
+                relative_path = os.path.join(dir_name, f)
+                txt_files.append(relative_path)
+
+        if not txt_files:
+            return False
+
+        # Lisa failid indeksisse
+        repo.index.add(txt_files)
+
+        # Tee commit
+        author = Actor("Automaatne", "auto@vutt.local")
+        repo.index.commit(
+            f"Originaal OCR: {dir_name} ({len(txt_files)} lehekülge)",
+            author=author,
+            committer=author
+        )
+        print(f"GIT: Lisatud uus teos {dir_name} ({len(txt_files)} txt faili)")
+        return True
+    except Exception as e:
+        print(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
+        return False
+
 def metadata_watcher_loop():
     """Taustalõim, mis otsib uusi kaustu ja loob neile metaandmed."""
     print(f"Metaandmete jälgija käivitatud (kataloog: {BASE_DIR})")
@@ -401,9 +613,12 @@ def metadata_watcher_loop():
                                 with open(meta_path, 'w', encoding='utf-8') as f:
                                     json.dump(metadata, f, ensure_ascii=False, indent=2)
                                 print(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
-                                
+
                                 # Indekseeri kohe Meilisearchis
                                 index_new_work(entry.name, metadata)
+
+                                # Lisa txt failid Giti originaal-OCR commitina
+                                commit_new_work_to_git(entry.name)
                             except Exception as e:
                                 print(f"Viga metaandmete loomisel ({entry.name}): {e}")
             
@@ -533,48 +748,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # os.makedirs(os.path.dirname(txt_path), exist_ok=True)
 
                 # -------------------------------------------------
-                # 1. TEKSTIFAILI SALVESTAMINE (.txt)
+                # 1. TEKSTIFAILI SALVESTAMINE (.txt) - GIT VERSIOONIHALDUS
                 # -------------------------------------------------
-                
-                # Teeme varukoopia kui fail juba eksisteerib
-                backup_path = ""
-                if os.path.exists(txt_path):
-                    # ORIGINAALI KAITSE: Kui .backup.ORIGINAL ei eksisteeri, loome selle
-                    # See on ALGNE OCR-tekst, mida ei kustutata kunagi
-                    original_backup_path = f"{txt_path}.backup.ORIGINAL"
-                    if not os.path.exists(original_backup_path):
-                        # Kontrollime, kas on olemas vanemaid varukoopiad
-                        existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
-                        if existing_backups:
-                            # Vanemad backupid olemas - kõige vanem on originaal
-                            # Nimetame selle ümber .backup.ORIGINAL nimeks
-                            oldest_backup = existing_backups[0]
-                            shutil.copy2(oldest_backup, original_backup_path)
-                            print(f"Originaal kaitstud (kopeeritud vanemast): {os.path.basename(original_backup_path)}")
-                        else:
-                            # Pole ühtegi backupi - praegune .txt ON originaal
-                            shutil.copy2(txt_path, original_backup_path)
-                            print(f"Originaal kaitstud (esimene salvestus): {os.path.basename(original_backup_path)}")
-                    
-                    # Tavaline varukoopia praegusest versioonist
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_path = f"{txt_path}.backup.{timestamp}"
-                    shutil.copy2(txt_path, backup_path)
-                    
-                    # Piirame varukoopiate arvu (max 10 faili kohta, v.a ORIGINAL)
-                    existing_backups = sorted(glob.glob(f"{txt_path}.backup.*"))
-                    # Eemaldame ORIGINAL loendist - seda ei arvestata limiidi hulka
-                    existing_backups = [b for b in existing_backups if not b.endswith('.backup.ORIGINAL')]
-                    if len(existing_backups) > 10:
-                        # Kustutame vanemad vaheversioonid, jätame 10 uuemat
-                        for old_backup in existing_backups[:-10]:
-                            os.remove(old_backup)
-                            print(f"Kustutatud vana varukoopia: {os.path.basename(old_backup)}")
-                
-                # Kirjutame teksti
-                with open(txt_path, 'w', encoding='utf-8') as f:
-                    f.write(text_content)
-                print(f"Salvestatud tekst: {txt_path}")
+
+                # Salvestame faili ja teeme Git commiti
+                git_result = save_with_git(
+                    filepath=txt_path,
+                    content=text_content,
+                    username=user['username']
+                )
+
+                if git_result.get("success"):
+                    print(f"Salvestatud tekst (Git): {txt_path} -> {git_result.get('commit_hash', '')[:8]}")
+                else:
+                    print(f"Git commit ebaõnnestus: {git_result.get('error')}")
+                    # Fallback: salvestame faili ilma Gitita
+                    with open(txt_path, 'w', encoding='utf-8') as f:
+                        f.write(text_content)
+                    print(f"Salvestatud tekst (ilma Gitita): {txt_path}")
                 
                 # -------------------------------------------------
                 # 2. METAANDMETE SALVESTAMINE (.json)
@@ -597,8 +788,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.end_headers()
                 
                 response = {
-                    "status": "success", 
-                    "backup": os.path.basename(backup_path) if backup_path else None,
+                    "status": "success",
+                    "commit_hash": git_result.get("commit_hash", "")[:8] if git_result.get("success") else None,
+                    "is_first_commit": git_result.get("is_first_commit", False),
                     "json_created": json_saved
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
@@ -793,6 +985,163 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
             except Exception as e:
                 print(f"RESTORE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/git-history':
+            # Git ajaloo päring (asendab /backups)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                # Autentimise kontroll - nõuab vähemalt 'admin' õigusi
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+
+                if not original_catalog or not target_filename:
+                    self.send_error(400, "Puudub 'original_path' või 'file_name'")
+                    return
+
+                safe_catalog = os.path.basename(original_catalog)
+                safe_filename = os.path.basename(target_filename)
+                relative_path = os.path.join(safe_catalog, safe_filename)
+
+                # Küsime Git ajaloo
+                history = get_file_git_history(relative_path, max_count=50)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "history": history,
+                    "total": len(history)
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"GIT-HISTORY VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/git-restore':
+            # Git versiooni taastamine
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                # Autentimise kontroll - nõuab 'admin' õigusi
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+                commit_hash = data.get('commit_hash')
+
+                if not original_catalog or not target_filename or not commit_hash:
+                    self.send_error(400, "Puudub 'original_path', 'file_name' või 'commit_hash'")
+                    return
+
+                safe_catalog = os.path.basename(original_catalog)
+                safe_filename = os.path.basename(target_filename)
+                relative_path = os.path.join(safe_catalog, safe_filename)
+
+                # Loe faili sisu kindlast commitist
+                restored_content = get_file_at_commit(relative_path, commit_hash)
+
+                if restored_content is None:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    response = {"status": "error", "message": "Versiooni ei leitud"}
+                    self.wfile.write(json.dumps(response).encode('utf-8'))
+                    return
+
+                print(f"Git restore: {commit_hash[:8]} -> {relative_path} (kasutaja: {user['username']})")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Versioon laaditud",
+                    "restored_content": restored_content,
+                    "from_commit": commit_hash
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"GIT-RESTORE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/git-diff':
+            # Git diff kahe commiti vahel
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                # Autentimise kontroll - nõuab 'admin' õigusi
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                original_catalog = data.get('original_path')
+                target_filename = data.get('file_name')
+                hash1 = data.get('hash1')
+                hash2 = data.get('hash2')
+
+                if not original_catalog or not target_filename or not hash1 or not hash2:
+                    self.send_error(400, "Puudub 'original_path', 'file_name', 'hash1' või 'hash2'")
+                    return
+
+                safe_catalog = os.path.basename(original_catalog)
+                safe_filename = os.path.basename(target_filename)
+                relative_path = os.path.join(safe_catalog, safe_filename)
+
+                # Genereeri diff
+                diff = get_file_diff(relative_path, hash1, hash2)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "diff": diff or "",
+                    "hash1": hash1,
+                    "hash2": hash2
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"GIT-DIFF VIGA: {e}")
                 self.send_error(500, str(e))
 
         elif self.path == '/update-work-metadata':

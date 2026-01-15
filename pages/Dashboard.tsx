@@ -655,6 +655,13 @@ const Dashboard: React.FC = () => {
               {t('footer.aboutProject')}
             </button>
             <span className="text-gray-300">|</span>
+            <Link
+              to="/stats"
+              className="hover:text-primary-600 transition-colors"
+            >
+              {t('footer.statistics')}
+            </Link>
+            <span className="text-gray-300">|</span>
             <a
               href="https://utlib.ut.ee/et"
               target="_blank"

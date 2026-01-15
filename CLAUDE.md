@@ -118,11 +118,24 @@ The text viewer uses a stateful parser for 1:1 line alignment with line numbers:
 - Multi-line styles (bold, italic) tracked across line boundaries
 - Marginalia `[[m: ...]]` displayed inline with yellow background
 
-### Backup System
-- On save: creates `.backup.YYYYMMDD_HHMMSS` files
-- `.backup.ORIGINAL` preserves first version forever
-- Max 10 timestamped backups per file
+### Version Control (Git)
+- On save: creates Git commit with username as author
+- First commit per file = original OCR (always restorable)
+- Git repo located in `data/04_sorditud_dokumendid/.git`
 - Admin restores via "Ajalugu" tab (loads into editor, must save to persist)
+- Endpoints: `/git-history`, `/git-restore`, `/git-diff`
+
+### Moving Files Between Folders
+When reorganizing files (e.g., moving a page to different work):
+```bash
+cd data/04_sorditud_dokumendid
+mv old_folder/page5.txt new_folder/
+mv old_folder/page5.jpg new_folder/
+git add -A
+git commit -m "Move page5 to new_folder"
+python3 scripts/sync_meilisearch.py --apply
+```
+Git detects moves automatically if content is unchanged. History is preserved.
 
 ### Internationalization (i18n)
 Uses `react-i18next` with translations bundled directly (no HTTP backend).
