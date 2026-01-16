@@ -226,6 +226,22 @@ Edit `users.json` with SHA-256 hashed password:
 - **Path traversal protection**: `os.path.basename()` on all file paths
 - **No default users**: `users.json` must exist, no auto-creation
 
+### User Management Security (added 2026-01-16)
+**Implemented:**
+- ✅ Registration requires admin approval (no auto-registration)
+- ✅ Invite tokens expire in 48h and can only be used once
+- ✅ Duplicate email check on registration
+- ✅ Email normalization (lowercase)
+- ✅ Minimum password length (8 chars)
+- ✅ All admin endpoints require `min_role='admin'`
+- ✅ Editor endpoints require `min_role='editor'`
+- ✅ Contributors can only edit text, not change status
+
+**Acceptable limitations (internal use):**
+- SHA-256 without salt (rainbow table attack requires `users.json` access)
+- Sessions stored in memory (server restart logs everyone out)
+- JSON files for storage (race conditions unlikely with few users)
+
 ### Production Checklist (see `deployment_guide.md`)
 - [ ] HTTPS enabled (domain: `vutt.utlib.ut.ee`)
 - [ ] Backend ports (7700, 8001, 8002) closed from outside
@@ -233,14 +249,33 @@ Edit `users.json` with SHA-256 hashed password:
 - [ ] Strong passwords in `users.json`
 - [ ] Meilisearch master key in `.env`
 
-### CORS TODO
-When domain is finalized, update `file_server.py` class `RequestHandler`:
+### Security TODO (for public deployment)
+
+**1. CORS restriction** - Currently `Access-Control-Allow-Origin: *`
 ```python
+# In file_server.py RequestHandler, replace all occurrences of:
+self.send_header('Access-Control-Allow-Origin', '*')
+
+# With:
 allowed_origins = ['https://vutt.utlib.ut.ee']
 origin = self.headers.get('Origin')
 if origin in allowed_origins:
     self.send_header('Access-Control-Allow-Origin', origin)
 ```
+
+**2. Rate limiting** - Currently no rate limiting
+- `/register` endpoint vulnerable to spam registrations
+- `/login` endpoint vulnerable to brute force
+- Recommendation: Add IP-based rate limiting (e.g., 5 attempts/minute)
+- Can be implemented at Nginx level or in Python
+
+**3. HTTPS enforcement**
+- Nginx should redirect all HTTP to HTTPS
+- Consider adding HSTS header
+
+**4. Password hashing upgrade** (optional, for high-security)
+- Replace SHA-256 with bcrypt/argon2
+- Would require migration script for existing passwords
 
 ### Meilisearch Index Settings
 If adding new filterable fields, update `meiliService.ts`:
