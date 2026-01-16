@@ -1,0 +1,40 @@
+{
+  "title": "Haldus",
+  "tabs": {
+    "registrations": "Taotlused",
+    "users": "Kasutajad",
+    "pending": "Ootel muudatused"
+  },
+  "registrations": {
+    "title": "Registreerimistaotlused",
+    "empty": "Ootel taotlusi pole",
+    "name": "Nimi",
+    "email": "E-post",
+    "affiliation": "Asutus",
+    "motivation": "Motivatsioon",
+    "submitted": "Esitatud",
+    "approve": "Kinnita",
+    "reject": "Lükka tagasi",
+    "approved": "Kinnitatud",
+    "rejected": "Tagasi lükatud",
+    "inviteLinkGenerated": "Kutse link on loodud",
+    "copyLink": "Kopeeri link",
+    "linkCopied": "Link kopeeritud!"
+  },
+  "users": {
+    "title": "Kasutajad",
+    "username": "Kasutajanimi",
+    "name": "Nimi",
+    "role": "Roll",
+    "changeRole": "Muuda rolli"
+  },
+  "pending": {
+    "title": "Ootel muudatused",
+    "empty": "Ootel muudatusi pole",
+    "user": "Kasutaja",
+    "page": "Lehekülg",
+    "submitted": "Esitatud",
+    "hasConflict": "Konflikt",
+    "viewDetails": "Vaata detaile"
+  }
+}

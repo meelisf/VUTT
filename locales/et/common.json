@@ -32,7 +32,7 @@
   "roles": {
     "admin": "Administraator",
     "editor": "Toimetaja",
-    "viewer": "Vaataja"
+    "contributor": "Kaastööline"
   },
   "labels": {
     "page": "Lk",

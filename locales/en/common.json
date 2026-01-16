@@ -32,7 +32,7 @@
   "roles": {
     "admin": "Administrator",
     "editor": "Editor",
-    "viewer": "Viewer"
+    "contributor": "Contributor"
   },
   "labels": {
     "page": "Page",

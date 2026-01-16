@@ -1,0 +1,41 @@
+{
+  "title": "Liitu VUTTiga",
+  "subtitle": "Taotle ligipääsu varauusaegsete tekstide töölauale",
+  "form": {
+    "name": "Nimi",
+    "namePlaceholder": "Sinu täisnimi",
+    "email": "E-posti aadress",
+    "emailPlaceholder": "nimi@näide.ee",
+    "affiliation": "Asutus (valikuline)",
+    "affiliationPlaceholder": "Ülikool, raamatukogu vms",
+    "motivation": "Miks soovid liituda?",
+    "motivationPlaceholder": "Kirjelda lühidalt oma huvi varauusaegsete tekstide vastu...",
+    "submit": "Esita taotlus"
+  },
+  "success": {
+    "title": "Taotlus esitatud!",
+    "message": "Sinu taotlus on saadetud ülevaatusele. Kui administraator selle kinnitab, saad e-kirja juhiste ja lingiga parooli seadmiseks."
+  },
+  "errors": {
+    "nameRequired": "Nimi on kohustuslik",
+    "emailRequired": "E-posti aadress on kohustuslik",
+    "emailInvalid": "Vigane e-posti aadress",
+    "motivationRequired": "Motivatsioon on kohustuslik",
+    "submitFailed": "Taotluse esitamine ebaõnnestus"
+  },
+  "setPassword": {
+    "title": "Seadista parool",
+    "subtitle": "Vali oma kontole tugev parool",
+    "password": "Parool",
+    "passwordConfirm": "Kinnita parool",
+    "submit": "Salvesta parool",
+    "success": "Parool seadistatud! Võid nüüd sisse logida.",
+    "errors": {
+      "passwordRequired": "Parool on kohustuslik",
+      "passwordTooShort": "Parool peab olema vähemalt 8 tähemärki",
+      "passwordMismatch": "Paroolid ei ühti",
+      "tokenInvalid": "Kutse link on aegunud või vigane",
+      "saveFailed": "Parooli salvestamine ebaõnnestus"
+    }
+  }
+}

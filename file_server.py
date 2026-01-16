@@ -319,8 +319,11 @@ def require_token(data, min_role=None):
     user = session["user"]
 
     # Rollide hierarhia kontroll
+    # contributor = kaastööline (muudatused vajavad ülevaatust)
+    # editor = toimetaja (muudatused rakenduvad kohe, saab kinnitada)
+    # admin = administraator (kõik õigused)
     if min_role:
-        role_hierarchy = {'viewer': 0, 'editor': 1, 'admin': 2}
+        role_hierarchy = {'contributor': 0, 'editor': 1, 'admin': 2}
         user_level = role_hierarchy.get(user['role'], 0)
         required_level = role_hierarchy.get(min_role, 0)
         if user_level < required_level:

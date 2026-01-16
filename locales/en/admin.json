@@ -1,0 +1,40 @@
+{
+  "title": "Administration",
+  "tabs": {
+    "registrations": "Registrations",
+    "users": "Users",
+    "pending": "Pending Edits"
+  },
+  "registrations": {
+    "title": "Registration Requests",
+    "empty": "No pending registrations",
+    "name": "Name",
+    "email": "Email",
+    "affiliation": "Affiliation",
+    "motivation": "Motivation",
+    "submitted": "Submitted",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "inviteLinkGenerated": "Invite link generated",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied!"
+  },
+  "users": {
+    "title": "Users",
+    "username": "Username",
+    "name": "Name",
+    "role": "Role",
+    "changeRole": "Change role"
+  },
+  "pending": {
+    "title": "Pending Edits",
+    "empty": "No pending edits",
+    "user": "User",
+    "page": "Page",
+    "submitted": "Submitted",
+    "hasConflict": "Conflict",
+    "viewDetails": "View details"
+  }
+}

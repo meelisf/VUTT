@@ -108,7 +108,10 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ### Authentication
 - Token-based (UUID session tokens, 24h expiry)
-- Roles: `viewer` < `editor` < `admin`
+- Roles: `contributor` < `editor` < `admin`
+  - `contributor` (kaastööline): can edit, but changes go to pending review
+  - `editor` (toimetaja): direct edits, can approve pending changes
+  - `admin`: all rights + user management
 - localStorage: `vutt_user` + `vutt_token`
 - Write endpoints require `auth_token` in request body
 
@@ -145,7 +148,7 @@ Uses `react-i18next` with translations bundled directly (no HTTP backend).
 - `components/LanguageSwitcher.tsx` - Toggle button (Lucide Languages icon + language name)
 - `locales/{et,en}/*.json` - Translation files by namespace
 
-**Namespaces:** `common`, `auth`, `dashboard`, `workspace`, `search`, `statistics`
+**Namespaces:** `common`, `auth`, `dashboard`, `workspace`, `search`, `statistics`, `admin`, `register`, `review`
 
 **Usage pattern:**
 ```tsx
@@ -198,10 +201,11 @@ Edit `users.json` with SHA-256 hashed password:
   "username": {
     "password_hash": "<sha256>",
     "name": "Display Name",
-    "role": "admin|editor|viewer"
+    "role": "admin|editor|contributor"
   }
 }
 ```
+**Note:** Self-registration system is planned (see `PLAAN_kasutajahaldus.md`).
 
 ### Adding translations
 1. Add keys to both `locales/et/{namespace}.json` and `locales/en/{namespace}.json`
@@ -218,7 +222,7 @@ Edit `users.json` with SHA-256 hashed password:
 ### Current Implementation
 - **Session tokens**: UUID-based, 24h expiry (checked in `require_token()`)
 - **Password hashing**: SHA-256 (no salt) - adequate for internal use
-- **Role hierarchy**: viewer (0) < editor (1) < admin (2)
+- **Role hierarchy**: contributor (0) < editor (1) < admin (2)
 - **Path traversal protection**: `os.path.basename()` on all file paths
 - **No default users**: `users.json` must exist, no auto-creation
 
@@ -275,6 +279,22 @@ Supports URL parameters: `?author=`, `?respondens=`, `?printer=`, `?status=`, `?
 Clickable links in Workspace "Info ja annotatsioonid" tab navigate to filtered Dashboard.
 
 ## Future Ideas
+
+### User Management System (In Progress)
+See `PLAAN_kasutajahaldus.md` for detailed implementation plan.
+
+**Key features:**
+- Self-registration with admin approval
+- Invite token system (48h expiry)
+- Pending edits review for contributors
+- Conflict detection (base_text_hash)
+
+**New pages:** `/register`, `/set-password`, `/admin`, `/review`
+
+**New data files:**
+- `pending_registrations.json` - registration requests
+- `invite_tokens.json` - invite links
+- `pending_edits.json` - contributor edits awaiting review
 
 ### ESTER Integration (TODO)
 Currently `ester_id` is manually added. Planned improvement:

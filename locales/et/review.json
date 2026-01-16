@@ -1,0 +1,36 @@
+{
+  "title": "Muudatuste ülevaatus",
+  "subtitle": "Vaata üle ja kinnita kaastööliste muudatused",
+  "empty": "Ühtegi ootel muudatust pole",
+  "list": {
+    "user": "Kasutaja",
+    "work": "Teos",
+    "page": "Lehekülg",
+    "submitted": "Esitatud",
+    "conflict": "Konflikt"
+  },
+  "detail": {
+    "title": "Muudatuse detailid",
+    "submittedBy": "Esitas",
+    "submittedAt": "Esitatud",
+    "originalText": "Algne tekst",
+    "newText": "Uus tekst",
+    "diff": "Muudatused",
+    "image": "Pilt"
+  },
+  "conflicts": {
+    "otherPending": "Teine kasutaja on samale lehele muudatuse esitanud",
+    "baseChanged": "Tekst on vahepeal muutunud",
+    "both": "Mitu konflikti"
+  },
+  "actions": {
+    "approve": "Kinnita",
+    "reject": "Lükka tagasi",
+    "approveWithComment": "Kinnita kommentaariga",
+    "rejectReason": "Tagasilükkamise põhjus"
+  },
+  "success": {
+    "approved": "Muudatus kinnitatud",
+    "rejected": "Muudatus tagasi lükatud"
+  }
+}

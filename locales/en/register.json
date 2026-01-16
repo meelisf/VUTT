@@ -1,0 +1,41 @@
+{
+  "title": "Join VUTT",
+  "subtitle": "Request access to the Early Modern Text Workbench",
+  "form": {
+    "name": "Name",
+    "namePlaceholder": "Your full name",
+    "email": "Email address",
+    "emailPlaceholder": "name@example.com",
+    "affiliation": "Affiliation (optional)",
+    "affiliationPlaceholder": "University, library, etc.",
+    "motivation": "Why do you want to join?",
+    "motivationPlaceholder": "Briefly describe your interest in early modern texts...",
+    "submit": "Submit request"
+  },
+  "success": {
+    "title": "Request submitted!",
+    "message": "Your request has been sent for review. If approved by an administrator, you will receive an email with instructions and a link to set your password."
+  },
+  "errors": {
+    "nameRequired": "Name is required",
+    "emailRequired": "Email address is required",
+    "emailInvalid": "Invalid email address",
+    "motivationRequired": "Motivation is required",
+    "submitFailed": "Failed to submit request"
+  },
+  "setPassword": {
+    "title": "Set your password",
+    "subtitle": "Choose a strong password for your account",
+    "password": "Password",
+    "passwordConfirm": "Confirm password",
+    "submit": "Save password",
+    "success": "Password set! You can now log in.",
+    "errors": {
+      "passwordRequired": "Password is required",
+      "passwordTooShort": "Password must be at least 8 characters",
+      "passwordMismatch": "Passwords do not match",
+      "tokenInvalid": "Invite link is expired or invalid",
+      "saveFailed": "Failed to save password"
+    }
+  }
+}

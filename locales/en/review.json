@@ -1,0 +1,36 @@
+{
+  "title": "Review Edits",
+  "subtitle": "Review and approve contributor edits",
+  "empty": "No pending edits to review",
+  "list": {
+    "user": "User",
+    "work": "Work",
+    "page": "Page",
+    "submitted": "Submitted",
+    "conflict": "Conflict"
+  },
+  "detail": {
+    "title": "Edit Details",
+    "submittedBy": "Submitted by",
+    "submittedAt": "Submitted at",
+    "originalText": "Original text",
+    "newText": "New text",
+    "diff": "Changes",
+    "image": "Image"
+  },
+  "conflicts": {
+    "otherPending": "Another user has submitted changes to the same page",
+    "baseChanged": "The text has changed since this edit was submitted",
+    "both": "Multiple conflicts"
+  },
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "approveWithComment": "Approve with comment",
+    "rejectReason": "Reason for rejection"
+  },
+  "success": {
+    "approved": "Edit approved",
+    "rejected": "Edit rejected"
+  }
+}
