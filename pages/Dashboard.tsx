@@ -271,7 +271,7 @@ const Dashboard: React.FC = () => {
             <>
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.role === 'admin' ? t('common:roles.admin') : t('auth:user.role')}</p>
+                <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
               </div>
               <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
                 {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
