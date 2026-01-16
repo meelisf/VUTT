@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
-import { LogIn, Loader2, AlertCircle } from 'lucide-react';
+import { LogIn, Loader2, AlertCircle, UserPlus } from 'lucide-react';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -116,6 +117,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
                 </>
               )}
             </button>
+          </div>
+
+          {/* Registreerimise link */}
+          <div className="pt-4 border-t border-gray-200 text-center text-sm text-gray-600">
+            {t('login.noAccount')}{' '}
+            <Link
+              to="/register"
+              onClick={onClose}
+              className="text-primary-600 hover:text-primary-700 font-medium inline-flex items-center gap-1"
+            >
+              <UserPlus size={14} />
+              {t('login.register')}
+            </Link>
           </div>
         </form>
       </div>

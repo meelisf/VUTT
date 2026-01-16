@@ -69,5 +69,14 @@
   },
   "confirm": {
     "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?"
+  },
+  "pendingEdit": {
+    "hasPending": "You have a pending edit for this page under review.",
+    "otherPending": "This page has {{count}} pending edit(s) from other users.",
+    "saved": "Edit submitted for review. An editor will review it.",
+    "savedWithConflict": "Edit submitted for review. Note: Another user has already submitted an edit for the same page."
+  },
+  "status": {
+    "contributorDisabled": "Only editors can change the status"
   }
 }

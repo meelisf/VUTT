@@ -301,23 +301,23 @@ Alternatiiv pending-edits jaoks: eraldi failid iga muudatuse kohta `pending/` ka
 3. [x] Uuenda UI rollide kuvamine
 4. [x] Testi olemasolevate kasutajatega
 
-### Faas 2: Registreerimine
+### Faas 2: Registreerimine ✅
 1. [x] Loo `pending_registrations.json` struktuur
-2. [ ] Loo `/register` leht ja vorm
-3. [ ] Loo `POST /register` endpoint
-4. [ ] Loo `/admin` leht taotluste vaatamiseks
-5. [ ] Loo kinnitamise/tagasilükkamise endpointid
+2. [x] Loo `/register` leht ja vorm
+3. [x] Loo `POST /register` endpoint
+4. [x] Loo `/admin` leht taotluste vaatamiseks
+5. [x] Loo kinnitamise/tagasilükkamise endpointid
 6. [x] Loo `invite_tokens.json` struktuur
-7. [ ] Loo `/set-password` leht
+7. [x] Loo `/set-password` leht
 8. [ ] Testi kogu registreerimisvoog
 
-### Faas 3: Pending-muudatused
+### Faas 3: Pending-muudatused ✅
 1. [x] Loo `pending_edits.json` struktuur
-2. [ ] Muuda salvestamisloogika (contributor → pending)
-3. [ ] Loo `/review` leht
-4. [ ] Loo diff-vaate komponent
-5. [ ] Loo kinnitamise loogika (fail + git + meilisearch)
-6. [ ] Lisa Workspace'i pending-staatuse näitamine
+2. [x] Muuda salvestamisloogika (contributor → pending)
+3. [x] Loo `/review` leht
+4. [x] Loo diff-vaate komponent
+5. [x] Loo kinnitamise loogika (fail + git + meilisearch)
+6. [x] Lisa Workspace'i pending-staatuse näitamine
 7. [ ] Testi kogu muudatuste voog
 
 ### Faas 4: SMTP (tulevikus)
@@ -356,5 +356,34 @@ Alternatiiv pending-edits jaoks: eraldi failid iga muudatuse kohta `pending/` ka
 ---
 
 *Plaan koostatud: 2025-01-16*
-*Viimati uuendatud: 2025-01-16*
+*Viimati uuendatud: 2026-01-16*
 *Otsused kinnitatud: rollid, konfliktid, git autorsus*
+
+---
+
+## JÄTKAMISE MÄRKMED (2026-01-16)
+
+**Valmis:** Faas 1 (rollid), Faas 2 (registreerimine), Faas 3 (pending-muudatused)
+
+### Tehtud 2026-01-16
+
+**UI parandused:**
+- ✅ Kasutaja rippmenüü kõigil lehtedel (Dashboard, Admin, Review)
+  - Avatar + nool → klikk avab menüü
+  - Menüüs: Ülevaatus (editor+), Admin (admin), Logi välja
+  - Keelevahetaja paremas servas
+- ✅ Ühtne header kõigil lehtedel (logo + VUTT vasakul)
+- ✅ Registreerumise link sisselogimise modaalis
+- ✅ Admin lehelt eemaldatud "Ootel muudatused" tab (dubleeris /review lehte)
+
+**Review lehe parandused:**
+- ✅ Sõna-taseme diff esiletõstmine (näitab täpselt muutunud sõnu)
+- ✅ Korralik scrollimine (nupud alati nähtavad)
+
+**Rollipõhised piirangud:**
+- ✅ Kaastööline ei saa muuta staatust (ainult teksti)
+  - Staatuse valik on disabled + tooltip selgitusega
+
+**Järgmised sammud:**
+1. Faas 4 (SMTP) - tulevikus, kui vaja
+2. Kasutajate halduse tab Admin lehel (praegu placeholder)

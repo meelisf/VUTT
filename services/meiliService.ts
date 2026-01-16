@@ -531,6 +531,92 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
   }
 };
 
+// =========================================================
+// PENDING-EDITS FUNKTSIOONID (kaastööliste muudatused)
+// =========================================================
+
+export interface PendingEditInfo {
+  has_own_pending: boolean;
+  own_pending_edit: {
+    id: string;
+    submitted_at: string;
+    new_text: string;
+  } | null;
+  other_pending_count: number;
+}
+
+// Kontrollib, kas lehel on ootel muudatusi
+export const checkPendingEdits = async (
+  teoseId: string,
+  lehekyljeNumber: number,
+  authToken: string
+): Promise<PendingEditInfo> => {
+  try {
+    const response = await fetch(`${FILE_API_URL}/pending-edits/check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_token: authToken,
+        teose_id: teoseId,
+        lehekylje_number: lehekyljeNumber
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      return {
+        has_own_pending: data.has_own_pending,
+        own_pending_edit: data.own_pending_edit,
+        other_pending_count: data.other_pending_count
+      };
+    }
+
+    return { has_own_pending: false, own_pending_edit: null, other_pending_count: 0 };
+  } catch (e) {
+    console.error('Check pending edits error:', e);
+    return { has_own_pending: false, own_pending_edit: null, other_pending_count: 0 };
+  }
+};
+
+// Salvestab muudatuse pending-olekusse (kaastöölise jaoks)
+export const savePageAsPending = async (
+  teoseId: string,
+  lehekyljeNumber: number,
+  originalText: string,
+  newText: string,
+  authToken: string
+): Promise<{ success: boolean; editId?: string; hasOtherPending?: boolean; error?: string }> => {
+  try {
+    const response = await fetch(`${FILE_API_URL}/save-pending`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        auth_token: authToken,
+        teose_id: teoseId,
+        lehekylje_number: lehekyljeNumber,
+        original_text: originalText,
+        new_text: newText
+      })
+    });
+
+    const data = await response.json();
+
+    if (data.status === 'success') {
+      return {
+        success: true,
+        editId: data.edit_id,
+        hasOtherPending: data.has_other_pending
+      };
+    }
+
+    return { success: false, error: data.message };
+  } catch (e: any) {
+    console.error('Save pending edit error:', e);
+    return { success: false, error: e.message || 'Salvestamine ebaõnnestus' };
+  }
+};
+
 // Abifunktsioon: Arvutab teose staatuse ja uuendab selle kõigil lehekülgedel
 // (denormaliseeritud väli kiireks filtreerimiseks)
 const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {

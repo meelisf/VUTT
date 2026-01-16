@@ -7,9 +7,9 @@ import Statistics from './pages/Statistics';
 import SearchPage from './pages/SearchPage';
 // Kasutajahalduse lehed
 import Register from './pages/Register';
-// import SetPassword from './pages/SetPassword';
-// import Admin from './pages/Admin';
-// import Review from './pages/Review';
+import SetPassword from './pages/SetPassword';
+import Admin from './pages/Admin';
+import Review from './pages/Review';
 
 const router = createBrowserRouter([
   {
@@ -33,18 +33,18 @@ const router = createBrowserRouter([
     path: "/register",
     element: <Register />,
   },
-  // {
-  //   path: "/set-password",
-  //   element: <SetPassword />,
-  // },
-  // {
-  //   path: "/admin",
-  //   element: <Admin />,
-  // },
-  // {
-  //   path: "/review",
-  //   element: <Review />,
-  // },
+  {
+    path: "/set-password",
+    element: <SetPassword />,
+  },
+  {
+    path: "/admin",
+    element: <Admin />,
+  },
+  {
+    path: "/review",
+    element: <Review />,
+  },
 ]);
 
 const App: React.FC = () => {

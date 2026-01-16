@@ -60,5 +60,9 @@
   },
   "confirmation": {
     "title": "Kinnitus"
+  },
+  "nav": {
+    "review": "Ülevaatus",
+    "admin": "Admin"
   }
 }

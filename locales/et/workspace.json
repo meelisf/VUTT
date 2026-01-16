@@ -69,5 +69,14 @@
   },
   "confirm": {
     "unsavedChanges": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?"
+  },
+  "pendingEdit": {
+    "hasPending": "Sul on selle lehe kohta muudatus ülevaatusel.",
+    "otherPending": "Sellel lehel on {{count}} ootel muudatus(t) teistelt kasutajatelt.",
+    "saved": "Muudatus salvestatud ülevaatusele. Toimetaja vaatab selle üle.",
+    "savedWithConflict": "Muudatus salvestatud ülevaatusele. NB: Teine kasutaja on samale lehele juba muudatuse esitanud."
+  },
+  "status": {
+    "contributorDisabled": "Staatust saab muuta ainult toimetaja"
   }
 }

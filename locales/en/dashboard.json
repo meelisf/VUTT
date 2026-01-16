@@ -1,6 +1,8 @@
 {
   "header": {
-    "fullTextSearch": "Full-text search"
+    "fullTextSearch": "Full-text search",
+    "adminPanel": "Admin",
+    "reviewEdits": "Review"
   },
   "search": {
     "placeholder": "Search works by title or author...",

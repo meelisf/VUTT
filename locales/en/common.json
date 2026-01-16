@@ -60,5 +60,9 @@
   },
   "confirmation": {
     "title": "Confirmation"
+  },
+  "nav": {
+    "review": "Review",
+    "admin": "Admin"
   }
 }

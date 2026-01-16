@@ -6,7 +6,7 @@ import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag, FileEdit, Settings, ChevronDown } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
@@ -17,6 +17,7 @@ const Dashboard: React.FC = () => {
   const { user, logout, isLoading: userLoading } = useUser();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showAboutModal, setShowAboutModal] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -266,24 +267,82 @@ const Dashboard: React.FC = () => {
           </Link>
         </div>
         <div className="flex items-center gap-4">
-          <LanguageSwitcher />
           {user ? (
-            <>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-              </div>
-              <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
-                {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-              </div>
+            <div className="relative">
+              {/* Kasutaja avatar ja nimi - klikitav */}
               <button
-                onClick={logout}
-                className="p-2 text-gray-500 hover:bg-gray-100 rounded-full transition-colors"
-                title={t('auth:login.logout')}
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors"
               >
-                <LogOut size={18} />
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
+                </div>
+                <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
+                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+                <ChevronDown size={16} className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
               </button>
-            </>
+
+              {/* Rippmenüü */}
+              {showUserMenu && (
+                <>
+                  {/* Taust menüü sulgemiseks */}
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowUserMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-50">
+                    {/* Kasutaja nimi mobiilis */}
+                    <div className="sm:hidden px-4 py-2 border-b border-gray-100">
+                      <p className="font-medium text-gray-900">{user.name}</p>
+                      <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
+                    </div>
+
+                    {/* Ülevaatus link (editor+) */}
+                    {['editor', 'admin'].includes(user.role) && (
+                      <Link
+                        to="/review"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <FileEdit size={16} />
+                        {t('common:nav.review')}
+                      </Link>
+                    )}
+
+                    {/* Admin link (admin only) */}
+                    {user.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Settings size={16} />
+                        {t('common:nav.admin')}
+                      </Link>
+                    )}
+
+                    {/* Eraldaja kui on admin/editor lingid */}
+                    {['editor', 'admin'].includes(user.role) && (
+                      <div className="border-t border-gray-100 my-1" />
+                    )}
+
+                    {/* Logi välja */}
+                    <button
+                      onClick={() => {
+                        setShowUserMenu(false);
+                        logout();
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                    >
+                      <LogOut size={16} />
+                      {t('auth:login.logout')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}
@@ -293,6 +352,7 @@ const Dashboard: React.FC = () => {
               {t('auth:login.title')}
             </button>
           )}
+          <LanguageSwitcher />
         </div>
       </header>
 

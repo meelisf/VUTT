@@ -346,6 +346,266 @@ def add_registration(name, email, affiliation, motivation):
     print(f"Uus registreerimistaotlus: {name} ({email})")
     return registration, None
 
+def get_registration_by_id(reg_id):
+    """Leiab registreerimistaotluse ID järgi."""
+    data = load_pending_registrations()
+    for reg in data["registrations"]:
+        if reg["id"] == reg_id:
+            return reg
+    return None
+
+def update_registration_status(reg_id, status, reviewed_by):
+    """Uuendab registreerimistaotluse staatust."""
+    data = load_pending_registrations()
+    for reg in data["registrations"]:
+        if reg["id"] == reg_id:
+            reg["status"] = status
+            reg["reviewed_by"] = reviewed_by
+            reg["reviewed_at"] = datetime.now().isoformat()
+            save_pending_registrations(data)
+            return reg
+    return None
+
+# =========================================================
+# INVITE TOKENITE FUNKTSIOONID
+# =========================================================
+
+def load_invite_tokens():
+    """Laeb invite tokenid."""
+    if not os.path.exists(INVITE_TOKENS_FILE):
+        return {"tokens": []}
+    with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_invite_tokens(data):
+    """Salvestab invite tokenid."""
+    with open(INVITE_TOKENS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def create_invite_token(email, name, created_by):
+    """Loob uue invite tokeni (kehtiv 48h)."""
+    data = load_invite_tokens()
+
+    token = str(uuid.uuid4())
+    expires_at = datetime.now() + timedelta(hours=48)
+
+    token_data = {
+        "token": token,
+        "email": email.lower(),
+        "name": name,
+        "created_at": datetime.now().isoformat(),
+        "expires_at": expires_at.isoformat(),
+        "created_by": created_by,
+        "used": False
+    }
+
+    data["tokens"].append(token_data)
+    save_invite_tokens(data)
+
+    print(f"Loodud invite token kasutajale {name} ({email})")
+    return token_data
+
+def validate_invite_token(token):
+    """Kontrollib invite tokeni kehtivust. Tagastab (token_data, error)."""
+    data = load_invite_tokens()
+
+    for t in data["tokens"]:
+        if t["token"] == token:
+            if t["used"]:
+                return None, "Token on juba kasutatud"
+
+            expires = datetime.fromisoformat(t["expires_at"])
+            if datetime.now() > expires:
+                return None, "Token on aegunud"
+
+            return t, None
+
+    return None, "Token ei leitud"
+
+def use_invite_token(token):
+    """Märgib tokeni kasutatuks."""
+    data = load_invite_tokens()
+
+    for t in data["tokens"]:
+        if t["token"] == token:
+            t["used"] = True
+            t["used_at"] = datetime.now().isoformat()
+            save_invite_tokens(data)
+            return True
+
+    return False
+
+def create_user_from_invite(token, password):
+    """Loob kasutaja invite tokeni põhjal."""
+    token_data, error = validate_invite_token(token)
+    if error:
+        return None, error
+
+    email = token_data["email"]
+    name = token_data["name"]
+
+    # Genereeri kasutajanimi emaili põhjal
+    username = email.split('@')[0].lower()
+    username = re.sub(r'[^a-z0-9]', '', username)
+
+    # Kontrolli, kas kasutajanimi on juba olemas
+    users = load_users()
+    base_username = username
+    counter = 1
+    while username in users:
+        username = f"{base_username}{counter}"
+        counter += 1
+
+    # Loo uus kasutaja
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    users[username] = {
+        "password_hash": password_hash,
+        "name": name,
+        "email": email,
+        "role": "contributor",
+        "created_at": datetime.now().isoformat()
+    }
+
+    # Salvesta users.json
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+    # Märgi token kasutatuks
+    use_invite_token(token)
+
+    print(f"Loodud uus kasutaja: {username} ({name})")
+    return {"username": username, "name": name, "role": "contributor"}, None
+
+# =========================================================
+# PENDING-EDITS FUNKTSIOONID
+# =========================================================
+
+def load_pending_edits():
+    """Laeb ootel muudatused."""
+    if not os.path.exists(PENDING_EDITS_FILE):
+        return {"pending_edits": []}
+    with open(PENDING_EDITS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_pending_edits(data):
+    """Salvestab ootel muudatused."""
+    with open(PENDING_EDITS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def create_pending_edit(teose_id, lehekylje_number, user, original_text, new_text):
+    """
+    Loob uue pending-edit kirje.
+    Kontrollib konflikte ja tagastab (edit, error) tuple.
+    """
+    data = load_pending_edits()
+
+    # Arvuta base_text_hash konfliktide tuvastamiseks
+    base_text_hash = hashlib.sha256(original_text.encode('utf-8')).hexdigest()
+
+    # Kontrolli, kas sama kasutaja on juba teinud muudatuse samale lehele
+    # Kui jah, siis kirjuta see üle
+    existing_idx = None
+    other_pending = False
+
+    for idx, edit in enumerate(data["pending_edits"]):
+        if edit["teose_id"] == teose_id and edit["lehekylje_number"] == lehekylje_number:
+            if edit["status"] == "pending":
+                if edit["user"] == user["username"]:
+                    # Sama kasutaja - kirjutame üle
+                    existing_idx = idx
+                else:
+                    # Teine kasutaja on juba muudatuse teinud
+                    other_pending = True
+
+    # Konflikti tüüp
+    conflict_type = None
+    if other_pending:
+        conflict_type = "other_pending"
+
+    new_edit = {
+        "id": str(uuid.uuid4()),
+        "teose_id": teose_id,
+        "lehekylje_number": lehekylje_number,
+        "user": user["username"],
+        "user_name": user["name"],
+        "role_at_submission": user["role"],
+        "submitted_at": datetime.now().isoformat(),
+        "original_text": original_text,
+        "new_text": new_text,
+        "base_text_hash": base_text_hash,
+        "status": "pending",
+        "has_conflict": other_pending,
+        "conflict_type": conflict_type,
+        "reviewed_by": None,
+        "reviewed_at": None,
+        "review_comment": None
+    }
+
+    if existing_idx is not None:
+        # Asenda olemasolev
+        data["pending_edits"][existing_idx] = new_edit
+        print(f"Uuendatud pending-edit: {user['username']} -> {teose_id}/{lehekylje_number}")
+    else:
+        # Lisa uus
+        data["pending_edits"].append(new_edit)
+        print(f"Uus pending-edit: {user['username']} -> {teose_id}/{lehekylje_number}")
+
+    save_pending_edits(data)
+
+    return new_edit, None
+
+def get_pending_edit_by_id(edit_id):
+    """Leiab pending-edit ID järgi."""
+    data = load_pending_edits()
+    for edit in data["pending_edits"]:
+        if edit["id"] == edit_id:
+            return edit
+    return None
+
+def get_pending_edits_for_page(teose_id, lehekylje_number):
+    """Tagastab kõik ootel muudatused konkreetse lehe jaoks."""
+    data = load_pending_edits()
+    return [
+        edit for edit in data["pending_edits"]
+        if edit["teose_id"] == teose_id
+        and edit["lehekylje_number"] == lehekylje_number
+        and edit["status"] == "pending"
+    ]
+
+def get_user_pending_edit_for_page(teose_id, lehekylje_number, username):
+    """Tagastab kasutaja ootel muudatuse konkreetse lehe jaoks."""
+    data = load_pending_edits()
+    for edit in data["pending_edits"]:
+        if (edit["teose_id"] == teose_id
+            and edit["lehekylje_number"] == lehekylje_number
+            and edit["user"] == username
+            and edit["status"] == "pending"):
+            return edit
+    return None
+
+def update_pending_edit_status(edit_id, status, reviewed_by, comment=None):
+    """Uuendab pending-edit staatust."""
+    data = load_pending_edits()
+    for edit in data["pending_edits"]:
+        if edit["id"] == edit_id:
+            edit["status"] = status
+            edit["reviewed_by"] = reviewed_by
+            edit["reviewed_at"] = datetime.now().isoformat()
+            if comment:
+                edit["review_comment"] = comment
+            save_pending_edits(data)
+            return edit
+    return None
+
+def check_base_text_conflict(edit, current_text):
+    """
+    Kontrollib, kas originaaltekst on vahepeal muutunud.
+    Tagastab True kui on konflikt.
+    """
+    current_hash = hashlib.sha256(current_text.encode('utf-8')).hexdigest()
+    return current_hash != edit["base_text_hash"]
+
 def require_token(data, min_role=None):
     """
     Kontrollib tokenit päringus.
@@ -692,9 +952,46 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200, "ok")
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
+
+    def do_GET(self):
+        # GET /invite/{token} - tokeni kehtivuse kontroll (avalik)
+        if self.path.startswith('/invite/'):
+            token = self.path.split('/invite/')[1].split('?')[0]  # Eemalda query params
+
+            try:
+                token_data, error = validate_invite_token(token)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                if token_data:
+                    response = {
+                        "status": "success",
+                        "valid": True,
+                        "email": token_data["email"],
+                        "name": token_data["name"],
+                        "expires_at": token_data["expires_at"]
+                    }
+                else:
+                    response = {
+                        "status": "error",
+                        "valid": False,
+                        "message": error
+                    }
+
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"INVITE VALIDATE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        else:
+            self.send_error(404)
 
     def do_POST(self):
         if self.path == '/login':
@@ -1444,7 +1741,565 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"SUGGESTIONS VIGA: {e}")
                 self.send_error(500, str(e))
-                
+
+        # =========================================================
+        # ADMIN REGISTREERINGUTE ENDPOINTID
+        # =========================================================
+
+        elif self.path == '/admin/registrations':
+            # Tagastab ootel registreerimistaotlused (admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                reg_data = load_pending_registrations()
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "registrations": reg_data["registrations"]
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"ADMIN REGISTRATIONS VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/admin/registrations/approve':
+            # Kinnitab registreerimistaotluse ja loob invite tokeni (admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                reg_id = data.get('registration_id')
+                if not reg_id:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "registration_id puudub"}).encode('utf-8'))
+                    return
+
+                # Leia taotlus
+                reg = get_registration_by_id(reg_id)
+                if not reg:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlust ei leitud"}).encode('utf-8'))
+                    return
+
+                if reg["status"] != "pending":
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlus on juba käsitletud"}).encode('utf-8'))
+                    return
+
+                # Uuenda staatus
+                update_registration_status(reg_id, "approved", user["username"])
+
+                # Loo invite token
+                token_data = create_invite_token(reg["email"], reg["name"], user["username"])
+
+                # Genereeri link (kasutaja peab selle käsitsi saatma)
+                invite_url = f"/set-password?token={token_data['token']}"
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Taotlus kinnitatud",
+                    "invite_url": invite_url,
+                    "invite_token": token_data["token"],
+                    "expires_at": token_data["expires_at"],
+                    "email": reg["email"],
+                    "name": reg["name"]
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+                print(f"Admin {user['username']} kinnitas taotluse: {reg['name']} ({reg['email']})")
+
+            except Exception as e:
+                print(f"APPROVE REGISTRATION VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/admin/registrations/reject':
+            # Lükkab registreerimistaotluse tagasi (admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                reg_id = data.get('registration_id')
+                if not reg_id:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "registration_id puudub"}).encode('utf-8'))
+                    return
+
+                reg = get_registration_by_id(reg_id)
+                if not reg:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlust ei leitud"}).encode('utf-8'))
+                    return
+
+                if reg["status"] != "pending":
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlus on juba käsitletud"}).encode('utf-8'))
+                    return
+
+                # Uuenda staatus
+                update_registration_status(reg_id, "rejected", user["username"])
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Taotlus tagasi lükatud"
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+                print(f"Admin {user['username']} lükkas tagasi taotluse: {reg['name']} ({reg['email']})")
+
+            except Exception as e:
+                print(f"REJECT REGISTRATION VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # =========================================================
+        # PAROOLI SEADMISE ENDPOINT
+        # =========================================================
+
+        elif self.path == '/invite/set-password':
+            # Seab parooli invite tokeni abil (avalik)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                token = data.get('token', '').strip()
+                password = data.get('password', '')
+
+                if not token:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Token puudub"}).encode('utf-8'))
+                    return
+
+                if not password or len(password) < 8:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Parool peab olema vähemalt 8 tähemärki"}).encode('utf-8'))
+                    return
+
+                # Loo kasutaja
+                new_user, error = create_user_from_invite(token, password)
+
+                self.send_response(200 if new_user else 400)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                if new_user:
+                    response = {
+                        "status": "success",
+                        "message": "Kasutaja loodud",
+                        "username": new_user["username"],
+                        "name": new_user["name"]
+                    }
+                else:
+                    response = {
+                        "status": "error",
+                        "message": error
+                    }
+
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"SET PASSWORD VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # =========================================================
+        # PENDING-EDITS ENDPOINTID
+        # =========================================================
+
+        elif self.path == '/save-pending':
+            # Salvestab kaastöölise muudatuse pending-olekusse
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                # Nõuab vähemalt contributor õigusi
+                user, auth_error = require_token(data, min_role='contributor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                teose_id = data.get('teose_id')
+                lehekylje_number = data.get('lehekylje_number')
+                original_text = data.get('original_text', '')
+                new_text = data.get('new_text', '')
+
+                if not teose_id or lehekylje_number is None:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "teose_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
+                    return
+
+                # Kontrolli, kas teised kasutajad on juba muudatusi teinud
+                other_edits = get_pending_edits_for_page(teose_id, lehekylje_number)
+                other_users_edits = [e for e in other_edits if e["user"] != user["username"]]
+                has_other_pending = len(other_users_edits) > 0
+
+                # Loo pending-edit
+                edit, error = create_pending_edit(
+                    teose_id=teose_id,
+                    lehekylje_number=lehekylje_number,
+                    user=user,
+                    original_text=original_text,
+                    new_text=new_text
+                )
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Muudatus salvestatud ülevaatusele",
+                    "edit_id": edit["id"],
+                    "has_other_pending": has_other_pending
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"SAVE-PENDING VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/pending-edits':
+            # Tagastab ootel muudatused (toimetaja+)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                edits_data = load_pending_edits()
+
+                # Filtreeri ainult pending-staatusega
+                pending = [e for e in edits_data["pending_edits"] if e["status"] == "pending"]
+
+                # Sorteeri kuupäeva järgi (uuemad ees)
+                pending.sort(key=lambda x: x["submitted_at"], reverse=True)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "pending_edits": pending
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"PENDING-EDITS VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/pending-edits/check':
+            # Kontrollib, kas lehel on ootel muudatusi (contributor näeb oma muudatust)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='contributor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                teose_id = data.get('teose_id')
+                lehekylje_number = data.get('lehekylje_number')
+
+                if not teose_id or lehekylje_number is None:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "teose_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
+                    return
+
+                # Kasutaja enda muudatus
+                user_edit = get_user_pending_edit_for_page(teose_id, lehekylje_number, user["username"])
+
+                # Kas on teiste muudatusi (ainult toimetaja näeb)
+                all_edits = get_pending_edits_for_page(teose_id, lehekylje_number)
+                other_edits_count = len([e for e in all_edits if e["user"] != user["username"]])
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "has_own_pending": user_edit is not None,
+                    "own_pending_edit": user_edit,
+                    "other_pending_count": other_edits_count if user["role"] in ['editor', 'admin'] else 0
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"PENDING-EDITS CHECK VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/pending-edits/approve':
+            # Kinnitab pending-edit (toimetaja+)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                edit_id = data.get('edit_id')
+                comment = data.get('comment', '')
+
+                if not edit_id:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "edit_id puudub"}).encode('utf-8'))
+                    return
+
+                edit = get_pending_edit_by_id(edit_id)
+                if not edit:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Muudatust ei leitud"}).encode('utf-8'))
+                    return
+
+                if edit["status"] != "pending":
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Muudatus on juba käsitletud"}).encode('utf-8'))
+                    return
+
+                # Leia fail
+                dir_path = find_directory_by_id(edit["teose_id"])
+                if not dir_path:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Teost ei leitud"}).encode('utf-8'))
+                    return
+
+                # Leia .txt fail
+                txt_files = sorted(glob.glob(os.path.join(dir_path, '*.txt')))
+                if edit["lehekylje_number"] < 1 or edit["lehekylje_number"] > len(txt_files):
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Lehekülge ei leitud"}).encode('utf-8'))
+                    return
+
+                txt_path = txt_files[edit["lehekylje_number"] - 1]
+
+                # Loe praegune tekst konfliktide kontrolliks
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    current_text = f.read()
+
+                base_changed = check_base_text_conflict(edit, current_text)
+
+                # Salvesta uus tekst Git commiti abil
+                # Autor = kaastööline, kes muudatuse tegi
+                author_name = edit.get("user_name", edit["user"])
+                commit_message = f"Muuda: {os.path.basename(txt_path)} (kinnitatud {user['username']} poolt)"
+
+                git_result = save_with_git(
+                    filepath=txt_path,
+                    content=edit["new_text"],
+                    username=author_name,
+                    message=commit_message
+                )
+
+                # Uuenda Meilisearch
+                sync_work_to_meilisearch(os.path.basename(dir_path))
+
+                # Märgi muudatus kinnitatuks
+                update_pending_edit_status(edit_id, "approved", user["username"], comment)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Muudatus kinnitatud",
+                    "base_changed": base_changed,
+                    "git_commit": git_result.get("commit_hash", "")[:8] if git_result.get("success") else None
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+                print(f"Toimetaja {user['username']} kinnitas muudatuse: {edit['user']} -> {edit['teose_id']}/{edit['lehekylje_number']}")
+
+            except Exception as e:
+                print(f"APPROVE PENDING VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/pending-edits/reject':
+            # Lükkab pending-edit tagasi (toimetaja+)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='editor')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                edit_id = data.get('edit_id')
+                comment = data.get('comment', '')
+
+                if not edit_id:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "edit_id puudub"}).encode('utf-8'))
+                    return
+
+                edit = get_pending_edit_by_id(edit_id)
+                if not edit:
+                    self.send_response(404)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Muudatust ei leitud"}).encode('utf-8'))
+                    return
+
+                if edit["status"] != "pending":
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Muudatus on juba käsitletud"}).encode('utf-8'))
+                    return
+
+                # Märgi muudatus tagasilükatuks
+                update_pending_edit_status(edit_id, "rejected", user["username"], comment)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": "Muudatus tagasi lükatud"
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+                print(f"Toimetaja {user['username']} lükkas tagasi muudatuse: {edit['user']} -> {edit['teose_id']}/{edit['lehekylje_number']}")
+
+            except Exception as e:
+                print(f"REJECT PENDING VIGA: {e}")
+                self.send_error(500, str(e))
+
         else:
             self.send_error(404)
 

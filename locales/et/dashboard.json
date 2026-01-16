@@ -1,6 +1,8 @@
 {
   "header": {
-    "fullTextSearch": "Täisteksti otsing"
+    "fullTextSearch": "Täisteksti otsing",
+    "adminPanel": "Admin",
+    "reviewEdits": "Ülevaatus"
   },
   "search": {
     "placeholder": "Otsi teost pealkirja või autori järgi...",
