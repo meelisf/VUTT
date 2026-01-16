@@ -5,8 +5,8 @@ import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
 import Statistics from './pages/Statistics';
 import SearchPage from './pages/SearchPage';
-// Uued kasutajahalduse lehed (TODO: loo komponendid)
-// import Register from './pages/Register';
+// Kasutajahalduse lehed
+import Register from './pages/Register';
 // import SetPassword from './pages/SetPassword';
 // import Admin from './pages/Admin';
 // import Review from './pages/Review';
@@ -28,11 +28,11 @@ const router = createBrowserRouter([
     path: "/work/:workId/:pageNum",
     element: <Workspace />,
   },
-  // Uued kasutajahalduse route'id (TODO: eemalda kommentaarid kui komponendid valmis)
-  // {
-  //   path: "/register",
-  //   element: <Register />,
-  // },
+  // Kasutajahalduse route'id
+  {
+    path: "/register",
+    element: <Register />,
+  },
   // {
   //   path: "/set-password",
   //   element: <SetPassword />,

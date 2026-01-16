@@ -23,6 +23,9 @@ from git.exc import InvalidGitRepositoryError, GitCommandError
 DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
 BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR) 
 USERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "users.json")
+PENDING_REGISTRATIONS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending_registrations.json")
+INVITE_TOKENS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "invite_tokens.json")
+PENDING_EDITS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pending_edits.json")
 # =========================================================
 
 PORT = 8002
@@ -292,6 +295,56 @@ def create_session(user):
     }
     print(f"Uus sessioon loodud: {user['username']} (aktiivseid sessioone: {len(sessions)})")
     return token
+
+# =========================================================
+# REGISTREERIMISE FUNKTSIOONID
+# =========================================================
+
+def load_pending_registrations():
+    """Laeb ootel registreerimistaotlused."""
+    if not os.path.exists(PENDING_REGISTRATIONS_FILE):
+        return {"registrations": []}
+    with open(PENDING_REGISTRATIONS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_pending_registrations(data):
+    """Salvestab ootel registreerimistaotlused."""
+    with open(PENDING_REGISTRATIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def add_registration(name, email, affiliation, motivation):
+    """Lisab uue registreerimistaotluse."""
+    data = load_pending_registrations()
+
+    # Kontrolli, kas sama email on juba ootel
+    for reg in data["registrations"]:
+        if reg["email"].lower() == email.lower() and reg["status"] == "pending":
+            return None, "Selle e-posti aadressiga taotlus on juba ootel"
+
+    # Kontrolli, kas sama email on juba kasutajate seas
+    users = load_users()
+    for username, user_data in users.items():
+        # Kui kasutajal on email väli (tulevikus võib olla)
+        if user_data.get("email", "").lower() == email.lower():
+            return None, "Selle e-posti aadressiga kasutaja on juba olemas"
+
+    registration = {
+        "id": str(uuid.uuid4()),
+        "name": name,
+        "email": email.lower(),
+        "affiliation": affiliation,
+        "motivation": motivation,
+        "submitted_at": datetime.now().isoformat(),
+        "status": "pending",
+        "reviewed_by": None,
+        "reviewed_at": None
+    }
+
+    data["registrations"].append(registration)
+    save_pending_registrations(data)
+
+    print(f"Uus registreerimistaotlus: {name} ({email})")
+    return registration, None
 
 def require_token(data, min_role=None):
     """
@@ -704,7 +757,63 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"VERIFY-TOKEN VIGA: {e}")
                 self.send_error(500, str(e))
-                
+
+        elif self.path == '/register':
+            # Avalik registreerimistaotluse esitamine
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                name = data.get('name', '').strip()
+                email = data.get('email', '').strip()
+                affiliation = data.get('affiliation', '').strip() if data.get('affiliation') else None
+                motivation = data.get('motivation', '').strip()
+
+                # Valideerimine
+                if not name:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Nimi on kohustuslik"}).encode('utf-8'))
+                    return
+
+                if not email or '@' not in email:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Kehtiv e-posti aadress on kohustuslik"}).encode('utf-8'))
+                    return
+
+                if not motivation:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Motivatsioon on kohustuslik"}).encode('utf-8'))
+                    return
+
+                # Lisa taotlus
+                registration, error = add_registration(name, email, affiliation, motivation)
+
+                self.send_response(200 if registration else 400)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+
+                if registration:
+                    response = {"status": "success", "message": "Taotlus esitatud", "id": registration["id"]}
+                else:
+                    response = {"status": "error", "message": error}
+
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"REGISTER VIGA: {e}")
+                self.send_error(500, str(e))
+
         elif self.path == '/save':
             try:
                 content_length = int(self.headers['Content-Length'])

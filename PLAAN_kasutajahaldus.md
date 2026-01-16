@@ -295,24 +295,24 @@ Alternatiiv pending-edits jaoks: eraldi failid iga muudatuse kohta `pending/` ka
 
 ## 8. Implementeerimise järjekord
 
-### Faas 1: Rollisüsteem
-1. [ ] Uuenda rollid koodis (contributor/editor/admin)
-2. [ ] Uuenda `file_server.py` õiguste kontroll
-3. [ ] Uuenda UI rollide kuvamine
-4. [ ] Testi olemasolevate kasutajatega
+### Faas 1: Rollisüsteem ✅
+1. [x] Uuenda rollid koodis (contributor/editor/admin)
+2. [x] Uuenda `file_server.py` õiguste kontroll
+3. [x] Uuenda UI rollide kuvamine
+4. [x] Testi olemasolevate kasutajatega
 
 ### Faas 2: Registreerimine
-1. [ ] Loo `pending_registrations.json` struktuur
+1. [x] Loo `pending_registrations.json` struktuur
 2. [ ] Loo `/register` leht ja vorm
 3. [ ] Loo `POST /register` endpoint
 4. [ ] Loo `/admin` leht taotluste vaatamiseks
 5. [ ] Loo kinnitamise/tagasilükkamise endpointid
-6. [ ] Loo `invite_tokens.json` struktuur
+6. [x] Loo `invite_tokens.json` struktuur
 7. [ ] Loo `/set-password` leht
 8. [ ] Testi kogu registreerimisvoog
 
 ### Faas 3: Pending-muudatused
-1. [ ] Loo `pending_edits.json` struktuur
+1. [x] Loo `pending_edits.json` struktuur
 2. [ ] Muuda salvestamisloogika (contributor → pending)
 3. [ ] Loo `/review` leht
 4. [ ] Loo diff-vaate komponent
