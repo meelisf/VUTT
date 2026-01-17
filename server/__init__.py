@@ -42,7 +42,8 @@ from .pending_edits import (
 # Git operatsioonid
 from .git_ops import (
     get_or_init_repo, save_with_git, get_file_git_history,
-    get_file_at_commit, get_file_diff, commit_new_work_to_git
+    get_file_at_commit, get_file_diff, commit_new_work_to_git,
+    get_recent_commits
 )
 
 # Meilisearch operatsioonid

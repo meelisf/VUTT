@@ -120,7 +120,7 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 - `state/users.json` - User credentials (not in git!)
 - `state/invite_tokens.json` - Active invite links
 - `state/pending_registrations.json` - Registration requests awaiting approval
-- `state/pending_edits.json` - Contributor edits awaiting review
+- `state/pending_edits.json` - Reserved for future contributor review system
 
 ### Scripts (`scripts/`)
 - Migration and utility scripts
@@ -161,7 +161,14 @@ The text viewer uses a stateful parser for 1:1 line alignment with line numbers:
 - First commit per file = original OCR (always restorable)
 - Git repo located in `data/04_sorditud_dokumendid/.git`
 - Admin restores via "Ajalugu" tab (loads into editor, must save to persist)
-- Endpoints: `/git-history`, `/git-restore`, `/git-diff`
+- Endpoints: `/git-history`, `/git-restore`, `/git-diff`, `/recent-edits`
+
+### Recent Changes Page (`/review`)
+Git-based activity log accessible from user menu:
+- **Regular users**: see only their own changes, useful for "where did I leave off"
+- **Admin**: sees all users' changes, can filter to own changes
+- Each entry links directly to the page for quick continuation
+- Endpoint: `GET /recent-edits?token=...&user=...&limit=50`
 
 ### Moving Files Between Folders
 When reorganizing files (e.g., moving a page to different work):

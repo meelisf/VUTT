@@ -33,6 +33,7 @@ from server import (
     update_pending_edit_status, check_base_text_conflict,
     # Git
     save_with_git, get_file_git_history, get_file_at_commit, get_file_diff,
+    get_recent_commits,
     # Meilisearch
     sync_work_to_meilisearch, metadata_watcher_loop,
     # Utils
@@ -53,6 +54,71 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        # GET /recent-edits - viimased muudatused (Git-põhine)
+        if self.path.startswith('/recent-edits'):
+            try:
+                # Parsi query parameetrid
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                
+                # Autentimine on kohustuslik
+                auth_token = params.get('token', [None])[0]
+                if not auth_token:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Token puudub"}).encode('utf-8'))
+                    return
+                
+                session = sessions.get(auth_token)
+                if not session:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Kehtetu token"}).encode('utf-8'))
+                    return
+                
+                current_user = session['user']
+                is_admin = current_user.get('role') == 'admin'
+                
+                # Admin näeb kõiki, tavaline kasutaja ainult oma muudatusi
+                filter_user = params.get('user', [None])[0]
+                limit = int(params.get('limit', [30])[0])
+                
+                # Kui pole admin ja üritab teiste muudatusi vaadata
+                if not is_admin and filter_user and filter_user != current_user.get('name'):
+                    filter_user = current_user.get('name')
+                
+                # Kui pole admin ja ei ole filtrit, näita ainult oma muudatusi
+                if not is_admin and not filter_user:
+                    filter_user = current_user.get('name')
+                
+                # Hangi commitid
+                commits = get_recent_commits(username=filter_user, limit=limit)
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+                
+                response = {
+                    "status": "success",
+                    "commits": commits,
+                    "is_admin": is_admin,
+                    "filtered_by": filter_user
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                
+            except Exception as e:
+                print(f"RECENT-EDITS VIGA: {e}")
+                import traceback
+                traceback.print_exc()
+                self.send_error(500, str(e))
+            return
+
         # GET /invite/{token} - tokeni kehtivuse kontroll (avalik)
         if self.path.startswith('/invite/'):
             token = self.path.split('/invite/')[1].split('?')[0]  # Eemalda query params

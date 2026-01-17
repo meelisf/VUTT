@@ -2,12 +2,42 @@
 Git versioonihalduse operatsioonid.
 """
 import os
+import json
+import re
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
 from .config import BASE_DIR
 
 # Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
 _git_repo = None
+
+# Cache teose_id jaoks (kausta nimi -> teose_id)
+_teose_id_cache = {}
+
+
+def get_teose_id_from_folder(folder_name):
+    """
+    Leiab teose_id kausta nime järgi.
+    Loeb _metadata.json failist, kui olemas, muidu tagastab kausta nime.
+    Kasutab cache'i, et vältida korduvaid faililugemisi.
+    """
+    if folder_name in _teose_id_cache:
+        return _teose_id_cache[folder_name]
+    
+    # Proovi lugeda _metadata.json
+    metadata_path = os.path.join(BASE_DIR, folder_name, '_metadata.json')
+    teose_id = folder_name  # Vaikimisi kausta nimi
+    
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+                teose_id = meta.get('teose_id', folder_name)
+        except (json.JSONDecodeError, IOError):
+            pass  # Kasuta kausta nime
+    
+    _teose_id_cache[folder_name] = teose_id
+    return teose_id
 
 
 def get_or_init_repo():
@@ -215,3 +245,97 @@ def commit_new_work_to_git(dir_name):
     except Exception as e:
         print(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
         return False
+
+
+def get_recent_commits(username=None, limit=50):
+    """
+    Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.
+    
+    Args:
+        username: Kui määratud, tagastab ainult selle kasutaja commitid
+        limit: Maksimaalne commitide arv
+    
+    Returns:
+        list: Commitide nimekiri koos teose ja lehekülje infoga
+    """
+    repo = get_or_init_repo()
+    
+    try:
+        all_commits = list(repo.iter_commits(max_count=limit * 3))  # Võtame rohkem, et filtreerimise järel piisaks
+    except:
+        return []
+    
+    results = []
+    seen_files = set()  # Vältimaks duplikaate sama faili kohta
+    
+    for commit in all_commits:
+        # Filtreeri kasutaja järgi (kui määratud)
+        if username and commit.author.name != username:
+            continue
+        
+        # Jäta vahele automaatsed commitid
+        if commit.author.name == "Automaatne":
+            continue
+        
+        # Leia muudetud failid selles commitis
+        try:
+            if commit.parents:
+                # Võrdle parent commitiga
+                diffs = commit.parents[0].diff(commit)
+            else:
+                # Esimene commit - kõik failid on uued
+                diffs = commit.diff(None)
+            
+            for diff in diffs:
+                filepath = diff.b_path or diff.a_path
+                if not filepath or not filepath.endswith('.txt'):
+                    continue
+                
+                # Parsi kausta nimi ja lehekylje_number failiteest
+                parts = filepath.split('/')
+                if len(parts) < 2:
+                    continue
+                
+                folder_name = parts[0]
+                filename = parts[-1]
+                
+                # Leia teose_id _metadata.json failist (või kasuta kausta nime)
+                teose_id = get_teose_id_from_folder(folder_name)
+                
+                # Eralda lehekülje number failinimest (nt "lk_003.txt" → 3)
+                page_num = 1
+                name_without_ext = filename.rsplit('.', 1)[0]
+                # Proovi leida number failinimest
+                numbers = re.findall(r'\d+', name_without_ext)
+                if numbers:
+                    page_num = int(numbers[-1])
+                
+                # Unikaalne võti (et vältida duplikaate)
+                file_key = f"{teose_id}/{page_num}"
+                if file_key in seen_files:
+                    continue
+                seen_files.add(file_key)
+                
+                results.append({
+                    "commit_hash": commit.hexsha[:8],
+                    "full_hash": commit.hexsha,
+                    "author": commit.author.name,
+                    "date": commit.committed_datetime.isoformat(),
+                    "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
+                    "message": commit.message.strip(),
+                    "teose_id": teose_id,
+                    "lehekylje_number": page_num,
+                    "filepath": filepath
+                })
+                
+                if len(results) >= limit:
+                    break
+            
+            if len(results) >= limit:
+                break
+                
+        except Exception as e:
+            print(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
+            continue
+    
+    return results

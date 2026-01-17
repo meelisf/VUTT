@@ -6,7 +6,7 @@ import WorkCard from '../components/WorkCard';
 import LoginModal from '../components/LoginModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag, FileEdit, Settings, ChevronDown } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag, History, Settings, ChevronDown } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
@@ -299,17 +299,15 @@ const Dashboard: React.FC = () => {
                       <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
                     </div>
 
-                    {/* Ülevaatus link (editor+) */}
-                    {['editor', 'admin'].includes(user.role) && (
-                      <Link
-                        to="/review"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <FileEdit size={16} />
-                        {t('common:nav.review')}
-                      </Link>
-                    )}
+                    {/* Viimased muudatused link (kõigile) */}
+                    <Link
+                      to="/review"
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <History size={16} />
+                      {t('common:nav.review')}
+                    </Link>
 
                     {/* Admin link (admin only) */}
                     {user.role === 'admin' && (
@@ -323,10 +321,8 @@ const Dashboard: React.FC = () => {
                       </Link>
                     )}
 
-                    {/* Eraldaja kui on admin/editor lingid */}
-                    {['editor', 'admin'].includes(user.role) && (
-                      <div className="border-t border-gray-100 my-1" />
-                    )}
+                    {/* Eraldaja */}
+                    <div className="border-t border-gray-100 my-1" />
 
                     {/* Logi välja */}
                     <button

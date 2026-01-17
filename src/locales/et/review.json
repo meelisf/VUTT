@@ -1,36 +1,23 @@
 {
-  "title": "Muudatuste ülevaatus",
-  "subtitle": "Vaata üle ja kinnita kaastööliste muudatused",
-  "empty": "Ühtegi ootel muudatust pole",
-  "list": {
-    "user": "Kasutaja",
-    "work": "Teos",
-    "page": "Lehekülg",
-    "submitted": "Esitatud",
-    "conflict": "Konflikt"
+  "title": "Viimased muudatused",
+  "subtitle": "Sinu viimased töökohad",
+  "subtitleAdmin": "Kõigi kasutajate muudatused",
+  "empty": "Muudatusi pole veel tehtud",
+  "emptyUser": "Sa pole veel ühtegi muudatust teinud",
+  "loading": "Laadin muudatusi...",
+  "error": "Muudatuste laadimine ebaõnnestus",
+  "table": {
+    "when": "Millal",
+    "who": "Kes",
+    "what": "Mida",
+    "where": "Kus"
   },
-  "detail": {
-    "title": "Muudatuse detailid",
-    "submittedBy": "Esitas",
-    "submittedAt": "Esitatud",
-    "originalText": "Algne tekst",
-    "newText": "Uus tekst",
-    "diff": "Muudatused",
-    "image": "Pilt"
-  },
-  "conflicts": {
-    "otherPending": "Teine kasutaja on samale lehele muudatuse esitanud",
-    "baseChanged": "Tekst on vahepeal muutunud",
-    "both": "Mitu konflikti"
+  "filters": {
+    "all": "Kõik kasutajad",
+    "onlyMine": "Ainult minu muudatused"
   },
   "actions": {
-    "approve": "Kinnita",
-    "reject": "Lükka tagasi",
-    "approveWithComment": "Kinnita kommentaariga",
-    "rejectReason": "Tagasilükkamise põhjus"
-  },
-  "success": {
-    "approved": "Muudatus kinnitatud",
-    "rejected": "Muudatus tagasi lükatud"
+    "openPage": "Ava lehekülg",
+    "continue": "Jätka tööd"
   }
 }
