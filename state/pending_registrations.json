@@ -1,0 +1,26 @@
+{
+  "registrations": [
+    {
+      "id": "78ff7705-a805-42c8-8e58-b29f81dca429",
+      "name": "Test Kasutaja",
+      "email": "meelis.friedenthal@gmail.com",
+      "affiliation": "Tartu ülikool",
+      "motivation": "siin on lihtsalt mingi teade.",
+      "submitted_at": "2026-01-16T20:45:03.049057",
+      "status": "approved",
+      "reviewed_by": "admin",
+      "reviewed_at": "2026-01-16T20:45:21.083593"
+    },
+    {
+      "id": "24f1004f-9759-490a-8ae6-9e9bde8eaa89",
+      "name": "test kasutaja",
+      "email": "meelis.friedenthal@gmail.com",
+      "affiliation": "Tartu ülikooli",
+      "motivation": "mingi küsimus jne.",
+      "submitted_at": "2026-01-17T19:09:40.845792",
+      "status": "approved",
+      "reviewed_by": "admin",
+      "reviewed_at": "2026-01-17T19:10:16.201238"
+    }
+  ]
+}

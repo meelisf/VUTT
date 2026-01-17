@@ -70,8 +70,18 @@ const SetPassword: React.FC = () => {
     if (!password) {
       return t('setPassword.errors.passwordRequired');
     }
-    if (password.length < 8) {
+    if (password.length < 12) {
       return t('setPassword.errors.passwordTooShort');
+    }
+    // Lihtsa parooli kontroll - vähemalt 4 erinevat tähemärki
+    const uniqueChars = new Set(password).size;
+    if (uniqueChars < 4) {
+      return t('setPassword.errors.passwordTooSimple');
+    }
+    // Keela korduvad tähed ja numbrijadad
+    const simplePatterns = ['123456789012', '111111111111', 'aaaaaaaaaaaa', 'password1234', 'qwertyuiop12'];
+    if (simplePatterns.includes(password.toLowerCase()) || password === password[0].repeat(password.length)) {
+      return t('setPassword.errors.passwordTooSimple');
     }
     if (password !== passwordConfirm) {
       return t('setPassword.errors.passwordMismatch');
@@ -238,7 +248,7 @@ const SetPassword: React.FC = () => {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Vähemalt 8 tähemärki</p>
+              <p className="text-xs text-gray-500 mt-1">{t('setPassword.passwordHint')}</p>
             </div>
 
             {/* Kinnita parool */}

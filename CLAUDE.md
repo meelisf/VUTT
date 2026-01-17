@@ -20,19 +20,19 @@ npm run build         # Production build to dist/
 ./start_services.sh   # Starts meilisearch + python servers
 
 # Or start services individually:
-docker compose up meilisearch   # Meilisearch on port 7700
-python3 file_server.py          # File server on port 8002
-python3 image_server.py         # Image server on port 8001
+docker compose up meilisearch       # Meilisearch on port 7700
+python3 server/file_server.py       # File server on port 8002
+python3 server/image_server.py      # Image server on port 8001
 
 # Data management
 python3 scripts/sync_meilisearch.py          # Compare Meilisearch with filesystem (dry-run)
 python3 scripts/sync_meilisearch.py --apply  # Apply sync changes
 
 # Full re-indexing (if needed)
-python3 1-1_consolidate_data.py  # Generate JSONL from filesystem
-python3 2-1_upload_to_meili.py   # Upload to Meilisearch
+python3 scripts/1-1_consolidate_data.py  # Generate JSONL from filesystem
+python3 scripts/2-1_upload_to_meili.py   # Upload to Meilisearch
 
-# Generate password hash for users.json
+# Generate password hash for state/users.json
 echo -n "password" | sha256sum
 ```
 
@@ -95,29 +95,49 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ## File Structure
 
-### Frontend
-- `/pages/` - Route components: Dashboard, Workspace, SearchPage, Statistics
-- `/components/` - UI: ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
-- `/services/meiliService.ts` - All Meilisearch operations
-- `/contexts/UserContext.tsx` - Authentication state
-- `config.ts` - Server URLs with `DEPLOYMENT_MODE`: 'nginx' (HTTPS) or 'direct' (HTTP internal)
+### Frontend (`src/`)
+- `src/pages/` - Route components: Dashboard, Workspace, SearchPage, Statistics
+- `src/components/` - UI: ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
+- `src/services/meiliService.ts` - All Meilisearch operations
+- `src/contexts/UserContext.tsx` - Authentication state
+- `src/config.ts` - Server URLs with `DEPLOYMENT_MODE`: 'nginx' (HTTPS) or 'direct' (HTTP internal)
+- `src/locales/{et,en}/` - Translation files
 
-### Backend (Python)
-- `file_server.py` - Main HTTP server with RequestHandler (endpoints)
-- `image_server.py` - Image serving with CORS
-- `/server/` - Modular backend code (refactored 2026-01-17):
-  - `config.py` - Configuration (paths, ports, rate limits, CORS origins)
-  - `auth.py` - Sessions, user verification, `require_token()`
-  - `cors.py` - CORS header functions
-  - `rate_limit.py` - IP-based rate limiting
-  - `registration.py` - User registration + invite tokens
-  - `pending_edits.py` - Contributor pending edits management
-  - `git_ops.py` - Git version control operations
-  - `meilisearch_ops.py` - Meilisearch sync, metadata watcher
-  - `utils.py` - Helper functions (sanitize_id, find_directory_by_id)
+### Backend (`server/`)
+- `server/file_server.py` - Main HTTP server with RequestHandler (endpoints)
+- `server/image_server.py` - Image serving with CORS
+- `server/config.py` - Configuration (paths, ports, rate limits, CORS origins)
+- `server/auth.py` - Sessions, user verification, `require_token()`
+- `server/cors.py` - CORS header functions
+- `server/rate_limit.py` - IP-based rate limiting
+- `server/registration.py` - User registration + invite tokens
+- `server/pending_edits.py` - Contributor pending edits management
+- `server/git_ops.py` - Git version control operations
+- `server/meilisearch_ops.py` - Meilisearch sync, metadata watcher
+- `server/utils.py` - Helper functions (sanitize_id, find_directory_by_id)
 
-### Scripts & Data
-- `/scripts/` - Migration and utility scripts
+### State (`state/`)
+- `state/users.json` - User credentials (not in git!)
+- `state/invite_tokens.json` - Active invite links
+- `state/pending_registrations.json` - Registration requests awaiting approval
+- `state/pending_edits.json` - Contributor edits awaiting review
+
+### Scripts (`scripts/`)
+- Migration and utility scripts
+- `scripts/sync_meilisearch.py` - Sync filesystem with Meilisearch
+- `scripts/1-1_consolidate_data.py` - Generate JSONL from filesystem
+- `scripts/2-1_upload_to_meili.py` - Upload to Meilisearch
+
+### Docs (`docs/`)
+- `docs/deployment_guide.md` - Production deployment instructions
+- `docs/PLAAN_kasutajahaldus.md` - User management implementation plan
+
+### Root
+- `index.html` - Vite entry point
+- `package.json`, `vite.config.ts`, `tsconfig.json`, `tailwind.config.js` - Build config
+- `docker-compose.yml`, `Dockerfile`, `nginx.conf` - Deployment
+- `start_services.sh` - Local service launcher
+- `public/` - Static assets (transcription_guide.html, special_characters.json)
 
 ## Key Patterns
 
@@ -160,8 +180,8 @@ Uses `react-i18next` with translations bundled directly (no HTTP backend).
 
 **Files:**
 - `i18n.ts` - Configuration, imports all translation JSONs
-- `components/LanguageSwitcher.tsx` - Toggle button (Lucide Languages icon + language name)
-- `locales/{et,en}/*.json` - Translation files by namespace
+- `src/components/LanguageSwitcher.tsx` - Toggle button (Lucide Languages icon + language name)
+- `src/locales/{et,en}/*.json` - Translation files by namespace
 
 **Namespaces:** `common`, `auth`, `dashboard`, `workspace`, `search`, `statistics`, `admin`, `register`, `review`
 
@@ -210,7 +230,7 @@ python3 scripts/sync_meilisearch.py --apply
 4. Update relevant component
 
 ### Adding users
-Edit `users.json` with SHA-256 hashed password:
+Edit `state/users.json` with SHA-256 hashed password:
 ```json
 {
   "username": {
@@ -220,7 +240,7 @@ Edit `users.json` with SHA-256 hashed password:
   }
 }
 ```
-**Note:** Self-registration system is planned (see `PLAAN_kasutajahaldus.md`).
+**Note:** Self-registration system is planned (see `docs/PLAAN_kasutajahaldus.md`).
 
 ### Adding translations
 1. Add keys to both `locales/et/{namespace}.json` and `locales/en/{namespace}.json`
@@ -237,6 +257,7 @@ Edit `users.json` with SHA-256 hashed password:
 ### Current Implementation
 - **Session tokens**: UUID-based, 24h expiry (checked in `require_token()`)
 - **Password hashing**: SHA-256 (no salt) - adequate for internal use
+- **Password requirements**: min 12 chars, min 4 unique chars, no simple patterns
 - **Role hierarchy**: contributor (0) < editor (1) < admin (2)
 - **Path traversal protection**: `os.path.basename()` on all file paths
 - **No default users**: `users.json` must exist, no auto-creation
@@ -247,7 +268,7 @@ Edit `users.json` with SHA-256 hashed password:
 - ✅ Invite tokens expire in 48h and can only be used once
 - ✅ Duplicate email check on registration
 - ✅ Email normalization (lowercase)
-- ✅ Minimum password length (8 chars)
+- ✅ Minimum password length (12 chars) with complexity check
 - ✅ All admin endpoints require `min_role='admin'`
 - ✅ Editor endpoints require `min_role='editor'`
 - ✅ Contributors can only edit text, not change status
@@ -315,7 +336,7 @@ curl -X PATCH 'http://HOST:7700/indexes/teosed/settings' \
 - `docker-compose.yml` - Service definitions
 - `nginx.conf` - Reverse proxy config
 - `Dockerfile` - Python backend image
-- `users.json` - User credentials (not in git!)
+- `state/users.json` - User credentials (not in git!)
 - `.env` - Meilisearch key (not in git!)
 - `dist/` - Built frontend (run `npm run build` first)
 
@@ -342,7 +363,7 @@ See `PLAAN_kasutajahaldus.md` for detailed implementation plan.
 
 **New pages:** `/register`, `/set-password`, `/admin`, `/review`
 
-**New data files:**
+**State files (in `state/` folder):**
 - `pending_registrations.json` - registration requests
 - `invite_tokens.json` - invite links
 - `pending_edits.json` - contributor edits awaiting review

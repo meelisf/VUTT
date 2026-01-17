@@ -20,3 +20,5 @@ data.ms/
 # Project specific
 *.backup.*
 meilisearch
+# State files with sensitive data (keep templates, not actual data)
+state/users.json

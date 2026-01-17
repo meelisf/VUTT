@@ -149,18 +149,18 @@ Enne avalikku kasutamist veendu, et kõik punktid on täidetud:
   - Port 8002 (File server) - SULETUD väljapoolt
   - Kontrolli: `sudo ufw status` või `sudo iptables -L`
 
-- [ ] **CORS piiratud** - Pärast domeeni saamist muuda `file_server.py`:
+- [ ] **CORS piiratud** - Konfigureeritud `server/config.py` failis:
   ```python
-  # Asenda '*' konkreetse domeeniga:
-  allowed_origins = ['https://vutt.utlib.ut.ee'] #nt
-  origin = self.headers.get('Origin')
-  if origin in allowed_origins:
-      self.send_header('Access-Control-Allow-Origin', origin)
+  # ALLOWED_ORIGINS list failis server/config.py
+  ALLOWED_ORIGINS = [
+      'https://vutt.utlib.ut.ee',
+      # ... jne
+  ]
   ```
 
 ### Kohustuslik (Kasutajad ja paroolid)
 
-- [ ] **users.json loodud** - Fail peab eksisteerima (automaatselt ei looda!)
+- [ ] **state/users.json loodud** - Fail peab eksisteerima (automaatselt ei looda!)
   ```bash
   # Parooli hash:
   echo -n 'tugev_parool_123' | sha256sum

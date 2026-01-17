@@ -13,12 +13,13 @@ from datetime import timedelta
 DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
 BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 
-# JSON failide asukohad (sama kaustas kui file_server.py)
-_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-USERS_FILE = os.path.join(_SERVER_DIR, "users.json")
-PENDING_REGISTRATIONS_FILE = os.path.join(_SERVER_DIR, "pending_registrations.json")
-INVITE_TOKENS_FILE = os.path.join(_SERVER_DIR, "invite_tokens.json")
-PENDING_EDITS_FILE = os.path.join(_SERVER_DIR, "pending_edits.json")
+# JSON failide asukohad (state/ kaustas projekti juurkataloogis)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_STATE_DIR = os.path.join(_PROJECT_ROOT, "state")
+USERS_FILE = os.path.join(_STATE_DIR, "users.json")
+PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
+INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
+PENDING_EDITS_FILE = os.path.join(_STATE_DIR, "pending_edits.json")
 
 # =========================================================
 # SERVERI SEADED
@@ -68,7 +69,7 @@ INDEX_NAME = "teosed"
 def load_env():
     """Laeb .env failist Meilisearchi andmed."""
     global MEILI_URL, MEILI_KEY
-    env_path = os.path.join(_SERVER_DIR, ".env")
+    env_path = os.path.join(_PROJECT_ROOT, ".env")
     if os.path.exists(env_path):
         with open(env_path, 'r') as f:
             for line in f:

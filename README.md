@@ -112,7 +112,7 @@ See on lihtsaim viis VUTT-i käivitamiseks serveris või oma arvutis.
 
 **Serverisse paigaldamine (HTTPS):**
 Tootmiskeskkonnas (`vutt.utlib.ut.ee`) kasutab rakendus Nginxi reverse proxy-t ja HTTPS-i.
-Täpsemat infot uude serverisse paigaldamise, andmete kolimise ja HTTPS-i seadistamise kohta loe failist **[deployment_guide.md](deployment_guide.md)**.
+Täpsemat infot uude serverisse paigaldamise, andmete kolimise ja HTTPS-i seadistamise kohta loe failist **[docs/deployment_guide.md](docs/deployment_guide.md)**.
 
 ### Arendus (Manuaalne paigaldus)
 
@@ -129,14 +129,14 @@ npm install
 ./start_services.sh
 
 # Või eraldi terminalides:
-docker compose up meilisearch  # Ainult andmebaas
-python3 file_server.py         # Backend
-python3 image_server.py        # Pildid
-npm run dev                    # Frontend
+docker compose up meilisearch     # Ainult andmebaas
+python3 server/file_server.py     # Backend
+python3 server/image_server.py    # Pildid
+npm run dev                       # Frontend
 ```
 
 #### 3. Konfiguratsioon
-Arenduses (`npm run dev`) loeb rakendus sätteid failist `config.ts`, kasutades `DEV_IP` muutujat. Produktsioonis (Docker/Nginx) kasutatakse suhtelisi radu (`/api/...`).
+Arenduses (`npm run dev`) loeb rakendus sätteid failist `src/config.ts`, kasutades `DEV_IP` muutujat. Produktsioonis (Docker/Nginx) kasutatakse suhtelisi radu (`/api/...`).
 
 ### Andmete ettevalmistamine
 

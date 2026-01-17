@@ -31,10 +31,13 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
+# Lisa praegune kaust PYTHONPATH-i, et server/ moodul oleks leitav
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$(pwd)"
+
 echo "Käivitan Pildiserveri (Port 8001)..."
-nohup python3 image_server.py > logs/pildiserver.log 2>&1 &
+nohup python3 server/image_server.py > logs/pildiserver.log 2>&1 &
 echo "Pildiserver PID: $!"
 
 echo "Käivitan Failisalvestuse API (Port 8002)..."
-nohup python3 file_server.py > logs/apiserver.log 2>&1 &
+nohup python3 server/file_server.py > logs/apiserver.log 2>&1 &
 echo "API Server PID: $!"

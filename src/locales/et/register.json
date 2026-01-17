@@ -28,11 +28,13 @@
     "subtitle": "Vali oma kontole tugev parool",
     "password": "Parool",
     "passwordConfirm": "Kinnita parool",
+    "passwordHint": "Soovitus: kasuta paroolifraasi, nt 'minukassarmastabkala' – pikem on turvalisem ja lihtsam meeles pidada",
     "submit": "Salvesta parool",
     "success": "Parool seadistatud! Võid nüüd sisse logida.",
     "errors": {
       "passwordRequired": "Parool on kohustuslik",
-      "passwordTooShort": "Parool peab olema vähemalt 8 tähemärki",
+      "passwordTooShort": "Parool peab olema vähemalt 12 tähemärki",
+      "passwordTooSimple": "Parool on liiga lihtne – kasuta rohkem erinevaid tähemärke",
       "passwordMismatch": "Paroolid ei ühti",
       "tokenInvalid": "Kutse link on aegunud või vigane",
       "saveFailed": "Parooli salvestamine ebaõnnestus"

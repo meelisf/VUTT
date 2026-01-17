@@ -1181,12 +1181,31 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps({"status": "error", "message": "Token puudub"}).encode('utf-8'))
                     return
 
-                if not password or len(password) < 8:
+                if not password or len(password) < 12:
                     self.send_response(400)
                     self.send_header('Content-type', 'application/json')
                     send_cors_headers(self)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Parool peab olema vähemalt 8 tähemärki"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"status": "error", "message": "Parool peab olema vähemalt 12 tähemärki"}).encode('utf-8'))
+                    return
+
+                # Lihtsa parooli kontroll
+                if len(set(password)) < 4:  # Liiga vähe erinevaid tähemärke
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Parool on liiga lihtne - kasuta rohkem erinevaid tähemärke"}).encode('utf-8'))
+                    return
+
+                # Keela numbrijadad ja korduvad mustrid
+                simple_patterns = ['123456789012', '111111111111', 'aaaaaaaaaaaa', 'password1234', 'qwertyuiop12']
+                if password.lower() in simple_patterns or password == password[0] * len(password):
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "Parool on liiga lihtne - vali tugevam parool"}).encode('utf-8'))
                     return
 
                 # Loo kasutaja

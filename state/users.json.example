@@ -1,0 +1,17 @@
+{
+  "admin": {
+    "password_hash": "<sha256-of-password>",
+    "name": "Administrator",
+    "role": "admin"
+  },
+  "editor": {
+    "password_hash": "<sha256-of-password>",
+    "name": "Toimetaja",
+    "role": "editor"
+  },
+  "contributor": {
+    "password_hash": "<sha256-of-password>",
+    "name": "Kaastööline",
+    "role": "contributor"
+  }
+}

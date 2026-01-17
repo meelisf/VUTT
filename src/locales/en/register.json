@@ -28,11 +28,13 @@
     "subtitle": "Choose a strong password for your account",
     "password": "Password",
     "passwordConfirm": "Confirm password",
+    "passwordHint": "Tip: use a passphrase like 'mycatloveseatingfish' – longer is safer and easier to remember",
     "submit": "Save password",
     "success": "Password set! You can now log in.",
     "errors": {
       "passwordRequired": "Password is required",
-      "passwordTooShort": "Password must be at least 8 characters",
+      "passwordTooShort": "Password must be at least 12 characters",
+      "passwordTooSimple": "Password is too simple – use more different characters",
       "passwordMismatch": "Passwords do not match",
       "tokenInvalid": "Invite link is expired or invalid",
       "saveFailed": "Failed to save password"
