@@ -1,0 +1,87 @@
+"""
+Serveri konfiguratsioon.
+Kõik seaded ja konstandid ühes kohas.
+"""
+import os
+from datetime import timedelta
+
+# =========================================================
+# FAILISÜSTEEMI TEED
+# =========================================================
+
+# VUTT_DATA_DIR env variable allows overriding the path for Docker/Production
+DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
+
+# JSON failide asukohad (sama kaustas kui file_server.py)
+_SERVER_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+USERS_FILE = os.path.join(_SERVER_DIR, "users.json")
+PENDING_REGISTRATIONS_FILE = os.path.join(_SERVER_DIR, "pending_registrations.json")
+INVITE_TOKENS_FILE = os.path.join(_SERVER_DIR, "invite_tokens.json")
+PENDING_EDITS_FILE = os.path.join(_SERVER_DIR, "pending_edits.json")
+
+# =========================================================
+# SERVERI SEADED
+# =========================================================
+
+PORT = 8002
+
+# =========================================================
+# SESSIOONID
+# =========================================================
+
+# Sessiooni kehtivusaeg
+SESSION_DURATION = timedelta(hours=24)
+
+# =========================================================
+# CORS - lubatud päritolud
+# =========================================================
+
+ALLOWED_ORIGINS = [
+    'https://vutt.utlib.ut.ee',
+    'http://vutt.utlib.ut.ee',
+    'http://localhost:5173',      # Vite dev server
+    'http://localhost:3000',      # Alternatiivne dev port
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+]
+
+# =========================================================
+# RATE LIMITING
+# =========================================================
+
+# (max_requests, window_seconds)
+RATE_LIMITS = {
+    '/login': (5, 60),              # 5 katset minutis
+    '/register': (3, 3600),         # 3 taotlust tunnis
+    '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
+}
+
+# =========================================================
+# MEILISEARCH
+# =========================================================
+
+MEILI_URL = "http://127.0.0.1:7700"
+MEILI_KEY = ""  # Laetakse .env failist
+INDEX_NAME = "teosed"
+
+def load_env():
+    """Laeb .env failist Meilisearchi andmed."""
+    global MEILI_URL, MEILI_KEY
+    env_path = os.path.join(_SERVER_DIR, ".env")
+    if os.path.exists(env_path):
+        with open(env_path, 'r') as f:
+            for line in f:
+                if '=' in line and not line.startswith('#'):
+                    key, value = line.strip().split('=', 1)
+                    value = value.strip('"').strip("'")
+                    if key == "MEILISEARCH_URL":
+                        MEILI_URL = value
+                    elif key == "MEILISEARCH_MASTER_KEY":
+                        MEILI_KEY = value
+                    elif key == "MEILI_SEARCH_API_KEY" and not MEILI_KEY:
+                        MEILI_KEY = value
+    print(f"Meilisearch URL: {MEILI_URL}")
+
+# Lae env kohe mooduli importimisel
+load_env()

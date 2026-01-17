@@ -95,14 +95,29 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ## File Structure
 
+### Frontend
 - `/pages/` - Route components: Dashboard, Workspace, SearchPage, Statistics
 - `/components/` - UI: ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
 - `/services/meiliService.ts` - All Meilisearch operations
 - `/contexts/UserContext.tsx` - Authentication state
-- `/scripts/` - Migration and utility scripts
-- `file_server.py` - File persistence + auth + auto-indexing background thread
-- `image_server.py` - Image serving with CORS
 - `config.ts` - Server URLs with `DEPLOYMENT_MODE`: 'nginx' (HTTPS) or 'direct' (HTTP internal)
+
+### Backend (Python)
+- `file_server.py` - Main HTTP server with RequestHandler (endpoints)
+- `image_server.py` - Image serving with CORS
+- `/server/` - Modular backend code (refactored 2026-01-17):
+  - `config.py` - Configuration (paths, ports, rate limits, CORS origins)
+  - `auth.py` - Sessions, user verification, `require_token()`
+  - `cors.py` - CORS header functions
+  - `rate_limit.py` - IP-based rate limiting
+  - `registration.py` - User registration + invite tokens
+  - `pending_edits.py` - Contributor pending edits management
+  - `git_ops.py` - Git version control operations
+  - `meilisearch_ops.py` - Meilisearch sync, metadata watcher
+  - `utils.py` - Helper functions (sanitize_id, find_directory_by_id)
+
+### Scripts & Data
+- `/scripts/` - Migration and utility scripts
 
 ## Key Patterns
 
@@ -236,6 +251,8 @@ Edit `users.json` with SHA-256 hashed password:
 - ✅ All admin endpoints require `min_role='admin'`
 - ✅ Editor endpoints require `min_role='editor'`
 - ✅ Contributors can only edit text, not change status
+- ✅ Rate limiting on `/login`, `/register`, `/invite/set-password` (added 2026-01-17)
+- ✅ CORS restricted to allowed origins only (added 2026-01-17)
 
 **Acceptable limitations (internal use):**
 - SHA-256 without salt (rainbow table attack requires `users.json` access)
@@ -244,30 +261,29 @@ Edit `users.json` with SHA-256 hashed password:
 
 ### Production Checklist (see `deployment_guide.md`)
 - [ ] HTTPS enabled (domain: `vutt.utlib.ut.ee`)
-- [ ] Backend ports (7700, 8001, 8002) closed from outside
-- [ ] CORS restricted to specific domain in `file_server.py`
+- [x] Backend ports (7700, 8001, 8002) closed from outside
+- [x] CORS restricted to specific domains in `server/config.py`
 - [ ] Strong passwords in `users.json`
 - [ ] Meilisearch master key in `.env`
+- [x] Rate limiting enabled (IP-based, in `server/rate_limit.py`)
 
 ### Security TODO (for public deployment)
 
-**1. CORS restriction** - Currently `Access-Control-Allow-Origin: *`
-```python
-# In file_server.py RequestHandler, replace all occurrences of:
-self.send_header('Access-Control-Allow-Origin', '*')
+**1. CORS restriction** - ✅ Implemented (2026-01-17)
+- Configured in `ALLOWED_ORIGINS` list in `server/config.py`
+- Production: `https://vutt.utlib.ut.ee`, `http://vutt.utlib.ut.ee`
+- Development: `localhost:5173`, `localhost:3000`, `127.0.0.1:*`
+- Uses `send_cors_headers(handler)` from `server/cors.py`
+- Only returns `Access-Control-Allow-Origin` if Origin is in allowed list
 
-# With:
-allowed_origins = ['https://vutt.utlib.ut.ee']
-origin = self.headers.get('Origin')
-if origin in allowed_origins:
-    self.send_header('Access-Control-Allow-Origin', origin)
-```
-
-**2. Rate limiting** - Currently no rate limiting
-- `/register` endpoint vulnerable to spam registrations
-- `/login` endpoint vulnerable to brute force
-- Recommendation: Add IP-based rate limiting (e.g., 5 attempts/minute)
-- Can be implemented at Nginx level or in Python
+**2. Rate limiting** - ✅ Implemented (2026-01-17)
+- IP-based rate limiting in `server/rate_limit.py`
+- Configuration in `RATE_LIMITS` dict (`server/config.py`):
+  - `/login`: 5 attempts/minute (brute force protection)
+  - `/register`: 3 requests/hour (spam protection)
+  - `/invite/set-password`: 5 attempts/5 minutes
+- Returns HTTP 429 with `Retry-After` header when limit exceeded
+- Respects `X-Real-IP` and `X-Forwarded-For` headers from Nginx
 
 **3. HTTPS enforcement**
 - Nginx should redirect all HTTP to HTTPS

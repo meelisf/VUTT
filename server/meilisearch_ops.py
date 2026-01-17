@@ -1,0 +1,211 @@
+"""
+Meilisearch operatsioonid ja sünkroonimine.
+"""
+import os
+import json
+import time
+import urllib.request
+import urllib.parse
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME
+from .utils import sanitize_id, generate_default_metadata, normalize_genre, calculate_work_status
+from .git_ops import commit_new_work_to_git
+
+
+def send_to_meilisearch(documents):
+    """Saadab dokumendid Meilisearchi kasutades urllib-i."""
+    if not MEILI_KEY:
+        print("HOIATUS: Meilisearchi võti puudub, ei saa indekseerida.")
+        return False
+
+    url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents"
+    try:
+        data = json.dumps(documents).encode('utf-8')
+        req = urllib.request.Request(url, data=data, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+
+        with urllib.request.urlopen(req) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            print(f"Meilisearch vastus: {res_data}")
+            return True
+    except Exception as e:
+        print(f"Viga Meilisearchi saatmisel: {e}")
+        return False
+
+
+def sync_work_to_meilisearch(dir_name):
+    """
+    Sünkroonib ühe teose kõik leheküljed Meilisearchi.
+    Loeb andmed failisüsteemist (_metadata.json, pildid, .txt, .json).
+    """
+    dir_path = os.path.join(BASE_DIR, dir_name)
+    if not os.path.exists(dir_path):
+        print(f"SÜNK: Kausta ei leitud: {dir_path}")
+        return False
+
+    # 1. Lae teose metaandmed
+    meta_path = os.path.join(dir_path, '_metadata.json')
+    metadata = {}
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        except Exception as e:
+            print(f"SÜNK: Viga metaandmete lugemisel: {e}")
+            return False
+
+    if not metadata:
+        metadata = generate_default_metadata(dir_name)
+
+    teose_id = metadata.get('teose_id', sanitize_id(dir_name))
+    pealkiri = metadata.get('pealkiri', 'Pealkiri puudub')
+    autor = metadata.get('autor', '')
+    respondens = metadata.get('respondens', '')
+    aasta = metadata.get('aasta', 0)
+    teose_tags = metadata.get('teose_tags', [])
+    if isinstance(teose_tags, list):
+        teose_tags = [normalize_genre(t) for t in teose_tags]
+
+    ester_id = metadata.get('ester_id')
+    external_url = metadata.get('external_url')
+    koht = metadata.get('koht')
+    trükkal = metadata.get('trükkal')
+
+    # 2. Leia leheküljed (pildid)
+    images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+    if not images:
+        print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
+        return False
+
+    documents = []
+    page_statuses = []
+
+    for i, img_name in enumerate(images):
+        page_num = i + 1
+        page_id = f"{teose_id}-{page_num}"
+        base_name = os.path.splitext(img_name)[0]
+
+        # Tekst
+        txt_path = os.path.join(dir_path, base_name + '.txt')
+        page_text = ""
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    page_text = f.read()
+            except:
+                pass
+
+        # Lehekülje meta (status, tags, comments)
+        json_path = os.path.join(dir_path, base_name + '.json')
+        page_meta = {
+            'status': 'Toores',
+            'tags': [],
+            'comments': [],
+            'history': []
+        }
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    p_data = json.load(f)
+                    # Toeta nii vana kui uut formaati (meta_content wrapper)
+                    source = p_data.get('meta_content', p_data)
+                    page_meta['status'] = source.get('status', 'Toores')
+                    page_meta['tags'] = source.get('tags', [])
+                    page_meta['comments'] = source.get('comments', [])
+                    page_meta['history'] = source.get('history', [])
+                    # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
+                    if not page_text and 'text_content' in p_data:
+                        page_text = p_data['text_content']
+            except:
+                pass
+
+        page_statuses.append(page_meta['status'])
+
+        doc = {
+            "id": page_id,
+            "teose_id": teose_id,
+            "pealkiri": pealkiri,
+            "autor": autor,
+            "respondens": respondens,
+            "aasta": aasta,
+            "lehekylje_number": page_num,
+            "teose_lehekylgede_arv": len(images),
+            "lehekylje_tekst": page_text,
+            "lehekylje_pilt": os.path.join(dir_name, img_name),
+            "originaal_kataloog": dir_name,
+            "status": page_meta['status'],
+            "tags": [t.lower() for t in page_meta['tags']],
+            "comments": page_meta['comments'],
+            "history": page_meta['history'],
+            "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
+            "teose_tags": teose_tags
+        }
+
+        if ester_id:
+            doc['ester_id'] = ester_id
+        if external_url:
+            doc['external_url'] = external_url
+        if koht:
+            doc['koht'] = koht
+        if trükkal:
+            doc['trükkal'] = trükkal
+
+        documents.append(doc)
+
+    # 3. Arvuta teose koondstaatus
+    teose_staatus = calculate_work_status(page_statuses)
+    for doc in documents:
+        doc['teose_staatus'] = teose_staatus
+
+    # 4. Saada Meilisearchi
+    if documents:
+        print(f"AUTOMAATNE SÜNK: Teos {teose_id} ({len(documents)} lk), staatus: {teose_staatus}")
+        return send_to_meilisearch(documents)
+    return False
+
+
+def index_new_work(dir_name, metadata):
+    """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
+    return sync_work_to_meilisearch(dir_name)
+
+
+def metadata_watcher_loop():
+    """Taustalõim, mis otsib uusi kaustu ja loob neile metaandmed."""
+    print(f"Metaandmete jälgija käivitatud (kataloog: {BASE_DIR})")
+    while True:
+        try:
+            if not os.path.exists(BASE_DIR):
+                time.sleep(60)
+                continue
+
+            for entry in os.scandir(BASE_DIR):
+                if entry.is_dir():
+                    meta_path = os.path.join(entry.path, '_metadata.json')
+                    if not os.path.exists(meta_path):
+                        # Kontrollime kas on pilte
+                        has_images = False
+                        for f in os.listdir(entry.path):
+                            if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                                has_images = True
+                                break
+
+                        if has_images:
+                            try:
+                                metadata = generate_default_metadata(entry.name)
+                                with open(meta_path, 'w', encoding='utf-8') as f:
+                                    json.dump(metadata, f, ensure_ascii=False, indent=2)
+                                print(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
+
+                                # Indekseeri kohe Meilisearchis
+                                index_new_work(entry.name, metadata)
+
+                                # Lisa txt failid Giti originaal-OCR commitina
+                                commit_new_work_to_git(entry.name)
+                            except Exception as e:
+                                print(f"Viga metaandmete loomisel ({entry.name}): {e}")
+
+            # Oota 30 sekundit järgmise skannimiseni
+            time.sleep(30)
+        except Exception as e:
+            print(f"Jälgija viga: {e}")
+            time.sleep(60)
