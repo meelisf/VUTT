@@ -103,7 +103,7 @@ const Register: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50 overflow-y-auto">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
@@ -119,7 +119,7 @@ const Register: React.FC = () => {
       </header>
 
       {/* Form */}
-      <main className="max-w-lg mx-auto px-4 py-12">
+      <main className="max-w-lg mx-auto px-4 py-12 pb-20">
         <div className="bg-white rounded-xl shadow-lg p-8">
           <div className="text-center mb-8">
             <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">

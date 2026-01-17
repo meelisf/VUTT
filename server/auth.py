@@ -113,3 +113,98 @@ def require_token(data, min_role=None):
 def require_auth(data, min_role=None):
     """DEPRECATED: Kasuta require_token() asemel."""
     return require_token(data, min_role)
+
+
+# =========================================================
+# KASUTAJATE HALDUS
+# =========================================================
+
+def get_all_users():
+    """
+    Tagastab kõigi kasutajate nimekirja (ilma paroolihashideta).
+    """
+    users = load_users()
+    result = []
+    for username, user_data in users.items():
+        result.append({
+            "username": username,
+            "name": user_data.get("name", ""),
+            "email": user_data.get("email", ""),
+            "role": user_data.get("role", "contributor"),
+            "created_at": user_data.get("created_at")
+        })
+    # Sorteeri loomisaja järgi (uuemad ees), kui loomisaeg puudub, siis lõppu
+    result.sort(key=lambda x: x.get("created_at") or "0000", reverse=True)
+    return result
+
+
+def update_user_role(username, new_role, admin_user):
+    """
+    Muudab kasutaja rolli.
+
+    Args:
+        username: Muudetava kasutaja kasutajanimi
+        new_role: Uus roll ('contributor', 'editor', 'admin')
+        admin_user: Admin kasutaja, kes muudatuse teeb
+
+    Returns:
+        (success: bool, message: str)
+    """
+    # Kontrolli rolli kehtivust
+    valid_roles = ['contributor', 'editor', 'admin']
+    if new_role not in valid_roles:
+        return False, f"Vigane roll. Lubatud: {', '.join(valid_roles)}"
+
+    # Admin ei saa oma rolli muuta
+    if username == admin_user["username"]:
+        return False, "Ei saa muuta enda rolli"
+
+    users = load_users()
+
+    if username not in users:
+        return False, "Kasutajat ei leitud"
+
+    old_role = users[username].get("role", "contributor")
+    users[username]["role"] = new_role
+    save_users(users)
+
+    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}")
+    return True, "Roll muudetud"
+
+
+def delete_user(username, admin_user):
+    """
+    Kustutab kasutaja.
+
+    Args:
+        username: Kustutatava kasutaja kasutajanimi
+        admin_user: Admin kasutaja, kes kustutamise teeb
+
+    Returns:
+        (success: bool, message: str)
+    """
+    # Admin ei saa ennast kustutada
+    if username == admin_user["username"]:
+        return False, "Ei saa kustutada ennast"
+
+    users = load_users()
+
+    if username not in users:
+        return False, "Kasutajat ei leitud"
+
+    # Eemalda kasutaja
+    deleted_name = users[username].get("name", username)
+    del users[username]
+    save_users(users)
+
+    # Eemalda kasutaja aktiivsed sessioonid
+    tokens_to_delete = []
+    for token, session_data in sessions.items():
+        if session_data["user"]["username"] == username:
+            tokens_to_delete.append(token)
+
+    for token in tokens_to_delete:
+        del sessions[token]
+
+    print(f"Admin '{admin_user['username']}' kustutas kasutaja '{username}' ({deleted_name}). Eemaldatud {len(tokens_to_delete)} sessiooni.")
+    return True, "Kasutaja kustutatud"

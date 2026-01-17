@@ -19,7 +19,8 @@ from .rate_limit import get_client_ip, check_rate_limit, rate_limit_response
 # Autentimine
 from .auth import (
     sessions, load_users, save_users, verify_user,
-    create_session, get_session, delete_session, require_token, require_auth
+    create_session, get_session, delete_session, require_token, require_auth,
+    get_all_users, update_user_role, delete_user
 )
 
 # Registreerimine ja invite tokenid

@@ -5,6 +5,13 @@ body {
   /* bg-gray-50 fallback */
   color: #111827;
   /* text-gray-900 fallback */
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Workspace leht vajab fikseeritud kõrgust */
+body:has(.workspace-container) {
   height: 100vh;
   overflow: hidden;
 }

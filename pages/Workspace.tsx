@@ -503,7 +503,7 @@ const Workspace: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+    <div className="workspace-container h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* COinS for Zotero - peidetud span bibliograafiliste andmetega */}
       {page && <span className="Z3988" title={generateCoins() || ''} />}
 
