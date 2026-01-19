@@ -214,6 +214,69 @@ def get_file_diff(relative_path, hash1, hash2):
         return None
 
 
+def get_commit_diff(commit_hash, filepath=None):
+    """
+    Tagastab ühe commiti diff'i (võrreldes parent commitiga).
+    
+    Args:
+        commit_hash: Commit hash (täis- või lühike)
+        filepath: Valikuline failirada, et näidata ainult selle faili muutused
+    
+    Returns:
+        dict: {"diff": str, "additions": int, "deletions": int, "files": list}
+    """
+    repo = get_or_init_repo()
+    
+    try:
+        commit = repo.commit(commit_hash)
+        
+        if commit.parents:
+            parent = commit.parents[0]
+            if filepath:
+                # Ainult konkreetne fail
+                diff_text = repo.git.diff(parent.hexsha, commit.hexsha, '--', filepath)
+            else:
+                # Kõik failid commitis
+                diff_text = repo.git.diff(parent.hexsha, commit.hexsha)
+        else:
+            # Esimene commit - võrdle tühja puuga
+            if filepath:
+                diff_text = repo.git.show(commit.hexsha, '--', filepath)
+            else:
+                diff_text = repo.git.show(commit.hexsha)
+        
+        # Loe statistika
+        stat = repo.git.diff(parent.hexsha if commit.parents else '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 
+                             commit.hexsha, '--numstat')
+        additions = 0
+        deletions = 0
+        files = []
+        
+        for line in stat.strip().split('\n'):
+            if line:
+                parts = line.split('\t')
+                if len(parts) >= 3:
+                    try:
+                        additions += int(parts[0]) if parts[0] != '-' else 0
+                        deletions += int(parts[1]) if parts[1] != '-' else 0
+                        files.append(parts[2])
+                    except ValueError:
+                        pass
+        
+        return {
+            "diff": diff_text,
+            "additions": additions,
+            "deletions": deletions,
+            "files": files
+        }
+    except GitCommandError as e:
+        print(f"Git commit diff viga: {e}")
+        return None
+    except Exception as e:
+        print(f"Commiti diff viga: {e}")
+        return None
+
+
 def commit_new_work_to_git(dir_name):
     """Lisab uue teose txt failid Git reposse originaal-OCR commitina."""
     try:

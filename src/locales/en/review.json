@@ -19,5 +19,12 @@
   "actions": {
     "openPage": "Open page",
     "continue": "Continue working"
+  },
+  "diff": {
+    "loading": "Loading changes...",
+    "additions": "added",
+    "deletions": "removed",
+    "empty": "No changes found",
+    "error": "Failed to load changes"
   }
 }

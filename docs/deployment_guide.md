@@ -1,60 +1,123 @@
 # VUTT Paigaldamine ja Kolimine
 
-See juhend kirjeldab, kuidas liigutada VUTT rakendus ja andmed uude serverisse kasutades Dockerit ja Nginxi.
+See juhend kirjeldab, kuidas paigaldada VUTT rakendus tootmisserverisse.
+
+*Viimati uuendatud: 2026-01-19*
 
 ## Eeldused
-- Uus server (Linux)
-- Installitud **Docker** ja **Docker Compose**
+
+- Linux server (testitud Ubuntu 22.04+)
+- Python 3.10+ koos pip-iga
+- Node.js 18+ (fronti ehitamiseks)
+- Nginx (reverse proxy)
+- Git (versioonihaldus tekstidele)
 
 ## 1. Failide ettevalmistamine
 
-1. Kopeeri kogu **VUTT koodikataloog** uude masinasse (nt `/opt/vutt`).
-2. Kopeeri andmekataloog (`04_sorditud_dokumendid`) uude masinasse (nt `/opt/vutt/data`).
-3. OLULINE: Enne kopeerimist ehita frontend valmis:
+1. Klooni repositoorium serverisse:
    ```bash
-   # Sinu oma arvutis:
+   cd /opt
+   git clone https://github.com/... vutt
+   cd /opt/vutt
+   ```
+
+2. Kopeeri andmekataloog (`04_sorditud_dokumendid`) serverisse:
+   ```bash
+   # nt /opt/vutt/data/
+   ```
+
+3. Ehita frontend:
+   ```bash
    npm install
    npm run build
-   # Tekib 'dist' kaust. See PEAB olema serveris kaasas!
+   # Tekib 'dist/' kaust - kopeeri see Nginxi kausta
+   cp -r dist/* /var/www/vutt/
    ```
 
 Struktuur serveris (`/opt/vutt/`):
 ```
 /opt/vutt/
-  ├── docker-compose.yml
-  ├── Dockerfile
-  ├── nginx.conf
-  ├── dist/                  <-- Builditud frontend (kopeeri oma arvutist!)
-  ├── data/                  <-- Andmed
-  └── ... (muud failid)
+  ├── server/                <-- Backend moodulid (Python)
+  │   ├── __init__.py        <-- Eksportide koondus
+  │   ├── file_server.py     <-- Peamine HTTP server
+  │   ├── image_server.py    <-- Pildiserver
+  │   ├── config.py          <-- Seadistused
+  │   ├── auth.py            <-- Autentimine ja sessioonid
+  │   ├── git_ops.py         <-- Git versioonihaldus
+  │   ├── meilisearch_ops.py <-- Meilisearchi sünkroonimine
+  │   ├── pending_edits.py   <-- Kaastööliste muudatused
+  │   ├── registration.py    <-- Kasutajate registreerimine
+  │   ├── rate_limit.py      <-- Rate limiting
+  │   ├── cors.py            <-- CORS käsitlus
+  │   └── utils.py           <-- Abifunktsioonid
+  ├── state/                 <-- Andmefailid
+  │   ├── users.json         <-- Kasutajad (loo käsitsi!)
+  │   ├── pending_registrations.json
+  │   ├── invite_tokens.json
+  │   └── pending_edits.json
+  ├── scripts/               <-- Migratsiooniskriptid
+  ├── .env                   <-- Konfig (Meilisearch võti)
+  └── data/                  <-- Andmekataloog (symlink või koopia)
 ```
 
 ## 2. Seadistamine
 
-1. Ava `docker-compose.yml` ja vaata üle `volumes` real:
-   `- ./data:/data`
-   Veendu, et sinu andmed on tõesti kaustas `data` (Dockerfile kõrval).
+### 2.1 Keskkonnamuutujad (.env)
 
-2. (Valikuline) Määra Meilisearchi võti:
-   - Loo `.env` fail: `MEILI_MASTER_KEY=sinu_võti`
+Loo `.env` fail projekti juurkausta:
+```bash
+MEILISEARCH_URL=http://127.0.0.1:7700
+MEILISEARCH_MASTER_KEY=sinu_meilisearch_võti
+VUTT_DATA_DIR=/opt/vutt/data
+```
+
+### 2.2 Kasutajate fail (state/users.json)
+
+Loo fail käsitsi (automaatselt EI looda!):
+```json
+{
+  "admin": {
+    "password_hash": "sha256_hash_siia",
+    "name": "Admin Nimi",
+    "email": "admin@example.com",
+    "role": "admin"
+  }
+}
+```
+
+Parooli hashi saad:
+```bash
+echo -n 'tugev_parool' | sha256sum
+```
+
+### 2.3 Python sõltuvused
+
+```bash
+pip install meilisearch GitPython
+```
 
 ## 3. Käivitamine
 
+### Teenuste käivitamine
+
 ```bash
 cd /opt/vutt
-docker compose up -d
+./start_services.sh
 ```
 
-Pärast käivitamist on VUTT kättesaadav serveri IP-aadressil pordil 80 (ehk lihtsalt `http://SERVERI_IP`).
+Skript käivitab:
+- **Meilisearch** (port 7700) - otsingu- ja dokumendimootor
+- **Image server** (port 8001) - pilditeenindus
+- **File server** (port 8002) - API ja failide salvestamine
 
-- Pildid ja API on kättesaadavad läbi Nginxi (`/api/images/...`, `/api/files/...`).
-- Meilisearch on kättesaadav aadressil `/meili/`.
+Logid kirjutatakse `./logs/` kausta.
 
-## Probleemide korral
-- `docker compose logs -f` - näitab logisid
-- `docker compose restart` - taaskäivitab teenused
+### Taustaprotsessid
 
-## 5. HTTPS Seadistamine (vutt.utlib.ut.ee)
+File server käivitab automaatselt:
+- **Metadata watcher** - tuvastab uued teosed ja indekseerib need Meilisearchi
+
+## 4. HTTPS Seadistamine (vutt.utlib.ut.ee)
 
 > [!IMPORTANT]
 > **Meilisearch SDK nõue**: Meilisearch JavaScript SDK **ei toeta suhtelisi URL-e** (nt `/meili`). `config.ts` failis peab `MEILI_HOST` olema absoluutne URL: `${window.location.origin}/meili`. Pildid ja failid (`/api/images`, `/api/files`) töötavad suhteliste URL-idega.
@@ -121,20 +184,68 @@ server {
 ### Frontend uuendamine
 ```bash
 npm run build
-# Kopeeri dist/ sisu serverisse /var/www/vutt/
+cp -r dist/* /var/www/vutt/
 ```
 
-### Taustateenused (mitte-Docker variant)
+### Taustateenused
 ```bash
-cd /home/mf/Dokumendid/LLM/tartu-acad
+cd /opt/vutt
 ./start_services.sh
 ```
 
-## 6. Turvalisuse Checklist (Tootmisserver)
+## 5. Serveri moodulid
 
-Enne avalikku kasutamist veendu, et kõik punktid on täidetud:
+Backend koosneb moodulitest `server/` kaustas:
 
-### Kohustuslik (HTTPS ja võrk)
+| Moodul | Kirjeldus |
+|--------|-----------|
+| `file_server.py` | Peamine HTTP server (port 8002), kõik API endpointid |
+| `image_server.py` | Pildiserver (port 8001), serveerib skaneeritud pilte |
+| `config.py` | Kõik seadistused: teed, pordid, rate limits, CORS origins |
+| `auth.py` | Autentimine, sessioonid, kasutajahaldus |
+| `git_ops.py` | Git versioonihaldus (commitid, ajalugu, taastamine) |
+| `meilisearch_ops.py` | Indekseerimine ja sünkroonimine Meilisearchiga |
+| `pending_edits.py` | Kaastööliste (contributor) ootel muudatuste haldus |
+| `registration.py` | Registreerimistaotlused ja invite tokenid |
+| `rate_limit.py` | Rate limiting brute-force kaitseks |
+| `cors.py` | CORS päiste käsitlus |
+| `utils.py` | Abifunktsioonid (sanitize_id, metadata genereerimine) |
+
+### API endpointid
+
+**Autentimine:**
+- `POST /login` - Sisselogimine
+- `POST /logout` - Väljalogimine
+- `GET /verify-token?token=...` - Tokeni valideerimine
+
+**Andmed:**
+- `POST /save` - Lehekülje salvestamine (editor+)
+- `POST /save-pending` - Kaastöölise muudatus ülevaatusele (contributor)
+- `GET /backups?file=...` - Faili versiooniajalugu (admin)
+- `POST /restore` - Versiooni taastamine (admin)
+- `GET /recent-edits?token=...` - Viimased muudatused
+
+**Registreerimine (avalik):**
+- `POST /register` - Taotluse esitamine
+- `GET /invite/{token}` - Tokeni kehtivuse kontroll
+- `POST /invite/{token}/set-password` - Parooli seadmine
+
+**Admin:**
+- `GET /admin/registrations?auth_token=...` - Taotluste nimekiri
+- `POST /admin/registrations/{id}/approve` - Kinnitamine
+- `POST /admin/registrations/{id}/reject` - Tagasilükkamine
+- `GET /admin/users?auth_token=...` - Kasutajate nimekiri
+- `POST /admin/users/{username}/role` - Rolli muutmine
+- `DELETE /admin/users/{username}` - Kasutaja kustutamine
+
+**Viimased muudatused:**
+- `GET /recent-edits?token=...` - Viimased Git commitid
+
+**Metaandmed:**
+- `GET /metadata-suggestions` - Autorite, kohtade, trükkalite soovitused
+- `POST /update-metadata` - Teose metaandmete uuendamine (admin)
+
+## 6. Turvalisuse checklist
 
 - [ ] **HTTPS aktiveeritud** - Paroolid ja sessioonitokenid liiguvad üle võrgu
   - Domeeninimi olemas (nt `vutt.utlib.ut.ee`)
@@ -196,10 +307,8 @@ Enne avalikku kasutamist veendu, et kõik punktid on täidetud:
 
 - [ ] **Logide monitooring** - Jälgi kahtlast tegevust
   ```bash
-  docker compose logs -f --tail=100
+  tail -f logs/*.log
   ```
-
-- [ ] **Uuendused** - Docker images ja OS turvauuendused
 
 ### Põhiasjad
 

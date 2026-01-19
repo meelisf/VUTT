@@ -1,8 +1,19 @@
+/**
+ * Review / Viimased muudatused leht
+ * 
+ * Näitab Git-põhiseid viimaseid muudatusi. Kasutajad näevad oma muudatusi,
+ * admin näeb kõiki.
+ * 
+ * MÄRKUS: Algselt oli see leht mõeldud pending-edits ülevaatuseks
+ * (contributor-rolli kasutajate muudatuste kinnitamiseks). See süsteem
+ * on implementeeritud (vt server/pending_edits.py), kuid ei ole kasutusel,
+ * kuna tekitab liiga suure halduskoormuse. Praegu on see leht lihtsalt
+ * Git ajaloo vaatamiseks.
+ */
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   Clock,
   User,
   FileText,
@@ -10,12 +21,13 @@ import {
   Loader2,
   AlertCircle,
   ChevronDown,
-  LogOut,
-  Settings,
+  ChevronRight,
   Filter,
-  History
+  History,
+  Plus,
+  Minus
 } from 'lucide-react';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 
@@ -31,18 +43,28 @@ interface RecentCommit {
   filepath: string;
 }
 
+interface DiffData {
+  diff: string;
+  additions: number;
+  deletions: number;
+  files: string[];
+}
+
 const Review: React.FC = () => {
   const { t } = useTranslation(['review', 'common']);
-  const { user, authToken: token, logout, isLoading: userLoading } = useUser();
+  const { user, authToken: token, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
 
   const [commits, setCommits] = useState<RecentCommit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [filterUser, setFilterUser] = useState<string | null>(null);
-  const [showOnlyMine, setShowOnlyMine] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null); // null = kõik kasutajad
+  const [showUserFilter, setShowUserFilter] = useState(false);
+  const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
+  const [diffCache, setDiffCache] = useState<Record<string, DiffData>>({});
+  const [loadingDiff, setLoadingDiff] = useState<string | null>(null);
 
   // Kontrolli ligipääsu (oota kuni kasutaja andmed on laetud)
   useEffect(() => {
@@ -56,7 +78,7 @@ const Review: React.FC = () => {
     if (user && token) {
       loadRecentEdits();
     }
-  }, [user, token, showOnlyMine]);
+  }, [user, token, selectedUser]);
 
   const loadRecentEdits = async () => {
     if (!token) return;
@@ -67,9 +89,9 @@ const Review: React.FC = () => {
     try {
       let url = `${FILE_API_URL}/recent-edits?token=${token}&limit=50`;
       
-      // Kui kasutaja tahab ainult oma muudatusi (admin valib seda)
-      if (showOnlyMine && user) {
-        url += `&user=${encodeURIComponent(user.name)}`;
+      // Kui admin on valinud konkreetse kasutaja
+      if (selectedUser) {
+        url += `&user=${encodeURIComponent(selectedUser)}`;
       }
 
       const response = await fetch(url);
@@ -96,65 +118,98 @@ const Review: React.FC = () => {
     return Array.from(authors).sort();
   };
 
+  // Lae diff'i andmed lazy loading'uga
+  const loadDiff = async (commit: RecentCommit) => {
+    const key = commit.full_hash;
+    
+    // Kui juba on laetud, kasuta cache'i
+    if (diffCache[key]) {
+      return;
+    }
+    
+    setLoadingDiff(key);
+    
+    try {
+      const response = await fetch(`${FILE_API_URL}/commit-diff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_token: token,
+          commit_hash: commit.full_hash,
+          filepath: commit.filepath
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.status === 'success') {
+        setDiffCache(prev => ({
+          ...prev,
+          [key]: {
+            diff: data.diff,
+            additions: data.additions,
+            deletions: data.deletions,
+            files: data.files
+          }
+        }));
+      }
+    } catch (err) {
+      console.error('Diff laadimine ebaõnnestus:', err);
+    } finally {
+      setLoadingDiff(null);
+    }
+  };
+
+  // Ava/sulge diff
+  const toggleDiff = (commit: RecentCommit) => {
+    const key = commit.full_hash;
+    if (expandedCommit === key) {
+      setExpandedCommit(null);
+    } else {
+      setExpandedCommit(key);
+      loadDiff(commit);
+    }
+  };
+
+  // Parsi diff lihtsaks kuvamiseks
+  const renderDiff = (diffText: string) => {
+    const lines = diffText.split('\n');
+    return lines.map((line, i) => {
+      // Jäta vahele diff päised
+      if (line.startsWith('diff --git') || 
+          line.startsWith('index ') || 
+          line.startsWith('---') || 
+          line.startsWith('+++') ||
+          line.startsWith('@@')) {
+        return null;
+      }
+      
+      let className = 'text-gray-700';
+      let prefix = ' ';
+      
+      if (line.startsWith('+')) {
+        className = 'bg-green-100 text-green-800';
+        prefix = '+';
+      } else if (line.startsWith('-')) {
+        className = 'bg-red-100 text-red-800';
+        prefix = '-';
+      }
+      
+      return (
+        <div key={i} className={`px-2 py-0.5 font-mono text-xs ${className} whitespace-pre-wrap break-all`}>
+          {line}
+        </div>
+      );
+    }).filter(Boolean);
+  };
+
   if (!user) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 text-primary-600 hover:text-primary-700">
-            <ArrowLeft size={20} />
-            <span className="font-medium">{t('common:buttons.back')}</span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-
-            {/* Kasutaja menüü */}
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <span className="text-sm text-gray-600 hidden sm:block">{user.name}</span>
-                <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-sm">
-                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showUserMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-50">
-                    {user.role === 'admin' && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Settings size={16} />
-                        {t('common:nav.admin')}
-                      </Link>
-                    )}
-                    {user.role === 'admin' && <div className="border-t border-gray-100 my-1" />}
-                    <button
-                      onClick={() => { setShowUserMenu(false); logout(); }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <LogOut size={16} />
-                      {t('common:buttons.logout')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header showSearchButton={false} />
 
       {/* Main content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
@@ -174,18 +229,50 @@ const Review: React.FC = () => {
 
               {/* Filter (ainult admin) */}
               {isAdmin && (
-                <div className="flex items-center gap-2">
+                <div className="relative">
                   <button
-                    onClick={() => setShowOnlyMine(!showOnlyMine)}
+                    onClick={() => setShowUserFilter(!showUserFilter)}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      showOnlyMine 
+                      selectedUser 
                         ? 'bg-primary-100 text-primary-700 border border-primary-200' 
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
                     <Filter size={16} />
-                    {showOnlyMine ? t('filters.onlyMine') : t('filters.all')}
+                    {selectedUser || t('filters.all')}
+                    <ChevronDown size={14} className={`transition-transform ${showUserFilter ? 'rotate-180' : ''}`} />
                   </button>
+                  
+                  {showUserFilter && (
+                    <>
+                      <div className="fixed inset-0 z-[100]" onClick={() => setShowUserFilter(false)} />
+                      <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-[110] max-h-64 overflow-y-auto">
+                        <button
+                          onClick={() => { setSelectedUser(null); setShowUserFilter(false); }}
+                          className={`flex items-center gap-2 px-4 py-2 text-sm w-full text-left ${
+                            selectedUser === null ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {t('filters.all')}
+                        </button>
+                        <div className="border-t border-gray-100 my-1" />
+                        {getUniqueAuthors().map(author => (
+                          <button
+                            key={author}
+                            onClick={() => { setSelectedUser(author); setShowUserFilter(false); }}
+                            className={`flex items-center gap-2 px-4 py-2 text-sm w-full text-left ${
+                              selectedUser === author ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                            }`}
+                          >
+                            <div className="h-5 w-5 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs flex-shrink-0">
+                              {author.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            {author}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -211,71 +298,131 @@ const Review: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {/* Tabeli päis */}
                 <div className="hidden sm:grid sm:grid-cols-12 gap-4 px-4 py-2 text-sm text-gray-500 font-medium border-b border-gray-200">
+                  <div className="col-span-1"></div>
                   <div className="col-span-2">{t('table.when')}</div>
-                  {isAdmin && !showOnlyMine && (
+                  {isAdmin && !selectedUser && (
                     <div className="col-span-2">{t('table.who')}</div>
                   )}
-                  <div className={isAdmin && !showOnlyMine ? "col-span-4" : "col-span-5"}>{t('table.where')}</div>
-                  <div className={isAdmin && !showOnlyMine ? "col-span-3" : "col-span-4"}>{t('table.what')}</div>
+                  <div className={isAdmin && !selectedUser ? "col-span-6" : "col-span-8"}>{t('table.where')}</div>
                   <div className="col-span-1"></div>
                 </div>
 
                 {/* Tabeli read */}
-                {commits.map((commit, index) => (
-                  <div 
-                    key={`${commit.commit_hash}-${index}`} 
-                    className="grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 px-4 py-3 hover:bg-gray-50 rounded-lg border border-gray-100 sm:border-0 sm:border-b"
-                  >
-                    {/* Kuupäev */}
-                    <div className="col-span-2 flex items-center gap-2 text-sm text-gray-600">
-                      <Clock size={14} className="text-gray-400 hidden sm:block" />
-                      <span className="sm:hidden text-xs text-gray-400">{t('table.when')}:</span>
-                      {commit.formatted_date}
-                    </div>
-                    
-                    {/* Kasutaja (ainult admin) */}
-                    {isAdmin && !showOnlyMine && (
-                      <div className="col-span-2 flex items-center gap-2">
-                        <div className="h-6 w-6 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs flex-shrink-0">
-                          {commit.author.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                        </div>
-                        <span className="text-sm text-gray-700 truncate">{commit.author}</span>
-                      </div>
-                    )}
-                    
-                    {/* Koht (teose_id + lk) */}
-                    <div className={`${isAdmin && !showOnlyMine ? "col-span-4" : "col-span-5"} flex items-center gap-2 min-w-0`}>
-                      <FileText size={14} className="text-gray-400 flex-shrink-0 hidden sm:block" />
-                      <span className="text-sm font-medium text-gray-900 truncate" title={commit.teose_id}>
-                        {commit.teose_id}
-                      </span>
-                      <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                        lk {commit.lehekylje_number}
-                      </span>
-                    </div>
-                    
-                    {/* Tegevus */}
-                    <div className={`${isAdmin && !showOnlyMine ? "col-span-3" : "col-span-4"} flex items-center min-w-0`}>
-                      <span className="text-sm text-gray-600 truncate" title={commit.message}>
-                        {commit.message}
-                      </span>
-                    </div>
-                    
-                    {/* Link */}
-                    <div className="col-span-1 flex items-center justify-end">
-                      <Link
-                        to={`/work/${commit.teose_id}/${commit.lehekylje_number}`}
-                        className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-                        title={t('actions.openPage')}
+                {commits.map((commit, index) => {
+                  const isExpanded = expandedCommit === commit.full_hash;
+                  const diffData = diffCache[commit.full_hash];
+                  const isLoadingThis = loadingDiff === commit.full_hash;
+                  
+                  return (
+                    <div key={`${commit.commit_hash}-${index}`} className="border border-gray-100 rounded-lg overflow-hidden">
+                      {/* Peamine rida */}
+                      <div 
+                        className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 px-4 py-3 hover:bg-gray-50 cursor-pointer ${isExpanded ? 'bg-gray-50' : ''}`}
+                        onClick={() => toggleDiff(commit)}
                       >
-                        <ExternalLink size={18} />
-                      </Link>
+                        {/* Ava/sulge nupp */}
+                        <div className="col-span-1 flex items-center">
+                          <button 
+                            className="p-1 hover:bg-gray-200 rounded transition-colors"
+                            onClick={(e) => { e.stopPropagation(); toggleDiff(commit); }}
+                          >
+                            {isLoadingThis ? (
+                              <Loader2 size={16} className="animate-spin text-primary-600" />
+                            ) : isExpanded ? (
+                              <ChevronDown size={16} className="text-gray-600" />
+                            ) : (
+                              <ChevronRight size={16} className="text-gray-400" />
+                            )}
+                          </button>
+                        </div>
+                        
+                        {/* Kuupäev */}
+                        <div className="col-span-2 flex items-center gap-2 text-sm text-gray-600">
+                          <Clock size={14} className="text-gray-400 hidden sm:block" />
+                          <span className="sm:hidden text-xs text-gray-400">{t('table.when')}:</span>
+                          {commit.formatted_date}
+                        </div>
+                        
+                        {/* Kasutaja (ainult admin) */}
+                        {isAdmin && !selectedUser && (
+                          <div className="col-span-2 flex items-center gap-2">
+                            <div className="h-6 w-6 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold text-xs flex-shrink-0">
+                              {commit.author.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </div>
+                            <span className="text-sm text-gray-700 truncate">{commit.author}</span>
+                          </div>
+                        )}
+                        
+                        {/* Koht (teose_id + lk) */}
+                        <div className={`${isAdmin && !selectedUser ? "col-span-6" : "col-span-8"} flex items-center gap-2 min-w-0`}>
+                          <FileText size={14} className="text-gray-400 flex-shrink-0 hidden sm:block" />
+                          <span className="text-sm font-medium text-gray-900 truncate" title={commit.teose_id}>
+                            {commit.teose_id}
+                          </span>
+                          <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                            lk {commit.lehekylje_number}
+                          </span>
+                        </div>
+                        
+                        {/* Link */}
+                        <div className="col-span-1 flex items-center justify-end">
+                          <Link
+                            to={`/work/${commit.teose_id}/${commit.lehekylje_number}`}
+                            className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                            title={t('actions.openPage')}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ExternalLink size={18} />
+                          </Link>
+                        </div>
+                      </div>
+                      
+                      {/* Avatav diff paneel */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-200 bg-gray-50 px-4 py-3">
+                          {isLoadingThis ? (
+                            <div className="flex items-center gap-2 text-gray-500 py-2">
+                              <Loader2 size={16} className="animate-spin" />
+                              <span className="text-sm">{t('diff.loading')}</span>
+                            </div>
+                          ) : diffData ? (
+                            <div>
+                              {/* Statistika */}
+                              <div className="flex items-center gap-4 mb-3 text-sm">
+                                <span className="flex items-center gap-1 text-green-700">
+                                  <Plus size={14} />
+                                  {diffData.additions} {t('diff.additions')}
+                                </span>
+                                <span className="flex items-center gap-1 text-red-700">
+                                  <Minus size={14} />
+                                  {diffData.deletions} {t('diff.deletions')}
+                                </span>
+                              </div>
+                              
+                              {/* Diff sisu */}
+                              <div className="bg-white rounded border border-gray-200 max-h-96 overflow-auto">
+                                {diffData.diff ? (
+                                  renderDiff(diffData.diff)
+                                ) : (
+                                  <div className="p-4 text-gray-500 text-sm text-center">
+                                    {t('diff.empty')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-gray-500 text-sm py-2">
+                              {t('diff.error')}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

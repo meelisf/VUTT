@@ -19,5 +19,12 @@
   "actions": {
     "openPage": "Ava lehekülg",
     "continue": "Jätka tööd"
+  },
+  "diff": {
+    "loading": "Laadin muudatusi...",
+    "additions": "lisatud",
+    "deletions": "eemaldatud",
+    "empty": "Muudatused puuduvad",
+    "error": "Muudatuste laadimine ebaõnnestus"
   }
 }

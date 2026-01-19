@@ -3,10 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { searchWorks, getTeoseTagsFacets } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
-import LoginModal from '../components/LoginModal';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, LogOut, LogIn, User, Tag, History, Settings, ChevronDown } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, Tag, User } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 12;
@@ -14,10 +13,8 @@ const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 
 const Dashboard: React.FC = () => {
   const { t } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user, logout, isLoading: userLoading } = useUser();
-  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { user, isLoading: userLoading } = useUser();
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -247,116 +244,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="hover:opacity-80 transition-opacity flex items-center gap-3">
-            <img src="/logo.png" alt="VUTT Logo" className="h-10 w-auto" />
-            <div>
-              <h1 className="text-2xl font-bold text-primary-900 tracking-tight leading-none">{t('common:app.name')}</h1>
-              <p className="text-xs text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">{t('common:app.subtitle')}</p>
-            </div>
-          </Link>
-          <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
-          <Link
-            to="/search"
-            className="hidden sm:flex items-center gap-2 text-sm font-bold text-white bg-primary-600 hover:bg-primary-700 px-4 py-2 rounded-lg transition-colors shadow-sm"
-          >
-            <Search size={18} />
-            {t('header.fullTextSearch')}
-          </Link>
-        </div>
-        <div className="flex items-center gap-4">
-          {user ? (
-            <div className="relative">
-              {/* Kasutaja avatar ja nimi - klikitav */}
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors"
-              >
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-                  <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-                </div>
-                <div className="h-9 w-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-sm">
-                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-                <ChevronDown size={16} className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Rippmenüü */}
-              {showUserMenu && (
-                <>
-                  {/* Taust menüü sulgemiseks */}
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowUserMenu(false)}
-                  />
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-50">
-                    {/* Kasutaja nimi mobiilis */}
-                    <div className="sm:hidden px-4 py-2 border-b border-gray-100">
-                      <p className="font-medium text-gray-900">{user.name}</p>
-                      <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-                    </div>
-
-                    {/* Viimased muudatused link (kõigile) */}
-                    <Link
-                      to="/review"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <History size={16} />
-                      {t('common:nav.review')}
-                    </Link>
-
-                    {/* Admin link (admin only) */}
-                    {user.role === 'admin' && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Settings size={16} />
-                        {t('common:nav.admin')}
-                      </Link>
-                    )}
-
-                    {/* Eraldaja */}
-                    <div className="border-t border-gray-100 my-1" />
-
-                    {/* Logi välja */}
-                    <button
-                      onClick={() => {
-                        setShowUserMenu(false);
-                        logout();
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <LogOut size={16} />
-                      {t('auth:login.logout')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowLoginModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 font-medium text-sm transition-colors"
-            >
-              <LogIn size={18} />
-              {t('auth:login.title')}
-            </button>
-          )}
-          <LanguageSwitcher />
-        </div>
-      </header>
-
-      {/* Login Modal */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-      />
+      <Header />
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-8 py-8">

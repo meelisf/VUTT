@@ -1,389 +1,146 @@
 # Kasutajahalduse laiendamise plaan
 
+**Staatus: LÕPETATUD** ✅
+
+*Viimati uuendatud: 2026-01-19*
+
 ## Ülevaade
 
-Eesmärk: võimaldada kodanikuteaduse raames laiemat kasutajate ringi, säilitades kvaliteedikontrolli akadeemiliste tekstide toimetamisel.
+Eesmärk: võimaldada laiemat kasutajate ringi, säilitades kvaliteedikontrolli akadeemiliste tekstide toimetamisel.
 
-## 1. Rollisüsteemi muudatused
+**Tulemus:** Kaheastmeline rollisüsteem (editor → admin) koos registreerimissüsteemiga on implementeeritud.
+
+> **Märkus:** Algselt planeeritud kolmeastmeline süsteem (contributor → editor → admin) koos pending-muudatuste ülevaatusega osutus praktikas üleliigseks. Kood toetab endiselt contributor rolli, kuid seda ei kasutata – uued kasutajad saavad editor rolli.
+
+## 1. Rollisüsteem ✅
 
 ### Praegune süsteem
-| Roll | Tase | Õigused |
-|------|------|---------|
-| viewer | 0 | Ainult vaatamine |
-| editor | 1 | Muutmine, salvestamine |
-| admin | 2 | Kõik + kasutajahaldus |
+| Roll | Koodis | Õigused |
+|------|--------|---------|
+| toimetaja | `editor` | Teksti muutmine, annotatsioonid, staatuse muutmine |
+| admin | `admin` | Kõik + kasutajahaldus + taotluste kinnitamine + versioonide taastamine |
 
-### Uus süsteem
-| Roll | Tase | Õigused |
-|------|------|---------|
-| kaastööline | 0 | Muutmine → pending-muudatused (vajavad ülevaatust) |
-| toimetaja | 1 | Muutmine (kohe rakendub), pending-muudatuste kinnitamine |
-| admin | 2 | Kõik + kasutajahaldus + taotluste kinnitamine |
-
-### Migratsiooni sammud
-1. Uuenda `users.json` struktuur (`role`: `contributor` | `editor` | `admin`)
-2. Uuenda `UserContext.tsx` rollide käsitlus
-3. Uuenda `file_server.py` õiguste kontroll
-4. Lisa i18n tõlked rollide kuvamiseks UI-s
+### Implementatsioon
+- `server/auth.py`: `require_token(data, min_role)` kontrollib rollide hierarhiat
+- `server/registration.py`: Uued kasutajad saavad `editor` rolli
+- `src/contexts/UserContext.tsx`: Rollide käsitlus frontendis
+- `src/locales/*/common.json`: Rollide tõlked UI-s
 
 ---
 
-## 2. Registreerimissüsteem
+## 2. Registreerimissüsteem ✅
 
-### 2.1 Taotluse esitamine (avalik)
+### 2.1 Taotluse esitamine
 
-**Uus komponent:** `RegistrationForm.tsx`
-**Uus leht:** `/register`
+**Leht:** `/register` → `src/pages/Register.tsx`
 
 Väljad:
 - Nimi (kohustuslik)
 - Email (kohustuslik)
 - Asutus/kuuluvus (valikuline)
-- Motivatsioon / miks soovid liituda (textarea, kohustuslik)
+- Motivatsioon (kohustuslik)
 
-**Salvestuskoht:** `pending_registrations.json`
+**Backend:** `POST /register` → `server/registration.py`
+**Salvestuskoht:** `state/pending_registrations.json`
 
-```json
-{
-  "registrations": [
-    {
-      "id": "uuid-1234",
-      "name": "Mari Maasikas",
-      "email": "mari@example.com",
-      "affiliation": "Tartu Ülikool",
-      "motivation": "Olen huvitatud vanade tekstide...",
-      "submitted_at": "2025-01-16T14:30:00Z",
-      "status": "pending",
-      "reviewed_by": null,
-      "reviewed_at": null
-    }
-  ]
-}
-```
+### 2.2 Taotluste ülevaatus
 
-### 2.2 Taotluste ülevaatus (admin)
-
-**Uus leht:** `/admin`
+**Leht:** `/admin` → `src/pages/Admin.tsx`
 
 Admin näeb:
-- Ootel taotluste nimekiri
-- Iga taotluse detailid
-- Nupud: "Kinnita" / "Lükka tagasi"
+- Ootel taotluste nimekiri koos detailidega
+- "Kinnita" / "Lükka tagasi" nupud
 
 Kinnitamisel:
-1. Genereeritakse unikaalne UUID token
-2. Token salvestatakse `invite_tokens.json` koos aegumisajaga (48h)
-3. Genereeritakse link: `https://vutt.utlib.ut.ee/set-password?token=UUID`
-4. **Esialgu:** Link kuvatakse adminile, kes saadab selle käsitsi emailiga
-5. **Tulevikus:** SMTP integratsioon saadab automaatselt
+1. Genereeritakse UUID token (kehtib 48h)
+2. Token salvestatakse `state/invite_tokens.json`
+3. Genereeritakse link, mille admin saadab kasutajale
 
-```json
-// invite_tokens.json
-{
-  "tokens": [
-    {
-      "token": "uuid-5678",
-      "email": "mari@example.com",
-      "name": "Mari Maasikas",
-      "created_at": "2025-01-16T15:00:00Z",
-      "expires_at": "2025-01-18T15:00:00Z",
-      "used": false
-    }
-  ]
-}
-```
+### 2.3 Parooli seadmine
 
-### 2.3 Parooli seadmine (uus kasutaja)
-
-**Uus leht:** `/set-password`
+**Leht:** `/set-password?token=UUID` → `src/pages/SetPassword.tsx`
 
 Voog:
-1. Kasutaja avab lingi tokeniga
-2. Süsteem kontrollib tokeni kehtivust
-3. Kasutaja sisestab parooli (+ kinnitus)
-4. Parool hashitakse (SHA-256) ja salvestatakse `users.json`
-5. Token märgitakse kasutatuks
-6. Kasutaja suunatakse sisselogimislehele
+1. Token valideerimine (`GET /invite/{token}`)
+2. Parooli sisestamine + kinnitus
+3. Kasutaja loomine (`POST /invite/{token}/set-password`)
+4. Token märgitakse kasutatuks
+5. Suunamine sisselogimislehele
 
 ---
 
-## 3. Pending-muudatuste süsteem
+## 3. Pending-muudatuste süsteem (EI KASUTATA)
 
-### 3.1 Muudatuse salvestamine (kaastööline)
+> **Märkus:** See funktsioon on koodis olemas, kuid praktikas ei kasutata. Kõik registreeritud kasutajad saavad editor rolli ja nende muudatused rakenduvad kohe.
 
-Kui `kaastööline` salvestab teksti:
-1. Muudatus EI lähe otse `page.txt` faili
-2. Muudatus salvestatakse `pending_edits.json` (või eraldi failidesse)
+Algselt planeeritud süsteem:
+- Contributor salvestab → pending-edit
+- Editor/admin kinnitab → rakendub
 
-```json
-{
-  "pending_edits": [
-    {
-      "id": "edit-uuid-1",
-      "page_id": "teose_id/lehekylje_number",
-      "teose_id": "1632_Disputatio_1",
-      "lehekylje_number": 3,
-      "user": "mari",
-      "role_at_submission": "contributor",
-      "submitted_at": "2025-01-16T16:00:00Z",
-      "original_text": "vana tekst...",
-      "new_text": "uus tekst...",
-      "base_text_hash": "sha256-hash-of-original-text",
-      "status": "pending",
-      "has_conflict": false,
-      "conflict_type": null,
-      "reviewed_by": null,
-      "reviewed_at": null,
-      "review_comment": null
-    }
-  ]
-}
-```
-
-### 3.2 Ülevaatuse töövoog
-
-**Uus leht:** `/review`
-
-Toimetaja/admin näeb:
-- Ootel muudatuste nimekiri (sorteeritav kuupäeva, kasutaja, teose järgi)
-- Muudatuse detailvaade:
-  - Diff-vaade (vana vs uus)
-  - Pildiga kõrvutamine (nagu Workspace)
-  - Kasutaja info ja motivatsioon
-- Nupud: "Kinnita" / "Lükka tagasi" / "Kinnita kommentaariga"
-
-Kinnitamisel:
-1. `new_text` kirjutatakse `page.txt` faili
-2. Tehakse Git commit:
-   - `--author="Kaastööline <email>"` (kes muudatuse tegi)
-   - Committer = kinnitaja (automaatselt git config järgi)
-3. Uuendatakse Meilisearch
-4. Pending-edit märgitakse kinnitatuks
-
-Tagasilükkamisel:
-1. Pending-edit märgitakse tagasilükatuks
-2. Salvestatakse kommentaar (miks lükati tagasi)
-3. (Tulevikus: teavitus kasutajale)
-
-### 3.3 Kaastöölise vaade oma muudatustele
-
-Workspace'is peaks kaastööline nägema:
-- Kui lehel on tema ootel muudatus: teade "Sul on selle lehe kohta muudatus ülevaatusel"
-- Kusagil (profiilis? eraldi lehel?) oma muudatuste ajalugu ja staatus
-
-### 3.4 Konfliktide lahendamine
-
-**Põhimõte:** Hoiatused + kasutaja otsustab + ülevaataja lahendab
-
-#### Stsenaarium 1: Sama kasutaja mitu muudatust
-- Kui kaastööline salvestab uue muudatuse samale lehele, kus tal juba on pending-muudatus
-- **Lahendus:** Uus muudatus kirjutab vana üle (sama kasutaja puhul)
-
-#### Stsenaarium 2: Eri kasutajate muudatused samale lehele
-- Mari salvestab pending-muudatuse 14:00
-- Jüri üritab salvestada 14:30 (ei tea Mari omast)
-- **Lahendus (C):** Hoiatus "Sellel lehel on juba ootel muudatus teiselt kasutajalt. Kas soovid siiski salvestada?"
-- Kui Jüri jätkab, tekib kaks pending-muudatust
-- Ülevaataja näeb mõlemat ja lahendab konflikti (valib ühe, ühendab, või lükkab tagasi)
-
-#### Stsenaarium 3: Originaaltekst on muutunud
-- Mari salvestab pending-muudatuse 14:00 (põhineb tekstil X)
-- Toimetaja teeb otsemuudatuse 14:30 (tekst on nüüd Y)
-- Mari pending-muudatus põhineb vananenud tekstil
-- **Lahendus (D):** Pending-muudatuse juurde salvestatakse `base_text_hash`
-- Ülevaatamisel kontrollitakse, kas praegune tekst ühtib `base_text_hash`-iga
-- Kui ei ühti → hoiatus ülevaatajale "Tekst on vahepeal muutunud, kontrolli hoolikalt"
-
-#### Implementatsioon
-
-Pending-edit struktuuri lisandub:
-```json
-{
-  "base_text_hash": "sha256-of-original-text",
-  "has_conflict": false,
-  "conflict_type": null
-}
-```
-
-Konfliktitüübid:
-- `other_pending` - teine kasutaja on samale lehele muudatuse teinud
-- `base_changed` - originaaltekst on vahepeal muutunud
-- `both` - mõlemad
+Kood asub: `server/pending_edits.py`, `src/pages/Review.tsx`
 
 ---
 
-## 4. Uued API endpointid (file_server.py)
-
-### Registreerimine
-- `POST /register` - taotluse esitamine (avalik)
-- `GET /admin/registrations` - taotluste nimekiri (admin)
-- `POST /admin/registrations/{id}/approve` - kinnitamine (admin)
-- `POST /admin/registrations/{id}/reject` - tagasilükkamine (admin)
-
-### Parooli seadmine
-- `GET /invite/{token}` - tokeni kehtivuse kontroll (avalik)
-- `POST /invite/{token}/set-password` - parooli seadmine (avalik)
-
-### Pending-muudatused
-- `POST /save-pending` - kaastöölise muudatuse salvestamine
-- `GET /pending-edits` - ootel muudatuste nimekiri (toimetaja+)
-- `GET /pending-edits/{id}` - muudatuse detailid (toimetaja+)
-- `POST /pending-edits/{id}/approve` - kinnitamine (toimetaja+)
-- `POST /pending-edits/{id}/reject` - tagasilükkamine (toimetaja+)
-
-### Kasutajahaldus
-- `GET /admin/users` - kasutajate nimekiri (admin)
-- `POST /admin/users/{username}/role` - rolli muutmine (admin)
-
----
-
-## 5. Uued komponendid ja lehed
+## 4. Implementeeritud komponendid ja lehed ✅
 
 ### Lehed
 | Leht | Fail | Ligipääs |
 |------|------|----------|
-| `/register` | `pages/Register.tsx` | Avalik |
-| `/set-password` | `pages/SetPassword.tsx` | Avalik (tokeniga) |
-| `/admin` | `pages/Admin.tsx` | Admin |
-| `/review` | `pages/Review.tsx` | Toimetaja+ |
+| `/register` | `src/pages/Register.tsx` | Avalik |
+| `/set-password` | `src/pages/SetPassword.tsx` | Avalik (tokeniga) |
+| `/admin` | `src/pages/Admin.tsx` | Admin |
+| `/review` | `src/pages/Review.tsx` | Editor+ (viimased muudatused) |
 
-### Komponendid
-- `RegistrationForm.tsx` - taotlusvorm
-- `SetPasswordForm.tsx` - parooli seadmise vorm
-- `PendingRegistrationsList.tsx` - taotluste tabel
-- `PendingEditsList.tsx` - muudatuste tabel
-- `EditDiffView.tsx` - muudatuse diff-vaade
-- `UserManagement.tsx` - kasutajate haldus
+### Backend moodulid
+| Moodul | Kirjeldus |
+|--------|-----------|
+| `server/auth.py` | Autentimine, sessioonid, rollide kontroll |
+| `server/registration.py` | Registreerimistaotlused, invite tokenid |
+| `server/git_ops.py` | Git versioonihaldus |
+| `server/config.py` | Seadistused (teed, pordid, CORS, rate limits) |
+| `server/rate_limit.py` | Rate limiting brute-force kaitseks |
+| `server/pending_edits.py` | *(ei kasutata)* |
 
----
-
-## 6. SMTP-valmidus
-
-### Esimene faas (manuaalne)
-- Admin näeb genereeritud linki
-- Admin kopeerib ja saadab emailiga käsitsi
-
-### Teine faas (automaatne)
-Konfiguratsioon `config.ts` või `.env`:
-```
-SMTP_ENABLED=true
-SMTP_HOST=mail.ut.ee
-SMTP_PORT=587
-SMTP_USER=vutt@ut.ee
-SMTP_FROM=VUTT <vutt@ut.ee>
-```
-
-Email-mallid:
-- `invite.txt` - kutse link
-- `edit_approved.txt` - muudatus kinnitatud
-- `edit_rejected.txt` - muudatus tagasi lükatud
-
-**NB:** Email-saatmine peaks toimuma backend'is (Python), mitte frontendis.
+### Andmefailid (`state/` kaustas)
+- `users.json` - Kasutajad
+- `pending_registrations.json` - Ootel taotlused
+- `invite_tokens.json` - Aktiivsed kutsed (kehtivad 48h)
 
 ---
 
-## 7. Andmefailid
+## 5. SMTP (tulevikus)
 
-Uued failid (sama kaustas kui `users.json`):
-- `pending_registrations.json` - ootel taotlused
-- `invite_tokens.json` - aktiivsed kutsed
-- `pending_edits.json` - ootel muudatused
+Praegu admin saadab invite-lingi kasutajale käsitsi e-postiga.
 
-Alternatiiv pending-edits jaoks: eraldi failid iga muudatuse kohta `pending/` kaustas.
-
----
-
-## 8. Implementeerimise järjekord
-
-### Faas 1: Rollisüsteem ✅
-1. [x] Uuenda rollid koodis (contributor/editor/admin)
-2. [x] Uuenda `file_server.py` õiguste kontroll
-3. [x] Uuenda UI rollide kuvamine
-4. [x] Testi olemasolevate kasutajatega
-
-### Faas 2: Registreerimine ✅
-1. [x] Loo `pending_registrations.json` struktuur
-2. [x] Loo `/register` leht ja vorm
-3. [x] Loo `POST /register` endpoint
-4. [x] Loo `/admin` leht taotluste vaatamiseks
-5. [x] Loo kinnitamise/tagasilükkamise endpointid
-6. [x] Loo `invite_tokens.json` struktuur
-7. [x] Loo `/set-password` leht
-8. [ ] Testi kogu registreerimisvoog
-
-### Faas 3: Pending-muudatused ✅
-1. [x] Loo `pending_edits.json` struktuur
-2. [x] Muuda salvestamisloogika (contributor → pending)
-3. [x] Loo `/review` leht
-4. [x] Loo diff-vaate komponent
-5. [x] Loo kinnitamise loogika (fail + git + meilisearch)
-6. [x] Lisa Workspace'i pending-staatuse näitamine
-7. [ ] Testi kogu muudatuste voog
-
-### Faas 4: SMTP (tulevikus)
-1. [ ] Lisa SMTP konfiguratsioon
-2. [ ] Loo email-saatmise moodul Pythonis
-3. [ ] Loo email-mallid
-4. [ ] Integreeri kinnitamisvoogu
+Tulevikus võimalik automatiseerida:
+- SMTP konfiguratsioon `.env` failis
+- Email-saatmise moodul Pythonis
 
 ---
 
-## 9. Otsustatud küsimused
+## 6. Turvalisus ✅
 
-1. **Rollide nimetused koodis:** ✅ Inglise keeles (`contributor`/`editor`/`admin`), UI-s tõlgitud
-
-2. **Mitu pending-muudatust tohib ühel lehel olla?**
-   - ✅ Sama kasutaja: üks (uus kirjutab vana üle)
-   - ✅ Eri kasutajad: mitu lubatud, hoiatusega + ülevaataja lahendab konflikti
-
-3. **Kas kaastööline näeb teiste kaastööliste pending-muudatusi?**
-   - ✅ Ei näe, aga saab hoiatuse salvestamisel kui teine on juba muudatuse teinud
-
-4. **Git commit'i autorsus pending-muudatuse kinnitamisel:**
-   - ✅ Autor = kaastööline, Committer = kinnitaja
+Implementeeritud turvameetmed:
+- **Invite tokenid aeguvad** (48h)
+- **Kasutatud tokenid** märgitakse ja ei tööta uuesti
+- **Admin-endpointid** nõuavad admin-rolli
+- **Rate-limiting** registreerimisel ja sisselogimisel (vt `server/config.py`)
+- **CORS piiratud** lubatud domeenidega
 
 ---
 
-## 10. Turvalisus
+## 7. Kokkuvõte
 
-- Invite tokenid aeguvad (48h)
-- Kasutatud tokenid märgitakse ja ei tööta uuesti
-- Pending-edits on seotud kasutaja ja esitamishetke rolliga
-- Admin-endpointid nõuavad admin-rolli
-- Review-endpointid nõuavad vähemalt toimetaja-rolli
-- Rate-limiting registreerimisel (vältida spämmi)
+**Plaan lõpetatud: 2026-01-19**
 
----
+Implementeeritud:
+- ✅ Kaheastmeline rollisüsteem (editor → admin)
+- ✅ Avalik registreerimisvõimalus koos admin-kinnitusega
+- ✅ Git versioonihaldus koos autorsusega
+- ✅ Rate limiting ja turvameetmed
 
-*Plaan koostatud: 2025-01-16*
-*Viimati uuendatud: 2026-01-16*
-*Otsused kinnitatud: rollid, konfliktid, git autorsus*
+Planeeritud, kuid praktikas ei kasutata:
+- Pending-muudatuste süsteem (kood olemas, contributor rolli ei anta)
 
----
-
-## JÄTKAMISE MÄRKMED (2026-01-16)
-
-**Valmis:** Faas 1 (rollid), Faas 2 (registreerimine), Faas 3 (pending-muudatused)
-
-### Tehtud 2026-01-16
-
-**UI parandused:**
-- ✅ Kasutaja rippmenüü kõigil lehtedel (Dashboard, Admin, Review)
-  - Avatar + nool → klikk avab menüü
-  - Menüüs: Ülevaatus (editor+), Admin (admin), Logi välja
-  - Keelevahetaja paremas servas
-- ✅ Ühtne header kõigil lehtedel (logo + VUTT vasakul)
-- ✅ Registreerumise link sisselogimise modaalis
-- ✅ Admin lehelt eemaldatud "Ootel muudatused" tab (dubleeris /review lehte)
-
-**Review lehe parandused:**
-- ✅ Sõna-taseme diff esiletõstmine (näitab täpselt muutunud sõnu)
-- ✅ Korralik scrollimine (nupud alati nähtavad)
-
-**Rollipõhised piirangud:**
-- ✅ Kaastööline ei saa muuta staatust (ainult teksti)
-  - Staatuse valik on disabled + tooltip selgitusega
-
-**Järgmised sammud:**
-1. Faas 4 (SMTP) - tulevikus, kui vaja
-2. Kasutajate halduse tab Admin lehel (praegu placeholder)
+**Jäänud tulevikuks:**
+- SMTP automatiseerimine (praegu manuaalne)

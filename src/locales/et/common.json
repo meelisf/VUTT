@@ -55,6 +55,7 @@
   },
   "language": {
     "switchTo": "Vaheta keeleks {{lang}}",
+    "select": "Vali keel",
     "et": "Eesti",
     "en": "English"
   },

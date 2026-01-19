@@ -4,9 +4,9 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Home, Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import Header from '../components/Header';
 
 // Abifunktsioon pildi URL-i ehitamiseks
 const getImageUrl = (imagePath: string): string => {
@@ -346,54 +346,39 @@ const SearchPage: React.FC = () => {
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-            {/* Header */}
-            <header className="bg-white border-b border-gray-200 shadow-sm z-20 shrink-0">
-                {/* Ülemine riba - nav + keelevahetaja */}
-                <div className="px-6 py-3 flex items-center justify-between border-b border-gray-100">
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => navigate('/')}
-                            className="p-2 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
-                            title={t('header.home')}
-                        >
-                            <Home size={18} />
-                            <span className="font-bold text-gray-800 tracking-tight">VUTT</span>
-                        </button>
-                        <div className="h-6 w-px bg-gray-300"></div>
-                        <h1 className="text-xl font-bold text-primary-900 leading-none">{t('header.title')}</h1>
-                    </div>
-                    <LanguageSwitcher />
-                </div>
+            <Header showSearchButton={false} pageTitle={t('header.title')}>
                 {/* Otsingu vorm */}
-                <div className="max-w-7xl mx-auto px-6 py-4">
-                    <form onSubmit={handleSearch} className="flex gap-2 relative">
-                        <div className="relative flex-1">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                            <input
-                                type="search"
-                                placeholder={t('form.searchPlaceholder')}
-                                value={inputValue}
-                                onChange={(e) => setInputValue(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none text-lg"
-                                autoFocus
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            className="bg-primary-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-primary-700 transition-colors shadow-sm"
-                        >
-                            {t('form.search')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setShowFiltersMobile(!showFiltersMobile)}
-                            className="md:hidden p-3 bg-white border border-gray-300 rounded-lg text-gray-600"
-                        >
-                            <Filter size={20} />
-                        </button>
-                    </form>
+                <div className="bg-white border-b border-gray-200 px-6 py-4">
+                    <div className="max-w-7xl mx-auto">
+                        <form onSubmit={handleSearch} className="flex gap-2 relative">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                                <input
+                                    type="search"
+                                    placeholder={t('form.searchPlaceholder')}
+                                    value={inputValue}
+                                    onChange={(e) => setInputValue(e.target.value)}
+                                    className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none text-lg"
+                                    autoFocus
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="bg-primary-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-primary-700 transition-colors shadow-sm"
+                            >
+                                {t('form.search')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowFiltersMobile(!showFiltersMobile)}
+                                className="md:hidden p-3 bg-white border border-gray-300 rounded-lg text-gray-600"
+                            >
+                                <Filter size={20} />
+                            </button>
+                        </form>
+                    </div>
                 </div>
-            </header>
+            </Header>
 
             <div className="flex-1 overflow-hidden flex max-w-7xl mx-auto w-full">
 

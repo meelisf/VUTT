@@ -35,12 +35,14 @@ interface TextEditorProps {
   onOpenMetaModal?: () => void;
   readOnly?: boolean;
   statusDirty?: boolean;
+  currentStatus?: PageStatus | null;
+  onStatusChange?: (status: PageStatus) => void;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 type ViewMode = 'edit' | 'read';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
@@ -752,6 +754,28 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
                     {/* Links and Actions */}
                     <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">
+                      {/* Lehekülje staatus */}
+                      {onStatusChange && (
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('workspace:status.label')}</span>
+                          <select
+                            value={currentStatus || page.status}
+                            onChange={(e) => onStatusChange(e.target.value as PageStatus)}
+                            disabled={readOnly}
+                            className={`text-xs font-bold uppercase px-3 py-1.5 rounded-full border outline-none transition-all shadow-sm ${readOnly ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
+                                (currentStatus || page.status) === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer' :
+                                  (currentStatus || page.status) === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer' :
+                                    (currentStatus || page.status) === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer' :
+                                      'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 cursor-pointer'
+                              }`}
+                          >
+                            {Object.values(PageStatus).map((s) => (
+                              <option key={s} value={s}>{t(`common:status.${s}`)}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       {work.ester_id && (
                         <a
                           href={`https://www.ester.ee/record=${work.ester_id}*est`}

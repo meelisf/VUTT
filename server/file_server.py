@@ -33,7 +33,7 @@ from server import (
     update_pending_edit_status, check_base_text_conflict,
     # Git
     save_with_git, get_file_git_history, get_file_at_commit, get_file_diff,
-    get_recent_commits,
+    get_commit_diff, get_recent_commits,
     # Meilisearch
     sync_work_to_meilisearch, metadata_watcher_loop,
     # Utils
@@ -729,6 +729,57 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"GIT-DIFF VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path == '/commit-diff':
+            # Ühe commiti diff (võrreldes parent commitiga)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                # Autentimise kontroll - kõik sisselogitud kasutajad näevad
+                user, auth_error = require_token(data, min_role='viewer')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                commit_hash = data.get('commit_hash')
+                filepath = data.get('filepath')  # Valikuline
+
+                if not commit_hash:
+                    self.send_error(400, "Puudub 'commit_hash'")
+                    return
+
+                # Hangi diff
+                result = get_commit_diff(commit_hash, filepath)
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                if result:
+                    response = {
+                        "status": "success",
+                        "diff": result["diff"],
+                        "additions": result["additions"],
+                        "deletions": result["deletions"],
+                        "files": result["files"]
+                    }
+                else:
+                    response = {
+                        "status": "error",
+                        "message": "Diff'i ei leitud"
+                    }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"COMMIT-DIFF VIGA: {e}")
                 self.send_error(500, str(e))
 
         elif self.path == '/update-work-metadata':

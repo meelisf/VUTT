@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/meiliService';
 import { Page, PageStatus, Work } from '../types';
 import ImageViewer from '../components/ImageViewer';
@@ -8,12 +8,12 @@ import TextEditor from '../components/TextEditor';
 import ConfirmModal from '../components/ConfirmModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, Edit3, X, Save } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Search, Home, Edit3, X, Save, LogOut, Settings, History } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
-  const { user, authToken } = useUser();
+  const { user, authToken, logout } = useUser();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -48,12 +48,18 @@ const Workspace: React.FC = () => {
   const [saveMetaStatus, setSaveMetaStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Pending-edit olek (kaastöölistele)
+  // MÄRKUS: Contributor/pending-edit süsteem on implementeeritud, kuid EI OLE KASUTUSEL.
+  // Uued kasutajad saavad editor rolli, seega isContributor on alati false.
+  // Vt server/pending_edits.py ja server/registration.py kommentaare.
   const [pendingEditInfo, setPendingEditInfo] = useState<PendingEditInfo | null>(null);
   const [originalTextForPending, setOriginalTextForPending] = useState<string>('');
   const isContributor = user?.role === 'contributor';
 
   // Salvestamata muudatuste kinnitusdialoogi olek
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+
+  // Kasutaja menüü olek
+  const [showUserMenu, setShowUserMenu] = useState(false);
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -508,7 +514,7 @@ const Workspace: React.FC = () => {
       {page && <span className="Z3988" title={generateCoins() || ''} />}
 
       {/* Top Navigation Bar */}
-      <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-10">
+      <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm relative z-50">
         <div className="flex items-center gap-2">
           {/* Avaleht */}
           <button
@@ -575,31 +581,63 @@ const Workspace: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={currentStatus || page.status}
-            onChange={(e) => {
-              setCurrentStatus(e.target.value as PageStatus);
-            }}
-            disabled={!user || isContributor}
-            title={isContributor ? t('workspace:status.contributorDisabled') : undefined}
-            className={`text-xs font-bold uppercase px-3 py-1.5 rounded-full border outline-none transition-all shadow-sm ${(!user || isContributor) ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
-                (currentStatus || page.status) === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer' :
-                  (currentStatus || page.status) === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 cursor-pointer' :
-                    (currentStatus || page.status) === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 cursor-pointer' :
-                      'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 cursor-pointer'
-              }`}
-          >
-            {Object.values(PageStatus).map((s) => (
-              <option key={s} value={s}>{t(`common:status.${s}`)}</option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2">
+          {/* Kasutaja menüü */}
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowUserMenu(!showUserMenu)}
+                className="flex items-center justify-center h-8 w-8 bg-primary-100 rounded-full text-primary-700 font-bold text-xs hover:bg-primary-200 transition-colors"
+                title={user.name}
+              >
+                {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </button>
+
+              {showUserMenu && (
+                <>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setShowUserMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-[110]">
+                    <div className="px-4 py-2 border-b border-gray-100">
+                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                      <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
+                    </div>
+                    <Link
+                      to="/review"
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <History size={16} />
+                      {t('common:nav.review')}
+                    </Link>
+                    {user.role === 'admin' && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Settings size={16} />
+                        {t('common:nav.admin')}
+                      </Link>
+                    )}
+                    <div className="border-t border-gray-100 my-1" />
+                    <button
+                      onClick={() => { setShowUserMenu(false); logout(); }}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
+                    >
+                      <LogOut size={16} />
+                      {t('common:buttons.logout')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
           <LanguageSwitcher />
         </div>
       </div>
 
       {/* Split View Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative z-0">
         {/* Left: Image Viewer */}
         <div className="w-1/2 h-full border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
@@ -646,6 +684,8 @@ const Workspace: React.FC = () => {
             onOpenMetaModal={user?.role === 'admin' ? openMetaModal : undefined}
             readOnly={!user}
             statusDirty={statusDirty}
+            currentStatus={currentStatus}
+            onStatusChange={user && !isContributor ? setCurrentStatus : undefined}
           />
           </div>
         </div>

@@ -180,13 +180,17 @@ def create_user_from_invite(token, password):
         counter += 1
 
     # Loo uus kasutaja
+    # NB: Vaikimisi editor, mitte contributor.
+    # Contributor-roll ja pending-edits süsteem on implementeeritud, kuid
+    # praegu ei kasutata - see tekitaks liiga suure halduskoormuse.
+    # Vt server/pending_edits.py kommentaare.
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     users[username] = {
         "password_hash": password_hash,
         "name": name,
         "email": email,
-        "role": "contributor",
+        "role": "editor",  # Oli: "contributor" - vt kommentaari ülal
         "created_at": datetime.now().isoformat()
     }
 
@@ -198,4 +202,4 @@ def create_user_from_invite(token, password):
     use_invite_token(token)
 
     print(f"Loodud uus kasutaja: {username} ({name})")
-    return {"username": username, "name": name, "role": "contributor"}, None
+    return {"username": username, "name": name, "role": "editor"}, None

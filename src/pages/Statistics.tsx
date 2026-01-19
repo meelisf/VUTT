@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2 } from 'lucide-react';
+import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2 } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
 
 interface StatusCount {
@@ -19,7 +18,6 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t } = useTranslation(['statistics', 'common']);
-  const navigate = useNavigate();
 
   const [isLoading, setIsLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(0);
@@ -105,25 +103,11 @@ const Statistics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-4 shadow-sm sticky top-0 z-10">
-        <div className="flex justify-between items-start">
-          <div>
-            <button
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-2"
-            >
-                <ArrowLeft size={18} />
-                <span className="font-medium">{t('header.backToHome')}</span>
-            </button>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <BarChart3 className="text-primary-600" />
-                {t('header.title')}
-            </h1>
-          </div>
-          <LanguageSwitcher />
-        </div>
-      </div>
+      <Header 
+        showSearchButton={false} 
+        pageTitle={t('header.title')} 
+        pageTitleIcon={<BarChart3 className="text-primary-600" size={22} />} 
+      />
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
 

@@ -97,7 +97,8 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ### Frontend (`src/`)
 - `src/pages/` - Route components: Dashboard, Workspace, SearchPage, Statistics
-- `src/components/` - UI: ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
+- `src/components/` - UI: Header, ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
+- `src/components/Header.tsx` - Unified header for all pages (except Workspace/SetPassword)
 - `src/services/meiliService.ts` - All Meilisearch operations
 - `src/contexts/UserContext.tsx` - Authentication state
 - `src/config.ts` - Server URLs with `DEPLOYMENT_MODE`: 'nginx' (HTTPS) or 'direct' (HTTP internal)
@@ -143,10 +144,9 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ### Authentication
 - Token-based (UUID session tokens, 24h expiry)
-- Roles: `contributor` < `editor` < `admin`
-  - `contributor` (kaastööline): can edit, but changes go to pending review
-  - `editor` (toimetaja): direct edits, can approve pending changes
-  - `admin`: all rights + user management
+- Roles: `editor` < `admin`
+  - `editor` (toimetaja): direct edits, annotations
+  - `admin`: all rights + user management + version restore
 - localStorage: `vutt_user` + `vutt_token`
 - Write endpoints require `auth_token` in request body
 
@@ -203,7 +203,25 @@ const { t } = useTranslation(['workspace', 'common']);
 - Language stored in `localStorage` key `vutt_language`
 - Status enum values stay in Estonian (DB keys), translated at display: `t('common:status.${status}')`
 - LanguageSwitcher placed consistently in top-right corner of all pages
+### Unified Header Component
+`src/components/Header.tsx` provides a consistent header across all pages (except Workspace and SetPassword which have custom layouts):
 
+**Props:**
+- `showSearchButton?: boolean` - Show full-text search button (default: true)
+- `pageTitle?: string` - Optional page title displayed after logo
+- `pageTitleIcon?: ReactNode` - Optional icon before page title
+- `children?: ReactNode` - Content rendered below header (e.g., search form)
+
+**Usage examples:**
+```tsx
+<Header />                                        // Dashboard: logo + search button + user menu
+<Header showSearchButton={false} pageTitle="..." /> // Statistics: logo + title + user menu
+<Header showSearchButton={false}>                 // SearchPage: with search form as children
+  <div className="...">search form here</div>
+</Header>
+```
+
+**Includes:** Logo, app name/subtitle, search button, user menu (avatar, Review/Admin links, logout), LanguageSwitcher, LoginModal.
 ### Genre Tags (teose_tags)
 Source: `_metadata.json` in each work folder (auto-created if missing, with tags derived from title).
 Auto-detection: `Disputatio...` → `disputatsioon`, `Oratio...` → `oratsioon`, etc.
@@ -237,17 +255,24 @@ python3 scripts/sync_meilisearch.py --apply
 4. Update relevant component
 
 ### Adding users
+**Option 1: Self-registration (recommended)**
+1. User registers at `/register`
+2. Admin approves at `/admin`
+3. User sets password via invite link
+
+**Option 2: Manual (admin creates directly)**
 Edit `state/users.json` with SHA-256 hashed password:
 ```json
 {
   "username": {
     "password_hash": "<sha256>",
     "name": "Display Name",
-    "role": "admin|editor|contributor"
+    "email": "user@example.com",
+    "role": "editor|admin"
   }
 }
 ```
-**Note:** Self-registration system is planned (see `docs/PLAAN_kasutajahaldus.md`).
+Hash: `echo -n "password" | sha256sum`
 
 ### Adding translations
 1. Add keys to both `locales/et/{namespace}.json` and `locales/en/{namespace}.json`
@@ -357,25 +382,36 @@ curl -X PATCH 'http://HOST:7700/indexes/teosed/settings' \
 Supports URL parameters: `?author=`, `?respondens=`, `?printer=`, `?status=`, `?teoseTags=`
 Clickable links in Workspace "Info ja annotatsioonid" tab navigate to filtered Dashboard.
 
-## Future Ideas
+## Implemented Features
 
-### User Management System (In Progress)
-See `PLAAN_kasutajahaldus.md` for detailed implementation plan.
+### User Management System ✅ (Completed 2026-01-19)
+Three-tier role system with registration and pending edits workflow.
 
-**Key features:**
-- Self-registration with admin approval
-- Invite token system (48h expiry)
-- Pending edits review for contributors
-- Conflict detection (base_text_hash)
+**Roles:**
+- `editor` (toimetaja): direct edits, annotations
+- `admin`: all rights + user management + registration approval + version restore
 
-**New pages:** `/register`, `/set-password`, `/admin`, `/review`
+**Pages:**
+- `/register` - Public registration form
+- `/set-password?token=UUID` - Password setup with invite token
+- `/admin` - User management, registration approval
+- `/review` - Pending edits approval (editor+), recent changes
 
 **State files (in `state/` folder):**
-- `pending_registrations.json` - registration requests
-- `invite_tokens.json` - invite links
-- `pending_edits.json` - contributor edits awaiting review
+- `users.json` - User credentials (loo käsitsi!)
+- `pending_registrations.json` - Registration requests
+- `invite_tokens.json` - Invite links (48h expiry, single-use)
+- `pending_edits.json` - Contributor edits awaiting review
 
-### ESTER Integration (TODO)
+**Flow:**
+1. User submits registration at `/register`
+2. Admin approves at `/admin` → generates invite link
+3. User sets password at `/set-password`
+4. Contributor edits → pending review → editor approves at `/review`
+
+See `docs/PLAAN_kasutajahaldus.md` for implementation details.
+
+## Future Ideas
 Currently `ester_id` is manually added. Planned improvement:
 - Add "Search ESTER" button in admin metadata modal
 - Query ESTER API (SRU?) by year + title keywords

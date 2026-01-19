@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 
 const Register: React.FC = () => {
@@ -104,19 +104,7 @@ const Register: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50 overflow-y-auto">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-          <Link
-            to="/"
-            className="flex items-center gap-2 text-gray-600 hover:text-primary-700 transition-colors"
-          >
-            <ArrowLeft size={20} />
-            <span className="font-medium">{t('common:app.name')}</span>
-          </Link>
-          <LanguageSwitcher />
-        </div>
-      </header>
+      <Header showSearchButton={false} />
 
       {/* Form */}
       <main className="max-w-lg mx-auto px-4 py-12 pb-20">

@@ -55,6 +55,7 @@
   },
   "language": {
     "switchTo": "Switch language to {{lang}}",
+    "select": "Select language",
     "et": "Eesti",
     "en": "English"
   },

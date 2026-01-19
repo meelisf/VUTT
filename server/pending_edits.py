@@ -1,5 +1,18 @@
 """
 Kaastööliste (contributor) ootel muudatuste haldus.
+
+MÄRKUS: See moodul on implementeeritud, kuid PRAEGU EI OLE KASUTUSEL.
+
+Algselt oli plaan, et contributor-rolli kasutajate muudatused läheksid
+ülevaatusele (pending), kus editor/admin peaks need kinnitama. See tekitab
+aga suure halduskoormuse ja ei ole praegu mõttekas.
+
+Praegune lahendus: kõik registreeritud kasutajad saavad editor rolli
+(vt registration.py) ja nende muudatused rakenduvad kohe.
+
+Kui tulevikus on vaja suuremat kvaliteedikontrolli, saab selle süsteemi
+uuesti aktiveerida, muutes registration.py-s uue kasutaja vaikerolli
+tagasi 'contributor'-iks.
 """
 import json
 import os
