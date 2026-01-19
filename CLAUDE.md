@@ -72,6 +72,21 @@ Each Meilisearch document is a **page** with fields:
 
 Work status is recalculated on every page save and propagated to all pages of that work.
 
+### teose_id Handling
+**Single source of truth:** `_metadata.json` contains the canonical `teose_id`.
+
+The `teose_id` is the sanitized version of the folder name (diacritics removed, special chars → underscore).
+All components read `teose_id` from `_metadata.json`, NOT from folder names directly.
+
+**Migration script:** `scripts/migrate_teose_id.py` adds `teose_id` to existing `_metadata.json` files.
+```bash
+python3 scripts/migrate_teose_id.py           # Dry-run
+python3 scripts/migrate_teose_id.py --apply   # Apply changes
+```
+
+**Why:** Folder names can contain special characters, but Meilisearch IDs and URLs need sanitized versions.
+Previously, `git_ops.py` used raw folder names while Meilisearch used sanitized IDs → mismatch in URLs.
+
 ### Metadata Modal (Admin)
 Admin users can edit work metadata via the pencil icon in Workspace:
 
@@ -412,6 +427,13 @@ Three-tier role system with registration and pending edits workflow.
 See `docs/PLAAN_kasutajahaldus.md` for implementation details.
 
 ## Future Ideas
+
+### Collections (kollektsioonid)
+See `docs/PLAAN_kollektsioonid.md` for detailed planning document.
+
+Brief summary: Hierarchical organization of works by provenance/institution (not topic - use tags for that). One collection per work, with parent collections inherited for filtering. Global context selector in Header, bulk assignment in Dashboard.
+
+### ESTER Integration
 Currently `ester_id` is manually added. Planned improvement:
 - Add "Search ESTER" button in admin metadata modal
 - Query ESTER API (SRU?) by year + title keywords

@@ -3,7 +3,8 @@
     "backToDashboard": "Tagasi avalehele",
     "page": "Lk",
     "of": "/",
-    "goToPage": "Mine lehele"
+    "goToPage": "Mine lehele",
+    "toFirstPage": "Mine teose algusesse"
   },
   "tabs": {
     "edit": "Muuda",

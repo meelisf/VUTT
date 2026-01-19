@@ -7,6 +7,7 @@ import re
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
 from .config import BASE_DIR
+from .utils import sanitize_id
 
 # Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
 _git_repo = None
@@ -18,7 +19,10 @@ _teose_id_cache = {}
 def get_teose_id_from_folder(folder_name):
     """
     Leiab teose_id kausta nime järgi.
-    Loeb _metadata.json failist, kui olemas, muidu tagastab kausta nime.
+    1. Loeb _metadata.json failist (kui olemas)
+    2. Fallback: sanitize_id(folder_name)
+    
+    NB: Kasutab sanitize_id(), et tagada ühilduvus Meilisearchiga.
     Kasutab cache'i, et vältida korduvaid faililugemisi.
     """
     if folder_name in _teose_id_cache:
@@ -26,15 +30,19 @@ def get_teose_id_from_folder(folder_name):
     
     # Proovi lugeda _metadata.json
     metadata_path = os.path.join(BASE_DIR, folder_name, '_metadata.json')
-    teose_id = folder_name  # Vaikimisi kausta nimi
+    teose_id = None
     
     if os.path.exists(metadata_path):
         try:
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
-                teose_id = meta.get('teose_id', folder_name)
+                teose_id = meta.get('teose_id')
         except (json.JSONDecodeError, IOError):
-            pass  # Kasuta kausta nime
+            pass
+    
+    # Fallback: sanitize kausta nimi (sama loogika mis Meilisearch indekseerimisel)
+    if not teose_id:
+        teose_id = sanitize_id(folder_name)
     
     _teose_id_cache[folder_name] = teose_id
     return teose_id

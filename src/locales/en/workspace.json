@@ -3,7 +3,8 @@
     "backToDashboard": "Back to home",
     "page": "Page",
     "of": "/",
-    "goToPage": "Go to page"
+    "goToPage": "Go to page",
+    "toFirstPage": "Go to start of work"
   },
   "tabs": {
     "edit": "Edit",

@@ -124,7 +124,7 @@ const Workspace: React.FC = () => {
         ]);
 
         if (!pageData) {
-          setError("Lehekülge ei leitud. Kontrolli, kas Meilisearchis on andmed olemas.");
+          setError("Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele.");
         } else {
           setPage(pageData);
           setCurrentStatus(pageData.status);
@@ -434,12 +434,20 @@ const Workspace: React.FC = () => {
           <div className="text-xs bg-gray-100 p-2 rounded mb-4 text-left font-mono overflow-auto max-h-32">
             Debug: WorkID: {workId}, Page: {currentPageNum}
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-          >
-            {t('navigation.backToDashboard')}
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => navigate(`/work/${workId}/1`)}
+              className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+            >
+              {t('workspace:navigation.toFirstPage', 'Mine teose algusesse')}
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+            >
+              {t('navigation.backToDashboard')}
+            </button>
+          </div>
         </div>
       </div>
     );
