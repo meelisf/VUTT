@@ -1,20 +1,33 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface WorkCardProps {
   work: Work;
+  // Multi-select režiim (optional)
+  selectMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
+const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect }) => {
   const { t } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
 
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
+
+  // Select mode: klikkimine kaardil lülitab valiku
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (selectMode && onToggleSelect) {
+      e.preventDefault();
+      e.stopPropagation();
+      onToggleSelect();
+    }
+  };
 
   // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
@@ -36,19 +49,44 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200 flex flex-col overflow-hidden">
+    <div
+      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden ${
+        selectMode ? 'cursor-pointer' : ''
+      } ${
+        isSelected
+          ? 'border-primary-500 ring-2 ring-primary-200'
+          : 'border-gray-200'
+      }`}
+      onClick={handleCardClick}
+    >
       <div className="h-40 bg-gray-100 relative overflow-hidden group">
+        {/* Checkbox select mode'is */}
+        {selectMode && (
+          <div
+            className="absolute top-2 left-2 z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleSelect?.();
+            }}
+          >
+            {isSelected ? (
+              <CheckSquare className="w-6 h-6 text-primary-600 bg-white rounded" />
+            ) : (
+              <Square className="w-6 h-6 text-gray-400 bg-white/80 rounded hover:text-primary-500" />
+            )}
+          </div>
+        )}
         <img
           src={work.thumbnail_url}
           alt={work.title}
           loading="lazy"
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
-        {/* Žanrid pildi peal */}
+        {/* Žanrid pildi peal (max 3, kompaktne) */}
         {work.teose_tags && work.teose_tags.length > 0 && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
-            <div className="flex flex-wrap gap-1">
-              {work.teose_tags.slice(0, 6).map((tag, idx) => (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
+            <div className="flex flex-wrap items-center gap-1">
+              {work.teose_tags.slice(0, 3).map((tag, idx) => (
                 <button
                   key={idx}
                   onClick={(e) => {
@@ -57,14 +95,19 @@ const WorkCard: React.FC<WorkCardProps> = ({ work }) => {
                     // Navigeeri otsingusse selle žanriga
                     navigate(`/search?teoseTags=${encodeURIComponent(tag)}`);
                   }}
-                  className="text-[10px] font-bold text-white bg-slate-900/40 hover:bg-green-700/50 px-2 py-0.5 rounded border border-gray-500/30 backdrop-blur-sm transition-colors uppercase tracking-wider"
+                  className="text-[10px] font-medium text-white bg-slate-800/60 hover:bg-primary-600/80 px-1.5 py-0.5 rounded backdrop-blur-sm transition-colors"
                   title={t('workCard.searchGenre', { genre: tag })}
                 >
-                  {tag.toLowerCase()}
+                  {tag}
                 </button>
               ))}
-              {work.teose_tags.length > 6 && (
-                <span className="text-xs text-white/70 px-1">+{work.teose_tags.length - 6}</span>
+              {work.teose_tags.length > 3 && (
+                <span
+                  className="text-[10px] text-white/80 bg-slate-800/40 px-1.5 py-0.5 rounded"
+                  title={work.teose_tags.slice(3).join(', ')}
+                >
+                  +{work.teose_tags.length - 3}
+                </span>
               )}
             </div>
           </div>

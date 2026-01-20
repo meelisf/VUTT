@@ -8,12 +8,15 @@ import TextEditor from '../components/TextEditor';
 import ConfirmModal from '../components/ConfirmModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
-import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Search, Home, Edit3, X, Save, LogOut, Settings, History } from 'lucide-react';
+import { useCollection } from '../contexts/CollectionContext';
+import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Search, Home, Edit3, X, Save, LogOut, Settings, History, Library } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 
 const Workspace: React.FC = () => {
-  const { t } = useTranslation(['workspace', 'common']);
+  const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, logout } = useUser();
+  const { collections } = useCollection();
+  const lang = (i18n.language as 'et' | 'en') || 'et';
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -41,7 +44,8 @@ const Workspace: React.FC = () => {
     ester_id: '',
     external_url: '',
     koht: '',
-    trükkal: ''
+    trükkal: '',
+    collection: null as string | null
   });
   const [suggestions, setSuggestions] = useState<{ authors: string[], tags: string[], places: string[], printers: string[] }>({ authors: [], tags: [], places: [], printers: [] });
   const [isSavingMeta, setIsSavingMeta] = useState(false);
@@ -231,18 +235,46 @@ const Workspace: React.FC = () => {
       if (data.status === 'success' && data.metadata) {
         const m = data.metadata;
         console.log("Serverist laetud metadata:", m);
+
+        // =================================================================
+        // V1/V2 FORMAADI TUGI - vt CLAUDE.md "_metadata.json Formaadid"
+        // v1 = eestikeelsed väljad (pealkiri, aasta, teose_tags, koht, trükkal)
+        // v2 = ingliskeelsed väljad (title, year, tags, location, publisher, creators[])
+        // =================================================================
+        // Pealkiri: v1=pealkiri, v2=title
+        const pealkiri = m.pealkiri ?? m.title;
+        // Aasta: v1=aasta, v2=year
+        const aasta = m.aasta ?? m.year;
+        // Koht: v1=koht, v2=location
+        const koht = m.koht ?? m.location;
+        // Trükkal: v1=trükkal, v2=publisher
+        const trükkal = m.trükkal ?? m.publisher;
+        // Tags: v1=teose_tags, v2=tags
+        const tags = m.teose_tags ?? m.tags;
+
+        // Autor ja respondens: v1=otsene, v2=creators massiiv
+        let autor = m.autor;
+        let respondens = m.respondens;
+        if ((!autor || !respondens) && Array.isArray(m.creators)) {
+          const praeses = m.creators.find((c: any) => c.role === 'praeses');
+          const resp = m.creators.find((c: any) => c.role === 'respondens');
+          if (!autor && praeses) autor = praeses.name;
+          if (!respondens && resp) respondens = resp.name;
+        }
+
         // Uuenda vormi serverist saadud värske infoga
         setMetaForm(prev => ({
           ...prev,
-          pealkiri: m.pealkiri !== undefined ? m.pealkiri : prev.pealkiri,
-          autor: m.autor !== undefined ? m.autor : prev.autor,
-          respondens: m.respondens !== undefined ? m.respondens : prev.respondens,
-          aasta: m.aasta ? parseInt(m.aasta) : prev.aasta,
-          teose_tags: Array.isArray(m.teose_tags) ? m.teose_tags.join(', ') : (m.teose_tags !== undefined ? m.teose_tags : prev.teose_tags),
+          pealkiri: pealkiri !== undefined ? pealkiri : prev.pealkiri,
+          autor: autor !== undefined ? autor : prev.autor,
+          respondens: respondens !== undefined ? respondens : prev.respondens,
+          aasta: aasta ? parseInt(aasta) : prev.aasta,
+          teose_tags: Array.isArray(tags) ? tags.join(', ') : (tags !== undefined ? tags : prev.teose_tags),
           ester_id: m.ester_id !== undefined ? (m.ester_id || '') : prev.ester_id,
           external_url: m.external_url !== undefined ? (m.external_url || '') : prev.external_url,
-          koht: m.koht !== undefined ? (m.koht || '') : prev.koht,
-          trükkal: m.trükkal !== undefined ? (m.trükkal || '') : prev.trükkal
+          koht: koht !== undefined ? (koht || '') : prev.koht,
+          trükkal: trükkal !== undefined ? (trükkal || '') : prev.trükkal,
+          collection: m.collection !== undefined ? m.collection : prev.collection
         }));
       }
     } catch (e) {
@@ -270,19 +302,29 @@ const Workspace: React.FC = () => {
         cleanEsterId = esterMatch[1];
       }
 
+      // Ehitame creators massiivi v2 formaadis
+      const creators: Array<{name: string, role: string}> = [];
+      if (metaForm.autor.trim()) {
+        creators.push({ name: metaForm.autor.trim(), role: 'praeses' });
+      }
+      if (metaForm.respondens.trim()) {
+        creators.push({ name: metaForm.respondens.trim(), role: 'respondens' });
+      }
+
+      // V2 formaat - saadame ainult v2 väljad
       let payload: any = {
         auth_token: authToken,
-        work_id: workId, // Põhiline identifikaator
+        work_id: workId,
         metadata: {
-          pealkiri: metaForm.pealkiri,
-          autor: metaForm.autor,
-          respondens: metaForm.respondens,
-          aasta: metaForm.aasta,
-          teose_tags: tagsArray,
+          title: metaForm.pealkiri,
+          year: metaForm.aasta,
+          creators: creators,
+          tags: tagsArray,
+          location: metaForm.koht.trim() || null,
+          publisher: metaForm.trükkal.trim() || null,
           ester_id: cleanEsterId || null,
           external_url: metaForm.external_url.trim() || null,
-          koht: metaForm.koht.trim() || null,
-          trükkal: metaForm.trükkal.trim() || null
+          collection: metaForm.collection
         }
       };
 
@@ -781,6 +823,26 @@ const Workspace: React.FC = () => {
               {/* Grupp 2: Klassifikatsioon ja lingid */}
               <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
                 <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">Klassifikatsioon ja lingid</h4>
+                {/* Kollektsioon */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                    <Library size={12} />
+                    {t('metadata.collection', 'Kollektsioon')}
+                  </label>
+                  <select
+                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                    value={metaForm.collection || ''}
+                    onChange={e => setMetaForm({ ...metaForm, collection: e.target.value || null })}
+                  >
+                    <option value="">{t('metadata.noCollection', '— Määramata —')}</option>
+                    {Object.entries(collections).map(([id, col]) => (
+                      <option key={id} value={id}>
+                        {col.name[lang] || col.name.et}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Žanrid / Tagid (komadega eraldatud)</label>
                   <input

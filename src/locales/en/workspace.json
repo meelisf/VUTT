@@ -44,6 +44,8 @@
     "printer": "Printer",
     "tags": "Genres / Tags",
     "tagsHint": "Separate with comma",
+    "collection": "Collection",
+    "noCollection": "— Unassigned —",
     "esterId": "ESTER ID",
     "externalUrl": "External URL",
     "save": "Save metadata",

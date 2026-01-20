@@ -16,10 +16,13 @@ BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 # JSON failide asukohad (state/ kaustas projekti juurkataloogis)
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _STATE_DIR = os.path.join(_PROJECT_ROOT, "state")
+STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 PENDING_EDITS_FILE = os.path.join(_STATE_DIR, "pending_edits.json")
+COLLECTIONS_FILE = os.path.join(_STATE_DIR, "collections.json")
+VOCABULARIES_FILE = os.path.join(_STATE_DIR, "vocabularies.json")
 
 # =========================================================
 # SERVERI SEADED

@@ -104,7 +104,7 @@ const Register: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50 overflow-y-auto">
-      <Header showSearchButton={false} />
+      <Header />
 
       {/* Form */}
       <main className="max-w-lg mx-auto px-4 py-12 pb-20">

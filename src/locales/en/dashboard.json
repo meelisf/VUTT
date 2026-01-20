@@ -47,5 +47,24 @@
     "filterByStatus": "Filter by status \"{{status}}\"",
     "searchGenre": "Search genre: {{genre}}",
     "openWorkspace": "Open workspace"
+  },
+  "bulkAssign": {
+    "select": "Select",
+    "enterSelect": "Enter selection mode",
+    "exitSelect": "Exit",
+    "selectAllVisible": "Select all visible",
+    "clearSelection": "Clear selection",
+    "selectedCount": "{{count}} selected",
+    "assignCollection": "Assign collection",
+    "selectCollection": "Select collection",
+    "error": "Failed to assign collection",
+    "success": "Collection assigned to {{count}} works"
+  },
+  "filters": {
+    "advanced": "Advanced options",
+    "genre": "Genre",
+    "tags": "Tags",
+    "type": "Type",
+    "clearAdvanced": "Clear advanced filters"
   }
 }

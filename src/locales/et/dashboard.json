@@ -47,5 +47,24 @@
     "filterByStatus": "Filtreeri staatuse \"{{status}}\" järgi",
     "searchGenre": "Otsi žanrit: {{genre}}",
     "openWorkspace": "Ava töölaud"
+  },
+  "bulkAssign": {
+    "select": "Vali",
+    "enterSelect": "Lülita valikurežiim sisse",
+    "exitSelect": "Välju",
+    "selectAllVisible": "Vali kõik nähtavad",
+    "clearSelection": "Tühista valik",
+    "selectedCount": "{{count}} valitud",
+    "assignCollection": "Määra kollektsioon",
+    "selectCollection": "Vali kollektsioon",
+    "error": "Kollektsiooni määramine ebaõnnestus",
+    "success": "Kollektsioon määratud {{count}} teosele"
+  },
+  "filters": {
+    "advanced": "Täpsemad valikud",
+    "genre": "Žanr",
+    "tags": "Märksõnad",
+    "type": "Tüüp",
+    "clearAdvanced": "Tühjenda täpsemad filtrid"
   }
 }

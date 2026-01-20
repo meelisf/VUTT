@@ -65,5 +65,14 @@
   "nav": {
     "review": "Muudatused",
     "admin": "Admin"
+  },
+  "collections": {
+    "title": "Vali kollektsioon",
+    "all": "Kõik tööd",
+    "unassigned": "Määramata (eemalda kollektsioon)",
+    "empty": "Kollektsioone pole veel lisatud",
+    "hint": "Valik salvestub ja kehtib kõigis vaadetes",
+    "activeFilter": "Aktiivne kollektsioon",
+    "changeInHeader": "Muuda päises olevast valijast"
   }
 }

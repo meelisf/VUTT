@@ -4,9 +4,10 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets } from '../services/meiliService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
+import { useCollection } from '../contexts/CollectionContext';
 
 // Abifunktsioon pildi URL-i ehitamiseks
 const getImageUrl = (imagePath: string): string => {
@@ -19,6 +20,7 @@ const SearchPage: React.FC = () => {
     const { t } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
+    const { selectedCollection, getCollectionName } = useCollection();
 
     // URL params control the actual search
     const queryParam = searchParams.get('q') || '';
@@ -132,14 +134,15 @@ const SearchPage: React.FC = () => {
                 yearEnd: yearEndParam,
                 scope: scopeParam,
                 workId: workIdParam || undefined,  // Lisa workId filter
-                teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined
+                teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
+                collection: selectedCollection || undefined  // Kollektsiooni filter
             };
 
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(',')]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), selectedCollection]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -346,7 +349,7 @@ const SearchPage: React.FC = () => {
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
-            <Header showSearchButton={false} pageTitle={t('header.title')}>
+            <Header>
                 {/* Otsingu vorm */}
                 <div className="bg-white border-b border-gray-200 px-6 py-4">
                     <div className="max-w-7xl mx-auto">
@@ -393,6 +396,21 @@ const SearchPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-6">
+
+                        {/* Active Collection Indicator */}
+                        {selectedCollection && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                                <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1 flex items-center gap-2">
+                                    <Library size={14} /> {t('common:collections.activeFilter')}
+                                </h3>
+                                <p className="text-sm font-medium text-amber-900">
+                                    {getCollectionName(selectedCollection)}
+                                </p>
+                                <p className="text-xs text-amber-600 mt-1">
+                                    {t('common:collections.changeInHeader')}
+                                </p>
+                            </div>
+                        )}
 
                         {/* Search Scope */}
                         <div>

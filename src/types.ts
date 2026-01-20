@@ -10,25 +10,94 @@ export enum PageStatus {
 // Teose koondstaatus dashboardi jaoks
 export type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 
-// See vastab struktuurile, mis tuleb Meilisearchist (lehekylje_number=1 päringuga)
-export interface Work {
-  id: string; // See on teose_id (nt "1632-1")
-  catalog_name: string; // originaal_kataloog
-  title: string; // pealkiri
-  author: string; // autor
-  respondens?: string; // respondens (disputatsioonide puhul)
-  year: number; // aasta
-  publisher: string; // Hetkel puudub Meilisearchist, võib jätta tühjaks
-  page_count: number; // Seda peame eraldi lugema või hinnanguliselt panema
-  thumbnail_url: string; // lehekylje_pilt esimeselt lehelt
-  work_status?: WorkStatus; // Teose koondstaatus (arvutatakse lehekülgede staatustest)
-  tags?: string[]; // Esimese lehekülje tagid (dashboardil kuvamiseks)
-  teose_tags?: string[]; // Teose-tasemel märksõnad/kollektsioonid (admin saab muuta)
-  ester_id?: string; // ESTER kataloogi ID (nt "b1510692")
-  external_url?: string; // Väline kataloogilink (kui pole ESTERis)
-  koht?: string; // Trükikoht (Tartu / Pärnu)
-  trükkal?: string; // Trükkal (printer)
+// =========================================================
+// V2 TÜÜBID - Kollektsioonide süsteem
+// =========================================================
+
+// Isiku roll teoses
+export type CreatorRole = 'praeses' | 'respondens' | 'auctor' | 'gratulator' | 'dedicator' | 'editor';
+
+// Isik teoses
+export interface Creator {
+  name: string;
+  role: CreatorRole;
+  identifiers?: {
+    gnd?: string;   // GND ID (Saksa rahvusbibliograafia)
+    viaf?: string;  // VIAF ID
+  };
 }
+
+// Seeria info
+export interface Series {
+  title: string;
+  number?: string;
+}
+
+// Seos teiste teostega
+export interface Relation {
+  id: string;
+  rel_type: 'isPartOf' | 'hasPart' | 'isVersionOf' | 'isReferencedBy' | 'references';
+  label?: string;
+}
+
+// =========================================================
+// WORK - Teose andmed (Dashboard, WorkCard)
+// =========================================================
+
+export interface Work {
+  // V2 identifikaatorid
+  id: string;               // Lehekülje ID (Meilisearch primary key)
+  work_id?: string;         // Püsiv lühikood (nanoid)
+  teose_id: string;         // Slug (URL-is, tagasiühilduvus)
+
+  // V2 teose andmed
+  title: string;
+  year: number | null;
+  location: string;
+  publisher: string;
+
+  // V2 taksonoomia
+  type?: string;            // 'impressum' | 'manuscriptum'
+  genre?: string | null;    // 'disputatio' | 'oratio' | ...
+  collection?: string | null;
+  collections_hierarchy?: string[];
+
+  // V2 isikud
+  creators?: Creator[];
+  authors_text?: string[];  // Denormaliseeritud otsinguks
+
+  // V2 märksõnad
+  teose_tags?: string[];    // Sisuline klassifikatsioon
+  languages?: string[];     // Keeled (ISO 639-3)
+
+  // Seosed
+  series?: Series;
+  series_title?: string;
+  relations?: Relation[];
+
+  // Välised lingid
+  ester_id?: string;
+  external_url?: string;
+
+  // Lehekülje info (esimese lehe andmed)
+  page_count: number;
+  thumbnail_url: string;
+  work_status?: WorkStatus;
+  tags?: string[];          // Esimese lehekülje tagid
+
+  // Tagasiühilduvus (ajutine)
+  catalog_name?: string;    // originaal_kataloog
+  author?: string;          // Esimene praeses
+  respondens?: string;      // Esimene respondens
+  koht?: string;
+  trükkal?: string;
+  pealkiri?: string;
+  aasta?: number;
+}
+
+// =========================================================
+// PAGE - Lehekülje andmed (Workspace)
+// =========================================================
 
 export interface Annotation {
   id: string;
@@ -45,31 +114,53 @@ export interface HistoryEntry {
   description: string;
 }
 
-// Vastab Meilisearchi dokumendi struktuurile
 export interface Page {
-  id: string; // nt "1632-1-1"
-  work_id: string; // teose_id
-  page_number: number; // lehekylje_number
-  text_content: string; // lehekylje_tekst
-  image_url: string; // lehekylje_pilt (täispikk URL)
-  status: PageStatus; // Hetkel pole Meilisearchis, simuleerime või lisame hiljem
+  // Identifikaatorid
+  id: string;               // Lehekülje ID (nt "1632-1-1")
+  work_id?: string;         // Püsiv lühikood
+  teose_id: string;         // Slug
+
+  // Lehekülje andmed
+  page_number: number;
+  text_content: string;
+  image_url: string;
+  status: PageStatus;
   comments: Annotation[];
   tags: string[];
   history: HistoryEntry[];
 
-  // Meilisearchi spetsiifilised väljad (metadata, mis on lehekülje dokumendi küljes)
+  // V2 teose andmed (denormaliseeritud)
+  title?: string;
+  year?: number | null;
+  location?: string;
+  publisher?: string;
+  type?: string;
+  genre?: string | null;
+  collection?: string | null;
+  collections_hierarchy?: string[];
+  creators?: Creator[];
+  authors_text?: string[];
+  teose_tags?: string[];
+  languages?: string[];
+  series?: Series;
+  series_title?: string;
+  ester_id?: string;
+  external_url?: string;
+
+  // Tagasiühilduvus (ajutine)
   pealkiri?: string;
   autor?: string;
   respondens?: string;
   aasta?: number;
-  teose_tags?: string[];
   originaal_kataloog?: string;
-  ester_id?: string;
-  external_url?: string;
   original_path?: string;
-  koht?: string; // Trükikoht (Tartu / Pärnu)
-  trükkal?: string; // Trükkal (printer)
+  koht?: string;
+  trükkal?: string;
 }
+
+// =========================================================
+// OTSINGU TÜÜBID
+// =========================================================
 
 export interface SearchFilters {
   query: string;
@@ -82,37 +173,53 @@ export interface ContentSearchOptions {
   yearStart?: number;
   yearEnd?: number;
   catalog?: string;
-  workId?: string;  // Filter ühe teose piires
+  workId?: string;
   scope?: 'all' | 'annotation' | 'original';
-  teoseTags?: string[];  // Teose märksõnade filter (AND loogika)
+  teoseTags?: string[];
+  genre?: string;
+  collection?: string;    // V2: kollektsiooni filter
 }
 
-// Full Text Search specific types
 export interface ContentSearchHit {
   id: string;
   teose_id: string;
+  work_id?: string;
   lehekylje_number: number | string;
+  lehekylje_tekst: string;
+  lehekylje_pilt: string;
+
+  // V2 väljad
+  title?: string;
+  year?: number | string | null;
+  location?: string;
+  publisher?: string;
+  genre?: string | null;
+  collection?: string | null;
+  creators?: Creator[];
+  authors_text?: string[];
+
+  // Tagasiühilduvus
   pealkiri?: string;
   autor?: string;
   aasta?: number | string;
   originaal_kataloog?: string;
-  lehekylje_tekst: string;
-  lehekylje_pilt: string;
+
   tags?: string[];
   comments?: Annotation[];
+
   _formatted?: {
     lehekylje_tekst: string;
     tags?: string[];
     comments?: Annotation[];
   };
-  // Vastete arv selles teoses (distinct päringu puhul)
+
   hitCount?: number;
 }
 
 export interface ContentSearchResponse {
   hits: ContentSearchHit[];
-  totalHits: number;        // Kokku lehekülgi/vasteid
-  totalWorks?: number;      // Kokku teoseid (distinct päringu puhul)
+  totalHits: number;
+  totalWorks?: number;
   totalPages: number;
   page: number;
   processingTimeMs: number;

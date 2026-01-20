@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { searchWorks, getTeoseTagsFacets } from '../services/meiliService';
+import { searchWorks } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
+import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, Tag, User } from 'lucide-react';
+import { useCollection } from '../contexts/CollectionContext';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput } from 'lucide-react';
+import CollectionPicker from '../components/CollectionPicker';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { FILE_API_URL } from '../config';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -14,6 +18,7 @@ const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const Dashboard: React.FC = () => {
   const { t } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, isLoading: userLoading } = useUser();
+  const { selectedCollection } = useCollection();
   const [showAboutModal, setShowAboutModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
@@ -28,6 +33,8 @@ const Dashboard: React.FC = () => {
   const printerParam = searchParams.get('printer') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
   const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
+  const genreParam = searchParams.get('genre') || null;
+  const typeParam = searchParams.get('type') || null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
 
   const [inputValue, setInputValue] = useState(queryParam);
@@ -41,24 +48,21 @@ const Dashboard: React.FC = () => {
   const [yearEnd, setYearEnd] = useState<string>(yearEndParam || '1710');
   const [sort, setSort] = useState<string>(sortParam);
 
-  // Teose märksõnade filter
-  const [availableTags, setAvailableTags] = useState<{ tag: string; count: number }[]>([]);
+  // Täpsemad filtrid (AdvancedFilters komponent)
   const [selectedTags, setSelectedTags] = useState<string[]>(teoseTagsParam);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(genreParam);
+  const [selectedType, setSelectedType] = useState<string | null>(typeParam);
+  const [selectedStatus, setSelectedStatus] = useState<WorkStatus | null>(statusParam);
+
+  // Multi-select režiim (ainult admin)
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
+  const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
+  const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
+  const [refreshCounter, setRefreshCounter] = useState(0);  // Triggers re-fetch
 
   const navigate = useNavigate();
-
-  // Laadi teose märksõnade facets alguses
-  useEffect(() => {
-    const loadTags = async () => {
-      try {
-        const tags = await getTeoseTagsFacets();
-        setAvailableTags(tags);
-      } catch (e) {
-        console.warn('Teose märksõnade laadimine ebaõnnestus:', e);
-      }
-    };
-    loadTags();
-  }, []);
+  const isAdmin = user?.role === 'admin';
 
   // Laadime "Projektist" HTML faili
   useEffect(() => {
@@ -124,8 +128,11 @@ const Dashboard: React.FC = () => {
     if (yearEndParam) setYearEnd(yearEndParam);
     if (sortParam) setSort(sortParam);
     setSelectedTags(teoseTagsParam);
+    setSelectedGenre(genreParam);
+    setSelectedType(typeParam);
+    setSelectedStatus(statusParam);
     setCurrentPage(pageParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), pageParam]);
+  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam, pageParam]);
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -187,6 +194,39 @@ const Dashboard: React.FC = () => {
         resetPage = true;
       }
 
+      // Žanr
+      if (selectedGenre !== genreParam) {
+        if (selectedGenre) {
+          newParams.set('genre', selectedGenre);
+        } else {
+          newParams.delete('genre');
+        }
+        changed = true;
+        resetPage = true;
+      }
+
+      // Tüüp
+      if (selectedType !== typeParam) {
+        if (selectedType) {
+          newParams.set('type', selectedType);
+        } else {
+          newParams.delete('type');
+        }
+        changed = true;
+        resetPage = true;
+      }
+
+      // Staatus
+      if (selectedStatus !== statusParam) {
+        if (selectedStatus) {
+          newParams.set('status', selectedStatus);
+        } else {
+          newParams.delete('status');
+        }
+        changed = true;
+        resetPage = true;
+      }
+
       // Lähtesta leht 1-le kui filtrid muutusid
       if (resetPage && pageParam > 1) {
         newParams.delete('page');
@@ -198,7 +238,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, selectedTags, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam]);
+  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam]);
 
   // Perform search when params change
   useEffect(() => {
@@ -219,7 +259,10 @@ const Dashboard: React.FC = () => {
           printer: printerParam || undefined,
           workStatus: statusParam || undefined,
           teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
-          onlyFirstPage: sort !== 'recent' // CUSTOM: If sorting by recent, we want to see ANY page that was modified
+          genre: selectedGenre || undefined,
+          type: selectedType || undefined,
+          collection: selectedCollection || undefined,
+          onlyFirstPage: sort !== 'recent'
         });
         setWorks(results);
 
@@ -240,7 +283,76 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter]);
+
+  // Multi-select helper funktsioonid
+  const toggleWorkSelection = (workId: string) => {
+    setSelectedWorkIds(prev => {
+      const next = new Set(prev);
+      if (next.has(workId)) {
+        next.delete(workId);
+      } else {
+        next.add(workId);
+      }
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const currentWorks = works.slice(startIndex, endIndex);
+    setSelectedWorkIds(prev => {
+      const next = new Set(prev);
+      currentWorks.forEach(w => next.add(w.work_id || w.teose_id));
+      return next;
+    });
+  };
+
+  const clearSelection = () => {
+    setSelectedWorkIds(new Set());
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedWorkIds(new Set());
+  };
+
+  // Massilise kollektsiooni määramine
+  const handleBulkAssignCollection = async (collectionId: string | null) => {
+    if (selectedWorkIds.size === 0) return;
+
+    setBulkAssignLoading(true);
+    try {
+      const token = localStorage.getItem('vutt_token');
+      const response = await fetch(`${FILE_API_URL}/works/bulk-collection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_token: token,
+          work_ids: Array.from(selectedWorkIds),
+          collection: collectionId
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        // Tühjenda valik ja uuenda otsing
+        setSelectedWorkIds(new Set());
+        setSelectMode(false);
+        // Trigger re-fetch by incrementing refresh counter
+        setRefreshCounter(prev => prev + 1);
+      } else {
+        alert(result.message || t('dashboard:bulkAssign.error'));
+      }
+    } catch (e) {
+      console.error('Bulk assign failed:', e);
+      alert(t('dashboard:bulkAssign.error'));
+    } finally {
+      setBulkAssignLoading(false);
+      setShowBulkCollectionPicker(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full bg-gray-50 font-sans">
@@ -421,36 +533,18 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Teose märksõnade filter (chip-based) */}
-              {availableTags.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 bg-white/50 p-2 rounded-lg">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-                    <Tag size={12} />
-                    {t('search.genre')}
-                  </span>
-                  {availableTags.map(({ tag, count }) => {
-                    const isSelected = selectedTags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedTags(selectedTags.filter(t => t !== tag));
-                          } else {
-                            setSelectedTags([...selectedTags, tag]);
-                          }
-                        }}
-                        className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${isSelected
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                      >
-                        {tag} <span className="opacity-60">({count})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              {/* Täpsemad filtrid (žanr, märksõnad, tüüp) */}
+              <AdvancedFilters
+                selectedGenre={selectedGenre}
+                selectedTags={selectedTags}
+                selectedType={selectedType}
+                selectedStatus={selectedStatus}
+                onGenreChange={setSelectedGenre}
+                onTagsChange={setSelectedTags}
+                onTypeChange={setSelectedType}
+                onStatusChange={setSelectedStatus}
+                collection={selectedCollection}
+              />
             </div>
           </div>
 
@@ -496,10 +590,51 @@ const Dashboard: React.FC = () => {
               return (
                 <>
                   <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
-                    <h2 className="text-xl font-bold text-gray-800">{t('results.bookshelf')}</h2>
-                    <span className="text-sm text-gray-500">
-                      {t('results.worksCount', { count: works.length })} {statusParam && t('results.filtered')} {totalPages > 1 && `• ${t('results.pageOf', { current: currentPage, total: totalPages })}`}
-                    </span>
+                    <div className="flex items-center gap-4">
+                      <h2 className="text-xl font-bold text-gray-800">{t('results.bookshelf')}</h2>
+                      {/* Admin: Select mode toggle */}
+                      {isAdmin && works.length > 0 && (
+                        <button
+                          onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                            selectMode
+                              ? 'bg-primary-100 text-primary-700 font-medium'
+                              : 'text-gray-500 hover:bg-gray-100'
+                          }`}
+                          title={selectMode ? t('bulkAssign.exitSelect') : t('bulkAssign.enterSelect')}
+                        >
+                          {selectMode ? <CheckSquare size={16} /> : <Square size={16} />}
+                          {selectMode ? t('bulkAssign.exitSelect') : t('bulkAssign.select')}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {/* Select all / clear selection */}
+                      {selectMode && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <button
+                            onClick={selectAllVisible}
+                            className="text-primary-600 hover:text-primary-800 font-medium"
+                          >
+                            {t('bulkAssign.selectAllVisible')}
+                          </button>
+                          {selectedWorkIds.size > 0 && (
+                            <>
+                              <span className="text-gray-300">|</span>
+                              <button
+                                onClick={clearSelection}
+                                className="text-gray-500 hover:text-gray-700"
+                              >
+                                {t('bulkAssign.clearSelection')}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <span className="text-sm text-gray-500">
+                        {t('results.worksCount', { count: works.length })} {statusParam && t('results.filtered')} {totalPages > 1 && `• ${t('results.pageOf', { current: currentPage, total: totalPages })}`}
+                      </span>
+                    </div>
                   </div>
 
                   {loading ? (
@@ -512,9 +647,19 @@ const Dashboard: React.FC = () => {
                   ) : works.length > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {currentWorks.map(work => (
-                          <WorkCard key={work.id} work={work} />
-                        ))}
+                        {currentWorks.map(work => {
+                          // Kasuta work_id (nanoid) kui olemas, muidu teose_id (tagasiühilduvus)
+                          const workIdentifier = work.work_id || work.teose_id;
+                          return (
+                            <WorkCard
+                              key={workIdentifier}
+                              work={work}
+                              selectMode={selectMode}
+                              isSelected={selectedWorkIds.has(workIdentifier)}
+                              onToggleSelect={() => toggleWorkSelection(workIdentifier)}
+                            />
+                          );
+                        })}
                       </div>
 
                       {/* Pagination */}
@@ -637,6 +782,41 @@ const Dashboard: React.FC = () => {
             />
           </div>
         </div>
+      )}
+
+      {/* Floating Action Bar - ilmub kui teosed on valitud */}
+      {selectMode && selectedWorkIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 z-40">
+          <span className="font-medium">
+            {t('bulkAssign.selectedCount', { count: selectedWorkIds.size })}
+          </span>
+          <div className="h-5 w-px bg-gray-600" />
+          <button
+            onClick={() => setShowBulkCollectionPicker(true)}
+            disabled={bulkAssignLoading}
+            className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 hover:bg-primary-700 rounded-full font-medium transition-colors disabled:opacity-50"
+          >
+            <FolderInput size={18} />
+            {bulkAssignLoading ? t('common:labels.loading') : t('bulkAssign.assignCollection')}
+          </button>
+          <button
+            onClick={exitSelectMode}
+            className="text-gray-400 hover:text-white transition-colors p-1"
+            title={t('bulkAssign.exitSelect')}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Bulk Collection Picker Modal */}
+      {showBulkCollectionPicker && (
+        <CollectionPicker
+          onSelect={handleBulkAssignCollection}
+          onClose={() => setShowBulkCollectionPicker(false)}
+          showUnassigned={true}
+          title={t('bulkAssign.selectCollection')}
+        />
       )}
     </div>
   );

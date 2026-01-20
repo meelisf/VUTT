@@ -4,8 +4,19 @@ Abifunktsioonid ja utiliidid.
 import os
 import re
 import json
+import secrets
+import string
 import unicodedata
 from .config import BASE_DIR
+
+# Nanoid seadistus
+NANOID_LENGTH = 8
+NANOID_ALPHABET = string.ascii_lowercase + string.digits  # a-z, 0-9
+
+
+def generate_nanoid(length=NANOID_LENGTH):
+    """Genereerib nanoid-stiilis lühikoodi."""
+    return ''.join(secrets.choice(NANOID_ALPHABET) for _ in range(length))
 
 
 def sanitize_id(text):
@@ -25,24 +36,33 @@ def sanitize_id(text):
 
 
 def find_directory_by_id(target_id):
-    """Leiab failisüsteemist kausta teose ID järgi."""
+    """Leiab failisüsteemist kausta teose ID järgi.
+
+    Otsib järjekorras:
+    1. `id` väli (nanoid, püsiv) - eelistatud
+    2. `teose_id` väli (slug, tagasiühilduvus)
+    3. Kausta nimi (sanitiseeritult, viimane võimalus)
+    """
     if not target_id:
         return None
 
     for entry in os.scandir(BASE_DIR):
         if entry.is_dir():
-            # 1. Kontrolli _metadata.json faili sisu
             meta_path = os.path.join(entry.path, '_metadata.json')
             if os.path.exists(meta_path):
                 try:
                     with open(meta_path, 'r', encoding='utf-8') as f:
                         meta = json.load(f)
+                        # 1. Kontrolli nanoid `id` välja (eelistatud)
+                        if meta.get('id') == target_id:
+                            return entry.path
+                        # 2. Kontrolli `teose_id` välja (tagasiühilduvus)
                         if meta.get('teose_id') == target_id:
                             return entry.path
                 except:
                     pass
 
-            # 2. Kontrolli kausta nime (sanitiseeritult)
+            # 3. Kontrolli kausta nime (sanitiseeritult)
             if sanitize_id(entry.name) == target_id:
                 return entry.path
     return None
@@ -67,12 +87,14 @@ def generate_default_metadata(dir_name):
         year = int(year_match.group(1))
 
     return {
-        "teose_id": teose_id,
+        "id": generate_nanoid(),  # Püsiv lühikood
+        "teose_id": teose_id,     # Slug (URL-ides)
         "pealkiri": title,
         "autor": "",
         "respondens": "",
         "aasta": year,
         "teose_tags": [],
+        "collection": None,
         "ester_id": None,
         "external_url": None
     }

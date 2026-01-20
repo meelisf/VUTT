@@ -15,7 +15,7 @@ from datetime import datetime
 # Impordi kõik vajalik server/ moodulitest
 from server import (
     # Konfiguratsioon
-    BASE_DIR, PORT, SESSION_DURATION,
+    BASE_DIR, PORT, SESSION_DURATION, COLLECTIONS_FILE, VOCABULARIES_FILE,
     # CORS
     send_cors_headers,
     # Rate limiting
@@ -150,6 +150,52 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"INVITE VALIDATE VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /collections - kollektsioonide puu (avalik)
+        elif self.path == '/collections':
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                collections = {}
+                if os.path.exists(COLLECTIONS_FILE):
+                    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+                        collections = json.load(f)
+
+                response = {
+                    "status": "success",
+                    "collections": collections
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+
+            except Exception as e:
+                print(f"COLLECTIONS VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /vocabularies - kontrollitud sõnavara (avalik)
+        elif self.path == '/vocabularies':
+            try:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                vocabularies = {}
+                if os.path.exists(VOCABULARIES_FILE):
+                    with open(VOCABULARIES_FILE, 'r', encoding='utf-8') as f:
+                        vocabularies = json.load(f)
+
+                response = {
+                    "status": "success",
+                    "vocabularies": vocabularies
+                }
+                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+
+            except Exception as e:
+                print(f"VOCABULARIES VIGA: {e}")
                 self.send_error(500, str(e))
 
         else:
@@ -825,10 +871,30 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if os.path.exists(metadata_path):
                     with open(metadata_path, 'r', encoding='utf-8') as f:
                         current_meta = json.load(f)
-                
+
                 # Uuendame andmed
                 current_meta.update(new_metadata)
-                
+
+                # V1→V2 normaliseerimine: eemalda v1 väljad kui v2 on olemas
+                v1_to_v2_mapping = {
+                    'pealkiri': 'title',
+                    'aasta': 'year',
+                    'koht': 'location',
+                    'trükkal': 'publisher',
+                    'teose_tags': 'tags',
+                    # autor ja respondens → creators (keerulisem, käsitleme eraldi)
+                }
+                for v1_key, v2_key in v1_to_v2_mapping.items():
+                    if v2_key in current_meta and v1_key in current_meta:
+                        del current_meta[v1_key]
+
+                # Kui on creators massiiv, eemalda autor ja respondens väljad
+                if 'creators' in current_meta and isinstance(current_meta.get('creators'), list):
+                    if 'autor' in current_meta:
+                        del current_meta['autor']
+                    if 'respondens' in current_meta:
+                        del current_meta['respondens']
+
                 # Salvestame
                 with open(metadata_path, 'w', encoding='utf-8') as f:
                     json.dump(current_meta, f, ensure_ascii=False, indent=2)
@@ -1678,6 +1744,106 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"REJECT PENDING VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # =========================================================
+        # MASSILINE KOLLEKTSIOONI MÄÄRAMINE
+        # =========================================================
+
+        elif self.path == '/works/bulk-collection':
+            # Määrab kollektsiooni mitmele teosele korraga (ainult admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                work_ids = data.get('work_ids', [])
+                collection = data.get('collection')  # None = eemalda kollektsioon
+
+                if not work_ids:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    return
+
+                # Valideeri kollektsioon (kui pole None/null)
+                if collection:
+                    collections_data = {}
+                    if os.path.exists(COLLECTIONS_FILE):
+                        with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+                            collections_data = json.load(f)
+                    if collection not in collections_data:
+                        self.send_response(400)
+                        self.send_header('Content-type', 'application/json')
+                        send_cors_headers(self)
+                        self.end_headers()
+                        self.wfile.write(json.dumps({"status": "error", "message": f"Kollektsiooni '{collection}' ei leitud"}).encode('utf-8'))
+                        return
+
+                updated = 0
+                failed = []
+
+                for work_id in work_ids:
+                    try:
+                        # Leia kaust ID järgi
+                        dir_path = find_directory_by_id(work_id)
+                        if not dir_path:
+                            failed.append({"id": work_id, "error": "Kausta ei leitud"})
+                            continue
+
+                        metadata_path = os.path.join(dir_path, '_metadata.json')
+
+                        # Loe olemasolev metadata
+                        current_meta = {}
+                        if os.path.exists(metadata_path):
+                            with open(metadata_path, 'r', encoding='utf-8') as f:
+                                current_meta = json.load(f)
+
+                        # Uuenda collection väli
+                        current_meta['collection'] = collection
+
+                        # Salvesta
+                        with open(metadata_path, 'w', encoding='utf-8') as f:
+                            json.dump(current_meta, f, ensure_ascii=False, indent=2)
+
+                        # Sünkrooni Meilisearchiga
+                        sync_work_to_meilisearch(os.path.basename(dir_path))
+
+                        updated += 1
+
+                    except Exception as e:
+                        failed.append({"id": work_id, "error": str(e)})
+
+                print(f"Admin '{user['username']}' määras kollektsiooni '{collection}' {updated} teosele")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": f"Uuendatud {updated} teost",
+                    "updated": updated,
+                    "failed": failed
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"BULK-COLLECTION VIGA: {e}")
+                import traceback
+                traceback.print_exc()
                 self.send_error(500, str(e))
 
         else:

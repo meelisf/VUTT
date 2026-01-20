@@ -65,5 +65,14 @@
   "nav": {
     "review": "Changes",
     "admin": "Admin"
+  },
+  "collections": {
+    "title": "Select Collection",
+    "all": "All Works",
+    "unassigned": "Unassigned (remove collection)",
+    "empty": "No collections added yet",
+    "hint": "Selection is saved and applies to all views",
+    "activeFilter": "Active Collection",
+    "changeInHeader": "Change from the selector in header"
   }
 }

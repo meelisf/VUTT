@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
+import { CollectionProvider } from './contexts/CollectionContext';
 import Dashboard from './pages/Dashboard';
 import Workspace from './pages/Workspace';
 import Statistics from './pages/Statistics';
@@ -50,7 +51,9 @@ const router = createBrowserRouter([
 const App: React.FC = () => {
   return (
     <UserProvider>
-      <RouterProvider router={router} />
+      <CollectionProvider>
+        <RouterProvider router={router} />
+      </CollectionProvider>
     </UserProvider>
   );
 };

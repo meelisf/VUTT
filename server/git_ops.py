@@ -12,40 +12,100 @@ from .utils import sanitize_id
 # Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
 _git_repo = None
 
-# Cache teose_id jaoks (kausta nimi -> teose_id)
-_teose_id_cache = {}
+# Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))
+_work_ids_cache = {}
 
 
-def get_teose_id_from_folder(folder_name):
+def get_work_ids_from_folder(folder_name):
     """
-    Leiab teose_id kausta nime järgi.
-    1. Loeb _metadata.json failist (kui olemas)
-    2. Fallback: sanitize_id(folder_name)
-    
-    NB: Kasutab sanitize_id(), et tagada ühilduvus Meilisearchiga.
+    Leiab teose ID-d kausta nime järgi.
+
+    Tagastab: (work_id, slug)
+    - work_id: nanoid _metadata.json `id` väljast (v2 formaat)
+    - slug: _metadata.json `slug` väljast, fallback sanitize_id(folder_name)
+
     Kasutab cache'i, et vältida korduvaid faililugemisi.
     """
-    if folder_name in _teose_id_cache:
-        return _teose_id_cache[folder_name]
-    
-    # Proovi lugeda _metadata.json
+    if folder_name in _work_ids_cache:
+        return _work_ids_cache[folder_name]
+
     metadata_path = os.path.join(BASE_DIR, folder_name, '_metadata.json')
-    teose_id = None
-    
+    work_id = None
+    slug = None
+
     if os.path.exists(metadata_path):
         try:
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
-                teose_id = meta.get('teose_id')
+                work_id = meta.get('id')  # v2: nanoid
+                slug = meta.get('slug') or meta.get('teose_id')  # v2: slug, v1 fallback: teose_id
         except (json.JSONDecodeError, IOError):
             pass
-    
-    # Fallback: sanitize kausta nimi (sama loogika mis Meilisearch indekseerimisel)
-    if not teose_id:
-        teose_id = sanitize_id(folder_name)
-    
-    _teose_id_cache[folder_name] = teose_id
-    return teose_id
+
+    # Fallback slug: sanitize kausta nimi
+    if not slug:
+        slug = sanitize_id(folder_name)
+
+    _work_ids_cache[folder_name] = (work_id, slug)
+    return work_id, slug
+
+
+def get_teose_id_from_folder(folder_name):
+    """
+    DEPRECATED: Kasuta get_work_ids_from_folder() asemel.
+    Tagasiühilduvus vanade funktsioonide jaoks.
+    """
+    work_id, slug = get_work_ids_from_folder(folder_name)
+    return slug
+
+
+# Cache piltide nimekirja jaoks (kausta nimi -> sorteeritud piltide nimekiri)
+_images_cache = {}
+
+
+def get_page_number_from_txt(folder_name, txt_filename):
+    """
+    Leiab lehekülje numbri txt-faili järgi.
+
+    Meilisearch kasutab PILDI positsiooni sorteeritud nimekirjas (1-indekseeritud).
+    See funktsioon tagastab sama numbri, et Review lehel ja Workspace'is
+    oleksid samad leheküljenumbrid.
+
+    Args:
+        folder_name: Kausta nimi (nt "1632-1")
+        txt_filename: Tekstifaili nimi (nt "lk_003.txt")
+
+    Returns:
+        int: Lehekülje number (1-indekseeritud) või 1 kui ei leia
+    """
+    # Kasuta cache'i
+    if folder_name not in _images_cache:
+        folder_path = os.path.join(BASE_DIR, folder_name)
+        if os.path.exists(folder_path):
+            images = sorted([f for f in os.listdir(folder_path)
+                           if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+            _images_cache[folder_name] = images
+        else:
+            _images_cache[folder_name] = []
+
+    images = _images_cache[folder_name]
+    if not images:
+        return 1
+
+    # Leia vastav pilt (sama base name)
+    txt_base = txt_filename.rsplit('.', 1)[0]  # "lk_003.txt" -> "lk_003"
+
+    for i, img in enumerate(images):
+        img_base = img.rsplit('.', 1)[0]  # "lk_003.jpg" -> "lk_003"
+        if img_base == txt_base:
+            return i + 1  # 1-indekseeritud
+
+    # Fallback: proovi number failinimest
+    numbers = re.findall(r'\d+', txt_base)
+    if numbers:
+        return int(numbers[-1])
+
+    return 1
 
 
 def get_or_init_repo():
@@ -370,23 +430,18 @@ def get_recent_commits(username=None, limit=50):
                 folder_name = parts[0]
                 filename = parts[-1]
                 
-                # Leia teose_id _metadata.json failist (või kasuta kausta nime)
-                teose_id = get_teose_id_from_folder(folder_name)
-                
-                # Eralda lehekülje number failinimest (nt "lk_003.txt" → 3)
-                page_num = 1
-                name_without_ext = filename.rsplit('.', 1)[0]
-                # Proovi leida number failinimest
-                numbers = re.findall(r'\d+', name_without_ext)
-                if numbers:
-                    page_num = int(numbers[-1])
-                
+                # Leia teose ID-d _metadata.json failist
+                work_id, slug = get_work_ids_from_folder(folder_name)
+
+                # Leia lehekülje number pildi positsiooni järgi (sama loogika mis Meilisearchis)
+                page_num = get_page_number_from_txt(folder_name, filename)
+
                 # Unikaalne võti (et vältida duplikaate)
-                file_key = f"{teose_id}/{page_num}"
+                file_key = f"{work_id or slug}/{page_num}"
                 if file_key in seen_files:
                     continue
                 seen_files.add(file_key)
-                
+
                 results.append({
                     "commit_hash": commit.hexsha[:8],
                     "full_hash": commit.hexsha,
@@ -394,7 +449,8 @@ def get_recent_commits(username=None, limit=50):
                     "date": commit.committed_datetime.isoformat(),
                     "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
                     "message": commit.message.strip(),
-                    "teose_id": teose_id,
+                    "work_id": work_id,  # v2: nanoid (eelistatud routing jaoks)
+                    "teose_id": slug,    # tagasiühilduvus, kuvamiseks
                     "lehekylje_number": page_num,
                     "filepath": filepath
                 })

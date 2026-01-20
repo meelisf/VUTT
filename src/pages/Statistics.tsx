@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2 } from 'lucide-react';
+import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
+import { useCollection } from '../contexts/CollectionContext';
 
 interface StatusCount {
   name: string;
@@ -18,6 +19,7 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t } = useTranslation(['statistics', 'common']);
+  const { selectedCollection, getCollectionName } = useCollection();
 
   const [isLoading, setIsLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(0);
@@ -37,13 +39,20 @@ const Statistics: React.FC = () => {
           headers['Authorization'] = `Bearer ${MEILI_API_KEY}`;
         }
 
+        // Ehita filter - kollektsiooni filter kui valitud
+        const filter: string[] = [];
+        if (selectedCollection) {
+          filter.push(`collections_hierarchy = "${selectedCollection}"`);
+        }
+
         const statusResponse = await fetch(`${MEILI_HOST}/indexes/teosed/search`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             q: '',
             limit: 0,
-            facets: ['teose_staatus', 'aasta', 'teose_id']
+            facets: ['teose_staatus', 'aasta', 'teose_id'],
+            filter: filter.length > 0 ? filter : undefined
           })
         });
 
@@ -88,7 +97,7 @@ const Statistics: React.FC = () => {
     };
 
     fetchStats();
-  }, []);
+  }, [selectedCollection]);
 
   const completedPages = statusData.find(d => d.name === 'Valmis')?.value || 0;
   const progressPercentage = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
@@ -103,13 +112,23 @@ const Statistics: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <Header 
-        showSearchButton={false} 
-        pageTitle={t('header.title')} 
-        pageTitleIcon={<BarChart3 className="text-primary-600" size={22} />} 
+      <Header
+        pageTitle={t('header.title')}
+        pageTitleIcon={<BarChart3 className="text-primary-600" size={22} />}
       />
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
+
+        {/* Collection Filter Indicator */}
+        {selectedCollection && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
+            <Library className="text-amber-600" size={20} />
+            <div>
+              <span className="text-sm text-amber-700">{t('common:collections.activeFilter')}:</span>
+              <span className="ml-2 font-bold text-amber-900">{getCollectionName(selectedCollection)}</span>
+            </div>
+          </div>
+        )}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

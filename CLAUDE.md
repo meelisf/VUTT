@@ -101,6 +101,146 @@ Admin users can edit work metadata via the pencil icon in Workspace:
 
 The modal saves to `_metadata.json` and syncs to Meilisearch.
 
+### _metadata.json Formaadid (v1 vs v2)
+
+**MIGRATSIOON TEHTUD:** Kõik `_metadata.json` failid on nüüd v2 formaadis. Koodis on veel v1 fallback-tugi turvavõrguna, kuid seda ei peaks praktikas vaja minema.
+
+#### Formaadid
+
+- **v1 (eestikeelne):** ~~Vana formaat~~ - enam ei kasutata
+- **v2 (ingliskeelne):** **Aktiivne formaat.** Kasutab ingliskeelseid nimesid (`title`, `year`, `tags`) ja struktureeritud `creators` massiivi
+
+#### Migratsiooniskript
+
+`scripts/migrate_metadata_v2.py` - konverteerib v1 → v2 (juba käivitatud)
+
+#### Väljade võrdlustabel
+
+| Väli | v1 (eestikeelne) | v2 (ingliskeelne) | Meilisearch väli |
+|------|------------------|-------------------|------------------|
+| Püsiv ID | - | `id` (nanoid) | `work_id` |
+| Slug | `teose_id` | `slug` / `teose_id` | `teose_id` |
+| Pealkiri | `pealkiri` | `title` | `pealkiri` |
+| Aasta | `aasta` | `year` | `aasta` |
+| Autor | `autor` | `creators[role=praeses].name` | `autor` |
+| Respondens | `respondens` | `creators[role=respondens].name` | `respondens` |
+| Trükikoht | `koht` | `location` | `koht` |
+| Trükkal | `trükkal` | `publisher` | `trükkal` |
+| Žanr | - | `genre` | `genre` |
+| Märksõnad | `teose_tags` | `tags` | `teose_tags` |
+| Kollektsioon | `collection` | `collection` | `collection` |
+| ESTER | `ester_id` | `ester_id` | `ester_id` |
+
+**TODO:** `genre` ja `tags` on praegu eraldi väljad. Frontend (Dashboard, Workspace, Search) vajab uuendamist, et kuvada ja filtreerida mõlemat.
+
+#### Näide: v1 _metadata.json
+```json
+{
+  "teose_id": "1635-virginus-manipulus",
+  "pealkiri": "Manipulus Florum...",
+  "aasta": 1635,
+  "autor": "Virginius, Georg",
+  "respondens": "Schomerus, Johannes",
+  "koht": "Tartu",
+  "trükkal": "Jacob Becker",
+  "teose_tags": ["disputatsioon"],
+  "ester_id": "b12345678"
+}
+```
+
+#### Näide: v2 _metadata.json
+```json
+{
+  "id": "x9r4mk2p",
+  "teose_id": "1635-virginus-manipulus",
+  "title": "Manipulus Florum...",
+  "year": 1635,
+  "location": "Tartu",
+  "publisher": "Jacob Becker",
+  "creators": [
+    {"name": "Virginius, Georg", "role": "praeses"},
+    {"name": "Schomerus, Johannes", "role": "respondens"}
+  ],
+  "tags": ["disputatsioon"],
+  "collection": "academia-gustaviana",
+  "ester_id": "b12345678"
+}
+```
+
+#### Lugemisloogika (v2 esmalt, v1 fallback)
+
+**UUENDATUD 2026-01-20:** Kõik `_metadata.json` failid on nüüd v2 formaadis. Kood kasutab v2-esmalt lähenemist, v1 fallback on turvavõrk.
+
+**Python (server/):**
+```python
+# V2 esmalt, v1 fallback
+title = meta.get('title') or meta.get('pealkiri', '')
+year = meta.get('year') or meta.get('aasta', 0)
+location = meta.get('location') or meta.get('koht')
+publisher = meta.get('publisher') or meta.get('trükkal')
+tags = meta.get('tags') or meta.get('teose_tags', [])
+
+# Autor/respondens: v2 creators esmalt
+creators = meta.get('creators', [])
+autor = ''
+respondens = ''
+if creators:
+    praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
+    resp = next((c for c in creators if c.get('role') == 'respondens'), None)
+    if praeses: autor = praeses.get('name', '')
+    if resp: respondens = resp.get('name', '')
+# v1 fallback
+if not autor: autor = meta.get('autor', '')
+if not respondens: respondens = meta.get('respondens', '')
+```
+
+**TypeScript (src/):**
+```typescript
+// V2 esmalt, v1 fallback
+const title = m.title ?? m.pealkiri ?? '';
+const year = m.year ?? m.aasta ?? 0;
+const location = m.location ?? m.koht ?? '';
+const publisher = m.publisher ?? m.trükkal ?? '';
+const tags = m.tags ?? m.teose_tags ?? [];
+
+// Autor/respondens: v2 creators esmalt
+let autor = '';
+let respondens = '';
+if (Array.isArray(m.creators) && m.creators.length > 0) {
+  const praeses = m.creators.find((c: any) => c.role === 'praeses');
+  const resp = m.creators.find((c: any) => c.role === 'respondens');
+  if (praeses) autor = praeses.name;
+  if (resp) respondens = resp.name;
+}
+// v1 fallback
+if (!autor) autor = m.autor ?? '';
+if (!respondens) respondens = m.respondens ?? '';
+```
+
+#### Server normaliseerib salvestamisel
+
+`/update-work-metadata` endpoint eemaldab v1 väljad kui v2 on olemas:
+- `title` olemas → `pealkiri` eemaldatakse
+- `year` olemas → `aasta` eemaldatakse
+- `creators` olemas → `autor`, `respondens` eemaldatakse
+- jne
+
+#### Failid, kus v2 tugi on implementeeritud
+
+| Fail | Funktsioon | Staatus | Märkused |
+|------|------------|---------|----------|
+| `server/meilisearch_ops.py` | `sync_work_to_meilisearch()` | ✅ | v2-first lugemine |
+| `server/file_server.py` | `/update-work-metadata` | ✅ | v1→v2 normaliseerimine |
+| `scripts/1-1_consolidate_data.py` | `get_work_metadata()` | ✅ | v2-first lugemine |
+| `src/pages/Workspace.tsx` | `handleSaveMetadata()` | ✅ | Saadab v2 formaadis |
+
+#### Uue koodi kirjutamisel
+
+1. **Kirjuta ainult v2 formaadis** (`title`, `year`, `tags`, `creators[]` jne)
+2. **Lugemiseks** kasuta v2-first loogika (v1 fallback turvavõrguna)
+3. **Meilisearch** kasutab v1 väljanimesid (`pealkiri`, `aasta`, `teose_tags`) - see on indeksi sisemine skeem
+2. Uuenda see dokumentatsioon
+
 ### COinS (Zotero Integration)
 Workspace includes hidden COinS metadata for Zotero browser connector:
 - `rft.au` = author (praeses)
@@ -427,6 +567,21 @@ Three-tier role system with registration and pending edits workflow.
 See `docs/PLAAN_kasutajahaldus.md` for implementation details.
 
 ## Future Ideas
+
+### Genre vs Tags eraldamine frontendis
+
+Praegu on `_metadata.json` v2 formaadis kaks eraldi välja:
+- `genre` - teose žanr (disputatio, oratio, carmen jne) - üks väärtus
+- `tags` - lisatags/märksõnad - massiiv
+
+**Probleem:** Frontend (Dashboard, Workspace, Search) kasutab ainult `teose_tags` Meilisearchist, mis sisaldab `tags` massiivi. `genre` väli on Meilisearchis olemas, aga seda ei kuvata ega filtreerita.
+
+**Lahendus:**
+1. Lisa `genre` väli Meilisearchi filterable/sortable attributes
+2. Dashboard: lisa žanri filter (eraldi tags filtrist)
+3. Search: lisa žanri facet sidebar'i
+4. Workspace admin modal: kuva žanr eraldi väljana
+5. WorkCard: kuva žanr badge'ina (nt pildi peal)
 
 ### Collections (kollektsioonid)
 See `docs/PLAAN_kollektsioonid.md` for detailed planning document.

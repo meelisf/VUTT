@@ -44,6 +44,8 @@
     "printer": "Trükkal",
     "tags": "Žanrid / Tagid",
     "tagsHint": "Eraldage komaga",
+    "collection": "Kollektsioon",
+    "noCollection": "— Määramata —",
     "esterId": "ESTER ID",
     "externalUrl": "Väline URL",
     "save": "Salvesta metaandmed",

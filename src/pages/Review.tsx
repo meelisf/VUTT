@@ -38,7 +38,8 @@ interface RecentCommit {
   date: string;
   formatted_date: string;
   message: string;
-  teose_id: string;
+  work_id: string | null;  // v2: nanoid (eelistatud routing jaoks)
+  teose_id: string;        // tagasiühilduvus, kuvamiseks
   lehekylje_number: number;
   filepath: string;
 }
@@ -209,7 +210,7 @@ const Review: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50">
-      <Header showSearchButton={false} />
+      <Header />
 
       {/* Main content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
@@ -370,7 +371,7 @@ const Review: React.FC = () => {
                         {/* Link */}
                         <div className="col-span-1 flex items-center justify-end">
                           <Link
-                            to={`/work/${commit.teose_id}/${commit.lehekylje_number}`}
+                            to={`/work/${commit.work_id || commit.teose_id}/${commit.lehekylje_number}`}
                             className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
                             title={t('actions.openPage')}
                             onClick={(e) => e.stopPropagation()}

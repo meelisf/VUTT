@@ -6,9 +6,36 @@ import json
 import time
 import urllib.request
 import urllib.parse
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE
 from .utils import sanitize_id, generate_default_metadata, normalize_genre, calculate_work_status
 from .git_ops import commit_new_work_to_git
+
+
+def load_collections():
+    """Laeb kollektsioonide hierarhia."""
+    if os.path.exists(COLLECTIONS_FILE):
+        try:
+            with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def get_collection_hierarchy(collections, collection_id):
+    """Tagastab kollektsiooni hierarhia (vanematest lapseni)."""
+    if not collection_id or not collections:
+        return []
+
+    hierarchy = []
+    current_id = collection_id
+
+    while current_id:
+        hierarchy.insert(0, current_id)
+        collection = collections.get(current_id)
+        current_id = collection.get('parent') if collection else None
+
+    return hierarchy
 
 
 def send_to_meilisearch(documents):
@@ -57,19 +84,48 @@ def sync_work_to_meilisearch(dir_name):
     if not metadata:
         metadata = generate_default_metadata(dir_name)
 
-    teose_id = metadata.get('teose_id', sanitize_id(dir_name))
-    pealkiri = metadata.get('pealkiri', 'Pealkiri puudub')
-    autor = metadata.get('autor', '')
-    respondens = metadata.get('respondens', '')
-    aasta = metadata.get('aasta', 0)
-    teose_tags = metadata.get('teose_tags', [])
+    # =================================================================
+    # V2 FORMAAT (esmane) koos v1 fallback'iga turvavõrguna
+    # v2 = title, year, tags, location, publisher, creators[]
+    # v1 = pealkiri, aasta, teose_tags, koht, trükkal, autor, respondens
+    # =================================================================
+    work_id = metadata.get('id')  # Nanoid (püsiv lühikood)
+    teose_id = metadata.get('slug') or metadata.get('teose_id', sanitize_id(dir_name))
+    pealkiri = metadata.get('title') or metadata.get('pealkiri', 'Pealkiri puudub')
+    aasta = metadata.get('year') or metadata.get('aasta', 0)
+
+    # Autor ja respondens: v2=creators massiiv, v1=otsene (fallback)
+    creators = metadata.get('creators', [])
+    autor = ''
+    respondens = ''
+    if creators:
+        praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
+        resp = next((c for c in creators if c.get('role') == 'respondens'), None)
+        if praeses:
+            autor = praeses.get('name', '')
+        if resp:
+            respondens = resp.get('name', '')
+    # v1 fallback
+    if not autor:
+        autor = metadata.get('autor', '')
+    if not respondens:
+        respondens = metadata.get('respondens', '')
+
+    # Tags: v2=tags, v1=teose_tags (fallback)
+    teose_tags = metadata.get('tags') or metadata.get('teose_tags', [])
     if isinstance(teose_tags, list):
         teose_tags = [normalize_genre(t) for t in teose_tags]
 
+    # Kollektsioon
+    collection = metadata.get('collection')
+    collections = load_collections()
+    collections_hierarchy = get_collection_hierarchy(collections, collection)
+
     ester_id = metadata.get('ester_id')
     external_url = metadata.get('external_url')
-    koht = metadata.get('koht')
-    trükkal = metadata.get('trükkal')
+    # Koht ja trükkal: v2=location/publisher, v1=koht/trükkal (fallback)
+    koht = metadata.get('location') or metadata.get('koht')
+    trükkal = metadata.get('publisher') or metadata.get('trükkal')
 
     # 2. Leia leheküljed (pildid)
     images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
@@ -123,6 +179,7 @@ def sync_work_to_meilisearch(dir_name):
 
         doc = {
             "id": page_id,
+            "work_id": work_id,  # Nanoid (püsiv lühikood)
             "teose_id": teose_id,
             "pealkiri": pealkiri,
             "autor": autor,
@@ -138,7 +195,9 @@ def sync_work_to_meilisearch(dir_name):
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
-            "teose_tags": teose_tags
+            "teose_tags": teose_tags,
+            "collection": collection,
+            "collections_hierarchy": collections_hierarchy
         }
 
         if ester_id:

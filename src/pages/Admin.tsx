@@ -316,7 +316,7 @@ const Admin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-y-auto">
-      <Header showSearchButton={false} />
+      <Header />
 
       {/* Tabs */}
       <div className="bg-white border-b border-gray-200">

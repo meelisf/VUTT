@@ -51,7 +51,7 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['teose_staatus', 'teose_tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
+    const requiredFilter = ['work_id', 'teose_staatus', 'teose_tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
@@ -71,6 +71,19 @@ const fixIndexSettings = async () => {
     }
 
     await index.updateFilterableAttributes([
+      // V2 väljad
+      'work_id',  // nanoid - eelistatud routing jaoks
+      'year',
+      'title',
+      'location',
+      'publisher',
+      'type',
+      'genre',
+      'collection',
+      'collections_hierarchy',
+      'authors_text',
+      'languages',
+      // Tagasiühilduvus
       'aasta',
       'autor',
       'respondens',
@@ -78,10 +91,10 @@ const fixIndexSettings = async () => {
       'teose_id',
       'lehekylje_number',
       'originaal_kataloog',
-      'tags',  // Vajalik facet'ide jaoks (märksõnade autocomplete)
-      'status', // Lehekülje staatus
-      'teose_staatus', // Teose koondstaatus (Toores/Töös/Valmis)
-      'teose_tags' // Teose märksõnad (disputatsioon, oratsioon jne)
+      'tags',
+      'status',
+      'teose_staatus',
+      'teose_tags'
     ]);
 
     await index.updateSortableAttributes([
@@ -92,6 +105,14 @@ const fixIndexSettings = async () => {
     ]);
 
     const searchTask = await index.updateSearchableAttributes([
+      // V2 väljad
+      'title',
+      'authors_text',
+      'year',
+      'location',
+      'publisher',
+      'series_title',
+      // Tagasiühilduvus
       'pealkiri',
       'autor',
       'respondens',
@@ -155,6 +176,10 @@ interface DashboardSearchOptions {
   workStatus?: WorkStatus; // Teose koondstaatuse filter
   teoseTags?: string[]; // Teose märksõnad (AND loogika)
   onlyFirstPage?: boolean;
+  // V2 väljad
+  collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
+  genre?: string; // Žanri filter
+  type?: string; // Tüübi filter (impressum, manuscript, jne)
 }
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
@@ -215,29 +240,92 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
 };
 
 // Saab kõik teose märksõnad (teose_tags) koos loendiga - facet query
-export const getTeoseTagsFacets = async (): Promise<{ tag: string; count: number }[]> => {
+// Valikuline collection parameeter filtreerib kollektsiooni järgi
+export const getTeoseTagsFacets = async (collection?: string): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
 
   try {
-    // Kasutame facet päringut, et saada kõik unikaalsed teose_tags väärtused koos loendiga
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) {
+      filter.push(`collections_hierarchy = "${collection}"`);
+    }
+
     const response = await index.search('', {
-      filter: ['lehekylje_number = 1'], // Ainult esimesed lehed, et vältida korduvat loendamist
-      limit: 0, // Ei vaja tulemusi, ainult facet'e
+      filter,
+      limit: 0,
       facets: ['teose_tags']
     });
 
     const facetDistribution = response.facetDistribution?.teose_tags || {};
 
-    // Teisenda objektist massiiviks ja sorteeri loendi järgi kahanevalt
     const result = Object.entries(facetDistribution)
       .map(([tag, count]) => ({ tag, count: count as number }))
       .sort((a, b) => b.count - a.count);
 
-    console.log('getTeoseTagsFacets:', result.length, 'unique tags found');
     return result;
   } catch (error) {
     console.error("getTeoseTagsFacets error:", error);
+    return [];
+  }
+};
+
+// Saab kõik žanrid (genre) koos loendiga - facet query
+export const getGenreFacets = async (collection?: string): Promise<{ value: string; count: number }[]> => {
+  checkMixedContent();
+  await ensureSettings();
+
+  try {
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) {
+      filter.push(`collections_hierarchy = "${collection}"`);
+    }
+
+    const response = await index.search('', {
+      filter,
+      limit: 0,
+      facets: ['genre']
+    });
+
+    const facetDistribution = response.facetDistribution?.genre || {};
+
+    const result = Object.entries(facetDistribution)
+      .map(([value, count]) => ({ value, count: count as number }))
+      .sort((a, b) => b.count - a.count);
+
+    return result;
+  } catch (error) {
+    console.error("getGenreFacets error:", error);
+    return [];
+  }
+};
+
+// Saab kõik tüübid (type) koos loendiga - facet query
+export const getTypeFacets = async (collection?: string): Promise<{ value: string; count: number }[]> => {
+  checkMixedContent();
+  await ensureSettings();
+
+  try {
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) {
+      filter.push(`collections_hierarchy = "${collection}"`);
+    }
+
+    const response = await index.search('', {
+      filter,
+      limit: 0,
+      facets: ['type']
+    });
+
+    const facetDistribution = response.facetDistribution?.type || {};
+
+    const result = Object.entries(facetDistribution)
+      .map(([value, count]) => ({ value, count: count as number }))
+      .sort((a, b) => b.count - a.count);
+
+    return result;
+  } catch (error) {
+    console.error("getTypeFacets error:", error);
     return [];
   }
 };
@@ -281,11 +369,32 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         filter.push(`teose_tags = "${tag}"`);
       }
     }
+    // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
+    if (options?.collection) {
+      filter.push(`collections_hierarchy = "${options.collection}"`);
+    }
+    // V2: Žanri filter
+    if (options?.genre) {
+      filter.push(`genre = "${options.genre}"`);
+    }
+    // V2: Tüübi filter
+    if (options?.type) {
+      filter.push(`type = "${options.type}"`);
+    }
 
     const searchParams: any = {
       limit: 2000, // Enough for all works (~1200)
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus', 'teose_tags', 'ester_id', 'external_url', 'koht', 'trükkal'],
-      attributesToSearchOn: ['pealkiri', 'autor', 'respondens'], // Dashboard otsib ainult pealkirjast ja autoritest
+      attributesToRetrieve: [
+        // V2 väljad
+        'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
+        'type', 'genre', 'collection', 'collections_hierarchy',
+        'creators', 'authors_text', 'teose_tags', 'languages',
+        'series', 'series_title', 'ester_id', 'external_url',
+        // Tagasiühilduvus
+        'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'koht', 'trükkal',
+        'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
+      ],
+      attributesToSearchOn: ['title', 'authors_text', 'pealkiri', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter
     };
 
@@ -385,25 +494,57 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const works: Work[] = uniqueHits.map((hit: any) => {
       const firstPageData = firstPagesMap.get(hit.teose_id);
       return {
-        id: hit.teose_id,
-        catalog_name: hit.originaal_kataloog || 'Unknown',
-        title: hit.pealkiri || 'Pealkiri puudub',
-        author: hit.autor || 'Teadmata autor',
-        respondens: hit.respondens || undefined,
-        year: parseInt(hit.aasta) || 0,
-        publisher: '',
-        page_count: hit.teose_lehekylgede_arv || 0,
-        // Use first page data if available, otherwise fall back to the hit's data
-        thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
-        work_status: hit.teose_staatus || undefined,
-        tags: firstPageData?.tags || hit.tags || [],
+        // V2 identifikaatorid
+        id: hit.id || hit.teose_id,
+        work_id: hit.work_id,
+        teose_id: hit.teose_id,
+
+        // V2 teose andmed (kasuta uusi välju, fallback vanadele)
+        title: hit.title || hit.pealkiri || 'Pealkiri puudub',
+        year: hit.year ?? parseInt(hit.aasta) ?? 0,
+        location: hit.location || hit.koht || '',
+        publisher: hit.publisher || hit.trükkal || '',
+
+        // V2 taksonoomia
+        type: hit.type,
+        genre: hit.genre,
+        collection: hit.collection,
+        collections_hierarchy: hit.collections_hierarchy || [],
+
+        // V2 isikud
+        creators: hit.creators || [],
+        authors_text: hit.authors_text || [],
+
+        // V2 märksõnad
         teose_tags: hit.teose_tags || [],
-        ester_id: hit.ester_id || undefined,
-        external_url: hit.external_url || undefined,
-        koht: hit.koht || undefined,
-        trükkal: hit.trükkal || undefined,
-        last_modified: hit.last_modified // Hoidke ajutine väli sorteerimiseks
-      };
+        languages: hit.languages || ['lat'],
+
+        // Seosed
+        series: hit.series,
+        series_title: hit.series_title,
+
+        // Välised lingid
+        ester_id: hit.ester_id,
+        external_url: hit.external_url,
+
+        // Lehekülje info
+        page_count: hit.teose_lehekylgede_arv || 0,
+        thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
+        work_status: hit.teose_staatus,
+        tags: firstPageData?.tags || hit.tags || [],
+
+        // Tagasiühilduvus
+        catalog_name: hit.originaal_kataloog || 'Unknown',
+        author: hit.autor || (hit.creators?.[0]?.name) || 'Teadmata autor',
+        respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
+        koht: hit.koht || hit.location,
+        trükkal: hit.trükkal || hit.publisher,
+        pealkiri: hit.pealkiri || hit.title,
+        aasta: hit.aasta ?? hit.year,
+
+        // Ajutine väli sorteerimiseks
+        last_modified: hit.last_modified
+      } as Work;
     });
 
     // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
@@ -438,8 +579,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 export const getPage = async (workId: string, pageNum: number): Promise<Page | null> => {
   checkMixedContent();
   try {
+    // Otsime nii work_id (v2 nanoid) kui teose_id (slug) järgi
+    // See võimaldab mõlemat tüüpi URL-e: /work/r20x08/1 ja /work/1640-4/1
     const response = await index.search('', {
-      filter: [`teose_id = "${workId}"`, `lehekylje_number = ${pageNum}`],
+      filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`, `lehekylje_number = ${pageNum}`],
       limit: 1
     });
 
@@ -447,8 +590,12 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
     const hit: any = response.hits[0];
 
     return {
+      // Identifikaatorid
       id: hit.id,
-      work_id: hit.teose_id,
+      work_id: hit.work_id,
+      teose_id: hit.teose_id,
+
+      // Lehekülje andmed
       page_number: parseInt(hit.lehekylje_number),
       text_content: hit.lehekylje_tekst || '',
       image_url: getFullImageUrl(hit.lehekylje_pilt),
@@ -456,13 +603,34 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       comments: hit.comments || [],
       tags: Array.from(new Set((hit.tags || []).map((t: string) => t.toLowerCase()))),
       history: hit.history || [],
+
+      // V2 teose andmed
+      title: hit.title || hit.pealkiri,
+      year: hit.year ?? hit.aasta,
+      location: hit.location || hit.koht,
+      publisher: hit.publisher || hit.trükkal,
+      type: hit.type,
+      genre: hit.genre,
+      collection: hit.collection,
+      collections_hierarchy: hit.collections_hierarchy || [],
+      creators: hit.creators || [],
+      authors_text: hit.authors_text || [],
+      teose_tags: hit.teose_tags || [],
+      languages: hit.languages || ['lat'],
+      series: hit.series,
+      series_title: hit.series_title,
+      ester_id: hit.ester_id,
+      external_url: hit.external_url,
+
+      // Tagasiühilduvus
       original_path: hit.originaal_kataloog,
-      // Metaandmed COinS jaoks
-      pealkiri: hit.pealkiri,
+      originaal_kataloog: hit.originaal_kataloog,
+      pealkiri: hit.pealkiri || hit.title,
       autor: hit.autor,
-      aasta: hit.aasta,
-      koht: hit.koht,
-      trükkal: hit.trükkal,
+      respondens: hit.respondens,
+      aasta: hit.aasta ?? hit.year,
+      koht: hit.koht || hit.location,
+      trükkal: hit.trükkal || hit.publisher,
     };
   } catch (error) {
     console.error("Get Page Error:", error);
@@ -706,9 +874,19 @@ export const savePage = async (
 // Töölaud: Saa teose metaandmed
 export const getWorkMetadata = async (workId: string): Promise<Work | undefined> => {
   try {
+    // Otsime nii work_id (v2 nanoid) kui teose_id (slug) järgi
     const response = await index.search('', {
-      filter: [`teose_id = "${workId}"`],
-      attributesToRetrieve: ['teose_id', 'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'lehekylje_pilt', 'teose_lehekylgede_arv', 'ester_id', 'external_url', 'teose_tags', 'koht', 'trükkal'],
+      filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`],
+      attributesToRetrieve: [
+        // V2 väljad
+        'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
+        'type', 'genre', 'collection', 'collections_hierarchy',
+        'creators', 'authors_text', 'teose_tags', 'languages',
+        'series', 'series_title', 'ester_id', 'external_url',
+        // Tagasiühilduvus
+        'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta',
+        'lehekylje_pilt', 'teose_lehekylgede_arv', 'koht', 'trükkal'
+      ],
       limit: 1
     });
 
@@ -716,21 +894,52 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
     const hit: any = response.hits[0];
 
     return {
-      id: hit.teose_id,
-      catalog_name: hit.originaal_kataloog,
-      title: hit.pealkiri,
-      author: hit.autor,
-      respondens: hit.respondens || undefined,
-      year: parseInt(hit.aasta),
-      publisher: '',
+      // V2 identifikaatorid
+      id: hit.id || hit.teose_id,
+      work_id: hit.work_id,
+      teose_id: hit.teose_id,
+
+      // V2 teose andmed
+      title: hit.title || hit.pealkiri || '',
+      year: hit.year ?? parseInt(hit.aasta) ?? 0,
+      location: hit.location || hit.koht || '',
+      publisher: hit.publisher || hit.trükkal || '',
+
+      // V2 taksonoomia
+      type: hit.type,
+      genre: hit.genre,
+      collection: hit.collection,
+      collections_hierarchy: hit.collections_hierarchy || [],
+
+      // V2 isikud
+      creators: hit.creators || [],
+      authors_text: hit.authors_text || [],
+
+      // V2 märksõnad
+      teose_tags: Array.from(new Set((hit.teose_tags || []).map((t: string) => t.toLowerCase()))),
+      languages: hit.languages || ['lat'],
+
+      // Seosed
+      series: hit.series,
+      series_title: hit.series_title,
+
+      // Välised lingid
+      ester_id: hit.ester_id,
+      external_url: hit.external_url,
+
+      // Lehekülje info
       page_count: hit.teose_lehekylgede_arv || 0,
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
-      teose_tags: Array.from(new Set((hit.teose_tags || []).map((t: string) => t.toLowerCase()))),
-      ester_id: hit.ester_id || undefined,
-      external_url: hit.external_url || undefined,
-      koht: hit.koht || undefined,
-      trükkal: hit.trükkal || undefined
-    };
+
+      // Tagasiühilduvus
+      catalog_name: hit.originaal_kataloog,
+      author: hit.autor || (hit.creators?.[0]?.name) || '',
+      respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
+      koht: hit.koht || hit.location,
+      trükkal: hit.trükkal || hit.publisher,
+      pealkiri: hit.pealkiri || hit.title,
+      aasta: hit.aasta ?? hit.year
+    } as Work;
   } catch (e) {
     console.error("Work Metadata Error:", e);
     return undefined;
@@ -757,6 +966,14 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     for (const tag of options.teoseTags) {
       filter.push(`teose_tags = "${tag}"`);
     }
+  }
+  // V2: Kollektsiooni filter
+  if (options.collection) {
+    filter.push(`collections_hierarchy = "${options.collection}"`);
+  }
+  // V2: Žanri filter
+  if (options.genre) {
+    filter.push(`genre = "${options.genre}"`);
   }
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
