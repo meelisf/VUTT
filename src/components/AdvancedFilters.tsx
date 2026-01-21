@@ -69,10 +69,13 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       setLoading(true);
       try {
         const collectionFilter = collection || undefined;
+        // Kasutame keelt, mis on i18n kaudu määratud
+        const facetLang = lang.split('-')[0]; // 'et-EE' -> 'et'
+
         const [genreData, tagData, typeData, vocabs] = await Promise.all([
-          getGenreFacets(collectionFilter),
-          getTeoseTagsFacets(collectionFilter),
-          getTypeFacets(collectionFilter),
+          getGenreFacets(collectionFilter, facetLang),
+          getTeoseTagsFacets(collectionFilter, facetLang),
+          getTypeFacets(collectionFilter, facetLang),
           getVocabularies()
         ]);
         setGenres(genreData);
@@ -86,7 +89,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       }
     };
     loadFacets();
-  }, [collection]);
+  }, [collection, lang]);
 
   // Kontrolli, kas on aktiivne filter
   const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;
@@ -172,6 +175,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {genres.map(({ value, count }) => {
                       const isSelected = selectedGenre === value;
+                      // Proovi tõlkida ID järgi vocabist (legacy), muul juhul kasuta väärtust otse (V3 localized string)
                       const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
                       return (
                         <button
@@ -229,6 +233,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {types.map(({ value, count }) => {
                       const isSelected = selectedType === value;
+                      // Proovi tõlkida ID järgi vocabist (legacy), muul juhul kasuta väärtust otse
                       const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
                       return (
                         <button

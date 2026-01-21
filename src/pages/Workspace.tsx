@@ -13,6 +13,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History } from 'lucide-react';
 import { FILE_API_URL } from '../config';
+import { getLabel } from '../utils/metadataUtils';
 
 const Workspace: React.FC = () => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
@@ -326,8 +327,8 @@ const Workspace: React.FC = () => {
     const author = work?.author || page.autor || '';
     const respondens = work?.respondens || page.respondens || '';
     const year = work?.year || page.aasta || 0;
-    const place = page.koht || (year >= 1699 ? 'Pärnu' : 'Tartu');
-    const printer = page.trükkal || 'Typis Academicis';
+    const place = getLabel(work?.location || page.location || page.koht || (year >= 1699 ? 'Pärnu' : 'Tartu'));
+    const printer = getLabel(work?.publisher || page.publisher || page.trükkal || 'Typis Academicis');
 
     const params = new URLSearchParams();
     params.set('ctx_ver', 'Z39.88-2004');

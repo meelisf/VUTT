@@ -99,6 +99,124 @@ def derive_printer(year):
     return "Typis Academicis"
 
 
+def capitalize_first(text):
+    """Teeb esimese tähe suureks, ülejäänud jätab samaks."""
+    if not text:
+        return ""
+    return text[0].upper() + text[1:]
+
+
+def get_label(value):
+    """Tagastab sildi LinkedEntity objektist või stringist."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        return capitalize_first(value)
+    if isinstance(value, dict):
+        return capitalize_first(value.get('label', ''))
+    return capitalize_first(str(value))
+
+
+def get_id(value):
+    """Tagastab ID LinkedEntity objektist."""
+    if isinstance(value, dict):
+        return value.get('id')
+    return None
+
+
+def get_all_labels(value):
+    """Kogub kõik sildid (sh mitmekeelsed) LinkedEntity objektist või massiivist."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    labels = []
+    
+    for val in values:
+        if isinstance(val, str):
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            # Peamine silt
+            if val.get('label'):
+                labels.append(capitalize_first(val['label']))
+            # Mitmekeelsed sildid
+            if val.get('labels') and isinstance(val['labels'], dict):
+                for l in val['labels'].values():
+                    if l:
+                        labels.append(capitalize_first(l))
+    
+    return sorted(list(set(labels)))
+
+
+def get_primary_labels(value):
+    """Tagastab ainult peamised sildid LinkedEntity objektist või massiivist. Eelistab eesti keelt."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    labels = []
+    
+    for val in values:
+        if isinstance(val, str):
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            # Eelisjärjekord: et > label > esimene väärtus labels dictist
+            label = None
+            if val.get('labels') and isinstance(val['labels'], dict):
+                label = val['labels'].get('et')
+            
+            if not label:
+                label = val.get('label')
+            
+            if label:
+                labels.append(capitalize_first(label))
+                
+    return labels
+
+
+def get_labels_by_lang(value, lang):
+    """Tagastab sildid konkreetses keeles (või fallback)."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    labels = []
+    
+    for val in values:
+        if isinstance(val, str):
+            # Stringi puhul ei tea keelt, tagastame alati (eeldades et on primaarne)
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            label = None
+            # Otsi konkreetses keeles
+            if val.get('labels') and isinstance(val['labels'], dict):
+                label = val['labels'].get(lang)
+            
+            # Fallback: primaarne label
+            if not label:
+                label = val.get('label')
+            
+            if label:
+                labels.append(capitalize_first(label))
+                
+    return labels
+
+
+def get_all_ids(value):
+    """Kogub kõik ID-d LinkedEntity objektist või massiivist."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    ids = []
+    
+    for val in values:
+        if isinstance(val, dict) and val.get('id'):
+            ids.append(val['id'])
+            
+    return sorted(list(set(ids)))
+
+
 def get_work_metadata(doc_path, dir_name, collections):
     """
     Loeb teose metaandmed _metadata.json failist.
@@ -290,31 +408,49 @@ def create_meilisearch_data_per_page():
 
             image_path = os.path.join(dir_name, jpg_filename)
 
-            # Meilisearch dokument (v2 formaat)
+            # Meilisearch dokument (v2/v3 formaat)
             meili_doc = {
                 # Identifikaatorid
                 'id': page_id,
                 'work_id': doc_metadata.get('id'),  # Püsiv lühikood
                 'teose_id': teose_id,               # Slug (tagasiühilduvus)
 
-                # Teose andmed
+                # Teose andmed (lamedaks lüüdud otsinguks ja kuvamiseks)
                 'title': doc_metadata.get('title', ''),
                 'year': doc_metadata.get('year'),
-                'location': doc_metadata.get('location', ''),
-                'publisher': doc_metadata.get('publisher', ''),
+                'location': get_label(doc_metadata.get('location')),
+                'location_id': get_id(doc_metadata.get('location')),
+                'publisher': get_label(doc_metadata.get('publisher')),
+                'publisher_id': get_id(doc_metadata.get('publisher')),
 
                 # Taksonoomia
-                'type': doc_metadata.get('type', 'impressum'),
-                'genre': doc_metadata.get('genre'),
+                'type': get_label(doc_metadata.get('type', 'impressum')), # Vaikimisi (et)
+                'type_et': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'et'),
+                'type_en': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'en'),
+                'type_object': doc_metadata.get('type'),
+                
+                'genre': get_label(doc_metadata.get('genre')), # Vaikimisi (et)
+                'genre_et': get_labels_by_lang(doc_metadata.get('genre'), 'et'),
+                'genre_en': get_labels_by_lang(doc_metadata.get('genre'), 'en'),
+                'genre_object': doc_metadata.get('genre'),
+                'genre_search': get_all_labels(doc_metadata.get('genre')),
+                'genre_ids': get_all_ids(doc_metadata.get('genre')),
+                
                 'collection': doc_metadata.get('collection'),
                 'collections_hierarchy': doc_metadata.get('collections_hierarchy', []),
 
                 # Isikud
                 'creators': doc_metadata.get('creators', []),
                 'authors_text': doc_metadata.get('authors_text', []),
+                'creator_ids': [c.get('id') for c in doc_metadata.get('creators', []) if c.get('id')],
 
-                # Täiendav klassifikatsioon
-                'teose_tags': doc_metadata.get('tags', []),
+                # Täiendav klassifikatsioon (märksõnad)
+                'tags': get_primary_labels(doc_metadata.get('tags', [])), # Vaikimisi (et)
+                'tags_et': get_labels_by_lang(doc_metadata.get('tags', []), 'et'),
+                'tags_en': get_labels_by_lang(doc_metadata.get('tags', []), 'en'),
+                'tags_object': doc_metadata.get('tags', []),
+                'tags_search': get_all_labels(doc_metadata.get('tags')),
+                'tags_ids': get_all_ids(doc_metadata.get('tags')),
                 'languages': doc_metadata.get('languages', ['lat']),
 
                 # Lehekülje andmed
@@ -325,7 +461,7 @@ def create_meilisearch_data_per_page():
                 'originaal_kataloog': dir_name,
 
                 # Annotatsioonid ja staatus
-                'tags': page_meta['tags'],
+                'page_tags': page_meta['tags'], # Lehekülje märksõnad
                 'comments': page_meta['comments'],
                 'status': page_meta['status'],
                 'history': page_meta['history'],
@@ -346,12 +482,19 @@ def create_meilisearch_data_per_page():
             # Tagasiühilduvus (ajutine - eemaldada hiljem)
             meili_doc['pealkiri'] = doc_metadata.get('title', '')
             meili_doc['aasta'] = doc_metadata.get('year')
-            meili_doc['koht'] = doc_metadata.get('location', '')
-            meili_doc['trükkal'] = doc_metadata.get('publisher', '')
+            meili_doc['koht'] = get_label(doc_metadata.get('location'))
+            meili_doc['trükkal'] = get_label(doc_metadata.get('publisher'))
+            
+            # V3 bibliograafia (täisobjektid dünaamilise UI jaoks)
+            meili_doc['location'] = doc_metadata.get('location')
+            meili_doc['publisher'] = doc_metadata.get('publisher')
+            meili_doc['location_search'] = get_all_labels(doc_metadata.get('location'))
+            meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher'))
 
             # Autor ja respondens (denormaliseeritud tagasiühilduvuseks)
-            authors = [c for c in doc_metadata.get('creators', []) if c.get('role') == 'praeses']
-            respondents = [c for c in doc_metadata.get('creators', []) if c.get('role') == 'respondens']
+            creators = doc_metadata.get('creators', [])
+            authors = [c for c in creators if c.get('role') == 'praeses']
+            respondents = [c for c in creators if c.get('role') == 'respondens']
             meili_doc['autor'] = authors[0]['name'] if authors else ''
             meili_doc['respondens'] = respondents[0]['name'] if respondents else ''
 

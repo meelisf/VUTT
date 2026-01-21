@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { Edit3, X, Save, Plus, Trash2, Library } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections } from '../services/collectionService';
 import { Creator, CreatorRole, Page, Work } from '../types';
+import { LinkedEntity } from '../types/LinkedEntity';
+import { getLabel } from '../utils/metadataUtils';
+import EntityPicker from './EntityPicker';
 import { FILE_API_URL } from '../config';
 
 interface MetadataModalProps {
@@ -20,10 +23,10 @@ interface MetadataForm {
   title: string;
   year: number;
   type: string | null;
-  genre: string | null;
-  tags: string;
-  location: string;
-  publisher: string;
+  genre: string | LinkedEntity | LinkedEntity[] | null;
+  tags: (string | LinkedEntity)[];
+  location: string | LinkedEntity;
+  publisher: string | LinkedEntity;
   creators: Creator[];
   languages: string[];
   ester_id: string;
@@ -50,7 +53,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     year: 0,
     type: null,
     genre: null,
-    tags: '',
+    tags: [],
     location: '',
     publisher: '',
     creators: [],
@@ -91,7 +94,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       year: work?.year || page.year || page.aasta || 0,
       type: work?.type || page.type || null,
       genre: work?.genre || page.genre || null,
-      tags: (work?.teose_tags || page.teose_tags || []).join(', '),
+      tags: work?.teose_tags || page.teose_tags || [],
       location: work?.location || work?.koht || page.location || page.koht || '',
       publisher: work?.publisher || work?.trükkal || page.publisher || page.trükkal || '',
       creators: work?.creators || page.creators || initialCreators,
@@ -174,7 +177,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           year: year ? parseInt(year) : 0,
           type: m.type || null,
           genre: m.genre || null,
-          tags: Array.isArray(tags) ? tags.join(', ') : (tags || ''),
+          tags: Array.isArray(tags) ? tags : [],
           location: location || '',
           publisher: publisher || '',
           creators: creators,
@@ -194,10 +197,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     setSaveStatus('idle');
 
     try {
+      // Puhasta märksõnad (eemalda tühjad stringid)
       const tagsArray = metaForm.tags
-        .split(',')
-        .map(t => t.trim().toLowerCase())
-        .filter(t => t !== '');
+        .filter(t => {
+          if (typeof t === 'string') return t.trim() !== '';
+          return !!t.label;
+        })
+        .map(t => {
+          if (typeof t === 'string') return t.trim();
+          return t;
+        });
 
       // ESTER ID puhastamine
       let cleanEsterId = metaForm.ester_id.trim();
@@ -209,9 +218,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       // Puhasta creators massiiv
       const cleanCreators = metaForm.creators
         .filter(c => c.name.trim() !== '')
-        .map(c => ({ name: c.name.trim(), role: c.role }));
+        .map(c => ({ 
+          name: c.name.trim(), 
+          role: c.role,
+          id: c.id,
+          source: c.source 
+        }));
 
-      // V2 formaat
+      // V2/V3 formaat
       let payload: any = {
         auth_token: authToken,
         work_id: workId,
@@ -223,8 +237,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           creators: cleanCreators,
           tags: tagsArray,
           languages: metaForm.languages.length > 0 ? metaForm.languages : null,
-          location: metaForm.location.trim() || null,
-          publisher: metaForm.publisher.trim() || null,
+          location: metaForm.location,
+          publisher: metaForm.publisher,
           ester_id: cleanEsterId || null,
           external_url: metaForm.external_url.trim() || null,
           collection: metaForm.collection
@@ -246,6 +260,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         const praeses = cleanCreators.find(c => c.role === 'praeses');
         const respondens = cleanCreators.find(c => c.role === 'respondens');
 
+        const locationLabel = typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label;
+        const publisherLabel = typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label;
+
         // Teata parent komponendile uuendatud andmetest
         onSaveSuccess(
           {
@@ -254,16 +271,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             year: metaForm.year,
             aasta: metaForm.year,
             type: metaForm.type || undefined,
-            genre: metaForm.genre,
+            genre: metaForm.genre || undefined,
             creators: cleanCreators,
             autor: praeses?.name,
             respondens: respondens?.name,
-            teose_tags: tagsArray,
+            tags: tagsArray,
             languages: metaForm.languages,
-            location: metaForm.location.trim() || undefined,
-            koht: metaForm.location.trim() || undefined,
-            publisher: metaForm.publisher.trim() || undefined,
-            trükkal: metaForm.publisher.trim() || undefined,
+            location: metaForm.location,
+            koht: locationLabel,
+            publisher: metaForm.publisher,
+            trükkal: publisherLabel,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collection: metaForm.collection
@@ -272,16 +289,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             title: metaForm.title,
             year: metaForm.year,
             type: metaForm.type || undefined,
-            genre: metaForm.genre,
+            genre: metaForm.genre || undefined,
             creators: cleanCreators,
             author: praeses?.name,
             respondens: respondens?.name,
-            teose_tags: tagsArray,
+            tags: tagsArray,
             languages: metaForm.languages,
-            location: metaForm.location.trim() || '',
-            koht: metaForm.location.trim() || undefined,
-            publisher: metaForm.publisher.trim() || '',
-            trükkal: metaForm.publisher.trim() || undefined,
+            location: metaForm.location,
+            koht: locationLabel,
+            publisher: metaForm.publisher,
+            trükkal: publisherLabel,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collection: metaForm.collection
@@ -355,20 +372,25 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 {metaForm.creators.map((creator, index) => (
                   <div key={index} className="flex gap-2 items-start">
                     <div className="flex-1">
-                      <input
-                        list="author-suggestions"
-                        className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                        placeholder={t('metadata.creatorName', 'Nimi')}
+                      <EntityPicker
+                        type="person"
                         value={creator.name}
-                        onChange={e => {
+                        onChange={(val) => {
                           const newCreators = [...metaForm.creators];
-                          newCreators[index] = { ...creator, name: e.target.value };
+                          newCreators[index] = { 
+                            ...creator, 
+                            name: val?.label || '',
+                            id: val?.id || null,
+                            source: val?.source || 'manual'
+                          };
                           setMetaForm({ ...metaForm, creators: newCreators });
                         }}
+                        placeholder={t('metadata.creatorName', 'Nimi')}
+                        lang={lang}
                       />
                     </div>
                     <select
-                      className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-36"
+                      className="border border-gray-300 rounded px-2 py-[7px] text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-36"
                       value={creator.role}
                       onChange={e => {
                         const newCreators = [...metaForm.creators];
@@ -420,21 +442,21 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.place')}</label>
-                <input
-                  list="place-suggestions"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                <EntityPicker
+                  label={t('metadata.place')}
+                  type="place"
                   value={metaForm.location}
-                  onChange={e => setMetaForm({ ...metaForm, location: e.target.value })}
+                  onChange={val => setMetaForm({ ...metaForm, location: val || '' })}
+                  lang={lang}
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.printer')}</label>
-                <input
-                  list="printer-suggestions"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                <EntityPicker
+                  label={t('metadata.printer')}
+                  type="printer"
                   value={metaForm.publisher}
-                  onChange={e => setMetaForm({ ...metaForm, publisher: e.target.value })}
+                  onChange={val => setMetaForm({ ...metaForm, publisher: val || '' })}
+                  lang={lang}
                 />
               </div>
             </div>
@@ -446,35 +468,25 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             <div className="grid grid-cols-3 gap-3">
               {/* Tüüp */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.type', 'Tüüp')}</label>
-                <select
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  value={metaForm.type || ''}
-                  onChange={e => setMetaForm({ ...metaForm, type: e.target.value || null })}
-                >
-                  <option value="">—</option>
-                  {vocabularies && Object.entries(vocabularies.types).map(([typeId, typeData]) => (
-                    <option key={typeId} value={typeId}>
-                      {typeData[lang] || typeData.et}
-                    </option>
-                  ))}
-                </select>
+                <EntityPicker
+                  label={t('metadata.type', 'Tüüp')}
+                  type="topic"
+                  value={metaForm.type}
+                  onChange={val => setMetaForm({ ...metaForm, type: val })}
+                  placeholder="nt: trükis, käsikiri"
+                  lang={lang}
+                />
               </div>
               {/* Žanr */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.genre', 'Žanr')}</label>
-                <select
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  value={metaForm.genre || ''}
-                  onChange={e => setMetaForm({ ...metaForm, genre: e.target.value || null })}
-                >
-                  <option value="">—</option>
-                  {vocabularies && Object.entries(vocabularies.genres).map(([genreId, genreData]) => (
-                    <option key={genreId} value={genreId}>
-                      {genreData[lang] || genreData.et}
-                    </option>
-                  ))}
-                </select>
+                <EntityPicker
+                  label={t('metadata.genre', 'Žanr')}
+                  type="genre"
+                  value={metaForm.genre}
+                  onChange={val => setMetaForm({ ...metaForm, genre: val })}
+                  placeholder="nt: disputatsioon, oratsioon"
+                  lang={lang}
+                />
               </div>
               {/* Kollektsioon */}
               <div>
@@ -521,13 +533,35 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             </div>
             {/* Tagid */}
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.tags')}</label>
-              <input
-                list="tag-suggestions"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                value={metaForm.tags}
-                onChange={e => setMetaForm({ ...metaForm, tags: e.target.value })}
-                placeholder={t('metadata.tagsPlaceholder', 'nt: teoloogia, polemika')}
+              <label className="block text-xs font-medium text-gray-500 mb-2">{t('metadata.tags')}</label>
+              
+              <div className="flex flex-wrap gap-2 mb-3">
+                {metaForm.tags.length === 0 && <span className="text-xs text-gray-400 italic">Märksõnad puuduvad</span>}
+                {metaForm.tags.map((tag, idx) => (
+                  <span key={idx} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border ${
+                    typeof tag !== 'string' && tag.id ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                  }`}>
+                    {getLabel(tag, lang)}
+                    <button 
+                      onClick={() => setMetaForm({ ...metaForm, tags: metaForm.tags.filter((_, i) => i !== idx) })}
+                      className="hover:text-red-500"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              <EntityPicker
+                type="topic"
+                value={null}
+                onChange={val => {
+                  if (val) {
+                    setMetaForm({ ...metaForm, tags: [...metaForm.tags, val] });
+                  }
+                }}
+                placeholder={t('metadata.tagsPlaceholder', 'Lisa märksõna...')}
+                lang={lang}
               />
               <p className="text-[10px] text-gray-400 mt-1 italic">
                 {t('metadata.tagsHint')}

@@ -1,3 +1,4 @@
+import { LinkedEntity } from './types/LinkedEntity';
 
 export enum PageStatus {
   RAW = 'Toores',
@@ -21,6 +22,8 @@ export type CreatorRole = 'praeses' | 'respondens' | 'auctor' | 'gratulator' | '
 export interface Creator {
   name: string;
   role: CreatorRole;
+  id?: string | null;       // New: Wikidata ID
+  source?: 'wikidata' | 'manual'; // New: Linking source
   identifiers?: {
     gnd?: string;   // GND ID (Saksa rahvusbibliograafia)
     viaf?: string;  // VIAF ID
@@ -63,7 +66,7 @@ export interface Relation {
  */
 export interface Work {
   // =========================================================
-  // V2 VÄLJAD - KASUTA NEID UUES KOODIS
+  // V2/V3 VÄLJAD - KASUTA NEID UUES KOODIS
   // =========================================================
 
   // Identifikaatorid
@@ -74,12 +77,16 @@ export interface Work {
   // Teose põhiandmed
   title: string;            // Pealkiri
   year: number | null;      // Ilmumisaasta
-  location: string;         // Trükikoht (nt "Tartu", "Riga")
-  publisher: string;        // Trükkal/kirjastaja
+  location: string;         // Trükikoht (string facetiks)
+  location_object?: LinkedEntity; // Trükikoht (objekt)
+  publisher: string;        // Trükkal (string facetiks)
+  publisher_object?: LinkedEntity; // Trükkal (objekt)
 
   // Taksonoomia
   type?: string;            // 'impressum' | 'manuscriptum'
-  genre?: string | null;    // 'disputatio' | 'oratio' | 'carmen' | ...
+  type_object?: LinkedEntity;
+  genre?: string | null;    // 'disputatio' jne (string facetiks)
+  genre_object?: LinkedEntity | LinkedEntity[] | null;
   collection?: string | null;
   collections_hierarchy?: string[];
 
@@ -88,7 +95,8 @@ export interface Work {
   authors_text?: string[];  // Denormaliseeritud otsinguks
 
   // Märksõnad ja keeled
-  teose_tags?: string[];    // Sisuline klassifikatsioon
+  tags?: string[];          // Märksõnad (stringid facetiks)
+  tags_object?: LinkedEntity[]; // Märksõnad (objektid)
   languages?: string[];     // Keeled (ISO 639-3: lat, deu, est, ...)
 
   // Seosed
@@ -104,7 +112,7 @@ export interface Work {
   page_count: number;
   thumbnail_url: string;
   work_status?: WorkStatus;
-  tags?: string[];          // Esimese lehekülje tagid
+  page_tags?: string[];     // Esimese lehekülje tagid
 
   // =========================================================
   // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
@@ -164,7 +172,7 @@ export interface Page {
   image_url: string;
   status: PageStatus;
   comments: Annotation[];
-  tags: string[];
+  page_tags: string[];      // Changed from tags
   history: HistoryEntry[];
 
   // =========================================================
@@ -173,14 +181,19 @@ export interface Page {
   title?: string;
   year?: number | null;
   location?: string;
+  location_object?: LinkedEntity;
   publisher?: string;
+  publisher_object?: LinkedEntity;
   type?: string;
+  type_object?: LinkedEntity;
   genre?: string | null;
+  genre_object?: LinkedEntity | LinkedEntity[] | null;
   collection?: string | null;
   collections_hierarchy?: string[];
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];
-  teose_tags?: string[];
+  tags?: string[];
+  tags_object?: LinkedEntity[];
   languages?: string[];
   series?: Series;
   series_title?: string;
@@ -244,17 +257,22 @@ export interface ContentSearchHit {
   lehekylje_tekst: string;
   lehekylje_pilt: string;
 
-  // =========================================================
   // V2 VÄLJAD - KASUTA NEID
-  // =========================================================
   title?: string;
   year?: number | string | null;
   location?: string;
+  location_object?: LinkedEntity;
   publisher?: string;
+  publisher_object?: LinkedEntity;
   genre?: string | null;
+  genre_object?: LinkedEntity | LinkedEntity[] | null;
   collection?: string | null;
   creators?: Creator[];
   authors_text?: string[];
+  tags?: string[]; // Added support for V3
+  tags_object?: LinkedEntity[];
+  page_tags?: string[]; // Per-page tags
+
 
   // =========================================================
   // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!

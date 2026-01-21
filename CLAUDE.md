@@ -64,13 +64,37 @@ Filesystem: data/{work-folder}/{page}.txt + {page}.jpg + {page}.json
 ### Page vs Work
 
 Each Meilisearch document is a **page** with fields:
-- `teose_id` (work ID), `lehekylje_number` (page number)
+- `work_id` (nanoid), `lehekylje_number` (page number)
 - `lehekylje_tekst` (text), `lehekylje_pilt` (image path)
 - `teose_staatus` (denormalized work status: 'Toores' | 'Töös' | 'Valmis')
-- `teose_tags` (work-level genre tags: string[])
-- `koht` (printing place: Tartu / Pärnu), `trükkal` (printer name)
+- `tags` (work-level keywords: string[] or LinkedEntity[]) - **Updated V3**
+- `page_tags` (page-level keywords) - **Updated V3**
+- `location` / `publisher` (LinkedEntity objects)
 
-Work status is recalculated on every page save and propagated to all pages of that work.
+### Metadata V3 (Linked Data)
+
+**MAJOR UPDATE (Jan 2026):**
+Metadata fields (`genre`, `type`, `location`, `publisher`, `tags`) now support **Linked Data objects** sourced from Wikidata.
+
+**Structure:**
+```json
+{
+  "label": "Ajalugu",
+  "id": "Q309",
+  "labels": { "et": "Ajalugu", "en": "History" },
+  "source": "wikidata"
+}
+```
+
+**Multilingual Indexing:**
+Meilisearch index contains language-specific fields for faceting:
+- `tags` (default/et), `tags_en`
+- `genre` (default/et), `genre_en`
+- `type` (default/et), `type_en`
+
+**Frontend:**
+- `EntityPicker` component used for selecting values from Wikidata.
+- `getLabel(value, lang)` utility handles dynamic language display.
 
 ### teose_id Handling
 **Single source of truth:** `_metadata.json` contains the canonical `teose_id`.
@@ -187,22 +211,19 @@ Süsteemis on **kolm kihti** erinevate väljanimedega - see tekitab tihti segadu
 
 #### Väljade võrdlustabel
 
-| Väli | v1 (eestikeelne) | v2 (ingliskeelne) | Meilisearch väli |
-|------|------------------|-------------------|------------------|
-| Püsiv ID | - | `id` (nanoid) | `work_id` |
-| Slug | `teose_id` | `slug` / `teose_id` | `teose_id` |
-| Pealkiri | `pealkiri` | `title` | `pealkiri` |
-| Aasta | `aasta` | `year` | `aasta` |
-| Autor | `autor` | `creators[role=praeses].name` | `autor` |
-| Respondens | `respondens` | `creators[role=respondens].name` | `respondens` |
-| Trükikoht | `koht` | `location` | `koht` |
-| Trükkal | `trükkal` | `publisher` | `trükkal` |
-| Žanr | - | `genre` | `genre` |
-| Märksõnad | `teose_tags` | `tags` | `teose_tags` |
-| Kollektsioon | `collection` | `collection` | `collection` |
-| ESTER | `ester_id` | `ester_id` | `ester_id` |
+| Väli | v1 (eestikeelne) | v2 (ingliskeelne) | V3 (Linked Data) | Meilisearch väli |
+|------|------------------|-------------------|------------------|------------------|
+| Püsiv ID | - | `id` (nanoid) | `id` | `work_id` |
+| Slug | `teose_id` | `slug` | `slug` | `teose_id` |
+| Pealkiri | `pealkiri` | `title` | `title` | `title` / `pealkiri` |
+| Aasta | `aasta` | `year` | `year` | `year` / `aasta` |
+| Koht | `koht` | `location` | `location` (Objekt) | `location` (str) + `location_object` |
+| Trükkal | `trükkal` | `publisher` | `publisher` (Objekt) | `publisher` (str) + `publisher_object` |
+| Žanr | - | `genre` | `genre` (Objekt) | `genre` (str) + `genre_object` |
+| Märksõnad | `teose_tags` | `tags` | `tags` (Objekt[]) | `tags` (str[]) + `tags_object` |
+| Kollektsioon | `collection` | `collection` | `collection` | `collection` |
 
-**Staatus:** `genre` ja `tags` on eraldi väljad. Kõik komponendid toetavad mõlemat (2026-01-21).
+**Märkus:** Meilisearch sisaldab lisaks `_et`, `_en` sufiksiga välju (nt `tags_en`) mitmekeelseks filtreerimiseks.
 
 #### Näide: v1 _metadata.json
 ```json

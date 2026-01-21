@@ -32,7 +32,7 @@ const Dashboard: React.FC = () => {
   const respondensParam = searchParams.get('respondens') || '';
   const printerParam = searchParams.get('printer') || '';
   const statusParam = searchParams.get('status') as WorkStatus | null;
-  const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
+  const teoseTagsParam = searchParams.get('tags')?.split(',').filter(Boolean) || [];
   const genreParam = searchParams.get('genre') || null;
   const typeParam = searchParams.get('type') || null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
@@ -182,13 +182,13 @@ const Dashboard: React.FC = () => {
       }
 
       // Teose märksõnad
-      const currentTagsParam = searchParams.get('teoseTags') || '';
+      const currentTagsParam = searchParams.get('tags') || '';
       const newTagsParam = selectedTags.join(',');
       if (newTagsParam !== currentTagsParam) {
         if (newTagsParam) {
-          newParams.set('teoseTags', newTagsParam);
+          newParams.set('tags', newTagsParam);
         } else {
-          newParams.delete('teoseTags');
+          newParams.delete('tags');
         }
         changed = true;
         resetPage = true;

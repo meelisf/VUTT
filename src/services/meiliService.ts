@@ -49,9 +49,9 @@ const fixIndexSettings = async () => {
       // Indeksit ei pruugi veel eksisteerida
     }
 
-    const requiredSearch = ['tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
+    const requiredSearch = ['page_tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['work_id', 'teose_staatus', 'teose_tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
+    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
@@ -71,14 +71,19 @@ const fixIndexSettings = async () => {
     }
 
     await index.updateFilterableAttributes([
-      // V2 väljad
+      // V2/V3 väljad
       'work_id',  // nanoid - eelistatud routing jaoks
       'year',
       'title',
-      'location',
-      'publisher',
+      'location_id',
+      'publisher_id',
+      'genre_ids',
+      'tags_ids',
+      'creator_ids',
       'type',
+      'type_et', 'type_en',
       'genre',
+      'genre_et', 'genre_en',
       'collection',
       'collections_hierarchy',
       'authors_text',
@@ -91,10 +96,11 @@ const fixIndexSettings = async () => {
       'teose_id',
       'lehekylje_number',
       'originaal_kataloog',
-      'tags',
+      'page_tags',
       'status',
       'teose_staatus',
-      'teose_tags'
+      'tags',
+      'tags_et', 'tags_en'
     ]);
 
     await index.updateSortableAttributes([
@@ -105,12 +111,14 @@ const fixIndexSettings = async () => {
     ]);
 
     const searchTask = await index.updateSearchableAttributes([
-      // V2 väljad
+      // V2/V3 väljad
       'title',
       'authors_text',
       'year',
-      'location',
-      'publisher',
+      'location_search',
+      'publisher_search',
+      'genre_search',
+      'tags_search',
       'series_title',
       // Tagasiühilduvus
       'pealkiri',
@@ -120,7 +128,7 @@ const fixIndexSettings = async () => {
       'teose_id',
       'originaal_kataloog',
       'lehekylje_tekst',
-      'tags',
+      'page_tags',
       'comments.text'
     ]);
 
@@ -239,11 +247,16 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
   }
 };
 
-// Saab kõik teose märksõnad (teose_tags) koos loendiga - facet query
+// Saab kõik teose märksõnad (tags) koos loendiga - facet query
 // Valikuline collection parameeter filtreerib kollektsiooni järgi
-export const getTeoseTagsFacets = async (collection?: string): Promise<{ tag: string; count: number }[]> => {
+export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et'): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
+
+  // Vali õige väli vastavalt keelele
+  // Kui keel on 'et', kasutame 'tags' (mis on vaikimisi et), muul juhul 'tags_en' jne
+  // Või kindlam: tags_et, tags_en
+  const facetField = lang === 'et' ? 'tags' : `tags_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -254,10 +267,10 @@ export const getTeoseTagsFacets = async (collection?: string): Promise<{ tag: st
     const response = await index.search('', {
       filter,
       limit: 0,
-      facets: ['teose_tags']
+      facets: [facetField]
     });
 
-    const facetDistribution = response.facetDistribution?.teose_tags || {};
+    const facetDistribution = response.facetDistribution?.[facetField] || {};
 
     const result = Object.entries(facetDistribution)
       .map(([tag, count]) => ({ tag, count: count as number }))
@@ -266,14 +279,18 @@ export const getTeoseTagsFacets = async (collection?: string): Promise<{ tag: st
     return result;
   } catch (error) {
     console.error("getTeoseTagsFacets error:", error);
+    // Fallback 'tags' väljale kui keelepõhist ei leidu
+    if (facetField !== 'tags') return getTeoseTagsFacets(collection, 'et');
     return [];
   }
 };
 
 // Saab kõik žanrid (genre) koos loendiga - facet query
-export const getGenreFacets = async (collection?: string): Promise<{ value: string; count: number }[]> => {
+export const getGenreFacets = async (collection?: string, lang: string = 'et'): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
+
+  const facetField = lang === 'et' ? 'genre' : `genre_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -284,10 +301,10 @@ export const getGenreFacets = async (collection?: string): Promise<{ value: stri
     const response = await index.search('', {
       filter,
       limit: 0,
-      facets: ['genre']
+      facets: [facetField]
     });
 
-    const facetDistribution = response.facetDistribution?.genre || {};
+    const facetDistribution = response.facetDistribution?.[facetField] || {};
 
     const result = Object.entries(facetDistribution)
       .map(([value, count]) => ({ value, count: count as number }))
@@ -296,14 +313,17 @@ export const getGenreFacets = async (collection?: string): Promise<{ value: stri
     return result;
   } catch (error) {
     console.error("getGenreFacets error:", error);
+    if (facetField !== 'genre') return getGenreFacets(collection, 'et');
     return [];
   }
 };
 
 // Saab kõik tüübid (type) koos loendiga - facet query
-export const getTypeFacets = async (collection?: string): Promise<{ value: string; count: number }[]> => {
+export const getTypeFacets = async (collection?: string, lang: string = 'et'): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
+
+  const facetField = lang === 'et' ? 'type' : `type_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -314,10 +334,10 @@ export const getTypeFacets = async (collection?: string): Promise<{ value: strin
     const response = await index.search('', {
       filter,
       limit: 0,
-      facets: ['type']
+      facets: [facetField]
     });
 
-    const facetDistribution = response.facetDistribution?.type || {};
+    const facetDistribution = response.facetDistribution?.[facetField] || {};
 
     const result = Object.entries(facetDistribution)
       .map(([value, count]) => ({ value, count: count as number }))
@@ -326,6 +346,7 @@ export const getTypeFacets = async (collection?: string): Promise<{ value: strin
     return result;
   } catch (error) {
     console.error("getTypeFacets error:", error);
+    if (facetField !== 'type') return getTypeFacets(collection, 'et');
     return [];
   }
 };
@@ -366,7 +387,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
     if (options?.teoseTags && options.teoseTags.length > 0) {
       for (const tag of options.teoseTags) {
-        filter.push(`teose_tags = "${tag}"`);
+        filter.push(`tags = "${tag}"`);
       }
     }
     // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
@@ -383,12 +404,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     }
 
     const searchParams: any = {
-      limit: 2000, // Enough for all works (~1200)
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
-        'type', 'genre', 'collection', 'collections_hierarchy',
-        'creators', 'authors_text', 'teose_tags', 'languages',
+        'work_id', 'teose_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
+        'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         // Tagasiühilduvus
         'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'koht', 'trükkal',
@@ -502,12 +522,13 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         // V2 teose andmed (kasuta uusi välju, fallback vanadele)
         title: hit.title || hit.pealkiri || 'Pealkiri puudub',
         year: hit.year ?? parseInt(hit.aasta) ?? 0,
-        location: hit.location || hit.koht || '',
-        publisher: hit.publisher || hit.trükkal || '',
+        location: hit.location_object || hit.location || hit.koht || '',
+        publisher: hit.publisher_object || hit.publisher || hit.trükkal || '',
 
         // V2 taksonoomia
         type: hit.type,
-        genre: hit.genre,
+        type_object: hit.type_object,
+        genre: hit.genre_object || hit.genre,
         collection: hit.collection,
         collections_hierarchy: hit.collections_hierarchy || [],
 
@@ -516,7 +537,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         authors_text: hit.authors_text || [],
 
         // V2 märksõnad
-        teose_tags: hit.teose_tags || [],
+        tags: hit.tags || [],
+        tags_object: hit.tags_object || [],
         languages: hit.languages || ['lat'],
 
         // Seosed
@@ -531,7 +553,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         page_count: hit.teose_lehekylgede_arv || 0,
         thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
         work_status: hit.teose_staatus,
-        tags: firstPageData?.tags || hit.tags || [],
+        page_tags: firstPageData?.page_tags || hit.page_tags || [],
 
         // Tagasiühilduvus
         catalog_name: hit.originaal_kataloog || 'Unknown',
@@ -601,26 +623,26 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       image_url: getFullImageUrl(hit.lehekylje_pilt),
       status: hit.status || PageStatus.RAW,
       comments: hit.comments || [],
-      tags: Array.from(new Set((hit.tags || []).map((t: string) => t.toLowerCase()))),
+      page_tags: Array.from(new Set((hit.page_tags || []).map((t: any) => 
+        typeof t === 'string' ? t.toLowerCase() : t
+      ))),
       history: hit.history || [],
 
       // V2 teose andmed
       title: hit.title || hit.pealkiri,
       year: hit.year ?? hit.aasta,
-      location: hit.location || hit.koht,
-      publisher: hit.publisher || hit.trükkal,
+      location: hit.location_object || hit.location || hit.koht,
+      publisher: hit.publisher_object || hit.publisher || hit.trükkal,
       type: hit.type,
-      genre: hit.genre,
+      type_object: hit.type_object,
+      genre: hit.genre_object || hit.genre,
       collection: hit.collection,
       collections_hierarchy: hit.collections_hierarchy || [],
       creators: hit.creators || [],
       authors_text: hit.authors_text || [],
-      teose_tags: hit.teose_tags || [],
+      tags: hit.tags || [],
+      tags_object: hit.tags_object || [],
       languages: hit.languages || ['lat'],
-      series: hit.series,
-      series_title: hit.series_title,
-      ester_id: hit.ester_id,
-      external_url: hit.external_url,
 
       // Tagasiühilduvus
       original_path: hit.originaal_kataloog,
@@ -879,9 +901,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
-        'type', 'genre', 'collection', 'collections_hierarchy',
-        'creators', 'authors_text', 'teose_tags', 'languages',
+        'work_id', 'teose_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
+        'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         // Tagasiühilduvus
         'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta',
@@ -902,12 +924,13 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       // V2 teose andmed
       title: hit.title || hit.pealkiri || '',
       year: hit.year ?? parseInt(hit.aasta) ?? 0,
-      location: hit.location || hit.koht || '',
-      publisher: hit.publisher || hit.trükkal || '',
+      location: hit.location_object || hit.location || hit.koht || '',
+      publisher: hit.publisher_object || hit.publisher || hit.trükkal || '',
 
       // V2 taksonoomia
       type: hit.type,
-      genre: hit.genre,
+      type_object: hit.type_object,
+      genre: hit.genre_object || hit.genre,
       collection: hit.collection,
       collections_hierarchy: hit.collections_hierarchy || [],
 
@@ -916,7 +939,8 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       authors_text: hit.authors_text || [],
 
       // V2 märksõnad
-      teose_tags: Array.from(new Set((hit.teose_tags || []).map((t: string) => t.toLowerCase()))),
+      tags: hit.tags || [],
+      tags_object: hit.tags_object || [],
       languages: hit.languages || ['lat'],
 
       // Seosed
@@ -964,7 +988,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   // Teose märksõnade filter (AND loogika)
   if (options.teoseTags && options.teoseTags.length > 0) {
     for (const tag of options.teoseTags) {
-      filter.push(`teose_tags = "${tag}"`);
+      filter.push(`tags = "${tag}"`);
     }
   }
   // V2: Kollektsiooni filter
@@ -980,9 +1004,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     filter.push(`type = "${options.type}"`);
   }
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'page_tags', 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
-  else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
+  else if (options.scope === 'annotation') attributesToSearchOn = ['page_tags', 'comments.text'];
 
   try {
     // Kui otsime ühe teose piires, näitame kogu lehekülje teksti kõigi highlight'idega
@@ -992,9 +1016,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'teose_id'],
-        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
         // Ei kasuta croppi - näitame kogu teksti
-        attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+        attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
         attributesToSearchOn: attributesToSearchOn
@@ -1030,10 +1054,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         distinct: 'teose_id',
-        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
         attributesToCrop: ['lehekylje_tekst', 'comments.text'],
         cropLength: 35,
-        attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+        attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
         attributesToSearchOn: attributesToSearchOn
@@ -1081,18 +1105,18 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'page_tags', 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
-  else if (options.scope === 'annotation') attributesToSearchOn = ['tags', 'comments.text'];
+  else if (options.scope === 'annotation') attributesToSearchOn = ['page_tags', 'comments.text'];
 
   try {
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'comments'],
+      attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
-      attributesToHighlight: ['lehekylje_tekst', 'tags', 'comments.text'],
+      attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
       highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
       highlightPostTag: '</em>',
       sort: ['lehekylje_number:asc'],
@@ -1114,10 +1138,10 @@ export const getAllTags = async (): Promise<string[]> => {
     // See on palju efektiivsem kui kõikide dokumentide läbivaatamine
     const response = await index.search('', {
       limit: 0, // Me ei vaja tulemusi, ainult facet'e
-      facets: ['tags']
+      facets: ['page_tags']
     });
 
-    const tagFacets = response.facetDistribution?.['tags'] || {};
+    const tagFacets = response.facetDistribution?.['page_tags'] || {};
     const normalizedTags = Array.from(new Set(Object.keys(tagFacets).map(t => t.toLowerCase())));
     return normalizedTags.sort((a, b) => a.localeCompare(b, 'et'));
   } catch (e) {

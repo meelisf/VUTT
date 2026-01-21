@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User, Tag, CheckSquare, Square } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { getLabel } from '../utils/metadataUtils';
 
 interface WorkCardProps {
   work: Work;
@@ -13,7 +14,7 @@ interface WorkCardProps {
 }
 
 const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect }) => {
-  const { t } = useTranslation(['dashboard', 'common']);
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,6 +48,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
         return 'text-gray-500 bg-gray-50';
     }
   };
+
+  const tags = work.tags || [];
+  const lang = i18n.language || 'et';
 
   return (
     <div
@@ -83,30 +87,33 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
         {/* Žanrid pildi peal (max 3, kompaktne) */}
-        {work.teose_tags && work.teose_tags.length > 0 && (
+        {tags.length > 0 && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
             <div className="flex flex-wrap items-center gap-1">
-              {work.teose_tags.slice(0, 3).map((tag, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    // Navigeeri otsingusse selle žanriga
-                    navigate(`/search?teoseTags=${encodeURIComponent(tag)}`);
-                  }}
-                  className="text-[10px] font-medium text-white bg-slate-800/60 hover:bg-primary-600/80 px-1.5 py-0.5 rounded backdrop-blur-sm transition-colors"
-                  title={t('workCard.searchGenre', { genre: tag })}
-                >
-                  {tag}
-                </button>
-              ))}
-              {work.teose_tags.length > 3 && (
+              {tags.slice(0, 3).map((tag, idx) => {
+                const label = getLabel(tag, lang);
+                return (
+                  <button
+                    key={idx}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      // Navigeeri otsingusse selle žanriga
+                      navigate(`/search?teoseTags=${encodeURIComponent(label)}`);
+                    }}
+                    className="text-[10px] font-medium text-white bg-slate-800/60 hover:bg-primary-600/80 px-1.5 py-0.5 rounded backdrop-blur-sm transition-colors"
+                    title={t('workCard.searchGenre', { genre: label })}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+              {tags.length > 3 && (
                 <span
                   className="text-[10px] text-white/80 bg-slate-800/40 px-1.5 py-0.5 rounded"
-                  title={work.teose_tags.slice(3).join(', ')}
+                  title={tags.slice(3).map(t => getLabel(t, lang)).join(', ')}
                 >
-                  +{work.teose_tags.length - 3}
+                  +{tags.length - 3}
                 </span>
               )}
             </div>
@@ -130,7 +137,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             onClick={(e) => {
               e.preventDefault();
               // Navigate to search page with author name (finds all occurrences)
-              navigate(`/search?q="${encodeURIComponent(work.author)}"`);
+              navigate(`/search?q="${encodeURIComponent(work.author || '')}"`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
             title={t('workCard.searchAuthor', 'Otsi autorit kõikidest teostest')}

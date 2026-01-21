@@ -35,30 +35,81 @@ def main():
 
     print(f"Loon indeksi '{INDEX_NAME}' ja seadistan parameetrid...")
     
-    # UUENDUS: Lisasime tags ja comments.text searchableAttributes hulka
+    # UUENDUS: Lisasime V3 väljad ja täiendavad seaded
     client.index(INDEX_NAME).update_settings({
         'searchableAttributes': [
-            'lehekylje_tekst', 
-            'pealkiri', 
-            'autor', 
-            'tags', 
+            # V2/V3 väljad
+            'title',
+            'authors_text',
+            'year',
+            'location_search',
+            'publisher_search',
+            'genre_search',
+            'tags_search',
+            'series_title',
+            # Tagasiühilduvus
+            'pealkiri',
+            'autor',
+            'respondens',
+            'aasta',
+            'teose_id',
+            'originaal_kataloog',
+            'lehekylje_tekst',
+            'page_tags',
             'comments.text'
         ],
         'filterableAttributes': [
-            'aasta', 
-            'autor', 
-            'teose_id', 
-            'originaal_kataloog', 
+            # V2/V3 väljad
+            'work_id',
+            'year',
+            'title',
+            'location_id',
+            'publisher_id',
+            'genre_ids',
+            'tags_ids',
+            'creator_ids',
+            'type',
+            'type_et', 'type_en', # Keeltepõhised filtrid
+            'genre',
+            'genre_et', 'genre_en',
+            'collection',
+            'collections_hierarchy',
+            'authors_text',
+            'languages',
+            # Tagasiühilduvus
+            'aasta',
+            'autor',
+            'respondens',
+            'trükkal',
+            'teose_id',
             'lehekylje_number',
-            'status', # Võimaldab filtreerida staatuse järgi
-            'tags'    # Võimaldab filtreerida siltide järgi
+            'originaal_kataloog',
+            'page_tags',
+            'status',
+            'teose_staatus',
+            'tags',
+            'tags_et', 'tags_en'
         ],
         'sortableAttributes': [
             'aasta', 
             'lehekylje_number',
-            'last_modified'
+            'last_modified',
+            'pealkiri'
         ],
-        # Lisame tekstikatkestused ja esiletõstmise seaded
+        'rankingRules': [
+            "exactness",
+            "words",
+            "typo",
+            "proximity",
+            "attribute",
+            "sort"
+        ],
+        'faceting': {
+            'maxValuesPerFacet': 5000
+        },
+        'pagination': {
+            'maxTotalHits': 10000
+        },
         'typoTolerance': {
             'minWordSizeForTypos': {
                 'oneTypo': 5,

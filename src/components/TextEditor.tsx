@@ -7,6 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye, User } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
+import { getLabel } from '../utils/metadataUtils';
 
 // Git ajaloo kirje tüüp
 interface GitHistoryEntry {
@@ -43,9 +44,10 @@ type TabType = 'edit' | 'annotate' | 'history';
 type ViewMode = 'edit' | 'read';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange }) => {
-  const { t } = useTranslation(['workspace', 'common']);
+  const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
+  const lang = i18n.language || 'et';
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   // Default to 'read' mode for non-logged-in users (readOnly), 'edit' for logged-in users
   const [viewMode, setViewMode] = useState<ViewMode>(readOnly ? 'read' : 'edit');
@@ -53,7 +55,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [text, setText] = useState(page.text_content);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
-  const [tags, setTags] = useState<string[]>(page.tags);
+  const [page_tags, setPageTags] = useState<string[]>(page.page_tags);
   const [newTag, setNewTag] = useState('');
   const [newComment, setNewComment] = useState('');
 
@@ -82,7 +84,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     text: page.text_content,
     status: page.status,
     comments: page.comments,
-    tags: page.tags
+    page_tags: page.page_tags
   });
 
   // Refs for sync scrolling
@@ -94,19 +96,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     text !== savedState.text ||
     status !== savedState.status ||
     JSON.stringify(comments) !== JSON.stringify(savedState.comments) ||
-    JSON.stringify(tags) !== JSON.stringify(savedState.tags);
+    JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags);
 
   useEffect(() => {
     setText(page.text_content);
     setStatus(page.status);
     setComments(page.comments);
-    setTags(page.tags);
+    setPageTags(page.page_tags);
     // Uuendame ka salvestatud olekut uue lehe laadimisel
     setSavedState({
       text: page.text_content,
       status: page.status,
       comments: page.comments,
-      tags: page.tags
+      page_tags: page.page_tags
     });
   }, [page]);
 
@@ -247,7 +249,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       text_content: text,
       status: status,
       comments: comments,
-      tags: tags,
+      page_tags: page_tags,
     };
 
     try {
@@ -256,7 +258,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         text: text,
         status: status,
         comments: comments,
-        tags: tags
+        page_tags: page_tags
       });
       const refreshedTags = await getAllTags();
       setAllAvailableTags(refreshedTags);
@@ -389,13 +391,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   };
 
   const filteredSuggestions = allAvailableTags.filter(
-    tag => tag.includes(newTag.toLowerCase()) && !tags.includes(tag)
+    tag => tag.includes(newTag.toLowerCase()) && !page_tags.includes(tag)
   );
 
   const addTagFromInput = (tagValue: string) => {
     const trimmed = tagValue.trim().toLowerCase();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags([...tags, trimmed]);
+    if (trimmed && !page_tags.includes(trimmed)) {
+      setPageTags([...page_tags, trimmed]);
       if (!allAvailableTags.includes(trimmed)) {
         setAllAvailableTags(prev => {
           if (prev.includes(trimmed)) return prev;
@@ -436,7 +438,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   };
 
   const removeTag = (tagToRemove: string) => {
-    setTags(tags.filter(t => t !== tagToRemove));
+    setPageTags(page_tags.filter(t => t !== tagToRemove));
   };
 
   const addComment = () => {
@@ -783,19 +785,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       {work.location && (
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
-                          <p className="text-gray-900">{work.location}</p>
+                          <p className="text-gray-900">{getLabel(work.location, lang)}</p>
                         </div>
                       )}
                       {work.publisher && (
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
                           <button
-                            onClick={() => navigate(`/?printer=${encodeURIComponent(work.publisher)}`)}
+                            onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
                             className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
                             title="Filtreeri trükkali järgi"
                           >
                             <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
-                            <span>{work.publisher}</span>
+                            <span>{getLabel(work.publisher, lang)}</span>
                           </button>
                         </div>
                       )}
@@ -860,24 +862,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               )}
 
               {/* Genre / Teose märksõnad */}
-              {work && work.teose_tags && work.teose_tags.length > 0 && (
+              {work && work.tags && work.tags.length > 0 && (
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                   <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                     <BookOpen size={18} className="text-green-600" />
                     <h4 className="font-bold">Žanr</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {work.teose_tags.map(tag => (
-                      <button
-                        key={tag}
-                        onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(tag)}`)}
-                        className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-50 border border-green-100 text-sm text-green-800 hover:bg-green-100 transition-colors"
-                        title={`Otsi žanrit: ${tag}`}
-                      >
-                        {tag.toLowerCase()}
-                        <Search size={12} className="ml-1 opacity-50" />
-                      </button>
-                    ))}
+                    {work.tags.map((tag, idx) => {
+                      const label = getLabel(tag, lang);
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(label)}`)}
+                          className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-50 border border-green-100 text-sm text-green-800 hover:bg-green-100 transition-colors"
+                          title={`Otsi žanrit: ${label}`}
+                        >
+                          {label.toLowerCase()}
+                          <Search size={12} className="ml-1 opacity-50" />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -889,8 +894,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   <h4 className="font-bold">Märksõnad</h4>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {tags.length === 0 && <span className="text-sm text-gray-400 italic">Märksõnad puuduvad</span>}
-                  {tags.map(tag => (
+                  {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">Märksõnad puuduvad</span>}
+                  {page_tags.map(tag => (
                     <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group">
                       <button
                         onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}&scope=annotation`)}

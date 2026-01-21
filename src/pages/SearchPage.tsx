@@ -10,6 +10,7 @@ import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
 import { useCollection } from '../contexts/CollectionContext';
+import { getLabel } from '../utils/metadataUtils';
 
 // Abifunktsioon pildi URL-i ehitamiseks
 const getImageUrl = (imagePath: string): string => {
@@ -76,10 +77,11 @@ const SearchPage: React.FC = () => {
     useEffect(() => {
         const loadFilterData = async () => {
             try {
+                const facetLang = i18n.language.split('-')[0];
                 const [tags, genres, types, vocabs] = await Promise.all([
-                    getTeoseTagsFacets(selectedCollection || undefined),
-                    getGenreFacets(selectedCollection || undefined),
-                    getTypeFacets(selectedCollection || undefined),
+                    getTeoseTagsFacets(selectedCollection || undefined, facetLang),
+                    getGenreFacets(selectedCollection || undefined, facetLang),
+                    getTypeFacets(selectedCollection || undefined, facetLang),
                     getVocabularies()
                 ]);
                 setAvailableTeoseTags(tags);
@@ -91,7 +93,7 @@ const SearchPage: React.FC = () => {
             }
         };
         loadFilterData();
-    }, [selectedCollection]);
+    }, [selectedCollection, i18n.language]);
 
     // Sync local input with URL param when URL changes (e.g. back button)
     useEffect(() => {
@@ -105,17 +107,25 @@ const SearchPage: React.FC = () => {
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
-        if (workIdParam && !selectedWorkInfo) {
-            getWorkMetadata(workIdParam).then(work => {
-                if (work) {
-                    setSelectedWorkInfo({
-                        title: work.title,
-                        year: work.year,
-                        author: work.author
+                if (workIdParam && !selectedWorkInfo) {
+                    getWorkMetadata(workIdParam).then(work => {
+                        if (work) {
+                            // Get primary author from creators if available
+                            let author = work.author || '';
+                            if (work.creators && work.creators.length > 0) {
+                                const praeses = work.creators.find(c => c.role === 'praeses');
+                                if (praeses) author = praeses.name;
+                            }
+                            
+                            setSelectedWorkInfo({
+                                title: work.title,
+                                year: work.year || undefined,
+                                author: author
+                            });
+                        }
                     });
                 }
-            });
-        } else if (!workIdParam) {
+         else if (!workIdParam) {
             setSelectedWorkInfo(null);
         }
     }, [workIdParam]);
@@ -282,7 +292,7 @@ const SearchPage: React.FC = () => {
         const snippet = hit._formatted?.lehekylje_tekst || hit.lehekylje_tekst;
 
         // Helper to find relevant tags/comments (those containing highlight marks)
-        const hasHighlightedTags = hit._formatted?.tags?.some(t => t.includes('<em'));
+        const hasHighlightedTags = hit._formatted?.page_tags?.some(t => t.includes('<em'));
         const highlightedComments = hit._formatted?.comments?.filter(c => c.text.includes('<em'));
 
         // Navigeeri töölauasse
@@ -322,7 +332,7 @@ const SearchPage: React.FC = () => {
                         {/* Matched Tags */}
                         {hasHighlightedTags && (
                             <div className="flex flex-wrap gap-2 mt-2">
-                                {hit._formatted?.tags?.filter(t => t.includes('<em')).map((tagHtml, idx) => (
+                                {hit._formatted?.page_tags?.filter(t => t.includes('<em')).map((tagHtml, idx) => (
                                     <span
                                         key={idx}
                                         className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full"
@@ -887,6 +897,24 @@ const SearchPage: React.FC = () => {
                                                             </button>
                                                             <span className="text-gray-300">❧</span>
                                                             <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
+                                                            
+                                                            {/* Lisame Žanri ja Tüübi */}
+                                                            {(firstHit.genre || firstHit.genre_object) && (
+                                                                <>
+                                                                    <span className="text-gray-300">❧</span>
+                                                                    <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
+                                                                        {getLabel(firstHit.genre_object || firstHit.genre, i18n.language)}
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                            {(firstHit.type || firstHit.type_object) && (
+                                                                <>
+                                                                    <span className="text-gray-300">❧</span>
+                                                                    <span className="text-gray-500 italic">
+                                                                        {getLabel(firstHit.type_object || firstHit.type, i18n.language)}
+                                                                    </span>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div className="shrink-0 text-right">

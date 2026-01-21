@@ -7,7 +7,11 @@ import time
 import urllib.request
 import urllib.parse
 from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE
-from .utils import sanitize_id, generate_default_metadata, normalize_genre, calculate_work_status
+from .utils import (
+    sanitize_id, generate_default_metadata, normalize_genre, 
+    calculate_work_status, get_label, get_id, get_all_labels, get_all_ids, get_primary_labels,
+    get_labels_by_lang
+)
 from .git_ops import commit_new_work_to_git
 
 
@@ -196,40 +200,61 @@ def sync_work_to_meilisearch(dir_name):
             "work_id": work_id,  # Nanoid (püsiv lühikood)
             "teose_id": teose_id,
             "pealkiri": pealkiri,
+            "title": pealkiri,
             "autor": autor,
             "respondens": respondens,
             "aasta": aasta,
+            "year": aasta,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
             "lehekylje_tekst": page_text,
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "tags": [t.lower() for t in page_meta['tags']],
+            "page_tags": [t.lower() for t in page_meta['page_tags']] if 'page_tags' in page_meta else [t.lower() for t in page_meta.get('tags', [])],
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
-            "teose_tags": teose_tags,
+            "tags": get_primary_labels(teose_tags), # Faceti jaoks stringide massiiv (et)
+            "tags_et": get_labels_by_lang(teose_tags, 'et'),
+            "tags_en": get_labels_by_lang(teose_tags, 'en'),
+            "tags_object": teose_tags,
+            "tags_search": get_all_labels(teose_tags),
+            "tags_ids": get_all_ids(teose_tags),
             "collection": collection,
-            "collections_hierarchy": collections_hierarchy
+            "collections_hierarchy": collections_hierarchy,
+            "location": get_label(koht),
+            "location_object": koht,
+            "location_id": get_id(koht),
+            "location_search": get_all_labels(koht),
+            "publisher": get_label(trükkal),
+            "publisher_object": trükkal,
+            "publisher_id": get_id(trükkal),
+            "publisher_search": get_all_labels(trükkal),
+            "genre": get_label(genre),
+            "genre_et": get_labels_by_lang(genre, 'et'),
+            "genre_en": get_labels_by_lang(genre, 'en'),
+            "genre_object": genre,
+            "genre_search": get_all_labels(genre),
+            "genre_ids": get_all_ids(genre),
+            "type": get_label(work_type),
+            "type_et": get_labels_by_lang(work_type, 'et'),
+            "type_en": get_labels_by_lang(work_type, 'en'),
+            "type_object": work_type,
+            "languages": languages,
+            "creators": creators,
+            "authors_text": [c['name'] for c in creators if c.get('name')],
+            "creator_ids": [c.get('id') for c in creators if c.get('id')]
         }
 
         if ester_id:
             doc['ester_id'] = ester_id
         if external_url:
             doc['external_url'] = external_url
-        if koht:
-            doc['koht'] = koht
-        if trükkal:
-            doc['trükkal'] = trükkal
-        if work_type:
-            doc['type'] = work_type
-        if genre:
-            doc['genre'] = genre
-        if languages:
-            doc['languages'] = languages
-        if creators:
-            doc['creators'] = creators  # V2: täielik isikute massiiv
+        
+        # Tagasiühilduvus
+        doc['koht'] = get_label(koht)
+        doc['trükkal'] = get_label(trükkal)
 
         documents.append(doc)
 

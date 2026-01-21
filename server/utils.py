@@ -35,6 +35,124 @@ def sanitize_id(text):
     return sanitized
 
 
+def capitalize_first(text):
+    """Teeb esimese tähe suureks, ülejäänud jätab samaks (toetab lühendeid)."""
+    if not text:
+        return ""
+    return text[0].upper() + text[1:]
+
+
+def get_label(value):
+    """Tagastab sildi LinkedEntity objektist või stringist."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        return capitalize_first(value)
+    if isinstance(value, dict):
+        return capitalize_first(value.get('label', ''))
+    return capitalize_first(str(value))
+
+
+def get_id(value):
+    """Tagastab ID LinkedEntity objektist."""
+    if isinstance(value, dict):
+        return value.get('id')
+    return None
+
+
+def get_all_labels(value):
+    """Kogub kõik sildid (sh mitmekeelsed) LinkedEntity objektist või massiivist."""
+    if not value:
+        return []
+
+    values = value if isinstance(value, list) else [value]
+    labels = []
+
+    for val in values:
+        if isinstance(val, str):
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            # Peamine silt
+            if val.get('label'):
+                labels.append(capitalize_first(val['label']))
+            # Mitmekeelsed sildid
+            if val.get('labels') and isinstance(val['labels'], dict):
+                for l in val['labels'].values():
+                    if l:
+                        labels.append(capitalize_first(l))
+
+    return sorted(list(set(labels)))
+
+
+def get_primary_labels(value):
+    """Tagastab ainult peamised sildid LinkedEntity objektist või massiivist. Eelistab eesti keelt."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    labels = []
+    
+    for val in values:
+        if isinstance(val, str):
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            # Eelisjärjekord: et > label > esimene väärtus labels dictist
+            label = None
+            if val.get('labels') and isinstance(val['labels'], dict):
+                label = val['labels'].get('et')
+            
+            if not label:
+                label = val.get('label')
+            
+            if label:
+                labels.append(capitalize_first(label))
+                
+    return labels
+
+
+def get_labels_by_lang(value, lang):
+    """Tagastab sildid konkreetses keeles (või fallback)."""
+    if not value:
+        return []
+    
+    values = value if isinstance(value, list) else [value]
+    labels = []
+    
+    for val in values:
+        if isinstance(val, str):
+            # Stringi puhul ei tea keelt, tagastame alati (eeldades et on primaarne)
+            labels.append(capitalize_first(val))
+        elif isinstance(val, dict):
+            label = None
+            # Otsi konkreetses keeles
+            if val.get('labels') and isinstance(val['labels'], dict):
+                label = val['labels'].get(lang)
+            
+            # Fallback: primaarne label
+            if not label:
+                label = val.get('label')
+            
+            if label:
+                labels.append(capitalize_first(label))
+                
+    return labels
+
+
+def get_all_ids(value):
+    """Kogub kõik ID-d LinkedEntity objektist või massiivist."""
+    if not value:
+        return []
+
+    values = value if isinstance(value, list) else [value]
+    ids = []
+
+    for val in values:
+        if isinstance(val, dict) and val.get('id'):
+            ids.append(val['id'])
+
+    return sorted(list(set(ids)))
+
+
 def find_directory_by_id(target_id):
     """Leiab failisüsteemist kausta teose ID järgi.
 
@@ -112,6 +230,18 @@ def generate_default_metadata(dir_name):
 
 def normalize_genre(tag):
     """Normaliseerib žanri väärtuse 'disputatsioon'-iks, kui see on üks sünonüümidest."""
+    # Kui on objekt, võta sealt label
+    if isinstance(tag, dict):
+        label = tag.get('label', '')
+        # Võime tagastada objekti muutmata kujul, või normaliseerida labelit.
+        # Kuna normalize_genre eesmärk on ühtlustada stringe vanade andmete jaoks,
+        # siis objektide puhul (mis tulevad Wikidatast) on need ilmselt juba korras.
+        # Tagastame objekti endisena.
+        return tag
+    
+    if not isinstance(tag, str):
+        return tag
+
     synonyms = ["dissertatsioon", "exercitatio", "teesid", "dissertatio", "theses", "disputatio"]
     if tag and tag.strip().lower() in synonyms:
         return "disputatsioon"
