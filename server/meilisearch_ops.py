@@ -99,10 +99,19 @@ def sync_work_to_meilisearch(dir_name):
     autor = ''
     respondens = ''
     if creators:
+        # Prioriteet: praeses > auctor > esimene isik
         praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
+        auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
         resp = next((c for c in creators if c.get('role') == 'respondens'), None)
         if praeses:
             autor = praeses.get('name', '')
+        elif auctor:
+            autor = auctor.get('name', '')
+        elif creators:
+            # Fallback: esimene isik, kui pole praeses ega auctor
+            first_creator = creators[0]
+            if first_creator.get('role') not in ['respondens', 'gratulator', 'dedicator']:
+                autor = first_creator.get('name', '')
         if resp:
             respondens = resp.get('name', '')
     # v1 fallback
@@ -219,6 +228,8 @@ def sync_work_to_meilisearch(dir_name):
             doc['genre'] = genre
         if languages:
             doc['languages'] = languages
+        if creators:
+            doc['creators'] = creators  # V2: täielik isikute massiiv
 
         documents.append(doc)
 

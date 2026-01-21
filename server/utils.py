@@ -40,7 +40,7 @@ def find_directory_by_id(target_id):
 
     Otsib järjekorras:
     1. `id` väli (nanoid, püsiv) - eelistatud
-    2. `teose_id` väli (slug, tagasiühilduvus)
+    2. `slug` väli (v2) või `teose_id` väli (v1 fallback)
     3. Kausta nimi (sanitiseeritult, viimane võimalus)
     """
     if not target_id:
@@ -56,8 +56,9 @@ def find_directory_by_id(target_id):
                         # 1. Kontrolli nanoid `id` välja (eelistatud)
                         if meta.get('id') == target_id:
                             return entry.path
-                        # 2. Kontrolli `teose_id` välja (tagasiühilduvus)
-                        if meta.get('teose_id') == target_id:
+                        # 2. Kontrolli slug välja (v2 esmalt, teose_id v1 fallback)
+                        slug = meta.get('slug') or meta.get('teose_id')
+                        if slug == target_id:
                             return entry.path
                 except:
                     pass
@@ -69,8 +70,12 @@ def find_directory_by_id(target_id):
 
 
 def generate_default_metadata(dir_name):
-    """Genereerib vaike-metaandmed kataloogi nime põhjal."""
-    teose_id = sanitize_id(dir_name)
+    """Genereerib vaike-metaandmed kataloogi nime põhjal.
+
+    ⚠️  OLULINE: Genereerib V2 formaadis metaandmed!
+    Vt CLAUDE.md v1/v2 väljade võrdlustabelit.
+    """
+    slug = sanitize_id(dir_name)
 
     # Pealkiri kataloogi nimest (eemaldame aastaarvu ja ID osa kui võimalik)
     # Sama loogika mis 1-1_consolidate_data.py skriptis
@@ -86,14 +91,19 @@ def generate_default_metadata(dir_name):
     if year_match:
         year = int(year_match.group(1))
 
+    # V2 formaat (ingliskeelsed väljad)
     return {
         "id": generate_nanoid(),  # Püsiv lühikood
-        "teose_id": teose_id,     # Slug (URL-ides)
-        "pealkiri": title,
-        "autor": "",
-        "respondens": "",
-        "aasta": year,
-        "teose_tags": [],
+        "teose_id": slug,         # Slug (URL-ides) - NB: teose_id jääb tagasiühilduvuseks
+        "title": title,           # V2: pealkiri
+        "year": year,             # V2: aasta
+        "location": None,         # V2: trükikoht
+        "publisher": None,        # V2: trükkal
+        "creators": [],           # V2: isikud koos rollidega
+        "tags": [],               # V2: märksõnad
+        "type": None,             # V2: impressum / manuscriptum
+        "genre": None,            # V2: disputatio, oratio, jne
+        "languages": [],          # V2: keeled (lat, deu, est, ...)
         "collection": None,
         "ester_id": None,
         "external_url": None

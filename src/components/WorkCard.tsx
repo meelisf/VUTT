@@ -129,16 +129,28 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           <button
             onClick={(e) => {
               e.preventDefault();
-              // Navigate to dashboard with author filter (exact match)
-              navigate(`/?author=${encodeURIComponent(work.author)}`);
+              // Navigate to search page with author name (finds all occurrences)
+              navigate(`/search?q="${encodeURIComponent(work.author)}"`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
-            title={t('workCard.filterByAuthor')}
+            title={t('workCard.searchAuthor', 'Otsi autorit kõikidest teostest')}
           >
             <User size={14} />
             <span className="truncate">
               {work.author}
-              {work.respondens && <span className="text-gray-400 font-normal"> / {work.respondens}</span>}
+              {work.respondens && (
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate(`/search?q="${encodeURIComponent(work.respondens!)}"`);
+                  }}
+                  className="text-gray-400 font-normal hover:text-indigo-600"
+                  title={t('workCard.searchRespondens', 'Otsi respondenti kõikidest teostest')}
+                >
+                  {' / '}{work.respondens}
+                </button>
+              )}
             </span>
           </button>
           <button

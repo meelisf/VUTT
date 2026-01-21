@@ -44,31 +44,52 @@ export interface Relation {
 // WORK - Teose andmed (Dashboard, WorkCard)
 // =========================================================
 
+/**
+ * Work - Teose andmed (Dashboard, WorkCard)
+ *
+ * ⚠️  OLULINE: Kasuta AINULT v2 välju uues koodis!
+ *
+ * V2 väljad (KASUTA NEID):
+ *   - title, year, location, publisher
+ *   - creators[] (isikud koos rollidega)
+ *   - type, genre, collection, tags, languages
+ *
+ * V1 väljad (ÄRA KASUTA, ainult tagasiühilduvuseks):
+ *   - pealkiri, aasta, koht, trükkal
+ *   - author, respondens (kasuta creators[] asemel)
+ *
+ * Meilisearch kasutab sisemiselt eestikeelseid välju (koht, trükkal),
+ * aga meiliService.ts kaardistab need v2 väljadele (location, publisher).
+ */
 export interface Work {
-  // V2 identifikaatorid
+  // =========================================================
+  // V2 VÄLJAD - KASUTA NEID UUES KOODIS
+  // =========================================================
+
+  // Identifikaatorid
   id: string;               // Lehekülje ID (Meilisearch primary key)
   work_id?: string;         // Püsiv lühikood (nanoid)
-  teose_id: string;         // Slug (URL-is, tagasiühilduvus)
+  teose_id: string;         // Slug (URL-is)
 
-  // V2 teose andmed
-  title: string;
-  year: number | null;
-  location: string;
-  publisher: string;
+  // Teose põhiandmed
+  title: string;            // Pealkiri
+  year: number | null;      // Ilmumisaasta
+  location: string;         // Trükikoht (nt "Tartu", "Riga")
+  publisher: string;        // Trükkal/kirjastaja
 
-  // V2 taksonoomia
+  // Taksonoomia
   type?: string;            // 'impressum' | 'manuscriptum'
-  genre?: string | null;    // 'disputatio' | 'oratio' | ...
+  genre?: string | null;    // 'disputatio' | 'oratio' | 'carmen' | ...
   collection?: string | null;
   collections_hierarchy?: string[];
 
-  // V2 isikud
-  creators?: Creator[];
+  // Isikud - KASUTA SEDA, mitte author/respondens!
+  creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];  // Denormaliseeritud otsinguks
 
-  // V2 märksõnad
+  // Märksõnad ja keeled
   teose_tags?: string[];    // Sisuline klassifikatsioon
-  languages?: string[];     // Keeled (ISO 639-3)
+  languages?: string[];     // Keeled (ISO 639-3: lat, deu, est, ...)
 
   // Seosed
   series?: Series;
@@ -85,13 +106,24 @@ export interface Work {
   work_status?: WorkStatus;
   tags?: string[];          // Esimese lehekülje tagid
 
-  // Tagasiühilduvus (ajutine)
-  catalog_name?: string;    // originaal_kataloog
-  author?: string;          // Esimene praeses
-  respondens?: string;      // Esimene respondens
+  // =========================================================
+  // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
+  // Ainult tagasiühilduvuseks Meilisearchi skeemiga.
+  // Eemaldatakse tulevikus.
+  // =========================================================
+  /** @deprecated Kasuta `catalog_name` asemel */
+  catalog_name?: string;
+  /** @deprecated Kasuta `creators.find(c => c.role === 'praeses')` */
+  author?: string;
+  /** @deprecated Kasuta `creators.find(c => c.role === 'respondens')` */
+  respondens?: string;
+  /** @deprecated Kasuta `location` */
   koht?: string;
+  /** @deprecated Kasuta `publisher` */
   trükkal?: string;
+  /** @deprecated Kasuta `title` */
   pealkiri?: string;
+  /** @deprecated Kasuta `year` */
   aasta?: number;
 }
 
@@ -114,6 +146,12 @@ export interface HistoryEntry {
   description: string;
 }
 
+/**
+ * Page - Lehekülje andmed (Workspace)
+ *
+ * ⚠️  OLULINE: Kasuta AINULT v2 välju uues koodis!
+ * Vt Work interface'i kommentaare detailsema selgituse jaoks.
+ */
 export interface Page {
   // Identifikaatorid
   id: string;               // Lehekülje ID (nt "1632-1-1")
@@ -129,7 +167,9 @@ export interface Page {
   tags: string[];
   history: HistoryEntry[];
 
-  // V2 teose andmed (denormaliseeritud)
+  // =========================================================
+  // V2 TEOSE ANDMED (denormaliseeritud) - KASUTA NEID
+  // =========================================================
   title?: string;
   year?: number | null;
   location?: string;
@@ -138,7 +178,7 @@ export interface Page {
   genre?: string | null;
   collection?: string | null;
   collections_hierarchy?: string[];
-  creators?: Creator[];
+  creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];
   teose_tags?: string[];
   languages?: string[];
@@ -147,14 +187,24 @@ export interface Page {
   ester_id?: string;
   external_url?: string;
 
-  // Tagasiühilduvus (ajutine)
+  // =========================================================
+  // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
+  // =========================================================
+  /** @deprecated Kasuta `title` */
   pealkiri?: string;
+  /** @deprecated Kasuta `creators.find(c => c.role === 'praeses')` */
   autor?: string;
+  /** @deprecated Kasuta `creators.find(c => c.role === 'respondens')` */
   respondens?: string;
+  /** @deprecated Kasuta `year` */
   aasta?: number;
+  /** @deprecated */
   originaal_kataloog?: string;
+  /** @deprecated */
   original_path?: string;
+  /** @deprecated Kasuta `location` */
   koht?: string;
+  /** @deprecated Kasuta `publisher` */
   trükkal?: string;
 }
 
@@ -181,6 +231,11 @@ export interface ContentSearchOptions {
   collection?: string;    // V2: kollektsiooni filter
 }
 
+/**
+ * ContentSearchHit - Otsingutulemuse kirje
+ *
+ * ⚠️  OLULINE: Kasuta AINULT v2 välju uues koodis!
+ */
 export interface ContentSearchHit {
   id: string;
   teose_id: string;
@@ -189,7 +244,9 @@ export interface ContentSearchHit {
   lehekylje_tekst: string;
   lehekylje_pilt: string;
 
-  // V2 väljad
+  // =========================================================
+  // V2 VÄLJAD - KASUTA NEID
+  // =========================================================
   title?: string;
   year?: number | string | null;
   location?: string;
@@ -199,10 +256,16 @@ export interface ContentSearchHit {
   creators?: Creator[];
   authors_text?: string[];
 
-  // Tagasiühilduvus
+  // =========================================================
+  // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
+  // =========================================================
+  /** @deprecated Kasuta `title` */
   pealkiri?: string;
+  /** @deprecated Kasuta `creators` */
   autor?: string;
+  /** @deprecated Kasuta `year` */
   aasta?: number | string;
+  /** @deprecated */
   originaal_kataloog?: string;
 
   tags?: string[];

@@ -1002,16 +1002,36 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                             try:
                                 with open(meta_path, 'r', encoding='utf-8') as f:
                                     meta = json.load(f)
+
+                                    # V2 formaat: creators[] massiiv
+                                    creators = meta.get('creators', [])
+                                    if creators:
+                                        for creator in creators:
+                                            name = creator.get('name', '').strip()
+                                            if name:
+                                                authors.add(name)
+
+                                    # V1 fallback: autor ja respondens
                                     if meta.get('autor'):
                                         authors.add(meta['autor'].strip())
                                     if meta.get('respondens'):
                                         authors.add(meta['respondens'].strip())
+
+                                    # V2 tags esmalt, siis v1 teose_tags
+                                    for t in meta.get('tags', []):
+                                        tags.add(t.strip().lower())
                                     for t in meta.get('teose_tags', []):
                                         tags.add(t.strip().lower())
-                                    if meta.get('koht'):
-                                        places.add(meta['koht'].strip())
-                                    if meta.get('trükkal'):
-                                        printers.add(meta['trükkal'].strip())
+
+                                    # V2 location esmalt, siis v1 koht
+                                    location = meta.get('location') or meta.get('koht')
+                                    if location:
+                                        places.add(location.strip())
+
+                                    # V2 publisher esmalt, siis v1 trükkal
+                                    publisher = meta.get('publisher') or meta.get('trükkal')
+                                    if publisher:
+                                        printers.add(publisher.strip())
                             except:
                                 continue
                 

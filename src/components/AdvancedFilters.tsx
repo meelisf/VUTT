@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, BookOpen, FileType, CircleDot } from 'lucide-react';
 import { getGenreFacets, getTypeFacets, getTeoseTagsFacets } from '../services/meiliService';
+import { getVocabularies, Vocabularies } from '../services/collectionService';
 
 interface FacetItem {
   value: string;
@@ -48,32 +49,36 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   collection,
   defaultExpanded = false
 }) => {
-  const { t } = useTranslation(['dashboard', 'common']);
+  const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const lang = (i18n.language as 'et' | 'en') || 'et';
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Facetide state
+  // Facetide ja sõnavara state
   const [genres, setGenres] = useState<FacetItem[]>([]);
   const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
   const [types, setTypes] = useState<FacetItem[]>([]);
+  const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Staatuse valikud (fikseeritud, mitte facet)
   const statusOptions: WorkStatus[] = ['Toores', 'Töös', 'Valmis'];
 
-  // Lae facetid - uuesti kui kollektsioon muutub
+  // Lae facetid ja sõnavara - uuesti kui kollektsioon muutub
   useEffect(() => {
     const loadFacets = async () => {
       setLoading(true);
       try {
         const collectionFilter = collection || undefined;
-        const [genreData, tagData, typeData] = await Promise.all([
+        const [genreData, tagData, typeData, vocabs] = await Promise.all([
           getGenreFacets(collectionFilter),
           getTeoseTagsFacets(collectionFilter),
-          getTypeFacets(collectionFilter)
+          getTypeFacets(collectionFilter),
+          getVocabularies()
         ]);
         setGenres(genreData);
         setTags(tagData);
         setTypes(typeData);
+        setVocabularies(vocabs);
       } catch (e) {
         console.warn('Facetide laadimine ebaõnnestus:', e);
       } finally {
@@ -167,6 +172,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {genres.map(({ value, count }) => {
                       const isSelected = selectedGenre === value;
+                      const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
                       return (
                         <button
                           key={value}
@@ -177,7 +183,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
-                          {value} <span className="opacity-60">({count})</span>
+                          {label} <span className="opacity-60">({count})</span>
                         </button>
                       );
                     })}
@@ -223,6 +229,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   <div className="flex flex-wrap gap-2">
                     {types.map(({ value, count }) => {
                       const isSelected = selectedType === value;
+                      const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
                       return (
                         <button
                           key={value}
@@ -233,7 +240,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                           }`}
                         >
-                          {value} <span className="opacity-60">({count})</span>
+                          {label} <span className="opacity-60">({count})</span>
                         </button>
                       );
                     })}

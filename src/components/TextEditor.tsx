@@ -710,67 +710,94 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Pealkiri</span>
                       <p className="text-gray-900 font-medium">{work.title}</p>
                     </div>
-                    <div className="grid grid-cols-3 gap-6">
-                      {/* Rida 1: Autor, Respondens, Aasta */}
+
+                    {/* Isikud: v2 creators[] või fallback v1 author/respondens */}
+                    {work.creators && work.creators.length > 0 ? (
                       <div>
-                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Autor</span>
-                        <button
-                          onClick={() => navigate(`/?author=${encodeURIComponent(work.author)}`)}
-                          className="flex items-center gap-1.5 text-gray-900 hover:text-primary-600 transition-colors group"
-                          title="Filtreeri autori järgi"
-                        >
-                          <User size={14} className="text-gray-400 group-hover:text-primary-500" />
-                          <span>{work.author}</span>
-                        </button>
+                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">Isikud</span>
+                        <div className="space-y-1.5">
+                          {work.creators.map((creator, idx) => {
+                            const roleLabels: Record<string, string> = {
+                              praeses: 'Eesistuja',
+                              respondens: 'Respondens',
+                              auctor: 'Autor',
+                              gratulator: 'Õnnitleja',
+                              dedicator: 'Pühendaja',
+                              editor: 'Toimetaja'
+                            };
+                            const roleLabel = roleLabels[creator.role] || creator.role;
+                            return (
+                              <div key={idx} className="flex items-center gap-2">
+                                <button
+                                  onClick={() => navigate(`/search?q="${encodeURIComponent(creator.name)}"`)}
+                                  className="flex items-center gap-1.5 text-gray-900 hover:text-primary-600 transition-colors group"
+                                  title={`Otsi "${creator.name}" kõikidest teostest`}
+                                >
+                                  <User size={14} className="text-gray-400 group-hover:text-primary-500" />
+                                  <span className="font-medium">{creator.name}</span>
+                                </button>
+                                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div>
+                    ) : (
+                      /* Fallback: v1 author/respondens */
+                      <div className="grid grid-cols-2 gap-4">
+                        {work.author && (
+                          <div>
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Autor</span>
+                            <button
+                              onClick={() => navigate(`/search?q="${encodeURIComponent(work.author)}"`)}
+                              className="flex items-center gap-1.5 text-gray-900 hover:text-primary-600 transition-colors group"
+                              title={`Otsi "${work.author}" kõikidest teostest`}
+                            >
+                              <User size={14} className="text-gray-400 group-hover:text-primary-500" />
+                              <span>{work.author}</span>
+                            </button>
+                          </div>
+                        )}
                         {work.respondens && (
-                          <>
+                          <div>
                             <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Respondens</span>
                             <button
-                              onClick={() => navigate(`/?respondens=${encodeURIComponent(work.respondens!)}`)}
+                              onClick={() => navigate(`/search?q="${encodeURIComponent(work.respondens)}"`)}
                               className="flex items-center gap-1.5 text-gray-900 hover:text-indigo-600 transition-colors group"
-                              title="Filtreeri respondendi järgi"
+                              title={`Otsi "${work.respondens}" kõikidest teostest`}
                             >
                               <User size={14} className="text-gray-400 group-hover:text-indigo-500" />
                               <span>{work.respondens}</span>
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
+                    )}
+
+                    {/* Aasta, Trükikoht, Trükkal */}
+                    <div className="grid grid-cols-3 gap-6">
                       <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Aasta</span>
                         <p className="text-gray-900">{work.year}</p>
                       </div>
-
-                      {/* Rida 2: Trükikoht, Trükkal (joondatud Autor ja Respondensiga) */}
-                      {(work.koht || work.trükkal) && (
-                        <>
-                          <div>
-                            {work.koht && (
-                              <>
-                                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
-                                <p className="text-gray-900">{work.koht}</p>
-                              </>
-                            )}
-                          </div>
-                          <div>
-                            {work.trükkal && (
-                              <>
-                                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
-                                <button
-                                  onClick={() => navigate(`/?printer=${encodeURIComponent(work.trükkal!)}`)}
-                                  className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
-                                  title="Filtreeri trükkali järgi"
-                                >
-                                  <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
-                                  <span>{work.trükkal}</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                          <div></div>
-                        </>
+                      {work.location && (
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
+                          <p className="text-gray-900">{work.location}</p>
+                        </div>
+                      )}
+                      {work.publisher && (
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
+                          <button
+                            onClick={() => navigate(`/?printer=${encodeURIComponent(work.publisher)}`)}
+                            className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
+                            title="Filtreeri trükkali järgi"
+                          >
+                            <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
+                            <span>{work.publisher}</span>
+                          </button>
+                        </div>
                       )}
                     </div>
 

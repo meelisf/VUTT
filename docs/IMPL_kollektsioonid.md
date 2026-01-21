@@ -6,6 +6,32 @@
 
 ## Hetkeolukord
 
+### ✅ VALMIS: Isikute (creators) kuvamise ja otsingu parandused (2026-01-21)
+
+**Probleemid:**
+1. Admin metaandmete modaalis "autori" muutmisel ei näidatud seda Info vaates
+2. Dashboardis klikkides autorile, otsiti ainult praeses väljalt
+3. Nimede automaatne soovitus ei töötanud (luges ainult v1 formaati)
+
+**Lahendused:**
+
+1. **Server-side parandused:**
+   - `server/file_server.py` `/get-metadata-suggestions` - loeb nüüd v2 `creators[]` massiivi
+   - `server/meilisearch_ops.py` `sync_work_to_meilisearch()`:
+     - Autor: prioriteet praeses > auctor > esimene muu-rolli isik
+     - Lisab nüüd `creators[]` massiivi ka Meilisearchi dokumenti
+
+2. **Frontend parandused:**
+   - `src/components/TextEditor.tsx` Info tab:
+     - Näitab kõiki `work.creators[]` isikuid koos rollisiltidega
+     - Fallback v1 `author`/`respondens` väljadele
+   - `src/components/WorkCard.tsx`:
+     - Autori/respondendi klikkimisel navigeerib nüüd `/search?q="Nimi"` (mitte `/?author=...`)
+     - Otsib isikut kõikidest teostest, mitte ainult konkreetselt väljalt
+   - Isiku nimele vajutamine kasutab täistekstiotsingut, et leida teda kõikides rollides
+
+---
+
 ### ✅ VALMIS: Etapp 1+2+3 - Vundament ja UI
 
 **Tehtud 2026-01-19:**
@@ -317,22 +343,15 @@ src/locales/en/workspace.json
 
 ---
 
-## 🔜 TODO: Dashboard filtrite tõlked
+## ✅ VALMIS: Dashboard filtrite tõlked (2026-01-21)
 
-**Probleem:** Dashboard "Täpsemad valikud" menüüs on tõlked ebaühtlased.
+**Lahendatud:**
+1. `AdvancedFilters` komponent nüüd laeb `vocabularies.json` ja kasutab tõlkeid
+2. Žanr ja tüüp väljad näitavad nüüd lokaliseeritud nimesid (et/en)
+3. Ühtlustatud SearchPage ja Dashboard filtrite käitumine
 
-- SearchPage filtrid kasutavad `vocabularies.json` tõlkeid (et/en)
-- Dashboard filtrid näitavad osaliselt ladinakeelseid väärtusi otse andmebaasist
-
-**Lahendus:**
-1. Dashboard `AdvancedFilters` komponent peaks kasutama sama `vocabularies.json` loogikat
-2. Žanr, tüüp jm väljad peaksid olema tõlgitud (nagu SearchPage's)
-3. Ühtlustada mõlema lehe filtrite välimus ja käitumine
-
-**Failid:**
-- `src/pages/Dashboard.tsx` - AdvancedFilters sektsioon
-- `src/locales/et/dashboard.json` - tõlked
-- `src/locales/en/dashboard.json` - tõlked
+**Muudetud failid:**
+- `src/components/AdvancedFilters.tsx` - lisatud vocabularies import ja tõlkeloogika
 
 ---
 

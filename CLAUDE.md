@@ -116,6 +116,66 @@ The modal saves in v2 format to `_metadata.json` and syncs to Meilisearch.
 
 **MIGRATSIOON TEHTUD:** Kõik `_metadata.json` failid on nüüd v2 formaadis. Koodis on veel v1 fallback-tugi turvavõrguna, kuid seda ei peaks praktikas vaja minema.
 
+> ⚠️ **OLULINE UUES KOODIS:**
+>
+> **Kasuta AINULT v2 välju:**
+> - `title`, `year`, `location`, `publisher`
+> - `creators[]` (isikud koos rollidega)
+> - `type`, `genre`, `collection`, `tags`, `languages`
+>
+> **ÄRA kasuta v1 välju** (märgitud `@deprecated` tüübifailis):
+> - `pealkiri`, `aasta`, `koht`, `trükkal`
+> - `author`, `respondens` (kasuta `creators[]` asemel)
+>
+> Vt `src/types.ts` detailsemaks juhiseks.
+
+#### Andmete arhitektuur (OLULINE!)
+
+Süsteemis on **kolm kihti** erinevate väljanimedega - see tekitab tihti segadust:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  1. FAILISÜSTEEM: _metadata.json                                    │
+│     Formaat: V2 (ingliskeelsed väljad)                              │
+│     Näide: title, year, location, publisher, creators[]             │
+│     Fail: data/{kaust}/_metadata.json                               │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ server/meilisearch_ops.py kaardistab
+┌─────────────────────────────────────────────────────────────────────┐
+│  2. MEILISEARCH INDEKS: teosed                                      │
+│     Formaat: Eestikeelsed väljad (indeksi sisemine skeem)           │
+│     Näide: pealkiri, aasta, koht, trükkal, autor, respondens        │
+│     NB: See on TAHTLIK - indeksi skeemi ei muudeta!                 │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ src/services/meiliService.ts kaardistab
+┌─────────────────────────────────────────────────────────────────────┐
+│  3. FRONTEND: Work / Page tüübid                                    │
+│     Formaat: Mõlemad (v2 EELISTATUD, v1 tagasiühilduvuseks)         │
+│     V2: title, year, location, publisher, creators[]                │
+│     V1: pealkiri, aasta, koht, trükkal, author ← @deprecated        │
+│     Fail: src/types.ts                                              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Miks nii keeruline?**
+- Meilisearch indeksi skeem loodi algselt eestikeelsete väljadega
+- Skeemi muutmine nõuaks täielikku reindekseerimist + koodi muudatusi
+- Selle asemel: metadata failid v2, Meilisearch jääb nagu on, frontend kaardistab
+
+> 💡 **Tuleviku ühtlustamine:** Vt "Future Ideas" → "Andmekihtide ühtlustamine + Name Authority"
+
+**Kus mida kasutada:**
+
+| Koht | Kasuta | Näide |
+|------|--------|-------|
+| `_metadata.json` kirjutamine | V2 väljad | `title`, `creators[]` |
+| `_metadata.json` lugemine | V2 esmalt, v1 fallback | `meta.get('title') or meta.get('pealkiri')` |
+| Meilisearch päringud | Eestikeelsed | `filter: 'autor = "Nimi"'` |
+| Frontend komponendid | V2 väljad | `work.title`, `work.creators` |
+| Uus TypeScript kood | V2 väljad | `work.location` (mitte `work.koht`) |
+
 #### Formaadid
 
 - **v1 (eestikeelne):** ~~Vana formaat~~ - enam ei kasutata
@@ -142,7 +202,7 @@ The modal saves in v2 format to `_metadata.json` and syncs to Meilisearch.
 | Kollektsioon | `collection` | `collection` | `collection` |
 | ESTER | `ester_id` | `ester_id` | `ester_id` |
 
-**Staatus:** `genre` ja `tags` on eraldi väljad. Workspace metadata modaal toetab mõlemat (2026-01-21). Dashboard ja Search filtrid vajavad veel uuendamist.
+**Staatus:** `genre` ja `tags` on eraldi väljad. Kõik komponendid toetavad mõlemat (2026-01-21).
 
 #### Näide: v1 _metadata.json
 ```json
@@ -579,20 +639,32 @@ See `docs/PLAAN_kasutajahaldus.md` for implementation details.
 
 ## Future Ideas
 
-### Genre vs Tags eraldamine frontendis
+### Andmekihtide ühtlustamine + Name Authority
 
-Praegu on `_metadata.json` v2 formaadis kaks eraldi välja:
-- `genre` - teose žanr (disputatio, oratio, carmen jne) - üks väärtus
-- `tags` - lisatags/märksõnad - massiiv
+**Praegune olukord:** Süsteemis on kolm kihti erinevate väljanimedega (vt "Andmete arhitektuur" sektsioon). See tekitab segadust arenduses.
 
-**Probleem:** Frontend (Dashboard, Workspace, Search) kasutab ainult `teose_tags` Meilisearchist, mis sisaldab `tags` massiivi. `genre` väli on Meilisearchis olemas, aga seda ei kuvata ega filtreerita.
+**Tuleviku visioon:** Kui lisandub Name Authority tugi (GND, VIAF), tuleb nagunii teha suurem refaktoreerimine. Sel hetkel tasub ühtlustada kõik kihid:
 
-**Lahendus:**
-1. Lisa `genre` väli Meilisearchi filterable/sortable attributes
-2. Dashboard: lisa žanri filter (eraldi tags filtrist)
-3. Search: lisa žanri facet sidebar'i
-4. Workspace admin modal: kuva žanr eraldi väljana
-5. WorkCard: kuva žanr badge'ina (nt pildi peal)
+1. **Meilisearch indeksi skeem → ingliskeelsed väljad:**
+   - `pealkiri` → `title`
+   - `aasta` → `year`
+   - `autor` → `author` (või `primary_creator`)
+   - `koht` → `location`
+   - `trükkal` → `publisher`
+
+2. **Name Authority integratsioon:**
+   - `creators[].identifiers.gnd` - GND ID (Saksa rahvusbibliograafia)
+   - `creators[].identifiers.viaf` - VIAF ID
+   - Automaatne nimede normaliseerimine ja linkimine
+   - Nimede sisestamisel soovitused olemasolevate normaliseeritud nimede põhjal
+
+3. **Sammud:**
+   - Uuenda `scripts/1-1_consolidate_data.py` ja `scripts/2-1_upload_to_meili.py`
+   - Uuenda `meiliService.ts` päringud
+   - Eemalda v1 väljad `src/types.ts` failist
+   - Täielik reindekseerimine
+
+**NB:** See on suur töö, aga lihtsustab koodi oluliselt ja võimaldab korraliku isikuregistri.
 
 ### Collections (kollektsioonid)
 See `docs/PLAAN_kollektsioonid.md` for detailed planning document.
