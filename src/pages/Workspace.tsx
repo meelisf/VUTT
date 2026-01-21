@@ -2,14 +2,16 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
 import { getPage, savePage, getWorkMetadata, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/meiliService';
-import { Page, PageStatus, Work } from '../types';
+import type { Page, Work } from '../types';
+import { PageStatus } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import TextEditor from '../components/TextEditor';
 import ConfirmModal from '../components/ConfirmModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
-import { ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, Search, Home, Edit3, X, Save, LogOut, Settings, History, Library } from 'lucide-react';
+import MetadataModal from '../components/MetadataModal';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 
 const Workspace: React.FC = () => {
@@ -33,23 +35,8 @@ const Workspace: React.FC = () => {
     setEditorChanges(false);
   }, [pageNum]);
 
-  // Metaandmete muutmise olekud
+  // Metaandmete muutmise modal
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
-  const [metaForm, setMetaForm] = useState({
-    pealkiri: '',
-    autor: '',
-    respondens: '',
-    aasta: 0,
-    teose_tags: '',
-    ester_id: '',
-    external_url: '',
-    koht: '',
-    trükkal: '',
-    collection: null as string | null
-  });
-  const [suggestions, setSuggestions] = useState<{ authors: string[], tags: string[], places: string[], printers: string[] }>({ authors: [], tags: [], places: [], printers: [] });
-  const [isSavingMeta, setIsSavingMeta] = useState(false);
-  const [saveMetaStatus, setSaveMetaStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Pending-edit olek (kaastöölistele)
   // MÄRKUS: Contributor/pending-edit süsteem on implementeeritud, kuid EI OLE KASUTUSEL.
@@ -172,220 +159,18 @@ const Workspace: React.FC = () => {
     checkPending();
   }, [page, authToken, workId, currentPageNum, isContributor]);
 
-  // Lae soovitused (autorid ja tagid) kui modal avatakse
-  const fetchSuggestions = async () => {
-    try {
-      const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
-      });
-      const data = await response.json();
-      if (data.status === 'success') {
-        const normalizedTags = (data.tags || []).map((t: string) => t.toLowerCase());
-        setSuggestions({ 
-          authors: data.authors || [], 
-          tags: normalizedTags,
-          places: data.places || [],
-          printers: data.printers || []
-        });
-      }
-    } catch (e) {
-      console.error("Viga soovituste laadimisel", e);
-    }
+  // Metaandmete modaali avamine
+  const openMetaModal = () => {
+    if (page) setIsMetaModalOpen(true);
   };
 
-  const openMetaModal = async () => {
-    if (!page) return;
-
-    const initialForm = {
-      pealkiri: work?.title || page.pealkiri || '',
-      autor: work?.author || page.autor || '',
-      respondens: work?.respondens || page.respondens || '',
-      aasta: work?.year || page.aasta || 0,
-      teose_tags: (work?.teose_tags || page.teose_tags || []).join(', '),
-      ester_id: work?.ester_id || page.ester_id || '',
-      external_url: work?.external_url || page.external_url || '',
-      koht: work?.koht || page.koht || '',
-      trükkal: work?.trükkal || page.trükkal || ''
-    };
-    console.log("Avame modaali algandmetega:", initialForm);
-
-    // 1. Ava modal kohe ja täida esialgsete andmetega (fallback)
-    setIsMetaModalOpen(true);
-    setMetaForm(initialForm);
-
-    // Valmistame ette päringu andmed
-    // Saadame alati work_id, server leiab selle järgi kausta ise üles
-    let payload: any = { auth_token: authToken, work_id: workId };
-    if (page.originaal_kataloog) {
-      payload.original_path = page.originaal_kataloog;
+  // Metaandmete salvestamise callback
+  const handleMetadataSaved = (updatedPage: Partial<Page>, updatedWork: Partial<Work>) => {
+    if (page) {
+      setPage({ ...page, ...updatedPage });
     }
-
-    // 2. Küsi serverist otse faili sisu (_metadata.json), et saada värskeim info
-    try {
-      const response = await fetch(`${FILE_API_URL}/get-work-metadata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success' && data.metadata) {
-        const m = data.metadata;
-        console.log("Serverist laetud metadata:", m);
-
-        // =================================================================
-        // V1/V2 FORMAADI TUGI - vt CLAUDE.md "_metadata.json Formaadid"
-        // v1 = eestikeelsed väljad (pealkiri, aasta, teose_tags, koht, trükkal)
-        // v2 = ingliskeelsed väljad (title, year, tags, location, publisher, creators[])
-        // =================================================================
-        // Pealkiri: v1=pealkiri, v2=title
-        const pealkiri = m.pealkiri ?? m.title;
-        // Aasta: v1=aasta, v2=year
-        const aasta = m.aasta ?? m.year;
-        // Koht: v1=koht, v2=location
-        const koht = m.koht ?? m.location;
-        // Trükkal: v1=trükkal, v2=publisher
-        const trükkal = m.trükkal ?? m.publisher;
-        // Tags: v1=teose_tags, v2=tags
-        const tags = m.teose_tags ?? m.tags;
-
-        // Autor ja respondens: v1=otsene, v2=creators massiiv
-        let autor = m.autor;
-        let respondens = m.respondens;
-        if ((!autor || !respondens) && Array.isArray(m.creators)) {
-          const praeses = m.creators.find((c: any) => c.role === 'praeses');
-          const resp = m.creators.find((c: any) => c.role === 'respondens');
-          if (!autor && praeses) autor = praeses.name;
-          if (!respondens && resp) respondens = resp.name;
-        }
-
-        // Uuenda vormi serverist saadud värske infoga
-        setMetaForm(prev => ({
-          ...prev,
-          pealkiri: pealkiri !== undefined ? pealkiri : prev.pealkiri,
-          autor: autor !== undefined ? autor : prev.autor,
-          respondens: respondens !== undefined ? respondens : prev.respondens,
-          aasta: aasta ? parseInt(aasta) : prev.aasta,
-          teose_tags: Array.isArray(tags) ? tags.join(', ') : (tags !== undefined ? tags : prev.teose_tags),
-          ester_id: m.ester_id !== undefined ? (m.ester_id || '') : prev.ester_id,
-          external_url: m.external_url !== undefined ? (m.external_url || '') : prev.external_url,
-          koht: koht !== undefined ? (koht || '') : prev.koht,
-          trükkal: trükkal !== undefined ? (trükkal || '') : prev.trükkal,
-          collection: m.collection !== undefined ? m.collection : prev.collection
-        }));
-      }
-    } catch (e) {
-      console.error("Viga metaandmete laadimisel failiserverist:", e);
-    }
-
-    fetchSuggestions();
-  };
-
-  const handleSaveMetadata = async () => {
-    if (!page || !authToken) return;
-    setIsSavingMeta(true);
-    setSaveMetaStatus('idle');
-
-    try {
-      const tagsArray = metaForm.teose_tags
-        .split(',')
-        .map(t => t.trim().toLowerCase())
-        .filter(t => t !== '');
-
-      // ESTER ID puhastamine: toetame nii puhast ID-d kui ka täispikka URL-i
-      let cleanEsterId = metaForm.ester_id.trim();
-      const esterMatch = cleanEsterId.match(/record=(b\d+)/);
-      if (esterMatch) {
-        cleanEsterId = esterMatch[1];
-      }
-
-      // Ehitame creators massiivi v2 formaadis
-      const creators: Array<{name: string, role: string}> = [];
-      if (metaForm.autor.trim()) {
-        creators.push({ name: metaForm.autor.trim(), role: 'praeses' });
-      }
-      if (metaForm.respondens.trim()) {
-        creators.push({ name: metaForm.respondens.trim(), role: 'respondens' });
-      }
-
-      // V2 formaat - saadame ainult v2 väljad
-      let payload: any = {
-        auth_token: authToken,
-        work_id: workId,
-        metadata: {
-          title: metaForm.pealkiri,
-          year: metaForm.aasta,
-          creators: creators,
-          tags: tagsArray,
-          location: metaForm.koht.trim() || null,
-          publisher: metaForm.trükkal.trim() || null,
-          ester_id: cleanEsterId || null,
-          external_url: metaForm.external_url.trim() || null,
-          collection: metaForm.collection
-        }
-      };
-
-      // Kui meil on kataloog teada, lisame selle optimeerimiseks, aga see pole kohustuslik
-      if (page.originaal_kataloog) {
-        payload.original_path = page.originaal_kataloog;
-      }
-
-      const response = await fetch(`${FILE_API_URL}/update-work-metadata`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-      if (data.status === 'success') {
-        // Uuenda kohalikku olekut, et muudatused paistaksid kohe
-        setPage({
-          ...page,
-          pealkiri: metaForm.pealkiri,
-          autor: metaForm.autor,
-          respondens: metaForm.respondens,
-          aasta: metaForm.aasta,
-          teose_tags: tagsArray,
-          ester_id: cleanEsterId || undefined,
-          external_url: metaForm.external_url.trim() || undefined,
-          koht: metaForm.koht.trim() || undefined,
-          trükkal: metaForm.trükkal.trim() || undefined
-        });
-
-        // Uuenda ka work objekti, et muudatused (nt ESTER link) ilmuksid kohe TextEditoris
-        if (work) {
-          setWork({
-            ...work,
-            title: metaForm.pealkiri,
-            author: metaForm.autor,
-            respondens: metaForm.respondens,
-            year: metaForm.aasta,
-            teose_tags: tagsArray,
-            ester_id: cleanEsterId || undefined,
-            external_url: metaForm.external_url.trim() || undefined,
-            koht: metaForm.koht.trim() || undefined,
-            trükkal: metaForm.trükkal.trim() || undefined
-          });
-        }
-
-        setSaveMetaStatus('success');
-        setTimeout(() => {
-          setIsMetaModalOpen(false);
-          setSaveMetaStatus('idle');
-        }, 1500);
-      } else {
-        setSaveMetaStatus('error');
-        alert('Viga salvestamisel: ' + data.message);
-      }
-    } catch (e) {
-      console.error("Metadata save failed", e);
-      setSaveMetaStatus('error');
-      alert('Serveri viga andmete salvestamisel.');
-    } finally {
-      setIsSavingMeta(false);
+    if (work) {
+      setWork({ ...work, ...updatedWork });
     }
   };
 
@@ -742,188 +527,17 @@ const Workspace: React.FC = () => {
       </div>
 
       {/* Metaandmete muutmise modal */}
-      {isMetaModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <Edit3 size={18} className="text-amber-600" />
-                {t('metadata.title')}
-              </h3>
-              <button onClick={() => setIsMetaModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-4 space-y-4">
-              {/* Pealkiri */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('metadata.workTitle')}</label>
-                <textarea
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                  rows={3}
-                  value={metaForm.pealkiri}
-                  onChange={e => setMetaForm({ ...metaForm, pealkiri: e.target.value })}
-                />
-              </div>
-
-              {/* Grupp 1: Bibliograafilised andmed */}
-              <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
-                <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">Bibliograafilised andmed</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Autor</label>
-                    <input
-                      list="author-suggestions"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.autor}
-                      onChange={e => setMetaForm({ ...metaForm, autor: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Respondens</label>
-                    <input
-                      list="author-suggestions"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.respondens}
-                      onChange={e => setMetaForm({ ...metaForm, respondens: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Aasta</label>
-                    <input
-                      type="number"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.aasta}
-                      onChange={e => setMetaForm({ ...metaForm, aasta: parseInt(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Trükikoht</label>
-                    <input
-                      list="place-suggestions"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.koht}
-                      onChange={e => setMetaForm({ ...metaForm, koht: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Trükkal</label>
-                    <input
-                      list="printer-suggestions"
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.trükkal}
-                      onChange={e => setMetaForm({ ...metaForm, trükkal: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Grupp 2: Klassifikatsioon ja lingid */}
-              <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
-                <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">Klassifikatsioon ja lingid</h4>
-                {/* Kollektsioon */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                    <Library size={12} />
-                    {t('metadata.collection', 'Kollektsioon')}
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                    value={metaForm.collection || ''}
-                    onChange={e => setMetaForm({ ...metaForm, collection: e.target.value || null })}
-                  >
-                    <option value="">{t('metadata.noCollection', '— Määramata —')}</option>
-                    {Object.entries(collections).map(([id, col]) => (
-                      <option key={id} value={id}>
-                        {col.name[lang] || col.name.et}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Žanrid / Tagid (komadega eraldatud)</label>
-                  <input
-                    list="tag-suggestions"
-                    className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                    value={metaForm.teose_tags}
-                    onChange={e => setMetaForm({ ...metaForm, teose_tags: e.target.value })}
-                    placeholder="nt: disputatsioon, plakat"
-                  />
-                  <p className="text-[10px] text-gray-400 mt-1 italic">
-                    Vihje: dissertatsioon, exercitatio ja teesid muutuvad automaatselt disputatsiooniks.
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">ESTER ID või URL</label>
-                    <input
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.ester_id}
-                      onChange={e => setMetaForm({ ...metaForm, ester_id: e.target.value })}
-                      placeholder="nt: b1234567 või täislink"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Väline URL</label>
-                    <input
-                      className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                      value={metaForm.external_url}
-                      onChange={e => setMetaForm({ ...metaForm, external_url: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Soovituste nimekirjad */}
-              <datalist id="tag-suggestions">
-                {suggestions.tags.map(t => <option key={t} value={t} />)}
-              </datalist>
-              <datalist id="author-suggestions">
-                {suggestions.authors.map(a => <option key={a} value={a} />)}
-              </datalist>
-              <datalist id="place-suggestions">
-                {suggestions.places.map(p => <option key={p} value={p} />)}
-              </datalist>
-              <datalist id="printer-suggestions">
-                {suggestions.printers.map(p => <option key={p} value={p} />)}
-              </datalist>
-            </div>
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2">
-              <button
-                onClick={() => setIsMetaModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
-              >
-                {t('common:buttons.cancel')}
-              </button>
-              <button
-                onClick={handleSaveMetadata}
-                disabled={isSavingMeta}
-                className={`px-4 py-2 rounded text-sm font-medium flex items-center gap-2 transition-all min-w-[120px] justify-center ${saveMetaStatus === 'success'
-                  ? 'bg-green-600 text-white'
-                  : saveMetaStatus === 'error'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-amber-600 text-white hover:bg-amber-700'
-                  } disabled:opacity-70`}
-              >
-                {isSavingMeta ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
-                ) : saveMetaStatus === 'success' ? (
-                  <>{t('metadata.saveSuccess')}</>
-                ) : saveMetaStatus === 'error' ? (
-                  <>{t('metadata.saveError')}</>
-                ) : (
-                  <>
-                    <Save size={16} />
-                    {t('metadata.save')}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
+      {page && workId && authToken && (
+        <MetadataModal
+          isOpen={isMetaModalOpen}
+          onClose={() => setIsMetaModalOpen(false)}
+          page={page}
+          work={work}
+          workId={workId}
+          authToken={authToken}
+          collections={collections}
+          onSaveSuccess={handleMetadataSaved}
+        />
       )}
 
       {/* Salvestamata muudatuste kinnitusdialoog */}

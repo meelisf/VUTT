@@ -975,6 +975,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.genre) {
     filter.push(`genre = "${options.genre}"`);
   }
+  // V2: Tüübi filter
+  if (options.type) {
+    filter.push(`type = "${options.type}"`);
+  }
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', 'tags', 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];

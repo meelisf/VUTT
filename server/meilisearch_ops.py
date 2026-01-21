@@ -127,6 +127,11 @@ def sync_work_to_meilisearch(dir_name):
     koht = metadata.get('location') or metadata.get('koht')
     trükkal = metadata.get('publisher') or metadata.get('trükkal')
 
+    # Type ja genre (v2 väljad)
+    work_type = metadata.get('type')  # impressum / manuscriptum
+    genre = metadata.get('genre')  # disputatio, oratio, carmen, jne
+    languages = metadata.get('languages', [])
+
     # 2. Leia leheküljed (pildid)
     images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
     if not images:
@@ -208,6 +213,12 @@ def sync_work_to_meilisearch(dir_name):
             doc['koht'] = koht
         if trükkal:
             doc['trükkal'] = trükkal
+        if work_type:
+            doc['type'] = work_type
+        if genre:
+            doc['genre'] = genre
+        if languages:
+            doc['languages'] = languages
 
         documents.append(doc)
 

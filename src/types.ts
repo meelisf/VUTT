@@ -177,6 +177,7 @@ export interface ContentSearchOptions {
   scope?: 'all' | 'annotation' | 'original';
   teoseTags?: string[];
   genre?: string;
+  type?: string;          // V2: tüübi filter (impressum/manuscriptum)
   collection?: string;    // V2: kollektsiooni filter
 }
 

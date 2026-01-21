@@ -1,7 +1,7 @@
 # Kollektsioonide implementatsiooniplaan
 
-> **Staatus:** Töös (Etapid 1-4 + 7 + 9 valmis)
-> **Viimati uuendatud:** 2026-01-20
+> **Staatus:** Töös (Etapid 1-4, 6, 7, 9, 10 valmis)
+> **Viimati uuendatud:** 2026-01-21
 > **Alusdokument:** `docs/PLAAN_kollektsioonid.md`
 
 ## Hetkeolukord
@@ -116,17 +116,38 @@
 
 ---
 
-### Etapp 6: Metadata modaali uuendus
+### ✅ VALMIS: Etapp 6 - Metadata modaali täielik v2 tugi
 
-**Eesmärk:** Workspace'i metadata modaal töötab uue v2 struktuuriga.
+**Tehtud 2026-01-21:**
 
-**Staatus:** ⚠️ Osaliselt implementeeritud (vajab ülevaatust)
+1. **Creators massiivi toimetamine:**
+   - Dünaamiline loend isikutest (lisa/eemalda nupud)
+   - Rolli valik dropdown'ist (praeses, respondens, auctor, gratulator, jne)
+   - Rollid tulevad `vocabularies.json` failist
+   - Automaatne soovitus (datalist) nime sisestamisel
 
-**Tööd:**
-1. ✅ Kollektsiooni dropdown olemas (vajab testimist)
-2. ❌ Creators massiivi toimetamine (praeses/respondens → creators[])
-3. ❌ Type/genre dropdown'id vocabularies'ist
-4. ❌ Backend salvestab v2 formaati
+2. **Type/genre dropdown'id:**
+   - Type: impressum / manuscriptum valik
+   - Genre: disputatio, oratio, carmen, jne valik
+   - Mõlemad loetakse `vocabularies.json` failist
+   - Keeletundlik (et/en)
+
+3. **Keelte valik:**
+   - Checkbox-põhine mitmevalik
+   - Keeled: lat, deu, est, grc, heb, swe, fra, rus
+   - Loetakse `vocabularies.json` failist
+
+4. **Uuendatud väljad:**
+   - `title` (mitte `pealkiri`)
+   - `year` (mitte `aasta`)
+   - `location` (mitte `koht`)
+   - `publisher` (mitte `trükkal`)
+   - `tags` (mitte `teose_tags`)
+
+5. **UI parandused:**
+   - Modaal keritav (max-h-[90vh])
+   - Grupeeritud sektsioonid: Isikud, Bibliograafilised andmed, Klassifikatsioon, Välised lingid
+   - Tõlked lisatud (et/en)
 
 **Sõltuvused:** Etapid 1-3 (valmis)
 
@@ -278,12 +299,81 @@ src/pages/Statistics.tsx
 src/pages/Workspace.tsx
 server/file_server.py
 server/meilisearch_ops.py
+
+# Muudetud failid (Etapp 6)
+src/components/MetadataModal.tsx  # UUS: eraldatud komponent
+src/pages/Workspace.tsx           # 1092→555 rida
+src/locales/et/workspace.json
+src/locales/en/workspace.json
 ```
 
 ---
 
 ## Avatud otsused
 
-1. **URL routing `/collections/:slug`** - Kas vaja? Praegu toimib ilma (global state).
+1. **URL routing `/collections/:slug`** - Praegu pole vaja, global state töötab.
 2. **Collection landing page** - Kirjeldus Dashboard'il kui kollektsioon valitud. Madal prioriteet.
-3. **WorkCard badge** - Kas näidata kollektsiooni kaardil? Võib segadusse ajada tags'idega.
+3. **WorkCard badge** - Kas näidata kollektsiooni kaardil? Mõtleme hiljem.
+
+---
+
+## 🔜 TODO: Dashboard filtrite tõlked
+
+**Probleem:** Dashboard "Täpsemad valikud" menüüs on tõlked ebaühtlased.
+
+- SearchPage filtrid kasutavad `vocabularies.json` tõlkeid (et/en)
+- Dashboard filtrid näitavad osaliselt ladinakeelseid väärtusi otse andmebaasist
+
+**Lahendus:**
+1. Dashboard `AdvancedFilters` komponent peaks kasutama sama `vocabularies.json` loogikat
+2. Žanr, tüüp jm väljad peaksid olema tõlgitud (nagu SearchPage's)
+3. Ühtlustada mõlema lehe filtrite välimus ja käitumine
+
+**Failid:**
+- `src/pages/Dashboard.tsx` - AdvancedFilters sektsioon
+- `src/locales/et/dashboard.json` - tõlked
+- `src/locales/en/dashboard.json` - tõlked
+
+---
+
+### ✅ VALMIS: Etapp 10 - SearchPage sidebar refaktoreerimine
+
+**Tehtud 2026-01-21:**
+
+1. **CollapsibleSection komponent:**
+   - `src/components/CollapsibleSection.tsx` - taaskasutatav klapitav sektsioon
+   - Propid: `title`, `icon`, `defaultOpen`, `badge`, `children`
+   - Animeeritud avamine/sulgemine
+
+2. **SearchPage sidebar klapitavaks:**
+   - Ulatus (scope) - vaikimisi AVATUD
+   - Aasta vahemik - vaikimisi AVATUD
+   - Žanr (genre väli) - vaikimisi KINNI
+   - Märksõnad (teose_tags) - vaikimisi KINNI
+   - Tüüp (type väli) - vaikimisi KINNI
+   - Teose filter - vaikimisi KINNI
+
+3. **Type ja genre filtrid:**
+   - Žanr: disputatio, oratio, carmen jne (vocabularies.json)
+   - Tüüp: impressum, manuscriptum (vocabularies.json)
+   - URL parameetrid: `?genre=...&type=...`
+   - Facetid: `getGenreFacets()`, `getTypeFacets()`
+
+4. **Backend parandus (metadata modaali bug):**
+   - `server/meilisearch_ops.py` `sync_work_to_meilisearch()` lisatud `type`, `genre`, `languages` väljad
+   - Nüüd admin modaalist muudetud tüüp/žanr indekseeritakse kohe
+
+5. **Tõlked:**
+   - `filters.tags` - "Märksõnad" / "Tags"
+   - `filters.type` - "Tüüp" / "Type"
+   - `filters.allGenres` - "Kõik žanrid" / "All genres"
+   - `filters.allTypes` - "Kõik tüübid" / "All types"
+
+**Muudetud failid:**
+- `src/components/CollapsibleSection.tsx` (UUS)
+- `src/pages/SearchPage.tsx`
+- `src/types.ts` (ContentSearchOptions)
+- `src/services/meiliService.ts` (type filter)
+- `src/locales/et/search.json`
+- `src/locales/en/search.json`
+- `server/meilisearch_ops.py`

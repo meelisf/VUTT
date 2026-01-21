@@ -2,11 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets } from '../services/meiliService';
+import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets } from '../services/meiliService';
+import { getVocabularies, Vocabularies } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
+import CollapsibleSection from '../components/CollapsibleSection';
 import { useCollection } from '../contexts/CollectionContext';
 
 // Abifunktsioon pildi URL-i ehitamiseks
@@ -17,7 +19,7 @@ const getImageUrl = (imagePath: string): string => {
 };
 
 const SearchPage: React.FC = () => {
-    const { t } = useTranslation(['search', 'common']);
+    const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const { selectedCollection, getCollectionName } = useCollection();
@@ -32,6 +34,8 @@ const SearchPage: React.FC = () => {
     const yearEndParam = searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined;
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
     const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
+    const genreParam = searchParams.get('genre') || '';
+    const typeParam = searchParams.get('type') || '';
 
     // Local state for input fields
     const [inputValue, setInputValue] = useState(queryParam);
@@ -45,6 +49,17 @@ const SearchPage: React.FC = () => {
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
 
+    // Žanri filter (genre väli)
+    const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
+    const [selectedGenre, setSelectedGenre] = useState<string>(genreParam);
+
+    // Tüübi filter (type väli)
+    const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
+    const [selectedType, setSelectedType] = useState<string>(typeParam);
+
+    // Sõnavara (tõlgete jaoks)
+    const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
+
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -57,18 +72,26 @@ const SearchPage: React.FC = () => {
 
     const contentRef = useRef<HTMLDivElement>(null);
 
-    // Laadi teose märksõnade facets alguses
+    // Laadi filtrite andmed alguses
     useEffect(() => {
-        const loadTags = async () => {
+        const loadFilterData = async () => {
             try {
-                const tags = await getTeoseTagsFacets();
+                const [tags, genres, types, vocabs] = await Promise.all([
+                    getTeoseTagsFacets(selectedCollection || undefined),
+                    getGenreFacets(selectedCollection || undefined),
+                    getTypeFacets(selectedCollection || undefined),
+                    getVocabularies()
+                ]);
                 setAvailableTeoseTags(tags);
+                setAvailableGenres(genres);
+                setAvailableTypes(types);
+                setVocabularies(vocabs);
             } catch (e) {
-                console.warn('Teose märksõnade laadimine ebaõnnestus:', e);
+                console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
             }
         };
-        loadTags();
-    }, []);
+        loadFilterData();
+    }, [selectedCollection]);
 
     // Sync local input with URL param when URL changes (e.g. back button)
     useEffect(() => {
@@ -76,7 +99,9 @@ const SearchPage: React.FC = () => {
         if (scopeParam) setSelectedScope(scopeParam);
         setSelectedWork(workIdParam);
         setSelectedTeoseTags(teoseTagsParam);
-    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(',')]);
+        setSelectedGenre(genreParam);
+        setSelectedType(typeParam);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam, typeParam]);
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
@@ -109,6 +134,8 @@ const SearchPage: React.FC = () => {
                 prev.delete('scope');
                 prev.delete('work');
                 prev.delete('teoseTags');
+                prev.delete('genre');
+                prev.delete('type');
             } else {
                 prev.set('q', inputValue);
                 prev.set('p', '1'); // Reset page
@@ -118,6 +145,8 @@ const SearchPage: React.FC = () => {
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
                 if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
+                if (selectedGenre) prev.set('genre', selectedGenre); else prev.delete('genre');
+                if (selectedType) prev.set('type', selectedType); else prev.delete('type');
             }
             return prev;
         });
@@ -133,16 +162,18 @@ const SearchPage: React.FC = () => {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
                 scope: scopeParam,
-                workId: workIdParam || undefined,  // Lisa workId filter
+                workId: workIdParam || undefined,
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
-                collection: selectedCollection || undefined  // Kollektsiooni filter
+                genre: genreParam || undefined,
+                type: typeParam || undefined,
+                collection: selectedCollection || undefined
             };
 
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), selectedCollection]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -395,11 +426,11 @@ const SearchPage: React.FC = () => {
                         <button onClick={() => setShowFiltersMobile(false)}>{t('filters.close')}</button>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-2">
 
                         {/* Active Collection Indicator */}
                         {selectedCollection && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                                 <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1 flex items-center gap-2">
                                     <Library size={14} /> {t('common:collections.activeFilter')}
                                 </h3>
@@ -413,10 +444,12 @@ const SearchPage: React.FC = () => {
                         )}
 
                         {/* Search Scope */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Layers size={14} /> {t('filters.scope')}
-                            </h3>
+                        <CollapsibleSection
+                            title={t('filters.scope')}
+                            icon={<Layers size={14} />}
+                            defaultOpen={true}
+                            badge={selectedScope !== 'all' ? 1 : undefined}
+                        >
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                     <input
@@ -452,14 +485,87 @@ const SearchPage: React.FC = () => {
                                     <span className="text-sm text-gray-700">{t('filters.scopeAnnotation')}</span>
                                 </label>
                             </div>
-                        </div>
+                        </CollapsibleSection>
 
-                        {/* Teose märksõnade filter (Žanr) */}
+                        {/* Year Filter */}
+                        <CollapsibleSection
+                            title={t('filters.timeRange')}
+                            icon={<Calendar size={14} />}
+                            defaultOpen={true}
+                            badge={(yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ? 1 : undefined}
+                        >
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.from')}</label>
+                                    <input
+                                        type="number"
+                                        value={yearStart}
+                                        onChange={(e) => setYearStart(e.target.value)}
+                                        className="w-full p-2 border border-gray-300 rounded text-sm text-center"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.until')}</label>
+                                    <input
+                                        type="number"
+                                        value={yearEnd}
+                                        onChange={(e) => setYearEnd(e.target.value)}
+                                        className="w-full p-2 border border-gray-300 rounded text-sm text-center"
+                                    />
+                                </div>
+                            </div>
+                        </CollapsibleSection>
+
+                        {/* Genre Filter (genre väli - disputatio, oratio jne) */}
+                        {availableGenres.length > 0 && (
+                            <CollapsibleSection
+                                title={t('filters.genre')}
+                                icon={<BookOpen size={14} />}
+                                defaultOpen={false}
+                                badge={selectedGenre ? 1 : undefined}
+                            >
+                                <div className="space-y-1">
+                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                        <input
+                                            type="radio"
+                                            name="genre"
+                                            value=""
+                                            checked={!selectedGenre}
+                                            onChange={() => setSelectedGenre('')}
+                                            className="text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm text-gray-700">{t('filters.allGenres')}</span>
+                                    </label>
+                                    {availableGenres.map(({ value, count }) => {
+                                        const lang = (i18n.language as 'et' | 'en') || 'et';
+                                        const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
+                                        return (
+                                            <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input
+                                                    type="radio"
+                                                    name="genre"
+                                                    value={value}
+                                                    checked={selectedGenre === value}
+                                                    onChange={() => setSelectedGenre(value)}
+                                                    className="text-primary-600 focus:ring-primary-500"
+                                                />
+                                                <span className="text-sm text-gray-700 flex-1">{label}</span>
+                                                <span className="text-xs text-gray-400">({count})</span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </CollapsibleSection>
+                        )}
+
+                        {/* Tags Filter (teose_tags - märksõnad) */}
                         {availableTeoseTags.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <BookOpen size={14} /> {t('filters.genre')}
-                                </h3>
+                            <CollapsibleSection
+                                title={t('filters.tags')}
+                                icon={<Tag size={14} />}
+                                defaultOpen={false}
+                                badge={selectedTeoseTags.length || undefined}
+                            >
                                 <div className="space-y-1">
                                     {availableTeoseTags.map(({ tag, count }) => {
                                         const isSelected = selectedTeoseTags.includes(tag);
@@ -483,42 +589,59 @@ const SearchPage: React.FC = () => {
                                         );
                                     })}
                                 </div>
-                            </div>
+                            </CollapsibleSection>
                         )}
 
-                        {/* Year Filter */}
-                        <div>
-                            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Calendar size={14} /> {t('filters.timeRange')}
-                            </h3>
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.from')}</label>
-                                    <input
-                                        type="number"
-                                        value={yearStart}
-                                        onChange={(e) => setYearStart(e.target.value)}
-                                        className="w-full p-2 border border-gray-300 rounded text-sm text-center"
-                                    />
+                        {/* Type Filter (impressum/manuscriptum) */}
+                        {availableTypes.length > 0 && (
+                            <CollapsibleSection
+                                title={t('filters.type')}
+                                icon={<ScrollText size={14} />}
+                                defaultOpen={false}
+                                badge={selectedType ? 1 : undefined}
+                            >
+                                <div className="space-y-1">
+                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                        <input
+                                            type="radio"
+                                            name="type"
+                                            value=""
+                                            checked={!selectedType}
+                                            onChange={() => setSelectedType('')}
+                                            className="text-primary-600 focus:ring-primary-500"
+                                        />
+                                        <span className="text-sm text-gray-700">{t('filters.allTypes')}</span>
+                                    </label>
+                                    {availableTypes.map(({ value, count }) => {
+                                        const lang = (i18n.language as 'et' | 'en') || 'et';
+                                        const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
+                                        return (
+                                            <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                                <input
+                                                    type="radio"
+                                                    name="type"
+                                                    value={value}
+                                                    checked={selectedType === value}
+                                                    onChange={() => setSelectedType(value)}
+                                                    className="text-primary-600 focus:ring-primary-500"
+                                                />
+                                                <span className="text-sm text-gray-700 flex-1">{label}</span>
+                                                <span className="text-xs text-gray-400">({count})</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">{t('filters.until')}</label>
-                                    <input
-                                        type="number"
-                                        value={yearEnd}
-                                        onChange={(e) => setYearEnd(e.target.value)}
-                                        className="w-full p-2 border border-gray-300 rounded text-sm text-center"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                            </CollapsibleSection>
+                        )}
 
                         {/* Work Filter - teose valik */}
                         {(availableWorks.length > 0 || selectedWork) && (
-                            <div>
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                    <FileText size={14} /> {t('filters.work')}
-                                </h3>
+                            <CollapsibleSection
+                                title={t('filters.work')}
+                                icon={<FileText size={14} />}
+                                defaultOpen={false}
+                                badge={selectedWork ? 1 : undefined}
+                            >
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
                                     <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                         <input
@@ -584,7 +707,7 @@ const SearchPage: React.FC = () => {
                                         </label>
                                     )}
                                 </div>
-                            </div>
+                            </CollapsibleSection>
                         )}
 
                         <div className="pt-4 border-t border-gray-100 space-y-2">
@@ -594,7 +717,7 @@ const SearchPage: React.FC = () => {
                             >
                                 {t('filters.applyFilters')}
                             </button>
-                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenre || selectedType) && (
                                 <button
                                     onClick={() => {
                                         setYearStart('');
@@ -603,12 +726,16 @@ const SearchPage: React.FC = () => {
                                         setSelectedWork('');
                                         setSelectedWorkInfo(null);
                                         setSelectedTeoseTags([]);
+                                        setSelectedGenre('');
+                                        setSelectedType('');
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');
                                             prev.delete('scope');
                                             prev.delete('work');
                                             prev.delete('teoseTags');
+                                            prev.delete('genre');
+                                            prev.delete('type');
                                             prev.set('p', '1');
                                             return prev;
                                         });

@@ -90,16 +90,27 @@ Previously, `git_ops.py` used raw folder names while Meilisearch used sanitized 
 ### Metadata Modal (Admin)
 Admin users can edit work metadata via the pencil icon in Workspace:
 
-**Bibliographic fields:**
-- Pealkiri, Autor, Respondens, Aasta
-- Koht (printing place), Trükkal (printer)
-  - Auto-suggested: Tartu/Pärnu for places; historical printers by year
+**Creators (v2 format):**
+- Dynamic list of creators with roles (praeses, respondens, auctor, gratulator, etc.)
+- Role dropdown populated from `state/vocabularies.json`
+- Auto-suggested names from existing data
 
-**Classification & links:**
-- Žanrid/Tagid (genre tags, comma-separated)
+**Bibliographic fields:**
+- Title (pealkiri), Year (aasta)
+- Location (koht), Publisher (trükkal)
+  - Auto-suggested: Tartu/Pärnu for places; historical printers
+
+**Classification:**
+- Type: impressum / manuscriptum (from vocabularies)
+- Genre: disputatio, oratio, carmen, etc. (from vocabularies)
+- Languages: multi-select checkboxes (lat, deu, est, grc, etc.)
+- Tags: free-form comma-separated keywords
+- Collection: dropdown from `state/collections.json`
+
+**External links:**
 - ESTER ID, External URL
 
-The modal saves to `_metadata.json` and syncs to Meilisearch.
+The modal saves in v2 format to `_metadata.json` and syncs to Meilisearch.
 
 ### _metadata.json Formaadid (v1 vs v2)
 
@@ -131,7 +142,7 @@ The modal saves to `_metadata.json` and syncs to Meilisearch.
 | Kollektsioon | `collection` | `collection` | `collection` |
 | ESTER | `ester_id` | `ester_id` | `ester_id` |
 
-**TODO:** `genre` ja `tags` on praegu eraldi väljad. Frontend (Dashboard, Workspace, Search) vajab uuendamist, et kuvada ja filtreerida mõlemat.
+**Staatus:** `genre` ja `tags` on eraldi väljad. Workspace metadata modaal toetab mõlemat (2026-01-21). Dashboard ja Search filtrid vajavad veel uuendamist.
 
 #### Näide: v1 _metadata.json
 ```json
@@ -252,7 +263,7 @@ Workspace includes hidden COinS metadata for Zotero browser connector:
 
 ### Frontend (`src/`)
 - `src/pages/` - Route components: Dashboard, Workspace, SearchPage, Statistics
-- `src/components/` - UI: Header, ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard
+- `src/components/` - UI: Header, ImageViewer, TextEditor, MarkdownPreview, LoginModal, WorkCard, MetadataModal, CollectionPicker
 - `src/components/Header.tsx` - Unified header for all pages (except Workspace/SetPassword)
 - `src/services/meiliService.ts` - All Meilisearch operations
 - `src/contexts/UserContext.tsx` - Authentication state
