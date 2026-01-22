@@ -219,9 +219,76 @@ The search index schema (`teosed`) relies on string fields for filtering (`koht`
 **Result:** Existing filters and search queries continue to work exactly as before without any code changes in search logic.
 
 ### 5.4. Implementation Checklist
-1.  [ ] **Helper Utils:** Create `metadataUtils.ts` first.
-2.  [ ] **Frontend Hardening:** Refactor `WorkCard`, `SearchPage`, etc., to use `getLabel()` instead of direct access. **Verify Dashboard still works.**
-3.  [ ] **Indexer Update:** Modify `1-1_consolidate_data.py` to handle both strings and objects, flattening objects for legacy fields. **Verify search still works.**
-4.  [ ] **New UI:** Only *then* implement `EntityPicker` and enable V3 saving.
+1.  [x] **Helper Utils:** Create `metadataUtils.ts` first.
+2.  [x] **Frontend Hardening:** Refactor `WorkCard`, `SearchPage`, etc., to use `getLabel()` instead of direct access. **Verify Dashboard still works.**
+3.  [x] **Indexer Update:** Modify `1-1_consolidate_data.py` to handle both strings and objects, flattening objects for legacy fields. **Verify search still works.**
+4.  [x] **New UI:** `EntityPicker` implemented and V3 saving enabled.
+5.  [x] **Multilingual Faceting:** Fix language-specific field selection (see Section 8).
 
 ## 6. Specific Wikidata Rules
+
+(See Section 4 above)
+
+## 8. Multilingual Faceting Fix (2026-01-22)
+
+### 8.1. Problem
+
+Wikidata LinkedEntity objects have English as the primary `label` field (e.g., "treatise"), while language-specific labels are in `labels.et` (e.g., "Traktaat").
+
+The Python indexer (`1-1_consolidate_data.py`) creates multiple fields:
+- `genre` - primary label (English for Wikidata entries)
+- `genre_et` - Estonian label
+- `genre_en` - English label
+
+The frontend was using base fields (`genre`, `type`, `tags`) for Estonian language, which incorrectly displayed English labels.
+
+### 8.2. Solution
+
+**Changed files:**
+
+1. **`src/services/meiliService.ts`**
+   - Facet functions (`getGenreFacets`, `getTypeFacets`, `getTeoseTagsFacets`) now always use language-specific fields:
+     ```typescript
+     // Before:
+     const facetField = lang === 'et' ? 'genre' : `genre_${lang}`;
+     // After:
+     const facetField = `genre_${lang}`;
+     ```
+   - Filter functions (`searchWorks`, `searchContent`) also use language-specific fields:
+     ```typescript
+     const genreField = options.lang ? `genre_${options.lang}` : 'genre_et';
+     filter.push(`${genreField} = "${options.genre}"`);
+     ```
+
+2. **`src/types.ts`**
+   - Added `lang?: string` to `ContentSearchOptions` interface
+
+3. **`src/pages/Dashboard.tsx`**
+   - Added `i18n` to destructured imports
+   - Pass `lang: i18n.language.split('-')[0]` to `searchWorks()`
+   - Added `i18n.language` to useEffect dependencies
+
+4. **`src/pages/SearchPage.tsx`**
+   - Pass `lang: i18n.language.split('-')[0]` to search options
+   - Added `i18n.language` to useEffect dependencies
+
+### 8.3. Result
+
+- Estonian UI shows Estonian labels ("Traktaat", "Trükis")
+- English UI shows English labels ("treatise", "printed matter")
+- Filtering works correctly with the displayed language
+- Language switching triggers data refresh
+
+### 8.4. Prerequisites
+
+Meilisearch index must have language-specific fields as filterable:
+- `genre_et`, `genre_en`
+- `type_et`, `type_en`
+- `tags_et`, `tags_en`
+
+These are already configured in `meiliService.ts` `updateFilterableAttributes()`.
+
+### 8.5. Still TODO
+
+- [ ] Python indexer `get_label()` could be updated to prefer Estonian for base fields (optional, since we now use language-specific fields)
+- [ ] Consider if base fields (`genre`, `type`, `tags`) are still needed or can be removed

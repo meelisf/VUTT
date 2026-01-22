@@ -242,6 +242,7 @@ export interface ContentSearchOptions {
   genre?: string;
   type?: string;          // V2: tüübi filter (impressum/manuscriptum)
   collection?: string;    // V2: kollektsiooni filter
+  lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
 }
 
 /**

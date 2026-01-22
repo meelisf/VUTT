@@ -1,0 +1,83 @@
+{
+  "id": "occgcn",
+  "slug": "1632-1",
+  "type": {
+    "id": "Q1261026",
+    "label": "printed matter",
+    "source": "wikidata",
+    "labels": {
+      "de": "Druckerzeugnis",
+      "en": "printed matter",
+      "et": "trükis"
+    }
+  },
+  "genre": {
+    "id": "Q384515",
+    "label": "treatise",
+    "source": "wikidata",
+    "labels": {
+      "de": "Traktat",
+      "en": "treatise",
+      "et": "Traktaat"
+    }
+  },
+  "tags": [
+    {
+      "id": "Q309",
+      "label": "history",
+      "source": "wikidata",
+      "labels": {
+        "en": "history",
+        "de": "Geschichte",
+        "et": "ajalugu",
+        "la": "historia"
+      }
+    },
+    {
+      "id": "Q384515",
+      "label": "treatise",
+      "source": "wikidata",
+      "labels": {
+        "de": "Traktat",
+        "en": "treatise",
+        "et": "Traktaat"
+      }
+    }
+  ],
+  "collection": "academia-gustaviana",
+  "title": "Relatio Von Inauguration der Universität zu Dörpat, geschehen den 15. Octobris, Im Jahr 1632. Dörpath in Lieffland",
+  "year": 1632,
+  "location": {
+    "id": "Q13972",
+    "label": "Tartu",
+    "source": "wikidata",
+    "labels": {
+      "en": "Tartu",
+      "de": "Tartu",
+      "et": "Tartu",
+      "la": "Tarbatum"
+    }
+  },
+  "publisher": {
+    "id": "Q57556219",
+    "label": "Jakob Becker",
+    "source": "wikidata",
+    "labels": {
+      "en": "Jakob Becker",
+      "de": "Jakob Becker"
+    }
+  },
+  "creators": [
+    {
+      "name": "Fridericus Menius",
+      "role": "auctor",
+      "id": "Q5984508",
+      "source": "wikidata"
+    }
+  ],
+  "languages": [
+    "deu"
+  ],
+  "ester_id": "b1510692",
+  "external_url": null
+}

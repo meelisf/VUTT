@@ -188,6 +188,7 @@ interface DashboardSearchOptions {
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
   genre?: string; // Žanri filter
   type?: string; // Tüübi filter (impressum, manuscript, jne)
+  lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
 }
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
@@ -254,9 +255,9 @@ export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et
   await ensureSettings();
 
   // Vali õige väli vastavalt keelele
-  // Kui keel on 'et', kasutame 'tags' (mis on vaikimisi et), muul juhul 'tags_en' jne
-  // Või kindlam: tags_et, tags_en
-  const facetField = lang === 'et' ? 'tags' : `tags_${lang}`;
+  // Kasutame alati keelespetsiifilisi välju (tags_et, tags_en)
+  // sest põhiväli 'tags' võib sisaldada segamini keeli (Wikidata default label)
+  const facetField = `tags_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -279,8 +280,8 @@ export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et
     return result;
   } catch (error) {
     console.error("getTeoseTagsFacets error:", error);
-    // Fallback 'tags' väljale kui keelepõhist ei leidu
-    if (facetField !== 'tags') return getTeoseTagsFacets(collection, 'et');
+    // Fallback eesti keelele kui keelepõhist välja ei leidu
+    if (lang !== 'et') return getTeoseTagsFacets(collection, 'et');
     return [];
   }
 };
@@ -290,7 +291,8 @@ export const getGenreFacets = async (collection?: string, lang: string = 'et'): 
   checkMixedContent();
   await ensureSettings();
 
-  const facetField = lang === 'et' ? 'genre' : `genre_${lang}`;
+  // Kasutame alati keelespetsiifilisi välju (genre_et, genre_en)
+  const facetField = `genre_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -313,7 +315,8 @@ export const getGenreFacets = async (collection?: string, lang: string = 'et'): 
     return result;
   } catch (error) {
     console.error("getGenreFacets error:", error);
-    if (facetField !== 'genre') return getGenreFacets(collection, 'et');
+    // Fallback eesti keelele kui keelepõhist välja ei leidu
+    if (lang !== 'et') return getGenreFacets(collection, 'et');
     return [];
   }
 };
@@ -323,7 +326,8 @@ export const getTypeFacets = async (collection?: string, lang: string = 'et'): P
   checkMixedContent();
   await ensureSettings();
 
-  const facetField = lang === 'et' ? 'type' : `type_${lang}`;
+  // Kasutame alati keelespetsiifilisi välju (type_et, type_en)
+  const facetField = `type_${lang}`;
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -346,7 +350,8 @@ export const getTypeFacets = async (collection?: string, lang: string = 'et'): P
     return result;
   } catch (error) {
     console.error("getTypeFacets error:", error);
-    if (facetField !== 'type') return getTypeFacets(collection, 'et');
+    // Fallback eesti keelele kui keelepõhist välja ei leidu
+    if (lang !== 'et') return getTypeFacets(collection, 'et');
     return [];
   }
 };
@@ -385,22 +390,26 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`teose_staatus = "${options.workStatus}"`);
     }
     // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
+    // Kasutab keelespetsiifilist välja (tags_et, tags_en)
     if (options?.teoseTags && options.teoseTags.length > 0) {
+      const tagsField = options.lang ? `tags_${options.lang}` : 'tags_et';
       for (const tag of options.teoseTags) {
-        filter.push(`tags = "${tag}"`);
+        filter.push(`${tagsField} = "${tag}"`);
       }
     }
     // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
     if (options?.collection) {
       filter.push(`collections_hierarchy = "${options.collection}"`);
     }
-    // V2: Žanri filter
+    // V2: Žanri filter (kasutab keelespetsiifilist välja)
     if (options?.genre) {
-      filter.push(`genre = "${options.genre}"`);
+      const genreField = options.lang ? `genre_${options.lang}` : 'genre_et';
+      filter.push(`${genreField} = "${options.genre}"`);
     }
-    // V2: Tüübi filter
+    // V2: Tüübi filter (kasutab keelespetsiifilist välja)
     if (options?.type) {
-      filter.push(`type = "${options.type}"`);
+      const typeField = options.lang ? `type_${options.lang}` : 'type_et';
+      filter.push(`${typeField} = "${options.type}"`);
     }
 
     const searchParams: any = {
@@ -985,23 +994,26 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
-  // Teose märksõnade filter (AND loogika)
+  // Teose märksõnade filter (AND loogika, kasutab keelespetsiifilist välja)
   if (options.teoseTags && options.teoseTags.length > 0) {
+    const tagsField = options.lang ? `tags_${options.lang}` : 'tags_et';
     for (const tag of options.teoseTags) {
-      filter.push(`tags = "${tag}"`);
+      filter.push(`${tagsField} = "${tag}"`);
     }
   }
   // V2: Kollektsiooni filter
   if (options.collection) {
     filter.push(`collections_hierarchy = "${options.collection}"`);
   }
-  // V2: Žanri filter
+  // V2: Žanri filter (kasutab keelespetsiifilist välja)
   if (options.genre) {
-    filter.push(`genre = "${options.genre}"`);
+    const genreField = options.lang ? `genre_${options.lang}` : 'genre_et';
+    filter.push(`${genreField} = "${options.genre}"`);
   }
-  // V2: Tüübi filter
+  // V2: Tüübi filter (kasutab keelespetsiifilist välja)
   if (options.type) {
-    filter.push(`type = "${options.type}"`);
+    const typeField = options.lang ? `type_${options.lang}` : 'type_et';
+    filter.push(`${typeField} = "${options.type}"`);
   }
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', 'page_tags', 'comments.text'];

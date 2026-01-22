@@ -176,14 +176,15 @@ const SearchPage: React.FC = () => {
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
                 genre: genreParam || undefined,
                 type: typeParam || undefined,
-                collection: selectedCollection || undefined
+                collection: selectedCollection || undefined,
+                lang: i18n.language.split('-')[0]  // et-EE -> et
             };
 
             performSearch(queryParam, pageParam, options);
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection]);
+    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);

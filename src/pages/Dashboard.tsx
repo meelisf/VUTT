@@ -16,7 +16,7 @@ const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 
 const Dashboard: React.FC = () => {
-  const { t } = useTranslation(['dashboard', 'common', 'auth']);
+  const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, isLoading: userLoading } = useUser();
   const { selectedCollection } = useCollection();
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -262,7 +262,8 @@ const Dashboard: React.FC = () => {
           genre: selectedGenre || undefined,
           type: selectedType || undefined,
           collection: selectedCollection || undefined,
-          onlyFirstPage: sort !== 'recent'
+          onlyFirstPage: sort !== 'recent',
+          lang: i18n.language.split('-')[0]  // et-EE -> et
         });
         setWorks(results);
 
@@ -283,7 +284,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter]);
+  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
   const toggleWorkSelection = (workId: string) => {
