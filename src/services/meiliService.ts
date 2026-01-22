@@ -32,7 +32,6 @@ let settingsPromise: Promise<any> | null = null;
 
 // Funktsioon indeksi seadistuste parandamiseks
 const fixIndexSettings = async () => {
-  console.log("Kontrollin Meilisearchi indeksi seadistusi...");
   try {
     let currentSettings: string[] | null = null;
     let sortableSettings: string[] | null = null;
@@ -61,13 +60,7 @@ const fixIndexSettings = async () => {
     const needsDistinctReset = currentDistinct !== null; // Eemaldame globaalse distinct seadistuse
 
     if (!needsSearchUpdate && !needsSortUpdate && !needsFilterUpdate && !needsDistinctReset && !needsRankingUpdate) {
-      console.log("Indeksi seadistused on juba korras.");
       return true;
-    }
-
-    console.log("Algatan indeksi seadistuste uuendamise...");
-    if (needsRankingUpdate) {
-      console.log("Uuendan ranking rules (exactness esimeseks)...");
     }
 
     await index.updateFilterableAttributes([
@@ -156,9 +149,7 @@ const fixIndexSettings = async () => {
       ]
     });
 
-    console.log("Ootan indekseerimise lõppu (Task ID: " + searchTask.taskUid + ")...");
     await index.waitForTask(searchTask.taskUid);
-    console.log("Indeksi seadistused edukalt uuendatud.");
     return true;
   } catch (e) {
     console.warn("Ei suutnud indeksi seadistusi automaatselt parandada:", e);
@@ -229,12 +220,6 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
 
     const results = await Promise.all(promises);
 
-    // Debug log
-    console.log('getWorkStatuses: processed', results.length, 'works');
-    if (results.length > 0) {
-      const sample = results[0];
-      console.log('Sample work', sample.workId, ':', sample.statuses.length, 'pages, statuses:', sample.statuses);
-    }
 
     // Arvutame koondstaatuse igale teosele
     for (const { workId, statuses } of results) {
@@ -461,9 +446,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       searchParams.sort = ['aasta:asc'];
     }
 
-    console.log('searchWorks params:', { query, filter, searchParams });
     const response = await index.search(query, searchParams);
-    console.log('searchWorks response hits:', response.hits.length);
 
     // Kui kasutame distinct, siis iga hit on unikaalne teos
     // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
@@ -478,13 +461,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         seenWorkIds.add(hit.teose_id);
         return true;
       });
-      console.log('After deduplication:', uniqueHits.length, 'unique works');
     }
 
     const workIds = uniqueHits.map((hit: any) => hit.teose_id);
 
     // Fetch first page data (thumbnail, tags) for all works
-    const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[] }>();
+    const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[]; page_tags?: string[] }>();
 
     if (workIds.length > 0) {
       // Batch the requests to avoid too-long filters (max ~100 IDs per batch)
@@ -513,7 +495,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           if (!firstPagesMap.has(hit.teose_id)) {
             firstPagesMap.set(hit.teose_id, {
               thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
-              tags: hit.tags || []
+              tags: hit.tags || [],
+              page_tags: hit.page_tags || []
             });
           }
         }
@@ -841,8 +824,6 @@ const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
 
     const task = await index.updateDocuments(updates);
     await index.waitForTask(task.taskUid);
-
-    console.log(`Updated teose_staatus to '${newWorkStatus}' for ${updates.length} pages of work ${workId}`);
   } catch (error) {
     console.error(`Failed to update teose_staatus for work ${workId}:`, error);
     // Ei viska viga edasi, sest see on sekundaarne operatsioon

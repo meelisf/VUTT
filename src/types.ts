@@ -267,6 +267,8 @@ export interface ContentSearchHit {
   publisher_object?: LinkedEntity;
   genre?: string | null;
   genre_object?: LinkedEntity | LinkedEntity[] | null;
+  type?: string | null;
+  type_object?: LinkedEntity | null;
   collection?: string | null;
   creators?: Creator[];
   authors_text?: string[];
@@ -287,12 +289,12 @@ export interface ContentSearchHit {
   /** @deprecated */
   originaal_kataloog?: string;
 
-  tags?: string[];
   comments?: Annotation[];
 
   _formatted?: {
     lehekylje_tekst: string;
     tags?: string[];
+    page_tags?: string[];
     comments?: Annotation[];
   };
 

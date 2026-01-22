@@ -94,7 +94,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       year: work?.year || page.year || page.aasta || 0,
       type: work?.type || page.type || null,
       genre: work?.genre || page.genre || null,
-      tags: work?.teose_tags || page.teose_tags || [],
+      tags: work?.tags || page.tags || [],
       location: work?.location || work?.koht || page.location || page.koht || '',
       publisher: work?.publisher || work?.trükkal || page.publisher || page.trükkal || '',
       creators: work?.creators || page.creators || initialCreators,
@@ -154,7 +154,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
       if (data.status === 'success' && data.metadata) {
         const m = data.metadata;
-        console.log("Serverist laetud metadata:", m);
 
         // V2 formaat (v1 fallback turvavõrguna)
         const title = m.title ?? m.pealkiri ?? '';
