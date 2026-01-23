@@ -28,18 +28,16 @@ sudo apt install -y curl git rsync nginx python3-pip unzip ufw
 ```
 
 ### 2.2 Docker'i paigaldus
-Ubuntu 24.04 jaoks on Dockerit kõige lihtsam paigaldada ametlikust repost:
+Soovituslik on kasutada Ubuntu ametlikku repot (stabiilsem, auditeeritud):
 
 ```bash
-# Lisa Dockeri GPG võti ja repo
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
 sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+sudo apt install -y docker.io docker-compose-v2
+# Käivita ja luba automaatne start
+sudo systemctl enable --now docker
 ```
+
+*Alternatiiv (kui on vaja kõige uuemat versiooni):* Installi `download.docker.com` ametlikust repost (vt eelmist juhendi versiooni).
 
 ### 2.3 Rakenduse koodi paigaldus
 ```bash
@@ -77,7 +75,8 @@ rsync -avz --progress ./state/ root@1.2.3.4:/opt/vutt/state/
 
 ## 4. Rakenduse Käivitamine (Docker)
 
-Kasutame `docker-compose.yml` faili backend teenuste käivitamiseks, aga **Nginxi hoiame hostis** (parem SSL haldus).
+**TÄHELEPANU VÕRGUGA:** Ülikooli sisevõrgus (172.16.x.x - 172.31.x.x) võib tekkida konflikt Dockeri vaikevõrkudega.
+Selle vältimiseks on soovitatav `docker-compose.yml` failis defineerida kindel alamvõrk (nt 192.168.x.x) või seadistada `/etc/docker/daemon.json`.
 
 ### 4.1 Seadista keskkonnamuutujad
 Loo `.env` fail `/opt/vutt/.env`:
@@ -134,11 +133,14 @@ exit
 See on "Hübriidlahendus": Docker jooksutab rakendust, Hosti Nginx teeb SSL-i ja serveerib staatilist sisu.
 
 ### 5.1 Ehita Frontend
-Uues serveris on vaja ehitada Reacti rakendus.
+Kasutame Ubuntu repos leiduvat Node.js versiooni (stabiilne ja turvaline).
+
 ```bash
-# Paigalda Node.js (kui pole)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
+# Paigalda Node.js ja npm
+sudo apt install -y nodejs npm
+
+# Kontrolli versiooni (v18 või v20 on väga head)
+node -v 
 
 cd /opt/vutt
 npm install
@@ -170,6 +172,10 @@ server {
     # Turvalisus
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers HIGH:!aNULL:!MD5;
+    
+    # Logid (vajalikud statistika jaoks)
+    access_log /var/log/nginx/vutt_access.log;
+    error_log /var/log/nginx/vutt_error.log;
 
     root /opt/vutt/dist;  # Otse ehitatud kaustast
     index index.html;
@@ -217,6 +223,9 @@ Enne avalikustamist piira ligipääs.
 # Luba SSH
 sudo ufw allow ssh
 
+# Luba Zabbix Agent (kui monitooring on peal)
+sudo ufw allow 10050/tcp comment 'Zabbix Agent'
+
 # Luba veeb (80/443) - ligipääs on nüüd avatud kõigile, kes serverini jõuavad
 # (TÜ väline tulemüür kaitseb veel välismaailma eest)
 sudo ufw allow 'Nginx Full'
@@ -226,7 +235,20 @@ sudo ufw default deny incoming
 sudo ufw enable
 ```
 
-## 7. Kontrollnimekiri enne "Live" minekut
+## 7. Statistika ja Monitooring
+
+### 7.1 Serveri logide analüüs (GoAccess)
+Kuna me ei kasuta Google Analyticsit, on parim viis statistikat saada serveri logidest. Soovitame `goaccess` tööriista.
+
+```bash
+sudo apt install goaccess
+# Vaata raportit konsoolis
+sudo goaccess /var/log/nginx/vutt_access.log --log-format=COMBINED
+```
+
+Soovi korral võib seadistada GoAccessi genereerima HTML raportit, mida serveeritakse parooli taga oleval aadressil.
+
+## 8. Kontrollnimekiri enne "Live" minekut
 
 1.  [ ] **DNS:** `vutt.utlib.ut.ee` suunab uuele IP-le.
 2.  [ ] **SSL:** Sertifikaat kehtib ja brauser ei hoiata.

@@ -10,6 +10,7 @@ dist/
 logs/
 *.log
 data.ms/
+data/
 
 # System files
 .DS_Store
