@@ -65,36 +65,46 @@ RATE_LIMITS = {
 # MEILISEARCH
 # =========================================================
 
-# Proovime lugeda keskkonnamuutujatest (Docker/Prod)
-MEILI_URL = os.getenv("MEILISEARCH_URL", "http://127.0.0.1:7700")
-MEILI_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY", "")
+# Vaikimisi väärtused (arenduseks)
+_DEFAULT_MEILI_URL = "http://127.0.0.1:7700"
+
+# 1. Proovime lugeda süsteemi keskkonnamuutujatest (Docker/Production eelistatud)
+MEILI_URL = os.getenv("MEILISEARCH_URL")
+MEILI_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY")
 INDEX_NAME = "teosed"
 
-def load_env():
+def load_env_file():
     """
-    Laeb .env failist Meilisearchi andmed (arenduskeskkonna jaoks).
-    Ainult siis, kui neid pole juba keskkonnamuutujatest leitud.
+    Laeb .env failist seaded, kui süsteemi muutujad puuduvad.
+    Mõeldud lokaalseks arenduseks.
     """
     global MEILI_URL, MEILI_KEY
     
-    # Kui võtmed on juba olemas (nt Dockerist), siis ära loe failist üle
-    if MEILI_URL and MEILI_KEY and MEILI_URL != "http://127.0.0.1:7700":
+    # Kui mõlemad on juba olemas (nt Dockerist), siis me EI loe .env faili
+    if MEILI_URL and MEILI_KEY:
+        print(f"Meilisearch: Kasutan süsteemi keskkonnamutujaid (URL: {MEILI_URL})")
         return
 
     env_path = os.path.join(_PROJECT_ROOT, ".env")
     if os.path.exists(env_path):
+        print(f"Meilisearch: Loen seadeid failist {env_path}")
         with open(env_path, 'r') as f:
             for line in f:
                 if '=' in line and not line.startswith('#'):
                     key, value = line.strip().split('=', 1)
                     value = value.strip('"').strip("'")
-                    if key == "MEILISEARCH_URL":
+                    if key == "MEILISEARCH_URL" and not MEILI_URL:
                         MEILI_URL = value
-                    elif key in ["MEILISEARCH_MASTER_KEY", "MEILI_MASTER_KEY"]:
+                    elif key in ["MEILISEARCH_MASTER_KEY", "MEILI_MASTER_KEY"] and not MEILI_KEY:
                         MEILI_KEY = value
                     elif key == "MEILI_SEARCH_API_KEY" and not MEILI_KEY:
                         MEILI_KEY = value
-    print(f"Meilisearch URL: {MEILI_URL}")
 
-# Lae env kohe mooduli importimisel
-load_env()
+    # Kui ikka pole, kasuta vaikimisi URL-i
+    if not MEILI_URL:
+        MEILI_URL = _DEFAULT_MEILI_URL
+    
+    print(f"Meilisearch: URL={MEILI_URL}, Key={'määratud' if MEILI_KEY else 'puudu'}")
+
+# Lae seaded kohe mooduli importimisel
+load_env_file()
