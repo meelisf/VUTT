@@ -11,6 +11,8 @@ services:
     volumes:
       # Mountime andmed hostilt konteinerisse
       - ./data:/data
+      # Mountime olekufailid (kasutajad, tokenid jms)
+      - ./state:/app/state
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
     # Avame localhostile host Nginxi jaoks
     ports:
