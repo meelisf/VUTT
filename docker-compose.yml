@@ -31,19 +31,19 @@ services:
     # ports:
     #   - "7700:7700"
 
-  # Frontend ja Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: vutt-nginx
-    restart: always
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./dist:/usr/share/nginx/html:ro
-    depends_on:
-      - backend
-      - meilisearch
+  # Frontend ja Reverse Proxy (Host Nginx tegeleb sellega nüüd)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: vutt-nginx
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - ./dist:/usr/share/nginx/html:ro
+  #   depends_on:
+  #     - backend
+  #     - meilisearch
 
 volumes:
   meili_data:
