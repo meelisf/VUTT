@@ -5,6 +5,9 @@ WORKDIR /app
 # Install git (required for GitPython)
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
+# Mark /data as safe directory for Git (mounted volume has different owner)
+RUN git config --global --add safe.directory /data
+
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
