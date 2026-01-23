@@ -12,10 +12,10 @@ services:
       # Mountime andmed hostilt konteinerisse
       - ./data:/data
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
-    # Kui tahad otse ligi pääseda ilma nginxita, siis uncommenti
-    # ports:
-    #   - "8001:8001"
-    #   - "8002:8002"
+    # Avame localhostile host Nginxi jaoks
+    ports:
+      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:8002:8002"
 
   # Otsingumootor
   meilisearch:
@@ -27,9 +27,9 @@ services:
       - MEILI_NO_ANALYTICS=true
     volumes:
       - meili_data:/meili_data
-    # Sama siin - meilisearchile pääseb ligi läbi nginxi /meili/
-    # ports:
-    #   - "7700:7700"
+    # Avame localhostile host Nginxi jaoks
+    ports:
+      - "127.0.0.1:7700:7700"
 
   # Frontend ja Reverse Proxy (Host Nginx tegeleb sellega nüüd)
   # nginx:
