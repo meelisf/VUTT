@@ -1,5 +1,8 @@
 # VUTT Paigaldus- ja Migratsioonijuhend (2026)
 
+> **KIIRVIIDE:** Igapäevaseks halduseks vaata [docs/CHEAT_SHEET.md](CHEAT_SHEET.md).
+> Seal on käsud uuendamiseks, andmete laadimiseks ja frontendi saatmiseks.
+
 See dokument kirjeldab VUTT rakenduse migreerimist uuele serverile (`vutt.utlib.ut.ee`) ja selle seadistamist.
 
 **Viimati uuendatud:** 21. jaanuar 2026
