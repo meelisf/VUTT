@@ -854,21 +854,8 @@ export const savePage = async (
       history: updatedHistory
     };
 
-    const meiliPayload = {
-      id: page.id,
-      lehekylje_tekst: page.text_content,
-      status: page.status,
-      comments: page.comments,
-      tags: page.tags,
-      history: updatedHistory,
-      last_modified: nowTimestamp // Added timestamp for sorting
-    };
-
-    const task = await index.updateDocuments([meiliPayload]);
-    await index.waitForTask(task.taskUid);
-
-    // Uuenda teose_staatus kõigil teose lehekülgedel (denormaliseeritud väli)
-    await updateWorkStatusOnAllPages(page.work_id);
+    // Meilisearchi uuendamine toimub backendis (file_server.py kutsub sync_work_to_meilisearch)
+    // Frontend kasutab ainult otsinguvõtit, millel pole kirjutamisõigust
 
     if (page.original_path && page.image_url) {
       await saveToFileSystem(pageToSave, page.original_path, page.image_url, auth);

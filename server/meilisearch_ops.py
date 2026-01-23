@@ -211,7 +211,7 @@ def sync_work_to_meilisearch(dir_name):
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "page_tags": [t.lower() for t in page_meta['page_tags']] if 'page_tags' in page_meta else [t.lower() for t in page_meta.get('tags', [])],
+            "page_tags": [get_label(t).lower() for t in page_meta.get('page_tags', page_meta.get('tags', []))],
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
