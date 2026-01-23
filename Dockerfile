@@ -29,4 +29,4 @@ EXPOSE 8001
 EXPOSE 8002
 
 # Run both Python servers
-CMD ["/bin/bash", "-c", "python3 server/file_server.py & python3 server/image_server.py & wait"]
+CMD ["/bin/bash", "-c", "python3 -m server.file_server & python3 -m server.image_server & wait"]
