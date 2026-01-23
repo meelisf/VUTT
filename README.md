@@ -28,10 +28,12 @@ npm run dev           # Frontend: http://localhost:5173
 
 ### Tootmine
 
+Vaata [docs/deployment_guide.md](docs/deployment_guide.md) põhjalikuks paigalduseks.
+Igapäevaseks halduseks (uuendamine, andmete laadimine) vaata [docs/CHEAT_SHEET.md](docs/CHEAT_SHEET.md).
+
+Serveris (`~/VUTT`):
 ```bash
-npm run build
-# Kopeeri dist/ serverisse, käivita teenused
-# Vt docs/deployment_guide.md
+./scripts/server_update.sh  # Tõmbab koodi, uuendab Dockerit
 ```
 
 ## Arhitektuur
