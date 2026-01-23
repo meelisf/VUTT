@@ -65,13 +65,22 @@ RATE_LIMITS = {
 # MEILISEARCH
 # =========================================================
 
-MEILI_URL = "http://127.0.0.1:7700"
-MEILI_KEY = ""  # Laetakse .env failist
+# Proovime lugeda keskkonnamuutujatest (Docker/Prod)
+MEILI_URL = os.getenv("MEILISEARCH_URL", "http://127.0.0.1:7700")
+MEILI_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY", "")
 INDEX_NAME = "teosed"
 
 def load_env():
-    """Laeb .env failist Meilisearchi andmed."""
+    """
+    Laeb .env failist Meilisearchi andmed (arenduskeskkonna jaoks).
+    Ainult siis, kui neid pole juba keskkonnamuutujatest leitud.
+    """
     global MEILI_URL, MEILI_KEY
+    
+    # Kui võtmed on juba olemas (nt Dockerist), siis ära loe failist üle
+    if MEILI_URL and MEILI_KEY and MEILI_URL != "http://127.0.0.1:7700":
+        return
+
     env_path = os.path.join(_PROJECT_ROOT, ".env")
     if os.path.exists(env_path):
         with open(env_path, 'r') as f:
@@ -81,7 +90,7 @@ def load_env():
                     value = value.strip('"').strip("'")
                     if key == "MEILISEARCH_URL":
                         MEILI_URL = value
-                    elif key == "MEILISEARCH_MASTER_KEY":
+                    elif key in ["MEILISEARCH_MASTER_KEY", "MEILI_MASTER_KEY"]:
                         MEILI_KEY = value
                     elif key == "MEILI_SEARCH_API_KEY" and not MEILI_KEY:
                         MEILI_KEY = value
