@@ -985,9 +985,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     filter.push(`${typeField} = "${options.type}"`);
   }
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'page_tags', 'comments.text'];
+  const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
-  else if (options.scope === 'annotation') attributesToSearchOn = ['page_tags', 'comments.text'];
+  else if (options.scope === 'annotation') attributesToSearchOn = [tagsField, 'comments.text'];
 
   try {
     // Kui otsime ühe teose piires, näitame kogu lehekülje teksti kõigi highlight'idega
@@ -997,9 +998,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'teose_id'],
-        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments'],
         // Ei kasuta croppi - näitame kogu teksti
-        attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
+        attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
         attributesToSearchOn: attributesToSearchOn
@@ -1035,10 +1036,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         distinct: 'teose_id',
-        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
+        attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments'],
         attributesToCrop: ['lehekylje_tekst', 'comments.text'],
         cropLength: 35,
-        attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
+        attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
         attributesToSearchOn: attributesToSearchOn
@@ -1086,18 +1087,19 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'page_tags', 'comments.text'];
+  const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
-  else if (options.scope === 'annotation') attributesToSearchOn = ['page_tags', 'comments.text'];
+  else if (options.scope === 'annotation') attributesToSearchOn = [tagsField, 'comments.text'];
 
   try {
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'comments'],
+      attributesToRetrieve: ['id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
-      attributesToHighlight: ['lehekylje_tekst', 'page_tags', 'comments.text'],
+      attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
       highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
       highlightPostTag: '</em>',
       sort: ['lehekylje_number:asc'],

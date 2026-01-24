@@ -291,9 +291,13 @@ const SearchPage: React.FC = () => {
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
         const snippet = hit._formatted?.lehekylje_tekst || hit.lehekylje_tekst;
+        const lang = i18n.language.split('-')[0];
+        const tagsField = `page_tags_${lang}`;
 
         // Helper to find relevant tags/comments (those containing highlight marks)
-        const hasHighlightedTags = hit._formatted?.page_tags?.some(t => t.includes('<em'));
+        // Check localized field first, then fallback to generic
+        const formattedTags = (hit._formatted as any)?.[tagsField] || hit._formatted?.page_tags;
+        const hasHighlightedTags = formattedTags?.some((t: string) => t.includes('<em'));
         const highlightedComments = hit._formatted?.comments?.filter(c => c.text.includes('<em'));
 
         // Navigeeri töölauasse
@@ -333,7 +337,7 @@ const SearchPage: React.FC = () => {
                         {/* Matched Tags */}
                         {hasHighlightedTags && (
                             <div className="flex flex-wrap gap-2 mt-2">
-                                {hit._formatted?.page_tags?.filter(t => t.includes('<em')).map((tagHtml, idx) => (
+                                {formattedTags?.filter((t: string) => t.includes('<em')).map((tagHtml: string, idx: number) => (
                                     <span
                                         key={idx}
                                         className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full"
