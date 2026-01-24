@@ -1,6 +1,18 @@
+"""
+Piltide serveerimise server.
+Optimeeritud jõudluseks (threading, cache) ja turvalisuseks (CORS).
+"""
 import http.server
-import socketserver
 import os
+import sys
+
+# Lisame server/ kausta pathi, et saaks importida config moodulit,
+# kui skripti käivitatakse otse (mitte moodulina)
+if __name__ == '__main__' and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    __package__ = "server"
+
+from .config import ALLOWED_ORIGINS
 
 # =========================================================
 # KONFIGURATSIOON
@@ -11,12 +23,21 @@ DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
 DIRECTORY = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 # =========================================================
 
-class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
+class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET')
-        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
-        return super(CORSRequestHandler, self).end_headers()
+        # CORS: Luba ainult kindlad domeenid
+        origin = self.headers.get('Origin')
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_header('Access-Control-Allow-Origin', origin)
+            self.send_header('Access-Control-Allow-Credentials', 'true')
+        
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        
+        # Cache: Luba brauseril pilte hoida 24h (86400 sek)
+        # See vähendab oluliselt serveri koormust lehe sirvimisel
+        self.send_header('Cache-Control', 'public, max-age=86400')
+        
+        return super().end_headers()
 
     def translate_path(self, path):
         # Kindlustame, et serveerime failid õigest kaustast
@@ -25,21 +46,20 @@ class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
         return os.path.join(DIRECTORY, rel_path)
 
 # Liigume õigesse kausta, et SimpleHTTPRequestHandler leiaks failid üles
-# (alternatiiv translate_path muutmisele, töötab kindlamalt)
 if os.path.exists(DIRECTORY):
     os.chdir(DIRECTORY)
-    print(f"Juurkaust muudetud: {DIRECTORY}")
+    print(f"Pildiserver: Juurkaust muudetud -> {DIRECTORY}")
 else:
-    print(f"HOIATUS: Kausta {DIRECTORY} ei leitud!")
+    print(f"Pildiserver HOIATUS: Kausta {DIRECTORY} ei leitud!")
 
-print(f"Pildiserver käivitub pordil {PORT}...")
-# Luba aadressi taaskasutus (et ei peaks ootama kui restarti teed)
-socketserver.TCPServer.allow_reuse_address = True
+print(f"Pildiserver käivitub pordil {PORT} (Multi-threaded)...")
 
-with socketserver.TCPServer(("", PORT), CORSRequestHandler) as httpd:
-    print("Server töötab. Katkestamiseks vajuta Ctrl+C.")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    httpd.server_close()
+# Kasutame ThreadingHTTPServer, et teenindada mitut päringut korraga
+# See on kriitiline, kui lehel on palju pilte
+if __name__ == '__main__':
+    with http.server.ThreadingHTTPServer(("", PORT), ImageRequestHandler) as httpd:
+        print("Pildiserver töötab. Katkestamiseks vajuta Ctrl+C.")
+        try:
+            httpd.serve_forever()
+        except KeyboardInterrupt:
+            pass

@@ -1885,7 +1885,8 @@ if __name__ == '__main__':
     watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
     watcher_thread.start()
 
-    server = http.server.HTTPServer(('0.0.0.0', PORT), RequestHandler)
+    # Kasutame ThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
+    server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
