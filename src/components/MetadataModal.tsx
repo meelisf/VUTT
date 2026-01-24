@@ -34,6 +34,11 @@ interface MetadataForm {
   collection: string | null;
 }
 
+interface SuggestionItem {
+  label: string;
+  id: string | null;
+}
+
 const MetadataModal: React.FC<MetadataModalProps> = ({
   isOpen,
   onClose,
@@ -63,11 +68,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     collection: null
   });
   const [suggestions, setSuggestions] = useState<{
-    authors: string[];
-    tags: string[];
-    places: string[];
-    printers: string[];
-  }>({ authors: [], tags: [], places: [], printers: [] });
+    authors: SuggestionItem[];
+    tags: SuggestionItem[];
+    places: SuggestionItem[];
+    printers: SuggestionItem[];
+    types: SuggestionItem[];
+    genres: SuggestionItem[];
+  }>({ authors: [], tags: [], places: [], printers: [], types: [], genres: [] });
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -124,12 +131,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       });
       const data = await response.json();
       if (data.status === 'success') {
-        const normalizedTags = (data.tags || []).map((t: string) => t.toLowerCase());
+        // Server tagastab nüüd [{label: "...", id: "..."}, ...]
         setSuggestions({
           authors: data.authors || [],
-          tags: normalizedTags,
+          tags: data.tags || [],
           places: data.places || [],
-          printers: data.printers || []
+          printers: data.printers || [],
+          types: data.types || [],
+          genres: data.genres || []
         });
       }
     } catch (e) {
@@ -386,6 +395,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                         }}
                         placeholder={t('metadata.creatorName', 'Nimi')}
                         lang={lang}
+                        localSuggestions={suggestions.authors}
                       />
                     </div>
                     <select
@@ -447,6 +457,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   value={metaForm.location}
                   onChange={val => setMetaForm({ ...metaForm, location: val || '' })}
                   lang={lang}
+                  localSuggestions={suggestions.places}
                 />
               </div>
               <div className="col-span-2">
@@ -456,6 +467,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   value={metaForm.publisher}
                   onChange={val => setMetaForm({ ...metaForm, publisher: val || '' })}
                   lang={lang}
+                  localSuggestions={suggestions.printers}
                 />
               </div>
             </div>
@@ -474,6 +486,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   onChange={val => setMetaForm({ ...metaForm, type: val })}
                   placeholder="nt: trükis, käsikiri"
                   lang={lang}
+                  localSuggestions={suggestions.types}
                 />
               </div>
               {/* Žanr */}
@@ -485,6 +498,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   onChange={val => setMetaForm({ ...metaForm, genre: val })}
                   placeholder="nt: disputatsioon, oratsioon"
                   lang={lang}
+                  localSuggestions={suggestions.genres}
                 />
               </div>
               {/* Kollektsioon */}
@@ -561,6 +575,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 }}
                 placeholder={t('metadata.tagsPlaceholder', 'Lisa märksõna...')}
                 lang={lang}
+                localSuggestions={suggestions.tags}
               />
               <p className="text-[10px] text-gray-400 mt-1 italic">
                 {t('metadata.tagsHint')}
@@ -595,16 +610,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
           {/* Soovituste nimekirjad */}
           <datalist id="tag-suggestions">
-            {suggestions.tags.map(t => <option key={t} value={t} />)}
+            {suggestions.tags.map((t, i) => <option key={i} value={t.label} />)}
           </datalist>
           <datalist id="author-suggestions">
-            {suggestions.authors.map(a => <option key={a} value={a} />)}
+            {suggestions.authors.map((a, i) => <option key={i} value={a.label} />)}
           </datalist>
           <datalist id="place-suggestions">
-            {suggestions.places.map(p => <option key={p} value={p} />)}
+            {suggestions.places.map((p, i) => <option key={i} value={p.label} />)}
           </datalist>
           <datalist id="printer-suggestions">
-            {suggestions.printers.map(p => <option key={p} value={p} />)}
+            {suggestions.printers.map((p, i) => <option key={i} value={p.label} />)}
           </datalist>
         </div>
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2 shrink-0">

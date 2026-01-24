@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink } from 'lucide-react';
+import { Search, Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
+
+interface SuggestionItem {
+  label: string;
+  id: string | null;
+}
 
 interface EntityPickerProps {
   label?: string;
@@ -12,6 +17,7 @@ interface EntityPickerProps {
   onChange: (value: LinkedEntity | null) => void;
   className?: string;
   lang?: string; // Current UI language
+  localSuggestions?: SuggestionItem[]; // List of existing values from database
 }
 
 const EntityPicker: React.FC<EntityPickerProps> = ({
@@ -21,10 +27,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   value,
   onChange,
   className = '',
-  lang = 'et'
+  lang = 'et',
+  localSuggestions = []
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState<WikidataSearchResult[]>([]);
+  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -57,8 +64,33 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     const timer = setTimeout(async () => {
       if (inputValue && showSuggestions && (!value || (typeof value === 'string' ? value : value.label) !== inputValue)) {
         setIsLoading(true);
-        const results = await searchWikidata(inputValue);
-        setSuggestions(results);
+        
+        // 1. Otsi kohalikest soovitustest
+        const normalizedInput = inputValue.toLowerCase();
+        const localMatches: (WikidataSearchResult & { isLocal: boolean })[] = localSuggestions
+          .filter(s => s.label.toLowerCase().includes(normalizedInput))
+          .slice(0, 5) // Piira kohalike arvu
+          .map(s => ({
+            id: s.id || ('local-' + s.label), // Kasuta päris ID-d kui on, muidu local-
+            label: s.label,
+            description: s.id ? `Kohalik andmebaas (seotud: ${s.id})` : 'Kohalik andmebaas (sidumata)',
+            url: '',
+            isLocal: true
+          }));
+
+        // 2. Otsi Wikidatast (ainult kui kohalikest ei piisa või tahetakse alati näha)
+        let remoteMatches: WikidataSearchResult[] = [];
+        try {
+           remoteMatches = await searchWikidata(inputValue);
+        } catch (e) {
+           console.error("Wikidata search error", e);
+        }
+        
+        // Eemalda duplikaadid: kui kohalikul on SAMA ID mis kaugel, jäta kohalik
+        const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
+        const filteredRemote = remoteMatches.filter(m => !localIds.has(m.id));
+        
+        setSuggestions([...localMatches, ...filteredRemote]);
         setIsLoading(false);
         setSelectedIndex(0);
       } else {
@@ -66,18 +98,39 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [inputValue, showSuggestions, value]);
+  }, [inputValue, showSuggestions, value, localSuggestions]);
 
   const handleSelect = async (result: WikidataSearchResult) => {
     setIsLoading(true);
-    const multilingualLabels = await getEntityLabels(result.id);
     
-    const entity: LinkedEntity = {
-      id: result.id,
-      label: result.label,
-      source: 'wikidata',
-      labels: multilingualLabels
-    };
+    let entity: LinkedEntity;
+
+    if (result.id.startsWith('local-')) {
+        // Kohalik SIDUMATA valik (tekstipõhine)
+        entity = {
+            id: null,
+            label: result.label,
+            source: 'manual', 
+            labels: { et: result.label }
+        };
+    } else {
+        // Wikidata või Kohalik SEOTUD valik
+        // Igal juhul pärime Wikidatast värsked labelid, et tagada andmete kvaliteet
+        // (või kui see on kohalik ja meil pole võrguühendust, võiks fallbackida)
+        let multilingualLabels: Record<string, string> = { et: result.label };
+        try {
+            multilingualLabels = await getEntityLabels(result.id);
+        } catch (e) {
+            console.warn("Ei saanud silte Wikidatast", e);
+        }
+        
+        entity = {
+            id: result.id,
+            label: result.label, // Kasutame valitud labelit (võib olla kohalik)
+            source: 'wikidata',
+            labels: multilingualLabels
+        };
+    }
     
     onChange(entity);
     setInputValue(result.label);
@@ -181,7 +234,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       {showSuggestions && (inputValue.length >= 2 || suggestions.length > 0) && (
         <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-72 flex flex-col">
           <div className="overflow-y-auto flex-1">
-            {suggestions.map((result, idx) => (
+            {suggestions.map((result, idx) => {
+              const isLocal = result.isLocal;
+              return (
               <button
                 key={result.id}
                 onClick={() => handleSelect(result)}
@@ -190,14 +245,17 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-gray-900 text-sm">{result.label}</span>
-                  <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1 rounded">{result.id}</span>
+                  <div className="flex items-center gap-2">
+                    {isLocal && <Database size={12} className="text-amber-600" title="Kohalik andmebaas" />}
+                    <span className="font-medium text-gray-900 text-sm">{result.label}</span>
+                  </div>
+                  {!isLocal && <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1 rounded">{result.id}</span>}
                 </div>
                 {result.description && (
-                  <span className="text-xs text-gray-500 line-clamp-1">{result.description}</span>
+                  <span className={`text-xs line-clamp-1 ${isLocal ? 'text-amber-600/80 italic' : 'text-gray-500'}`}>{result.description}</span>
                 )}
               </button>
-            ))}
+            )})}
             
             <button
               onClick={handleManualEntry}

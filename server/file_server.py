@@ -974,7 +974,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
 
         elif self.path == '/get-metadata-suggestions':
-            # Tagastab unikaalsed autorid, žanrid, kohad ja trükkalid soovitusteks
+            # Tagastab unikaalsed autorid, žanrid, kohad ja trükkalid soovitusteks koos ID-dega
             try:
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
@@ -989,11 +989,36 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(auth_error).encode('utf-8'))
                     return
                 
-                authors = set()
-                tags = set()
-                places = set()
-                printers = set()
+                # Sõnastikud kujul: label.lower() -> { label: "Orig", id: "Q..." | None }
+                # Eesmärk: Iga nime kohta hoida parimat teadmist (eelistatult ID-ga)
+                authors = {}
+                tags = {}
+                places = {}
+                printers = {}
+                types = {}
+                genres = {}
                 
+                def add_item(store, val):
+                    """Lisab väärtuse hoidlasse, eelistades ID-ga versiooni."""
+                    if not val: return
+                    
+                    label = None
+                    id_code = None
+                    
+                    if isinstance(val, str):
+                        label = val.strip()
+                    elif isinstance(val, dict):
+                        label = val.get('label', '').strip()
+                        id_code = val.get('id')
+                    
+                    if not label: return
+                    
+                    key = label.lower()
+                    
+                    # Kui kirjet pole või uuel kirjel on ID ja vanal polnud, siis salvesta/uuenda
+                    if key not in store or (id_code and not store[key]['id']):
+                        store[key] = {'label': label, 'id': id_code}
+
                 # Käime läbi kõik kataloogid ja kogume andmeid
                 for entry in os.scandir(BASE_DIR):
                     if entry.is_dir():
@@ -1003,42 +1028,48 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                 with open(meta_path, 'r', encoding='utf-8') as f:
                                     meta = json.load(f)
 
-                                    # V2 formaat: creators[] massiiv
-                                    creators = meta.get('creators', [])
-                                    if creators:
-                                        for creator in creators:
-                                            name = creator.get('name', '').strip()
-                                            if name:
-                                                authors.add(name)
+                                    # Creators
+                                    for creator in meta.get('creators', []):
+                                        add_item(authors, {'label': creator.get('name'), 'id': creator.get('id')})
 
-                                    # V1 fallback: autor ja respondens
-                                    if meta.get('autor'):
-                                        authors.add(meta['autor'].strip())
-                                    if meta.get('respondens'):
-                                        authors.add(meta['respondens'].strip())
+                                    # V1 fallback authors
+                                    if meta.get('autor'): add_item(authors, meta['autor'])
+                                    if meta.get('respondens'): add_item(authors, meta['respondens'])
 
-                                    # V2 tags esmalt, siis v1 teose_tags
-                                    for t in meta.get('tags', []):
-                                        tags.add(t.strip().lower())
-                                    for t in meta.get('teose_tags', []):
-                                        tags.add(t.strip().lower())
+                                    # Tags
+                                    for t in meta.get('tags', []): add_item(tags, t)
+                                    for t in meta.get('teose_tags', []): add_item(tags, t)
 
-                                    # V2 location esmalt, siis v1 koht
-                                    location = meta.get('location') or meta.get('koht')
-                                    if location:
-                                        places.add(location.strip())
+                                    # Location
+                                    loc = meta.get('location') or meta.get('koht')
+                                    add_item(places, loc)
 
-                                    # V2 publisher esmalt, siis v1 trükkal
-                                    publisher = meta.get('publisher') or meta.get('trükkal')
-                                    if publisher:
-                                        printers.add(publisher.strip())
+                                    # Publisher
+                                    pub = meta.get('publisher') or meta.get('trükkal')
+                                    add_item(printers, pub)
+
+                                    # Type
+                                    add_item(types, meta.get('type'))
+
+                                    # Genre
+                                    g = meta.get('genre')
+                                    if g:
+                                        if isinstance(g, list):
+                                            for item in g: add_item(genres, item)
+                                        else:
+                                            add_item(genres, g)
                             except:
                                 continue
                 
-                # Lisa vaikimisi kohad ja trükkalid kui neid pole veel
-                places.update(['Tartu', 'Pärnu'])
-                printers.update(['Typis Academicis', 'Jacob Becker (Pistorius)', 'Johann Vogel (Vogelius)', 'Johann Brendeken'])
+                # Vaikimisi väärtused (kui puuduvad, lisa ilma ID-ta, v.a kui tahame hardcodeda ID-sid)
+                defaults_places = ['Tartu', 'Pärnu']
+                for p in defaults_places:
+                    if p.lower() not in places: places[p.lower()] = {'label': p, 'id': None}
                 
+                # Vorminda vastus listiks, sorteeri nime järgi
+                def to_sorted_list(store):
+                    return sorted(list(store.values()), key=lambda x: x['label'])
+
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
                 send_cors_headers(self)
@@ -1046,10 +1077,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 response = {
                     "status": "success",
-                    "authors": sorted(list(authors)),
-                    "tags": sorted(list(tags)),
-                    "places": sorted(list(places)),
-                    "printers": sorted(list(printers))
+                    "authors": to_sorted_list(authors),
+                    "tags": to_sorted_list(tags),
+                    "places": to_sorted_list(places),
+                    "printers": to_sorted_list(printers),
+                    "types": to_sorted_list(types),
+                    "genres": to_sorted_list(genres)
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
                 
