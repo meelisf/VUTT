@@ -40,7 +40,7 @@
     "author": "Author (praeses)",
     "respondens": "Respondent",
     "year": "Year",
-    "place": "Printing place",
+    "place": "Place",
     "printer": "Printer",
     "tags": "Tags",
     "tagsHint": "Separate with comma",
@@ -55,6 +55,14 @@
     "saveSuccess": "Saved",
     "saveError": "Error",
     "creators": "Creators",
+    "roles": {
+      "praeses": "Praeses",
+      "respondens": "Respondent",
+      "auctor": "Author",
+      "gratulator": "Gratulator",
+      "dedicator": "Dedicator",
+      "editor": "Editor"
+    },
     "addCreator": "Add person",
     "removeCreator": "Remove",
     "noCreators": "No creators added",

@@ -40,7 +40,7 @@
     "author": "Autor (praeses)",
     "respondens": "Respondens",
     "year": "Aasta",
-    "place": "Trükikoht",
+    "place": "Koht",
     "printer": "Trükkal",
     "tags": "Märksõnad",
     "tagsHint": "Eraldage komaga",
@@ -55,6 +55,14 @@
     "saveSuccess": "Salvestatud",
     "saveError": "Viga",
     "creators": "Isikud",
+    "roles": {
+      "praeses": "Eesistuja",
+      "respondens": "Respondens",
+      "auctor": "Autor",
+      "gratulator": "Õnnitleja",
+      "dedicator": "Pühendaja",
+      "editor": "Toimetaja"
+    },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",
     "noCreators": "Isikuid pole lisatud",

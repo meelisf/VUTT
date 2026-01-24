@@ -750,15 +750,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">{t('metadata.creators')}</span>
                         <div className="space-y-1.5">
                           {work.creators.map((creator, idx) => {
-                            const roleLabels: Record<string, string> = {
-                              praeses: 'Eesistuja',
-                              respondens: 'Respondens',
-                              auctor: 'Autor',
-                              gratulator: 'Õnnitleja',
-                              dedicator: 'Pühendaja',
-                              editor: 'Toimetaja'
-                            };
-                            const roleLabel = roleLabels[creator.role] || creator.role;
+                            const roleLabel = t(`metadata.roles.${creator.role}`, { defaultValue: creator.role });
                             return (
                               <div key={idx} className="flex items-center gap-2">
                                 <button
