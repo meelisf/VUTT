@@ -7,6 +7,7 @@ import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye, User } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
+import EntityPicker from './EntityPicker';
 import { getLabel } from '../utils/metadataUtils';
 
 // Git ajaloo kirje tüüp
