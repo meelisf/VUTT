@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 
@@ -52,6 +52,83 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   const tags = work.tags || [];
   const lang = i18n.language || 'et';
 
+  // Autorite kuvamise loogika
+  const renderAuthors = () => {
+    // Eelista struktureeritud andmeid (creators)
+    if (work.creators && work.creators.length > 0) {
+      // Näita max 2 autorit, ülejäänud "+X"
+      const displayCreators = work.creators.slice(0, 2);
+      const remaining = work.creators.length - 2;
+
+      return (
+        <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-600">
+          <User size={14} className="shrink-0" />
+          {displayCreators.map((creator, idx) => (
+            <span key={idx} className="flex items-center gap-1">
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate(`/search?q="${encodeURIComponent(creator.name)}"`);
+                }}
+                className="hover:text-primary-600 transition-colors truncate max-w-[150px]"
+                title={t('workCard.searchAuthor', 'Otsi autorit')}
+              >
+                {creator.name}
+              </button>
+              {creator.id && (
+                <a
+                  href={`https://www.wikidata.org/wiki/${creator.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                  title={`Wikidata: ${creator.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <ExternalLink size={10} />
+                </a>
+              )}
+              {idx < displayCreators.length - 1 && <span className="text-gray-400">/</span>}
+            </span>
+          ))}
+          {remaining > 0 && <span className="text-xs text-gray-400">+{remaining}</span>}
+        </div>
+      );
+    }
+
+    // Fallback vanadele väljadele
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-600">
+        <User size={14} className="shrink-0" />
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            navigate(`/search?q="${encodeURIComponent(work.author || '')}"`);
+          }}
+          className="hover:text-primary-600 transition-colors truncate"
+        >
+          {work.author}
+        </button>
+        {work.respondens && (
+          <>
+            <span className="text-gray-400">/</span>
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigate(`/search?q="${encodeURIComponent(work.respondens)}"`);
+              }}
+              className="hover:text-primary-600 transition-colors truncate"
+            >
+              {work.respondens}
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden ${
@@ -92,20 +169,36 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             <div className="flex flex-wrap items-center gap-1">
               {tags.slice(0, 3).map((tag, idx) => {
                 const label = getLabel(tag, lang);
+                // Kontrolli, kas on Wikidata ID
+                const tagId = typeof tag !== 'string' ? tag.id : null;
+                
                 return (
-                  <button
-                    key={idx}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      // Navigeeri otsingusse selle žanriga
-                      navigate(`/search?teoseTags=${encodeURIComponent(label)}`);
-                    }}
-                    className="text-[10px] font-medium text-white bg-slate-800/60 hover:bg-primary-600/80 px-1.5 py-0.5 rounded backdrop-blur-sm transition-colors"
-                    title={t('workCard.searchGenre', { genre: label })}
-                  >
-                    {label}
-                  </button>
+                  <div key={idx} className="flex items-center bg-slate-800/60 hover:bg-primary-600/80 rounded backdrop-blur-sm transition-colors overflow-hidden">
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        // Navigeeri otsingusse selle žanriga
+                        navigate(`/search?teoseTags=${encodeURIComponent(label)}`);
+                      }}
+                      className="text-[10px] font-medium text-white px-1.5 py-0.5"
+                      title={t('workCard.searchGenre', { genre: label })}
+                    >
+                      {label}
+                    </button>
+                    {tagId && (
+                      <a
+                        href={`https://www.wikidata.org/wiki/${tagId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-1 py-0.5 hover:bg-white/20 text-white/70 hover:text-white border-l border-white/10"
+                        title="Vaata Wikidatas"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink size={8} />
+                      </a>
+                    )}
+                  </div>
                 );
               })}
               {tags.length > 3 && (
@@ -133,33 +226,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
         </h3>
 
         <div className="mt-2 space-y-2 text-sm text-gray-600 flex-1">
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              // Navigate to search page with author name (finds all occurrences)
-              navigate(`/search?q="${encodeURIComponent(work.author || '')}"`);
-            }}
-            className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
-            title={t('workCard.searchAuthor', 'Otsi autorit kõikidest teostest')}
-          >
-            <User size={14} />
-            <span className="truncate">
-              {work.author}
-              {work.respondens && (
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigate(`/search?q="${encodeURIComponent(work.respondens!)}"`);
-                  }}
-                  className="text-gray-400 font-normal hover:text-indigo-600"
-                  title={t('workCard.searchRespondens', 'Otsi respondenti kõikidest teostest')}
-                >
-                  {' / '}{work.respondens}
-                </button>
-              )}
-            </span>
-          </button>
+          {renderAuthors()}
+          
           <button
             onClick={(e) => {
               e.preventDefault();

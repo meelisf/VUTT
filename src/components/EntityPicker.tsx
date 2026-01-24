@@ -185,6 +185,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   };
 
   const isLinked = value && typeof value !== 'string' && value.source === 'wikidata';
+  const wikidataId = isLinked && typeof value !== 'string' ? value.id : null;
+  const wikidataUrl = wikidataId ? `https://www.wikidata.org/wiki/${wikidataId}` : null;
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
@@ -210,13 +212,26 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           onFocus={() => setShowSuggestions(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || `Otsi ${label?.toLowerCase() || 'väärtust'}...`}
-          className={`w-full pl-10 pr-10 py-2 text-sm border rounded-md outline-none transition-all ${
+          className={`w-full pl-10 ${wikidataUrl ? 'pr-16' : 'pr-10'} py-2 text-sm border rounded-md outline-none transition-all ${
             isLinked 
               ? 'border-green-200 bg-green-50/30 focus:border-green-400 focus:ring-2 focus:ring-green-100' 
               : 'border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
           }`}
         />
         
+        {wikidataUrl && (
+          <a
+            href={wikidataUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="absolute right-9 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+            title="Vaata Wikidatas"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink size={14} />
+          </a>
+        )}
+
         {inputValue && (
           <button
             onClick={() => {
