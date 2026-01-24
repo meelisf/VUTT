@@ -50,6 +50,7 @@
     "esterId": "ESTER ID",
     "externalUrl": "Väline URL",
     "externalLinks": "Välised lingid",
+    "downloadFullText": "Lae alla kogu teose tekst",
     "save": "Salvesta metaandmed",
     "saving": "Salvestan...",
     "saveSuccess": "Salvestatud",

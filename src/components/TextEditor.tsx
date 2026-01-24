@@ -903,7 +903,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
                       >
                         <Download size={16} />
-                        Lae alla kogu teose tekst
+                        {t('metadata.downloadFullText')}
                       </button>
 
                       {onOpenMetaModal && (
@@ -922,14 +922,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               )}
 
               {/* Genre / Teose märksõnad */}
-              {work && work.tags && work.tags.length > 0 && (
+              {work && ((work.tags && work.tags.length > 0) || (work.tags_object && work.tags_object.length > 0)) && (
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                   <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                     <BookOpen size={18} className="text-green-600" />
-                    <h4 className="font-bold">{t('workspace:metadata.genre')}</h4>
+                    <h4 className="font-bold">{t('metadata.genre')}</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {work.tags.map((tag, idx) => {
+                    {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {
                       const label = getLabel(tag, lang);
                       const tagId = typeof tag !== 'string' ? (tag as any).id : null;
                       return (
