@@ -999,25 +999,40 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 genres = {}
                 
                 def add_item(store, val):
-                    """Lisab väärtuse hoidlasse, eelistades ID-ga versiooni."""
+                    """Lisab väärtuse hoidlasse. Kui on LinkedEntity koos tõlgetega, lisab kõik tõlked."""
                     if not val: return
                     
-                    label = None
-                    id_code = None
-                    
+                    # 1. Lihtne string
                     if isinstance(val, str):
                         label = val.strip()
-                    elif isinstance(val, dict):
-                        label = val.get('label', '').strip()
+                        if label:
+                            key = label.lower()
+                            if key not in store:
+                                store[key] = {'label': label, 'id': None}
+                        return
+
+                    # 2. Objekt (LinkedEntity)
+                    if isinstance(val, dict):
                         id_code = val.get('id')
-                    
-                    if not label: return
-                    
-                    key = label.lower()
-                    
-                    # Kui kirjet pole või uuel kirjel on ID ja vanal polnud, siis salvesta/uuenda
-                    if key not in store or (id_code and not store[key]['id']):
-                        store[key] = {'label': label, 'id': id_code}
+                        main_label = val.get('label', '').strip()
+                        
+                        # Lisa põhisilt
+                        if main_label:
+                            key = main_label.lower()
+                            # Uuenda kui ID on olemas ja vanal polnud
+                            if key not in store or (id_code and not store[key]['id']):
+                                store[key] = {'label': main_label, 'id': id_code}
+                        
+                        # Lisa kõik tõlked 'labels' sõnastikust
+                        labels = val.get('labels', {})
+                        if isinstance(labels, dict):
+                            for lang, label_text in labels.items():
+                                if label_text and isinstance(label_text, str):
+                                    label_text = label_text.strip()
+                                    key = label_text.lower()
+                                    # Sama loogika: eellista ID-ga varianti
+                                    if key not in store or (id_code and not store[key]['id']):
+                                        store[key] = {'label': label_text, 'id': id_code}
 
                 # Käime läbi kõik kataloogid ja kogume andmeid
                 for entry in os.scandir(BASE_DIR):
