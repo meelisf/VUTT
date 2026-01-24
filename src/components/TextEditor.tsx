@@ -738,6 +738,17 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                                   <User size={14} className="text-gray-400 group-hover:text-primary-500" />
                                   <span className="font-medium">{creator.name}</span>
                                 </button>
+                                {creator.id && (
+                                  <a
+                                    href={`https://www.wikidata.org/wiki/${creator.id}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                    title={`Vaata Wikidatas: ${creator.id}`}
+                                  >
+                                    <ExternalLink size={12} />
+                                  </a>
+                                )}
                                 <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
                               </div>
                             );
@@ -785,20 +796,46 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       {work.location && (
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
-                          <p className="text-gray-900">{getLabel(work.location, lang)}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-gray-900">{getLabel(work.location, lang)}</p>
+                            {work.location_object?.id && (
+                              <a
+                                href={`https://www.wikidata.org/wiki/${work.location_object.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                title={`Vaata Wikidatas: ${work.location_object.id}`}
+                              >
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
                       {work.publisher && (
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
-                          <button
-                            onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
-                            className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
-                            title="Filtreeri trükkali järgi"
-                          >
-                            <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
-                            <span>{getLabel(work.publisher, lang)}</span>
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
+                              className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
+                              title="Filtreeri trükkali järgi"
+                            >
+                              <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
+                              <span>{getLabel(work.publisher, lang)}</span>
+                            </button>
+                            {work.publisher_object?.id && (
+                              <a
+                                href={`https://www.wikidata.org/wiki/${work.publisher_object.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                title={`Vaata Wikidatas: ${work.publisher_object.id}`}
+                              >
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -871,16 +908,29 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   <div className="flex flex-wrap gap-2">
                     {work.tags.map((tag, idx) => {
                       const label = getLabel(tag, lang);
+                      const tagId = typeof tag !== 'string' ? (tag as any).id : null;
                       return (
-                        <button
-                          key={idx}
-                          onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(label)}`)}
-                          className="inline-flex items-center px-2.5 py-1 rounded-full bg-green-50 border border-green-100 text-sm text-green-800 hover:bg-green-100 transition-colors"
-                          title={`Otsi žanrit: ${label}`}
-                        >
-                          {label.toLowerCase()}
-                          <Search size={12} className="ml-1 opacity-50" />
-                        </button>
+                        <div key={idx} className="inline-flex items-center bg-green-50 border border-green-100 rounded-full overflow-hidden">
+                          <button
+                            onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(label)}`)}
+                            className="px-2.5 py-1 text-sm text-green-800 hover:bg-green-100 transition-colors flex items-center gap-1"
+                            title={`Otsi žanrit: ${label}`}
+                          >
+                            {label.toLowerCase()}
+                            <Search size={12} className="opacity-50" />
+                          </button>
+                          {tagId && (
+                            <a
+                              href={`https://www.wikidata.org/wiki/${tagId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pr-2 pl-1 py-1 text-green-600 hover:text-green-800 hover:bg-green-100 border-l border-green-100 transition-colors h-full flex items-center"
+                              title={`Vaata Wikidatas: ${tagId}`}
+                            >
+                              <ExternalLink size={10} />
+                            </a>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
