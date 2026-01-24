@@ -36,7 +36,7 @@ def main():
     print(f"Loon indeksi '{INDEX_NAME}' ja seadistan parameetrid...")
     
     # UUENDUS: Lisasime V3 väljad ja täiendavad seaded
-    client.index(INDEX_NAME).update_settings({
+    task = client.index(INDEX_NAME).update_settings({
         'searchableAttributes': [
             # V2/V3 väljad
             'title',
@@ -117,7 +117,10 @@ def main():
             }
         }
     })
-    print("Indeksi seadistused uuendatud.")
+    
+    print(f"Indeksi seadistused saadetud (Task ID: {task['taskUid']}). Ootan rakendumist...")
+    client.wait_for_task(task['taskUid'])
+    print("Indeksi seadistused on rakendatud.")
 
     try:
         print(f"Laen andmed failist '{JSONL_FILE_PATH}'...")
