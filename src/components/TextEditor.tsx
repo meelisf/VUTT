@@ -551,10 +551,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               ? 'bg-amber-500 hover:bg-amber-600'
               : 'bg-primary-600 hover:bg-primary-700'
               }`}
-            title={readOnly ? 'Salvestamiseks logi sisse' : ''}
+            title={readOnly ? t('editor.readOnlyHint') : ''}
           >
             {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-            {isSaving ? 'Salvestan...' : 'SALVESTA'}
+            {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
           </button>
         </div>
       </div>
@@ -605,7 +605,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               {/* Page Status Selector (Right) */}
               {onStatusChange && (
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('workspace:status.label')}</span>
+                  <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('status.label')}</span>
                   <select
                     value={currentStatus || page.status}
                     onChange={(e) => onStatusChange(e.target.value as PageStatus)}
@@ -647,7 +647,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   onScroll={handleScroll}
                   readOnly={readOnly}
                   className={`flex-1 w-full p-6 bg-white outline-none font-serif text-[18px] leading-[1.7] text-gray-800 resize-none whitespace-pre overflow-auto ${readOnly ? 'cursor-default' : ''}`}
-                  placeholder="Tekst puudub..."
+                  placeholder={t('editor.placeholder')}
                   spellCheck={false}
                 />
               ) : (
@@ -736,18 +736,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                   <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                     <BookOpen size={18} className="text-primary-600" />
-                    <h4 className="font-bold">Teose andmed</h4>
+                    <h4 className="font-bold">{t('info.workInfo')}</h4>
                   </div>
                   <div className="space-y-3 text-sm">
                     <div>
-                      <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Pealkiri</span>
+                      <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.workTitle')}</span>
                       <p className="text-gray-900 font-medium">{work.title}</p>
                     </div>
 
                     {/* Isikud: v2 creators[] või fallback v1 author/respondens */}
                     {work.creators && work.creators.length > 0 ? (
                       <div>
-                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">Isikud</span>
+                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">{t('metadata.creators')}</span>
                         <div className="space-y-1.5">
                           {work.creators.map((creator, idx) => {
                             const roleLabels: Record<string, string> = {
@@ -791,7 +791,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <div className="grid grid-cols-2 gap-4">
                         {work.author && (
                           <div>
-                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Autor</span>
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.author')}</span>
                             <button
                               onClick={() => navigate(`/search?q="${encodeURIComponent(work.author)}"`)}
                               className="flex items-center gap-1.5 text-gray-900 hover:text-primary-600 transition-colors group"
@@ -804,7 +804,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         )}
                         {work.respondens && (
                           <div>
-                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Respondens</span>
+                            <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.respondens')}</span>
                             <button
                               onClick={() => navigate(`/search?q="${encodeURIComponent(work.respondens)}"`)}
                               className="flex items-center gap-1.5 text-gray-900 hover:text-indigo-600 transition-colors group"
@@ -821,12 +821,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     {/* Aasta, Trükikoht, Trükkal */}
                     <div className="grid grid-cols-3 gap-6">
                       <div>
-                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Aasta</span>
+                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
                         <p className="text-gray-900">{work.year}</p>
                       </div>
                       {work.location && (
                         <div>
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükikoht</span>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
                           <div className="flex items-center gap-1.5">
                             <p className="text-gray-900">{getLabel(work.location, lang)}</p>
                             {work.location_object?.id && (
@@ -845,7 +845,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       )}
                       {work.publisher && (
                         <div>
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">Trükkal</span>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
@@ -882,7 +882,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           title="Ava ESTER-i kirje"
                         >
                           <ExternalLink size={16} />
-                          Vaata ESTER-is
+                          {t('info.viewInEster')}
                         </a>
                       )}
 
@@ -921,7 +921,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           title="Muuda teose metaandmeid"
                         >
                           <Edit3 size={16} />
-                          Muuda metaandmeid
+                          {t('metadata.editMetadata')}
                         </button>
                       )}
                     </div>
