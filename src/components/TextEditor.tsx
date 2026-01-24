@@ -415,14 +415,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   };
 
+  // Helper: saa string kuju võrdluseks
+  const getTagString = (t: string | any) => getLabel(t, lang).toLowerCase();
+
   const filteredSuggestions = allAvailableTags.filter(
-    tag => tag.includes(newTag.toLowerCase()) && !page_tags.includes(tag)
+    tag => tag.includes(newTag.toLowerCase()) && !page_tags.some(pt => getTagString(pt) === tag.toLowerCase())
   );
 
   const addTagFromInput = (tagValue: string) => {
     const trimmed = tagValue.trim().toLowerCase();
-    if (trimmed && !page_tags.includes(trimmed)) {
-      setPageTags([...page_tags, trimmed]);
+    const exists = page_tags.some(pt => getTagString(pt) === trimmed);
+    
+    if (trimmed && !exists) {
+      setPageTags([...page_tags, trimmed]); // Lisa stringina (kui pole EntityPickerist)
       if (!allAvailableTags.includes(trimmed)) {
         setAllAvailableTags(prev => {
           if (prev.includes(trimmed)) return prev;
@@ -463,7 +468,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   };
 
   const removeTag = (tagToRemove: string) => {
-    setPageTags(page_tags.filter(t => t !== tagToRemove));
+    // Eemalda sildi järgi (sest UI-s nupule vajutades saadame stringi)
+    setPageTags(page_tags.filter(t => getTagString(t) !== tagToRemove.toLowerCase()));
   };
 
   const addComment = () => {

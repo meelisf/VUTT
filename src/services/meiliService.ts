@@ -615,7 +615,8 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       image_url: getFullImageUrl(hit.lehekylje_pilt),
       status: hit.status || PageStatus.RAW,
       comments: hit.comments || [],
-      page_tags: Array.from(new Set((hit.page_tags || []).map((t: any) => 
+      // Eelistame page_tags_object (objektid), fallback page_tags (stringid)
+      page_tags: hit.page_tags_object || Array.from(new Set((hit.page_tags || []).map((t: any) => 
         typeof t === 'string' ? t.toLowerCase() : t
       ))),
       history: hit.history || [],

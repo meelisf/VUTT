@@ -172,7 +172,7 @@ export interface Page {
   image_url: string;
   status: PageStatus;
   comments: Annotation[];
-  page_tags: string[];      // Changed from tags
+  page_tags: (string | LinkedEntity)[];      // Changed from tags
   history: HistoryEntry[];
 
   // =========================================================
@@ -274,7 +274,7 @@ export interface ContentSearchHit {
   authors_text?: string[];
   tags?: string[]; // Added support for V3
   tags_object?: LinkedEntity[];
-  page_tags?: string[]; // Per-page tags
+  page_tags?: (string | LinkedEntity)[]; // Per-page tags
 
 
   // =========================================================
