@@ -72,6 +72,8 @@ searchable_attributes = [
     'originaal_kataloog',
     'lehekylje_tekst',
     'page_tags',
+    'page_tags_et',
+    'page_tags_en',
     'comments.text'
 ]
 
