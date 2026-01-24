@@ -118,8 +118,8 @@ def main():
         }
     })
     
-    print(f"Indeksi seadistused saadetud (Task ID: {task['taskUid']}). Ootan rakendumist...")
-    client.wait_for_task(task['taskUid'])
+    print(f"Indeksi seadistused saadetud (Task ID: {task.task_uid}). Ootan rakendumist...")
+    client.wait_for_task(task.task_uid)
     print("Indeksi seadistused on rakendatud.")
 
     try:

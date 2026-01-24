@@ -389,11 +389,12 @@ def create_meilisearch_data_per_page():
                 try:
                     with open(json_path, 'r', encoding='utf-8') as jf:
                         file_json = json.load(jf)
-                                            source = file_json.get('meta_content', file_json)
-                                            page_meta['tags'] = source.get('page_tags', source.get('tags', []))
-                                            page_meta['comments'] = source.get('comments', [])
-                                            page_meta['status'] = source.get('status', 'Toores')
-                                            page_meta['history'] = source.get('history', [])
+                        source = file_json.get('meta_content', file_json)
+                        page_meta['tags'] = source.get('page_tags', source.get('tags', []))
+                        page_meta['comments'] = source.get('comments', [])
+                        page_meta['status'] = source.get('status', 'Toores')
+                        page_meta['history'] = source.get('history', [])
+
                         if 'text_content' in file_json and file_json['text_content']:
                             page_text = file_json['text_content']
                 except Exception as e:
