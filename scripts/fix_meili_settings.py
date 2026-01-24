@@ -30,7 +30,9 @@ filterable_attributes = [
     'tags_ids',
     'creator_ids',
     'type',
+    'type_et', 'type_en',
     'genre',
+    'genre_et', 'genre_en',
     'collection',
     'collections_hierarchy',
     'authors_text',
@@ -46,7 +48,8 @@ filterable_attributes = [
     'page_tags',
     'status',
     'teose_staatus',
-    'tags'
+    'tags',
+    'tags_et', 'tags_en'
 ]
 
 # Searchable Attributes
@@ -80,19 +83,31 @@ sortable_attributes = [
     'pealkiri'
 ]
 
+# Ranking Rules
+ranking_rules = [
+    "exactness",
+    "words",
+    "typo",
+    "proximity",
+    "attribute",
+    "sort"
+]
+
 try:
-    task1 = index.update_filterable_attributes(filterable_attributes)
-    print(f"Filterable update task: {task1.task_uid}")
-    
-    task2 = index.update_searchable_attributes(searchable_attributes)
-    print(f"Searchable update task: {task2.task_uid}")
-    
-    task3 = index.update_sortable_attributes(sortable_attributes)
-    print(f"Sortable update task: {task3.task_uid}")
+    print("Saadan seadistused...")
+    task = index.update_settings({
+        'filterableAttributes': filterable_attributes,
+        'searchableAttributes': searchable_attributes,
+        'sortableAttributes': sortable_attributes,
+        'rankingRules': ranking_rules,
+        'faceting': {'maxValuesPerFacet': 5000},
+        'pagination': {'maxTotalHits': 10000}
+    })
+    print(f"Update task: {task.task_uid}")
 
     # Oota lõppu
     print("Ootan seadistuste rakendumist...")
-    client.wait_for_task(task2.task_uid)
+    client.wait_for_task(task.task_uid)
     print("VALMIS! Indeksi seadistused on uuendatud.")
 
 except Exception as e:
