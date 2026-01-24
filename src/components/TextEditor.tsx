@@ -810,12 +810,55 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       </div>
                     )}
 
-                    {/* Aasta, Trükikoht, Trükkal */}
-                    <div className="grid grid-cols-3 gap-6">
+                    {/* Aasta, Trükikoht, Trükkal, Žanr, Tüüp */}
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
                         <p className="text-gray-900">{work.year}</p>
                       </div>
+                      
+                      {/* Tüüp */}
+                      {work.type && (
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.type')}</span>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-gray-900">{getLabel(work.type_object || work.type, lang)}</p>
+                            {work.type_object?.id && (
+                              <a
+                                href={`https://www.wikidata.org/wiki/${work.type_object.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                title={`Vaata Wikidatas: ${work.type_object.id}`}
+                              >
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Žanr (üksik) */}
+                      {work.genre && (
+                        <div>
+                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
+                          <div className="flex items-center gap-1.5">
+                            <p className="text-gray-900">{getLabel(work.genre_object || work.genre, lang)}</p>
+                            {(Array.isArray(work.genre_object) ? work.genre_object[0]?.id : work.genre_object?.id) && (
+                              <a
+                                href={`https://www.wikidata.org/wiki/${Array.isArray(work.genre_object) ? work.genre_object[0].id : work.genre_object?.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                title="Vaata Wikidatas"
+                              >
+                                <ExternalLink size={12} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {work.location && (
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
@@ -835,24 +878,25 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           </div>
                         </div>
                       )}
+                      
                       {work.publisher && (
-                        <div>
+                        <div className="col-span-2 sm:col-span-1">
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
                           <div className="flex items-center gap-1.5">
                             <button
                               onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
-                              className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group"
+                              className="flex items-center gap-1.5 text-gray-900 hover:text-amber-600 transition-colors group text-left"
                               title="Filtreeri trükkali järgi"
                             >
-                              <span className="text-gray-400 group-hover:text-amber-500 font-serif">¶</span>
-                              <span>{getLabel(work.publisher, lang)}</span>
+                              <span className="text-gray-400 group-hover:text-amber-500 font-serif shrink-0">¶</span>
+                              <span className="truncate">{getLabel(work.publisher, lang)}</span>
                             </button>
                             {work.publisher_object?.id && (
                               <a
                                 href={`https://www.wikidata.org/wiki/${work.publisher_object.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors shrink-0"
                                 title={`Vaata Wikidatas: ${work.publisher_object.id}`}
                               >
                                 <ExternalLink size={12} />
