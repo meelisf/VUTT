@@ -1930,8 +1930,8 @@ if __name__ == '__main__':
     socketserver.TCPServer.allow_reuse_address = True
 
     # Käivita metaandmete jälgija taustal
-    watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
-    watcher_thread.start()
+    # watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
+    # watcher_thread.start()
 
     # Kasutame ThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
     server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)
