@@ -382,7 +382,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                     <div className="flex-1">
                       <EntityPicker
                         type="person"
-                        value={creator.name}
+                        value={creator.id || creator.source === 'wikidata' ? {
+                          id: creator.id || null,
+                          label: creator.name,
+                          source: creator.source || 'wikidata',
+                          labels: { et: creator.name }
+                        } : creator.name}
                         onChange={(val) => {
                           const newCreators = [...metaForm.creators];
                           newCreators[index] = { 
