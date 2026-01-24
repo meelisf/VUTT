@@ -671,7 +671,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
 
     const metaContent = {
       status: page.status,
-      tags: page.tags,
+      page_tags: page.page_tags, // Use explicit naming for page-level tags
       comments: page.comments,
       history: page.history,
       work_id: page.work_id,

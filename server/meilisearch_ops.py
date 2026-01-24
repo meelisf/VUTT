@@ -184,7 +184,8 @@ def sync_work_to_meilisearch(dir_name):
                     # Toeta nii vana kui uut formaati (meta_content wrapper)
                     source = p_data.get('meta_content', p_data)
                     page_meta['status'] = source.get('status', 'Toores')
-                    page_meta['tags'] = source.get('tags', [])
+                    # Eelistame uut nime 'page_tags'
+                    page_meta['tags'] = source.get('page_tags', source.get('tags', []))
                     page_meta['comments'] = source.get('comments', [])
                     page_meta['history'] = source.get('history', [])
                     # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
