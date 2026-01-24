@@ -55,11 +55,35 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [text, setText] = useState(page.text_content);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
-  const [page_tags, setPageTags] = useState<string[]>(page.page_tags);
+  const [page_tags, setPageTags] = useState<(string | any)[]>(page.page_tags || []);
   const [newTag, setNewTag] = useState('');
   const [newComment, setNewComment] = useState('');
 
-  // Autocomplete state
+  // Sõnavara soovitused lehekülje märksõnadele
+  const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
+
+  // Lae soovitused serverist (sama loogika mis MetadataModal-is)
+  useEffect(() => {
+    const fetchTags = async () => {
+      if (!authToken) return;
+      try {
+        const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auth_token: authToken })
+        });
+        const data = await response.json();
+        if (data.status === 'success') {
+          setTagSuggestions(data.tags || []);
+        }
+      } catch (e) {
+        console.error("Viga märksõnade laadimisel", e);
+      }
+    };
+    fetchTags();
+  }, [authToken]);
+
+  // Autocomplete state (vana loogika, jääb alles tagavaraks või eemaldame hiljem)
   const [allAvailableTags, setAllAvailableTags] = useState<string[]>([]);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
@@ -903,7 +927,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                   <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                     <BookOpen size={18} className="text-green-600" />
-                    <h4 className="font-bold">Žanr</h4>
+                    <h4 className="font-bold">{t('workspace:metadata.genre')}</h4>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {work.tags.map((tag, idx) => {
@@ -941,66 +965,68 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                 <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                   <Tag size={18} className="text-primary-600" />
-                  <h4 className="font-bold">Märksõnad</h4>
+                  <h4 className="font-bold">{t('workspace:info.pageTags')}</h4>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
                   {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">Märksõnad puuduvad</span>}
-                  {page_tags.map(tag => (
-                    <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group">
-                      <button
-                        onClick={() => navigate(`/search?q=${encodeURIComponent(tag)}&scope=annotation`)}
-                        className="hover:text-primary-600 flex items-center gap-1"
-                        title="Otsi seda märksõna kogu korpusest"
-                      >
-                        {tag.toLowerCase()}
-                        <Search size={12} className="opacity-0 group-hover:opacity-50" />
-                      </button>
-                      {!readOnly && (
-                        <button onClick={() => removeTag(tag)} className="ml-1.5 text-primary-400 hover:text-red-500">
-                          <X size={14} />
+                  {page_tags.map((tag, idx) => {
+                    const label = getLabel(tag, lang);
+                    const tagId = typeof tag !== 'string' ? (tag as any).id : null;
+                    
+                    return (
+                      <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group overflow-hidden">
+                        <button
+                          onClick={() => navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
+                          className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
+                          title="Otsi seda märksõna kogu korpusest"
+                        >
+                          {label.toLowerCase()}
+                          <Search size={12} className="opacity-0 group-hover:opacity-50" />
                         </button>
-                      )}
-                    </span>
-                  ))}
+                        
+                        {tagId && (
+                          <a
+                            href={`https://www.wikidata.org/wiki/${tagId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-1.5 py-1 text-primary-400 hover:text-blue-600 border-l border-primary-100 transition-colors"
+                            title={`Vaata Wikidatas: ${tagId}`}
+                          >
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
+
+                        {!readOnly && (
+                          <button 
+                            onClick={() => removeTag(typeof tag === 'string' ? tag : (tag as any).label)} 
+                            className={`pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 ${tagId ? 'border-l border-primary-100' : ''}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        )}
+                      </span>
+                    );
+                  })}
                 </div>
                 {!readOnly && (
                   <div className="relative">
-                    <input
-                      ref={tagInputRef}
-                      type="text"
-                      value={newTag}
-                      onChange={(e) => handleTagInputChange(e.target.value)}
-                      onKeyDown={handleTagKeyDown}
-                      onFocus={() => newTag.length > 0 && setShowTagSuggestions(true)}
-                      placeholder="+ Lisa märksõna..."
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none transition-shadow"
+                    <EntityPicker
+                      type="topic"
+                      value={null}
+                      onChange={(val) => {
+                        if (val) {
+                          // Lisa märksõna kui teda pole veel listis
+                          const label = val.label.toLowerCase();
+                          const exists = page_tags.some(t => getLabel(t, lang).toLowerCase() === label);
+                          if (!exists) {
+                            setPageTags([...page_tags, val]);
+                          }
+                        }
+                      }}
+                      placeholder={t('workspace:metadata.tagsPlaceholder')}
+                      lang={lang}
+                      localSuggestions={tagSuggestions}
                     />
-                    {/* Autocomplete dropdown */}
-                    {showTagSuggestions && filteredSuggestions.length > 0 && (
-                      <div
-                        ref={suggestionsRef}
-                        className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                      >
-                        {filteredSuggestions.slice(0, 10).map((suggestion, idx) => (
-                          <button
-                            key={suggestion}
-                            type="button"
-                            onClick={() => addTagFromInput(suggestion)}
-                            className={`w-full text-left px-3 py-2 text-sm transition-colors ${idx === selectedSuggestionIndex
-                              ? 'bg-primary-50 text-primary-700'
-                              : 'text-gray-700 hover:bg-gray-50'
-                              }`}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {showTagSuggestions && newTag.length > 0 && filteredSuggestions.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-500">
-                        Vajuta Enter, et lisada uus märksõna: <strong className="text-primary-600">{newTag}</strong>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -1009,7 +1035,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex-1 flex flex-col">
                 <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
                   <MessageSquare size={18} className="text-primary-600" />
-                  <h4 className="font-bold">Kommentaarid</h4>
+                  <h4 className="font-bold">{t('workspace:info.pageAnnotations')}</h4>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[100px]">
