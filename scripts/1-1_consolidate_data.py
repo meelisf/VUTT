@@ -345,7 +345,7 @@ def create_meilisearch_data_per_page():
     works_data = {}
 
     doc_dirs = sorted([d for d in os.listdir(DATA_ROOT_DIR)
-                       if os.path.isdir(os.path.join(DATA_ROOT_DIR, d))])
+                       if os.path.isdir(os.path.join(DATA_ROOT_DIR, d)) and not d.startswith('.')])
 
     for dir_name in tqdm(doc_dirs, desc="Teoste töötlemine"):
         doc_path = os.path.join(DATA_ROOT_DIR, dir_name)
@@ -461,7 +461,8 @@ def create_meilisearch_data_per_page():
                 'originaal_kataloog': dir_name,
 
                 # Annotatsioonid ja staatus
-                'page_tags': page_meta['tags'], # Lehekülje märksõnad
+                'page_tags': [get_label(t).lower() for t in page_meta.get('tags', [])],
+                'page_tags_object': page_meta.get('tags', []),
                 'comments': page_meta['comments'],
                 'status': page_meta['status'],
                 'history': page_meta['history'],

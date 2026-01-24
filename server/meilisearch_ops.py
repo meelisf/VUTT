@@ -286,7 +286,8 @@ def metadata_watcher_loop():
                 continue
 
             for entry in os.scandir(BASE_DIR):
-                if entry.is_dir():
+                # Ignoreeri peidetud kaustu (nt .git)
+                if entry.is_dir() and not entry.name.startswith('.'):
                     meta_path = os.path.join(entry.path, '_metadata.json')
                     if not os.path.exists(meta_path):
                         # Kontrollime kas on pilte
