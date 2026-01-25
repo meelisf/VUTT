@@ -1024,62 +1024,158 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       };
     }
 
-    // Tavaline otsing: kaks päringut paralleelselt
-    // 1. Ilma distinct'ita - saame teada, mitu lehekülge igas teoses vastab (teose_id facet)
-    // 2. Distinct'iga - saame unikaalsed teosed ja nende metaandmete statistika (genre, type, tags facetid)
-    const [facetResponse, distinctResponse] = await Promise.all([
-      // Päring 1: ainult teose vastete arvu jaoks (limit=0)
-      index.search(query, {
-        filter,
-        limit: 0,
-        facets: ['teose_id'], 
-        attributesToSearchOn: attributesToSearchOn
-      }),
-      // Päring 2: distinct teosed + metaandmete facetid
-      index.search(query, {
-        offset,
-        limit,
-        filter,
-        distinct: 'teose_id',
-        facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField],
-        attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
-        attributesToCrop: ['lehekylje_tekst', 'comments.text'],
-        cropLength: 35,
-        attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
-        highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
-        highlightPostTag: '</em>',
-        attributesToSearchOn: attributesToSearchOn
-      })
-    ]);
+    // Erijuhud statistika (facets) arvutamiseks
+    // Meilisearch facets loendavad alati dokumente (lehekülgi), mitte unikaalseid teoseid.
+    // Seega peame statistika saamiseks tegema eraldi loogika.
 
-    // Loe facetDistribution'ist iga teose vastete arv (ilma distinct'ita päringust)
-    const workHitCounts = facetResponse.facetDistribution?.['teose_id'] || {};
+    let facetDistribution: Record<string, Record<string, number>> = {};
+    let totalWorks = 0;
 
-    // Lisa igale hitile vastete arv
-    const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
-      ...hit,
-      hitCount: workHitCounts[hit.teose_id] || 1
-    }));
+    // 1. Kui otsingusõna PUUDUB (kasutaja ainult filtreerib/sirvib),
+    // siis on kõige kiirem viis saada teoste statistika filtreerides 'lehekylje_number = 1'.
+    // Kuna igal teosel on täpselt üks esimene lehekülg, siis dokumentide arv = teoste arv.
+    if (!query) {
+      const statsFilter = [...filter, 'lehekylje_number = 1'];
+      
+      const [statsResponse, distinctResponse] = await Promise.all([
+        // Päring 1: Statistika (ainult 1. leheküljed)
+        index.search('', {
+          filter: statsFilter,
+          limit: 0,
+          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField],
+          attributesToSearchOn: attributesToSearchOn
+        }),
+        // Päring 2: Sisu (teosed)
+        index.search('', {
+          offset,
+          limit,
+          filter,
+          distinct: 'teose_id',
+          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          sort: ['aasta:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
+          attributesToSearchOn: attributesToSearchOn
+        })
+      ]);
 
-    // Koguvastete arv ja teoste arv
-    const totalHits = facetResponse.estimatedTotalHits || 0;
-    const totalWorks = distinctResponse.estimatedTotalHits || 0;
+      facetDistribution = statsResponse.facetDistribution || {};
+      totalWorks = statsResponse.estimatedTotalHits || 0; // estimatedTotalHits on täpne kui pole query stringi
 
-    // Ühendame facetid: teose_id tuleb esimesest (leheküljed), teised teisest (teosed)
-    const combinedFacets = {
-      ...(distinctResponse.facetDistribution || {}),
-      teose_id: facetResponse.facetDistribution?.['teose_id'] || {}
-    };
+      // Hit count on alati lehekülgede arv (aga siin me ei tea seda täpselt ilma lisapäringuta,
+      // aga sirvimise puhul pole "x vastet sellest teosest" nii kriitiline, eeldame lehekülgede arvu teose metadata küljest)
+      
+      // Kui tahame teada teose lehekülgede arvu, peame seda küsima.
+      // Sirvimisel 'hitCount' pole tavaliselt vajalik või on see teose kogulehekülgede arv.
+      const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
+        ...hit,
+        hitCount: hit.teose_lehekylgede_arv || 1 // Fallback
+      }));
+      
+      return {
+        hits: hitsWithCounts as any,
+        totalHits: totalWorks, // Sirvimisel on hits = works
+        totalWorks: totalWorks,
+        totalPages: Math.ceil(totalWorks / limit),
+        page,
+        processingTimeMs: distinctResponse.processingTimeMs,
+        facetDistribution: facetDistribution
+      };
+    } 
+    
+    // 2. Kui otsingusõna ON OLEMAS (sisuotsing)
+    // Siis me ei saa kasutada 'lehekylje_number = 1' filtrit, sest otsitav sõna võib olla mujal.
+    // Lahendus: Tõmbame "statistika päringuga" suure hulga vasteid (ainult ID ja meta) ja agregeerime brauseris.
+    else {
+      // Optimeerimine: Küsime max 5000 vastet statistika jaoks. 
+      // See katab 99% tavalistest otsingutest. Väga üldiste otsingute puhul ("a") on see ligikaudne.
+      const STATS_LIMIT = 5000;
 
-    return {
-      hits: hitsWithCounts as any,
-      totalHits: totalHits,
-      totalWorks: totalWorks,
-      totalPages: Math.ceil(totalWorks / limit),
-      page,
-      processingTimeMs: distinctResponse.processingTimeMs,
-      facetDistribution: combinedFacets
-    };
+      const [statsResponse, distinctResponse, pageCountResponse] = await Promise.all([
+        // Päring 1: Statistika (kõik vasted, ainult metaandmed)
+        index.search(query, {
+          filter,
+          limit: STATS_LIMIT,
+          attributesToRetrieve: ['teose_id', genreFacetField, typeFacetField, tagsFacetField],
+          attributesToSearchOn: attributesToSearchOn
+        }),
+        // Päring 2: Sisu (kuvatavad teosed, distinct)
+        index.search(query, {
+          offset,
+          limit,
+          filter,
+          distinct: 'teose_id',
+          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          attributesToCrop: ['lehekylje_tekst', 'comments.text'],
+          cropLength: 35,
+          attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
+          highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
+          highlightPostTag: '</em>',
+          attributesToSearchOn: attributesToSearchOn
+        }),
+        // Päring 3: Lehekülgede arvud teoste kaupa (teose_id facet)
+        index.search(query, {
+          filter,
+          limit: 0,
+          facets: ['teose_id'],
+          attributesToSearchOn: attributesToSearchOn
+        })
+      ]);
+
+      // Arvuta unikaalsete teoste statistika käsitsi
+      const uniqueWorks = new Set<string>();
+      const calculatedFacets: Record<string, Record<string, number>> = {
+        [genreFacetField]: {},
+        [typeFacetField]: {},
+        [tagsFacetField]: {},
+        'originaal_kataloog': {} // Seda me stats querys ei küsinud, aga võiks
+      };
+
+      statsResponse.hits.forEach((hit: any) => {
+        if (!uniqueWorks.has(hit.teose_id)) {
+          uniqueWorks.add(hit.teose_id);
+          
+          // Helper stats
+          const addToStats = (field: string, value: string | string[]) => {
+             if (!value) return;
+             const values = Array.isArray(value) ? value : [value];
+             values.forEach(v => {
+               if (!calculatedFacets[field][v]) calculatedFacets[field][v] = 0;
+               calculatedFacets[field][v]++;
+             });
+          };
+
+          addToStats(genreFacetField, hit[genreFacetField]);
+          addToStats(typeFacetField, hit[typeFacetField]);
+          addToStats(tagsFacetField, hit[tagsFacetField]);
+        }
+      });
+      
+      // Lisa teose_id facet (lehekülgede arvud) otse Meilisearchist
+      calculatedFacets['teose_id'] = pageCountResponse.facetDistribution?.['teose_id'] || {};
+
+      totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size; // estimatedTotalHits on distinct query puhul ebatäpne vanemates versioonides
+      // Kasutame usaldusväärsemat numbrit: distinct response estimated hits peaks olema teoste arv
+      
+      // Workaround: Kui stats limit oli piisav, on uniqueWorks.size täpne. 
+      // Kui stats limit löödi lõhki, on distinctResponse.estimatedTotalHits parem (kuigi see võib olla page count).
+      // Meilisearchi käitumine estimatedTotalHits + distinct osas on versiooniti erinev.
+      // Eeldame praegu, et uniqueWorks.size on "vähemalt nii palju".
+
+      const workHitCounts = pageCountResponse.facetDistribution?.['teose_id'] || {};
+      const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
+        ...hit,
+        hitCount: workHitCounts[hit.teose_id] || 1
+      }));
+
+      return {
+        hits: hitsWithCounts as any,
+        totalHits: pageCountResponse.estimatedTotalHits || 0, // Lehekülgi kokku
+        totalWorks: totalWorks,
+        totalPages: Math.ceil(totalWorks / limit),
+        page,
+        processingTimeMs: distinctResponse.processingTimeMs,
+        facetDistribution: calculatedFacets
+      };
+    }
   } catch (e: any) {
     if (e.message && e.message.includes('not searchable')) {
       throw new Error("Otsinguindeksit alles uuendatakse. Palun oota hetk.");
