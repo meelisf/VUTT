@@ -901,14 +901,6 @@ const SearchPage: React.FC = () => {
                                                                 {firstHit.aasta || '...'}
                                                             </button>
                                                             
-                                                            {/* Kuvame originaalkataloogi ainult siis, kui see erineb ID-st (ja pole tühi) */}
-                                                            {firstHit.originaal_kataloog && firstHit.originaal_kataloog !== (firstHit.work_id || workId) && (
-                                                                <>
-                                                                    <span className="text-gray-300">❧</span>
-                                                                    <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
-                                                                </>
-                                                            )}
-                                                            
                                                             {/* Lisame Žanri ja Tüübi */}
                                                             {(firstHit.genre || firstHit.genre_object) && (
                                                                 <>
