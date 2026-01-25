@@ -19,6 +19,28 @@ const getImageUrl = (imagePath: string): string => {
     return `${IMAGE_BASE_URL}/${encodeURI(cleanPath)}`;
 };
 
+// Abifunktsioon autori nime leidmiseks
+const getAuthorDisplay = (hit: ContentSearchHit, t: any): string => {
+    // 1. Proovi leida creators massiivist
+    if (hit.creators && hit.creators.length > 0) {
+        // Prioriteet: praeses > auctor > esimene
+        const praeses = hit.creators.find(c => c.role === 'praeses');
+        if (praeses) return praeses.name;
+        
+        const auctor = hit.creators.find(c => c.role === 'auctor');
+        if (auctor) return auctor.name;
+        
+        return hit.creators[0].name;
+    }
+    
+    // 2. Fallback vana 'autor' väli
+    if (hit.autor) {
+        return Array.isArray(hit.autor) ? hit.autor[0] : hit.autor;
+    }
+    
+    return t('status.unknown');
+};
+
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
@@ -800,7 +822,7 @@ const SearchPage: React.FC = () => {
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                         <span>
                                             <span className="text-gray-400">{t('labels.author')}</span>{' '}
-                                            <span className="font-medium">{Array.isArray(results.hits[0]?.autor) ? results.hits[0].autor[0] : (results.hits[0]?.autor || t('status.unknown'))}</span>
+                                            <span className="font-medium">{getAuthorDisplay(results.hits[0], t)}</span>
                                         </span>
                                         <span>
                                             <span className="text-gray-400">{t('labels.year')}</span>{' '}
@@ -865,7 +887,7 @@ const SearchPage: React.FC = () => {
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
                                                             <button
                                                                 onClick={() => {
-                                                                    const authorName = Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || '');
+                                                                    const authorName = getAuthorDisplay(firstHit, t);
                                                                     setInputValue(authorName);
                                                                     setSearchParams(prev => {
                                                                         prev.set('q', authorName);
@@ -877,7 +899,7 @@ const SearchPage: React.FC = () => {
                                                                 title={t('results.searchAuthorWorks')}
                                                             >
                                                                 <span className="uppercase text-gray-400 text-[10px]">{t('labels.author')}</span>
-                                                                {Array.isArray(firstHit.autor) ? firstHit.autor[0] : (firstHit.autor || t('status.unknown'))}
+                                                                {getAuthorDisplay(firstHit, t)}
                                                             </button>
                                                             <span className="text-gray-300">❧</span>
                                                             <button
@@ -992,7 +1014,7 @@ const SearchPage: React.FC = () => {
                                                             setSelectedWorkInfo({
                                                                 title: firstHit.pealkiri || targetId,
                                                                 year: firstHit.aasta,
-                                                                author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
+                                                                author: getAuthorDisplay(firstHit, t)
                                                             });
                                                             setSearchParams(prev => {
                                                                 prev.set('work', targetId);
