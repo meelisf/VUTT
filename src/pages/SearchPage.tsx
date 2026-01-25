@@ -222,6 +222,7 @@ const SearchPage: React.FC = () => {
                 // Helper: teisenda jaotus massiiviks
                 const processFacets = (field: string) => {
                     const dist = data.facetDistribution?.[field] || {};
+                    if (Object.keys(dist).length === 0) console.log(`Empty facets for ${field}`, data.facetDistribution);
                     return Object.entries(dist)
                         .map(([value, count]) => ({ value, count: count as number }))
                         .sort((a, b) => b.count - a.count);
