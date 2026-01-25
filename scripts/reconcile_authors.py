@@ -339,16 +339,33 @@ def main():
             print(f"  LEITUD EELMINE OTSUS: '{processed_name}' oli seotud {previous_match}-ga.")
             auto_choice = input(f"  Kas soovid kasutada sama vastet ({previous_match})? [Y/n] > ").strip().lower()
             if auto_choice in ['', 'y']:
-                entity = get_wikidata_entity(previous_match)
-                if entity:
-                     new_entity = {"label": entity['label'], "id": entity['id'], "source": "wikidata"}
-                     count = 0
-                     for f in files:
-                        if update_file(f['path'], name, new_entity): count += 1
-                     state['processed'][name] = entity['id']
-                     save_state(state)
-                     print(f"  Automaatselt seotud {entity['id']} ({entity['label']}) {count} failis.")
-                     continue
+                # Kui on AA ID, siis ära küsi Wikidatast
+                if str(previous_match).startswith('AA:'):
+                     # Leia AA kirje
+                     num = int(previous_match.split(':')[1])
+                     entry = next((e for e in album_data if e.get('entry_number') == num), None)
+                     if entry:
+                         name_aa = entry.get('person', {}).get('name', {}).get('full')
+                         new_entity = {"label": name_aa, "id": previous_match, "source": "album_academicum"}
+                         count = 0
+                         for f in files:
+                            if update_file(f['path'], name, new_entity): count += 1
+                         state['processed'][name] = previous_match
+                         save_state(state)
+                         print(f"  Automaatselt seotud {previous_match} ({name_aa}) {count} failis.")
+                         continue
+                else:
+                    # Wikidata ID puhul küsi Wikidatast
+                    entity = get_wikidata_entity(previous_match)
+                    if entity:
+                         new_entity = {"label": entity['label'], "id": entity['id'], "source": "wikidata"}
+                         count = 0
+                         for f in files:
+                            if update_file(f['path'], name, new_entity): count += 1
+                         state['processed'][name] = entity['id']
+                         save_state(state)
+                         print(f"  Automaatselt seotud {entity['id']} ({entity['label']}) {count} failis.")
+                         continue
 
         results = search_wikidata(search_query)
 
