@@ -23,6 +23,7 @@ import urllib.parse
 import time
 import re
 import difflib
+from collections import Counter
 
 # Seadistused
 BASE_DIR = os.getenv("VUTT_DATA_DIR", "data/")
@@ -297,7 +298,7 @@ def main():
     
     # 1. Kogu kõik unikaalsed sidumata autorid
     print("Kogun andmeid...")
-    unique_authors = set()
+    author_counts = Counter()
     
     for root, dirs, files in os.walk(BASE_DIR):
         if '_metadata.json' in files:
@@ -309,15 +310,16 @@ def main():
                 # Lisa nimed, mis pole veel lingitud
                 for c in meta.get('creators', []):
                     if not c.get('id') and c.get('name'):
-                        unique_authors.add(c.get('name'))
+                        author_counts[c.get('name')] += 1
                 
                 if not meta.get('creators'):
-                    if meta.get('autor'): unique_authors.add(meta['autor'])
-                    if meta.get('respondens'): unique_authors.add(meta['respondens'])
+                    if meta.get('autor'): author_counts[meta['autor']] += 1
+                    if meta.get('respondens'): author_counts[meta['respondens']] += 1
             except:
                 pass
     
-    todo = sorted(list(unique_authors - processed))
+    unique_authors = set(author_counts.keys())
+    todo = sorted(list(unique_authors - processed), key=lambda x: author_counts[x], reverse=True)
     print(f"Leiti {len(unique_authors)} unikaalset nime.")
     print(f"Juba töödeldud: {len(processed)}")
     print(f"Teha: {len(todo)}\n")
@@ -337,7 +339,7 @@ def main():
         else:
             diff_display = ""
 
-        print(f"\n[{i+1}/{len(todo)}] Nimi: {name_display}{diff_display}")
+        print(f"\n[{i+1}/{len(todo)}] Nimi: {name_display}{diff_display} ({author_counts[name]} teost)")
         
         # Leia kontekst (kus failides esineb)
         files = get_files_with_author(name)
