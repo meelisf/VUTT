@@ -5,7 +5,12 @@ import time
 from dotenv import load_dotenv
 
 # --- SEADISTUS ---
-load_dotenv()
+# Leia projekti juurkaust (kaks taset kõrgemal scripts/ kaustast)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ENV_PATH = os.path.join(BASE_DIR, '.env')
+
+# Lae .env fail kindlast asukohast
+load_dotenv(dotenv_path=ENV_PATH)
 
 MEILI_URL = os.getenv("MEILISEARCH_URL")
 MEILI_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY")
