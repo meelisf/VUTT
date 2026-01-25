@@ -12,8 +12,8 @@ ENV_PATH = os.path.join(BASE_DIR, '.env')
 # Lae .env fail kindlast asukohast
 load_dotenv(dotenv_path=ENV_PATH)
 
-MEILI_URL = os.getenv("MEILISEARCH_URL")
-MEILI_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY")
+MEILI_URL = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_URL") or "http://127.0.0.1:7700"
+MEILI_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY") or os.getenv("MEILI_SEARCH_API_KEY")
 JSONL_FILE_PATH = 'output/meilisearch_data_per_page.jsonl' 
 INDEX_NAME = 'teosed'
 # --- LÕPP ---
