@@ -41,6 +41,7 @@ class Colors:
     BOLD = '\033[1m'
     BG_GREEN = '\033[42m\033[30m' # Must tekst rohelisel taustal
     BG_BLUE = '\033[44m\033[37m'  # Valge tekst sinisel taustal
+    BG_YELLOW = '\033[43m\033[30m' # Must tekst kollasel taustal
     RESET = '\033[0m'
 
 def load_album_data():
@@ -323,7 +324,16 @@ def main():
 
     # 2. Töötle järjest
     for i, name in enumerate(todo):
-        print(f"\n[{i+1}/{len(todo)}] Nimi: {name}")
+        search_query = clean_name_for_search(name)
+        
+        # Kuva nimi kollase taustaga ja diff, kui muutus
+        name_display = f"{Colors.BG_YELLOW}{name}{Colors.RESET}"
+        if name != search_query:
+            diff_display = f" {Colors.BLUE}→ {search_query}{Colors.RESET}"
+        else:
+            diff_display = ""
+
+        print(f"\n[{i+1}/{len(todo)}] Nimi: {name_display}{diff_display}")
         
         # Leia kontekst (kus failides esineb)
         files = get_files_with_author(name)
@@ -336,7 +346,6 @@ def main():
             print(f"    - {f['context']}")
         
         # Otsi Wikidatast
-        search_query = clean_name_for_search(name)
         print(f"  Otsin Wikidatast: '{search_query}'")
         
         # KONTROLLI: Kas me oleme sarnast nime juba lahendanud?
