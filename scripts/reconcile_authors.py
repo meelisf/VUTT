@@ -209,12 +209,41 @@ def main():
         
         # Otsi Wikidatast
         search_query = clean_name_for_search(name)
-        if search_query != name:
-            print(f"  Otsin Wikidatast ('{search_query}')... (algne: '{name}')")
-        else:
-            print(f"  Otsin Wikidatast ('{name}')...")
+        print(f"  Otsin Wikidatast: '{search_query}'")
             
         results = search_wikidata(search_query)
+
+        # Kui ei leidnud, proovi variatsioone
+        if not results:
+            variations = []
+            
+            # 1. Johannis <-> Johannes
+            if 'Johannis' in search_query:
+                variations.append(search_query.replace('Johannis', 'Johannes'))
+            elif 'Johannes' in search_query:
+                variations.append(search_query.replace('Johannes', 'Johannis'))
+            
+            # 2. Eemalda patronüümid (enamasti -is lõpuga keskmine nimi)
+            parts = search_query.split()
+            if len(parts) > 2:
+                # Proovi ilma keskmise nimeta (nt Ericus Johannis Albogius -> Ericus Albogius)
+                variations.append(f"{parts[0]} {parts[-1]}")
+                
+                # Proovi asendada -is -> -es (Johannis -> Johannes)
+                new_parts = []
+                for p in parts:
+                    if p.endswith('is') and len(p) > 4:
+                        new_parts.append(p[:-2] + 'es')
+                    else:
+                        new_parts.append(p)
+                variations.append(" ".join(new_parts))
+
+            for var in variations:
+                if var == search_query: continue
+                print(f"    ...ei leidnud. Proovin: '{var}'")
+                results = search_wikidata(var)
+                if results:
+                    break
         
         # Kuva valikud
         print("\n  VALIKUD:")
