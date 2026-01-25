@@ -1084,7 +1084,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 <div className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[100px]">
                   {comments.length === 0 && (
                     <div className="text-center py-8 text-gray-400">
-                      <p className="text-sm italic">Lisa esimene kommentaar või märkus.</p>
+                      <p className="text-sm italic">{t('info.noAnnotationsHint')}</p>
                     </div>
                   )}
                   {comments.map(comment => (
@@ -1112,7 +1112,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <textarea
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Kirjuta siia..."
+                      placeholder={t('info.commentPlaceholder')}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
                     />
                     <button
@@ -1120,7 +1120,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       disabled={!newComment.trim()}
                       className="w-full py-2 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
                     >
-                      Lisa Kommentaar
+                      {t('info.addComment').toUpperCase()}
                     </button>
                   </div>
                 ) : (
@@ -1141,7 +1141,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
                 <div className="flex items-center gap-2 mb-6 text-gray-800 border-b border-gray-100 pb-2">
                   <History size={18} className="text-primary-600" />
-                  <h4 className="font-bold">Muudatuste ajalugu</h4>
+                  <h4 className="font-bold">{t('history.title')}</h4>
                 </div>
 
                 <div className="relative border-l-2 border-gray-200 ml-3 space-y-8">
@@ -1174,19 +1174,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
                     <div className="flex items-center gap-2 text-gray-800">
                       <RotateCcw size={18} className="text-amber-600" />
-                      <h4 className="font-bold">Versiooniajalugu (Git)</h4>
+                      <h4 className="font-bold">{t('history.gitHistory')}</h4>
                     </div>
                     <button
                       onClick={loadGitHistory}
                       disabled={isLoadingHistory}
                       className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
                     >
-                      {isLoadingHistory ? 'Laadin...' : 'Värskenda'}
+                      {isLoadingHistory ? t('common:labels.loading') : t('history.refresh')}
                     </button>
                   </div>
 
                   {gitHistory.length === 0 && !isLoadingHistory && (
-                    <p className="text-sm text-gray-400 text-center py-4">Versiooniajalugu puudub või vajuta "Värskenda"</p>
+                    <p className="text-sm text-gray-400 text-center py-4">{t('history.emptyHistory')}</p>
                   )}
 
                   {gitHistory.length > 0 && (
@@ -1239,7 +1239,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                             ) : (
                               <RotateCcw size={12} />
                             )}
-                            {entry.is_original ? 'Taasta originaal' : 'Taasta'}
+                            {entry.is_original ? t('history.original') : t('history.restore')}
                           </button>
                         </div>
                       ))}

@@ -26,12 +26,21 @@
   },
   "history": {
     "title": "Varasemate versioonide ajalugu",
+    "gitHistory": "Versiooniajalugu (Git)",
+    "emptyHistory": "Versiooniajalugu puudub või vajuta \"Värskenda\"",
+    "refresh": "Värskenda",
     "original": "Algne OCR",
     "backup": "Varukoopia",
     "restore": "Taasta",
     "restoreConfirm": "Kas oled kindel, et soovid selle versiooni taastada? Praegune tekst asendatakse.",
     "noBackups": "Varasemaid versioone pole",
-    "loadError": "Ajaloo laadimine ebaõnnestus"
+    "loadError": "Ajaloo laadimine ebaõnnestus",
+    "action": {
+      "text_edit": "Muutis teksti",
+      "status_change": "Muutis staatust",
+      "comment_added": "Lisas kommentaari",
+      "saved_changes": "Salvestas muudatused"
+    }
   },
   "metadata": {
     "title": "Metaandmed",
@@ -86,8 +95,11 @@
     "pageTags": "Lehekülje märksõnad",
     "pageAnnotations": "Lehekülje märkmed",
     "noAnnotations": "Märkmeid pole lisatud",
+    "noAnnotationsHint": "Lisa esimene kommentaar või märkus.",
     "addAnnotation": "Lisa märge",
-    "annotationPlaceholder": "Kirjuta märge siia..."
+    "addComment": "Lisa kommentaar",
+    "annotationPlaceholder": "Kirjuta märge siia...",
+    "commentPlaceholder": "Kirjuta siia..."
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"

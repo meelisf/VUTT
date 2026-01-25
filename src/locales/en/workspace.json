@@ -26,12 +26,21 @@
   },
   "history": {
     "title": "Previous versions history",
+    "gitHistory": "Version history (Git)",
+    "emptyHistory": "No version history or press \"Refresh\"",
+    "refresh": "Refresh",
     "original": "Original OCR",
     "backup": "Backup",
     "restore": "Restore",
     "restoreConfirm": "Are you sure you want to restore this version? Current text will be replaced.",
     "noBackups": "No previous versions",
-    "loadError": "Failed to load history"
+    "loadError": "Failed to load history",
+    "action": {
+      "text_edit": "Edited text",
+      "status_change": "Changed status",
+      "comment_added": "Added comment",
+      "saved_changes": "Saved changes"
+    }
   },
   "metadata": {
     "title": "Metadata",
@@ -86,8 +95,11 @@
     "pageTags": "Page tags",
     "pageAnnotations": "Page notes",
     "noAnnotations": "No notes added",
+    "noAnnotationsHint": "Add first comment or note.",
     "addAnnotation": "Add note",
-    "annotationPlaceholder": "Write a note here..."
+    "addComment": "Add comment",
+    "annotationPlaceholder": "Write a note here...",
+    "commentPlaceholder": "Write here..."
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
