@@ -209,7 +209,7 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
     // ühes päringus saada kõiki lehekülgi erinevatest teostest
     const promises = workIds.map(async (workId) => {
       const response = await index.search('', {
-        filter: [`teose_id = "${workId}"`],
+        filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`],
         attributesToRetrieve: ['teose_id', 'status', 'lehekylje_number'],
         limit: 500  // Piisav ühe teose kõigile lehekülgedele
       });
@@ -409,7 +409,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text', 'pealkiri', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
-      filter: filter
+      filter: filter,
+      limit: 5000 // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
     };
 
     // Relevantsuse puhul EI kasuta distinct, et säilitada Meilisearchi relevantsuse järjekord
@@ -506,8 +507,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const works: Work[] = uniqueHits.map((hit: any) => {
       const firstPageData = firstPagesMap.get(hit.teose_id);
       return {
-        // V2 identifikaatorid
-        id: hit.id || hit.teose_id,
+        // V2 identifikaatorid - EELISTA NANOID!
+        id: hit.work_id || hit.id || hit.teose_id,
         work_id: hit.work_id,
         teose_id: hit.teose_id,
 
@@ -959,7 +960,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   const offset = (page - 1) * limit;
   const filter: string[] = [];
 
-  if (options.workId) filter.push(`teose_id = "${options.workId}"`);
+  if (options.workId) filter.push(`(work_id = "${options.workId}" OR teose_id = "${options.workId}")`);
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
@@ -1081,7 +1082,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   checkMixedContent();
   await ensureSettings();
 
-  const filter: string[] = [`teose_id = "${workId}"`];
+  const filter: string[] = [`(work_id = "${workId}" OR teose_id = "${workId}")`];
 
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
@@ -1139,7 +1140,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
   try {
     // Pärime kõik teose leheküljed, sorteeritud lehekülje numbri järgi
     const response = await index.search('', {
-      filter: `teose_id = "${teoseId}"`,
+      filter: `(work_id = "${teoseId}" OR teose_id = "${teoseId}")`,
       sort: ['lehekylje_number:asc'],
       limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
       attributesToRetrieve: ['lehekylje_tekst', 'lehekylje_number', 'pealkiri', 'autor', 'aasta']

@@ -38,7 +38,7 @@ from server import (
     sync_work_to_meilisearch, metadata_watcher_loop,
     # Utils
     sanitize_id, find_directory_by_id, generate_default_metadata,
-    normalize_genre, calculate_work_status
+    normalize_genre, calculate_work_status, build_work_id_cache
 )
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -1928,6 +1928,9 @@ if __name__ == '__main__':
     print(f"Kasutab mooduleid: server/")
 
     socketserver.TCPServer.allow_reuse_address = True
+
+    # Ehita Work ID cache kiiremaks failide leidmiseks
+    build_work_id_cache()
 
     # Käivita metaandmete jälgija taustal
     # watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
