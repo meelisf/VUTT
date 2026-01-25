@@ -32,6 +32,17 @@ ALBUM_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 # Wikidata API
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 
+# Värvid terminali jaoks
+class Colors:
+    HEADER = '\033[95m'
+    BLUE = '\033[94m'
+    GREEN = '\033[92m'
+    RED = '\033[91m'
+    BOLD = '\033[1m'
+    BG_GREEN = '\033[42m\033[30m' # Must tekst rohelisel taustal
+    BG_BLUE = '\033[44m\033[37m'  # Valge tekst sinisel taustal
+    RESET = '\033[0m'
+
 def load_album_data():
     if os.path.exists(ALBUM_FILE):
         try:
@@ -496,23 +507,28 @@ def main():
 
         # Kuva valikud (Album Academicum esimesena, et anda konteksti)
         if album_matches:
-            print("\n  VALIKUD (ALBUM ACADEMICUM):")
+            print(f"\n  {Colors.BOLD}VALIKUD (ALBUM ACADEMICUM):{Colors.RESET}")
             for idx, entry in enumerate(album_matches):
                 p = entry.get('person', {})
                 name_aa = p.get('name', {}).get('full')
                 death = p.get('death', {}).get('date') or "?"
                 origin = p.get('origin', {}).get('city') or "?"
                 num = entry.get('entry_number')
-                print(f"    A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]")
+                
+                style = Colors.BG_BLUE if idx == 0 else ""
+                print(f"    {style}A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]{Colors.RESET}")
+        else:
+            print(f"\n  {Colors.RED}VALIKUD (ALBUM ACADEMICUM): (Vasteid ei leitud){Colors.RESET}")
 
         # Kuva valikud (Wikidata)
-        print("\n  VALIKUD (WIKIDATA):")
+        print(f"\n  {Colors.BOLD}VALIKUD (WIKIDATA):{Colors.RESET}")
         if results:
             for idx, res in enumerate(results[:5]):
                 desc = res.get('description', '-')
-                print(f"    {idx+1}. {res['label']} ({res['id']}) - {desc}")
+                style = Colors.BG_GREEN if idx == 0 else ""
+                print(f"    {style}{idx+1}. {res['label']} ({res['id']}) - {desc}{Colors.RESET}")
         else:
-            print("    (Wikidatast vasteid ei leitud)")
+            print(f"    {Colors.RED}(Wikidatast vasteid ei leitud){Colors.RESET}")
 
         print("\n    L. (Local) - Märgi lokaalseks (ei seo Wikidataga)")
         print("    S. (Skip)  - Jäta vahele")
