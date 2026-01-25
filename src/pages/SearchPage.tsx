@@ -189,7 +189,19 @@ const SearchPage: React.FC = () => {
 
     // Perform search when URL params change
     useEffect(() => {
-        if (queryParam || teoseTagsParam.length > 0) {
+        // Kontrolli, kas on mõni aktiivne filter, mis peaks otsingu käivitama
+        const hasActiveFilter = queryParam || 
+                               (yearStartParam && yearStartParam !== 1630) || 
+                               (yearEndParam && yearEndParam !== 1710) || 
+                               scopeParam !== 'all' || 
+                               workIdParam || 
+                               teoseTagsParam.length > 0 || 
+                               genreParam || 
+                               typeParam;
+
+        // Või kui kasutaja on lihtsalt /search lehel ja vajutas otsi (isegi tühja sisuga võib tahta näha kõike)
+        // Aga praegu nõuame vähemalt ühte filtrit või otsingusõna, et mitte koormata serverit
+        if (hasActiveFilter) {
             const options: ContentSearchOptions = {
                 yearStart: yearStartParam,
                 yearEnd: yearEndParam,
