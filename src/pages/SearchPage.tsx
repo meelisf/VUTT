@@ -189,18 +189,11 @@ const SearchPage: React.FC = () => {
 
     // Perform search when URL params change
     useEffect(() => {
-        // Kontrolli, kas on mõni aktiivne filter, mis peaks otsingu käivitama
-        const hasActiveFilter = queryParam || 
-                               (yearStartParam && yearStartParam !== 1630) || 
-                               (yearEndParam && yearEndParam !== 1710) || 
-                               scopeParam !== 'all' || 
-                               workIdParam || 
-                               teoseTagsParam.length > 0 || 
-                               genreParam || 
-                               typeParam;
+        // Kontrolli, kas URL-is on mõni otsinguga seotud parameeter
+        // See on töökindlam kui väärtuste kontrollimine
+        const relevantParams = ['q', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type'];
+        const hasActiveFilter = relevantParams.some(key => searchParams.has(key));
 
-        // Või kui kasutaja on lihtsalt /search lehel ja vajutas otsi (isegi tühja sisuga võib tahta näha kõike)
-        // Aga praegu nõuame vähemalt ühte filtrit või otsingusõna, et mitte koormata serverit
         if (hasActiveFilter) {
             const options: ContentSearchOptions = {
                 yearStart: yearStartParam,
@@ -218,7 +211,7 @@ const SearchPage: React.FC = () => {
         } else {
             setResults(null);
         }
-    }, [queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection, i18n.language]);
+    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
