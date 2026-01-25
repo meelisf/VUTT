@@ -57,5 +57,6 @@ from .meilisearch_ops import (
 from .utils import (
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status,
-    get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids
+    get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids,
+    build_work_id_cache
 )
