@@ -84,7 +84,7 @@ const Dashboard: React.FC = () => {
       }
     };
     loadAbout();
-  }, []);
+  }, [i18n.language]);
 
   // Taasta scroll positsioon pärast teoste laadimist
   useEffect(() => {

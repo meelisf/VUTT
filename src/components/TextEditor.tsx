@@ -201,7 +201,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     };
     loadTranscriptionGuide();
-  }, []);
+  }, [lang]);
 
   // Erimärgi sisestamine või teksti ümbritsemine
   const insertCharacter = useCallback((char: string, e?: React.MouseEvent) => {
