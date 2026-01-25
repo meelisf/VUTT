@@ -54,46 +54,50 @@ def load_album_data():
     return []
 
 def clean_name_for_search(name):
-
     """
-
-    Puhastab nime otsingu jaoks:
-
-    1. Eemaldab sulud (ümar ja kandilised) koos sisuga
-
-    2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
-
+    Puhastab nime baaskujule.
+    Eemaldab sulud (aga jätab sisu meelde main funktsiooni jaoks).
     """
-
-    # 1. Asenda sulud ja nende sisu tühikuga
-
-    # Kasutame eraldi regexi ümarsulgude ja nurksulgude jaoks, et olla kindlam
-
-    s1 = re.sub(r'\(.*?\)', ' ', name)
-
-    s2 = re.sub(r'\[.*?\]', ' ', s1)
-
+    # Eemaldame sulud puhastatud nime jaoks, aga jätame sisu meelde muus kohas
+    name_clean = re.sub(r'\(.*?\)', ' ', name)
+    name_clean = re.sub(r'\[.*?\]', ' ', name_clean)
     
-
-    # 2. Eemalda üleliigsed tühikud ja sümbolid
-
-    clean = re.sub(r'\s+', ' ', s2).strip()
-
+    clean = re.sub(r'\s+', ' ', name_clean).strip()
     
-
-    # 3. Pööra nimi ringi (Perekonnanimi, Eesnimi -> Eesnimi Perekonnanimi)
-
     if ',' in clean:
-
         parts = clean.split(',', 1)
-
         if len(parts) == 2:
-
             clean = f"{parts[1].strip()} {parts[0].strip()}"
-
             
-
     return clean.strip()
+
+def get_name_variants_from_parentheses(name):
+    """
+    Eraldab sulgudest nimevariandid. 
+    Näiteks: "Carlholm (Carlhielm), Gustavus" -> ["Gustavus Carlholm", "Gustavus Carlhielm"]
+    """
+    variants = []
+    
+    # Leia sisu sulgudes
+    matches = re.findall(r'\((.*?)\)', name)
+    if not matches:
+        return []
+        
+    # Eemalda sulud algsest nimest, et saada "põhinimi"
+    base_name = clean_name_for_search(name)
+    variants.append(base_name)
+    
+    for m in matches:
+        # Kui sulgudes on ainult üks sõna (perekonnanimi), proovi seda asendada
+        if len(m.split()) == 1 and ',' in name:
+            surname = name.split(',')[0].strip()
+            first_names = name.split(',')[1].split('(')[0].strip()
+            variants.append(f"{first_names} {m.strip()}")
+        else:
+            # Muidu proovi sulgudes olevat asja eesnimena või eraldi
+            variants.append(m.strip())
+            
+    return variants
 
 def search_album(query, album_data):
     matches = []
@@ -391,44 +395,19 @@ def main():
 
         # Kui ei leidnud, proovi variatsioone (Waterfall strateegia)
         if not results:
-            variations = []
-            parts = search_query.split()
-            
-            # 1. Proovi ilma viimase nimeta (nt Andreas Arvidi Stregnensis -> Andreas Arvidi)
-            if len(parts) > 2:
-                variations.append(" ".join(parts[:-1]))
-            
-            # 2. Proovi ilma keskmiste nimedeta (nt Andreas Arvidi Stregnensis -> Andreas Stregnensis)
-            if len(parts) > 2:
-                variations.append(f"{parts[0]} {parts[-1]}")
-            
-            # 3. Proovi ilma -ensis lõpuga sõnadeta (kui neid on)
-            ensis_removed = [p for p in parts if not p.lower().endswith('ensis')]
-            if len(ensis_removed) < len(parts) and len(ensis_removed) >= 1:
-                variations.append(" ".join(ensis_removed))
-            
-            # 4. Proovi asendada -is -> -es (Johannis -> Johannes) jms
-            base_variations = [search_query] + variations
-            final_variations = []
-            
-            for base in base_variations:
-                if 'Johannis' in base:
-                    final_variations.append(base.replace('Johannis', 'Johannes'))
-                elif 'Johannes' in base:
-                    final_variations.append(base.replace('Johannes', 'Johannis'))
-            
-        # Kui ei leidnud, proovi variatsioone (Waterfall strateegia)
-        # UUS JÄRJEKORD:
-        # 1. Täisnime variatsioonid (C->K, Johannis->Johannes jne) - KÕIGE TÄHTSAM!
-        # 2. Lühendatud nimed (ilma keskmiseta jne)
-        # 3. Lühendatud nimede variatsioonid
-        
-        if not results:
-            # Abifunktsioon variatsioonide loomiseks antud stringist
             def get_variants(base_str):
                 vars_list = []
                 
-                # C <-> K ja muud asendused, sh ladina-rahvapärased nimed
+                # Suffixite eemaldamine (Ladina vormid)
+                words = base_str.split()
+                if len(words) > 0:
+                    first_name = words[0]
+                    # Petrus -> Peter/Petr, Gustavus -> Gustav
+                    if first_name.endswith('us'):
+                        vars_list.append(" ".join([first_name[:-2]] + words[1:]))
+                    if first_name.endswith('ius'):
+                        vars_list.append(" ".join([first_name[:-3]] + words[1:]))
+
                 common_replacements = {
                     'Jacob': 'Jakob', 'Jakob': 'Jacob',
                     'Carl': 'Karl', 'Karl': 'Carl',
@@ -462,7 +441,7 @@ def main():
                     if w_clean in common_replacements:
                         new_words.append(common_replacements[w_clean])
                         changed = True
-                    elif 'Frideric' in w and 'Friedrich' not in w: # Erileitlus
+                    elif 'Frideric' in w and 'Friedrich' not in w:
                          new_words.append(w.replace('Frideric', 'Friedrich').replace('o', ''))
                          changed = True
                     else:
@@ -470,11 +449,17 @@ def main():
                 
                 if changed:
                     vars_list.append(" ".join(new_words))
-                    
                 return vars_list
 
             # Generaator
             search_queue = []
+            
+            # 0. SULGUDES OLEVAD NIMED (Nt Carlhielm)
+            paren_variants = get_name_variants_from_parentheses(name)
+            for pv in paren_variants:
+                if pv not in search_queue:
+                    search_queue.append(pv)
+                    search_queue.extend(get_variants(pv))
             
             # 1. Täisnime variatsioonid
             search_queue.extend(get_variants(search_query))
@@ -482,27 +467,19 @@ def main():
             # 2. Lühendatud vormid
             parts = search_query.split()
             short_forms = []
-            
-            # Ilma viimase nimeta
             if len(parts) > 2:
                 short_forms.append(" ".join(parts[:-1]))
-            
-            # Ilma keskmiste nimedeta
-            if len(parts) > 2:
                 short_forms.append(f"{parts[0]} {parts[-1]}")
             
-            # Ilma -ensis nimedeta
             ensis_removed = [p for p in parts if not p.lower().endswith('ensis')]
             if len(ensis_removed) < len(parts) and len(ensis_removed) >= 1:
                 short_forms.append(" ".join(ensis_removed))
-                
             search_queue.extend(short_forms)
             
-            # 3. Lühendatud vormide variatsioonid (nt "Jakob Friedrich" kui "Jakob Friedrich Below" ei leitud)
+            # 3. Lühendatud vormide variatsioonid
             for sf in short_forms:
                 search_queue.extend(get_variants(sf))
             
-            # Eemalda duplikaadid ja algne päring
             unique_queue = []
             seen = set([search_query])
             for q in search_queue:
@@ -510,7 +487,6 @@ def main():
                     unique_queue.append(q)
                     seen.add(q)
             
-            # Käivita otsingud järjekorras
             for var in unique_queue:
                 print(f"    ...ei leidnud. Proovin: '{var}'")
                 results = search_wikidata(var)
@@ -529,7 +505,6 @@ def main():
                 death = p.get('death', {}).get('date') or "?"
                 origin = p.get('origin', {}).get('city') or "?"
                 num = entry.get('entry_number')
-                
                 style = Colors.BG_BLUE if idx == 0 else ""
                 print(f"    {style}A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]{Colors.RESET}")
         else:
