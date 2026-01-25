@@ -397,38 +397,99 @@ def main():
                 elif 'Johannes' in base:
                     final_variations.append(base.replace('Johannes', 'Johannis'))
             
-            # 5. C <-> K asendused levinud nimedes
-            common_replacements = {
-                'Jacob': 'Jakob', 'Jakob': 'Jacob',
-                'Carl': 'Karl', 'Karl': 'Carl',
-                'Eric': 'Erik', 'Erik': 'Eric',
-                'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus',
-                'Marcus': 'Markus', 'Markus': 'Marcus',
-                'Lucas': 'Lukas', 'Lukas': 'Lucas',
-                'Friderico': 'Friedrich', 'Friedrich': 'Friderico' # Lisaks ladina-saksa vaste
-            }
-            
-            ck_variations = []
-            # Proovime asendusi algsel päringul ja lühendatud versioonidel
-            for base in [search_query] + variations:
-                words = base.split()
+        # Kui ei leidnud, proovi variatsioone (Waterfall strateegia)
+        # UUS JÄRJEKORD:
+        # 1. Täisnime variatsioonid (C->K, Johannis->Johannes jne) - KÕIGE TÄHTSAM!
+        # 2. Lühendatud nimed (ilma keskmiseta jne)
+        # 3. Lühendatud nimede variatsioonid
+        
+        if not results:
+            # Abifunktsioon variatsioonide loomiseks antud stringist
+            def get_variants(base_str):
+                vars_list = []
+                
+                # C <-> K ja muud asendused
+                common_replacements = {
+                    'Jacob': 'Jakob', 'Jakob': 'Jacob',
+                    'Carl': 'Karl', 'Karl': 'Carl',
+                    'Eric': 'Erik', 'Erik': 'Eric',
+                    'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus',
+                    'Marcus': 'Markus', 'Markus': 'Marcus',
+                    'Lucas': 'Lukas', 'Lukas': 'Lucas',
+                    'Friderico': 'Friedrich', 'Friedrich': 'Friderico',
+                    'Christian': 'Kristian', 'Kristian': 'Christian',
+                    'Gustav': 'Gustaf', 'Gustaf': 'Gustav'
+                }
+                
+                # 1. Johannis/Johannes
+                if 'Johannis' in base_str:
+                    vars_list.append(base_str.replace('Johannis', 'Johannes'))
+                elif 'Johannes' in base_str:
+                    vars_list.append(base_str.replace('Johannes', 'Johannis'))
+                    
+                # 2. C/K asendused
+                words = base_str.split()
                 new_words = []
                 changed = False
                 for w in words:
-                    # Eemalda kirjavahemärgid kontrolliks (kuigi clean_name teeb seda, igaks juhuks)
                     w_clean = w.strip('.,')
                     if w_clean in common_replacements:
                         new_words.append(common_replacements[w_clean])
                         changed = True
-                    # Kontrolli ka osa sõnast (nt Friderico -> Friedrich)
-                    elif 'Frideric' in w and 'Friedrich' not in w:
+                    elif 'Frideric' in w and 'Friedrich' not in w: # Erileitlus
                          new_words.append(w.replace('Frideric', 'Friedrich').replace('o', ''))
                          changed = True
                     else:
                         new_words.append(w)
                 
                 if changed:
-                    ck_variations.append(" ".join(new_words))
+                    vars_list.append(" ".join(new_words))
+                    
+                return vars_list
+
+            # Generaator
+            search_queue = []
+            
+            # 1. Täisnime variatsioonid
+            search_queue.extend(get_variants(search_query))
+            
+            # 2. Lühendatud vormid
+            parts = search_query.split()
+            short_forms = []
+            
+            # Ilma viimase nimeta
+            if len(parts) > 2:
+                short_forms.append(" ".join(parts[:-1]))
+            
+            # Ilma keskmiste nimedeta
+            if len(parts) > 2:
+                short_forms.append(f"{parts[0]} {parts[-1]}")
+            
+            # Ilma -ensis nimedeta
+            ensis_removed = [p for p in parts if not p.lower().endswith('ensis')]
+            if len(ensis_removed) < len(parts) and len(ensis_removed) >= 1:
+                short_forms.append(" ".join(ensis_removed))
+                
+            search_queue.extend(short_forms)
+            
+            # 3. Lühendatud vormide variatsioonid (nt "Jakob Friedrich" kui "Jakob Friedrich Below" ei leitud)
+            for sf in short_forms:
+                search_queue.extend(get_variants(sf))
+            
+            # Eemalda duplikaadid ja algne päring
+            unique_queue = []
+            seen = set([search_query])
+            for q in search_queue:
+                if q not in seen:
+                    unique_queue.append(q)
+                    seen.add(q)
+            
+            # Käivita otsingud järjekorras
+            for var in unique_queue:
+                print(f"    ...ei leidnud. Proovin: '{var}'")
+                results = search_wikidata(var)
+                if results:
+                    break
 
             all_variations = variations + final_variations + ck_variations
             unique_vars = []
