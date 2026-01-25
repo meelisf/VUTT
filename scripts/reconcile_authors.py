@@ -22,13 +22,53 @@ import urllib.request
 import urllib.parse
 import time
 import re
+import difflib
 
 # Seadistused
 BASE_DIR = os.getenv("VUTT_DATA_DIR", "data/")
 STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "state", "reconcile_authors_state.json")
+ALBUM_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "reference_data", "album_academicum.json")
 
 # Wikidata API
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
+
+def load_album_data():
+    if os.path.exists(ALBUM_FILE):
+        try:
+            with open(ALBUM_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Viga Album Academicumi lugemisel: {e}")
+    return []
+
+def search_album(query, album_data):
+    matches = []
+    query_lower = query.lower()
+    
+    for entry in album_data:
+        p = entry.get('person', {})
+        full_name = p.get('name', {}).get('full', '')
+        if not full_name: continue
+        
+        score = 0
+        # 1. Täpne vaste
+        if query_lower == full_name.lower():
+            score = 1.0
+        # 2. Fuzzy match
+        else:
+            score = difflib.SequenceMatcher(None, query_lower, full_name.lower()).ratio()
+            
+        # 3. OCR kontroll (raw_text)
+        raw = entry.get('raw_text', '')
+        if query_lower in raw.lower() and score < 0.7:
+            score = 0.75
+
+        if score > 0.7:
+            matches.append((score, entry))
+            
+    # Sorteeri skoori järgi ja tagasta entry-d
+    matches.sort(key=lambda x: x[0], reverse=True)
+    return [m[1] for m in matches[:3]]
 
 def clean_name_for_search(name):
     """
@@ -193,12 +233,20 @@ def update_file(file_path, old_name, new_entity):
         return False
 
 def main():
-    print("---" + "AUTORITE ÜHTLUSTAJA" + "---")
+    print("--- AUTORITE ÜHTLUSTAJA ---")
     state = load_state()
+    album_data = load_album_data()
+    if album_data:
+        print(f"Laetud {len(album_data)} kirjet Album Academicumist.")
+        
     processed = set(state['processed'].keys())
     
     # 1. Kogu kõik unikaalsed sidumata autorid
+    # ... (sama mis varem)
     print("Kogun andmeid...")
+    # ...
+    # (Kuna ma ei taha tervet maini asendada ja vigu teha, teen täpsema asenduse main-tsükli sees)
+
     unique_authors = set()
     
     for root, dirs, files in os.walk(BASE_DIR):
@@ -270,49 +318,34 @@ def main():
 
         results = search_wikidata(search_query)
 
-        # Kui ei leidnud, proovi variatsioone
-        if not results:
-            variations = []
-            
-            # 1. Johannis <-> Johannes
-            if 'Johannis' in search_query:
-                variations.append(search_query.replace('Johannis', 'Johannes'))
-            elif 'Johannes' in search_query:
-                variations.append(search_query.replace('Johannes', 'Johannis'))
-            
-            # 2. Eemalda patronüümid (enamasti -is lõpuga keskmine nimi)
-            parts = search_query.split()
-            if len(parts) > 2:
-                # Proovi ilma keskmise nimeta (nt Ericus Johannis Albogius -> Ericus Albogius)
-                variations.append(f"{parts[0]} {parts[-1]}")
-                
-                # Proovi asendada -is -> -es (Johannis -> Johannes)
-                new_parts = []
-                for p in parts:
-                    if p.endswith('is') and len(p) > 4:
-                        new_parts.append(p[:-2] + 'es')
-                    else:
-                        new_parts.append(p)
-                variations.append(" ".join(new_parts))
+        # Otsi Album Academicumist
+        album_matches = search_album(search_query, album_data) if album_data else []
 
-            for var in variations:
-                if var == search_query: continue
-                print(f"    ...ei leidnud. Proovin: '{var}'")
-                results = search_wikidata(var)
-                if results:
-                    break
-        
-        # Kuva valikud
-        print("\n  VALIKUD:")
-        for idx, res in enumerate(results[:5]):
-            desc = res.get('description', '-')
-            print(f"    {idx+1}. {res['label']} ({res['id']}) - {desc}")
-        
-        print("    L. (Local) - Märgi lokaalseks (ei seo Wikidataga, aga loe tehtuks)")
-        print("    S. (Skip)  - Jäta vahele (küsi hiljem uuesti)")
+        # Kuva valikud (Album Academicum esimesena, et anda konteksti)
+        if album_matches:
+            print("\n  VALIKUD (ALBUM ACADEMICUM):")
+            for idx, entry in enumerate(album_matches):
+                p = entry.get('person', {})
+                name = p.get('name', {}).get('full')
+                death = p.get('death', {}).get('date') or "?"
+                origin = p.get('origin', {}).get('city') or "?"
+                num = entry.get('entry_number')
+                print(f"    A{idx+1}. {name} (surn. {death}, pärit {origin}) [AA:{num}]")
+
+        # Kuva valikud (Wikidata)
+        print("\n  VALIKUD (WIKIDATA):")
+        if results:
+            for idx, res in enumerate(results[:5]):
+                desc = res.get('description', '-')
+                print(f"    {idx+1}. {res['label']} ({res['id']}) - {desc}")
+        else:
+            print("    (Wikidatast vasteid ei leitud)")
+
+        print("\n    L. (Local) - Märgi lokaalseks (ei seo Wikidataga)")
+        print("    S. (Skip)  - Jäta vahele")
         print("    M. (Manual ID) - Sisesta Q-kood käsitsi")
-        print("    R. (Rename) - Nimeta ümber (ja otsi uuesti)")
-        print("    Q. (Quit) - Lõpeta praeguseks")
+        print("    R. (Rename) - Nimeta ümber")
+        print("    Q. (Quit) - Lõpeta")
         
         choice = input("\n  Valik > ").strip().lower()
         
@@ -320,6 +353,25 @@ def main():
             print("Salvestan oleku ja lõpetan.")
             break
         
+        elif choice.startswith('a') and len(choice) > 1 and choice[1:].isdigit():
+            idx = int(choice[1:]) - 1
+            if 0 <= idx < len(album_matches):
+                entry = album_matches[idx]
+                num = entry.get('entry_number')
+                name = entry.get('person', {}).get('name', {}).get('full')
+                new_entity = {
+                    "label": name,
+                    "id": f"AA:{num}",
+                    "source": "album_academicum"
+                }
+                count = 0
+                for f in files:
+                    if update_file(f['path'], name, new_entity): count += 1
+                state['processed'][name] = f"AA:{num}"
+                save_state(state)
+                print(f"  Seotud Album Academicumiga (AA:{num}) {count} failis.")
+                continue
+
         elif choice == 's':
             print("  Vahele jäetud.")
             continue
