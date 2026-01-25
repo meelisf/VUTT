@@ -38,11 +38,13 @@ PLACES_MAPPING = {
 PRINTERS_MAPPING = {
     # Jacob Becker
     "jacob becker": {"label": "Jacob Becker", "id": "Q110825272", "labels": {"et": "Jacob Becker"}},
+    "jacob becker (pistorius)": {"label": "Jacob Becker", "id": "Q110825272", "labels": {"et": "Jacob Becker"}},
     "becker": {"label": "Jacob Becker", "id": "Q110825272", "labels": {"et": "Jacob Becker"}},
     "pistorius": {"label": "Jacob Becker", "id": "Q110825272", "labels": {"et": "Jacob Becker"}},
     
     # Johann Vogel
     "johann vogel": {"label": "Johann Vogel", "id": "Q123498765", "labels": {"et": "Johann Vogel"}}, # NB: Kontrolli ID-d
+    "johann vogel (vogelius)": {"label": "Johann Vogel", "id": "Q123498765", "labels": {"et": "Johann Vogel"}},
     "vogel": {"label": "Johann Vogel", "id": "Q123498765", "labels": {"et": "Johann Vogel"}},
     "vogelius": {"label": "Johann Vogel", "id": "Q123498765", "labels": {"et": "Johann Vogel"}},
     
@@ -52,6 +54,11 @@ PRINTERS_MAPPING = {
     
     # Typis Academicis
     "typis academicis": {"label": "Typis Academicis", "id": None, "labels": {"et": "Akadeemia trükikoda", "la": "Typis Academicis"}},
+}
+
+TYPES_MAPPING = {
+    "trükis": {"label": "trükis", "id": "Q1261026", "labels": {"et": "trükis", "en": "printed matter", "de": "Druckerzeugnis"}},
+    "printed matter": {"label": "trükis", "id": "Q1261026", "labels": {"et": "trükis", "en": "printed matter", "de": "Druckerzeugnis"}},
 }
 
 def normalize_value(value, mapping):
@@ -71,7 +78,8 @@ def normalize_value(value, mapping):
     if isinstance(value, str):
         text_val = value.strip()
     elif isinstance(value, dict):
-        text_val = value.get('label', '').strip()
+        text_val = value.get('label') or value.get('labels', {}).get('et') or ""
+        text_val = text_val.strip()
 
     if not text_val:
         return value, False
@@ -106,13 +114,11 @@ def process_files():
                 changed = False
                 
                 # 1. Koha (location) normaliseerimine
-                # Kontrolli nii 'location' (v2) kui 'koht' (v1) välju
                 loc_val = data.get('location') or data.get('koht')
                 new_loc, loc_changed = normalize_value(loc_val, PLACES_MAPPING)
                 
                 if loc_changed:
                     data['location'] = new_loc
-                    # Eemalda vana 'koht' väli, et vältida segadust
                     if 'koht' in data: del data['koht']
                     changed = True
 
@@ -125,11 +131,19 @@ def process_files():
                     if 'trükkal' in data: del data['trükkal']
                     changed = True
 
+                # 3. Tüübi (type) normaliseerimine
+                type_val = data.get('type')
+                new_type, type_changed = normalize_value(type_val, TYPES_MAPPING)
+                
+                if type_changed:
+                    data['type'] = new_type
+                    changed = True
+
                 if changed:
                     files_to_change.append({
                         "path": path,
                         "data": data,
-                        "changes": [] + (["Koht"] if loc_changed else []) + (["Trükkal"] if pub_changed else [])
+                        "changes": [] + (["Koht"] if loc_changed else []) + (["Trükkal"] if pub_changed else []) + (["Tüüp"] if type_changed else [])
                     })
 
             except Exception as e:
