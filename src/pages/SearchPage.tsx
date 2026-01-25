@@ -870,8 +870,6 @@ const SearchPage: React.FC = () => {
                                     {Object.keys(groupedResults).map(workId => {
                                         const hits = groupedResults[workId];
                                         const firstHit = hits[0];
-                                        // DEBUG: Vaata konsooli, kas genre_object on olemas
-                                        if (firstHit.work_id === 'occgcn') console.log('Debug hit:', firstHit);
                                         
                                         const hitCount = firstHit.hitCount || 1;
                                         const hasMore = hitCount > 1;
