@@ -38,7 +38,7 @@ def clean_name_for_search(name):
     3. Eemaldab tüüpilised ladina päritolunimed (Stregnensis, Tarbatensis jne)
     """
     # Eemalda sulud (ümar ja kandilised) koos sisuga
-    name_clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', name)
+    name_clean = re.sub(r'\s*[\(\[].*?[\) T]', '', name)
     
     # Pöörab nime ümber, kui on koma
     if ',' in name_clean:
@@ -82,7 +82,7 @@ def get_wikidata_entity(q_id):
         print(f"Viga Wikidata päringus (ID): {e}")
     return None
 
-def search_wikidata(query):
+def load_state():
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -193,7 +193,7 @@ def update_file(file_path, old_name, new_entity):
         return False
 
 def main():
-    print("--- AUTORITE ÜHTLUSTAJA ---")
+    print("---" + "AUTORITE ÜHTLUSTAJA" + "---")
     state = load_state()
     processed = set(state['processed'].keys())
     
