@@ -428,17 +428,23 @@ def main():
             def get_variants(base_str):
                 vars_list = []
                 
-                # C <-> K ja muud asendused
+                # C <-> K ja muud asendused, sh ladina-rahvapärased nimed
                 common_replacements = {
                     'Jacob': 'Jakob', 'Jakob': 'Jacob',
                     'Carl': 'Karl', 'Karl': 'Carl',
-                    'Eric': 'Erik', 'Erik': 'Eric',
-                    'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus',
+                    'Eric': 'Erik', 'Erik': 'Eric', 'Ericus': 'Erik',
+                    'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus', 'Nils': 'Nicolaus',
                     'Marcus': 'Markus', 'Markus': 'Marcus',
                     'Lucas': 'Lukas', 'Lukas': 'Lucas',
                     'Friderico': 'Friedrich', 'Friedrich': 'Friderico',
                     'Christian': 'Kristian', 'Kristian': 'Christian',
-                    'Gustav': 'Gustaf', 'Gustaf': 'Gustav'
+                    'Gustav': 'Gustaf', 'Gustaf': 'Gustav',
+                    'Sueno': 'Sven', 'Sven': 'Sueno',
+                    'Laurentius': 'Lars', 'Lars': 'Laurentius',
+                    'Henricus': 'Henrik', 'Henrik': 'Henricus',
+                    'Georgius': 'Georg', 'Georg': 'Georgius',
+                    'Olaus': 'Olof', 'Olof': 'Olaus',
+                    'Petrus': 'Peter', 'Peter': 'Petrus'
                 }
                 
                 # 1. Johannis/Johannes
