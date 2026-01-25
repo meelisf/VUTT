@@ -33,6 +33,9 @@ interface AdvancedFiltersProps {
   onStatusChange: (status: WorkStatus | null) => void;
   // Kollektsiooni filter - facetid filtreeritakse selle järgi
   collection?: string | null;
+  // Aasta vahemik - facetid filtreeritakse selle järgi
+  yearStart?: number;
+  yearEnd?: number;
   // Valikuline: kas panna alguses lahti
   defaultExpanded?: boolean;
 }
@@ -47,6 +50,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   onTypeChange,
   onStatusChange,
   collection,
+  yearStart,
+  yearEnd,
   defaultExpanded = false
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
@@ -63,7 +68,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   // Staatuse valikud (fikseeritud, mitte facet)
   const statusOptions: WorkStatus[] = ['Toores', 'Töös', 'Valmis'];
 
-  // Lae facetid ja sõnavara - uuesti kui kollektsioon muutub
+  // Lae facetid ja sõnavara - uuesti kui kollektsioon või aasta vahemik muutub
   useEffect(() => {
     const loadFacets = async () => {
       setLoading(true);
@@ -73,9 +78,9 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         const facetLang = lang.split('-')[0]; // 'et-EE' -> 'et'
 
         const [genreData, tagData, typeData, vocabs] = await Promise.all([
-          getGenreFacets(collectionFilter, facetLang),
-          getTeoseTagsFacets(collectionFilter, facetLang),
-          getTypeFacets(collectionFilter, facetLang),
+          getGenreFacets(collectionFilter, facetLang, yearStart, yearEnd),
+          getTeoseTagsFacets(collectionFilter, facetLang, yearStart, yearEnd),
+          getTypeFacets(collectionFilter, facetLang, yearStart, yearEnd),
           getVocabularies()
         ]);
         setGenres(genreData);
@@ -89,7 +94,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       }
     };
     loadFacets();
-  }, [collection, lang]);
+  }, [collection, lang, yearStart, yearEnd]);
 
   // Kontrolli, kas on aktiivne filter
   const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;

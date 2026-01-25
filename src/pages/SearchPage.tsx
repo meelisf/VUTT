@@ -95,15 +95,15 @@ const SearchPage: React.FC = () => {
 
     const contentRef = useRef<HTMLDivElement>(null);
 
-    // Laadi filtrite andmed alguses
+    // Laadi filtrite andmed alguses ja uuenda kui aasta vahemik muutub
     useEffect(() => {
         const loadFilterData = async () => {
             try {
                 const facetLang = i18n.language.split('-')[0];
                 const [tags, genres, types, vocabs] = await Promise.all([
-                    getTeoseTagsFacets(selectedCollection || undefined, facetLang),
-                    getGenreFacets(selectedCollection || undefined, facetLang),
-                    getTypeFacets(selectedCollection || undefined, facetLang),
+                    getTeoseTagsFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
+                    getGenreFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
+                    getTypeFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getVocabularies()
                 ]);
                 setAvailableTeoseTags(tags);
@@ -115,7 +115,7 @@ const SearchPage: React.FC = () => {
             }
         };
         loadFilterData();
-    }, [selectedCollection, i18n.language]);
+    }, [selectedCollection, i18n.language, yearStartParam, yearEndParam]);
 
     // Sync local input with URL param when URL changes (e.g. back button)
     useEffect(() => {
@@ -156,9 +156,19 @@ const SearchPage: React.FC = () => {
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
 
+        // Kontrolli kas on filtreid (peale vaikeväärtuste)
+        const hasFilters = (yearStart && yearStart !== '1630') ||
+                          (yearEnd && yearEnd !== '1710') ||
+                          selectedScope !== 'all' ||
+                          selectedWork ||
+                          selectedTeoseTags.length > 0 ||
+                          selectedGenre ||
+                          selectedType;
+
         // Update URL params, which triggers the effect below
         setSearchParams(prev => {
-            if (!inputValue.trim()) {
+            // Kui pole otsingusõna EGA filtreid, tühjenda kõik
+            if (!inputValue.trim() && !hasFilters) {
                 prev.delete('q');
                 prev.delete('p');
                 prev.delete('ys');
@@ -169,9 +179,15 @@ const SearchPage: React.FC = () => {
                 prev.delete('genre');
                 prev.delete('type');
             } else {
-                prev.set('q', inputValue);
+                // Seadista otsingusõna (või eemalda kui tühi)
+                if (inputValue.trim()) {
+                    prev.set('q', inputValue);
+                } else {
+                    prev.delete('q');
+                }
                 prev.set('p', '1'); // Reset page
 
+                // Seadista filtrid
                 if (yearStart) prev.set('ys', yearStart); else prev.delete('ys');
                 if (yearEnd) prev.set('ye', yearEnd); else prev.delete('ye');
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');

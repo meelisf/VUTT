@@ -235,7 +235,13 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
 
 // Saab kõik teose märksõnad (tags) koos loendiga - facet query
 // Valikuline collection parameeter filtreerib kollektsiooni järgi
-export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et'): Promise<{ tag: string; count: number }[]> => {
+// yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
+export const getTeoseTagsFacets = async (
+  collection?: string,
+  lang: string = 'et',
+  yearStart?: number,
+  yearEnd?: number
+): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
 
@@ -248,6 +254,12 @@ export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
+    }
+    if (yearStart) {
+      filter.push(`aasta >= ${yearStart}`);
+    }
+    if (yearEnd) {
+      filter.push(`aasta <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -266,13 +278,19 @@ export const getTeoseTagsFacets = async (collection?: string, lang: string = 'et
   } catch (error) {
     console.error("getTeoseTagsFacets error:", error);
     // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getTeoseTagsFacets(collection, 'et');
+    if (lang !== 'et') return getTeoseTagsFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };
 
 // Saab kõik žanrid (genre) koos loendiga - facet query
-export const getGenreFacets = async (collection?: string, lang: string = 'et'): Promise<{ value: string; count: number }[]> => {
+// yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
+export const getGenreFacets = async (
+  collection?: string,
+  lang: string = 'et',
+  yearStart?: number,
+  yearEnd?: number
+): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
 
@@ -283,6 +301,12 @@ export const getGenreFacets = async (collection?: string, lang: string = 'et'): 
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
+    }
+    if (yearStart) {
+      filter.push(`aasta >= ${yearStart}`);
+    }
+    if (yearEnd) {
+      filter.push(`aasta <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -301,13 +325,19 @@ export const getGenreFacets = async (collection?: string, lang: string = 'et'): 
   } catch (error) {
     console.error("getGenreFacets error:", error);
     // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getGenreFacets(collection, 'et');
+    if (lang !== 'et') return getGenreFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };
 
 // Saab kõik tüübid (type) koos loendiga - facet query
-export const getTypeFacets = async (collection?: string, lang: string = 'et'): Promise<{ value: string; count: number }[]> => {
+// yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
+export const getTypeFacets = async (
+  collection?: string,
+  lang: string = 'et',
+  yearStart?: number,
+  yearEnd?: number
+): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
   await ensureSettings();
 
@@ -318,6 +348,12 @@ export const getTypeFacets = async (collection?: string, lang: string = 'et'): P
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
+    }
+    if (yearStart) {
+      filter.push(`aasta >= ${yearStart}`);
+    }
+    if (yearEnd) {
+      filter.push(`aasta <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -336,7 +372,7 @@ export const getTypeFacets = async (collection?: string, lang: string = 'et'): P
   } catch (error) {
     console.error("getTypeFacets error:", error);
     // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getTypeFacets(collection, 'et');
+    if (lang !== 'et') return getTypeFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };

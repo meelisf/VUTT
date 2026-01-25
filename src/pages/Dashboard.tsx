@@ -547,6 +547,8 @@ const Dashboard: React.FC = () => {
                 onTypeChange={setSelectedType}
                 onStatusChange={setSelectedStatus}
                 collection={selectedCollection}
+                yearStart={parseInt(yearStart) || undefined}
+                yearEnd={parseInt(yearEnd) || undefined}
               />
             </div>
           </div>
