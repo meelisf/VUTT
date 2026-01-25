@@ -33,8 +33,9 @@ WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 def clean_name_for_search(name):
     """
     Puhastab nime otsingu jaoks:
-    1. Eemaldab sulud ja nende sisu: "Albogius (Albohm)" -> "Albogius", "[A & R]" -> ""
+    1. Eemaldab sulud (ümar ja kandilised) koos sisuga
     2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
+    3. Eemaldab tüüpilised ladina päritolunimed (Stregnensis, Tarbatensis jne)
     """
     # Eemalda sulud (ümar ja kandilised) koos sisuga
     name_clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', name)
@@ -43,11 +44,45 @@ def clean_name_for_search(name):
     if ',' in name_clean:
         parts = name_clean.split(',', 1)
         if len(parts) == 2:
-            return f"{parts[1].strip()} {parts[0].strip()}".strip()
+            name_clean = f"{parts[1].strip()} {parts[0].strip()}"
+            
+    # Eemalda -ensis lõpuga sõnad (nt Stregnensis, Tarbatensis)
+    # Aga ainult siis, kui see pole ainuke nimi
+    name_parts = name_clean.split()
+    if len(name_parts) > 1:
+        filtered_parts = [p for p in name_parts if not p.lower().endswith('ensis')]
+        if filtered_parts:
+            name_clean = " ".join(filtered_parts)
             
     return name_clean.strip()
 
-def load_state():
+def get_wikidata_entity(q_id):
+    """Hangi konkreetne Wikidata üksus ID järgi."""
+    params = {
+        "action": "wbgetentities",
+        "ids": q_id,
+        "languages": "et|en|la",
+        "format": "json",
+        "props": "labels|descriptions",
+        "origin": "*"
+    }
+    url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"})
+    try:
+        with urllib.request.urlopen(req) as response:
+            data = json.load(response)
+            entity = data.get("entities", {}).get(q_id, {})
+            if entity and "labels" in entity:
+                # Vali parim label (et -> en -> la)
+                labels = entity["labels"]
+                label_val = labels.get("et", labels.get("en", labels.get("la", {}))).get("value")
+                desc_val = entity.get("descriptions", {}).get("et", entity.get("descriptions", {}).get("en", {})).get("value", "-")
+                return {"id": q_id, "label": label_val, "description": desc_val}
+    except Exception as e:
+        print(f"Viga Wikidata päringus (ID): {e}")
+    return None
+
+def search_wikidata(query):
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
@@ -222,24 +257,15 @@ def main():
             print(f"  LEITUD EELMINE OTSUS: '{processed_name}' oli seotud {previous_match}-ga.")
             auto_choice = input(f"  Kas soovid kasutada sama vastet ({previous_match})? [Y/n] > ").strip().lower()
             if auto_choice in ['', 'y']:
-                # Hangi silt Wikidatast (või kasuta placeholderit, hiljem uuendatakse)
-                # Lihtsuse mõttes teeme kiire päringu ID järgi või kasutame vana nime
-                # Aga meil on vaja korrektset labelit faili jaoks.
-                # Teeme uue päringu ID-ga, et saada värske label.
-                 # NB: See on lihtsustus, ideaalis võiks cache'ida labelid ka.
-                results = search_wikidata(previous_match) 
-                # search_wikidata otsib stringi, mitte ID-d otse, aga ID otsing töötab ka.
-                # Aga wbsearchentities 'search' parameeter töötab ka ID-ga.
-                
-                if results and results[0]['id'] == previous_match:
-                     res = results[0]
-                     new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
+                entity = get_wikidata_entity(previous_match)
+                if entity:
+                     new_entity = {"label": entity['label'], "id": entity['id'], "source": "wikidata"}
                      count = 0
                      for f in files:
                         if update_file(f['path'], name, new_entity): count += 1
-                     state['processed'][name] = res['id']
+                     state['processed'][name] = entity['id']
                      save_state(state)
-                     print(f"  Automaatselt seotud {res['id']}-ga {count} failis.")
+                     print(f"  Automaatselt seotud {entity['id']} ({entity['label']}) {count} failis.")
                      continue
 
         results = search_wikidata(search_query)
@@ -316,16 +342,22 @@ def main():
         
         elif choice == 'm':
             q_code = input("  Sisesta Q-kood (nt Q123) > ").strip().upper()
-            label = input(f"  Sisesta silt (vaikimisi '{name}') > ").strip() or name
             if q_code.startswith('Q'):
-                new_entity = {"label": label, "id": q_code, "source": "wikidata"}
-                count = 0
-                for f in files:
-                    if update_file(f['path'], name, new_entity): count += 1
-                
-                state['processed'][name] = q_code
-                save_state(state)
-                print(f"  Seotud {q_code}-ga {count} failis.")
+                entity = get_wikidata_entity(q_code)
+                if entity:
+                    print(f"  Leiti: {entity['label']} - {entity['description']}")
+                    confirm = input(f"  Kas seome sellega? [Y/n] > ").strip().lower()
+                    if confirm in ['', 'y']:
+                        new_entity = {"label": entity['label'], "id": q_code, "source": "wikidata"}
+                        count = 0
+                        for f in files:
+                            if update_file(f['path'], name, new_entity): count += 1
+                        
+                        state['processed'][name] = q_code
+                        save_state(state)
+                        print(f"  Seotud {q_code}-ga {count} failis.")
+                else:
+                    print(f"  Ei leidnud Wikidatast üksust koodiga {q_code}.")
             else:
                 print("  Vigane kood, jätsin vahele.")
 
