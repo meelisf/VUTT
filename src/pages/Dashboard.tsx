@@ -68,7 +68,9 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const loadAbout = async () => {
       try {
-        const response = await fetch('/about.html');
+        const lang = i18n.language.split('-')[0];
+        const fileSuffix = lang === 'en' ? '_en' : '';
+        const response = await fetch(`/about${fileSuffix}.html`);
         if (response.ok) {
           const html = await response.text();
           const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);

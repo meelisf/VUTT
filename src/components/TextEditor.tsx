@@ -186,7 +186,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   useEffect(() => {
     const loadTranscriptionGuide = async () => {
       try {
-        const response = await fetch('/transcription_guide.html');
+        const fileSuffix = lang === 'en' ? '_en' : '';
+        const response = await fetch(`/transcription_guide${fileSuffix}.html`);
         if (response.ok) {
           const html = await response.text();
           const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
@@ -591,13 +592,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 {viewMode === 'edit' && (
                   <div className="flex items-center gap-1">
                     <div className="w-px h-5 bg-gray-200 mx-2"></div>
-                    <button type="button" onClick={() => insertCharacter('**')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title="Esiletõst (Bold)">B</button>
-                    <button type="button" onClick={() => insertCharacter('*')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title="Kaldkiri (Italic)">I</button>
-                    <button type="button" onClick={() => insertCharacter('~')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title="Koodivahetus">𝔉</button>
+                    <button type="button" onClick={() => insertCharacter('**')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={t('editor.tooltips.bold')}>B</button>
+                    <button type="button" onClick={() => insertCharacter('*')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.italic')}>I</button>
+                    <button type="button" onClick={() => insertCharacter('~')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.fractur')}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={() => insertCharacter('[[m: ')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title="Ääremärkus">Marginalia</button>
-                    <button type="button" onClick={() => insertCharacter('[^1]')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title="Joonealune märkus">[^1]</button>
-                    <button type="button" onClick={() => insertCharacter('--lk--\n')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-400 border border-transparent hover:border-gray-200 font-mono" title="Lehekülje vahetus">--lk--</button>
+                    <button type="button" onClick={() => insertCharacter('[[m: ')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
+                    <button type="button" onClick={() => insertCharacter('[^1]')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.footnote')}>[^1]</button>
+                    <button type="button" onClick={() => insertCharacter('--lk--\n')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-400 border border-transparent hover:border-gray-200 font-mono" title={t('editor.tooltips.pageBreak')}>--lk--</button>
                   </div>
                 )}
               </div>

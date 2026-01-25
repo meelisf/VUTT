@@ -217,7 +217,7 @@ const Workspace: React.FC = () => {
 
     // Toimetaja/admin muudatused salvestatakse otse
     const pageWithStatus = { ...updatedPage, status: currentStatus || updatedPage.status };
-    const savedPage = await savePage(pageWithStatus, 'Salvestas muudatused', user.name, { token: authToken });
+    const savedPage = await savePage(pageWithStatus, t('history.action.saved_changes'), user.name, { token: authToken });
     setPage(savedPage);
     setCurrentStatus(savedPage.status);
     setEditorChanges(false);
