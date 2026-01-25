@@ -410,15 +410,11 @@ def get_recent_commits(username=None, limit=50):
         
         # Leia muudetud failid selles commitis
         try:
-            if commit.parents:
-                # Võrdle parent commitiga
-                diffs = commit.parents[0].diff(commit)
-            else:
-                # Esimene commit - kõik failid on uued
-                diffs = commit.diff(None)
+            # Optimeerimine: Kasutame stats.files, et saada ainult failinimed
+            # See väldib kulukat sisu võrdlemist (diff)
+            file_paths = list(commit.stats.files.keys())
             
-            for diff in diffs:
-                filepath = diff.b_path or diff.a_path
+            for filepath in file_paths:
                 if not filepath or not filepath.endswith('.txt'):
                     continue
                 
