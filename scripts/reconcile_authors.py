@@ -397,7 +397,40 @@ def main():
                 elif 'Johannes' in base:
                     final_variations.append(base.replace('Johannes', 'Johannis'))
             
-            all_variations = variations + final_variations
+            # 5. C <-> K asendused levinud nimedes
+            common_replacements = {
+                'Jacob': 'Jakob', 'Jakob': 'Jacob',
+                'Carl': 'Karl', 'Karl': 'Carl',
+                'Eric': 'Erik', 'Erik': 'Eric',
+                'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus',
+                'Marcus': 'Markus', 'Markus': 'Marcus',
+                'Lucas': 'Lukas', 'Lukas': 'Lucas',
+                'Friderico': 'Friedrich', 'Friedrich': 'Friderico' # Lisaks ladina-saksa vaste
+            }
+            
+            ck_variations = []
+            # Proovime asendusi algsel päringul ja lühendatud versioonidel
+            for base in [search_query] + variations:
+                words = base.split()
+                new_words = []
+                changed = False
+                for w in words:
+                    # Eemalda kirjavahemärgid kontrolliks (kuigi clean_name teeb seda, igaks juhuks)
+                    w_clean = w.strip('.,')
+                    if w_clean in common_replacements:
+                        new_words.append(common_replacements[w_clean])
+                        changed = True
+                    # Kontrolli ka osa sõnast (nt Friderico -> Friedrich)
+                    elif 'Frideric' in w and 'Friedrich' not in w:
+                         new_words.append(w.replace('Frideric', 'Friedrich').replace('o', ''))
+                         changed = True
+                    else:
+                        new_words.append(w)
+                
+                if changed:
+                    ck_variations.append(" ".join(new_words))
+
+            all_variations = variations + final_variations + ck_variations
             unique_vars = []
             seen = set([search_query])
             for v in all_variations:
