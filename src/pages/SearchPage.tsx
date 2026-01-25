@@ -214,6 +214,30 @@ const SearchPage: React.FC = () => {
         try {
             const data = await searchContent(searchQuery, page, options);
             setResults(data);
+            
+            // Uuenda filtrite loendeid vastavalt saadud tulemustele (dünaamilised numbrid)
+            if (data.facetDistribution) {
+                const lang = options.lang || 'et';
+                
+                // Helper: teisenda jaotus massiiviks
+                const processFacets = (field: string) => {
+                    const dist = data.facetDistribution?.[field] || {};
+                    return Object.entries(dist)
+                        .map(([value, count]) => ({ value, count: count as number }))
+                        .sort((a, b) => b.count - a.count);
+                };
+
+                const genres = processFacets(`genre_${lang}`);
+                const types = processFacets(`type_${lang}`);
+                const tags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count })); // Tags on natuke teise struktuuriga
+
+                // Uuenda state'i, aga säilita olemasolevad valikud isegi kui count on 0 (UX)
+                // (Meilisearch tagastab vaikimisi ainult need, mille count > 0)
+                setAvailableGenres(genres);
+                setAvailableTypes(types);
+                setAvailableTeoseTags(tags);
+            }
+
             // Only reset expanded groups if it's a new query (page 1) and not filtering by work
             if (page === 1 && !options.workId) setExpandedGroups(new Set());
 

@@ -987,6 +987,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
+  const genreFacetField = options.lang ? `genre_${options.lang}` : 'genre_et';
+  const typeFacetField = options.lang ? `type_${options.lang}` : 'type_et';
+  const tagsFacetField = options.lang ? `tags_${options.lang}` : 'tags_et';
+
   let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
   else if (options.scope === 'annotation') attributesToSearchOn = [tagsField, 'comments.text'];
@@ -1021,14 +1025,15 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     }
 
     // Tavaline otsing: kaks päringut paralleelselt
-    // 1. Ilma distinct'ita - saame facet'id õigete vastete arvudega
+    // 1. Ilma distinct'ita - saame facet'id õigete vastete arvudega KÕIGI kategooriate lõikes
     // 2. Distinct'iga - saame 10 erinevat teost
     const [facetResponse, distinctResponse] = await Promise.all([
       // Päring 1: ainult facet'ide jaoks (limit=0)
       index.search(query, {
         filter,
         limit: 0,
-        facets: ['originaal_kataloog', 'teose_id'],
+        // Küsima ka dünaamilisi faceteid (genre, type, tags)
+        facets: ['originaal_kataloog', 'teose_id', genreFacetField, typeFacetField, tagsFacetField],
         attributesToSearchOn: attributesToSearchOn
       }),
       // Päring 2: distinct teosed
