@@ -42,21 +42,46 @@ def load_album_data():
     return []
 
 def clean_name_for_search(name):
+
     """
+
     Puhastab nime otsingu jaoks:
+
     1. Eemaldab sulud (ümar ja kandilised) koos sisuga
+
     2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
+
     """
-    # Eemalda sulud (ümar ja kandilised) koos sisuga
-    name_clean = re.sub(r'\s*[\(\[].*?[\) \]]', '', name)
+
+    # 1. Asenda sulud ja nende sisu tühikuga
+
+    # Kasutame eraldi regexi ümarsulgude ja nurksulgude jaoks, et olla kindlam
+
+    s1 = re.sub(r'\(.*?\)', ' ', name)
+
+    s2 = re.sub(r'\[.*?\]', ' ', s1)
+
     
-    # Pöörab nime ümber, kui on koma
-    if ',' in name_clean:
-        parts = name_clean.split(',', 1)
+
+    # 2. Eemalda üleliigsed tühikud ja sümbolid
+
+    clean = re.sub(r'\s+', ' ', s2).strip()
+
+    
+
+    # 3. Pööra nimi ringi (Perekonnanimi, Eesnimi -> Eesnimi Perekonnanimi)
+
+    if ',' in clean:
+
+        parts = clean.split(',', 1)
+
         if len(parts) == 2:
-            name_clean = f"{parts[1].strip()} {parts[0].strip()}"
+
+            clean = f"{parts[1].strip()} {parts[0].strip()}"
+
             
-    return name_clean.strip()
+
+    return clean.strip()
 
 def search_album(query, album_data):
     matches = []
