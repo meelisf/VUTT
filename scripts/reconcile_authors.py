@@ -491,20 +491,6 @@ def main():
                 if results:
                     break
 
-            all_variations = variations + final_variations + ck_variations
-            unique_vars = []
-            seen = set([search_query])
-            for v in all_variations:
-                if v not in seen:
-                    unique_vars.append(v)
-                    seen.add(v)
-
-            for var in unique_vars:
-                print(f"    ...ei leidnud. Proovin: '{var}'")
-                results = search_wikidata(var)
-                if results:
-                    break
-
         # Otsi Album Academicumist
         album_matches = search_album(search_query, album_data) if album_data else []
 
