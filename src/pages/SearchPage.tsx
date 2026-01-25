@@ -302,7 +302,7 @@ const SearchPage: React.FC = () => {
 
         // Navigeeri töölauasse
         const navigateToWorkspace = () => {
-            navigate(`/work/${hit.teose_id}/${hit.lehekylje_number}`);
+            navigate(`/work/${hit.work_id || hit.teose_id}/${hit.lehekylje_number}`);
         };
 
         return (
@@ -989,14 +989,15 @@ const SearchPage: React.FC = () => {
                                                 <div className="py-2 px-3 bg-gray-50 border-t border-gray-200 flex justify-end">
                                                     <button
                                                         onClick={() => {
-                                                            setSelectedWork(workId);
+                                                            const targetId = firstHit.work_id || workId;
+                                                            setSelectedWork(targetId);
                                                             setSelectedWorkInfo({
-                                                                title: firstHit.pealkiri || workId,
+                                                                title: firstHit.pealkiri || targetId,
                                                                 year: firstHit.aasta,
                                                                 author: Array.isArray(firstHit.autor) ? firstHit.autor[0] : firstHit.autor
                                                             });
                                                             setSearchParams(prev => {
-                                                                prev.set('work', workId);
+                                                                prev.set('work', targetId);
                                                                 prev.set('p', '1');
                                                                 return prev;
                                                             });
