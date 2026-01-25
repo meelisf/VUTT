@@ -10,7 +10,7 @@ from datetime import timedelta
 # =========================================================
 
 # VUTT_DATA_DIR env variable allows overriding the path for Docker/Production
-DEFAULT_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+DEFAULT_DIR = "data"
 BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 
 # JSON failide asukohad (state/ kaustas projekti juurkataloogis)

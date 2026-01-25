@@ -22,7 +22,7 @@ import unicodedata
 from tqdm import tqdm
 
 # --- SEADISTUS ---
-DATA_ROOT_DIR = os.getenv('VUTT_DATA_DIR', 'data/04_sorditud_dokumendid')
+DATA_ROOT_DIR = os.getenv('VUTT_DATA_DIR', 'data')
 OUTPUT_FILE = 'output/meilisearch_data_per_page.jsonl'
 STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'state')
 COLLECTIONS_FILE = os.path.join(STATE_DIR, 'collections.json')
