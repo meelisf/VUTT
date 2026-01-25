@@ -570,11 +570,23 @@ def main():
                 print(f"  Nimi muudetud {count} failis.")
         
         elif choice == 'm':
-            q_code = input("  Sisesta Q-kood (nt Q123) > ").strip().upper()
-            if q_code.startswith('Q'):
+            manual_input = input("  Sisesta ID (Q123, VIAF:123) või permalink > ").strip()
+            
+            # Tuvasta permalinkidest ID
+            if 'viaf.org/viaf/' in manual_input:
+                match = re.search(r'viaf\.org/viaf/(\d+)', manual_input)
+                manual_id = f"VIAF:{match.group(1)}" if match else manual_input
+            elif 'wikidata.org/wiki/' in manual_input:
+                match = re.search(r'wikidata\.org/wiki/(Q\d+)', manual_input)
+                manual_id = match.group(1) if match else manual_input
+            else:
+                manual_id = manual_input
+
+            if manual_id.upper().startswith('Q'):
+                q_code = manual_id.upper()
                 entity = get_wikidata_entity(q_code)
                 if entity:
-                    print(f"  Leiti: {entity['label']} - {entity['description']}")
+                    print(f"  Leiti Wikidatast: {entity['label']} - {entity['description']}")
                     confirm = input(f"  Kas seome sellega? [Y/n] > ").strip().lower()
                     if confirm in ['', 'y']:
                         new_entity = {"label": entity['label'], "id": q_code, "source": "wikidata"}
@@ -586,7 +598,19 @@ def main():
                         print(f"  Seotud {q_code}-ga {count} failis.")
                 else:
                     print(f"  Ei leidnud Wikidatast üksust koodiga {q_code}.")
-        
+            elif manual_id.upper().startswith('VIAF:'):
+                viaf_code = manual_id.split(':', 1)[1].strip()
+                label = input(f"  Sisesta nimi (vaikimisi '{name}') > ").strip() or name
+                new_entity = {"label": label, "id": viaf_code, "source": "viaf"}
+                count = 0
+                for f in files:
+                    if update_file(f['path'], name, new_entity): count += 1
+                state['processed'][name] = f"VIAF:{viaf_code}"
+                save_state(state)
+                print(f"  Seotud VIAF-iga ({viaf_code}) {count} failis.")
+            else:
+                print("  Tundmatu ID vorming. Kasuta Q123, VIAF:123 või kopeeri permalink.")
+
         elif choice.isdigit() and 1 <= int(choice) <= len(results):
             res = results[int(choice) - 1]
             new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
