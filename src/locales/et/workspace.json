@@ -134,6 +134,14 @@
     "readOnlyHint": "Logi sisse, et teksti muuta",
     "specialChars": "Erimärgid ja juhend",
     "openGuide": "Ava transkribeerimise juhend",
-    "guideTitle": "Transkribeerimise juhend"
+    "guideTitle": "Transkribeerimise juhend",
+    "tooltips": {
+      "bold": "Paks kiri",
+      "italic": "Kaldkiri",
+      "fractur": "Koodivahetus (fraktuur)",
+      "marginalia": "Ääremärkus",
+      "footnote": "Joonealune märkus",
+      "pageBreak": "Lehekülje vahetus"
+    }
   }
 }

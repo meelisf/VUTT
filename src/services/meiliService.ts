@@ -1025,23 +1025,23 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     }
 
     // Tavaline otsing: kaks päringut paralleelselt
-    // 1. Ilma distinct'ita - saame facet'id õigete vastete arvudega KÕIGI kategooriate lõikes
-    // 2. Distinct'iga - saame 10 erinevat teost
+    // 1. Ilma distinct'ita - saame teada, mitu lehekülge igas teoses vastab (teose_id facet)
+    // 2. Distinct'iga - saame unikaalsed teosed ja nende metaandmete statistika (genre, type, tags facetid)
     const [facetResponse, distinctResponse] = await Promise.all([
-      // Päring 1: ainult facet'ide jaoks (limit=0)
+      // Päring 1: ainult teose vastete arvu jaoks (limit=0)
       index.search(query, {
         filter,
         limit: 0,
-        // Küsima ka dünaamilisi faceteid (genre, type, tags)
-        facets: ['originaal_kataloog', 'teose_id', genreFacetField, typeFacetField, tagsFacetField],
+        facets: ['teose_id'], 
         attributesToSearchOn: attributesToSearchOn
       }),
-      // Päring 2: distinct teosed
+      // Päring 2: distinct teosed + metaandmete facetid
       index.search(query, {
         offset,
         limit,
         filter,
         distinct: 'teose_id',
+        facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField],
         attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
         attributesToCrop: ['lehekylje_tekst', 'comments.text'],
         cropLength: 35,
@@ -1065,6 +1065,12 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     const totalHits = facetResponse.estimatedTotalHits || 0;
     const totalWorks = distinctResponse.estimatedTotalHits || 0;
 
+    // Ühendame facetid: teose_id tuleb esimesest (leheküljed), teised teisest (teosed)
+    const combinedFacets = {
+      ...(distinctResponse.facetDistribution || {}),
+      teose_id: facetResponse.facetDistribution?.['teose_id'] || {}
+    };
+
     return {
       hits: hitsWithCounts as any,
       totalHits: totalHits,
@@ -1072,7 +1078,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       totalPages: Math.ceil(totalWorks / limit),
       page,
       processingTimeMs: distinctResponse.processingTimeMs,
-      facetDistribution: facetResponse.facetDistribution
+      facetDistribution: combinedFacets
     };
   } catch (e: any) {
     if (e.message && e.message.includes('not searchable')) {

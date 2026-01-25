@@ -134,6 +134,14 @@
     "readOnlyHint": "Log in to edit text",
     "specialChars": "Special characters & guide",
     "openGuide": "Open transcription guide",
-    "guideTitle": "Transcription guide"
+    "guideTitle": "Transcription guide",
+    "tooltips": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "fractur": "Font switch (fractur)",
+      "marginalia": "Marginalia",
+      "footnote": "Footnote",
+      "pageBreak": "Page break"
+    }
   }
 }

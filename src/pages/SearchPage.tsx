@@ -221,8 +221,14 @@ const SearchPage: React.FC = () => {
                 
                 // Helper: teisenda jaotus massiiviks
                 const processFacets = (field: string) => {
-                    const dist = data.facetDistribution?.[field] || {};
-                    if (Object.keys(dist).length === 0) console.log(`Empty facets for ${field}`, data.facetDistribution);
+                    let dist = data.facetDistribution?.[field];
+                    // Fallback põhiväljale (nt 'genre_et' puudumisel proovi 'genre')
+                    if (!dist && field.includes('_')) {
+                        const baseField = field.split('_')[0];
+                        dist = data.facetDistribution?.[baseField];
+                    }
+                    dist = dist || {};
+                    
                     return Object.entries(dist)
                         .map(([value, count]) => ({ value, count: count as number }))
                         .sort((a, b) => b.count - a.count);
