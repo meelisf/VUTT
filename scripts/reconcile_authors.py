@@ -33,11 +33,11 @@ WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 def clean_name_for_search(name):
     """
     Puhastab nime otsingu jaoks:
-    1. Eemaldab sulud ja nende sisu: "Albogius (Albohm)" -> "Albogius"
+    1. Eemaldab sulud ja nende sisu: "Albogius (Albohm)" -> "Albogius", "[A & R]" -> ""
     2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
     """
-    # Eemalda sulud koos sisuga
-    name_clean = re.sub(r'\s*\(.*?\)', '', name)
+    # Eemalda sulud (ümar ja kandilised) koos sisuga
+    name_clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', name)
     
     # Pöörab nime ümber, kui on koma
     if ',' in name_clean:
@@ -210,7 +210,38 @@ def main():
         # Otsi Wikidatast
         search_query = clean_name_for_search(name)
         print(f"  Otsin Wikidatast: '{search_query}'")
-            
+        
+        # KONTROLLI: Kas me oleme sarnast nime juba lahendanud?
+        previous_match = None
+        for processed_name, processed_id in state['processed'].items():
+            if processed_id != "LOCAL" and clean_name_for_search(processed_name) == search_query:
+                previous_match = processed_id
+                break
+        
+        if previous_match:
+            print(f"  LEITUD EELMINE OTSUS: '{processed_name}' oli seotud {previous_match}-ga.")
+            auto_choice = input(f"  Kas soovid kasutada sama vastet ({previous_match})? [Y/n] > ").strip().lower()
+            if auto_choice in ['', 'y']:
+                # Hangi silt Wikidatast (või kasuta placeholderit, hiljem uuendatakse)
+                # Lihtsuse mõttes teeme kiire päringu ID järgi või kasutame vana nime
+                # Aga meil on vaja korrektset labelit faili jaoks.
+                # Teeme uue päringu ID-ga, et saada värske label.
+                 # NB: See on lihtsustus, ideaalis võiks cache'ida labelid ka.
+                results = search_wikidata(previous_match) 
+                # search_wikidata otsib stringi, mitte ID-d otse, aga ID otsing töötab ka.
+                # Aga wbsearchentities 'search' parameeter töötab ka ID-ga.
+                
+                if results and results[0]['id'] == previous_match:
+                     res = results[0]
+                     new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
+                     count = 0
+                     for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                     state['processed'][name] = res['id']
+                     save_state(state)
+                     print(f"  Automaatselt seotud {res['id']}-ga {count} failis.")
+                     continue
+
         results = search_wikidata(search_query)
 
         # Kui ei leidnud, proovi variatsioone
