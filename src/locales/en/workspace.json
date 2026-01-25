@@ -40,7 +40,9 @@
       "status_change": "Changed status",
       "comment_added": "Added comment",
       "saved_changes": "Saved changes"
-    }
+    },
+    "adminOnly": "Version restoration is only available to administrators.",
+    "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes."
   },
   "metadata": {
     "title": "Metadata",
@@ -96,10 +98,12 @@
     "pageAnnotations": "Page notes",
     "noAnnotations": "No notes added",
     "noAnnotationsHint": "Add first comment or note.",
+    "noTags": "No tags added",
     "addAnnotation": "Add note",
     "addComment": "Add comment",
     "annotationPlaceholder": "Write a note here...",
-    "commentPlaceholder": "Write here..."
+    "commentPlaceholder": "Write here...",
+    "loginToComment": "Log in to add comments"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
@@ -116,5 +120,20 @@
   "status": {
     "label": "Page status",
     "contributorDisabled": "Only editors can change the status"
+  },
+  "editor": {
+    "placeholder": "No text...",
+    "unsavedChanges": "Unsaved changes",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveError": "Save failed",
+    "save": "Save",
+    "lastModified": "Last modified",
+    "by": "by",
+    "readOnly": "Read only",
+    "readOnlyHint": "Log in to edit text",
+    "specialChars": "Special characters & guide",
+    "openGuide": "Open transcription guide",
+    "guideTitle": "Transcription guide"
   }
 }

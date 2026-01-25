@@ -671,7 +671,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <div className={`transition-transform duration-200 text-gray-400 ${showCharPanel ? 'rotate-90' : ''}`}>
                       <ChevronRight size={12} />
                     </div>
-                    Erimärgid ja juhend
+                    {t('editor.specialChars')}
                   </summary>
 
                   <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
@@ -696,7 +696,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       onClick={() => setShowTranscriptionGuide(true)}
                       className="text-[11px] text-primary-600 hover:text-primary-800 hover:underline py-1 transition-colors"
                     >
-                      Ava transkribeerimise juhend
+                      {t('editor.openGuide')}
                     </button>
                   </div>
                 </details>
@@ -709,14 +709,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
                   <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                      <h2 className="text-lg font-bold text-gray-800">Transkribeerimise juhend</h2>
+                      <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
                       <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
                         <X size={20} />
                       </button>
                     </div>
                     <div
                       className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-                      dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || '<p>Juhendi laadimine...</p>' }}
+                      dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
                     />
                   </div>
                 </div>
@@ -1011,7 +1011,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   <h4 className="font-bold">{t('workspace:info.pageTags')}</h4>
                 </div>
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">Märksõnad puuduvad</span>}
+                  {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">{t('info.noTags')}</span>}
                   {page_tags.map((tag, idx) => {
                     const label = getLabel(tag, lang);
                     const tagId = typeof tag !== 'string' ? (tag as any).id : null;
@@ -1125,7 +1125,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   </div>
                 ) : (
                   <div className="mt-auto text-center py-4 text-sm text-gray-400">
-                    Kommentaaride lisamiseks logi sisse
+                    {t('info.loginToComment')}
                   </div>
                 )}
               </div>
@@ -1157,13 +1157,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <p className="text-sm text-gray-600">{entry.description}</p>
                       {entry.action === 'status_change' && (
                         <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
-                          Staatus muudetud
+                          {t('history.action.status_change')}
                         </span>
                       )}
                     </div>
                   ))}
                   {(!page.history || page.history.length === 0) && (
-                    <p className="text-sm text-gray-400 pl-6">Ajalugu puudub.</p>
+                    <p className="text-sm text-gray-400 pl-6">{t('history.noBackups')}</p>
                   )}
                 </div>
               </div>
@@ -1248,14 +1248,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
                   <p className="mt-4 text-xs text-gray-500">
                     <AlertTriangle size={12} className="inline mr-1" />
-                    Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta "Salvesta".
+                    {t('history.restoreHint')}
                   </p>
                 </div>
               )}
 
               {user && user.role !== 'admin' && (
                 <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500">
-                  Varukoopiate taastamine on saadaval ainult administraatoritele.
+                  {t('history.adminOnly')}
                 </div>
               )}
             </div>

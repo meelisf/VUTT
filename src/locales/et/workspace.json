@@ -40,7 +40,9 @@
       "status_change": "Muutis staatust",
       "comment_added": "Lisas kommentaari",
       "saved_changes": "Salvestas muudatused"
-    }
+    },
+    "adminOnly": "Varukoopiate taastamine on saadaval ainult administraatoritele.",
+    "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\"."
   },
   "metadata": {
     "title": "Metaandmed",
@@ -96,10 +98,12 @@
     "pageAnnotations": "Lehekülje märkmed",
     "noAnnotations": "Märkmeid pole lisatud",
     "noAnnotationsHint": "Lisa esimene kommentaar või märkus.",
+    "noTags": "Märksõnad puuduvad",
     "addAnnotation": "Lisa märge",
     "addComment": "Lisa kommentaar",
     "annotationPlaceholder": "Kirjuta märge siia...",
-    "commentPlaceholder": "Kirjuta siia..."
+    "commentPlaceholder": "Kirjuta siia...",
+    "loginToComment": "Kommentaaride lisamiseks logi sisse"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
@@ -116,5 +120,20 @@
   "status": {
     "label": "Lehekülje staatus",
     "contributorDisabled": "Staatust saab muuta ainult toimetaja"
+  },
+  "editor": {
+    "placeholder": "Tekst puudub...",
+    "unsavedChanges": "Salvestamata muudatused",
+    "saving": "Salvestan...",
+    "saved": "Salvestatud",
+    "saveError": "Salvestamine ebaõnnestus",
+    "save": "Salvesta",
+    "lastModified": "Viimati muudetud",
+    "by": "muutja",
+    "readOnly": "Ainult lugemine",
+    "readOnlyHint": "Logi sisse, et teksti muuta",
+    "specialChars": "Erimärgid ja juhend",
+    "openGuide": "Ava transkribeerimise juhend",
+    "guideTitle": "Transkribeerimise juhend"
   }
 }
