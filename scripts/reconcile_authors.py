@@ -41,44 +41,14 @@ def load_album_data():
             print(f"Viga Album Academicumi lugemisel: {e}")
     return []
 
-def search_album(query, album_data):
-    matches = []
-    query_lower = query.lower()
-    
-    for entry in album_data:
-        p = entry.get('person', {})
-        full_name = p.get('name', {}).get('full', '')
-        if not full_name: continue
-        
-        score = 0
-        # 1. Täpne vaste
-        if query_lower == full_name.lower():
-            score = 1.0
-        # 2. Fuzzy match
-        else:
-            score = difflib.SequenceMatcher(None, query_lower, full_name.lower()).ratio()
-            
-        # 3. OCR kontroll (raw_text)
-        raw = entry.get('raw_text') or ''
-        if query_lower in raw.lower() and score < 0.7:
-            score = 0.75
-
-        if score > 0.7:
-            matches.append((score, entry))
-            
-    # Sorteeri skoori järgi ja tagasta entry-d
-    matches.sort(key=lambda x: x[0], reverse=True)
-    return [m[1] for m in matches[:3]]
-
 def clean_name_for_search(name):
     """
     Puhastab nime otsingu jaoks:
     1. Eemaldab sulud (ümar ja kandilised) koos sisuga
     2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
-    3. Eemaldab tüüpilised ladina päritolunimed (Stregnensis, Tarbatensis jne)
     """
     # Eemalda sulud (ümar ja kandilised) koos sisuga
-    name_clean = re.sub(r'\s*[\(\[].*?[\) T]', '', name)
+    name_clean = re.sub(r'\s*[\(\[].*?[\) \]]', '', name)
     
     # Pöörab nime ümber, kui on koma
     if ',' in name_clean:
@@ -86,15 +56,58 @@ def clean_name_for_search(name):
         if len(parts) == 2:
             name_clean = f"{parts[1].strip()} {parts[0].strip()}"
             
-    # Eemalda -ensis lõpuga sõnad (nt Stregnensis, Tarbatensis)
-    # Aga ainult siis, kui see pole ainuke nimi
-    name_parts = name_clean.split()
-    if len(name_parts) > 1:
-        filtered_parts = [p for p in name_parts if not p.lower().endswith('ensis')]
-        if filtered_parts:
-            name_clean = " ".join(filtered_parts)
-            
     return name_clean.strip()
+
+def search_album(query, album_data):
+    matches = []
+    # Query on juba clean_name_for_search poolt töödeldud
+    
+    # Koosta variatsioonid ka albumi jaoks
+    parts = query.split()
+    query_variants = [query]
+    if len(parts) > 2:
+        query_variants.append(" ".join(parts[:-1])) # Drop last
+        query_variants.append(f"{parts[0]} {parts[-1]}") # Drop middle
+    
+    # Eemalda duplikaadid
+    query_variants = list(dict.fromkeys(query_variants))
+
+    for entry in album_data:
+        p = entry.get('person', {})
+        full_name = p.get('name', {}).get('full', '')
+        if not full_name: continue
+        
+        # Puhastame ka Albumi nime võrdluseks (et kuju oleks sama)
+        album_full_clean = clean_name_for_search(full_name).lower()
+        
+        best_score = 0
+        for q_var in query_variants:
+            q_var_lower = q_var.lower()
+            
+            # 1. Täpne vaste variatsiooniga
+            if q_var_lower == album_full_clean:
+                score = 1.0
+            # 2. Fuzzy match
+            else:
+                score = max(
+                    difflib.SequenceMatcher(None, q_var_lower, album_full_clean).ratio(),
+                    difflib.SequenceMatcher(None, q_var_lower, full_name.lower()).ratio()
+                )
+            
+            if score > best_score:
+                best_score = score
+            
+        # 3. OCR kontroll (raw_text) - kasuta algset queryt
+        raw = entry.get('raw_text') or ''
+        if query.lower() in raw.lower() and best_score < 0.7:
+            best_score = 0.75
+
+        if best_score > 0.7:
+            matches.append((best_score, entry))
+            
+    # Sorteeri skoori järgi ja tagasta entry-d
+    matches.sort(key=lambda x: x[0], reverse=True)
+    return [m[1] for m in matches[:3]]
 
 def get_wikidata_entity(q_id):
     """Hangi konkreetne Wikidata üksus ID järgi."""
@@ -233,7 +246,7 @@ def update_file(file_path, old_name, new_entity):
         return False
 
 def main():
-    print("--- AUTORITE ÜHTLUSTAJA ---")
+    print("---" + " AUTORITE ÜHTLUSTAJA " + "---")
     state = load_state()
     album_data = load_album_data()
     if album_data:
@@ -242,11 +255,7 @@ def main():
     processed = set(state['processed'].keys())
     
     # 1. Kogu kõik unikaalsed sidumata autorid
-    # ... (sama mis varem)
     print("Kogun andmeid...")
-    # ...
-    # (Kuna ma ei taha tervet maini asendada ja vigu teha, teen täpsema asenduse main-tsükli sees)
-
     unique_authors = set()
     
     for root, dirs, files in os.walk(BASE_DIR):
@@ -318,6 +327,48 @@ def main():
 
         results = search_wikidata(search_query)
 
+        # Kui ei leidnud, proovi variatsioone (Waterfall strateegia)
+        if not results:
+            variations = []
+            parts = search_query.split()
+            
+            # 1. Proovi ilma viimase nimeta (nt Andreas Arvidi Stregnensis -> Andreas Arvidi)
+            if len(parts) > 2:
+                variations.append(" ".join(parts[:-1]))
+            
+            # 2. Proovi ilma keskmiste nimedeta (nt Andreas Arvidi Stregnensis -> Andreas Stregnensis)
+            if len(parts) > 2:
+                variations.append(f"{parts[0]} {parts[-1]}")
+            
+            # 3. Proovi ilma -ensis lõpuga sõnadeta (kui neid on)
+            ensis_removed = [p for p in parts if not p.lower().endswith('ensis')]
+            if len(ensis_removed) < len(parts) and len(ensis_removed) >= 1:
+                variations.append(" ".join(ensis_removed))
+            
+            # 4. Proovi asendada -is -> -es (Johannis -> Johannes) jms
+            base_variations = [search_query] + variations
+            final_variations = []
+            
+            for base in base_variations:
+                if 'Johannis' in base:
+                    final_variations.append(base.replace('Johannis', 'Johannes'))
+                elif 'Johannes' in base:
+                    final_variations.append(base.replace('Johannes', 'Johannis'))
+            
+            all_variations = variations + final_variations
+            unique_vars = []
+            seen = set([search_query])
+            for v in all_variations:
+                if v not in seen:
+                    unique_vars.append(v)
+                    seen.add(v)
+
+            for var in unique_vars:
+                print(f"    ...ei leidnud. Proovin: '{var}'")
+                results = search_wikidata(var)
+                if results:
+                    break
+
         # Otsi Album Academicumist
         album_matches = search_album(search_query, album_data) if album_data else []
 
@@ -326,11 +377,11 @@ def main():
             print("\n  VALIKUD (ALBUM ACADEMICUM):")
             for idx, entry in enumerate(album_matches):
                 p = entry.get('person', {})
-                name = p.get('name', {}).get('full')
+                name_aa = p.get('name', {}).get('full')
                 death = p.get('death', {}).get('date') or "?"
                 origin = p.get('origin', {}).get('city') or "?"
                 num = entry.get('entry_number')
-                print(f"    A{idx+1}. {name} (surn. {death}, pärit {origin}) [AA:{num}]")
+                print(f"    A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]")
 
         # Kuva valikud (Wikidata)
         print("\n  VALIKUD (WIKIDATA):")
@@ -358,9 +409,9 @@ def main():
             if 0 <= idx < len(album_matches):
                 entry = album_matches[idx]
                 num = entry.get('entry_number')
-                name = entry.get('person', {}).get('name', {}).get('full')
+                name_aa = entry.get('person', {}).get('name', {}).get('full')
                 new_entity = {
-                    "label": name,
+                    "label": name_aa,
                     "id": f"AA:{num}",
                     "source": "album_academicum"
                 }
@@ -377,7 +428,6 @@ def main():
             continue
             
         elif choice == 'l':
-            # Märgi lokaalseks (processed = "LOCAL")
             state['processed'][name] = "LOCAL"
             save_state(state)
             print("  Märgitud lokaalseks.")
@@ -385,12 +435,11 @@ def main():
         elif choice == 'r':
             new_name = input("  Sisesta uus nimi > ").strip()
             if new_name:
-                # Uuenda failides nimi ära, aga ära märgi tehtuks (järgmine kord leiab uue nimega)
                 new_entity = {"label": new_name, "id": None, "source": "manual"}
                 count = 0
                 for f in files:
                     if update_file(f['path'], name, new_entity): count += 1
-                print(f"  Nimi muudetud {count} failis. Uus nimi ilmub nimekirja järgmisel käivitusel.")
+                print(f"  Nimi muudetud {count} failis.")
         
         elif choice == 'm':
             q_code = input("  Sisesta Q-kood (nt Q123) > ").strip().upper()
@@ -404,29 +453,21 @@ def main():
                         count = 0
                         for f in files:
                             if update_file(f['path'], name, new_entity): count += 1
-                        
                         state['processed'][name] = q_code
                         save_state(state)
                         print(f"  Seotud {q_code}-ga {count} failis.")
                 else:
                     print(f"  Ei leidnud Wikidatast üksust koodiga {q_code}.")
-            else:
-                print("  Vigane kood, jätsin vahele.")
-
+        
         elif choice.isdigit() and 1 <= int(choice) <= len(results):
             res = results[int(choice) - 1]
             new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
-            
             count = 0
             for f in files:
                 if update_file(f['path'], name, new_entity): count += 1
-            
             state['processed'][name] = res['id']
             save_state(state)
             print(f"  Seotud {res['id']}-ga {count} failis.")
-            
-        else:
-            print("  Tundmatu valik, jätsin vahele.")
 
 if __name__ == '__main__':
     try:
