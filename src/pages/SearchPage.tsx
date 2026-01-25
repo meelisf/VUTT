@@ -928,26 +928,44 @@ const SearchPage: React.FC = () => {
                                                             
                                                             {/* Lisame Žanri ja Tüübi */}
                                                             {(() => {
-                                                                const genreLabel = getLabel(firstHit.genre_object || firstHit.genre, i18n.language);
-                                                                if (!genreLabel) return null;
+                                                                const lang = i18n.language.split('-')[0];
+                                                                let label = getLabel(firstHit.genre_object, i18n.language);
+                                                                
+                                                                // Fallback: proovi leida stringist või sõnavarast
+                                                                if (!label && firstHit.genre && typeof firstHit.genre === 'string') {
+                                                                    const val = firstHit.genre.toLowerCase();
+                                                                    label = vocabularies?.genres?.[val]?.[lang] || firstHit.genre;
+                                                                }
+
+                                                                if (!label) return null;
+                                                                
                                                                 return (
                                                                     <>
                                                                         <span className="text-gray-300">❧</span>
                                                                         <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                                                                            {genreLabel}
+                                                                            {label}
                                                                         </span>
                                                                     </>
                                                                 );
                                                             })()}
                                                             
                                                             {(() => {
-                                                                const typeLabel = getLabel(firstHit.type_object || firstHit.type, i18n.language);
-                                                                if (!typeLabel) return null;
+                                                                const lang = i18n.language.split('-')[0];
+                                                                let label = getLabel(firstHit.type_object, i18n.language);
+                                                                
+                                                                // Fallback: proovi leida stringist või sõnavarast
+                                                                if (!label && firstHit.type && typeof firstHit.type === 'string') {
+                                                                    const val = firstHit.type.toLowerCase();
+                                                                    label = vocabularies?.types?.[val]?.[lang] || firstHit.type;
+                                                                }
+
+                                                                if (!label) return null;
+
                                                                 return (
                                                                     <>
                                                                         <span className="text-gray-300">❧</span>
                                                                         <span className="text-gray-500 italic">
-                                                                            {typeLabel}
+                                                                            {label}
                                                                         </span>
                                                                     </>
                                                                 );
