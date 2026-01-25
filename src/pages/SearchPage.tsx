@@ -900,8 +900,14 @@ const SearchPage: React.FC = () => {
                                                                 <span className="uppercase text-gray-400 text-[10px]">{t('labels.year')}</span>
                                                                 {firstHit.aasta || '...'}
                                                             </button>
-                                                            <span className="text-gray-300">❧</span>
-                                                            <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
+                                                            
+                                                            {/* Kuvame originaalkataloogi ainult siis, kui see erineb ID-st (ja pole tühi) */}
+                                                            {firstHit.originaal_kataloog && firstHit.originaal_kataloog !== (firstHit.work_id || workId) && (
+                                                                <>
+                                                                    <span className="text-gray-300">❧</span>
+                                                                    <span className="text-gray-500">{firstHit.originaal_kataloog}</span>
+                                                                </>
+                                                            )}
                                                             
                                                             {/* Lisame Žanri ja Tüübi */}
                                                             {(firstHit.genre || firstHit.genre_object) && (
@@ -923,8 +929,8 @@ const SearchPage: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="shrink-0 text-right">
-                                                        <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600">
-                                                            {workId}
+                                                        <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600" title="Teose ID">
+                                                            {firstHit.work_id || workId}
                                                         </span>
                                                     </div>
                                                 </div>
