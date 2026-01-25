@@ -21,6 +21,7 @@ import sys
 import urllib.request
 import urllib.parse
 import time
+import re
 
 # Seadistused
 BASE_DIR = os.getenv("VUTT_DATA_DIR", "data/")
@@ -28,6 +29,23 @@ STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 
 # Wikidata API
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
+
+def clean_name_for_search(name):
+    """
+    Puhastab nime otsingu jaoks:
+    1. Eemaldab sulud ja nende sisu: "Albogius (Albohm)" -> "Albogius"
+    2. Pöörab 'Perekonnanimi, Eesnimi' -> 'Eesnimi Perekonnanimi'
+    """
+    # Eemalda sulud koos sisuga
+    name_clean = re.sub(r'\s*\(.*?\)', '', name)
+    
+    # Pöörab nime ümber, kui on koma
+    if ',' in name_clean:
+        parts = name_clean.split(',', 1)
+        if len(parts) == 2:
+            return f"{parts[1].strip()} {parts[0].strip()}".strip()
+            
+    return name_clean.strip()
 
 def load_state():
     if os.path.exists(STATE_FILE):
@@ -190,8 +208,13 @@ def main():
             print(f"    - {f['context']}")
         
         # Otsi Wikidatast
-        print("  Otsin Wikidatast...")
-        results = search_wikidata(name)
+        search_query = clean_name_for_search(name)
+        if search_query != name:
+            print(f"  Otsin Wikidatast ('{search_query}')... (algne: '{name}')")
+        else:
+            print(f"  Otsin Wikidatast ('{name}')...")
+            
+        results = search_wikidata(search_query)
         
         # Kuva valikud
         print("\n  VALIKUD:")
