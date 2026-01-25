@@ -23,7 +23,7 @@ import urllib.parse
 import time
 
 # Seadistused
-BASE_DIR = os.getenv("VUTT_DATA_DIR", "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/")
+BASE_DIR = os.getenv("VUTT_DATA_DIR", "data/")
 STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "state", "reconcile_authors_state.json")
 
 # Wikidata API

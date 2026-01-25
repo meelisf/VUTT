@@ -17,7 +17,7 @@ import sys
 
 # Määra andmete asukoht
 # Sinu süsteemis tundub olevat see:
-BASE_DIR = os.getenv("VUTT_DATA_DIR", "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/")
+BASE_DIR = os.getenv("VUTT_DATA_DIR", "data/")
 
 # Normaliseerimise reeglid
 # Vorming: "Otsitav sõna (lowercase)": {"label": "Õige silt", "id": "Q-kood", "labels": {"et": "..."}}
