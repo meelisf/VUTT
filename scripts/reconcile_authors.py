@@ -49,8 +49,9 @@ def search_wikidata(query):
         "origin": "*"
     }
     url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"})
     try:
-        with urllib.request.urlopen(url) as response:
+        with urllib.request.urlopen(req) as response:
             data = json.load(response)
             return data.get("search", [])
     except Exception as e:
