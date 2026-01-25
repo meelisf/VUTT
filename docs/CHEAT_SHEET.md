@@ -29,6 +29,22 @@ cd ~/VUTT
 ./scripts/server_seed_data.sh
 ```
 
+## 🔍 Andmete Indekseerimine Manuaalselt
+Kui soovid skripte käivitada otse serveri terminalis (väljaspool Dockerit):
+
+```bash
+cd ~/VUTT
+source .venv/bin/activate
+
+# 1. Konsolideeri andmed (genereerib JSONL faili)
+python3 scripts/1-1_consolidate_data.py
+
+# 2. Lae andmed Meilisearchi
+# Kuna .env-s on URL Dockeri jaoks (http://meilisearch:7700), 
+# peab käsitsi käivitades andma ette localhost aadressi:
+MEILISEARCH_URL=http://127.0.0.1:7700 python3 scripts/2-1_upload_to_meili.py
+```
+
 ## 🔑 Võtmed ja Paroolid
 *   **Kus nad asuvad:** `~/VUTT/.env`
 *   **Otsingu API võti:**
