@@ -59,7 +59,7 @@ def search_album(query, album_data):
             score = difflib.SequenceMatcher(None, query_lower, full_name.lower()).ratio()
             
         # 3. OCR kontroll (raw_text)
-        raw = entry.get('raw_text', '')
+        raw = entry.get('raw_text') or ''
         if query_lower in raw.lower() and score < 0.7:
             score = 0.75
 
