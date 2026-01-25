@@ -35,7 +35,7 @@ from server import (
     save_with_git, get_file_git_history, get_file_at_commit, get_file_diff,
     get_commit_diff, get_recent_commits,
     # Meilisearch
-    sync_work_to_meilisearch, metadata_watcher_loop,
+    sync_work_to_meilisearch,
     # Utils
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status, build_work_id_cache
@@ -1931,10 +1931,6 @@ if __name__ == '__main__':
 
     # Ehita Work ID cache kiiremaks failide leidmiseks
     build_work_id_cache()
-
-    # Käivita metaandmete jälgija taustal
-    # watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
-    # watcher_thread.start()
 
     # Kasutame ThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
     server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)

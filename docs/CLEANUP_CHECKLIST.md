@@ -34,3 +34,9 @@ Aja jooksul koguneb vanu pite ja konteinereid.
 ## 5. SSL Sertifikaadid
 - [ ] Kontrolli aegumist. TÜ sertifikaadid kehtivad tavaliselt 1-2 aastat.
 - [ ] Asukoht: `/etc/nginx/certs/vutt/`
+
+## 6. Koodi ja Andmete Puhtus (2026 Uuendus)
+- [ ] **NanoID üleminek:** Veendu, et `_metadata.json` failides on `id` väli (nanoid) olemas.
+- [ ] **Indeksi optimeerimine:** Kustuta ja loo Meilisearchi indeks uuesti (`scripts/2-1_upload_to_meili.py`), et vabaneda vanadest väljadest.
+- [ ] **Pythoni keskkond:** Kasuta alati `.venv` virtuaalkeskkonda skriptide käivitamisel.
+
