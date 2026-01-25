@@ -924,22 +924,31 @@ const SearchPage: React.FC = () => {
                                                             </button>
                                                             
                                                             {/* Lisame Žanri ja Tüübi */}
-                                                            {(firstHit.genre || firstHit.genre_object) && (
-                                                                <>
-                                                                    <span className="text-gray-300">❧</span>
-                                                                    <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                                                                        {getLabel(firstHit.genre_object || firstHit.genre, i18n.language)}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                            {(firstHit.type || firstHit.type_object) && (
-                                                                <>
-                                                                    <span className="text-gray-300">❧</span>
-                                                                    <span className="text-gray-500 italic">
-                                                                        {getLabel(firstHit.type_object || firstHit.type, i18n.language)}
-                                                                    </span>
-                                                                </>
-                                                            )}
+                                                            {(() => {
+                                                                const genreLabel = getLabel(firstHit.genre_object || firstHit.genre, i18n.language);
+                                                                if (!genreLabel) return null;
+                                                                return (
+                                                                    <>
+                                                                        <span className="text-gray-300">❧</span>
+                                                                        <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
+                                                                            {genreLabel}
+                                                                        </span>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                            
+                                                            {(() => {
+                                                                const typeLabel = getLabel(firstHit.type_object || firstHit.type, i18n.language);
+                                                                if (!typeLabel) return null;
+                                                                return (
+                                                                    <>
+                                                                        <span className="text-gray-300">❧</span>
+                                                                        <span className="text-gray-500 italic">
+                                                                            {typeLabel}
+                                                                        </span>
+                                                                    </>
+                                                                );
+                                                            })()}
                                                         </div>
                                                     </div>
                                                     <div className="shrink-0 text-right">
