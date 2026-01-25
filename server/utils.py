@@ -39,6 +39,10 @@ def sanitize_id(text):
 
 
 def capitalize_first(text):
+    """Teeb esimese tähe suureks, ülejäänud jätab samaks (toetab lühendeid)."""
+    if not text:
+        return ""
+    return text[0].upper() + text[1:]
 
 
 def build_work_id_cache():
@@ -55,19 +59,22 @@ def build_work_id_cache():
         return
 
     count = 0
-    for entry in os.scandir(BASE_DIR):
-        if entry.is_dir():
-            meta_path = os.path.join(entry.path, '_metadata.json')
-            if os.path.exists(meta_path):
-                try:
-                    with open(meta_path, 'r', encoding='utf-8') as f:
-                        meta = json.load(f)
-                        work_id = meta.get('id')
-                        if work_id:
-                            WORK_ID_CACHE[work_id] = entry.path
-                            count += 1
-                except Exception as e:
-                    print(f"Viga metaandmete lugemisel {entry.name}: {e}")
+    try:
+        for entry in os.scandir(BASE_DIR):
+            if entry.is_dir():
+                meta_path = os.path.join(entry.path, '_metadata.json')
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, 'r', encoding='utf-8') as f:
+                            meta = json.load(f)
+                            work_id = meta.get('id')
+                            if work_id:
+                                WORK_ID_CACHE[work_id] = entry.path
+                                count += 1
+                    except Exception as e:
+                        print(f"Viga metaandmete lugemisel {entry.name}: {e}")
+    except Exception as e:
+        print(f"Viga cache ehitamisel: {e}")
     
     print(f"Work ID cache built: {count} entries.")
 
@@ -94,36 +101,36 @@ def find_directory_by_id(target_id):
             del WORK_ID_CACHE[target_id]
 
     # Aeglane failisüsteemi otsing
-    for entry in os.scandir(BASE_DIR):
-        if entry.is_dir():
-            meta_path = os.path.join(entry.path, '_metadata.json')
-            if os.path.exists(meta_path):
-                try:
-                    with open(meta_path, 'r', encoding='utf-8') as f:
-                        meta = json.load(f)
-                        
-                        # 2. Kontrolli nanoid `id` välja (eelistatud)
-                        work_id = meta.get('id')
-                        if work_id == target_id:
-                            # Lisa leitud väärtus cache'i tuleviku jaoks
-                            WORK_ID_CACHE[work_id] = entry.path
-                            return entry.path
-                        
-                        # 3. Kontrolli slug välja (v2 esmalt, teose_id v1 fallback)
-                        slug = meta.get('slug') or meta.get('teose_id')
-                        if slug == target_id:
-                            return entry.path
-                except:
-                    pass
+    try:
+        for entry in os.scandir(BASE_DIR):
+            if entry.is_dir():
+                meta_path = os.path.join(entry.path, '_metadata.json')
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path, 'r', encoding='utf-8') as f:
+                            meta = json.load(f)
+                            
+                            # 2. Kontrolli nanoid `id` välja (eelistatud)
+                            work_id = meta.get('id')
+                            if work_id == target_id:
+                                # Lisa leitud väärtus cache'i tuleviku jaoks
+                                WORK_ID_CACHE[work_id] = entry.path
+                                return entry.path
+                            
+                            # 3. Kontrolli slug välja (v2 esmalt, teose_id v1 fallback)
+                            slug = meta.get('slug') or meta.get('teose_id')
+                            if slug == target_id:
+                                return entry.path
+                    except:
+                        pass
 
-            # 4. Kontrolli kausta nime (sanitiseeritult)
-            if sanitize_id(entry.name) == target_id:
-                return entry.path
+                # 4. Kontrolli kausta nime (sanitiseeritult)
+                if sanitize_id(entry.name) == target_id:
+                    return entry.path
+    except Exception:
+        pass
+        
     return None
-    """Teeb esimese tähe suureks, ülejäänud jätab samaks (toetab lühendeid)."""
-    if not text:
-        return ""
-    return text[0].upper() + text[1:]
 
 
 def get_label(value):
@@ -235,40 +242,6 @@ def get_all_ids(value):
             ids.append(val['id'])
 
     return sorted(list(set(ids)))
-
-
-def find_directory_by_id(target_id):
-    """Leiab failisüsteemist kausta teose ID järgi.
-
-    Otsib järjekorras:
-    1. `id` väli (nanoid, püsiv) - eelistatud
-    2. `slug` väli (v2) või `teose_id` väli (v1 fallback)
-    3. Kausta nimi (sanitiseeritult, viimane võimalus)
-    """
-    if not target_id:
-        return None
-
-    for entry in os.scandir(BASE_DIR):
-        if entry.is_dir():
-            meta_path = os.path.join(entry.path, '_metadata.json')
-            if os.path.exists(meta_path):
-                try:
-                    with open(meta_path, 'r', encoding='utf-8') as f:
-                        meta = json.load(f)
-                        # 1. Kontrolli nanoid `id` välja (eelistatud)
-                        if meta.get('id') == target_id:
-                            return entry.path
-                        # 2. Kontrolli slug välja (v2 esmalt, teose_id v1 fallback)
-                        slug = meta.get('slug') or meta.get('teose_id')
-                        if slug == target_id:
-                            return entry.path
-                except:
-                    pass
-
-            # 3. Kontrolli kausta nime (sanitiseeritult)
-            if sanitize_id(entry.name) == target_id:
-                return entry.path
-    return None
 
 
 def generate_default_metadata(dir_name):
