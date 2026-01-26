@@ -1,8 +1,8 @@
 # Kollektsioonide süsteem (Collections)
 
-> **Staatus:** Planeerimisel  
-> **Prioriteet:** Järgmine suurem arendus  
-> **Viimati uuendatud:** 2026-01-19
+> **Staatus:** ✅ Põhifunktsionaalsus valmis (vt `IMPL_kollektsioonid.md`)
+> **Järgmine:** Etapp 5 - Admin CRUD (madal prioriteet)
+> **Viimati uuendatud:** 2026-01-26
 
 ## Ülevaade
 

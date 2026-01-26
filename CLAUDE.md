@@ -491,7 +491,15 @@ python3 scripts/sync_meilisearch.py --apply
 ### Full-Text Search (SearchPage)
 - Grouped mode: 10 works/page with accordions, facets query for hit counts
 - Work filter mode: all hits from one work without distinct
-- Sidebar: scope (all/text/annotations), year range, genre checkboxes, work filter
+- Sidebar filters:
+  - Scope: all/text/annotations (radio)
+  - Year range: number inputs
+  - Genre: **multi-select checkboxes** (OR logic) - updated 2026-01-26
+  - Tags: multi-select checkboxes (AND logic)
+  - Type: radio buttons
+  - Work: radio buttons (appears when results have >1 work)
+- **Auto-open sections:** Filter sections automatically expand when they have active selections (from URL params)
+- **Known UX issue:** "Teos" section only appears when search results exist or `?work=` param is set. Needs better solution for switching between work-filtered and all-works search.
 
 ## Common Tasks
 

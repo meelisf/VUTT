@@ -292,3 +292,15 @@ These are already configured in `meiliService.ts` `updateFilterableAttributes()`
 
 - [ ] Python indexer `get_label()` could be updated to prefer Estonian for base fields (optional, since we now use language-specific fields)
 - [ ] Consider if base fields (`genre`, `type`, `tags`) are still needed or can be removed
+
+## 9. SearchPage Genre Multi-Select (2026-01-26)
+
+**Change:** Genre filter changed from single-select (radio buttons) to multi-select (checkboxes).
+
+**Files changed:**
+- `src/types.ts` - `ContentSearchOptions.genre` changed from `string` to `string[]`
+- `src/services/meiliService.ts` - Genre filter now uses OR logic: `(genre_et = "x" OR genre_et = "y")`
+- `src/pages/SearchPage.tsx` - Genre uses checkboxes, URL format: `?genre=disputatio,oratio`
+- `src/pages/Dashboard.tsx` - Wraps single genre in array for API compatibility
+
+**Also added:** Filter sections (genre, tags, type, work) now auto-expand when they have active selections from URL parameters.
