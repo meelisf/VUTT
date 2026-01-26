@@ -248,6 +248,9 @@ def sync_work_to_meilisearch(dir_name):
             "languages": languages,
             "creators": creators,
             "authors_text": [c['name'] for c in creators if c.get('name')],
+            # Rolliga eraldatud väljad filtreerimiseks
+            "author_names": [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
+            "respondens_names": [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
             "creator_ids": [c.get('id') for c in creators if c.get('id')]
         }
 

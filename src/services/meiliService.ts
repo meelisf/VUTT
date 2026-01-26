@@ -50,7 +50,7 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['page_tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'creators', 'publisher']; // Filtreeritavad väljad
+    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'creators', 'publisher', 'author_names', 'respondens_names']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
@@ -75,6 +75,8 @@ const fixIndexSettings = async () => {
       'tags_ids',
       'creator_ids',
       'creators',
+      'author_names',      // Mitte-respondens loojate nimed filtreerimiseks
+      'respondens_names',  // Respondens loojate nimed filtreerimiseks
       'type',
       'type_et', 'type_en',
       'genre',
@@ -401,12 +403,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`aasta <= ${options.yearEnd}`);
     }
     if (options?.author) {
-      // V2: Otsi creators seast, välista respondens
-      filter.push(`(creators.name = "${options.author}" AND creators.role != "respondens")`);
+      // V2: Otsi author_names väljalt (mitte-respondens loojad)
+      filter.push(`author_names = "${options.author}"`);
     }
     if (options?.respondens) {
-      // V2: Otsi creators seast, nõua respondens rolli
-      filter.push(`(creators.name = "${options.respondens}" AND creators.role = "respondens")`);
+      // V2: Otsi respondens_names väljalt
+      filter.push(`respondens_names = "${options.respondens}"`);
     }
     if (options?.printer) {
       // V2: Otsi publisher väljalt
