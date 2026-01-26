@@ -63,7 +63,7 @@ const fixIndexSettings = async () => {
       return true;
     }
 
-    await index.updateFilterableAttributes([
+    const filterTask = await index.updateFilterableAttributes([
       // V2/V3 väljad
       'work_id',  // nanoid - eelistatud routing jaoks
       'year',
@@ -153,6 +153,7 @@ const fixIndexSettings = async () => {
       ]
     });
 
+    await index.waitForTask(filterTask.taskUid);
     await index.waitForTask(searchTask.taskUid);
     return true;
   } catch (e) {
