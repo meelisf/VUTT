@@ -418,7 +418,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
                 {!readOnly && (
                   <button 
-                    onClick={() => removeTag(typeof tag === 'string' ? tag : (tag as any).label)} 
+                    onClick={() => removeTag(label)} 
                     className={`pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 ${tagId ? 'border-l border-primary-100' : ''}`}
                   >
                     <X size={14} />
