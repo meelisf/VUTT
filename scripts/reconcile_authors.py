@@ -18,8 +18,7 @@ Käivitamine:
 import os
 import json
 import sys
-import urllib.request
-import urllib.parse
+import requests
 import time
 import re
 import difflib
@@ -161,18 +160,18 @@ def get_wikidata_entity(q_id):
         "props": "labels|descriptions",
         "origin": "*"
     }
-    url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"})
+    headers = {"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"}
     try:
-        with urllib.request.urlopen(req) as response:
-            data = json.load(response)
-            entity = data.get("entities", {}).get(q_id, {})
-            if entity and "labels" in entity:
-                # Vali parim label (et -> en -> la)
-                labels = entity["labels"]
-                label_val = labels.get("et", labels.get("en", labels.get("la", {}))).get("value")
-                desc_val = entity.get("descriptions", {}).get("et", entity.get("descriptions", {}).get("en", {})).get("value", "-")
-                return {"id": q_id, "label": label_val, "description": desc_val}
+        response = requests.get(WIKIDATA_API, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        entity = data.get("entities", {}).get(q_id, {})
+        if entity and "labels" in entity:
+            # Vali parim label (et -> en -> la)
+            labels = entity["labels"]
+            label_val = labels.get("et", labels.get("en", labels.get("la", {}))).get("value")
+            desc_val = entity.get("descriptions", {}).get("et", entity.get("descriptions", {}).get("en", {})).get("value", "-")
+            return {"id": q_id, "label": label_val, "description": desc_val}
     except Exception as e:
         print(f"Viga Wikidata päringus (ID): {e}")
     return None
@@ -196,12 +195,12 @@ def search_wikidata(query):
         "type": "item",
         "origin": "*"
     }
-    url = f"{WIKIDATA_API}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"})
+    headers = {"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"}
     try:
-        with urllib.request.urlopen(req) as response:
-            data = json.load(response)
-            return data.get("search", [])
+        response = requests.get(WIKIDATA_API, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        return data.get("search", [])
     except Exception as e:
         print(f"Viga Wikidata päringus: {e}")
         return []
