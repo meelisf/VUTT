@@ -84,6 +84,8 @@ def main():
             'collection',
             'collections_hierarchy',
             'authors_text',
+            'author_names',
+            'respondens_names',
             'languages',
             # Tagasiühilduvus
             'aasta',
@@ -153,12 +155,16 @@ def main():
         while True:
             task_status = client.get_task(task.task_uid)
             if task_status.status == 'succeeded':
-                print(f"Valmis! Indekseeritud dokumente: {task_status.details.get('indexedDocuments', 'N/A')}")
                 break
             elif task_status.status == 'failed':
-                print(f"Viga: {task_status.error}")
+                print(f"Viga viimases paketis: {task_status.error}")
                 break
             time.sleep(2)
+            
+        # Küsi lõplikku statistikat
+        stats = client.index(INDEX_NAME).get_stats()
+        print(f"Valmis! Indeksis on kokku {stats.number_of_documents} dokumenti.")
+        print(f"Indekseerimine on lõppenud: {stats.is_indexing}")
 
     except FileNotFoundError:
         print(f"Faili ei leitud: {JSONL_FILE_PATH}")
