@@ -98,6 +98,8 @@ def main():
             'page_tags',
             'page_tags_et',
             'page_tags_en',
+            'page_tags_suggest_et',
+            'page_tags_suggest_en',
             'status',
             'teose_staatus',
             'tags',

@@ -95,6 +95,7 @@ const fixIndexSettings = async () => {
       'originaal_kataloog',
       'page_tags',
       'page_tags_et', 'page_tags_en',
+      'page_tags_suggest_et', 'page_tags_suggest_en',
       'status',
       'teose_staatus',
       'tags',
@@ -1266,13 +1267,12 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   }
 };
 
-// Märksõnade autocomplete: saa kõik unikaalsed märksõnad kasutades facet'e
-export const getAllTags = async (lang: string = 'et'): Promise<string[]> => {
+// Märksõnade autocomplete: saa kõik unikaalsed märksõnad koos ID-dega
+export const getAllTags = async (lang: string = 'et'): Promise<{ label: string; id: string | null }[]> => {
   checkMixedContent();
   try {
-    // Kasuta keelespetsiifilist välja (nt page_tags_et)
-    // Fallback: kui on tundmatu keel, kasuta 'page_tags' (kõik keeled segamini)
-    const facetField = ['et', 'en'].includes(lang) ? `page_tags_${lang}` : 'page_tags';
+    // Kasuta spetsiaalset suggest välja, mis sisaldab ID-sid (formaat: Label|||ID)
+    const facetField = ['et', 'en'].includes(lang) ? `page_tags_suggest_${lang}` : 'page_tags_suggest_et';
 
     const response = await index.search('', {
       limit: 0, 
@@ -1280,11 +1280,24 @@ export const getAllTags = async (lang: string = 'et'): Promise<string[]> => {
     });
 
     const tagFacets = response.facetDistribution?.[facetField] || {};
-    // Normaliseeri: väiketähed ja unikaalsed
-    const normalizedTags = Array.from(new Set(Object.keys(tagFacets).map(t => t.toLowerCase())));
     
-    // Sorteeri tähestikuliselt vastavas keeles
-    return normalizedTags.sort((a, b) => a.localeCompare(b, lang));
+    // Parsi stringid objektideks
+    const parsedTags = Object.keys(tagFacets).map(raw => {
+      const parts = raw.split('|||');
+      if (parts.length === 2) {
+        return { label: parts[0], id: parts[1] || null };
+      }
+      return { label: raw, id: null }; // Fallback
+    });
+
+    // Eemalda duplikaadid (label+id kombinatsioonid) ja sorteeri
+    const uniqueTags = new Map<string, { label: string; id: string | null }>();
+    parsedTags.forEach(tag => {
+      const key = `${tag.label.toLowerCase()}|${tag.id || ''}`;
+      uniqueTags.set(key, tag);
+    });
+    
+    return Array.from(uniqueTags.values()).sort((a, b) => a.label.localeCompare(b.label, lang));
   } catch (e) {
     console.error("Failed to fetch tags:", e);
     return [];

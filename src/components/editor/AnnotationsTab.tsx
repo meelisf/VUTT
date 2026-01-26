@@ -41,8 +41,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
   const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
-  // Meilisearchi märksõnad (kõik olemasolevad)
-  const [allAvailableTags, setAllAvailableTags] = useState<string[]>([]);
+  // Meilisearchi märksõnad (kõik olemasolevad, koos ID-dega)
+  const [allAvailableTags, setAllAvailableTags] = useState<{ label: string; id: string | null }[]>([]);
 
   // Lae soovitused serverist
   useEffect(() => {
@@ -68,29 +68,30 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   // Lae kõik olemasolevad märksõnad Meilisearchist
   useEffect(() => {
     const loadTags = async () => {
-      // Küsi märksõnu vastavas keeles
       const fetchedTags = await getAllTags(lang);
-      // getAllTags tagastab juba sorteeritud ja unikaalsed stringid
       setAllAvailableTags(fetchedTags);
     };
     loadTags();
-  }, [lang]); // Uuenda kui keel muutub
+  }, [lang]);
 
   // Ühenda serveri soovitused ja Meilisearchi märksõnad
   const mergedTagSuggestions = React.useMemo(() => {
-    // Teisenda stringid SuggestionItem kujule
-    const meiliSuggestions = allAvailableTags.map(tag => ({
-      label: tag,
-      id: null
-    }));
-
-    // Ühenda ja eemalda duplikaadid (labeli järgi)
-    const combined = [...tagSuggestions, ...meiliSuggestions];
+    // Ühenda ja eemalda duplikaadid (labeli ja ID järgi)
+    // Eelistame serveri omasid (tagSuggestions), siis Meilisearchi omasid (allAvailableTags)
+    const combined = [...tagSuggestions, ...allAvailableTags];
     const unique = new Map();
     
     combined.forEach(item => {
-      if (!unique.has(item.label.toLowerCase())) {
-        unique.set(item.label.toLowerCase(), item);
+      // Võti on label väiketähtedega. 
+      // Kui meil on juba kirje, siis uuendame ainult siis, kui uuel on ID ja vanal polnud.
+      const key = item.label.toLowerCase();
+      const existing = unique.get(key);
+      
+      if (!existing) {
+        unique.set(key, item);
+      } else if (!existing.id && item.id) {
+        // Kui olemasoleval pole ID-d, aga uuel on, asenda (rikasta)
+        unique.set(key, item);
       }
     });
 

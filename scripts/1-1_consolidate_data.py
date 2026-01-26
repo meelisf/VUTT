@@ -466,6 +466,14 @@ def create_meilisearch_data_per_page():
                 'page_tags': [l.lower() for l in get_primary_labels(page_meta.get('tags', []))],
                 'page_tags_et': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'et')],
                 'page_tags_en': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'en')],
+                'page_tags_suggest_et': [
+                    f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}" 
+                    for t in page_meta.get('tags', [])
+                ],
+                'page_tags_suggest_en': [
+                    f"{get_label(t, 'en')}|||{t.get('id') if isinstance(t, dict) else ''}" 
+                    for t in page_meta.get('tags', [])
+                ],
                 'page_tags_object': page_meta.get('tags', []),
                 'comments': page_meta['comments'],
                 'status': page_meta['status'],
