@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 
 interface WorkCardProps {
@@ -69,17 +69,14 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             
             return (
               <span key={idx} className="flex items-center gap-1">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    navigate(`/?${paramName}=${encodeURIComponent(creator.name)}`);
-                  }}
-                  className="hover:text-primary-600 transition-colors truncate max-w-[150px]"
+                <Link
+                  to={`/?${paramName}=${encodeURIComponent(creator.name)}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:text-primary-600 transition-colors truncate max-w-[150px] hover:underline"
                   title={t('workCard.searchAuthor', 'Otsi autorit')}
                 >
                   {creator.name}
-                </button>
+                </Link>
                 {creator.id && (
                   <a
                     href={`https://www.wikidata.org/wiki/${creator.id}`}
@@ -105,29 +102,23 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     return (
       <div className="flex items-center gap-2 text-sm text-gray-600">
         <User size={14} className="shrink-0" />
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            navigate(`/?author=${encodeURIComponent(work.author || '')}`);
-          }}
-          className="hover:text-primary-600 transition-colors truncate"
+        <Link
+          to={`/?author=${encodeURIComponent(work.author || '')}`}
+          onClick={(e) => e.stopPropagation()}
+          className="hover:text-primary-600 transition-colors truncate hover:underline"
         >
           {work.author}
-        </button>
+        </Link>
         {work.respondens && (
           <>
             <span className="text-gray-400">/</span>
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigate(`/?respondens=${encodeURIComponent(work.respondens)}`);
-              }}
-              className="hover:text-primary-600 transition-colors truncate"
+            <Link
+              to={`/?respondens=${encodeURIComponent(work.respondens)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="hover:text-primary-600 transition-colors truncate hover:underline"
             >
               {work.respondens}
-            </button>
+            </Link>
           </>
         )}
       </div>
