@@ -72,9 +72,11 @@ def main():
             'title',
             'location_id',
             'publisher_id',
+            'publisher',
             'genre_ids',
             'tags_ids',
             'creator_ids',
+            'creators',
             'type',
             'type_et', 'type_en', # Keeltepõhised filtrid
             'genre',
