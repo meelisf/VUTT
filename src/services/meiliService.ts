@@ -184,7 +184,7 @@ interface DashboardSearchOptions {
   onlyFirstPage?: boolean;
   // V2 väljad
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
-  genre?: string; // Žanri filter
+  genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
   type?: string; // Tüübi filter (impressum, manuscript, jne)
   lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
 }
@@ -432,10 +432,15 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     if (options?.collection) {
       filter.push(`collections_hierarchy = "${options.collection}"`);
     }
-    // V2: Žanri filter (kasutab keelespetsiifilist välja)
-    if (options?.genre) {
+    // V2: Žanri filter (OR loogika - teos võib vastata ükskõik millisele valitud žanrile)
+    if (options?.genre && options.genre.length > 0) {
       const genreField = options.lang ? `genre_${options.lang}` : 'genre_et';
-      filter.push(`${genreField} = "${options.genre}"`);
+      if (options.genre.length === 1) {
+        filter.push(`${genreField} = "${options.genre[0]}"`);
+      } else {
+        const genreConditions = options.genre.map(g => `${genreField} = "${g}"`).join(' OR ');
+        filter.push(`(${genreConditions})`);
+      }
     }
     // V2: Tüübi filter (kasutab keelespetsiifilist välja)
     if (options?.type) {
@@ -1021,10 +1026,15 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.collection) {
     filter.push(`collections_hierarchy = "${options.collection}"`);
   }
-  // V2: Žanri filter (kasutab keelespetsiifilist välja)
-  if (options.genre) {
+  // V2: Žanri filter (OR loogika - teos võib vastata ükskõik millisele valitud žanrile)
+  if (options.genre && options.genre.length > 0) {
     const genreField = options.lang ? `genre_${options.lang}` : 'genre_et';
-    filter.push(`${genreField} = "${options.genre}"`);
+    if (options.genre.length === 1) {
+      filter.push(`${genreField} = "${options.genre[0]}"`);
+    } else {
+      const genreConditions = options.genre.map(g => `${genreField} = "${g}"`).join(' OR ');
+      filter.push(`(${genreConditions})`);
+    }
   }
   // V2: Tüübi filter (kasutab keelespetsiifilist välja)
   if (options.type) {

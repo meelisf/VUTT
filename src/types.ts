@@ -239,7 +239,7 @@ export interface ContentSearchOptions {
   workId?: string;
   scope?: 'all' | 'annotation' | 'original';
   teoseTags?: string[];
-  genre?: string;
+  genre?: string[];       // V2: žanri filter (mitu valikut OR loogikaga)
   type?: string;          // V2: tüübi filter (impressum/manuscriptum)
   collection?: string;    // V2: kollektsiooni filter
   lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega

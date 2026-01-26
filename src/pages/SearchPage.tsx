@@ -57,7 +57,7 @@ const SearchPage: React.FC = () => {
     const yearEndParam = searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined;
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
     const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
-    const genreParam = searchParams.get('genre') || '';
+    const genreParam = searchParams.get('genre')?.split(',').filter(Boolean) || [];
     const typeParam = searchParams.get('type') || '';
 
     // Local state for input fields
@@ -72,9 +72,9 @@ const SearchPage: React.FC = () => {
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
 
-    // Žanri filter (genre väli)
+    // Žanri filter (genre väli) - mitu valikut lubatud
     const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
-    const [selectedGenre, setSelectedGenre] = useState<string>(genreParam);
+    const [selectedGenres, setSelectedGenres] = useState<string[]>(genreParam);
 
     // Tüübi filter (type väli)
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
@@ -123,7 +123,7 @@ const SearchPage: React.FC = () => {
         if (scopeParam) setSelectedScope(scopeParam);
         setSelectedWork(workIdParam);
         setSelectedTeoseTags(teoseTagsParam);
-        setSelectedGenre(genreParam);
+        setSelectedGenres(genreParam);
         setSelectedType(typeParam);
     }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam, typeParam]);
 
@@ -162,7 +162,7 @@ const SearchPage: React.FC = () => {
                           selectedScope !== 'all' ||
                           selectedWork ||
                           selectedTeoseTags.length > 0 ||
-                          selectedGenre ||
+                          selectedGenres.length > 0 ||
                           selectedType;
 
         // Update URL params, which triggers the effect below
@@ -193,7 +193,7 @@ const SearchPage: React.FC = () => {
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
                 if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
-                if (selectedGenre) prev.set('genre', selectedGenre); else prev.delete('genre');
+                if (selectedGenres.length > 0) prev.set('genre', selectedGenres.join(',')); else prev.delete('genre');
                 if (selectedType) prev.set('type', selectedType); else prev.delete('type');
             }
             return prev;
@@ -217,7 +217,7 @@ const SearchPage: React.FC = () => {
                 scope: scopeParam,
                 workId: workIdParam || undefined,
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
-                genre: genreParam || undefined,
+                genre: genreParam.length > 0 ? genreParam : undefined,
                 type: typeParam || undefined,
                 collection: selectedCollection || undefined,
                 lang: i18n.language.split('-')[0]  // et-EE -> et
@@ -227,7 +227,7 @@ const SearchPage: React.FC = () => {
         } else {
             setResults(null);
         }
-    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam, typeParam, selectedCollection, i18n.language]);
+    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam.join(','), typeParam, selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -605,38 +605,32 @@ const SearchPage: React.FC = () => {
                             </div>
                         </CollapsibleSection>
 
-                        {/* Genre Filter (genre väli - disputatio, oratio jne) */}
+                        {/* Genre Filter (genre väli - disputatio, oratio jne) - mitu valikut lubatud */}
                         {availableGenres.length > 0 && (
                             <CollapsibleSection
                                 title={t('filters.genre')}
                                 icon={<BookOpen size={14} />}
-                                defaultOpen={false}
-                                badge={selectedGenre ? 1 : undefined}
+                                defaultOpen={selectedGenres.length > 0}
+                                badge={selectedGenres.length || undefined}
                             >
                                 <div className="space-y-1">
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                        <input
-                                            type="radio"
-                                            name="genre"
-                                            value=""
-                                            checked={!selectedGenre}
-                                            onChange={() => setSelectedGenre('')}
-                                            className="text-primary-600 focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-gray-700">{t('filters.allGenres')}</span>
-                                    </label>
                                     {availableGenres.map(({ value, count }) => {
                                         const lang = (i18n.language as 'et' | 'en') || 'et';
                                         const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
+                                        const isSelected = selectedGenres.includes(value);
                                         return (
                                             <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                                 <input
-                                                    type="radio"
-                                                    name="genre"
-                                                    value={value}
-                                                    checked={selectedGenre === value}
-                                                    onChange={() => setSelectedGenre(value)}
-                                                    className="text-primary-600 focus:ring-primary-500"
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        if (isSelected) {
+                                                            setSelectedGenres(selectedGenres.filter(g => g !== value));
+                                                        } else {
+                                                            setSelectedGenres([...selectedGenres, value]);
+                                                        }
+                                                    }}
+                                                    className="text-primary-600 focus:ring-primary-500 rounded"
                                                 />
                                                 <span className="text-sm text-gray-700 flex-1">{label}</span>
                                                 <span className="text-xs text-gray-400">({count})</span>
@@ -652,7 +646,7 @@ const SearchPage: React.FC = () => {
                             <CollapsibleSection
                                 title={t('filters.tags')}
                                 icon={<Tag size={14} />}
-                                defaultOpen={false}
+                                defaultOpen={selectedTeoseTags.length > 0}
                                 badge={selectedTeoseTags.length || undefined}
                             >
                                 <div className="space-y-1">
@@ -686,7 +680,7 @@ const SearchPage: React.FC = () => {
                             <CollapsibleSection
                                 title={t('filters.type')}
                                 icon={<ScrollText size={14} />}
-                                defaultOpen={false}
+                                defaultOpen={!!selectedType}
                                 badge={selectedType ? 1 : undefined}
                             >
                                 <div className="space-y-1">
@@ -728,7 +722,7 @@ const SearchPage: React.FC = () => {
                             <CollapsibleSection
                                 title={t('filters.work')}
                                 icon={<FileText size={14} />}
-                                defaultOpen={false}
+                                defaultOpen={!!selectedWork}
                                 badge={selectedWork ? 1 : undefined}
                             >
                                 <div className="space-y-1 max-h-48 overflow-y-auto">
@@ -806,7 +800,7 @@ const SearchPage: React.FC = () => {
                             >
                                 {t('filters.applyFilters')}
                             </button>
-                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenre || selectedType) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedType) && (
                                 <button
                                     onClick={() => {
                                         setYearStart('');
@@ -815,7 +809,7 @@ const SearchPage: React.FC = () => {
                                         setSelectedWork('');
                                         setSelectedWorkInfo(null);
                                         setSelectedTeoseTags([]);
-                                        setSelectedGenre('');
+                                        setSelectedGenres([]);
                                         setSelectedType('');
                                         setSearchParams(prev => {
                                             prev.delete('ys');

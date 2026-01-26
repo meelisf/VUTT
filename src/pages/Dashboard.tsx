@@ -261,7 +261,7 @@ const Dashboard: React.FC = () => {
           printer: printerParam || undefined,
           workStatus: statusParam || undefined,
           teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
-          genre: selectedGenre || undefined,
+          genre: selectedGenre ? [selectedGenre] : undefined,
           type: selectedType || undefined,
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
