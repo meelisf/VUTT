@@ -1,25 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { Page, PageStatus, Annotation, Work } from '../types';
-import { getAllTags, getWorkFullText } from '../services/meiliService';
+import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { FILE_API_URL } from '../config';
-import { Save, Tag, MessageSquare, Loader2, History, Trash2, Download, X, BookOpen, AlertTriangle, Search, RotateCcw, Shield, ExternalLink, Edit3, ChevronRight, Eye, User } from 'lucide-react';
+import { Save, Loader2, Edit3, ChevronRight, Eye, X } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
-import EntityPicker from './EntityPicker';
-import { getLabel } from '../utils/metadataUtils';
-
-// Git ajaloo kirje tüüp
-interface GitHistoryEntry {
-  hash: string;
-  full_hash: string;
-  author: string;
-  date: string;
-  formatted_date: string;
-  message: string;
-  is_original: boolean;
-}
+import AnnotationsTab from './editor/AnnotationsTab';
+import HistoryTab from './editor/HistoryTab';
 
 // Erimärgi tüüp
 interface SpecialCharacter {
@@ -47,7 +34,6 @@ type ViewMode = 'edit' | 'read';
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
-  const navigate = useNavigate();
   const lang = i18n.language || 'et';
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   // Default to 'read' mode for non-logged-in users (readOnly), 'edit' for logged-in users
@@ -57,46 +43,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
   const [page_tags, setPageTags] = useState<(string | any)[]>(page.page_tags || []);
-  const [newTag, setNewTag] = useState('');
-  const [newComment, setNewComment] = useState('');
-
-  // Sõnavara soovitused lehekülje märksõnadele
-  const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
-
-  // Lae soovitused serverist (sama loogika mis MetadataModal-is)
-  useEffect(() => {
-    const fetchTags = async () => {
-      if (!authToken) return;
-      try {
-        const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken })
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-          setTagSuggestions(data.tags || []);
-        }
-      } catch (e) {
-        console.error("Viga märksõnade laadimisel", e);
-      }
-    };
-    fetchTags();
-  }, [authToken]);
-
-  // Autocomplete state (vana loogika, jääb alles tagavaraks või eemaldame hiljem)
-  const [allAvailableTags, setAllAvailableTags] = useState<string[]>([]);
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
-  const tagInputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const [isSaving, setIsSaving] = useState(false);
-
-  // Git ajaloo state
-  const [gitHistory, setGitHistory] = useState<GitHistoryEntry[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
   // Erimärkide state
   const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
@@ -155,16 +103,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
-
-  // Load all available tags for autocomplete
-  useEffect(() => {
-    const loadTags = async () => {
-      const fetchedTags = await getAllTags();
-      const normalized = Array.from(new Set(fetchedTags.map(t => t.toLowerCase())));
-      setAllAvailableTags(normalized);
-    };
-    loadTags();
-  }, []);
 
   // Laadime erimärgid JSON failist
   useEffect(() => {
@@ -233,7 +171,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     } else if (char === '[^1]') {
       // Kui tekst on valitud, lisa märgis selle lõppu (nt "sõna[^1]")
       // Kui valikut pole, lihtsalt sisesta märgis
-      insertValue = isSelection ? `${selectedText}[^1]` : `[^1]`;
+      insertValue = isSelection ? `${selectedText}[^1]` : `[^1]`
       newCursorPos = isSelection ? end + 4 : start + 4;
     }
 
@@ -256,18 +194,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }, 0);
   }, [text, readOnly]);
 
-  // Close suggestions when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (tagInputRef.current && !tagInputRef.current.contains(e.target as Node) &&
-        suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)) {
-        setShowTagSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const handleSave = async () => {
     setIsSaving(true);
     const updatedPage: Page = {
@@ -286,207 +212,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         comments: comments,
         page_tags: page_tags
       });
-      const refreshedTags = await getAllTags();
-      setAllAvailableTags(refreshedTags);
     } catch (e: any) {
       console.error("Save error:", e);
       alert(`Viga salvestamisel: ${e.message || "Tundmatu viga"}`);
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const loadGitHistory = async () => {
-    if (!page.original_path || !page.image_url) {
-      console.warn("Ei saa Git ajalugu laadida: puudub original_path või image_url");
-      return;
-    }
-
-    if (!authToken) {
-      alert("Ajaloo laadimiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
-      return;
-    }
-
-    setIsLoadingHistory(true);
-    try {
-      const imagePath = page.image_url.split('/').pop() || '';
-      const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
-
-      const response = await fetch(`${FILE_API_URL}/git-history`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          original_path: page.original_path,
-          file_name: txtFilename,
-          auth_token: authToken
-        })
-      });
-
-      const data = await response.json();
-      if (data.status === 'success') {
-        setGitHistory(data.history || []);
-      } else {
-        console.error("Git ajaloo laadimine ebaõnnestus:", data.message);
-        if (data.message?.includes('Autentimine') || data.message?.includes('parool')) {
-          alert("Autentimine ebaõnnestus. Palun logi välja ja uuesti sisse.");
-        }
-      }
-    } catch (e) {
-      console.error("Git ajaloo laadimine ebaõnnestus:", e);
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  };
-
-  const handleGitRestore = async (entry: GitHistoryEntry) => {
-    if (!page.original_path || !page.image_url) {
-      alert("Taastamine ebaõnnestus: puudub vajalik info");
-      return;
-    }
-
-    if (!authToken) {
-      alert("Taastamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.");
-      return;
-    }
-
-    const confirmMsg = entry.is_original
-      ? `Kas soovid taastada ORIGINAAL OCR versiooni?\n\nAutor: ${entry.author}\nKuupäev: ${entry.formatted_date}`
-      : `Kas soovid taastada versiooni?\n\nAutor: ${entry.author}\nKuupäev: ${entry.formatted_date}\n\nTekst laaditakse redaktorisse. Muudatuste salvestamiseks pead vajutama "Salvesta".`;
-
-    if (!confirm(confirmMsg)) {
-      return;
-    }
-
-    setIsRestoring(true);
-    try {
-      const imagePath = page.image_url.split('/').pop() || '';
-      const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
-
-      const response = await fetch(`${FILE_API_URL}/git-restore`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          original_path: page.original_path,
-          file_name: txtFilename,
-          commit_hash: entry.full_hash,
-          auth_token: authToken
-        })
-      });
-
-      const data = await response.json();
-      if (data.status === 'success' && data.restored_content !== undefined) {
-        setText(data.restored_content);
-        setActiveTab('edit');
-        alert(`Versioon ${entry.formatted_date} (${entry.author}) laaditud redaktorisse.\n\nSalvestamiseks vajuta "Salvesta" nuppu.`);
-        loadGitHistory();
-      } else {
-        alert(`Taastamine ebaõnnestus: ${data.message || 'Tundmatu viga'}`);
-      }
-    } catch (e: any) {
-      console.error("Taastamine ebaõnnestus:", e);
-      alert(`Taastamine ebaõnnestus: ${e.message || 'Võrgu viga'}`);
-    } finally {
-      setIsRestoring(false);
-    }
-  };
-
-  const handleDownloadImage = async () => {
-    if (!page.image_url) {
-      alert("Pildi URL puudub!");
-      return;
-    }
-
-    try {
-      const response = await fetch(page.image_url);
-      if (!response.ok) throw new Error("Fetch failed");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      const filename = page.image_url.split('/').pop() || `lk_${page.page_number}.jpg`;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (e) {
-      console.warn("Otse allalaadimine ebaõnnestus (CORS?), avan uuel vahelehel.", e);
-      window.open(page.image_url, '_blank');
-    }
-  };
-
-  // Helper: saa string kuju võrdluseks
-  const getTagString = (t: string | any) => getLabel(t, lang).toLowerCase();
-
-  const filteredSuggestions = allAvailableTags.filter(
-    tag => tag.includes(newTag.toLowerCase()) && !page_tags.some(pt => getTagString(pt) === tag.toLowerCase())
-  );
-
-  const addTagFromInput = (tagValue: string) => {
-    const trimmed = tagValue.trim().toLowerCase();
-    const exists = page_tags.some(pt => getTagString(pt) === trimmed);
-    
-    if (trimmed && !exists) {
-      setPageTags([...page_tags, trimmed]); // Lisa stringina (kui pole EntityPickerist)
-      if (!allAvailableTags.includes(trimmed)) {
-        setAllAvailableTags(prev => {
-          if (prev.includes(trimmed)) return prev;
-          return [...prev, trimmed].sort((a, b) => a.localeCompare(b, 'et'));
-        });
-      }
-    }
-    setNewTag('');
-    setShowTagSuggestions(false);
-    setSelectedSuggestionIndex(0);
-  };
-
-  const handleTagKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (showTagSuggestions && filteredSuggestions.length > 0) {
-        addTagFromInput(filteredSuggestions[selectedSuggestionIndex]);
-      } else if (newTag.trim()) {
-        addTagFromInput(newTag);
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedSuggestionIndex(prev =>
-        Math.min(prev + 1, filteredSuggestions.length - 1)
-      );
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedSuggestionIndex(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Escape') {
-      setShowTagSuggestions(false);
-    }
-  };
-
-  const handleTagInputChange = (value: string) => {
-    setNewTag(value);
-    setShowTagSuggestions(value.length > 0);
-    setSelectedSuggestionIndex(0);
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    // Eemalda sildi järgi (sest UI-s nupule vajutades saadame stringi)
-    setPageTags(page_tags.filter(t => getTagString(t) !== tagToRemove.toLowerCase()));
-  };
-
-  const addComment = () => {
-    if (!newComment.trim()) return;
-    const comment: Annotation = {
-      id: Date.now().toString(),
-      text: newComment,
-      author: user?.name || 'Anonüümne',
-      created_at: new Date().toISOString()
-    };
-    setComments([...comments, comment]);
-    setNewComment('');
-  };
-
-  const removeComment = (commentId: string) => {
-    setComments(comments.filter(c => c.id !== commentId));
   };
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
@@ -498,9 +229,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // Generate line numbers based on text content
   const lineCount = text.split('\n').length;
   const lineNumbers = Array.from({ length: Math.max(1, lineCount) }, (_, i) => i + 1);
-
-
-  // ... (insertCharacter & other handlers remain the same) ...
 
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
@@ -728,526 +456,35 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         )}
 
         {/* ANNOTATIONS TAB */}
-        {
-          activeTab === 'annotate' && (
-            <div className="h-full flex flex-col bg-gray-50 p-6 overflow-y-auto">
-
-              {/* Work Info */}
-              {work && (
-                <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-                  <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-                    <BookOpen size={18} className="text-primary-600" />
-                    <h4 className="font-bold">{t('info.workInfo')}</h4>
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.workTitle')}</span>
-                      <p className="text-gray-900 font-medium">{work.title}</p>
-                    </div>
-
-                    {/* Isikud: v2 creators[] */}
-                    {work.creators && work.creators.length > 0 && (
-                      <div>
-                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">{t('metadata.creators')}</span>
-                        <div className="space-y-1.5">
-                          {work.creators.map((creator, idx) => {
-                            const roleLabel = t(`metadata.roles.${creator.role}`, { defaultValue: creator.role });
-                            const dashboardParam = creator.role === 'respondens' ? 'respondens' : 'author';
-                            
-                            return (
-                              <div key={idx} className="flex items-center gap-2 group">
-                                <div className="flex items-center gap-1.5 text-gray-900">
-                                  <button
-                                    onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
-                                    className="text-gray-400 hover:text-primary-600 transition-colors"
-                                    title={t('workCard.searchAuthor', 'Filtreeri dashboardil')}
-                                  >
-                                    <User size={14} />
-                                  </button>
-                                  <span 
-                                    className="font-medium select-text cursor-pointer hover:text-primary-600 transition-colors"
-                                    onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
-                                  >
-                                    {creator.name}
-                                  </span>
-                                </div>
-                                {creator.id && (
-                                  <a
-                                    href={`https://www.wikidata.org/wiki/${creator.id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                                    title={`Vaata Wikidatas: ${creator.id}`}
-                                  >
-                                    <ExternalLink size={12} />
-                                  </a>
-                                )}
-                                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Aasta, Trükikoht, Trükkal, Žanr, Tüüp */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
-                        <p className="text-gray-900">{work.year}</p>
-                      </div>
-                      
-                      {/* Tüüp */}
-                      {work.type && (
-                        <div>
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.type')}</span>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-gray-900">{getLabel(work.type_object || work.type, lang)}</p>
-                            {work.type_object?.id && (
-                              <a
-                                href={`https://www.wikidata.org/wiki/${work.type_object.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                                title={`Vaata Wikidatas: ${work.type_object.id}`}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Žanr (üksik) */}
-                      {work.genre && (
-                        <div>
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-gray-900">{getLabel(work.genre_object || work.genre, lang)}</p>
-                            {(Array.isArray(work.genre_object) ? work.genre_object[0]?.id : work.genre_object?.id) && (
-                              <a
-                                href={`https://www.wikidata.org/wiki/${Array.isArray(work.genre_object) ? work.genre_object[0].id : work.genre_object?.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                                title="Vaata Wikidatas"
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {work.location && (
-                        <div>
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-gray-900">{getLabel(work.location, lang)}</p>
-                            {work.location_object?.id && (
-                              <a
-                                href={`https://www.wikidata.org/wiki/${work.location_object.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                                title={`Vaata Wikidatas: ${work.location_object.id}`}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {work.publisher && (
-                        <div className="col-span-2 sm:col-span-1">
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
-                          <div className="flex items-center gap-1.5 group">
-                            <div className="flex items-center gap-1.5 text-gray-900 overflow-hidden">
-                              <button
-                                onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
-                                className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
-                                title="Filtreeri trükkali järgi"
-                              >
-                                <User size={14} />
-                              </button>
-                              <span 
-                                className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
-                                onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
-                              >
-                                {getLabel(work.publisher, lang)}
-                              </span>
-                            </div>
-                            {work.publisher_object?.id && (
-                              <a
-                                href={`https://www.wikidata.org/wiki/${work.publisher_object.id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors shrink-0"
-                                title={`Vaata Wikidatas: ${work.publisher_object.id}`}
-                              >
-                                <ExternalLink size={12} />
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Links and Actions */}
-                    <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">
-                      {work.ester_id && (
-                        <a
-                          href={`https://www.ester.ee/record=${work.ester_id}*est`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
-                          title="Ava ESTER-i kirje"
-                        >
-                          <ExternalLink size={16} />
-                          {t('info.viewInEster')}
-                        </a>
-                      )}
-
-                      <button
-                        onClick={async () => {
-                          try {
-                            const { text, title, author, year } = await getWorkFullText(work.id);
-                            // Loome faili sisu päisega
-                            const header = `${title}\n${author}${year ? `, ${year}` : ''}\n\n`;
-                            const fullContent = header + text;
-                            // Genereerime faili ja pakume allalaadimiseks
-                            const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `${work.id}.txt`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                          } catch (err) {
-                            console.error('Download error:', err);
-                            alert('Viga teksti allalaadimisel');
-                          }
-                        }}
-                        className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
-                      >
-                        <Download size={16} />
-                        {t('metadata.downloadFullText')}
-                      </button>
-
-                      {onOpenMetaModal && (
-                        <button
-                          onClick={onOpenMetaModal}
-                          className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-800 hover:underline"
-                          title="Muuda teose metaandmeid"
-                        >
-                          <Edit3 size={16} />
-                          {t('metadata.editMetadata')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Genre / Teose märksõnad */}
-              {work && ((work.tags && work.tags.length > 0) || (work.tags_object && work.tags_object.length > 0)) && (
-                <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-                  <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-                    <BookOpen size={18} className="text-green-600" />
-                    <h4 className="font-bold">{t('metadata.genre')}</h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {
-                      const label = getLabel(tag, lang);
-                      const tagId = typeof tag !== 'string' ? (tag as any).id : null;
-                      return (
-                        <div key={idx} className="inline-flex items-center bg-green-50 border border-green-100 rounded-full overflow-hidden">
-                          <button
-                            onClick={() => navigate(`/search?teoseTags=${encodeURIComponent(label)}`)}
-                            className="px-2.5 py-1 text-sm text-green-800 hover:bg-green-100 transition-colors flex items-center gap-1"
-                            title={`Otsi žanrit: ${label}`}
-                          >
-                            {label.toLowerCase()}
-                            <Search size={12} className="opacity-50" />
-                          </button>
-                          {tagId && (
-                            <a
-                              href={`https://www.wikidata.org/wiki/${tagId}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="pr-2 pl-1 py-1 text-green-600 hover:text-green-800 hover:bg-green-100 border-l border-green-100 transition-colors h-full flex items-center"
-                              title={`Vaata Wikidatas: ${tagId}`}
-                            >
-                              <ExternalLink size={10} />
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Tags */}
-              <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-                <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-                  <Tag size={18} className="text-primary-600" />
-                  <h4 className="font-bold">{t('workspace:info.pageTags')}</h4>
-                </div>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">{t('info.noTags')}</span>}
-                  {page_tags.map((tag, idx) => {
-                    const label = getLabel(tag, lang);
-                    const tagId = typeof tag !== 'string' ? (tag as any).id : null;
-                    
-                    return (
-                      <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group overflow-hidden">
-                        <button
-                          onClick={() => navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
-                          className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
-                          title="Otsi seda märksõna kogu korpusest"
-                        >
-                          {label.toLowerCase()}
-                          <Search size={12} className="opacity-0 group-hover:opacity-50" />
-                        </button>
-                        
-                        {tagId && (
-                          <a
-                            href={`https://www.wikidata.org/wiki/${tagId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-1.5 py-1 text-primary-400 hover:text-blue-600 border-l border-primary-100 transition-colors"
-                            title={`Vaata Wikidatas: ${tagId}`}
-                          >
-                            <ExternalLink size={10} />
-                          </a>
-                        )}
-
-                        {!readOnly && (
-                          <button 
-                            onClick={() => removeTag(typeof tag === 'string' ? tag : (tag as any).label)} 
-                            className={`pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 ${tagId ? 'border-l border-primary-100' : ''}`}
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-                {!readOnly && (
-                  <div className="relative">
-                    <EntityPicker
-                      type="topic"
-                      value={null}
-                      onChange={(val) => {
-                        if (val) {
-                          // Lisa märksõna kui teda pole veel listis
-                          const label = val.label.toLowerCase();
-                          const exists = page_tags.some(t => getLabel(t, lang).toLowerCase() === label);
-                          if (!exists) {
-                            setPageTags([...page_tags, val]);
-                          }
-                        }
-                      }}
-                      placeholder={t('workspace:metadata.tagsPlaceholder')}
-                      lang={lang}
-                      localSuggestions={tagSuggestions}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Comments */}
-              <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm flex-1 flex flex-col">
-                <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-                  <MessageSquare size={18} className="text-primary-600" />
-                  <h4 className="font-bold">{t('workspace:info.pageAnnotations')}</h4>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-4 mb-4 min-h-[100px]">
-                  {comments.length === 0 && (
-                    <div className="text-center py-8 text-gray-400">
-                      <p className="text-sm italic">{t('info.noAnnotationsHint')}</p>
-                    </div>
-                  )}
-                  {comments.map(comment => (
-                    <div key={comment.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative group">
-                      <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5">{comment.text}</p>
-                      <div className="flex justify-between items-center text-xs text-gray-500">
-                        <span className="font-semibold text-primary-700">{comment.author}</span>
-                        <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
-                      </div>
-                      {!readOnly && (
-                        <button
-                          onClick={() => removeComment(comment.id)}
-                          className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white"
-                          title="Kustuta kommentaar"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {!readOnly ? (
-                  <div className="mt-auto">
-                    <textarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder={t('info.commentPlaceholder')}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
-                    />
-                    <button
-                      onClick={addComment}
-                      disabled={!newComment.trim()}
-                      className="w-full py-2 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider rounded hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                    >
-                      {t('info.addComment').toUpperCase()}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-auto text-center py-4 text-sm text-gray-400">
-                    {t('info.loginToComment')}
-                  </div>
-                )}
-              </div>
-            </div>
-          )
-        }
+        {activeTab === 'annotate' && (
+          <AnnotationsTab
+            work={work}
+            page={page}
+            page_tags={page_tags}
+            setPageTags={setPageTags}
+            comments={comments}
+            setComments={setComments}
+            readOnly={readOnly || false}
+            user={user}
+            authToken={authToken}
+            onOpenMetaModal={onOpenMetaModal}
+            lang={lang}
+          />
+        )}
 
         {/* HISTORY TAB */}
-        {
-          activeTab === 'history' && (
-            <div className="h-full bg-gray-50 p-6 overflow-y-auto">
-              {/* Muudatuste ajalugu (Meilisearchist) */}
-              <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-                <div className="flex items-center gap-2 mb-6 text-gray-800 border-b border-gray-100 pb-2">
-                  <History size={18} className="text-primary-600" />
-                  <h4 className="font-bold">{t('history.title')}</h4>
-                </div>
-
-                <div className="relative border-l-2 border-gray-200 ml-3 space-y-8">
-                  {page.history?.map((entry, idx) => (
-                    <div key={entry.id} className="relative pl-6">
-                      <span className={`absolute -left-[9px] top-1 w-4 h-4 rounded-full border-2 border-white ${entry.action === 'status_change' ? 'bg-blue-500' :
-                        entry.action === 'text_edit' ? 'bg-green-500' : 'bg-gray-400'
-                        }`}></span>
-                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-1">
-                        <span className="text-sm font-bold text-gray-900">{entry.user}</span>
-                        <span className="text-xs text-gray-500 font-mono">{new Date(entry.timestamp).toLocaleString('et-EE')}</span>
-                      </div>
-                      <p className="text-sm text-gray-600">{entry.description}</p>
-                      {entry.action === 'status_change' && (
-                        <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
-                          {t('history.action.status_change')}
-                        </span>
-                      )}
-                    </div>
-                  ))}
-                  {(!page.history || page.history.length === 0) && (
-                    <p className="text-sm text-gray-400 pl-6">{t('history.noBackups')}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Git versiooniajalugu (ainult admin näeb) */}
-              {user?.role === 'admin' && (
-                <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-                  <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-                    <div className="flex items-center gap-2 text-gray-800">
-                      <RotateCcw size={18} className="text-amber-600" />
-                      <h4 className="font-bold">{t('history.gitHistory')}</h4>
-                    </div>
-                    <button
-                      onClick={loadGitHistory}
-                      disabled={isLoadingHistory}
-                      className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-gray-700 transition-colors"
-                    >
-                      {isLoadingHistory ? t('common:labels.loading') : t('history.refresh')}
-                    </button>
-                  </div>
-
-                  {gitHistory.length === 0 && !isLoadingHistory && (
-                    <p className="text-sm text-gray-400 text-center py-4">{t('history.emptyHistory')}</p>
-                  )}
-
-                  {gitHistory.length > 0 && (
-                    <div className="space-y-2">
-                      {gitHistory.map((entry) => (
-                        <div
-                          key={entry.full_hash}
-                          className={`flex items-center justify-between p-3 rounded-lg border ${entry.is_original
-                            ? 'bg-green-50 border-green-200'
-                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            {entry.is_original && (
-                              <div title="Originaal OCR - esimene versioon">
-                                <Shield size={16} className="text-green-600" />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-medium text-gray-900">
-                                  {entry.formatted_date}
-                                </span>
-                                <span className="text-xs text-gray-500 font-mono">
-                                  {entry.hash}
-                                </span>
-                                {entry.is_original && (
-                                  <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
-                                    Originaal OCR
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                                <User size={10} />
-                                <span>{entry.author}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <button
-                            onClick={() => handleGitRestore(entry)}
-                            disabled={isRestoring || readOnly}
-                            className={`text-xs px-3 py-1.5 ${entry.is_original
-                              ? 'bg-green-600 hover:bg-green-700'
-                              : 'bg-primary-600 hover:bg-primary-700'
-                              } disabled:bg-gray-300 text-white rounded transition-colors flex items-center gap-1 shrink-0 ml-2`}
-                          >
-                            {isRestoring ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <RotateCcw size={12} />
-                            )}
-                            {entry.is_original ? t('history.original') : t('history.restore')}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <p className="mt-4 text-xs text-gray-500">
-                    <AlertTriangle size={12} className="inline mr-1" />
-                    {t('history.restoreHint')}
-                  </p>
-                </div>
-              )}
-
-              {user && user.role !== 'admin' && (
-                <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500">
-                  {t('history.adminOnly')}
-                </div>
-              )}
-            </div>
-          )
-        }
+        {activeTab === 'history' && (
+          <HistoryTab
+            page={page}
+            user={user}
+            authToken={authToken}
+            onRestore={(content) => {
+              setText(content);
+              setActiveTab('edit');
+            }}
+            readOnly={readOnly || false}
+          />
+        )}
 
       </div >
     </div >

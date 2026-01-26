@@ -94,6 +94,7 @@ const fixIndexSettings = async () => {
       'lehekylje_number',
       'originaal_kataloog',
       'page_tags',
+      'page_tags_et', 'page_tags_en',
       'status',
       'teose_staatus',
       'tags',
@@ -1266,19 +1267,24 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
 };
 
 // Märksõnade autocomplete: saa kõik unikaalsed märksõnad kasutades facet'e
-export const getAllTags = async (): Promise<string[]> => {
+export const getAllTags = async (lang: string = 'et'): Promise<string[]> => {
   checkMixedContent();
   try {
-    // Kasutame facet'e, et saada kõik unikaalsed märksõnad
-    // See on palju efektiivsem kui kõikide dokumentide läbivaatamine
+    // Kasuta keelespetsiifilist välja (nt page_tags_et)
+    // Fallback: kui on tundmatu keel, kasuta 'page_tags' (kõik keeled segamini)
+    const facetField = ['et', 'en'].includes(lang) ? `page_tags_${lang}` : 'page_tags';
+
     const response = await index.search('', {
-      limit: 0, // Me ei vaja tulemusi, ainult facet'e
-      facets: ['page_tags']
+      limit: 0, 
+      facets: [facetField]
     });
 
-    const tagFacets = response.facetDistribution?.['page_tags'] || {};
+    const tagFacets = response.facetDistribution?.[facetField] || {};
+    // Normaliseeri: väiketähed ja unikaalsed
     const normalizedTags = Array.from(new Set(Object.keys(tagFacets).map(t => t.toLowerCase())));
-    return normalizedTags.sort((a, b) => a.localeCompare(b, 'et'));
+    
+    // Sorteeri tähestikuliselt vastavas keeles
+    return normalizedTags.sort((a, b) => a.localeCompare(b, lang));
   } catch (e) {
     console.error("Failed to fetch tags:", e);
     return [];
