@@ -752,19 +752,25 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         <div className="space-y-1.5">
                           {work.creators.map((creator, idx) => {
                             const roleLabel = t(`metadata.roles.${creator.role}`, { defaultValue: creator.role });
+                            const dashboardParam = creator.role === 'respondens' ? 'respondens' : 'author';
+                            
                             return (
                               <div key={idx} className="flex items-center gap-2 group">
                                 <div className="flex items-center gap-1.5 text-gray-900">
-                                  <User size={14} className="text-gray-400" />
-                                  <span className="font-medium select-text">{creator.name}</span>
+                                  <button
+                                    onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
+                                    className="text-gray-400 hover:text-primary-600 transition-colors"
+                                    title={t('workCard.searchAuthor', 'Filtreeri dashboardil')}
+                                  >
+                                    <User size={14} />
+                                  </button>
+                                  <span 
+                                    className="font-medium select-text cursor-pointer hover:text-primary-600 transition-colors"
+                                    onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
+                                  >
+                                    {creator.name}
+                                  </span>
                                 </div>
-                                <button
-                                  onClick={() => navigate(`/search?q="${encodeURIComponent(creator.name)}"`)}
-                                  className="text-gray-400 hover:text-primary-600 p-0.5 rounded hover:bg-primary-50 transition-colors opacity-0 group-hover:opacity-100"
-                                  title={`Otsi "${creator.name}" kõikidest teostest`}
-                                >
-                                  <Search size={14} />
-                                </button>
                                 {creator.id && (
                                   <a
                                     href={`https://www.wikidata.org/wiki/${creator.id}`}
@@ -858,16 +864,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
                           <div className="flex items-center gap-1.5 group">
                             <div className="flex items-center gap-1.5 text-gray-900 overflow-hidden">
-                              <span className="text-gray-400 font-serif shrink-0">¶</span>
-                              <span className="truncate select-text">{getLabel(work.publisher, lang)}</span>
+                              <button
+                                onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
+                                className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
+                                title="Filtreeri trükkali järgi"
+                              >
+                                <User size={14} />
+                              </button>
+                              <span 
+                                className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
+                                onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
+                              >
+                                {getLabel(work.publisher, lang)}
+                              </span>
                             </div>
-                            <button
-                              onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
-                              className="text-gray-400 hover:text-amber-600 p-0.5 rounded hover:bg-amber-50 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-                              title="Filtreeri trükkali järgi"
-                            >
-                              <Search size={14} />
-                            </button>
                             {work.publisher_object?.id && (
                               <a
                                 href={`https://www.wikidata.org/wiki/${work.publisher_object.id}`}
