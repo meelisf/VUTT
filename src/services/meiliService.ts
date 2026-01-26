@@ -50,7 +50,7 @@ const fixIndexSettings = async () => {
 
     const requiredSearch = ['page_tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
     const requiredSort = ['last_modified'];
-    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'respondens', 'trükkal']; // Filtreeritavad väljad
+    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'creators', 'publisher']; // Filtreeritavad väljad
     // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
     const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
 
