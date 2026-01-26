@@ -63,34 +63,39 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       return (
         <div className="flex flex-wrap items-center gap-x-2 text-sm text-gray-600">
           <User size={14} className="shrink-0" />
-          {displayCreators.map((creator, idx) => (
-            <span key={idx} className="flex items-center gap-1">
-              <button
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  navigate(`/search?q="${encodeURIComponent(creator.name)}"`);
-                }}
-                className="hover:text-primary-600 transition-colors truncate max-w-[150px]"
-                title={t('workCard.searchAuthor', 'Otsi autorit')}
-              >
-                {creator.name}
-              </button>
-              {creator.id && (
-                <a
-                  href={`https://www.wikidata.org/wiki/${creator.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                  title={`Wikidata: ${creator.id}`}
-                  onClick={(e) => e.stopPropagation()}
+          {displayCreators.map((creator, idx) => {
+            const isRespondens = creator.role === 'respondens';
+            const paramName = isRespondens ? 'respondens' : 'author';
+            
+            return (
+              <span key={idx} className="flex items-center gap-1">
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    navigate(`/?${paramName}=${encodeURIComponent(creator.name)}`);
+                  }}
+                  className="hover:text-primary-600 transition-colors truncate max-w-[150px]"
+                  title={t('workCard.searchAuthor', 'Otsi autorit')}
                 >
-                  <ExternalLink size={10} />
-                </a>
-              )}
-              {idx < displayCreators.length - 1 && <span className="text-gray-400">/</span>}
-            </span>
-          ))}
+                  {creator.name}
+                </button>
+                {creator.id && (
+                  <a
+                    href={`https://www.wikidata.org/wiki/${creator.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                    title={`Wikidata: ${creator.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink size={10} />
+                  </a>
+                )}
+                {idx < displayCreators.length - 1 && <span className="text-gray-400">/</span>}
+              </span>
+            );
+          })}
           {remaining > 0 && <span className="text-xs text-gray-400">+{remaining}</span>}
         </div>
       );
@@ -104,7 +109,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            navigate(`/search?q="${encodeURIComponent(work.author || '')}"`);
+            navigate(`/?author=${encodeURIComponent(work.author || '')}`);
           }}
           className="hover:text-primary-600 transition-colors truncate"
         >
@@ -117,7 +122,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                navigate(`/search?q="${encodeURIComponent(work.respondens)}"`);
+                navigate(`/?respondens=${encodeURIComponent(work.respondens)}`);
               }}
               className="hover:text-primary-600 transition-colors truncate"
             >
@@ -179,7 +184,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                         e.preventDefault();
                         e.stopPropagation();
                         // Navigeeri otsingusse selle žanriga
-                        navigate(`/search?teoseTags=${encodeURIComponent(label)}`);
+                        navigate(`/?tags=${encodeURIComponent(label)}`);
                       }}
                       className="text-[10px] font-medium text-white px-1.5 py-0.5"
                       title={t('workCard.searchGenre', { genre: label })}
