@@ -106,13 +106,23 @@ def capitalize_first(text):
     return text[0].upper() + text[1:]
 
 
-def get_label(value):
-    """Tagastab sildi LinkedEntity objektist või stringist."""
+def get_label(value, lang='et'):
+    """Tagastab sildi LinkedEntity objektist või stringist eelistatud keeles."""
     if not value:
         return ""
     if isinstance(value, str):
         return capitalize_first(value)
     if isinstance(value, dict):
+        # Proovi leida silti konkreetses keeles
+        labels = value.get('labels')
+        if labels and isinstance(labels, dict):
+            if labels.get(lang):
+                return capitalize_first(labels[lang])
+            # Fallback eesti keelele
+            if labels.get('et'):
+                return capitalize_first(labels['et'])
+        
+        # Fallback peamisele sildile
         return capitalize_first(value.get('label', ''))
     return capitalize_first(str(value))
 
