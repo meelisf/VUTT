@@ -1,18 +1,40 @@
 # Cleanup Plan
 
-## Post-Migration Cleanup (NanoID Transition)
+## NanoID Migration Status
 
-Currently, the system supports both legacy slugs (`teose_id`, e.g., `1632-1`) and persistent NanoIDs (`work_id`, e.g., `occgcn`) to ensure smooth transition.
+> **Staatus:** ✅ NanoID implementeeritud kõikjal (2026-01-26)
+> **Puhastus:** Valikuline - tagasiühilduvuse kood töötab, aga pole enam vajalik
 
-Once the public launch is successful and no legacy links are in active circulation, we should clean up the codebase.
+Kõik `_metadata.json` failid sisaldavad nüüd `id` välja (nanoid). URL-id kasutavad `work_id` parameetrit.
 
-### 1. Frontend (`src/services/meiliService.ts`)
-- Remove `OR teose_id = ...` from all Meilisearch filters.
-- Rely strictly on `work_id`.
+### Tagasiühilduvuse kood (võib eemaldada)
 
-### 2. Backend (`server/utils.py`)
-- In `find_directory_by_id`, remove the fallback search for `slug` and directory names.
-- Rely strictly on the `WORK_ID_CACHE` and `id` field in `_metadata.json`.
+Järgmised koodilõigud toetavad vanu `teose_id` (slug) linke, aga pole enam vajalikud:
 
-### 3. Data Schema
-- Review `_metadata.json` files. `slug` field can be deprecated or kept purely for human-readable reference, but not used for logic.
+**1. Frontend (`src/services/meiliService.ts`)**
+```typescript
+// Praegu: filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`]
+// Pärast: filter: [`work_id = "${workId}"`]
+```
+Asukohad: read 219, 651, 931, 1014, 1248, 1323
+
+**2. Backend (`server/utils.py`)**
+- `find_directory_by_id()` funktsioon otsib fallback'ina ka `slug` ja kaustanime järgi
+- Pärast puhastust: kasuta ainult `WORK_ID_CACHE` ja `id` välja
+
+**3. Andmeskeem**
+- `teose_id` / `slug` väljad võib jätta inimloetavuseks, aga loogika ei tohiks neid kasutada
+
+### Miks mitte kohe puhastada?
+
+- Tagasiühilduvus ei tekita probleeme (töötab korrektselt)
+- Vanad järjehoidjad/lingid võivad veel eksisteerida
+- Puhastamine nõuab hoolikat testimist
+- Prioriteet on madal - "if it ain't broke, don't fix it"
+
+### Puhastamise sammud (kui otsustad teha)
+
+1. Eemalda `OR teose_id` kõigist Meilisearch filtritest
+2. Lihtsusta `find_directory_by_id()` - eemalda slug fallback
+3. Testi põhjalikult (kõik lingid, otsing, töölaud)
+4. Reindekseeri Meilisearch (valikuline - `teose_id` väli võib jääda)
