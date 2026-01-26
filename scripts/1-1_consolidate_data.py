@@ -442,6 +442,8 @@ def create_meilisearch_data_per_page():
                 # Isikud
                 'creators': doc_metadata.get('creators', []),
                 'authors_text': doc_metadata.get('authors_text', []),
+                'author_names': [c['name'] for c in doc_metadata.get('creators', []) if c.get('name') and c.get('role') != 'respondens'],
+                'respondens_names': [c['name'] for c in doc_metadata.get('creators', []) if c.get('name') and c.get('role') == 'respondens'],
                 'creator_ids': [c.get('id') for c in doc_metadata.get('creators', []) if c.get('id')],
 
                 # Täiendav klassifikatsioon (märksõnad)
@@ -496,9 +498,25 @@ def create_meilisearch_data_per_page():
 
             # Autor ja respondens (denormaliseeritud tagasiühilduvuseks)
             creators = doc_metadata.get('creators', [])
-            authors = [c for c in creators if c.get('role') == 'praeses']
+            
+            # Autor: praeses > auctor > esimene mitterespondent
+            autor_name = ''
+            praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
+            auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
+            
+            if praeses:
+                autor_name = praeses.get('name', '')
+            elif auctor:
+                autor_name = auctor.get('name', '')
+            elif creators:
+                # Fallback: esimene isik, kes pole respondens
+                first = next((c for c in creators if c.get('role') not in ['respondens', 'gratulator', 'dedicator']), None)
+                if first:
+                    autor_name = first.get('name', '')
+            
+            meili_doc['autor'] = autor_name
+            
             respondents = [c for c in creators if c.get('role') == 'respondens']
-            meili_doc['autor'] = authors[0]['name'] if authors else ''
             meili_doc['respondens'] = respondents[0]['name'] if respondents else ''
 
             pages.append(meili_doc)
