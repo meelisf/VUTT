@@ -14,7 +14,10 @@ fi
 echo "🚀 [1/2] Koondan andmed (consolidate)..."
 docker exec -it vutt-backend python3 scripts/1-1_consolidate_data.py
 
-echo "🚀 [2/2] Saadan Meilisearchi (upload)..."
+echo "🚀 [2/3] Saadan Meilisearchi (upload)..."
 docker exec -it vutt-backend python3 scripts/2-1_upload_to_meili.py
+
+echo "🔧 [3/3] Uuendan filtreeritavaid atribuute..."
+docker exec -it vutt-backend python3 scripts/update_filterable.py
 
 echo "✅ Andmed laetud!"

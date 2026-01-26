@@ -404,16 +404,16 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`aasta <= ${options.yearEnd}`);
     }
     if (options?.author) {
-      // V2: Otsi author_names väljalt (mitte-respondens loojad)
-      filter.push(`author_names = "${options.author}"`);
+      // Otsi nii author_names (v2 list) kui autor (v1 string) väljalt
+      filter.push(`(author_names = "${options.author}" OR autor = "${options.author}")`);
     }
     if (options?.respondens) {
-      // V2: Otsi respondens_names väljalt
-      filter.push(`respondens_names = "${options.respondens}"`);
+      // Otsi nii respondens_names (v2 list) kui respondens (v1 string) väljalt
+      filter.push(`(respondens_names = "${options.respondens}" OR respondens = "${options.respondens}")`);
     }
     if (options?.printer) {
-      // V2: Otsi publisher väljalt
-      filter.push(`publisher = "${options.printer}"`);
+      // Otsi nii publisher (v2) kui trükkal (v1) väljalt
+      filter.push(`(publisher = "${options.printer}" OR trükkal = "${options.printer}")`);
     }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
