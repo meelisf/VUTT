@@ -125,7 +125,7 @@ const SearchPage: React.FC = () => {
         setSelectedTeoseTags(teoseTagsParam);
         setSelectedGenres(genreParam);
         setSelectedType(typeParam);
-    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam, typeParam]);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam]);
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
