@@ -70,9 +70,11 @@ const fixIndexSettings = async () => {
       'title',
       'location_id',
       'publisher_id',
+      'publisher',
       'genre_ids',
       'tags_ids',
       'creator_ids',
+      'creators',
       'type',
       'type_et', 'type_en',
       'genre',
@@ -399,13 +401,16 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`aasta <= ${options.yearEnd}`);
     }
     if (options?.author) {
-      filter.push(`autor = "${options.author}"`);
+      // V2: Otsi creators seast, välista respondens
+      filter.push(`(creators.name = "${options.author}" AND creators.role != "respondens")`);
     }
     if (options?.respondens) {
-      filter.push(`respondens = "${options.respondens}"`);
+      // V2: Otsi creators seast, nõua respondens rolli
+      filter.push(`(creators.name = "${options.respondens}" AND creators.role = "respondens")`);
     }
     if (options?.printer) {
-      filter.push(`trükkal = "${options.printer}"`);
+      // V2: Otsi publisher väljalt
+      filter.push(`publisher = "${options.printer}"`);
     }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
