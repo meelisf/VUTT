@@ -49,7 +49,11 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     }
   };
 
-  const tags = work.tags || [];
+  // Eelistame tags_object (LinkedEntity[]) mitmekeelsuse jaoks
+  const displayTags = work.tags_object && work.tags_object.length > 0 
+    ? work.tags_object 
+    : (work.tags || []);
+
   const lang = i18n.language || 'et';
 
   // Autorite kuvamise loogika
@@ -160,10 +164,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
         />
         {/* Žanrid pildi peal (max 3, kompaktne) */}
-        {tags.length > 0 && (
+        {displayTags.length > 0 && (
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-8 pb-2 px-2">
             <div className="flex flex-wrap items-center gap-1">
-              {tags.slice(0, 3).map((tag, idx) => {
+              {displayTags.slice(0, 3).map((tag, idx) => {
                 const label = getLabel(tag, lang);
                 // Kontrolli, kas on Wikidata ID
                 const tagId = typeof tag !== 'string' ? tag.id : null;
@@ -174,7 +178,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        // Navigeeri otsingusse selle žanriga
+                        // Navigeeri otsingusse selle märksõnaga
                         navigate(`/?tags=${encodeURIComponent(label)}`);
                       }}
                       className="text-[10px] font-medium text-white px-1.5 py-0.5"
@@ -197,12 +201,12 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                   </div>
                 );
               })}
-              {tags.length > 3 && (
+              {displayTags.length > 3 && (
                 <span
                   className="text-[10px] text-white/80 bg-slate-800/40 px-1.5 py-0.5 rounded"
-                  title={tags.slice(3).map(t => getLabel(t, lang)).join(', ')}
+                  title={displayTags.slice(3).map(t => getLabel(t, lang)).join(', ')}
                 >
-                  +{tags.length - 3}
+                  +{displayTags.length - 3}
                 </span>
               )}
             </div>
