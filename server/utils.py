@@ -10,7 +10,7 @@ import unicodedata
 from .config import BASE_DIR
 
 # Nanoid seadistus
-NANOID_LENGTH = 8
+NANOID_LENGTH = 6
 NANOID_ALPHABET = string.ascii_lowercase + string.digits  # a-z, 0-9
 
 # Cache: Work ID (nanoid) -> Directory path
