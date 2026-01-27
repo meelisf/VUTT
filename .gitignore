@@ -20,6 +20,9 @@ data/
 
 # Project specific
 *.backup.*
+*_BACKUP/
+*_backup/
+state_SAFE_BACKUP/
 meilisearch
 # State files with sensitive data (keep templates, not actual data)
 state/*.json
