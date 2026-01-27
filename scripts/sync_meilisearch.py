@@ -84,11 +84,18 @@ def get_meilisearch_pages(client):
             else:
                 doc_dict = doc.__dict__ if hasattr(doc, '__dict__') else {}
 
-            doc_id = doc_dict.get('id') or getattr(doc, 'id', None)
-            if doc_id:
-                pages[doc_id] = {
-                    'teose_id': doc_dict.get('teose_id') or getattr(doc, 'teose_id', None),
-                    'lehekylje_number': doc_dict.get('lehekylje_number') or getattr(doc, 'lehekylje_number', None),
+            # Kasuta teose_id + lehekylje_number composite key'na (mitte dokumendi id)
+            # See tagab ühilduvuse failisüsteemiga, kus ID genereeritakse samuti nii
+            teose_id = doc_dict.get('teose_id') or getattr(doc, 'teose_id', None)
+            page_num = doc_dict.get('lehekylje_number') or getattr(doc, 'lehekylje_number', None)
+            doc_id = doc_dict.get('id') or getattr(doc, 'id', None)  # Algne ID kustutamiseks
+
+            if teose_id and page_num:
+                composite_key = f"{teose_id}-{page_num}"
+                pages[composite_key] = {
+                    'id': doc_id,  # Säilitame algse ID kustutamiseks
+                    'teose_id': teose_id,
+                    'lehekylje_number': page_num,
                     'lehekylje_pilt': doc_dict.get('lehekylje_pilt') or getattr(doc, 'lehekylje_pilt', None),
                     'teose_lehekylgede_arv': doc_dict.get('teose_lehekylgede_arv') or getattr(doc, 'teose_lehekylgede_arv', None),
                     'originaal_kataloog': doc_dict.get('originaal_kataloog') or getattr(doc, 'originaal_kataloog', None),
@@ -127,19 +134,24 @@ def get_filesystem_pages(data_dir):
         if not image_files:
             continue
 
-        # Hangi teose_id _metadata.json failist või katalooginimest
+        # Hangi work_id (nanoid) ja teose_id (slug) _metadata.json failist
         metadata_path = os.path.join(dir_path, '_metadata.json')
+        work_id = None  # nanoid
+        teose_id = sanitize_id(dir_name)  # slug fallback
+
         if os.path.exists(metadata_path):
             try:
                 with open(metadata_path, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
-                    teose_id = sanitize_id(meta.get('teose_id', dir_name))
+                    work_id = meta.get('id')  # nanoid
+                    teose_id = sanitize_id(meta.get('teose_id') or meta.get('slug') or dir_name)
             except:
-                teose_id = sanitize_id(dir_name)
-        else:
-            teose_id = sanitize_id(dir_name)
+                pass
 
-        works[teose_id] = {
+        # Kasuta nanoid't kui olemas, muidu slug
+        id_for_pages = work_id or teose_id
+
+        works[id_for_pages] = {
             'dir_name': dir_name,
             'page_count': len(image_files),
             'pages': []
@@ -147,17 +159,17 @@ def get_filesystem_pages(data_dir):
 
         for page_index, image_file in enumerate(image_files):
             page_num = page_index + 1
-            page_id = f"{teose_id}-{page_num}"
+            page_id = f"{id_for_pages}-{page_num}"
             image_path = os.path.join(dir_name, image_file)
 
             pages[page_id] = {
-                'teose_id': teose_id,
+                'teose_id': id_for_pages,
                 'lehekylje_number': page_num,
                 'lehekylje_pilt': image_path,
                 'teose_lehekylgede_arv': len(image_files),
                 'originaal_kataloog': dir_name,
             }
-            works[teose_id]['pages'].append(page_id)
+            works[id_for_pages]['pages'].append(page_id)
 
     return pages, works
 
@@ -264,11 +276,12 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
         # Kustuta
         if to_delete:
             print(f"Kustutan {len(to_delete)} lehekülge...")
+            # Kasuta Meilisearchi algset dokumendi ID-d (mitte composite key'd)
+            delete_ids = [meili_pages[key]['id'] for key in to_delete if meili_pages[key].get('id')]
             # Kustutame partiidena, kuna loend võib olla suur
-            delete_list = list(to_delete)
             batch_size = 100
-            for i in range(0, len(delete_list), batch_size):
-                batch = delete_list[i:i + batch_size]
+            for i in range(0, len(delete_ids), batch_size):
+                batch = delete_ids[i:i + batch_size]
                 task = index.delete_documents(batch)
                 index.wait_for_task(task.task_uid)
             print(f"   ✅ Kustutatud")

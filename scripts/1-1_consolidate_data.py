@@ -372,8 +372,10 @@ def create_meilisearch_data_per_page():
         teose_lehekylgede_arv = len(jpg_files)
 
         pages = []
+        # Kasuta nanoid't page ID-s (kui olemas), muidu fallback slugile
+        work_id = doc_metadata.get('id') or teose_id
         for page_index, jpg_filename in enumerate(jpg_files):
-            page_id = f"{teose_id}-{page_index + 1}"
+            page_id = f"{work_id}-{page_index + 1}"
             base_name = os.path.splitext(jpg_filename)[0]
 
             # Loe tekst
