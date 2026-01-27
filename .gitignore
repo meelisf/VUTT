@@ -22,7 +22,9 @@ data/
 *.backup.*
 meilisearch
 # State files with sensitive data (keep templates, not actual data)
-state/users.json
+state/*.json
+!state/*.example
+!state/*.json.example
 
 # Documentation (internal)
 docs/
