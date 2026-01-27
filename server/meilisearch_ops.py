@@ -42,8 +42,51 @@ def get_collection_hierarchy(collections, collection_id):
     return hierarchy
 
 
-def send_to_meilisearch(documents):
-    """Saadab dokumendid Meilisearchi kasutades urllib-i."""
+def wait_for_task(task_uid, timeout=30):
+    """Ootab Meilisearchi taski lõppu.
+
+    Args:
+        task_uid: Meilisearchi taski ID
+        timeout: Maksimaalne ooteaeg sekundites
+
+    Returns:
+        True kui task õnnestus, False kui ebaõnnestus või timeout
+    """
+    url = f"{MEILI_URL}/tasks/{task_uid}"
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        try:
+            req = urllib.request.Request(url)
+            req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+
+            with urllib.request.urlopen(req) as response:
+                task_data = json.loads(response.read().decode('utf-8'))
+                status = task_data.get('status')
+
+                if status == 'succeeded':
+                    return True
+                elif status == 'failed':
+                    print(f"Meilisearch task ebaõnnestus: {task_data.get('error')}")
+                    return False
+                # status on 'enqueued' või 'processing' - ootame edasi
+        except Exception as e:
+            print(f"Viga taski staatuse kontrollimisel: {e}")
+            return False
+
+        time.sleep(0.1)  # Oota 100ms enne järgmist kontrolli
+
+    print(f"Meilisearch task timeout ({timeout}s)")
+    return False
+
+
+def send_to_meilisearch(documents, wait=True):
+    """Saadab dokumendid Meilisearchi kasutades urllib-i.
+
+    Args:
+        documents: Dokumentide list
+        wait: Kui True, ootab kuni indekseerimine on lõppenud
+    """
     if not MEILI_KEY:
         print("HOIATUS: Meilisearchi võti puudub, ei saa indekseerida.")
         return False
@@ -57,7 +100,11 @@ def send_to_meilisearch(documents):
 
         with urllib.request.urlopen(req) as response:
             res_data = json.loads(response.read().decode('utf-8'))
-            print(f"Meilisearch vastus: {res_data}")
+            task_uid = res_data.get('taskUid')
+            print(f"Meilisearch task: {task_uid}")
+
+            if wait and task_uid:
+                return wait_for_task(task_uid)
             return True
     except Exception as e:
         print(f"Viga Meilisearchi saatmisel: {e}")
