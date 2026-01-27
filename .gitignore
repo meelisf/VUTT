@@ -23,3 +23,6 @@ data/
 meilisearch
 # State files with sensitive data (keep templates, not actual data)
 state/users.json
+
+# Documentation (internal)
+docs/
