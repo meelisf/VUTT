@@ -37,8 +37,10 @@ except ImportError:
 # --- SEADISTUS ---
 # NB: Docker sees on MEILISEARCH_URL=http://meilisearch:7700
 #     Otse serveris käivitades kasuta vaikimisi localhost
-MEILI_URL = os.environ.get('MEILISEARCH_URL', 'http://localhost:7700')
-MEILI_KEY = os.environ.get('MEILISEARCH_MASTER_KEY', '')
+_env_url = os.environ.get('MEILISEARCH_URL', 'http://localhost:7700')
+# Kui .env sisaldab Dockeri hostname'd, kasuta localhost (serveris otse käivitades)
+MEILI_URL = _env_url.replace('http://meilisearch:', 'http://localhost:')
+MEILI_KEY = os.environ.get('MEILI_MASTER_KEY', '')
 MEILI_INDEX = 'teosed'
 DATA_ROOT_DIR = os.environ.get('VUTT_DATA_DIR', 'data/')
 # --- LÕPP ---
