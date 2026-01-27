@@ -286,6 +286,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
 
+                # Honeypot kontroll - kui täidetud, siis bot
+                honeypot = data.get('website', '')
+                if honeypot:
+                    print(f"HONEYPOT: Tuvastatud bot IP-lt {client_ip}, website='{honeypot}'")
+                    # Tagastame "edu" et bot arvaks, et õnnestus
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "success", "message": "Taotlus esitatud"}).encode('utf-8'))
+                    return
+
                 name = data.get('name', '').strip()
                 email = data.get('email', '').strip()
                 affiliation = data.get('affiliation', '').strip() if data.get('affiliation') else None

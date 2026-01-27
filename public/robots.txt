@@ -1,0 +1,14 @@
+# VUTT - Varauusaegsete Tekstide Töölaud
+# https://vutt.utlib.ut.ee
+
+User-agent: *
+Allow: /$
+Disallow: /work/
+Disallow: /search
+Disallow: /register
+Disallow: /set-password
+Disallow: /admin
+Disallow: /review
+Disallow: /statistics
+Disallow: /api/
+Disallow: /meili/

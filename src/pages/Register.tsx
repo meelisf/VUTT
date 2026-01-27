@@ -12,7 +12,8 @@ const Register: React.FC = () => {
     name: '',
     email: '',
     affiliation: '',
-    motivation: ''
+    motivation: '',
+    website: ''  // Honeypot väli - botid täidavad, inimesed ei näe
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,7 +60,8 @@ const Register: React.FC = () => {
           name: formData.name.trim(),
           email: formData.email.trim().toLowerCase(),
           affiliation: formData.affiliation.trim() || null,
-          motivation: formData.motivation.trim()
+          motivation: formData.motivation.trim(),
+          website: formData.website  // Honeypot
         })
       });
 
@@ -126,6 +128,20 @@ const Register: React.FC = () => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Honeypot - peidetud väli botide püüdmiseks */}
+            <div className="absolute -left-[9999px]" aria-hidden="true">
+              <label htmlFor="website">Website</label>
+              <input
+                type="text"
+                id="website"
+                name="website"
+                value={formData.website}
+                onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                tabIndex={-1}
+                autoComplete="off"
+              />
+            </div>
+
             {/* Nimi */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
