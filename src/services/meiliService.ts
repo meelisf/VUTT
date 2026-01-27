@@ -961,6 +961,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       type: hit.type,
       type_object: hit.type_object,
       genre: hit.genre_object || hit.genre,
+      genre_object: hit.genre_object,
       collection: hit.collection,
       collections_hierarchy: hit.collections_hierarchy || [],
 
