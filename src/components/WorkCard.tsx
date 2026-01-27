@@ -4,6 +4,7 @@ import { Work, WorkStatus } from '../types';
 import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
+import { getEntityUrl } from '../utils/entityUrl';
 
 interface WorkCardProps {
   work: Work;
@@ -81,13 +82,13 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                 >
                   {creator.name}
                 </Link>
-                {creator.id && (
+                {getEntityUrl(creator.id, creator.source) && (
                   <a
-                    href={`https://www.wikidata.org/wiki/${creator.id}`}
+                    href={getEntityUrl(creator.id, creator.source)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                    title={`Wikidata: ${creator.id}`}
+                    title={creator.id || ''}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <ExternalLink size={10} />
@@ -186,13 +187,13 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                     >
                       {label}
                     </button>
-                    {tagId && (
+                    {getEntityUrl(tagId, typeof tag !== 'string' ? tag.source : undefined) && (
                       <a
-                        href={`https://www.wikidata.org/wiki/${tagId}`}
+                        href={getEntityUrl(tagId, typeof tag !== 'string' ? tag.source : undefined)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-1 py-0.5 hover:bg-white/20 text-white/70 hover:text-white border-l border-white/10"
-                        title="Vaata Wikidatas"
+                        title={tagId || ''}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <ExternalLink size={8} />

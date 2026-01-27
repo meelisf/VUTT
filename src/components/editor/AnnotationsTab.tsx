@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2 } from 'lucide-react';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
+import { getEntityUrl } from '../../utils/entityUrl';
 import { getWorkFullText, getAllTags } from '../../services/meiliService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
@@ -161,13 +162,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             {creator.name}
                           </span>
                         </div>
-                        {creator.id && (
+                        {getEntityUrl(creator.id, creator.source) && (
                           <a
-                            href={`https://www.wikidata.org/wiki/${creator.id}`}
+                            href={getEntityUrl(creator.id, creator.source)!}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                            title={`Vaata Wikidatas: ${creator.id}`}
+                            title={creator.id || ''}
                           >
                             <ExternalLink size={12} />
                           </a>
@@ -193,13 +194,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.type')}</span>
                   <div className="flex items-center gap-1.5">
                     <p className="text-gray-900">{getLabel(work.type_object || work.type, lang)}</p>
-                    {work.type_object?.id && (
+                    {getEntityUrl(work.type_object?.id, work.type_object?.source) && (
                       <a
-                        href={`https://www.wikidata.org/wiki/${work.type_object.id}`}
+                        href={getEntityUrl(work.type_object?.id, work.type_object?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title={`Vaata Wikidatas: ${work.type_object.id}`}
+                        title={work.type_object?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -214,17 +215,21 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
                   <div className="flex items-center gap-1.5">
                     <p className="text-gray-900">{getLabel(work.genre_object || work.genre, lang)}</p>
-                    {(Array.isArray(work.genre_object) ? work.genre_object[0]?.id : work.genre_object?.id) && (
-                      <a
-                        href={`https://www.wikidata.org/wiki/${Array.isArray(work.genre_object) ? work.genre_object[0].id : work.genre_object?.id}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title="Vaata Wikidatas"
-                      >
-                        <ExternalLink size={12} />
-                      </a>
-                    )}
+                    {(() => {
+                      const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
+                      const url = getEntityUrl(genreObj?.id, genreObj?.source);
+                      return url && (
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                          title={genreObj?.id || ''}
+                        >
+                          <ExternalLink size={12} />
+                        </a>
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -234,13 +239,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
                   <div className="flex items-center gap-1.5">
                     <p className="text-gray-900">{getLabel(work.location, lang)}</p>
-                    {work.location_object?.id && (
+                    {getEntityUrl(work.location_object?.id, work.location_object?.source) && (
                       <a
-                        href={`https://www.wikidata.org/wiki/${work.location_object.id}`}
+                        href={getEntityUrl(work.location_object?.id, work.location_object?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title={`Vaata Wikidatas: ${work.location_object.id}`}
+                        title={work.location_object?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -268,13 +273,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                         {getLabel(work.publisher, lang)}
                       </span>
                     </div>
-                    {work.publisher_object?.id && (
+                    {getEntityUrl(work.publisher_object?.id, work.publisher_object?.source) && (
                       <a
-                        href={`https://www.wikidata.org/wiki/${work.publisher_object.id}`}
+                        href={getEntityUrl(work.publisher_object?.id, work.publisher_object?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors shrink-0"
-                        title={`Vaata Wikidatas: ${work.publisher_object.id}`}
+                        title={work.publisher_object?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -363,13 +368,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     {label.toLowerCase()}
                     <Search size={12} className="opacity-50" />
                   </button>
-                  {tagId && (
+                  {getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined) && (
                     <a
-                      href={`https://www.wikidata.org/wiki/${tagId}`}
+                      href={getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined)!}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="pr-2 pl-1 py-1 text-green-600 hover:text-green-800 hover:bg-green-100 border-l border-green-100 transition-colors h-full flex items-center"
-                      title={`Vaata Wikidatas: ${tagId}`}
+                      title={tagId || ''}
                     >
                       <ExternalLink size={10} />
                     </a>
@@ -404,13 +409,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <Search size={12} className="opacity-0 group-hover:opacity-50" />
                 </button>
                 
-                {tagId && (
+                {getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined) && (
                   <a
-                    href={`https://www.wikidata.org/wiki/${tagId}`}
+                    href={getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined)!}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-1.5 py-1 text-primary-400 hover:text-blue-600 border-l border-primary-100 transition-colors"
-                    title={`Vaata Wikidatas: ${tagId}`}
+                    title={tagId || ''}
                   >
                     <ExternalLink size={10} />
                   </a>
