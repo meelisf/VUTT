@@ -65,9 +65,11 @@ def wait_for_task(task_uid, timeout=30):
                 status = task_data.get('status')
 
                 if status == 'succeeded':
+                    elapsed = time.time() - start_time
+                    print(f"Meilisearch task {task_uid} õnnestus ({elapsed:.2f}s)")
                     return True
                 elif status == 'failed':
-                    print(f"Meilisearch task ebaõnnestus: {task_data.get('error')}")
+                    print(f"Meilisearch task {task_uid} ebaõnnestus: {task_data.get('error')}")
                     return False
                 # status on 'enqueued' või 'processing' - ootame edasi
         except Exception as e:
