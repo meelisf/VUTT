@@ -6,23 +6,22 @@ Põhjus: Meilisearch käsitleb ¬ märki eraldajana, mistõttu poolitatud sõnu
 (nt "con¬\ncrediti") ei leia otsinguga "concrediti". Sidekriips (-) ja
 two-em dash (⸗) töötavad korrektselt.
 
-Käivita serveris:
-    python3 replace_negation_sign.py
-
-Enne käivitamist kontrolli BASE_DIR väärtust!
+Kasutus:
+    python3 replace_negation_sign.py          # Dry-run (näitab mida teeks)
+    python3 replace_negation_sign.py --apply  # Teeb päriselt muudatused
 """
 
 import os
 import glob
+import argparse
 
 # =========================================================
 # MUUDA VASTAVALT SERVERI KONFIGURATSIOONILE
 BASE_DIR = "data/"
 # =========================================================
 
-DRY_RUN = True  # True = ainult näita, mida teeks; False = tee päriselt
 
-def replace_negation_signs():
+def replace_negation_signs(dry_run=True):
     """Asendab ¬ märgi sidekriipsuga kõigis .txt failides."""
     
     stats = {
@@ -33,7 +32,7 @@ def replace_negation_signs():
     }
     
     print(f"BASE_DIR: {BASE_DIR}")
-    print(f"DRY_RUN: {DRY_RUN}")
+    print(f"Režiim: {'DRY-RUN (ainult näitab)' if dry_run else 'APPLY (teeb muudatused)'}")
     print(f"Asendus: ¬ (U+00AC) → - (U+002D)")
     print("-" * 60)
     
@@ -62,8 +61,8 @@ def replace_negation_signs():
                 if count > 0:
                     stats['files_modified'] += 1
                     stats['total_replacements'] += count
-                    
-                    if DRY_RUN:
+
+                    if dry_run:
                         print(f"[DRY] {catalog_name}/{txt_filename}: {count} asendust")
                     else:
                         # Asendame ¬ → -
@@ -84,14 +83,24 @@ def replace_negation_signs():
     print(f"  Asendusi kokku:         {stats['total_replacements']}")
     print(f"  Vigu:                   {stats['errors']}")
     
-    if DRY_RUN:
-        print("\n⚠️  DRY_RUN režiim - midagi ei muudetud!")
-        print("    Muuda DRY_RUN = False ja käivita uuesti.")
+    if dry_run:
+        print("\n⚠️  DRY-RUN režiim - midagi ei muudetud!")
+        print("    Käivita uuesti: python3 replace_negation_sign.py --apply")
     else:
         print("\n✅ Asendused tehtud!")
         print("    Järgmised sammud:")
-        print("    1. python3 1-1_consolidate_data.py")
-        print("    2. python3 2-1_upload_to_meili.py")
+        print("    1. python3 scripts/sync_meilisearch.py --apply")
+
 
 if __name__ == "__main__":
-    replace_negation_signs()
+    parser = argparse.ArgumentParser(
+        description="Asendab ¬ märgi sidekriipsuga (-) kõigis .txt failides."
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Tee muudatused päriselt (vaikimisi dry-run)"
+    )
+    args = parser.parse_args()
+
+    replace_negation_signs(dry_run=not args.apply)
