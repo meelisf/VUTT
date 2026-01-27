@@ -89,12 +89,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 limit = int(params.get('limit', [30])[0])
                 
                 # Kui pole admin ja üritab teiste muudatusi vaadata
-                if not is_admin and filter_user and filter_user != current_user.get('name'):
-                    filter_user = current_user.get('name')
-                
+                if not is_admin and filter_user and filter_user != current_user.get('username'):
+                    filter_user = current_user.get('username')
+
                 # Kui pole admin ja ei ole filtrit, näita ainult oma muudatusi
                 if not is_admin and not filter_user:
-                    filter_user = current_user.get('name')
+                    filter_user = current_user.get('username')
                 
                 # Hangi commitid
                 commits = get_recent_commits(username=filter_user, limit=limit)
