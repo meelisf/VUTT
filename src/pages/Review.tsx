@@ -372,13 +372,13 @@ const Review: React.FC = () => {
                             {commit.year || '?'}
                           </span>
                           {commit.work_author && (
-                            <span className="text-sm text-gray-700 truncate max-w-32" title={commit.work_author}>
+                            <span className="text-sm text-gray-700 flex-shrink-0 max-w-40 truncate" title={commit.work_author}>
                               {commit.work_author}
                             </span>
                           )}
                           {commit.title && (
-                            <span className="text-sm font-medium text-gray-900 truncate" title={commit.title}>
-                              {commit.title}
+                            <span className="text-sm text-gray-500 truncate" title={commit.title}>
+                              {commit.title.length > 20 ? commit.title.slice(0, 20) + '…' : commit.title}
                             </span>
                           )}
                           <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
