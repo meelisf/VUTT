@@ -78,8 +78,11 @@ const SetPassword: React.FC = () => {
     if (uniqueChars < 4) {
       return t('setPassword.errors.passwordTooSimple');
     }
-    // Keela korduvad tähed ja numbrijadad
-    const simplePatterns = ['123456789012', '111111111111', 'aaaaaaaaaaaa', 'password1234', 'qwertyuiop12'];
+    // Keela korduvad tähed, numbrijadad ja näidisparoolid
+    const simplePatterns = [
+      '123456789012', '111111111111', 'aaaaaaaaaaaa', 'password1234', 'qwertyuiop12',
+      'minukassarmastabkala', 'mycatloveseatingfish'  // Näidisparoolid vihjest
+    ];
     if (simplePatterns.includes(password.toLowerCase()) || password === password[0].repeat(password.length)) {
       return t('setPassword.errors.passwordTooSimple');
     }

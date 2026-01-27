@@ -28,7 +28,7 @@
     "subtitle": "Vali oma kontole tugev parool",
     "password": "Parool",
     "passwordConfirm": "Kinnita parool",
-    "passwordHint": "Soovitus: kasuta paroolifraasi, nt 'minukassarmastabkala' – pikem on turvalisem ja lihtsam meeles pidada",
+    "passwordHint": "Vähemalt 12 tähemärki. Soovitus: kasuta paroolifraasi, nt 'minukassarmastabkala'",
     "submit": "Salvesta parool",
     "success": "Parool seadistatud! Võid nüüd sisse logida.",
     "errors": {

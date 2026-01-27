@@ -28,7 +28,7 @@
     "subtitle": "Choose a strong password for your account",
     "password": "Password",
     "passwordConfirm": "Confirm password",
-    "passwordHint": "Tip: use a passphrase like 'mycatloveseatingfish' – longer is safer and easier to remember",
+    "passwordHint": "Minimum 12 characters. Tip: use a passphrase like 'mycatloveseatingfish'",
     "submit": "Save password",
     "success": "Password set! You can now log in.",
     "errors": {
