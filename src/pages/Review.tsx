@@ -344,7 +344,13 @@ const Review: React.FC = () => {
                         <div className="col-span-2 flex items-center gap-2 text-sm text-gray-600">
                           <Clock size={14} className="text-gray-400 hidden sm:block" />
                           <span className="sm:hidden text-xs text-gray-400">{t('table.when')}:</span>
-                          {commit.formatted_date}
+                          {new Date(commit.date).toLocaleString('et-EE', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
                         </div>
                         
                         {/* Kasutaja (ainult admin) */}
