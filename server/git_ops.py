@@ -491,7 +491,7 @@ def get_recent_commits(username=None, limit=50):
                 page_num = get_page_number_from_txt(folder_name, filename)
 
                 # Unikaalne võti (et vältida duplikaate)
-                file_key = f"{work_info['work_id'] or work_info['slug']}/{page_num}"
+                file_key = f"{work_info['work_id']}/{page_num}"
                 if file_key in seen_files:
                     continue
                 seen_files.add(file_key)
