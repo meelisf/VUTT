@@ -304,6 +304,13 @@ def metadata_watcher_loop():
                 if entry.is_dir() and not entry.name.startswith('.'):
                     meta_path = os.path.join(entry.path, '_metadata.json')
                     if not os.path.exists(meta_path):
+                        # Kontrolli kas kaust on "stabiilne" (pole muutunud viimase 60 sek jooksul)
+                        # See annab aega aeglasele kopeerimisele lõpule jõuda
+                        dir_mtime = entry.stat().st_mtime
+                        age_seconds = time.time() - dir_mtime
+                        if age_seconds < 60:
+                            continue  # Kaust on liiga uus, oota veel
+
                         # Kontrollime kas on pilte
                         has_images = False
                         for f in os.listdir(entry.path):
@@ -326,8 +333,8 @@ def metadata_watcher_loop():
                             except Exception as e:
                                 print(f"Viga metaandmete loomisel ({entry.name}): {e}")
 
-            # Oota 30 sekundit järgmise skannimiseni
-            time.sleep(30)
+            # Oota 60 sekundit järgmise skannimiseni
+            time.sleep(60)
         except Exception as e:
             print(f"Jälgija viga: {e}")
             time.sleep(60)
