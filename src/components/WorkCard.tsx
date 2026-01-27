@@ -183,7 +183,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                         navigate(`/?tags=${encodeURIComponent(label)}`);
                       }}
                       className="text-[10px] font-medium text-white px-1.5 py-0.5"
-                      title={t('workCard.searchGenre', { genre: label })}
+                      title={t('workCard.searchTag', { tag: label })}
                     >
                       {label}
                     </button>

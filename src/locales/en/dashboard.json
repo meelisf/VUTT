@@ -46,6 +46,7 @@
     "filterByYear": "Filter by year",
     "filterByStatus": "Filter by status \"{{status}}\"",
     "searchGenre": "Search genre: {{genre}}",
+    "searchTag": "Search keyword: {{tag}}",
     "openWorkspace": "Open workspace"
   },
   "bulkAssign": {

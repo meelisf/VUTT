@@ -36,7 +36,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   onOpenMetaModal,
   lang
 }) => {
-  const { t } = useTranslation(['workspace', 'common']);
+  const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
   
@@ -214,7 +214,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 <div>
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
                   <div className="flex items-center gap-1.5">
-                    <p className="text-gray-900">{getLabel(work.genre_object || work.genre, lang)}</p>
+                    <button
+                      onClick={() => navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
+                      className="text-gray-900 hover:text-primary-600 hover:underline transition-colors text-left font-medium"
+                      title={t('dashboard:workCard.searchGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
+                    >
+                      {getLabel(work.genre_object || work.genre, lang)}
+                    </button>
                     {(() => {
                       const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
                       const url = getEntityUrl(genreObj?.id, genreObj?.source);
@@ -352,7 +358,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
           <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
             <BookOpen size={18} className="text-green-600" />
-            <h4 className="font-bold">{t('metadata.genre')}</h4>
+            <h4 className="font-bold">{t('metadata.tags')}</h4>
           </div>
           <div className="flex flex-wrap gap-2">
             {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {

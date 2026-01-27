@@ -53,7 +53,7 @@
     "year": "Year",
     "place": "Place",
     "printer": "Printer",
-    "tags": "Tags",
+    "tags": "Work keywords",
     "tagsHint": "Separate with comma",
     "tagsPlaceholder": "e.g. theology, polemic",
     "collection": "Collection",
