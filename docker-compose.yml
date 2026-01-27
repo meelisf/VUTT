@@ -33,6 +33,32 @@ services:
     ports:
       - "127.0.0.1:7700:7700"
 
+  # Umami Analytics Database
+  db-umami:
+    image: postgres:15-alpine
+    container_name: vutt-umami-db
+    restart: always
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-vutt_umami_db_pass}
+    volumes:
+      - umami_db_data:/var/lib/postgresql/data
+
+  # Umami Analytics App
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: vutt-umami
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-vutt_umami_db_pass}@db-umami:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${UMAMI_APP_SECRET:-vutt_umami_secret_key_change_me}
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - db-umami
+
   # Frontend ja Reverse Proxy (Host Nginx tegeleb sellega nüüd)
   # nginx:
   #   image: nginx:alpine
@@ -49,6 +75,7 @@ services:
 
 volumes:
   meili_data:
+  umami_db_data:
 
 networks:
   default:
