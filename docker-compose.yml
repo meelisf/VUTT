@@ -54,7 +54,7 @@ services:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-vutt_umami_db_pass}@db-umami:5432/umami
       DATABASE_TYPE: postgresql
       APP_SECRET: ${UMAMI_APP_SECRET:-vutt_umami_secret_key_change_me}
-      BASE_PATH: /stats
+      BASE_PATH: /analytics
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
