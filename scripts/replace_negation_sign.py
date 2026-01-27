@@ -17,7 +17,7 @@ import glob
 
 # =========================================================
 # MUUDA VASTAVALT SERVERI KONFIGURATSIOONILE
-BASE_DIR = "/home/mf/Dokumendid/LLM/tartu-acad/data/04_sorditud_dokumendid/"
+BASE_DIR = "data/"
 # =========================================================
 
 DRY_RUN = True  # True = ainult näita, mida teeks; False = tee päriselt
