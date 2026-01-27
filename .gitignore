@@ -31,3 +31,4 @@ state/*.json
 
 # Documentation (internal)
 docs/
+CLAUDE.md

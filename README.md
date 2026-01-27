@@ -28,9 +28,6 @@ npm run dev           # Frontend: http://localhost:5173
 
 ### Tootmine
 
-Vaata [docs/deployment_guide.md](docs/deployment_guide.md) põhjalikuks paigalduseks.
-Igapäevaseks halduseks (uuendamine, andmete laadimine) vaata [docs/CHEAT_SHEET.md](docs/CHEAT_SHEET.md).
-
 Serveris (`~/VUTT`):
 ```bash
 ./scripts/server_update.sh  # Tõmbab koodi, uuendab Dockerit
@@ -70,11 +67,6 @@ data/
 ```
 
 **Uue teose lisamine:** kopeeri kaust → server tuvastab automaatselt ja indekseerib.
-
-## Dokumentatsioon
-
-- [CLAUDE.md](CLAUDE.md) – tehniline juhend arendajatele ja AI-le
-- [docs/deployment_guide.md](docs/deployment_guide.md) – paigaldamine serverisse
 
 ## Tehnoloogiad
 
