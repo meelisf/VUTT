@@ -1707,7 +1707,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 # Leia fail
-                dir_path = find_directory_by_id(edit["teose_id"])
+                dir_path = find_directory_by_id(edit["work_id"])
                 if not dir_path:
                     self.send_response(404)
                     self.send_header('Content-type', 'application/json')
@@ -1765,7 +1765,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
 
-                print(f"Toimetaja {user['username']} kinnitas muudatuse: {edit['user']} -> {edit['teose_id']}/{edit['lehekylje_number']}")
+                print(f"Toimetaja {user['username']} kinnitas muudatuse: {edit['user']} -> {edit['work_id']}/{edit['lehekylje_number']}")
 
             except Exception as e:
                 print(f"APPROVE PENDING VIGA: {e}")
@@ -1829,7 +1829,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 }
                 self.wfile.write(json.dumps(response).encode('utf-8'))
 
-                print(f"Toimetaja {user['username']} lükkas tagasi muudatuse: {edit['user']} -> {edit['teose_id']}/{edit['lehekylje_number']}")
+                print(f"Toimetaja {user['username']} lükkas tagasi muudatuse: {edit['user']} -> {edit['work_id']}/{edit['lehekylje_number']}")
 
             except Exception as e:
                 print(f"REJECT PENDING VIGA: {e}")
