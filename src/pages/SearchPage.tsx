@@ -376,7 +376,7 @@ const SearchPage: React.FC = () => {
 
         // Navigeeri töölauasse
         const navigateToWorkspace = () => {
-            navigate(`/work/${hit.work_id || hit.teose_id}/${hit.lehekylje_number}`);
+            navigate(`/work/${hit.work_id}/${hit.lehekylje_number}`);
         };
 
         return (

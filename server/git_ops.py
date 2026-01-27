@@ -15,6 +15,9 @@ _git_repo = None
 # Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))
 _work_ids_cache = {}
 
+# Cache teose info jaoks (kausta nimi -> {work_id, slug, title, year, author})
+_work_info_cache = {}
+
 
 def get_work_ids_from_folder(folder_name):
     """
@@ -57,6 +60,61 @@ def get_teose_id_from_folder(folder_name):
     """
     work_id, slug = get_work_ids_from_folder(folder_name)
     return slug
+
+
+def get_work_info_from_folder(folder_name):
+    """
+    Tagastab teose põhiinfo kausta nime järgi.
+
+    Tagastab dict:
+    - work_id: nanoid
+    - slug: human-readable ID
+    - title: pealkiri
+    - year: aasta
+    - author: autor (praeses või auctor)
+
+    Kasutab cache'i.
+    """
+    if folder_name in _work_info_cache:
+        return _work_info_cache[folder_name]
+
+    metadata_path = os.path.join(BASE_DIR, folder_name, '_metadata.json')
+    info = {
+        'work_id': None,
+        'slug': sanitize_id(folder_name),
+        'title': None,
+        'year': None,
+        'author': None
+    }
+
+    if os.path.exists(metadata_path):
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+                info['work_id'] = meta.get('id')
+                info['slug'] = meta.get('slug') or meta.get('teose_id') or info['slug']
+                info['title'] = meta.get('title') or meta.get('pealkiri')
+                info['year'] = meta.get('year') or meta.get('aasta')
+
+                # Autor: v2 creators esmalt, siis v1 fallback
+                creators = meta.get('creators', [])
+                if creators:
+                    praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
+                    auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
+                    if praeses:
+                        info['author'] = praeses.get('name')
+                    elif auctor:
+                        info['author'] = auctor.get('name')
+                    elif creators:
+                        info['author'] = creators[0].get('name')
+
+                if not info['author']:
+                    info['author'] = meta.get('autor')
+        except (json.JSONDecodeError, IOError):
+            pass
+
+    _work_info_cache[folder_name] = info
+    return info
 
 
 # Cache piltide nimekirja jaoks (kausta nimi -> sorteeritud piltide nimekiri)
@@ -426,14 +484,14 @@ def get_recent_commits(username=None, limit=50):
                 folder_name = parts[0]
                 filename = parts[-1]
                 
-                # Leia teose ID-d _metadata.json failist
-                work_id, slug = get_work_ids_from_folder(folder_name)
+                # Leia teose info _metadata.json failist
+                work_info = get_work_info_from_folder(folder_name)
 
                 # Leia lehekülje number pildi positsiooni järgi (sama loogika mis Meilisearchis)
                 page_num = get_page_number_from_txt(folder_name, filename)
 
                 # Unikaalne võti (et vältida duplikaate)
-                file_key = f"{work_id or slug}/{page_num}"
+                file_key = f"{work_info['work_id'] or work_info['slug']}/{page_num}"
                 if file_key in seen_files:
                     continue
                 seen_files.add(file_key)
@@ -445,8 +503,10 @@ def get_recent_commits(username=None, limit=50):
                     "date": commit.committed_datetime.isoformat(),
                     "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
                     "message": commit.message.strip(),
-                    "work_id": work_id,  # v2: nanoid (eelistatud routing jaoks)
-                    "teose_id": slug,    # tagasiühilduvus, kuvamiseks
+                    "work_id": work_info['work_id'],
+                    "title": work_info['title'],
+                    "year": work_info['year'],
+                    "work_author": work_info['author'],  # NB: 'author' on juba commit author
                     "lehekylje_number": page_num,
                     "filepath": filepath
                 })

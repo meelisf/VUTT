@@ -217,7 +217,7 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
     const promises = workIds.map(async (workId) => {
       const response = await index.search('', {
         filter: [`work_id = "${workId}"`],
-        attributesToRetrieve: ['teose_id', 'status', 'lehekylje_number'],
+        attributesToRetrieve: ['work_id', 'status', 'lehekylje_number'],
         limit: 500  // Piisav ühe teose kõigile lehekülgedele
       });
 
@@ -451,7 +451,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const searchParams: any = {
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'teose_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'work_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -929,7 +929,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'teose_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'work_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -1057,7 +1057,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
@@ -1105,7 +1105,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           sort: ['aasta:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
@@ -1148,7 +1148,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search(query, {
           filter,
           limit: STATS_LIMIT,
-          attributesToRetrieve: ['teose_id', genreFacetField, typeFacetField, tagsFacetField],
+          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (kuvatavad teosed, distinct)
@@ -1157,7 +1157,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1258,7 +1258,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],

@@ -38,8 +38,10 @@ interface RecentCommit {
   date: string;
   formatted_date: string;
   message: string;
-  work_id: string | null;  // v2: nanoid (eelistatud routing jaoks)
-  teose_id: string;        // tagasiühilduvus, kuvamiseks
+  work_id: string;
+  title: string | null;
+  year: number | null;
+  work_author: string | null;  // NB: 'author' on commit author
   lehekylje_number: number;
   filepath: string;
 }
@@ -363,12 +365,22 @@ const Review: React.FC = () => {
                           </div>
                         )}
                         
-                        {/* Koht (teose_id + lk) */}
+                        {/* Teos (aasta, autor, pealkiri + lk) */}
                         <div className={`${isAdmin && !selectedUser ? "col-span-6" : "col-span-8"} flex items-center gap-2 min-w-0`}>
                           <FileText size={14} className="text-gray-400 flex-shrink-0 hidden sm:block" />
-                          <span className="text-sm font-medium text-gray-900 truncate" title={commit.teose_id}>
-                            {commit.teose_id}
+                          <span className="text-xs text-gray-500 font-mono flex-shrink-0">
+                            {commit.year || '?'}
                           </span>
+                          {commit.work_author && (
+                            <span className="text-sm text-gray-700 truncate max-w-32" title={commit.work_author}>
+                              {commit.work_author}
+                            </span>
+                          )}
+                          {commit.title && (
+                            <span className="text-sm font-medium text-gray-900 truncate" title={commit.title}>
+                              {commit.title}
+                            </span>
+                          )}
                           <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
                             lk {commit.lehekylje_number}
                           </span>
@@ -377,7 +389,7 @@ const Review: React.FC = () => {
                         {/* Link */}
                         <div className="col-span-1 flex items-center justify-end">
                           <Link
-                            to={`/work/${commit.work_id || commit.teose_id}/${commit.lehekylje_number}`}
+                            to={`/work/${commit.work_id}/${commit.lehekylje_number}`}
                             className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
                             title={t('actions.openPage')}
                             onClick={(e) => e.stopPropagation()}
