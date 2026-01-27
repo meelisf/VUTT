@@ -214,13 +214,16 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 <div>
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
                   <div className="flex items-center gap-1.5">
-                    <button
+                    <span
                       onClick={() => navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
-                      className="text-gray-900 hover:text-primary-600 hover:underline transition-colors text-left font-medium"
+                      className="text-gray-900 hover:text-primary-600 hover:underline transition-colors cursor-pointer select-text"
                       title={t('dashboard:workCard.searchGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
                     >
                       {getLabel(work.genre_object || work.genre, lang)}
-                    </button>
+                    </span>
                     {(() => {
                       const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
                       const url = getEntityUrl(genreObj?.id, genreObj?.source);
