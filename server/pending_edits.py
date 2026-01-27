@@ -36,7 +36,7 @@ def save_pending_edits(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def create_pending_edit(teose_id, lehekylje_number, user, original_text, new_text):
+def create_pending_edit(work_id, lehekylje_number, user, original_text, new_text):
     """
     Loob uue pending-edit kirje.
     Kontrollib konflikte ja tagastab (edit, error) tuple.
@@ -52,7 +52,7 @@ def create_pending_edit(teose_id, lehekylje_number, user, original_text, new_tex
     other_pending = False
 
     for idx, edit in enumerate(data["pending_edits"]):
-        if edit["teose_id"] == teose_id and edit["lehekylje_number"] == lehekylje_number:
+        if edit["work_id"] == work_id and edit["lehekylje_number"] == lehekylje_number:
             if edit["status"] == "pending":
                 if edit["user"] == user["username"]:
                     # Sama kasutaja - kirjutame üle
@@ -68,7 +68,7 @@ def create_pending_edit(teose_id, lehekylje_number, user, original_text, new_tex
 
     new_edit = {
         "id": str(uuid.uuid4()),
-        "teose_id": teose_id,
+        "work_id": work_id,
         "lehekylje_number": lehekylje_number,
         "user": user["username"],
         "user_name": user["name"],
@@ -88,11 +88,11 @@ def create_pending_edit(teose_id, lehekylje_number, user, original_text, new_tex
     if existing_idx is not None:
         # Asenda olemasolev
         data["pending_edits"][existing_idx] = new_edit
-        print(f"Uuendatud pending-edit: {user['username']} -> {teose_id}/{lehekylje_number}")
+        print(f"Uuendatud pending-edit: {user['username']} -> {work_id}/{lehekylje_number}")
     else:
         # Lisa uus
         data["pending_edits"].append(new_edit)
-        print(f"Uus pending-edit: {user['username']} -> {teose_id}/{lehekylje_number}")
+        print(f"Uus pending-edit: {user['username']} -> {work_id}/{lehekylje_number}")
 
     save_pending_edits(data)
 
@@ -108,22 +108,22 @@ def get_pending_edit_by_id(edit_id):
     return None
 
 
-def get_pending_edits_for_page(teose_id, lehekylje_number):
+def get_pending_edits_for_page(work_id, lehekylje_number):
     """Tagastab kõik ootel muudatused konkreetse lehe jaoks."""
     data = load_pending_edits()
     return [
         edit for edit in data["pending_edits"]
-        if edit["teose_id"] == teose_id
+        if edit["work_id"] == work_id
         and edit["lehekylje_number"] == lehekylje_number
         and edit["status"] == "pending"
     ]
 
 
-def get_user_pending_edit_for_page(teose_id, lehekylje_number, username):
+def get_user_pending_edit_for_page(work_id, lehekylje_number, username):
     """Tagastab kasutaja ootel muudatuse konkreetse lehe jaoks."""
     data = load_pending_edits()
     for edit in data["pending_edits"]:
-        if (edit["teose_id"] == teose_id
+        if (edit["work_id"] == work_id
             and edit["lehekylje_number"] == lehekylje_number
             and edit["user"] == username
             and edit["status"] == "pending"):

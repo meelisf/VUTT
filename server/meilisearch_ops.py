@@ -203,9 +203,15 @@ def sync_work_to_meilisearch(dir_name):
     documents = []
     page_statuses = []
 
+    # Dokumendi ID = nanoid + lehekülje number (nt "cymbv7-1")
+    # Peab vastama 1-1_consolidate_data.py loogikale!
+    if not work_id:
+        print(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
+        work_id = teose_id  # Fallback slugile
+
     for i, img_name in enumerate(images):
         page_num = i + 1
-        page_id = f"{teose_id}-{page_num}"
+        page_id = f"{work_id}-{page_num}"
         base_name = os.path.splitext(img_name)[0]
 
         # Tekst

@@ -1528,27 +1528,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(auth_error).encode('utf-8'))
                     return
 
-                teose_id = data.get('teose_id')
+                work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
                 lehekylje_number = data.get('lehekylje_number')
                 original_text = data.get('original_text', '')
                 new_text = data.get('new_text', '')
 
-                if not teose_id or lehekylje_number is None:
+                if not work_id or lehekylje_number is None:
                     self.send_response(400)
                     self.send_header('Content-type', 'application/json')
                     send_cors_headers(self)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "teose_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"status": "error", "message": "work_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
                     return
 
                 # Kontrolli, kas teised kasutajad on juba muudatusi teinud
-                other_edits = get_pending_edits_for_page(teose_id, lehekylje_number)
+                other_edits = get_pending_edits_for_page(work_id, lehekylje_number)
                 other_users_edits = [e for e in other_edits if e["user"] != user["username"]]
                 has_other_pending = len(other_users_edits) > 0
 
                 # Loo pending-edit
                 edit, error = create_pending_edit(
-                    teose_id=teose_id,
+                    teose_id=work_id,  # NB: API funktsioon ootab teose_id parameetrit
                     lehekylje_number=lehekylje_number,
                     user=user,
                     original_text=original_text,
@@ -1627,22 +1627,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(auth_error).encode('utf-8'))
                     return
 
-                teose_id = data.get('teose_id')
+                work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
                 lehekylje_number = data.get('lehekylje_number')
 
-                if not teose_id or lehekylje_number is None:
+                if not work_id or lehekylje_number is None:
                     self.send_response(400)
                     self.send_header('Content-type', 'application/json')
                     send_cors_headers(self)
                     self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "teose_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
+                    self.wfile.write(json.dumps({"status": "error", "message": "work_id ja lehekylje_number on kohustuslikud"}).encode('utf-8'))
                     return
 
                 # Kasutaja enda muudatus
-                user_edit = get_user_pending_edit_for_page(teose_id, lehekylje_number, user["username"])
+                user_edit = get_user_pending_edit_for_page(work_id, lehekylje_number, user["username"])
 
                 # Kas on teiste muudatusi (ainult toimetaja näeb)
-                all_edits = get_pending_edits_for_page(teose_id, lehekylje_number)
+                all_edits = get_pending_edits_for_page(work_id, lehekylje_number)
                 other_edits_count = len([e for e in all_edits if e["user"] != user["username"]])
 
                 self.send_response(200)

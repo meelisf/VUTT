@@ -307,7 +307,7 @@ const Dashboard: React.FC = () => {
     const currentWorks = works.slice(startIndex, endIndex);
     setSelectedWorkIds(prev => {
       const next = new Set(prev);
-      currentWorks.forEach(w => next.add(w.work_id || w.teose_id));
+      currentWorks.forEach(w => next.add(w.work_id));
       return next;
     });
   };
@@ -652,19 +652,15 @@ const Dashboard: React.FC = () => {
                   ) : works.length > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {currentWorks.map(work => {
-                          // Kasuta work_id (nanoid) kui olemas, muidu teose_id (tagasiühilduvus)
-                          const workIdentifier = work.work_id || work.teose_id;
-                          return (
+                        {currentWorks.map(work => (
                             <WorkCard
-                              key={workIdentifier}
+                              key={work.work_id}
                               work={work}
                               selectMode={selectMode}
-                              isSelected={selectedWorkIds.has(workIdentifier)}
-                              onToggleSelect={() => toggleWorkSelection(workIdentifier)}
+                              isSelected={selectedWorkIds.has(work.work_id)}
+                              onToggleSelect={() => toggleWorkSelection(work.work_id)}
                             />
-                          );
-                        })}
+                          ))}
                       </div>
 
                       {/* Pagination */}

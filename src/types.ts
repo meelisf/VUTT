@@ -70,9 +70,8 @@ export interface Work {
   // =========================================================
 
   // Identifikaatorid
-  id: string;               // Lehekülje ID (Meilisearch primary key)
-  work_id?: string;         // Püsiv lühikood (nanoid)
-  teose_id: string;         // Slug (URL-is)
+  id: string;               // Lehekülje ID (Meilisearch primary key, nt "cymbv7-1")
+  work_id: string;          // Nanoid (püsiv lühikood, nt "cymbv7")
 
   // Teose põhiandmed
   title: string;            // Pealkiri
@@ -162,9 +161,8 @@ export interface HistoryEntry {
  */
 export interface Page {
   // Identifikaatorid
-  id: string;               // Lehekülje ID (nt "1632-1-1")
-  work_id?: string;         // Püsiv lühikood
-  teose_id: string;         // Slug
+  id: string;               // Lehekülje ID (nt "cymbv7-1")
+  work_id: string;          // Nanoid (püsiv lühikood, nt "cymbv7")
 
   // Lehekülje andmed
   page_number: number;
@@ -252,8 +250,7 @@ export interface ContentSearchOptions {
  */
 export interface ContentSearchHit {
   id: string;
-  teose_id: string;
-  work_id?: string;
+  work_id: string;
   lehekylje_number: number | string;
   lehekylje_tekst: string;
   lehekylje_pilt: string;

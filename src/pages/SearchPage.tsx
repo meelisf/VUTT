@@ -338,9 +338,9 @@ const SearchPage: React.FC = () => {
     // Grupeeri tulemused teose kaupa (distinct annab ühe hiti teose kohta)
     const getGroupedResults = () => {
         if (!results) return {};
-        // Iga hit on üks teos (distinct: teose_id), hitCount näitab vastete arvu
+        // Iga hit on üks teos (distinct: work_id), hitCount näitab vastete arvu
         return results.hits.reduce((acc, hit) => {
-            const key = hit.teose_id;
+            const key = hit.work_id;
             if (!acc[key]) acc[key] = [];
             acc[key].push(hit);
             return acc;
@@ -351,15 +351,15 @@ const SearchPage: React.FC = () => {
 
     // Extract work facets - järjestatud relevantsi järgi (sama järjekord mis otsingutulemustel)
     // NB: Kui juba ollakse teose piires otsingus VÕI laadib VÕI on ainult 1 teos, ei näita teose filtrit
-    const workHitCounts = results?.facetDistribution?.['teose_id'] || {};
-    const uniqueWorkIds = new Set(results?.hits?.map(h => h.teose_id) || []);
+    const workHitCounts = results?.facetDistribution?.['work_id'] || {};
+    const uniqueWorkIds = new Set(results?.hits?.map(h => h.work_id) || []);
     const availableWorks = (results?.hits && !workIdParam && !loading && uniqueWorkIds.size > 1)
         ? results.hits.map(hit => ({
-            id: hit.teose_id,
-            title: hit.pealkiri || hit.teose_id,
+            id: hit.work_id,
+            title: hit.pealkiri || hit.work_id,
             year: hit.aasta,
             author: Array.isArray(hit.autor) ? hit.autor[0] : hit.autor,
-            count: workHitCounts[hit.teose_id] || 1
+            count: workHitCounts[hit.work_id] || 1
         }))
         : [];
 
@@ -463,8 +463,8 @@ const SearchPage: React.FC = () => {
     };
 
     const groupedResults = getGroupedResults();
-    const uniqueWorksCount = results?.facetDistribution?.['teose_id']
-        ? Object.keys(results.facetDistribution['teose_id']).length
+    const uniqueWorksCount = results?.facetDistribution?.['work_id']
+        ? Object.keys(results.facetDistribution['work_id']).length
         : Object.keys(groupedResults).length;
 
     return (

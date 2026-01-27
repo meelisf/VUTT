@@ -204,7 +204,7 @@ const calculateWorkStatus = (statuses: string[]): WorkStatus => {
 };
 
 // Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)
-// NB: Kuna indeksil on distinct='teose_id', peame tegema eraldi päringud iga teose jaoks
+// NB: Kuna indeksil on distinct='work_id', peame tegema eraldi päringud iga teose jaoks
 export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, WorkStatus>> => {
   const statusMap = new Map<string, WorkStatus>();
 
@@ -216,7 +216,7 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
     // ühes päringus saada kõiki lehekülgi erinevatest teostest
     const promises = workIds.map(async (workId) => {
       const response = await index.search('', {
-        filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`],
+        filter: [`work_id = "${workId}"`],
         attributesToRetrieve: ['teose_id', 'status', 'lehekylje_number'],
         limit: 500  // Piisav ühe teose kõigile lehekülgedele
       });
@@ -468,7 +468,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     // Muul juhul kasutame distinct, et saada üks tulemus teose kohta
     const useDistinct = options?.sort !== 'relevance';
     if (useDistinct) {
-      searchParams.distinct = 'teose_id';
+      searchParams.distinct = 'work_id';
     }
 
     // Sorting logic
@@ -504,18 +504,18 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
     let uniqueHits = response.hits;
     if (!useDistinct) {
-      // Grupeeri teose_id järgi, võttes ainult esimese (kõrgeima relevantsusega) tulemuse
+      // Grupeeri work_id järgi, võttes ainult esimese (kõrgeima relevantsusega) tulemuse
       const seenWorkIds = new Set<string>();
       uniqueHits = response.hits.filter((hit: any) => {
-        if (seenWorkIds.has(hit.teose_id)) {
+        if (seenWorkIds.has(hit.work_id)) {
           return false;
         }
-        seenWorkIds.add(hit.teose_id);
+        seenWorkIds.add(hit.work_id);
         return true;
       });
     }
 
-    const workIds = uniqueHits.map((hit: any) => hit.teose_id);
+    const workIds = uniqueHits.map((hit: any) => hit.work_id);
 
     // Fetch first page data (thumbnail, tags) for all works
     const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[]; page_tags?: string[] }>();
@@ -531,10 +531,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       // Execute batch queries in parallel
       const batchPromises = batches.map(async (batchIds) => {
         const batchResponse = await index.search('', {
-          filter: batchIds.map(id => `teose_id = "${id}"`).join(' OR '),
+          filter: batchIds.map(id => `work_id = "${id}"`).join(' OR '),
           limit: batchIds.length * 20, // Max 20 pages per work
           sort: ['lehekylje_number:asc'],
-          attributesToRetrieve: ['teose_id', 'lehekylje_pilt', 'lehekylje_number', 'tags']
+          attributesToRetrieve: ['work_id', 'lehekylje_pilt', 'lehekylje_number', 'tags']
         });
         return batchResponse.hits;
       });
@@ -544,8 +544,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       // Process all results - take first (lowest page number) for each work
       for (const hits of batchResults) {
         for (const hit of hits as any[]) {
-          if (!firstPagesMap.has(hit.teose_id)) {
-            firstPagesMap.set(hit.teose_id, {
+          if (!firstPagesMap.has(hit.work_id)) {
+            firstPagesMap.set(hit.work_id, {
               thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
               tags: hit.tags || [],
               page_tags: hit.page_tags || []
@@ -556,12 +556,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     }
 
     const works: Work[] = uniqueHits.map((hit: any) => {
-      const firstPageData = firstPagesMap.get(hit.teose_id);
+      const firstPageData = firstPagesMap.get(hit.work_id);
       return {
-        // V2 identifikaatorid - EELISTA NANOID!
-        id: hit.work_id || hit.id || hit.teose_id,
+        // Identifikaatorid - kasuta AINULT nanoid
+        id: hit.work_id,
         work_id: hit.work_id,
-        teose_id: hit.teose_id,
 
         // V2 teose andmed (kasuta uusi välju, fallback vanadele)
         title: hit.title || hit.pealkiri || 'Pealkiri puudub',
@@ -645,10 +644,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 export const getPage = async (workId: string, pageNum: number): Promise<Page | null> => {
   checkMixedContent();
   try {
-    // Otsime nii work_id (v2 nanoid) kui teose_id (slug) järgi
+    // Otsime work_id (nanoid) järgi
     // See võimaldab mõlemat tüüpi URL-e: /work/r20x08/1 ja /work/1640-4/1
     const response = await index.search('', {
-      filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`, `lehekylje_number = ${pageNum}`],
+      filter: [`work_id = "${workId}"`, `lehekylje_number = ${pageNum}`],
       limit: 1
     });
 
@@ -659,7 +658,6 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       // Identifikaatorid
       id: hit.id,
       work_id: hit.work_id,
-      teose_id: hit.teose_id,
 
       // Lehekülje andmed
       page_number: parseInt(hit.lehekylje_number),
@@ -792,7 +790,7 @@ export const checkPendingEdits = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         auth_token: authToken,
-        teose_id: teoseId,
+        work_id: teoseId,
         lehekylje_number: lehekyljeNumber
       })
     });
@@ -828,7 +826,7 @@ export const savePageAsPending = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         auth_token: authToken,
-        teose_id: teoseId,
+        work_id: teoseId,
         lehekylje_number: lehekyljeNumber,
         original_text: originalText,
         new_text: newText
@@ -858,7 +856,7 @@ const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
   try {
     // 1. Päri kõik teose leheküljed
     const response = await index.search('', {
-      filter: [`teose_id = "${workId}"`],
+      filter: [`work_id = "${workId}"`],
       attributesToRetrieve: ['id', 'status'],
       limit: 500 // Piisav kõigile lehekülgedele
     });
@@ -926,9 +924,9 @@ export const savePage = async (
 // Töölaud: Saa teose metaandmed
 export const getWorkMetadata = async (workId: string): Promise<Work | undefined> => {
   try {
-    // Otsime nii work_id (v2 nanoid) kui teose_id (slug) järgi
+    // Otsime work_id (nanoid) järgi
     const response = await index.search('', {
-      filter: [`(work_id = "${workId}" OR teose_id = "${workId}")`],
+      filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
         'work_id', 'teose_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
@@ -946,10 +944,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
     const hit: any = response.hits[0];
 
     return {
-      // V2 identifikaatorid
-      id: hit.id || hit.teose_id,
+      // Identifikaatorid
+      id: hit.id || hit.work_id,
       work_id: hit.work_id,
-      teose_id: hit.teose_id,
 
       // V2 teose andmed
       title: hit.title || hit.pealkiri || '',
@@ -1012,7 +1009,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   const offset = (page - 1) * limit;
   const filter: string[] = [];
 
-  if (options.workId) filter.push(`(work_id = "${options.workId}" OR teose_id = "${options.workId}")`);
+  if (options.workId) filter.push(`work_id = "${options.workId}"`);
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
@@ -1059,7 +1056,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         offset,
         limit,
         filter,
-        facets: ['originaal_kataloog', 'teose_id'],
+        facets: ['originaal_kataloog', 'work_id'],
         attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1107,7 +1104,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           offset,
           limit,
           filter,
-          distinct: 'teose_id',
+          distinct: 'work_id',
           attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           sort: ['aasta:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
@@ -1159,7 +1156,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           offset,
           limit,
           filter,
-          distinct: 'teose_id',
+          distinct: 'work_id',
           attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
@@ -1168,11 +1165,11 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           highlightPostTag: '</em>',
           attributesToSearchOn: attributesToSearchOn
         }),
-        // Päring 3: Lehekülgede arvud teoste kaupa (teose_id facet)
+        // Päring 3: Lehekülgede arvud teoste kaupa (work_id facet)
         index.search(query, {
           filter,
           limit: 0,
-          facets: ['teose_id'],
+          facets: ['work_id'],
           attributesToSearchOn: attributesToSearchOn
         })
       ]);
@@ -1187,8 +1184,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       };
 
       statsResponse.hits.forEach((hit: any) => {
-        if (!uniqueWorks.has(hit.teose_id)) {
-          uniqueWorks.add(hit.teose_id);
+        if (!uniqueWorks.has(hit.work_id)) {
+          uniqueWorks.add(hit.work_id);
           
           // Helper stats
           const addToStats = (field: string, value: string | string[]) => {
@@ -1206,8 +1203,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         }
       });
       
-      // Lisa teose_id facet (lehekülgede arvud) otse Meilisearchist
-      calculatedFacets['teose_id'] = pageCountResponse.facetDistribution?.['teose_id'] || {};
+      // Lisa work_id facet (lehekülgede arvud) otse Meilisearchist
+      calculatedFacets['work_id'] = pageCountResponse.facetDistribution?.['work_id'] || {};
 
       totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size; // estimatedTotalHits on distinct query puhul ebatäpne vanemates versioonides
       // Kasutame usaldusväärsemat numbrit: distinct response estimated hits peaks olema teoste arv
@@ -1217,10 +1214,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       // Meilisearchi käitumine estimatedTotalHits + distinct osas on versiooniti erinev.
       // Eeldame praegu, et uniqueWorks.size on "vähemalt nii palju".
 
-      const workHitCounts = pageCountResponse.facetDistribution?.['teose_id'] || {};
+      const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
         ...hit,
-        hitCount: workHitCounts[hit.teose_id] || 1
+        hitCount: workHitCounts[hit.work_id] || 1
       }));
 
       return {
@@ -1246,7 +1243,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   checkMixedContent();
   await ensureSettings();
 
-  const filter: string[] = [`(work_id = "${workId}" OR teose_id = "${workId}")`];
+  const filter: string[] = [`work_id = "${workId}"`];
 
   if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
   if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
@@ -1321,7 +1318,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
   try {
     // Pärime kõik teose leheküljed, sorteeritud lehekülje numbri järgi
     const response = await index.search('', {
-      filter: `(work_id = "${teoseId}" OR teose_id = "${teoseId}")`,
+      filter: `work_id = "${teoseId}"`,
       sort: ['lehekylje_number:asc'],
       limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
       attributesToRetrieve: ['lehekylje_tekst', 'lehekylje_number', 'pealkiri', 'autor', 'aasta']

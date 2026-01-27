@@ -51,7 +51,7 @@ const Statistics: React.FC = () => {
           body: JSON.stringify({
             q: '',
             limit: 0,
-            facets: ['teose_staatus', 'aasta', 'teose_id'],
+            facets: ['teose_staatus', 'aasta', 'work_id'],
             filter: filter.length > 0 ? filter : undefined
           })
         });
@@ -85,8 +85,8 @@ const Statistics: React.FC = () => {
           .sort((a, b) => a.year - b.year);
         setYearData(yearArray);
 
-        // Works count - unikaalsete teose_id-de arv facetist
-        const worksFacets = statusResult.facetDistribution?.teose_id || {};
+        // Works count - unikaalsete work_id-de arv facetist
+        const worksFacets = statusResult.facetDistribution?.work_id || {};
         setTotalWorks(Object.keys(worksFacets).length);
 
       } catch (error) {
