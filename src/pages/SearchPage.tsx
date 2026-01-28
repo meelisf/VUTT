@@ -42,6 +42,79 @@ const getAuthorDisplay = (hit: ContentSearchHit, t: any): string => {
 };
 
 // Abifunktsioon: lisa valitud väärtused facetite nimekirja (count=0 kui pole tulemusi)
+// Merge uued facetid olemasolevate hulka, säilitades kõik valikud
+// - Uuendab olemasolevate countid
+// - Lisab uued valikud
+// - Säilitab vanad valikud (count=0 kui pole uutes)
+const mergeFacetsWithExisting = (
+    existing: { value: string; count: number }[],
+    newFacets: { value: string; count: number }[],
+    selected: string[]
+): { value: string; count: number }[] => {
+    const newMap = new Map(newFacets.map(f => [f.value, f.count]));
+    const result: { value: string; count: number }[] = [];
+    const seen = new Set<string>();
+
+    // Uuenda olemasolevate countid
+    for (const item of existing) {
+        if (!item.value) continue;
+        const count = newMap.get(item.value) ?? 0;
+        result.push({ value: item.value, count });
+        seen.add(item.value);
+    }
+
+    // Lisa uued valikud mida varem polnud
+    for (const item of newFacets) {
+        if (item.value && !seen.has(item.value)) {
+            result.push(item);
+            seen.add(item.value);
+        }
+    }
+
+    // Lisa valitud valikud kui neid pole
+    for (const sel of selected) {
+        if (sel && !seen.has(sel)) {
+            result.push({ value: sel, count: 0 });
+        }
+    }
+
+    return result.sort((a, b) => b.count - a.count);
+};
+
+// Sama loogika teoseTags jaoks (erinev struktuur: tag vs value)
+const mergeTagsWithExisting = (
+    existing: { tag: string; count: number }[],
+    newTags: { tag: string; count: number }[],
+    selected: string[]
+): { tag: string; count: number }[] => {
+    const newMap = new Map(newTags.map(t => [t.tag, t.count]));
+    const result: { tag: string; count: number }[] = [];
+    const seen = new Set<string>();
+
+    for (const item of existing) {
+        if (!item.tag) continue;
+        const count = newMap.get(item.tag) ?? 0;
+        result.push({ tag: item.tag, count });
+        seen.add(item.tag);
+    }
+
+    for (const item of newTags) {
+        if (item.tag && !seen.has(item.tag)) {
+            result.push(item);
+            seen.add(item.tag);
+        }
+    }
+
+    for (const sel of selected) {
+        if (sel && !seen.has(sel)) {
+            result.push({ tag: sel, count: 0 });
+        }
+    }
+
+    return result.sort((a, b) => b.count - a.count);
+};
+
+// Lihtne merge valitud väärtuste lisamiseks (initial load jaoks)
 const mergeSelectedIntoFacets = (
     facets: { value: string; count: number }[],
     selected: string[]
@@ -56,7 +129,6 @@ const mergeSelectedIntoFacets = (
     return merged;
 };
 
-// Sama loogika teoseTags jaoks (erinev struktuur: tag vs value)
 const mergeSelectedIntoTags = (
     tags: { tag: string; count: number }[],
     selected: string[]
@@ -139,7 +211,7 @@ const SearchPage: React.FC = () => {
                 // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
                 const tagsWithSelected = mergeSelectedIntoTags(tags, teoseTagsParam);
                 const genresWithSelected = mergeSelectedIntoFacets(genres, genreParam);
-                const typesWithSelected = mergeSelectedIntoFacets(types, typeParam ? [typeParam] : []);
+                const typesWithSelected = mergeSelectedIntoFacets(types, typeParam);
                 setAvailableTeoseTags(tagsWithSelected);
                 setAvailableGenres(genresWithSelected);
                 setAvailableTypes(typesWithSelected);
@@ -289,17 +361,15 @@ const SearchPage: React.FC = () => {
                         .sort((a, b) => b.count - a.count);
                 };
 
-                const genres = processFacets(`genre_${lang}`);
-                const types = processFacets(`type_${lang}`);
-                const tags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count })); // Tags on natuke teise struktuuriga
+                // Uuenda facette otsingutulemustest, AGA säilita KÕIK varasemad valikud
+                const newGenres = processFacets(`genre_${lang}`);
+                const newTypes = processFacets(`type_${lang}`);
+                const newTags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count }));
 
-                // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
-                const tagsWithSelected = mergeSelectedIntoTags(tags, selectedTeoseTags);
-                const genresWithSelected = mergeSelectedIntoFacets(genres, selectedGenres);
-                const typesWithSelected = mergeSelectedIntoFacets(types, selectedTypes);
-                setAvailableTeoseTags(tagsWithSelected);
-                setAvailableGenres(genresWithSelected);
-                setAvailableTypes(typesWithSelected);
+                // Merge: säilita olemasolevad valikud + uuenda countid + lisa valitud
+                setAvailableTeoseTags(prev => mergeTagsWithExisting(prev, newTags, selectedTeoseTags));
+                setAvailableGenres(prev => mergeFacetsWithExisting(prev, newGenres, selectedGenres));
+                setAvailableTypes(prev => mergeFacetsWithExisting(prev, newTypes, selectedTypes));
             }
 
             // Only reset expanded groups if it's a new query (page 1) and not filtering by work
@@ -720,7 +790,7 @@ const SearchPage: React.FC = () => {
                                 badge={selectedTypes.length || undefined}
                             >
                                 <div className="space-y-1">
-                                    {availableTypes.map(({ value, count }) => {
+                                    {availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => {
                                         const lang = (i18n.language as 'et' | 'en') || 'et';
                                         const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
                                         const isSelected = selectedTypes.includes(value);
@@ -833,8 +903,9 @@ const SearchPage: React.FC = () => {
                             {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0) && (
                                 <button
                                     onClick={() => {
-                                        setYearStart('');
-                                        setYearEnd('');
+                                        // Taasta vaikeväärtused
+                                        setYearStart('1630');
+                                        setYearEnd('1710');
                                         setSelectedScope('all');
                                         setSelectedWork('');
                                         setSelectedWorkInfo(null);
@@ -853,7 +924,7 @@ const SearchPage: React.FC = () => {
                                             return prev;
                                         });
                                     }}
-                                    className="w-full py-2 bg-white border border-gray-300 text-gray-600 rounded text-sm font-medium hover:bg-gray-50 transition-colors"
+                                    className="w-full py-2 bg-red-50 border border-red-200 text-red-700 rounded text-sm font-medium hover:bg-red-100 transition-colors"
                                 >
                                     {t('filters.clearFilters')}
                                 </button>
