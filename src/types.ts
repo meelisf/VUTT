@@ -5,18 +5,14 @@
  *
  * ANDMEKIHTIDE MÄRKUS:
  *
- * Work ja Page tüübid sisaldavad MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
+ * KASUTA (ingliskeelsed):
+ *   work.title, work.year, work.location, work.publisher, work.creators[]
  *
- *   KASUTA (ingliskeelsed)     |  VÄLDI (eestikeelsed, @deprecated)
- *   ---------------------------|--------------------------------------
- *   work.title                 |  work.pealkiri
- *   work.year                  |  work.aasta
- *   work.location              |  work.koht
- *   work.publisher             |  work.trükkal
- *   work.creators[]            |  work.author, work.respondens
+ * EEMALDATUD (Meilisearchist):
+ *   pealkiri, koht, trükkal - neid välju enam ei kirjutata ega pärita
  *
- * Eestikeelsed väljad on märgitud @deprecated ja jäetud tagasiühilduvuseks.
- * Uus kood peaks ALATI kasutama ingliskeelseid välju.
+ * SÄILITATUD (filtrite/sortimise jaoks):
+ *   aasta, autor, respondens, originaal_kataloog, lehekylje_number
  *
  * Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
  * =============================================================================

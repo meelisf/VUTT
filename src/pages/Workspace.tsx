@@ -323,7 +323,7 @@ const Workspace: React.FC = () => {
   const generateCoins = () => {
     if (!page) return null;
 
-    const title = work?.title || page.title || page.pealkiri || '';
+    const title = work?.title || page.title || '';
 
     // Leia autor ja respondens creators massiivist
     let author = work?.author || page.autor || '';
@@ -338,8 +338,8 @@ const Workspace: React.FC = () => {
     }
 
     const year = work?.year ?? page.year ?? page.aasta ?? 0;
-    const place = getLabel(work?.location || page.location || page.koht || (year >= 1699 ? 'Pärnu' : 'Tartu'));
-    const printer = getLabel(work?.publisher || page.publisher || page.trükkal || 'Typis Academicis');
+    const place = getLabel(work?.location || page.location || '');
+    const printer = getLabel(work?.publisher || page.publisher || '');
 
     const params = new URLSearchParams();
     params.set('ctx_ver', 'Z39.88-2004');

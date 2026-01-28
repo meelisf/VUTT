@@ -3,29 +3,14 @@
  * MEILISEARCH SERVICE - Andmekihtide Juhis
  * =============================================================================
  *
- * Meilisearch indeks sisaldab MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
+ * INGLISKEELSED väljad (kasuta neid):
+ *   title, year, location, publisher, creators[], work_id
  *
- *   Ingliskeelne (EELISTATUD)  |  Eestikeelne (legacy)
- *   ---------------------------|----------------------
- *   title                      |  pealkiri
- *   year                       |  aasta
- *   location                   |  koht
- *   publisher                  |  trükkal
- *   creators[]                 |  autor, respondens
- *   work_id (nanoid)           |  -
+ * EESTIKEELSED väljad (ainult filtrite/sortimise jaoks):
+ *   aasta, lehekylje_number, originaal_kataloog, autor, respondens
  *
- * KASUTAMISJUHISED:
- *
- * 1. Andmete LUGEMINE (attributesToRetrieve):
- *    - Kasuta ingliskeelseid: title, year, location, publisher, creators
- *    - Fallback vanadele: hit.title ?? hit.pealkiri
- *
- * 2. FILTRID ja SORTIMINE:
- *    - Kasuta eestikeelseid (need on indekseeritud): aasta, lehekylje_number
- *    - filter: [`aasta >= 1630`], sort: ['aasta:asc']
- *
- * 3. OTSING (attributesToSearchOn):
- *    - Kasuta mõlemaid: ['title', 'pealkiri', 'authors_text', 'lehekylje_tekst']
+ * EEMALDATUD väljad (ära kasuta):
+ *   pealkiri, koht, trükkal
  *
  * Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
  * =============================================================================
@@ -121,7 +106,6 @@ const fixIndexSettings = async () => {
       'aasta',
       'autor',
       'respondens',
-      'trükkal',
       'lehekylje_number',
       'originaal_kataloog',
       'page_tags',
@@ -137,11 +121,10 @@ const fixIndexSettings = async () => {
       'aasta',
       'lehekylje_number',
       'last_modified',
-      'pealkiri'
+      'title'
     ]);
 
     const searchTask = await index.updateSearchableAttributes([
-      // V2/V3 väljad
       'title',
       'authors_text',
       'year',
@@ -150,8 +133,6 @@ const fixIndexSettings = async () => {
       'genre_search',
       'tags_search',
       'series_title',
-      // Tagasiühilduvus (Meilisearch indeksi skeem)
-      'pealkiri',
       'autor',
       'respondens',
       'aasta',
@@ -180,7 +161,7 @@ const fixIndexSettings = async () => {
         "words",      // Mitu otsingusõna vastab
         "typo",       // Kirjavead
         "proximity",  // Sõnade lähedus
-        "attribute",  // Välja prioriteet (pealkiri > autor > respondens)
+        "attribute",  // Välja prioriteet (title > autor > respondens)
         "sort"        // Kasutaja sorteerimine
       ]
     });
@@ -485,11 +466,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
-        // Tagasiühilduvus
-        'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta', 'koht', 'trükkal',
+        // Filtrite/sortimise väljad (eesti keeles Meilisearchi skeemis)
+        'originaal_kataloog', 'autor', 'respondens', 'aasta',
         'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
-      attributesToSearchOn: ['title', 'authors_text', 'pealkiri', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
+      attributesToSearchOn: ['title', 'authors_text', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
       limit: 5000 // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
     };
@@ -514,7 +495,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           searchParams.sort = ['aasta:desc'];
           break;
         case 'az':
-          searchParams.sort = ['pealkiri:asc'];
+          searchParams.sort = ['title:asc'];
           break;
         case 'recent':
           searchParams.sort = ['last_modified:desc'];
@@ -592,11 +573,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         id: hit.work_id,
         work_id: hit.work_id,
 
-        // V2 teose andmed (kasuta uusi välju, fallback vanadele)
-        title: hit.title || hit.pealkiri || 'Pealkiri puudub',
-        year: hit.year ?? parseInt(hit.aasta) ?? 0,
-        location: hit.location_object || hit.location || hit.koht || '',
-        publisher: hit.publisher_object || hit.publisher || hit.trükkal || '',
+        // Teose andmed
+        title: hit.title || 'Pealkiri puudub',
+        year: hit.year ?? hit.aasta ?? 0,
+        location: hit.location_object || hit.location || '',
+        publisher: hit.publisher_object || hit.publisher || '',
 
         // V2 taksonoomia
         type: hit.type,
@@ -628,13 +609,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         work_status: hit.teose_staatus,
         page_tags: firstPageData?.page_tags || hit.page_tags || [],
 
-        // Tagasiühilduvus
+        // Tagasiühilduvus (filtrite/sortimise väljad)
         catalog_name: hit.originaal_kataloog || 'Unknown',
         author: hit.autor || (hit.creators?.[0]?.name) || 'Teadmata autor',
         respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
-        koht: hit.koht || hit.location,
-        trükkal: hit.trükkal || hit.publisher,
-        pealkiri: hit.pealkiri || hit.title,
         aasta: hit.aasta ?? hit.year,
 
         // Ajutine väli sorteerimiseks
@@ -701,11 +679,11 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       ))),
       history: hit.history || [],
 
-      // V2 teose andmed
-      title: hit.title || hit.pealkiri,
+      // Teose andmed
+      title: hit.title,
       year: hit.year ?? hit.aasta,
-      location: hit.location_object || hit.location || hit.koht,
-      publisher: hit.publisher_object || hit.publisher || hit.trükkal,
+      location: hit.location_object || hit.location,
+      publisher: hit.publisher_object || hit.publisher,
       type: hit.type,
       type_object: hit.type_object,
       genre: hit.genre_object || hit.genre,
@@ -717,15 +695,12 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       tags_object: hit.tags_object || [],
       languages: hit.languages || ['lat'],
 
-      // Tagasiühilduvus
+      // Tagasiühilduvus (filtrite väljad)
       original_path: hit.originaal_kataloog,
       originaal_kataloog: hit.originaal_kataloog,
-      pealkiri: hit.pealkiri || hit.title,
       autor: hit.autor,
       respondens: hit.respondens,
       aasta: hit.aasta ?? hit.year,
-      koht: hit.koht || hit.location,
-      trükkal: hit.trükkal || hit.publisher,
     };
   } catch (error) {
     console.error("Get Page Error:", error);
@@ -948,9 +923,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
-        // Tagasiühilduvus
-        'originaal_kataloog', 'pealkiri', 'autor', 'respondens', 'aasta',
-        'lehekylje_pilt', 'teose_lehekylgede_arv', 'koht', 'trükkal'
+        // Filtrite/sortimise väljad
+        'originaal_kataloog', 'autor', 'respondens', 'aasta',
+        'lehekylje_pilt', 'teose_lehekylgede_arv'
       ],
       limit: 1
     });
@@ -963,11 +938,11 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       id: hit.id || hit.work_id,
       work_id: hit.work_id,
 
-      // V2 teose andmed
-      title: hit.title || hit.pealkiri || '',
-      year: hit.year ?? parseInt(hit.aasta) ?? 0,
-      location: hit.location_object || hit.location || hit.koht || '',
-      publisher: hit.publisher_object || hit.publisher || hit.trükkal || '',
+      // Teose andmed
+      title: hit.title || '',
+      year: hit.year ?? hit.aasta ?? 0,
+      location: hit.location_object || hit.location || '',
+      publisher: hit.publisher_object || hit.publisher || '',
 
       // V2 taksonoomia
       type: hit.type,
@@ -998,13 +973,10 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       page_count: hit.teose_lehekylgede_arv || 0,
       thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
 
-      // Tagasiühilduvus
+      // Tagasiühilduvus (filtrite väljad)
       catalog_name: hit.originaal_kataloog,
       author: hit.autor || (hit.creators?.[0]?.name) || '',
       respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
-      koht: hit.koht || hit.location,
-      trükkal: hit.trükkal || hit.publisher,
-      pealkiri: hit.pealkiri || hit.title,
       aasta: hit.aasta ?? hit.year
     } as Work;
   } catch (e) {
@@ -1072,7 +1044,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
@@ -1120,7 +1092,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           sort: ['aasta:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
@@ -1172,7 +1144,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1273,7 +1245,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'pealkiri', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1336,7 +1308,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
       filter: `work_id = "${teoseId}"`,
       sort: ['lehekylje_number:asc'],
       limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
-      attributesToRetrieve: ['lehekylje_tekst', 'lehekylje_number', 'pealkiri', 'autor', 'aasta']
+      attributesToRetrieve: ['lehekylje_tekst', 'lehekylje_number', 'title', 'autor', 'aasta']
     });
 
     if (response.hits.length === 0) {
@@ -1344,7 +1316,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
     }
 
     const firstHit = response.hits[0] as any;
-    const title = firstHit.pealkiri || 'Tundmatu';
+    const title = firstHit.title || 'Tundmatu';
     const author = firstHit.autor || 'Tundmatu';
     const year = firstHit.aasta || 0;
 

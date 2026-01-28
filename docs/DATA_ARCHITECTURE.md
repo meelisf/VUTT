@@ -4,7 +4,7 @@
 
 ## Ülevaade
 
-VUTT süsteemis on **kolm andmekihti** erinevate väljanimedega. See on ajalooliselt kujunenud ja dokumenteeritud siin selguse huvides.
+VUTT süsteemis on **kolm andmekihti**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -16,42 +16,53 @@ VUTT süsteemis on **kolm andmekihti** erinevate väljanimedega. See on ajalooli
                               ▼ server/meilisearch_ops.py sync_work_to_meilisearch()
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  2. MEILISEARCH INDEKS: teosed                                         │
-│     Formaat: MÕLEMAD väljad (ingliskeelsed + eestikeelsed)             │
-│     - title JA pealkiri                                                │
-│     - year JA aasta                                                    │
-│     - location JA koht                                                 │
-│     - publisher JA trükkal                                             │
-│     - creators[] JA autor/respondens                                   │
+│     Formaat: Ingliskeelsed väljad + filtrid/sortimine eesti keeles     │
+│     - title, year, location, publisher (ingliskeelsed)                 │
+│     - aasta, autor, respondens (filtrite/sortimise jaoks)              │
+│     - EEMALDATUD: pealkiri, koht, trükkal                              │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼ src/services/meiliService.ts
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  3. FRONTEND: src/types.ts Work / Page tüübid                          │
-│     Formaat: Mõlemad (ingliskeelsed EELISTATUD)                        │
+│     Formaat: Ingliskeelsed väljad (ilma fallback'ideta)                │
 │     Kasuta: work.title, work.year, work.creators[]                     │
-│     Fallback: hit.pealkiri, hit.aasta (kui ingliskeelne puudub)        │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Meilisearchi Väljad (Täielik Nimekiri)
-
-Backend (`server/meilisearch_ops.py`) kirjutab Meilisearchi **mõlemad versioonid**:
+## Meilisearchi Väljad
 
 ### Põhiväljad
 
-| _metadata.json | Meilisearch (ingliskeelne) | Meilisearch (eestikeelne) | Märkus |
-|----------------|---------------------------|---------------------------|--------|
-| `id` | `work_id` | - | Nanoid, püsiv ID |
-| `slug` | - | `originaal_kataloog` | Kausta nimi |
-| `title` | `title` | `pealkiri` | Teose pealkiri |
-| `year` | `year` | `aasta` | Ilmumisaasta |
-| `location` | `location`, `location_object` | `koht` | LinkedEntity või string |
-| `publisher` | `publisher`, `publisher_object` | `trükkal` | LinkedEntity või string |
-| `creators[]` | `creators`, `author_names`, `respondens_names` | `autor`, `respondens` | Isikud |
-| `tags[]` | `tags`, `tags_et`, `tags_en`, `tags_object` | - | Märksõnad |
-| `genre` | `genre`, `genre_et`, `genre_en`, `genre_object` | - | Žanr |
-| `type` | `type`, `type_et`, `type_en`, `type_object` | - | Tüüp |
-| `collection` | `collection`, `collections_hierarchy` | - | Kollektsioon |
+| _metadata.json | Meilisearch | Märkus |
+|----------------|-------------|--------|
+| `id` | `work_id` | Nanoid, püsiv ID |
+| `slug` | `originaal_kataloog` | Kausta nimi |
+| `title` | `title` | Teose pealkiri |
+| `year` | `year`, `aasta` | `aasta` sortimise/filtrite jaoks |
+| `location` | `location`, `location_object` | LinkedEntity või string |
+| `publisher` | `publisher`, `publisher_object` | LinkedEntity või string |
+| `creators[]` | `creators`, `author_names`, `respondens_names`, `autor`, `respondens` | Isikud |
+| `tags[]` | `tags`, `tags_et`, `tags_en`, `tags_object` | Märksõnad |
+| `genre` | `genre`, `genre_et`, `genre_en`, `genre_object` | Žanr |
+| `type` | `type`, `type_et`, `type_en`, `type_object` | Tüüp |
+| `collection` | `collection`, `collections_hierarchy` | Kollektsioon |
+
+### EEMALDATUD väljad (ei kirjutata ega pärita)
+
+- `pealkiri` - kasuta `title`
+- `koht` - kasuta `location`
+- `trükkal` - kasuta `publisher`
+
+### Säilitatud eestikeelsed väljad (filtrite/sortimise jaoks)
+
+| Väli | Kasutus |
+|------|---------|
+| `aasta` | Aasta filter ja sortimine |
+| `autor` | Autori filter |
+| `respondens` | Respondendi filter |
+| `lehekylje_number` | Lehekülje sortimine |
+| `originaal_kataloog` | Kausta nimi |
 
 ### Lehekülje väljad
 
@@ -78,8 +89,8 @@ Backend (`server/meilisearch_ops.py`) kirjutab Meilisearchi **mõlemad versiooni
 
 Meilisearchis:
 - `creators` - terve massiiv (filtreerimiseks ja kuvamiseks)
-- `autor` - praeses/auctor nimi stringina (tagasiühilduvus)
-- `respondens` - respondens nimi stringina (tagasiühilduvus)
+- `autor` - praeses/auctor nimi stringina (filtreerimiseks)
+- `respondens` - respondens nimi stringina (filtreerimiseks)
 - `author_names` - kõik mitte-respondens nimed listina (filtreerimiseks)
 - `respondens_names` - respondens nimed listina (filtreerimiseks)
 - `authors_text` - kõik nimed listina (otsinguks)
@@ -88,37 +99,26 @@ Meilisearchis:
 
 ### KASUTA (ingliskeelsed väljad):
 ```typescript
-// Eelistatud - ingliskeelsed väljad
 work.title
 work.year
 work.location
 work.publisher
 work.creators
 work.tags
-hit.title
-hit.year
-```
-
-### VÄLDI (eestikeelsed väljad):
-```typescript
-// Tagasiühilduvus - kasuta ainult fallback'ina
-hit.pealkiri    // kasuta: hit.title ?? hit.pealkiri
-hit.aasta       // kasuta: hit.year ?? hit.aasta
-hit.autor       // kasuta: hit.creators või hit.author_names
-hit.trükkal     // kasuta: hit.publisher ?? hit.trükkal
-hit.koht        // kasuta: hit.location ?? hit.koht
 ```
 
 ### Filtrid ja Sortimine
 
-Meilisearchi filtrites/sortimises kasuta **eestikeelseid välju** (need on indekseeritud):
+Meilisearchi filtrites/sortimises kasuta eestikeelseid välju (need on indekseeritud):
 ```typescript
 // Filtrid
 filter: [`aasta >= 1630`, `aasta <= 1710`]
 filter: [`work_id = "cymbv7"`]
+filter: [`autor = "Virginius, Georg"`]
 
 // Sortimine
 sort: ['aasta:asc']
+sort: ['title:asc']
 sort: ['lehekylje_number:asc']
 ```
 
@@ -126,21 +126,17 @@ sort: ['lehekylje_number:asc']
 
 Otsinguväljad (`attributesToSearchOn`):
 ```typescript
-['title', 'pealkiri', 'authors_text', 'lehekylje_tekst']
+['title', 'authors_text', 'lehekylje_tekst']
 ```
 
-## Migratsiooniplaan
+## Migratsioon (Lõpetatud)
 
-Frontend liigub järk-järgult eestikeelsetelt väljadelt ingliskeelsetele:
-
-1. ✅ `work_id` - juba kasutusel (nanoid)
-2. ✅ `creators[]` - juba kasutusel
-3. ⏳ `title` asemel `pealkiri` - töös
-4. ⏳ `year` asemel `aasta` - töös
-5. ⏳ `location` asemel `koht` - töös
-6. ⏳ `publisher` asemel `trükkal` - töös
-
-**NB:** Filtrid ja sortimine jäävad eestikeelsetele väljadele (`aasta`, `lehekylje_number`), sest need on Meilisearchis indekseeritud.
+- ✅ `work_id` - nanoid kasutusel
+- ✅ `creators[]` - kasutusel
+- ✅ `title` - kasutusel (pealkiri eemaldatud)
+- ✅ `year` - kasutusel (aasta säilitatud sortimiseks)
+- ✅ `location` - kasutusel (koht eemaldatud)
+- ✅ `publisher` - kasutusel (trükkal eemaldatud)
 
 ## Failid
 
@@ -155,4 +151,3 @@ Frontend liigub järk-järgult eestikeelsetelt väljadelt ingliskeelsetele:
 ## Viited
 
 - `CLAUDE.md` - projekti üldine dokumentatsioon
-- `docs/PLAN_metadata_v3_linked_data.md` - LinkedEntity formaat

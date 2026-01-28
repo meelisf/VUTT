@@ -6,21 +6,23 @@ ANDMEKIHTIDE ARHITEKTUUR
 =============================================================================
 
 See fail vastutab _metadata.json → Meilisearch kaardistamise eest.
-Meilisearchi kirjutatakse MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
 
     _metadata.json     →  Meilisearch indeks
     ─────────────────────────────────────────
-    title              →  title + pealkiri
-    year               →  year + aasta
-    location           →  location + location_object + koht
-    publisher          →  publisher + publisher_object + trükkal
+    title              →  title
+    year               →  year + aasta (aasta filtrite jaoks)
+    location           →  location + location_object
+    publisher          →  publisher + publisher_object
     creators[]         →  creators + autor + respondens + author_names + respondens_names
     tags[]             →  tags + tags_et + tags_en + tags_object
     genre              →  genre + genre_et + genre_en + genre_object
     id (nanoid)        →  work_id
 
-Miks mõlemad? Tagasiühilduvus - frontend kasutab veel osaliselt eestikeelseid
-välju filtrites ja sortimises. Järk-järgult liigutakse ingliskeelsetele.
+Eestikeelsed väljad mis JÄÄVAD (filtrite/sortimise jaoks):
+- aasta, lehekylje_number, originaal_kataloog, autor, respondens
+
+Eestikeelsed väljad mis EEMALDATUD:
+- pealkiri (kasuta title), koht (kasuta location), trükkal (kasuta publisher)
 
 Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
 =============================================================================
@@ -268,11 +270,10 @@ def sync_work_to_meilisearch(dir_name):
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
-            "pealkiri": title,  # Meilisearch indeksi skeem (eestikeelne)
             "title": title,
-            "autor": autor,
-            "respondens": respondens,
-            "aasta": year,  # Meilisearch indeksi skeem (eestikeelne)
+            "autor": autor,      # Filtreerimiseks (jääb)
+            "respondens": respondens,  # Filtreerimiseks (jääb)
+            "aasta": year,       # Filtreerimiseks ja sortimiseks (jääb)
             "year": year,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
@@ -326,10 +327,8 @@ def sync_work_to_meilisearch(dir_name):
             "authors_text": [c['name'] for c in creators if c.get('name')],
             "author_names": [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
             "respondens_names": [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
-            "creator_ids": [c.get('id') for c in creators if c.get('id')],
-            # Meilisearch indeksi skeem (eestikeelsed väljad tagasiühilduvuseks)
-            "koht": get_label(location),
-            "trükkal": get_label(publisher)
+            "creator_ids": [c.get('id') for c in creators if c.get('id')]
+            # NB: pealkiri, koht, trükkal eemaldatud - kasuta title, location, publisher
         }
 
         if ester_id:

@@ -356,7 +356,7 @@ const SearchPage: React.FC = () => {
     const availableWorks = (results?.hits && !workIdParam && !loading && uniqueWorkIds.size > 1)
         ? results.hits.map(hit => ({
             id: hit.work_id,
-            title: hit.title || hit.pealkiri || hit.work_id,
+            title: hit.title || hit.work_id,
             year: hit.year ?? hit.aasta,
             author: Array.isArray(hit.autor) ? hit.autor[0] : hit.autor,
             count: workHitCounts[hit.work_id] || 1
@@ -863,7 +863,7 @@ const SearchPage: React.FC = () => {
                                         </span>
                                     </div>
                                     <h2 className="text-base font-bold text-gray-900 leading-snug mb-2">
-                                        {results.hits[0]?.title || results.hits[0]?.pealkiri || t('status.titleMissing')}
+                                        {results.hits[0]?.title || t('status.titleMissing')}
                                     </h2>
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                         <span>
@@ -929,7 +929,7 @@ const SearchPage: React.FC = () => {
                                                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
                                                     <div className="flex-1 min-w-0">
                                                         <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
-                                                            {firstHit.title || firstHit.pealkiri || t('status.titleMissing')}
+                                                            {firstHit.title || t('status.titleMissing')}
                                                         </h2>
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
                                                             <button
@@ -1086,7 +1086,7 @@ const SearchPage: React.FC = () => {
                                                             const targetId = firstHit.work_id || workId;
                                                             setSelectedWork(targetId);
                                                             setSelectedWorkInfo({
-                                                                title: firstHit.title || firstHit.pealkiri || targetId,
+                                                                title: firstHit.title || targetId,
                                                                 year: firstHit.year ?? firstHit.aasta,
                                                                 author: getAuthorDisplay(firstHit, t)
                                                             });

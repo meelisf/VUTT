@@ -97,13 +97,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
     // Algväärtused page/work objektidest
     setMetaForm({
-      title: work?.title || page.title || page.pealkiri || '',
+      title: work?.title || page.title || '',
       year: work?.year || page.year || page.aasta || 0,
       type: work?.type || page.type || null,
       genre: work?.genre || page.genre || null,
       tags: work?.tags || page.tags || [],
-      location: work?.location || work?.koht || page.location || page.koht || '',
-      publisher: work?.publisher || work?.trükkal || page.publisher || page.trükkal || '',
+      location: work?.location || page.location || '',
+      publisher: work?.publisher || page.publisher || '',
       creators: work?.creators || page.creators || initialCreators,
       languages: work?.languages || page.languages || [],
       ester_id: work?.ester_id || page.ester_id || '',
