@@ -29,4 +29,5 @@ state/*.json
 !state/*.example
 !state/*.json.example
 
-# Note: docs/ and CLAUDE.md are now tracked in git
+# Documentation archive (old/completed plans)
+docs/_archive/

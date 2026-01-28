@@ -323,21 +323,21 @@ const Workspace: React.FC = () => {
   const generateCoins = () => {
     if (!page) return null;
 
-    const title = work?.title || page.pealkiri || '';
-    
+    const title = work?.title || page.title || page.pealkiri || '';
+
     // Leia autor ja respondens creators massiivist
     let author = work?.author || page.autor || '';
     let respondens = work?.respondens || page.respondens || '';
-    
+
     if (work?.creators && work.creators.length > 0) {
       const authorCreator = work.creators.find(c => c.role === 'praeses' || c.role === 'autor');
       if (authorCreator) author = authorCreator.name;
-      
+
       const respondensCreator = work.creators.find(c => c.role === 'respondens');
       if (respondensCreator) respondens = respondensCreator.name;
     }
-    
-    const year = work?.year || page.aasta || 0;
+
+    const year = work?.year ?? page.year ?? page.aasta ?? 0;
     const place = getLabel(work?.location || page.location || page.koht || (year >= 1699 ? 'Pärnu' : 'Tartu'));
     const printer = getLabel(work?.publisher || page.publisher || page.trükkal || 'Typis Academicis');
 
