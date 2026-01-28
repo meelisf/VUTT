@@ -6,9 +6,14 @@ import os
 import re
 import hashlib
 import uuid
+import threading
 from datetime import datetime, timedelta
 from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE
 from .auth import load_users
+
+# Lukud failioperatsioonide jaoks
+registrations_lock = threading.RLock()
+tokens_lock = threading.RLock()
 
 # =========================================================
 # REGISTREERIMISE FUNKTSIOONID
@@ -16,16 +21,18 @@ from .auth import load_users
 
 def load_pending_registrations():
     """Laeb ootel registreerimistaotlused."""
-    if not os.path.exists(PENDING_REGISTRATIONS_FILE):
-        return {"registrations": []}
-    with open(PENDING_REGISTRATIONS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    with registrations_lock:
+        if not os.path.exists(PENDING_REGISTRATIONS_FILE):
+            return {"registrations": []}
+        with open(PENDING_REGISTRATIONS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 
 def save_pending_registrations(data):
     """Salvestab ootel registreerimistaotlused."""
-    with open(PENDING_REGISTRATIONS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with registrations_lock:
+        with open(PENDING_REGISTRATIONS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def add_registration(name, email, affiliation, motivation):
@@ -90,16 +97,18 @@ def update_registration_status(reg_id, status, reviewed_by):
 
 def load_invite_tokens():
     """Laeb invite tokenid."""
-    if not os.path.exists(INVITE_TOKENS_FILE):
-        return {"tokens": []}
-    with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    with tokens_lock:
+        if not os.path.exists(INVITE_TOKENS_FILE):
+            return {"tokens": []}
+        with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 
 def save_invite_tokens(data):
     """Salvestab invite tokenid."""
-    with open(INVITE_TOKENS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with tokens_lock:
+        with open(INVITE_TOKENS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def create_invite_token(email, name, created_by):

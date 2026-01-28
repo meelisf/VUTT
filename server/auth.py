@@ -5,6 +5,7 @@ import json
 import os
 import hashlib
 import uuid
+import threading
 from datetime import datetime
 from .config import USERS_FILE, SESSION_DURATION
 
@@ -12,24 +13,29 @@ from .config import USERS_FILE, SESSION_DURATION
 # NB: Serveri restart kustutab kõik sessioonid
 sessions = {}
 
+# Lukk failioperatsioonide jaoks
+users_lock = threading.RLock()
+
 
 def load_users():
     """Laeb kasutajad JSON failist."""
-    if not os.path.exists(USERS_FILE):
-        print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
-        print("Loo users.json fail koos kasutajatega. Näide:")
-        print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
-        print("Parooli hashi saad: echo -n 'parool' | sha256sum")
-        return {}
+    with users_lock:
+        if not os.path.exists(USERS_FILE):
+            print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
+            print("Loo users.json fail koos kasutajatega. Näide:")
+            print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
+            print("Parooli hashi saad: echo -n 'parool' | sha256sum")
+            return {}
 
-    with open(USERS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 
 def save_users(users):
     """Salvestab kasutajad JSON faili."""
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+    with users_lock:
+        with open(USERS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
 
 
 def verify_user(username, password):

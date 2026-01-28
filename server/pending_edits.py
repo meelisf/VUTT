@@ -18,22 +18,28 @@ import json
 import os
 import hashlib
 import uuid
+import threading
 from datetime import datetime
 from .config import PENDING_EDITS_FILE
+
+# Lukk failioperatsioonide jaoks
+edits_lock = threading.RLock()
 
 
 def load_pending_edits():
     """Laeb ootel muudatused."""
-    if not os.path.exists(PENDING_EDITS_FILE):
-        return {"pending_edits": []}
-    with open(PENDING_EDITS_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    with edits_lock:
+        if not os.path.exists(PENDING_EDITS_FILE):
+            return {"pending_edits": []}
+        with open(PENDING_EDITS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
 
 
 def save_pending_edits(data):
     """Salvestab ootel muudatused."""
-    with open(PENDING_EDITS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    with edits_lock:
+        with open(PENDING_EDITS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def create_pending_edit(work_id, lehekylje_number, user, original_text, new_text):
