@@ -730,7 +730,6 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       comments: page.comments,
       history: page.history,
       work_id: page.work_id,
-      page_number: page.page_number,
       updated_at: new Date().toISOString()
     };
 
@@ -739,8 +738,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       meta_content: metaContent,
       original_path: original_catalog,
       file_name: textFilename,
-      work_id: page.work_id,
-      page_number: page.page_number
+      work_id: page.work_id
     };
 
     // Lisa autentimistõend kui olemas

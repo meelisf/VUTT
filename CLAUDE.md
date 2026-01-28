@@ -885,6 +885,28 @@ rsync -av --delete /path/to/vutt/state/ /backup/vutt/state/
 
 2. **teoseTags filter ei näita valitud märksõnu:** URL parameetrist tulev `teoseTags=Ateism` ei ilmu kõrvalribale kui sellel pole tulemusi. Sama probleem mis oli genre/type puhul - vajab `mergeSelectedIntoFacets` loogika lisamist ka teoseTags jaoks.
 
+### Lehekülje JSON failide puhastus
+**Staatus:** Madal prioriteet (koristustöö)
+
+Lehekülje `.json` failides on üleliigne `page_number` väli, mida indekseerimisel ei kasutata (leheküljenumber arvutatakse failide järjekorra põhjal).
+
+**Muudatus tehtud (2026-01-28):**
+- `meiliService.ts` ei kirjuta enam `page_number` välja JSON-i
+
+**Koristustöö:**
+```bash
+# Eemalda page_number väli kõigist lehekülje JSON failidest
+find data/ -name "*.json" ! -name "_metadata.json" -exec \
+  python3 -c "
+import json, sys
+with open(sys.argv[1], 'r') as f: d = json.load(f)
+if 'page_number' in d:
+    del d['page_number']
+    with open(sys.argv[1], 'w') as f: json.dump(d, f, indent=2, ensure_ascii=False)
+    print(f'Cleaned: {sys.argv[1]}')
+" {} \;
+```
+
 ### Ülejäänud fallback'ide eemaldamine
 **Staatus:** Madal prioriteet (töötab, aga kood pole puhas)
 
