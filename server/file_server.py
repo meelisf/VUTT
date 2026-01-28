@@ -638,14 +638,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
 
         elif self.path == '/git-history':
-            # Git ajaloo päring (asendab /backups)
+            # Git ajaloo päring - kõik sisselogitud kasutajad näevad ajalugu
             try:
                 content_length = int(self.headers['Content-Length'])
                 post_data = self.rfile.read(content_length)
                 data = json.loads(post_data)
 
-                # Autentimise kontroll - nõuab vähemalt 'admin' õigusi
-                user, auth_error = require_token(data, min_role='admin')
+                # Autentimise kontroll - kõik sisselogitud kasutajad
+                user, auth_error = require_token(data, min_role='editor')
                 if auth_error:
                     self.send_response(401)
                     self.send_header('Content-type', 'application/json')
