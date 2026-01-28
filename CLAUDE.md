@@ -712,10 +712,14 @@ See `docs/PLAAN_kasutajahaldus.md` for implementation details.
 
 **NB:** See on suur töö, aga lihtsustab koodi oluliselt ja võimaldab korraliku isikuregistri.
 
-### Collections (kollektsioonid)
-See `docs/PLAAN_kollektsioonid.md` for detailed planning document.
+### Collections (kollektsioonid) ✅
+**Staatus:** Implementeeritud
 
-Brief summary: Hierarchical organization of works by provenance/institution (not topic - use tags for that). One collection per work, with parent collections inherited for filtering. Global context selector in Header, bulk assignment in Dashboard.
+Hierarhiline teoste organiseerimine päritolu/institutsiooni järgi:
+- `state/collections.json` - kollektsioonide definitsioonid (nimi, parent, children)
+- `CollectionPicker.tsx` - valikukomponent MetadataModal'is
+- Filtreerimine Dashboard'is ja otsingufilrites
+- Bulk assignment admin paneelist
 
 ### ESTER Integration
 Currently `ester_id` is manually added. Planned improvement:
