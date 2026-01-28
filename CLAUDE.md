@@ -685,32 +685,38 @@ See `docs/PLAAN_kasutajahaldus.md` for implementation details.
 
 ## Future Ideas
 
-### Andmekihtide ühtlustamine + Name Authority
+### Wikidata integratsioon ✅
+**Staatus:** Täielikult implementeeritud (Jan 2026)
+
+Wikidata linked data tugi **kõigile** metaandmete väljadele:
+- `genre`, `type`, `location`, `publisher`, `tags` - LinkedEntity objektid
+- `creators[]` - isikud (praeses, respondens jt) Wikidata ID-ga
+- `EntityPicker.tsx` - universaalne Wikidata otsingu komponent
+- `wikidataService.ts` - API teenus
+- Mitmekeelsed sildid (et, en, la, de)
+
+Vt detailid: "Metadata V3 (Linked Data)" sektsioon.
+
+**NB:** `Creator` interface'is on ka `identifiers.gnd` ja `identifiers.viaf` väljad tuleviku GND/VIAF toe jaoks.
+
+### Andmekihtide ühtlustamine
 
 **Praegune olukord:** Süsteemis on kolm kihti erinevate väljanimedega (vt "Andmete arhitektuur" sektsioon). See tekitab segadust arenduses.
 
-**Tuleviku visioon:** Kui lisandub Name Authority tugi (GND, VIAF), tuleb nagunii teha suurem refaktoreerimine. Sel hetkel tasub ühtlustada kõik kihid:
+**Tuleviku visioon:** Meilisearch indeksi skeem → ingliskeelsed väljad:
+- `pealkiri` → `title`
+- `aasta` → `year`
+- `autor` → `author`
+- `koht` → `location`
+- `trükkal` → `publisher`
 
-1. **Meilisearch indeksi skeem → ingliskeelsed väljad:**
-   - `pealkiri` → `title`
-   - `aasta` → `year`
-   - `autor` → `author` (või `primary_creator`)
-   - `koht` → `location`
-   - `trükkal` → `publisher`
+**Sammud:**
+- Uuenda `scripts/1-1_consolidate_data.py` ja `scripts/2-1_upload_to_meili.py`
+- Uuenda `meiliService.ts` päringud
+- Eemalda v1 väljad `src/types.ts` failist
+- Täielik reindekseerimine
 
-2. **Name Authority integratsioon:**
-   - `creators[].identifiers.gnd` - GND ID (Saksa rahvusbibliograafia)
-   - `creators[].identifiers.viaf` - VIAF ID
-   - Automaatne nimede normaliseerimine ja linkimine
-   - Nimede sisestamisel soovitused olemasolevate normaliseeritud nimede põhjal
-
-3. **Sammud:**
-   - Uuenda `scripts/1-1_consolidate_data.py` ja `scripts/2-1_upload_to_meili.py`
-   - Uuenda `meiliService.ts` päringud
-   - Eemalda v1 väljad `src/types.ts` failist
-   - Täielik reindekseerimine
-
-**NB:** See on suur töö, aga lihtsustab koodi oluliselt ja võimaldab korraliku isikuregistri.
+**NB:** See on suur töö, aga lihtsustab koodi oluliselt.
 
 ### Collections (kollektsioonid) ✅
 **Staatus:** Implementeeritud
