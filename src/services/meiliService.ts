@@ -85,12 +85,11 @@ const fixIndexSettings = async () => {
       'collections_hierarchy',
       'authors_text',
       'languages',
-      // Tagasiühilduvus
+      // Tagasiühilduvus (Meilisearch indeksi skeem)
       'aasta',
       'autor',
       'respondens',
       'trükkal',
-      'teose_id',
       'lehekylje_number',
       'originaal_kataloog',
       'page_tags',
@@ -119,12 +118,11 @@ const fixIndexSettings = async () => {
       'genre_search',
       'tags_search',
       'series_title',
-      // Tagasiühilduvus
+      // Tagasiühilduvus (Meilisearch indeksi skeem)
       'pealkiri',
       'autor',
       'respondens',
       'aasta',
-      'teose_id',
       'originaal_kataloog',
       'lehekylje_tekst',
       'page_tags',

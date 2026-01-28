@@ -125,7 +125,7 @@ def find_directory_by_id(target_id):
     Otsib järjekorras:
     1. Cache (kui on laetud)
     2. `id` väli (nanoid, püsiv) - otsib failisüsteemist kui cache puudub
-    3. `slug` väli (v2) või `teose_id` väli (v1 fallback)
+    3. `slug` väli
     4. Kausta nimi (sanitiseeritult, viimane võimalus)
     """
     if not target_id:
@@ -149,16 +149,15 @@ def find_directory_by_id(target_id):
                     try:
                         with open(meta_path, 'r', encoding='utf-8') as f:
                             meta = json.load(f)
-                            
+
                             # 2. Kontrolli nanoid `id` välja (eelistatud)
                             work_id = meta.get('id')
                             if work_id == target_id:
-                                # Lisa leitud väärtus cache'i tuleviku jaoks
                                 WORK_ID_CACHE[work_id] = entry.path
                                 return entry.path
-                            
-                            # 3. Kontrolli slug välja (v2 esmalt, teose_id v1 fallback)
-                            slug = meta.get('slug') or meta.get('teose_id')
+
+                            # 3. Kontrolli slug välja
+                            slug = meta.get('slug')
                             if slug == target_id:
                                 return entry.path
                     except:
@@ -169,7 +168,7 @@ def find_directory_by_id(target_id):
                     return entry.path
     except Exception:
         pass
-        
+
     return None
 
 
@@ -295,15 +294,10 @@ def get_all_ids(value):
 
 
 def generate_default_metadata(dir_name):
-    """Genereerib vaike-metaandmed kataloogi nime põhjal.
-
-    ⚠️  OLULINE: Genereerib V2 formaadis metaandmed!
-    Vt CLAUDE.md v1/v2 väljade võrdlustabelit.
-    """
+    """Genereerib vaike-metaandmed kataloogi nime põhjal."""
     slug = sanitize_id(dir_name)
 
     # Pealkiri kataloogi nimest (eemaldame aastaarvu ja ID osa kui võimalik)
-    # Sama loogika mis 1-1_consolidate_data.py skriptis
     clean_title = re.sub(r'^\d{4}[-_]\d+[-_]?', '', dir_name)
     if clean_title == dir_name:
         clean_title = re.sub(r'^\d{4}[-_]?', '', dir_name)
@@ -316,19 +310,18 @@ def generate_default_metadata(dir_name):
     if year_match:
         year = int(year_match.group(1))
 
-    # V2 formaat (ingliskeelsed väljad)
     return {
-        "id": generate_nanoid(),  # Püsiv lühikood
-        "teose_id": slug,         # Slug (URL-ides) - NB: teose_id jääb tagasiühilduvuseks
-        "title": title,           # V2: pealkiri
-        "year": year,             # V2: aasta
-        "location": None,         # V2: trükikoht
-        "publisher": None,        # V2: trükkal
-        "creators": [],           # V2: isikud koos rollidega
-        "tags": [],               # V2: märksõnad
-        "type": None,             # V2: impressum / manuscriptum
-        "genre": None,            # V2: disputatio, oratio, jne
-        "languages": [],          # V2: keeled (lat, deu, est, ...)
+        "id": generate_nanoid(),
+        "slug": slug,
+        "title": title,
+        "year": year,
+        "location": None,
+        "publisher": None,
+        "creators": [],
+        "tags": [],
+        "type": None,
+        "genre": None,
+        "languages": [],
         "collection": None,
         "ester_id": None,
         "external_url": None

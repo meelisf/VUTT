@@ -24,8 +24,8 @@ def get_work_ids_from_folder(folder_name):
     Leiab teose ID-d kausta nime järgi.
 
     Tagastab: (work_id, slug)
-    - work_id: nanoid _metadata.json `id` väljast (v2 formaat)
-    - slug: _metadata.json `slug` väljast, fallback sanitize_id(folder_name)
+    - work_id: nanoid _metadata.json `id` väljast
+    - slug: _metadata.json `slug` väljast
 
     Kasutab cache'i, et vältida korduvaid faililugemisi.
     """
@@ -40,26 +40,17 @@ def get_work_ids_from_folder(folder_name):
         try:
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
-                work_id = meta.get('id')  # v2: nanoid
-                slug = meta.get('slug') or meta.get('teose_id')  # v2: slug, v1 fallback: teose_id
+                work_id = meta.get('id')
+                slug = meta.get('slug')
         except (json.JSONDecodeError, IOError):
             pass
 
-    # Fallback slug: sanitize kausta nimi
+    # Fallback slug: sanitize kausta nimi (uute kaustade jaoks)
     if not slug:
         slug = sanitize_id(folder_name)
 
     _work_ids_cache[folder_name] = (work_id, slug)
     return work_id, slug
-
-
-def get_teose_id_from_folder(folder_name):
-    """
-    DEPRECATED: Kasuta get_work_ids_from_folder() asemel.
-    Tagasiühilduvus vanade funktsioonide jaoks.
-    """
-    work_id, slug = get_work_ids_from_folder(folder_name)
-    return slug
 
 
 def get_work_info_from_folder(folder_name):
@@ -92,11 +83,11 @@ def get_work_info_from_folder(folder_name):
             with open(metadata_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
                 info['work_id'] = meta.get('id')
-                info['slug'] = meta.get('slug') or meta.get('teose_id') or info['slug']
-                info['title'] = meta.get('title') or meta.get('pealkiri')
-                info['year'] = meta.get('year') or meta.get('aasta')
+                info['slug'] = meta.get('slug') or info['slug']
+                info['title'] = meta.get('title')
+                info['year'] = meta.get('year')
 
-                # Autor: v2 creators esmalt, siis v1 fallback
+                # Autor creators massiivist
                 creators = meta.get('creators', [])
                 if creators:
                     praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
@@ -107,9 +98,6 @@ def get_work_info_from_folder(folder_name):
                         info['author'] = auctor.get('name')
                     elif creators:
                         info['author'] = creators[0].get('name')
-
-                if not info['author']:
-                    info['author'] = meta.get('autor')
         except (json.JSONDecodeError, IOError):
             pass
 

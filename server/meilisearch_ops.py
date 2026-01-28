@@ -141,17 +141,13 @@ def sync_work_to_meilisearch(dir_name):
     if not metadata:
         metadata = generate_default_metadata(dir_name)
 
-    # =================================================================
-    # V2 FORMAAT (esmane) koos v1 fallback'iga turvavõrguna
-    # v2 = title, year, tags, location, publisher, creators[]
-    # v1 = pealkiri, aasta, teose_tags, koht, trükkal, autor, respondens
-    # =================================================================
+    # Metaandmed (v3 formaat: LinkedEntity objektid)
     work_id = metadata.get('id')  # Nanoid (püsiv lühikood)
-    teose_id = metadata.get('slug') or metadata.get('teose_id', sanitize_id(dir_name))
-    pealkiri = metadata.get('title') or metadata.get('pealkiri', 'Pealkiri puudub')
-    aasta = metadata.get('year') or metadata.get('aasta', 0)
+    slug = metadata.get('slug', sanitize_id(dir_name))
+    title = metadata.get('title', 'Pealkiri puudub')
+    year = metadata.get('year', 0)
 
-    # Autor ja respondens: v2=creators massiiv, v1=otsene (fallback)
+    # Autor ja respondens creators massiivist
     creators = metadata.get('creators', [])
     autor = ''
     respondens = ''
@@ -165,22 +161,16 @@ def sync_work_to_meilisearch(dir_name):
         elif auctor:
             autor = auctor.get('name', '')
         elif creators:
-            # Fallback: esimene isik, kui pole praeses ega auctor
             first_creator = creators[0]
             if first_creator.get('role') not in ['respondens', 'gratulator', 'dedicator']:
                 autor = first_creator.get('name', '')
         if resp:
             respondens = resp.get('name', '')
-    # v1 fallback
-    if not autor:
-        autor = metadata.get('autor', '')
-    if not respondens:
-        respondens = metadata.get('respondens', '')
 
-    # Tags: v2=tags, v1=teose_tags (fallback)
-    teose_tags = metadata.get('tags') or metadata.get('teose_tags', [])
-    if isinstance(teose_tags, list):
-        teose_tags = [normalize_genre(t) for t in teose_tags]
+    # Tags (LinkedEntity objektide massiiv või stringid)
+    tags = metadata.get('tags', [])
+    if isinstance(tags, list):
+        tags = [normalize_genre(t) for t in tags]
 
     # Kollektsioon
     collection = metadata.get('collection')
@@ -189,13 +179,10 @@ def sync_work_to_meilisearch(dir_name):
 
     ester_id = metadata.get('ester_id')
     external_url = metadata.get('external_url')
-    # Koht ja trükkal: v2=location/publisher, v1=koht/trükkal (fallback)
-    koht = metadata.get('location') or metadata.get('koht')
-    trükkal = metadata.get('publisher') or metadata.get('trükkal')
-
-    # Type ja genre (v2 väljad)
-    work_type = metadata.get('type')  # impressum / manuscriptum
-    genre = metadata.get('genre')  # disputatio, oratio, carmen, jne
+    location = metadata.get('location')
+    publisher = metadata.get('publisher')
+    work_type = metadata.get('type')
+    genre = metadata.get('genre')
     languages = metadata.get('languages', [])
 
     # 2. Leia leheküljed (pildid)
@@ -208,10 +195,9 @@ def sync_work_to_meilisearch(dir_name):
     page_statuses = []
 
     # Dokumendi ID = nanoid + lehekülje number (nt "cymbv7-1")
-    # Peab vastama 1-1_consolidate_data.py loogikale!
     if not work_id:
         print(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
-        work_id = teose_id  # Fallback slugile
+        work_id = slug  # Fallback slugile
 
     for i, img_name in enumerate(images):
         page_num = i + 1
@@ -258,50 +244,49 @@ def sync_work_to_meilisearch(dir_name):
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
-            "teose_id": teose_id,
-            "pealkiri": pealkiri,
-            "title": pealkiri,
+            "pealkiri": title,  # Meilisearch indeksi skeem (eestikeelne)
+            "title": title,
             "autor": autor,
             "respondens": respondens,
-            "aasta": aasta,
-            "year": aasta,
+            "aasta": year,  # Meilisearch indeksi skeem (eestikeelne)
+            "year": year,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
             "lehekylje_tekst": page_text,
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "page_tags": [l.lower() for l in get_primary_labels(page_meta.get('page_tags', page_meta.get('tags', [])))],
-            "page_tags_et": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', page_meta.get('tags', [])), 'et')],
-            "page_tags_en": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', page_meta.get('tags', [])), 'en')],
+            "page_tags": [l.lower() for l in get_primary_labels(page_meta.get('page_tags', []))],
+            "page_tags_et": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', []), 'et')],
+            "page_tags_en": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', []), 'en')],
             "page_tags_suggest_et": [
-                f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}" 
-                for t in page_meta.get('page_tags', page_meta.get('tags', []))
+                f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}"
+                for t in page_meta.get('page_tags', [])
             ],
             "page_tags_suggest_en": [
-                f"{get_label(t, 'en')}|||{t.get('id') if isinstance(t, dict) else ''}" 
-                for t in page_meta.get('page_tags', page_meta.get('tags', []))
+                f"{get_label(t, 'en')}|||{t.get('id') if isinstance(t, dict) else ''}"
+                for t in page_meta.get('page_tags', [])
             ],
-            "page_tags_object": page_meta.get('page_tags', page_meta.get('tags', [])),
+            "page_tags_object": page_meta.get('page_tags', []),
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
-            "tags": get_primary_labels(teose_tags), # Faceti jaoks stringide massiiv (et)
-            "tags_et": get_labels_by_lang(teose_tags, 'et'),
-            "tags_en": get_labels_by_lang(teose_tags, 'en'),
-            "tags_object": teose_tags,
-            "tags_search": get_all_labels(teose_tags),
-            "tags_ids": get_all_ids(teose_tags),
+            "tags": get_primary_labels(tags),
+            "tags_et": get_labels_by_lang(tags, 'et'),
+            "tags_en": get_labels_by_lang(tags, 'en'),
+            "tags_object": tags,
+            "tags_search": get_all_labels(tags),
+            "tags_ids": get_all_ids(tags),
             "collection": collection,
             "collections_hierarchy": collections_hierarchy,
-            "location": get_label(koht),
-            "location_object": koht,
-            "location_id": get_id(koht),
-            "location_search": get_all_labels(koht),
-            "publisher": get_label(trükkal),
-            "publisher_object": trükkal,
-            "publisher_id": get_id(trükkal),
-            "publisher_search": get_all_labels(trükkal),
+            "location": get_label(location),
+            "location_object": location,
+            "location_id": get_id(location),
+            "location_search": get_all_labels(location),
+            "publisher": get_label(publisher),
+            "publisher_object": publisher,
+            "publisher_id": get_id(publisher),
+            "publisher_search": get_all_labels(publisher),
             "genre": get_label(genre),
             "genre_et": get_labels_by_lang(genre, 'et'),
             "genre_en": get_labels_by_lang(genre, 'en'),
@@ -315,20 +300,18 @@ def sync_work_to_meilisearch(dir_name):
             "languages": languages,
             "creators": creators,
             "authors_text": [c['name'] for c in creators if c.get('name')],
-            # Rolliga eraldatud väljad filtreerimiseks
             "author_names": [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
             "respondens_names": [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
-            "creator_ids": [c.get('id') for c in creators if c.get('id')]
+            "creator_ids": [c.get('id') for c in creators if c.get('id')],
+            # Meilisearch indeksi skeem (eestikeelsed väljad tagasiühilduvuseks)
+            "koht": get_label(location),
+            "trükkal": get_label(publisher)
         }
 
         if ester_id:
             doc['ester_id'] = ester_id
         if external_url:
             doc['external_url'] = external_url
-        
-        # Tagasiühilduvus
-        doc['koht'] = get_label(koht)
-        doc['trükkal'] = get_label(trükkal)
 
         documents.append(doc)
 
@@ -339,7 +322,7 @@ def sync_work_to_meilisearch(dir_name):
 
     # 4. Saada Meilisearchi
     if documents:
-        print(f"AUTOMAATNE SÜNK: Teos {teose_id} ({len(documents)} lk), staatus: {teose_staatus}")
+        print(f"AUTOMAATNE SÜNK: Teos {slug} ({len(documents)} lk), staatus: {teose_staatus}")
         return send_to_meilisearch(documents)
     return False
 

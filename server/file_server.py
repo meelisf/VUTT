@@ -893,26 +893,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # Uuendame andmed
                     current_meta.update(new_metadata)
 
-                    # V1→V2 normaliseerimine: eemalda v1 väljad kui v2 on olemas
-                    v1_to_v2_mapping = {
-                        'pealkiri': 'title',
-                        'aasta': 'year',
-                        'koht': 'location',
-                        'trükkal': 'publisher',
-                        'teose_tags': 'tags',
-                        # autor ja respondens → creators (keerulisem, käsitleme eraldi)
-                    }
-                    for v1_key, v2_key in v1_to_v2_mapping.items():
-                        if v2_key in current_meta and v1_key in current_meta:
-                            del current_meta[v1_key]
-
-                    # Kui on creators massiiv, eemalda autor ja respondens väljad
-                    if 'creators' in current_meta and isinstance(current_meta.get('creators'), list):
-                        if 'autor' in current_meta:
-                            del current_meta['autor']
-                        if 'respondens' in current_meta:
-                            del current_meta['respondens']
-
                     # Salvestame (atomic write)
                     atomic_write_json(metadata_path, current_meta)
 
@@ -1070,21 +1050,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                     for creator in meta.get('creators', []):
                                         add_item(authors, {'label': creator.get('name'), 'id': creator.get('id')})
 
-                                    # V1 fallback authors
-                                    if meta.get('autor'): add_item(authors, meta['autor'])
-                                    if meta.get('respondens'): add_item(authors, meta['respondens'])
-
                                     # Tags
                                     for t in meta.get('tags', []): add_item(tags, t)
-                                    for t in meta.get('teose_tags', []): add_item(tags, t)
 
                                     # Location
-                                    loc = meta.get('location') or meta.get('koht')
-                                    add_item(places, loc)
+                                    add_item(places, meta.get('location'))
 
                                     # Publisher
-                                    pub = meta.get('publisher') or meta.get('trükkal')
-                                    add_item(printers, pub)
+                                    add_item(printers, meta.get('publisher'))
 
                                     # Type
                                     add_item(types, meta.get('type'))
@@ -1553,7 +1526,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Loo pending-edit
                 edit, error = create_pending_edit(
-                    teose_id=work_id,  # NB: API funktsioon ootab teose_id parameetrit
+                    work_id=work_id,
                     lehekylje_number=lehekylje_number,
                     user=user,
                     original_text=original_text,
