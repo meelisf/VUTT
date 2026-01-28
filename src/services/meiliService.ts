@@ -453,10 +453,15 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         filter.push(`(${genreConditions})`);
       }
     }
-    // V2: Tüübi filter (kasutab keelespetsiifilist välja)
-    if (options?.type) {
+    // V2: Tüübi filter (OR loogika - teos võib vastata ükskõik millisele valitud tüübile)
+    if (options?.type && options.type.length > 0) {
       const typeField = options.lang ? `type_${options.lang}` : 'type_et';
-      filter.push(`${typeField} = "${options.type}"`);
+      if (options.type.length === 1) {
+        filter.push(`${typeField} = "${options.type[0]}"`);
+      } else {
+        const typeConditions = options.type.map(t => `${typeField} = "${t}"`).join(' OR ');
+        filter.push(`(${typeConditions})`);
+      }
     }
 
     const searchParams: any = {
@@ -1019,10 +1024,15 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       filter.push(`(${genreConditions})`);
     }
   }
-  // V2: Tüübi filter (kasutab keelespetsiifilist välja)
-  if (options.type) {
+  // V2: Tüübi filter (OR loogika - teos võib vastata ükskõik millisele valitud tüübile)
+  if (options.type && options.type.length > 0) {
     const typeField = options.lang ? `type_${options.lang}` : 'type_et';
-    filter.push(`${typeField} = "${options.type}"`);
+    if (options.type.length === 1) {
+      filter.push(`${typeField} = "${options.type[0]}"`);
+    } else {
+      const typeConditions = options.type.map(t => `${typeField} = "${t}"`).join(' OR ');
+      filter.push(`(${typeConditions})`);
+    }
   }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';

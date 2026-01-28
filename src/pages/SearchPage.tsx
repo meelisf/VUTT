@@ -56,6 +56,21 @@ const mergeSelectedIntoFacets = (
     return merged;
 };
 
+// Sama loogika teoseTags jaoks (erinev struktuur: tag vs value)
+const mergeSelectedIntoTags = (
+    tags: { tag: string; count: number }[],
+    selected: string[]
+): { tag: string; count: number }[] => {
+    const existing = new Set(tags.map(t => t.tag));
+    const merged = [...tags];
+    for (const sel of selected) {
+        if (sel && !existing.has(sel)) {
+            merged.push({ tag: sel, count: 0 });
+        }
+    }
+    return merged;
+};
+
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
@@ -73,7 +88,7 @@ const SearchPage: React.FC = () => {
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
     const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
     const genreParam = searchParams.get('genre')?.split(',').filter(Boolean) || [];
-    const typeParam = searchParams.get('type') || '';
+    const typeParam = searchParams.get('type')?.split(',').filter(Boolean) || [];
 
     // Local state for input fields
     const [inputValue, setInputValue] = useState(queryParam);
@@ -91,9 +106,9 @@ const SearchPage: React.FC = () => {
     const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
     const [selectedGenres, setSelectedGenres] = useState<string[]>(genreParam);
 
-    // Tüübi filter (type väli)
+    // Tüübi filter (type väli) - mitu valikut lubatud
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
-    const [selectedType, setSelectedType] = useState<string>(typeParam);
+    const [selectedTypes, setSelectedTypes] = useState<string[]>(typeParam);
 
     // Sõnavara (tõlgete jaoks)
     const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
@@ -121,10 +136,11 @@ const SearchPage: React.FC = () => {
                     getTypeFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getVocabularies()
                 ]);
-                setAvailableTeoseTags(tags);
-                // Lisa valitud žanrid/tüübid nimekirja isegi kui count=0
+                // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
+                const tagsWithSelected = mergeSelectedIntoTags(tags, teoseTagsParam);
                 const genresWithSelected = mergeSelectedIntoFacets(genres, genreParam);
                 const typesWithSelected = mergeSelectedIntoFacets(types, typeParam ? [typeParam] : []);
+                setAvailableTeoseTags(tagsWithSelected);
                 setAvailableGenres(genresWithSelected);
                 setAvailableTypes(typesWithSelected);
                 setVocabularies(vocabs);
@@ -142,8 +158,8 @@ const SearchPage: React.FC = () => {
         setSelectedWork(workIdParam);
         setSelectedTeoseTags(teoseTagsParam);
         setSelectedGenres(genreParam);
-        setSelectedType(typeParam);
-    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam]);
+        setSelectedTypes(typeParam);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(',')]);
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
@@ -181,7 +197,7 @@ const SearchPage: React.FC = () => {
                           selectedWork ||
                           selectedTeoseTags.length > 0 ||
                           selectedGenres.length > 0 ||
-                          selectedType;
+                          selectedTypes.length > 0;
 
         // Update URL params, which triggers the effect below
         setSearchParams(prev => {
@@ -212,7 +228,7 @@ const SearchPage: React.FC = () => {
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
                 if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
                 if (selectedGenres.length > 0) prev.set('genre', selectedGenres.join(',')); else prev.delete('genre');
-                if (selectedType) prev.set('type', selectedType); else prev.delete('type');
+                if (selectedTypes.length > 0) prev.set('type', selectedTypes.join(',')); else prev.delete('type');
             }
             return prev;
         });
@@ -236,7 +252,7 @@ const SearchPage: React.FC = () => {
                 workId: workIdParam || undefined,
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
                 genre: genreParam.length > 0 ? genreParam : undefined,
-                type: typeParam || undefined,
+                type: typeParam.length > 0 ? typeParam : undefined,
                 collection: selectedCollection || undefined,
                 lang: i18n.language.split('-')[0]  // et-EE -> et
             };
@@ -245,7 +261,7 @@ const SearchPage: React.FC = () => {
         } else {
             setResults(null);
         }
-    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam.join(','), typeParam, selectedCollection, i18n.language]);
+    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -277,12 +293,13 @@ const SearchPage: React.FC = () => {
                 const types = processFacets(`type_${lang}`);
                 const tags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count })); // Tags on natuke teise struktuuriga
 
-                // Lisa valitud žanrid/tüübid nimekirja isegi kui count=0 (UX)
+                // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
+                const tagsWithSelected = mergeSelectedIntoTags(tags, selectedTeoseTags);
                 const genresWithSelected = mergeSelectedIntoFacets(genres, selectedGenres);
-                const typesWithSelected = mergeSelectedIntoFacets(types, selectedType ? [selectedType] : []);
+                const typesWithSelected = mergeSelectedIntoFacets(types, selectedTypes);
+                setAvailableTeoseTags(tagsWithSelected);
                 setAvailableGenres(genresWithSelected);
                 setAvailableTypes(typesWithSelected);
-                setAvailableTeoseTags(tags);
             }
 
             // Only reset expanded groups if it's a new query (page 1) and not filtering by work
@@ -694,38 +711,32 @@ const SearchPage: React.FC = () => {
                             </CollapsibleSection>
                         )}
 
-                        {/* Type Filter (impressum/manuscriptum) */}
+                        {/* Type Filter (impressum/manuscriptum) - mitu valikut lubatud */}
                         {availableTypes.length > 0 && (
                             <CollapsibleSection
                                 title={t('filters.type')}
                                 icon={<ScrollText size={14} />}
-                                defaultOpen={!!selectedType}
-                                badge={selectedType ? 1 : undefined}
+                                defaultOpen={selectedTypes.length > 0}
+                                badge={selectedTypes.length || undefined}
                             >
                                 <div className="space-y-1">
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                        <input
-                                            type="radio"
-                                            name="type"
-                                            value=""
-                                            checked={!selectedType}
-                                            onChange={() => setSelectedType('')}
-                                            className="text-primary-600 focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-gray-700">{t('filters.allTypes')}</span>
-                                    </label>
                                     {availableTypes.map(({ value, count }) => {
                                         const lang = (i18n.language as 'et' | 'en') || 'et';
                                         const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
+                                        const isSelected = selectedTypes.includes(value);
                                         return (
                                             <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
                                                 <input
-                                                    type="radio"
-                                                    name="type"
-                                                    value={value}
-                                                    checked={selectedType === value}
-                                                    onChange={() => setSelectedType(value)}
-                                                    className="text-primary-600 focus:ring-primary-500"
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        if (isSelected) {
+                                                            setSelectedTypes(selectedTypes.filter(t => t !== value));
+                                                        } else {
+                                                            setSelectedTypes([...selectedTypes, value]);
+                                                        }
+                                                    }}
+                                                    className="text-primary-600 focus:ring-primary-500 rounded"
                                                 />
                                                 <span className="text-sm text-gray-700 flex-1">{label}</span>
                                                 <span className="text-xs text-gray-400">({count})</span>
@@ -819,7 +830,7 @@ const SearchPage: React.FC = () => {
                             >
                                 {t('filters.applyFilters')}
                             </button>
-                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedType) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0) && (
                                 <button
                                     onClick={() => {
                                         setYearStart('');
@@ -829,7 +840,7 @@ const SearchPage: React.FC = () => {
                                         setSelectedWorkInfo(null);
                                         setSelectedTeoseTags([]);
                                         setSelectedGenres([]);
-                                        setSelectedType('');
+                                        setSelectedTypes([]);
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');

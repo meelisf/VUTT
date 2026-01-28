@@ -258,7 +258,7 @@ export interface ContentSearchOptions {
   scope?: 'all' | 'annotation' | 'original';
   teoseTags?: string[];
   genre?: string[];       // V2: žanri filter (mitu valikut OR loogikaga)
-  type?: string;          // V2: tüübi filter (impressum/manuscriptum)
+  type?: string[];        // V2: tüübi filter (mitu valikut OR loogikaga)
   collection?: string;    // V2: kollektsiooni filter
   lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
 }
