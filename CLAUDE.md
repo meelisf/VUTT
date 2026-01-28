@@ -697,7 +697,9 @@ Wikidata linked data tugi **kõigile** metaandmete väljadele:
 
 Vt detailid: "Metadata V3 (Linked Data)" sektsioon.
 
-**NB:** `Creator` interface'is on ka `identifiers.gnd` ja `identifiers.viaf` väljad tuleviku GND/VIAF toe jaoks.
+**VIAF tugi olemas:** `entityUrl.ts` toetab VIAF linke (`viaf:12345` → viaf.org). Album Academicum ID-d (`AA:123`) säilitatakse, aga pole avalikku URL-i.
+
+**Pooleli:** `scripts/reconcile_authors.py` - interaktiivne tööriist autorite sidumiseks Wikidata/VIAF-iga. Kasutab Album Academicumi andmeid (`reference_data/album_academicum.json`) võrdluseks.
 
 ### Andmekihtide ühtlustamine
 
