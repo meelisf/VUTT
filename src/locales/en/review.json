@@ -18,7 +18,11 @@
   },
   "actions": {
     "openPage": "Open page",
+    "openWork": "Open work",
     "continue": "Continue working"
+  },
+  "changeType": {
+    "metadata": "Metadata"
   },
   "diff": {
     "loading": "Loading changes...",

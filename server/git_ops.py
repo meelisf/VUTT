@@ -475,25 +475,39 @@ def get_recent_commits(username=None, limit=50):
             file_paths = list(commit.stats.files.keys())
             
             for filepath in file_paths:
-                if not filepath or not filepath.endswith('.txt'):
+                if not filepath:
                     continue
-                
-                # Parsi kausta nimi ja lehekylje_number failiteest
+
+                # Parsi kausta nimi failiteest
                 parts = filepath.split('/')
                 if len(parts) < 2:
                     continue
-                
+
                 folder_name = parts[0]
                 filename = parts[-1]
-                
+
+                # Käsitle erinevaid failitüüpe
+                is_txt = filename.endswith('.txt')
+                is_metadata = filename == '_metadata.json'
+
+                if not is_txt and not is_metadata:
+                    continue
+
                 # Leia teose info _metadata.json failist
                 work_info = get_work_info_from_folder(folder_name)
 
-                # Leia lehekülje number pildi positsiooni järgi (sama loogika mis Meilisearchis)
-                page_num = get_page_number_from_txt(folder_name, filename)
+                if is_txt:
+                    # Lehekülje muudatus
+                    page_num = get_page_number_from_txt(folder_name, filename)
+                    file_key = f"{work_info['work_id']}/{page_num}"
+                    change_type = "page"
+                else:
+                    # Metaandmete muudatus
+                    page_num = None
+                    file_key = f"{work_info['work_id']}/_metadata"
+                    change_type = "metadata"
 
                 # Unikaalne võti (et vältida duplikaate)
-                file_key = f"{work_info['work_id']}/{page_num}"
                 if file_key in seen_files:
                     continue
                 seen_files.add(file_key)
@@ -510,7 +524,8 @@ def get_recent_commits(username=None, limit=50):
                     "year": work_info['year'],
                     "work_author": work_info['author'],  # NB: 'author' on juba commit author
                     "lehekylje_number": page_num,
-                    "filepath": filepath
+                    "filepath": filepath,
+                    "change_type": change_type  # "page" või "metadata"
                 })
                 
                 if len(results) >= limit:

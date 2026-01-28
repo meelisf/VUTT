@@ -18,7 +18,11 @@
   },
   "actions": {
     "openPage": "Ava lehekülg",
+    "openWork": "Ava teos",
     "continue": "Jätka tööd"
+  },
+  "changeType": {
+    "metadata": "Metaandmed"
   },
   "diff": {
     "loading": "Laadin muudatusi...",

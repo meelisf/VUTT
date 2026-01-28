@@ -42,8 +42,9 @@ interface RecentCommit {
   title: string | null;
   year: number | null;
   work_author: string | null;  // NB: 'author' on commit author
-  lehekylje_number: number;
+  lehekylje_number: number | null;
   filepath: string;
+  change_type?: 'page' | 'metadata';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus
 }
 
 interface DiffData {
@@ -384,17 +385,25 @@ const Review: React.FC = () => {
                               {commit.title.length > 20 ? commit.title.slice(0, 20) + '…' : commit.title}
                             </span>
                           )}
-                          <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                            lk {commit.lehekylje_number}
-                          </span>
+                          {commit.change_type === 'metadata' ? (
+                            <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                              {t('changeType.metadata', 'Metaandmed')}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                              lk {commit.lehekylje_number}
+                            </span>
+                          )}
                         </div>
-                        
+
                         {/* Link */}
                         <div className="col-span-1 flex items-center justify-end">
                           <Link
-                            to={`/work/${commit.work_id}/${commit.lehekylje_number}`}
+                            to={commit.change_type === 'metadata'
+                              ? `/work/${commit.work_id}/1`
+                              : `/work/${commit.work_id}/${commit.lehekylje_number}`}
                             className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-                            title={t('actions.openPage')}
+                            title={commit.change_type === 'metadata' ? t('actions.openWork', 'Ava teos') : t('actions.openPage')}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ExternalLink size={18} />
