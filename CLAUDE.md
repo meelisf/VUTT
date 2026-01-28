@@ -113,7 +113,6 @@ Files: `src/locales/{et,en}/*.json`
 | Task | Priority |
 |------|----------|
 | Automatic backup system | High (waiting for IT) |
-| Search filter fixes (teoseTags) | Medium |
 | JSON cleanup (page_number removal) | Low |
 | Code fallback removal | Low |
 
@@ -124,3 +123,4 @@ Files: `src/locales/{et,en}/*.json`
 - Collections (hierarchical)
 - JSON files in git
 - Metadata changes in Review page
+- Search filters: teoseTags merge + type multi-select
