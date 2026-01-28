@@ -27,7 +27,7 @@
   "history": {
     "title": "Varasemate versioonide ajalugu",
     "gitHistory": "Versiooniajalugu",
-    "emptyHistory": "Versiooniajalugu puudub või vajuta \"Värskenda\"",
+    "emptyHistory": "Versiooniajalugu puudub või vajuta \"Laadi ajalugu\"",
     "refresh": "Laadi ajalugu",
     "original": "Algne OCR",
     "originalOCR": "Originaal OCR - esimene versioon",

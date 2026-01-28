@@ -1,6 +1,6 @@
 
 import { MeiliSearch } from 'meilisearch';
-import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, ContentSearchHit, HistoryEntry } from '../types';
+import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX, IMAGE_BASE_URL, FILE_API_URL } from '../config';
 
 // Initialize Meilisearch client
@@ -880,39 +880,24 @@ const updateWorkStatusOnAllPages = async (workId: string): Promise<void> => {
 };
 
 // Töölaud: Salvesta muudatused
+// NB: history massiivi enam ei kasutata - versiooniajalugu tuleb Gitist
 export const savePage = async (
   page: Page,
-  actionDescription: string = 'Muutis andmeid',
-  userName: string = 'Anonüümne',
+  _actionDescription: string = 'Muutis andmeid',
+  _userName: string = 'Anonüümne',
   auth?: AuthToken
 ): Promise<Page> => {
   try {
-    const newHistoryEntry: HistoryEntry = {
-      id: Date.now().toString(),
-      user: userName,
-      action: actionDescription.includes('staatus') ? 'status_change' : 'text_edit',
-      timestamp: new Date().toISOString(),
-      description: actionDescription
-    };
-
-    const updatedHistory = [newHistoryEntry, ...(page.history || [])];
-    const nowTimestamp = Date.now();
-
-    const pageToSave = {
-      ...page,
-      history: updatedHistory
-    };
-
     // Meilisearchi uuendamine toimub backendis (file_server.py kutsub sync_work_to_meilisearch)
     // Frontend kasutab ainult otsinguvõtit, millel pole kirjutamisõigust
 
     if (page.original_path && page.image_url) {
-      await saveToFileSystem(pageToSave, page.original_path, page.image_url, auth);
+      await saveToFileSystem(page, page.original_path, page.image_url, auth);
     } else {
       console.warn("Ei saa faili salvestada: puudub original_path või image_url");
     }
 
-    return pageToSave;
+    return page;
   } catch (error) {
     console.error("Save Page Error:", error);
     throw error;

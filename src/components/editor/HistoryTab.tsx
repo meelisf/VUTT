@@ -180,12 +180,15 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const renderDiff = (diffText: string) => {
     const lines = diffText.split('\n');
     return lines.map((line, i) => {
-      // Jäta vahele diff päised
+      // Jäta vahele diff päised ja tehniline info
       if (line.startsWith('diff --git') ||
           line.startsWith('index ') ||
           line.startsWith('---') ||
           line.startsWith('+++') ||
-          line.startsWith('@@')) {
+          line.startsWith('@@') ||
+          line.startsWith('\\ No newline') ||
+          line.startsWith('new file mode') ||
+          line.startsWith('old file mode')) {
         return null;
       }
 
