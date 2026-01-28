@@ -41,6 +41,21 @@ const getAuthorDisplay = (hit: ContentSearchHit, t: any): string => {
     return t('status.unknown');
 };
 
+// Abifunktsioon: lisa valitud väärtused facetite nimekirja (count=0 kui pole tulemusi)
+const mergeSelectedIntoFacets = (
+    facets: { value: string; count: number }[],
+    selected: string[]
+): { value: string; count: number }[] => {
+    const existing = new Set(facets.map(f => f.value));
+    const merged = [...facets];
+    for (const sel of selected) {
+        if (sel && !existing.has(sel)) {
+            merged.push({ value: sel, count: 0 });
+        }
+    }
+    return merged;
+};
+
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
@@ -107,8 +122,11 @@ const SearchPage: React.FC = () => {
                     getVocabularies()
                 ]);
                 setAvailableTeoseTags(tags);
-                setAvailableGenres(genres);
-                setAvailableTypes(types);
+                // Lisa valitud žanrid/tüübid nimekirja isegi kui count=0
+                const genresWithSelected = mergeSelectedIntoFacets(genres, genreParam);
+                const typesWithSelected = mergeSelectedIntoFacets(types, typeParam ? [typeParam] : []);
+                setAvailableGenres(genresWithSelected);
+                setAvailableTypes(typesWithSelected);
                 setVocabularies(vocabs);
             } catch (e) {
                 console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
@@ -259,10 +277,11 @@ const SearchPage: React.FC = () => {
                 const types = processFacets(`type_${lang}`);
                 const tags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count })); // Tags on natuke teise struktuuriga
 
-                // Uuenda state'i, aga säilita olemasolevad valikud isegi kui count on 0 (UX)
-                // (Meilisearch tagastab vaikimisi ainult need, mille count > 0)
-                setAvailableGenres(genres);
-                setAvailableTypes(types);
+                // Lisa valitud žanrid/tüübid nimekirja isegi kui count=0 (UX)
+                const genresWithSelected = mergeSelectedIntoFacets(genres, selectedGenres);
+                const typesWithSelected = mergeSelectedIntoFacets(types, selectedType ? [selectedType] : []);
+                setAvailableGenres(genresWithSelected);
+                setAvailableTypes(typesWithSelected);
                 setAvailableTeoseTags(tags);
             }
 
