@@ -2,8 +2,52 @@
 Serveri konfiguratsioon.
 Kõik seaded ja konstandid ühes kohas.
 """
+import logging
+import logging.handlers
 import os
+import sys
 from datetime import timedelta
+
+# =========================================================
+# LOGIMINE
+# =========================================================
+
+# Logide kaust
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LOGS_DIR = os.path.join(_PROJECT_ROOT, "logs")
+os.makedirs(_LOGS_DIR, exist_ok=True)
+
+# Logging formaat
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# Logifaili rotatsioon: max 10MB, hoiame 5 vana versiooni
+# Kokku max ~60MB logisid (vutt.log + vutt.log.1 ... vutt.log.5)
+_log_file_handler = logging.handlers.RotatingFileHandler(
+    os.path.join(_LOGS_DIR, "vutt.log"),
+    maxBytes=10 * 1024 * 1024,  # 10 MB
+    backupCount=5,
+    encoding="utf-8"
+)
+_log_file_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
+
+_log_stream_handler = logging.StreamHandler(sys.stdout)
+_log_stream_handler.setFormatter(logging.Formatter(LOG_FORMAT, LOG_DATE_FORMAT))
+
+# Konfigureeri juurlogger
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[_log_file_handler, _log_stream_handler]
+)
+
+# Vähenda kolmandate osapoolte logimist
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+logging.getLogger("git").setLevel(logging.WARNING)
+
+# Ekspordi logger teiste moodulite jaoks
+def get_logger(name):
+    """Tagastab loggeri antud nimega."""
+    return logging.getLogger(name)
 
 # =========================================================
 # FAILISÜSTEEMI TEED
@@ -14,7 +58,7 @@ DEFAULT_DIR = "data"
 BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 
 # JSON failide asukohad (state/ kaustas projekti juurkataloogis)
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# NB: _PROJECT_ROOT on defineeritud ülal logimise sektsioonis
 _STATE_DIR = os.path.join(_PROJECT_ROOT, "state")
 STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")

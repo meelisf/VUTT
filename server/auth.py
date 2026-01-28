@@ -8,6 +8,7 @@ import uuid
 import threading
 from datetime import datetime
 from .config import USERS_FILE, SESSION_DURATION
+from .utils import atomic_write_json
 
 # Sessioonide hoidla (token -> user info)
 # NB: Serveri restart kustutab kõik sessioonid
@@ -32,10 +33,9 @@ def load_users():
 
 
 def save_users(users):
-    """Salvestab kasutajad JSON faili."""
+    """Salvestab kasutajad JSON faili (atomic write)."""
     with users_lock:
-        with open(USERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
+        atomic_write_json(USERS_FILE, users)
 
 
 def verify_user(username, password):

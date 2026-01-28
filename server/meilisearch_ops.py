@@ -8,10 +8,14 @@ import urllib.request
 import urllib.parse
 from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE
 from .utils import (
-    sanitize_id, generate_default_metadata, normalize_genre, 
+    atomic_write_json,
+    sanitize_id, generate_default_metadata, normalize_genre,
     calculate_work_status, get_label, get_id, get_all_labels, get_all_ids, get_primary_labels,
     get_labels_by_lang
 )
+
+# Meilisearch päringu timeout sekundites
+MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
 
 
@@ -60,7 +64,7 @@ def wait_for_task(task_uid, timeout=30):
             req = urllib.request.Request(url)
             req.add_header('Authorization', f'Bearer {MEILI_KEY}')
 
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
                 task_data = json.loads(response.read().decode('utf-8'))
                 status = task_data.get('status')
 
@@ -100,7 +104,7 @@ def send_to_meilisearch(documents, wait=True):
         req.add_header('Content-Type', 'application/json')
         req.add_header('Authorization', f'Bearer {MEILI_KEY}')
 
-        with urllib.request.urlopen(req) as response:
+        with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             task_uid = res_data.get('taskUid')
             print(f"Meilisearch task: {task_uid}")
@@ -376,8 +380,7 @@ def metadata_watcher_loop():
                         if has_images:
                             try:
                                 metadata = generate_default_metadata(entry.name)
-                                with open(meta_path, 'w', encoding='utf-8') as f:
-                                    json.dump(metadata, f, ensure_ascii=False, indent=2)
+                                atomic_write_json(meta_path, metadata)
                                 print(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
 
                                 # Indekseeri kohe Meilisearchis

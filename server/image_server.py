@@ -5,6 +5,7 @@ Toetab NanoID püsiviiteid.
 """
 import http.server
 import os
+import socketserver
 import sys
 import urllib.parse
 
@@ -75,6 +76,18 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         # (juhul kui find_directory_by_id mingil põhjusel ei leia)
         return os.path.join(DIRECTORY, *parts)
 
+class SafeThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    """ThreadingHTTPServer parema exception handlinguga."""
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        """Logib vea ilma serverit crashimata."""
+        import traceback
+        print(f"[ERROR] Viga päringu töötlemisel kliendilt {client_address}:")
+        traceback.print_exc()
+
+
 print(f"Pildiserver käivitub pordil {PORT} (Multi-threaded)...")
 print(f"Juurkaust: {DIRECTORY}")
 
@@ -85,9 +98,10 @@ except Exception as e:
     print(f"Viga cache ehitamisel: {e}")
 
 if __name__ == '__main__':
-    with http.server.ThreadingHTTPServer(("", PORT), ImageRequestHandler) as httpd:
-        print("Pildiserver töötab.")
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            pass
+    server = SafeThreadingHTTPServer(("", PORT), ImageRequestHandler)
+    print("Pildiserver töötab.")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nPildiserver peatatud.")
+    server.server_close()

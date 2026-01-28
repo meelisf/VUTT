@@ -6,8 +6,48 @@ import re
 import json
 import secrets
 import string
+import tempfile
 import unicodedata
 from .config import BASE_DIR
+
+
+def atomic_write_json(filepath, data, indent=2):
+    """Kirjutab JSON faili atomically (temp file + rename).
+
+    See tagab, et serveri crashi korral ei jää fail poolikuks.
+    os.replace() on atomic operatsioon POSIX süsteemides.
+
+    Args:
+        filepath: Sihtfaili absoluutne tee
+        data: JSON-serialiseeritavad andmed
+        indent: JSON indentatsiooni tase (default 2)
+    """
+    dir_name = os.path.dirname(filepath)
+    tmp_path = None
+
+    try:
+        # Loo temp fail samas kataloogis (vajalik atomic rename jaoks)
+        with tempfile.NamedTemporaryFile(
+            mode='w',
+            encoding='utf-8',
+            dir=dir_name,
+            delete=False,
+            prefix='.tmp_',
+            suffix='.json'
+        ) as tmp:
+            json.dump(data, tmp, ensure_ascii=False, indent=indent)
+            tmp_path = tmp.name
+
+        # Atomic rename (asendab olemasoleva faili)
+        os.replace(tmp_path, filepath)
+    except Exception:
+        # Kustuta temp fail kui os.replace() ebaõnnestus
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
+        raise
 
 # Nanoid seadistus
 NANOID_LENGTH = 6

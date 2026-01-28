@@ -9,7 +9,8 @@ import uuid
 import threading
 from datetime import datetime, timedelta
 from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE
-from .auth import load_users
+from .auth import load_users, users_lock
+from .utils import atomic_write_json
 
 # Lukud failioperatsioonide jaoks
 registrations_lock = threading.RLock()
@@ -29,10 +30,9 @@ def load_pending_registrations():
 
 
 def save_pending_registrations(data):
-    """Salvestab ootel registreerimistaotlused."""
+    """Salvestab ootel registreerimistaotlused (atomic write)."""
     with registrations_lock:
-        with open(PENDING_REGISTRATIONS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
 
 
 def add_registration(name, email, affiliation, motivation):
@@ -105,10 +105,9 @@ def load_invite_tokens():
 
 
 def save_invite_tokens(data):
-    """Salvestab invite tokenid."""
+    """Salvestab invite tokenid (atomic write)."""
     with tokens_lock:
-        with open(INVITE_TOKENS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        atomic_write_json(INVITE_TOKENS_FILE, data)
 
 
 def create_invite_token(email, name, created_by):
@@ -203,9 +202,9 @@ def create_user_from_invite(token, password):
         "created_at": datetime.now().isoformat()
     }
 
-    # Salvesta users.json
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+    # Salvesta users.json (atomic write + lock)
+    with users_lock:
+        atomic_write_json(USERS_FILE, users)
 
     # Märgi token kasutatuks
     use_invite_token(token)

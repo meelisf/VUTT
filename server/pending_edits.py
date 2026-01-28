@@ -21,6 +21,7 @@ import uuid
 import threading
 from datetime import datetime
 from .config import PENDING_EDITS_FILE
+from .utils import atomic_write_json
 
 # Lukk failioperatsioonide jaoks
 edits_lock = threading.RLock()
@@ -36,10 +37,9 @@ def load_pending_edits():
 
 
 def save_pending_edits(data):
-    """Salvestab ootel muudatused."""
+    """Salvestab ootel muudatused (atomic write)."""
     with edits_lock:
-        with open(PENDING_EDITS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        atomic_write_json(PENDING_EDITS_FILE, data)
 
 
 def create_pending_edit(work_id, lehekylje_number, user, original_text, new_text):

@@ -8,7 +8,8 @@ from .config import (
     BASE_DIR, PORT, USERS_FILE, PENDING_REGISTRATIONS_FILE,
     INVITE_TOKENS_FILE, PENDING_EDITS_FILE, ALLOWED_ORIGINS,
     RATE_LIMITS, SESSION_DURATION, MEILI_URL, MEILI_KEY, INDEX_NAME,
-    COLLECTIONS_FILE, VOCABULARIES_FILE
+    COLLECTIONS_FILE, VOCABULARIES_FILE,
+    get_logger
 )
 
 # CORS
@@ -55,6 +56,7 @@ from .meilisearch_ops import (
 
 # Abifunktsioonid
 from .utils import (
+    atomic_write_json,
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status,
     get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids,

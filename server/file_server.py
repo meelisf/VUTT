@@ -37,9 +37,14 @@ from server import (
     # Meilisearch
     sync_work_to_meilisearch, metadata_watcher_loop,
     # Utils
+    atomic_write_json,
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status, build_work_id_cache
 )
+
+# Lukud failioperatsioonide jaoks (race condition'ide vältimine)
+metadata_lock = threading.RLock()  # _metadata.json operatsioonid
+page_json_lock = threading.RLock()  # Lehekülje .json failide operatsioonid
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     # TODO: Pärast kindla domeeni saamist piirata CORS lubatud domeenidele
@@ -299,7 +304,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 name = data.get('name', '').strip()
-                email = data.get('email', '').strip()
+                email = data.get('email', '').strip().lower()
                 affiliation = data.get('affiliation', '').strip() if data.get('affiliation') else None
                 motivation = data.get('motivation', '').strip()
 
@@ -368,8 +373,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Andmed frontendist
                 text_content = data.get('text_content')
                 meta_content = data.get('meta_content')
-                
-                original_catalog = data.get('original_path') 
+                original_catalog = data.get('original_path')
                 target_filename = data.get('file_name')
 
                 if not original_catalog or not target_filename:
@@ -420,9 +424,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     base_name = os.path.splitext(safe_filename)[0]
                     json_filename = base_name + ".json"
                     json_path = os.path.join(BASE_DIR, safe_catalog, json_filename)
-                    
-                    with open(json_path, 'w', encoding='utf-8') as f:
-                        json.dump(meta_content, f, ensure_ascii=False, indent=2)
+
+                    # Atomic write + lock race condition'ide vältimiseks
+                    with page_json_lock:
+                        atomic_write_json(json_path, meta_content)
                     json_saved = True
                     print(f"Salvestatud JSON: {json_path}")
 
@@ -858,8 +863,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 original_catalog = data.get('original_path')
                 work_id = data.get('work_id')
-                new_metadata = data.get('metadata') # Sõnastik uute andmetega
-                
+                new_metadata = data.get('metadata')  # Sõnastik uute andmetega
+
                 if (not original_catalog and not work_id) or not new_metadata:
                     self.send_response(400)
                     send_cors_headers(self)
@@ -878,38 +883,38 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         raise Exception(f"Ei leidnud kausta ID-ga: {work_id}")
                     metadata_path = os.path.join(found_path, '_metadata.json')
                 
-                # Loeme olemasoleva faili (et säilitada välju, mida me ei muuda)
-                current_meta = {}
-                if os.path.exists(metadata_path):
-                    with open(metadata_path, 'r', encoding='utf-8') as f:
-                        current_meta = json.load(f)
+                # Loeme olemasoleva faili ja salvestame (atomic + lock)
+                with metadata_lock:
+                    current_meta = {}
+                    if os.path.exists(metadata_path):
+                        with open(metadata_path, 'r', encoding='utf-8') as f:
+                            current_meta = json.load(f)
 
-                # Uuendame andmed
-                current_meta.update(new_metadata)
+                    # Uuendame andmed
+                    current_meta.update(new_metadata)
 
-                # V1→V2 normaliseerimine: eemalda v1 väljad kui v2 on olemas
-                v1_to_v2_mapping = {
-                    'pealkiri': 'title',
-                    'aasta': 'year',
-                    'koht': 'location',
-                    'trükkal': 'publisher',
-                    'teose_tags': 'tags',
-                    # autor ja respondens → creators (keerulisem, käsitleme eraldi)
-                }
-                for v1_key, v2_key in v1_to_v2_mapping.items():
-                    if v2_key in current_meta and v1_key in current_meta:
-                        del current_meta[v1_key]
+                    # V1→V2 normaliseerimine: eemalda v1 väljad kui v2 on olemas
+                    v1_to_v2_mapping = {
+                        'pealkiri': 'title',
+                        'aasta': 'year',
+                        'koht': 'location',
+                        'trükkal': 'publisher',
+                        'teose_tags': 'tags',
+                        # autor ja respondens → creators (keerulisem, käsitleme eraldi)
+                    }
+                    for v1_key, v2_key in v1_to_v2_mapping.items():
+                        if v2_key in current_meta and v1_key in current_meta:
+                            del current_meta[v1_key]
 
-                # Kui on creators massiiv, eemalda autor ja respondens väljad
-                if 'creators' in current_meta and isinstance(current_meta.get('creators'), list):
-                    if 'autor' in current_meta:
-                        del current_meta['autor']
-                    if 'respondens' in current_meta:
-                        del current_meta['respondens']
+                    # Kui on creators massiiv, eemalda autor ja respondens väljad
+                    if 'creators' in current_meta and isinstance(current_meta.get('creators'), list):
+                        if 'autor' in current_meta:
+                            del current_meta['autor']
+                        if 'respondens' in current_meta:
+                            del current_meta['respondens']
 
-                # Salvestame
-                with open(metadata_path, 'w', encoding='utf-8') as f:
-                    json.dump(current_meta, f, ensure_ascii=False, indent=2)
+                    # Salvestame (atomic write)
+                    atomic_write_json(metadata_path, current_meta)
 
                 print(f"Admin '{user['username']}' uuendas metaandmeid: {metadata_path}")
 
@@ -1893,18 +1898,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                         metadata_path = os.path.join(dir_path, '_metadata.json')
 
-                        # Loe olemasolev metadata
-                        current_meta = {}
-                        if os.path.exists(metadata_path):
-                            with open(metadata_path, 'r', encoding='utf-8') as f:
-                                current_meta = json.load(f)
+                        # Loe olemasolev metadata ja salvesta (atomic + lock)
+                        with metadata_lock:
+                            current_meta = {}
+                            if os.path.exists(metadata_path):
+                                with open(metadata_path, 'r', encoding='utf-8') as f:
+                                    current_meta = json.load(f)
 
-                        # Uuenda collection väli
-                        current_meta['collection'] = collection
+                            # Uuenda collection väli
+                            current_meta['collection'] = collection
 
-                        # Salvesta
-                        with open(metadata_path, 'w', encoding='utf-8') as f:
-                            json.dump(current_meta, f, ensure_ascii=False, indent=2)
+                            # Salvesta (atomic write)
+                            atomic_write_json(metadata_path, current_meta)
 
                         # Sünkrooni Meilisearchiga
                         sync_work_to_meilisearch(os.path.basename(dir_path))
@@ -1943,12 +1948,26 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 # SERVERI KÄIVITAMINE
 # =========================================================
 
+class SafeThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+    """ThreadingHTTPServer parema exception handlinguga.
+
+    - daemon_threads=True tagab, et server sulgub korrektselt
+    - handle_error logib vead ilma serverit crashimata
+    """
+    daemon_threads = True
+    allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        """Logib vea ilma serverit crashimata."""
+        import traceback
+        print(f"[ERROR] Viga päringu töötlemisel kliendilt {client_address}:")
+        traceback.print_exc()
+
+
 if __name__ == '__main__':
     print(f"VUTT Failiserver API käivitus pordil {PORT}.")
     print(f"Jälgitav juurkaust: {BASE_DIR}")
     print(f"Kasutab mooduleid: server/")
-
-    socketserver.TCPServer.allow_reuse_address = True
 
     # Ehita Work ID cache kiiremaks failide leidmiseks
     build_work_id_cache()
@@ -1957,8 +1976,8 @@ if __name__ == '__main__':
     watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
     watcher_thread.start()
 
-    # Kasutame ThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
-    server = http.server.ThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)
+    # Kasutame SafeThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
+    server = SafeThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
