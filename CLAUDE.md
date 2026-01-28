@@ -877,3 +877,30 @@ rsync -av --delete /path/to/vutt/state/ /backup/vutt/state/
 ```
 
 **NB:** Meilisearch indeksit ei pea backupima - taastub failisüsteemist (`scripts/sync_meilisearch.py --apply`).
+
+### Otsingu filtrite parandused
+**Staatus:** Ootab
+
+1. **Tüübi filter → multi-select:** Praegu radio buttons, peaks olema checkboxes nagu žanril (kui tüüpe tuleb juurde, võib tahta mitut valida)
+
+2. **teoseTags filter ei näita valitud märksõnu:** URL parameetrist tulev `teoseTags=Ateism` ei ilmu kõrvalribale kui sellel pole tulemusi. Sama probleem mis oli genre/type puhul - vajab `mergeSelectedIntoFacets` loogika lisamist ka teoseTags jaoks.
+
+### Ülejäänud fallback'ide eemaldamine
+**Staatus:** Madal prioriteet (töötab, aga kood pole puhas)
+
+Pärast Meilisearchi skeemi puhastust (pealkiri/koht/trükkal eemaldatud) on veel mõned fallback'id:
+
+**meiliService.ts:**
+- Printer filter kasutab veel `trükkal` fallbacki (rida ~429): `publisher = "..." OR trükkal = "..."`
+  - Põhjus: Vanad dokumendid võivad veel sisaldada trükkal välja
+  - Lahendus: Pärast täielikku reindekseerimist serveris võib eemaldada
+
+**MetadataModal.tsx:**
+- `fetchServerMetadata()` funktsioon (read ~168-172) kasutab fallbacke `_metadata.json` lugemisel
+  - Põhjus: Ajalooline turvavõrk
+  - Lahendus: Võib kohe eemaldada - kõik failid on v2/v3 formaadis (migreeritud skriptidega `migrate_metadata_v2.py`, `migrate_genres.py`, `migrate_v2_to_v3_objects.py`)
+
+**types.ts:**
+- V1 väljad on veel interface'ides (`koht`, `trükkal`, `pealkiri`) märgitud `@deprecated`
+  - Põhjus: TypeScript ei anna vigu kui neid kusagil veel kasutatakse
+  - Lahendus: Eemalda täielikult kui kõik fallbackid on eemaldatud
