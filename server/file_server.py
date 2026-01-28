@@ -397,39 +397,39 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # os.makedirs(os.path.dirname(txt_path), exist_ok=True)
 
                 # -------------------------------------------------
-                # 1. TEKSTIFAILI SALVESTAMINE (.txt) - GIT VERSIOONIHALDUS
+                # FAILIDE SALVESTAMINE (.txt + .json) - GIT VERSIOONIHALDUS
                 # -------------------------------------------------
 
-                # Salvestame faili ja teeme Git commiti
-                git_result = save_with_git(
-                    filepath=txt_path,
-                    content=text_content,
-                    username=user['username']
-                )
-
-                if git_result.get("success"):
-                    print(f"Salvestatud tekst (Git): {txt_path} -> {git_result.get('commit_hash', '')[:8]}")
-                else:
-                    print(f"Git commit ebaõnnestus: {git_result.get('error')}")
-                    # Fallback: salvestame faili ilma Gitita
-                    with open(txt_path, 'w', encoding='utf-8') as f:
-                        f.write(text_content)
-                    print(f"Salvestatud tekst (ilma Gitita): {txt_path}")
-                
-                # -------------------------------------------------
-                # 2. METAANDMETE SALVESTAMINE (.json)
-                # -------------------------------------------------
+                # Valmista ette lisafailid (JSON metaandmed)
+                additional_files = []
                 json_saved = False
                 if meta_content:
                     base_name = os.path.splitext(safe_filename)[0]
                     json_filename = base_name + ".json"
                     json_path = os.path.join(BASE_DIR, safe_catalog, json_filename)
-
-                    # Atomic write + lock race condition'ide vältimiseks
-                    with page_json_lock:
-                        atomic_write_json(json_path, meta_content)
+                    json_content = json.dumps(meta_content, indent=2, ensure_ascii=False)
+                    additional_files.append((json_path, json_content))
                     json_saved = True
-                    print(f"Salvestatud JSON: {json_path}")
+
+                # Salvestame failid ja teeme Git commiti
+                git_result = save_with_git(
+                    filepath=txt_path,
+                    content=text_content,
+                    username=user['username'],
+                    additional_files=additional_files if additional_files else None
+                )
+
+                if git_result.get("success"):
+                    print(f"Salvestatud (Git): {txt_path} + {len(additional_files)} lisafaili -> {git_result.get('commit_hash', '')[:8]}")
+                else:
+                    print(f"Git commit ebaõnnestus: {git_result.get('error')}")
+                    # Fallback: salvestame failid ilma Gitita
+                    with open(txt_path, 'w', encoding='utf-8') as f:
+                        f.write(text_content)
+                    for add_path, add_content in additional_files:
+                        with open(add_path, 'w', encoding='utf-8') as f:
+                            f.write(add_content)
+                    print(f"Salvestatud (ilma Gitita): {txt_path}")
 
                 # Sünkrooni Meilisearchiga ENNE vastuse saatmist
                 sync_work_to_meilisearch(safe_catalog)
@@ -883,7 +883,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         raise Exception(f"Ei leidnud kausta ID-ga: {work_id}")
                     metadata_path = os.path.join(found_path, '_metadata.json')
                 
-                # Loeme olemasoleva faili ja salvestame (atomic + lock)
+                # Loeme olemasoleva faili, uuendame ja salvestame Gitiga
                 with metadata_lock:
                     current_meta = {}
                     if os.path.exists(metadata_path):
@@ -893,10 +893,19 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # Uuendame andmed
                     current_meta.update(new_metadata)
 
-                    # Salvestame (atomic write)
-                    atomic_write_json(metadata_path, current_meta)
+                    # Salvestame Gitiga
+                    json_content = json.dumps(current_meta, indent=2, ensure_ascii=False)
+                    git_result = save_with_git(
+                        filepath=metadata_path,
+                        content=json_content,
+                        username=user['username'],
+                        message=f"Metaandmed: {os.path.basename(os.path.dirname(metadata_path))}"
+                    )
 
-                print(f"Admin '{user['username']}' uuendas metaandmeid: {metadata_path}")
+                if git_result.get("success"):
+                    print(f"Admin '{user['username']}' uuendas metaandmeid (Git): {metadata_path} -> {git_result.get('commit_hash', '')[:8]}")
+                else:
+                    print(f"Admin '{user['username']}' uuendas metaandmeid (Git ebaõnnestus): {metadata_path}")
 
                 # Sünkrooni Meilisearchiga ENNE vastuse saatmist
                 dir_name = os.path.basename(os.path.dirname(metadata_path))
@@ -1871,7 +1880,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                         metadata_path = os.path.join(dir_path, '_metadata.json')
 
-                        # Loe olemasolev metadata ja salvesta (atomic + lock)
+                        # Loe olemasolev metadata ja salvesta Gitiga
                         with metadata_lock:
                             current_meta = {}
                             if os.path.exists(metadata_path):
@@ -1881,8 +1890,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                             # Uuenda collection väli
                             current_meta['collection'] = collection
 
-                            # Salvesta (atomic write)
-                            atomic_write_json(metadata_path, current_meta)
+                            # Salvesta Gitiga
+                            json_content = json.dumps(current_meta, indent=2, ensure_ascii=False)
+                            save_with_git(
+                                filepath=metadata_path,
+                                content=json_content,
+                                username=user['username'],
+                                message=f"Kollektsioon: {os.path.basename(dir_path)}"
+                            )
 
                         # Sünkrooni Meilisearchiga
                         sync_work_to_meilisearch(os.path.basename(dir_path))

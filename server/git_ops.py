@@ -188,7 +188,7 @@ def get_or_init_repo():
     return _git_repo
 
 
-def save_with_git(filepath, content, username, message=None):
+def save_with_git(filepath, content, username, message=None, additional_files=None):
     """
     Salvestab faili ja teeb Git commiti.
 
@@ -197,6 +197,7 @@ def save_with_git(filepath, content, username, message=None):
         content: Faili sisu
         username: Kasutajanimi (commit author)
         message: Commit sõnum (valikuline, genereeritakse automaatselt)
+        additional_files: List of (filepath, content) tuples to include in same commit
 
     Returns:
         dict: {"success": bool, "commit_hash": str, "is_first_commit": bool}
@@ -213,12 +214,23 @@ def save_with_git(filepath, content, username, message=None):
     except:
         is_first_commit = True
 
-    # Kirjuta fail
+    # Kirjuta põhifail
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(content)
 
-    # Lisa fail indeksisse
-    repo.index.add([relative_path])
+    # Kogu kõik failid indeksisse lisamiseks
+    files_to_add = [relative_path]
+
+    # Kirjuta ja lisa lisafailid
+    if additional_files:
+        for add_filepath, add_content in additional_files:
+            with open(add_filepath, 'w', encoding='utf-8') as f:
+                f.write(add_content)
+            add_relative = os.path.relpath(add_filepath, BASE_DIR)
+            files_to_add.append(add_relative)
+
+    # Lisa kõik failid indeksisse
+    repo.index.add(files_to_add)
 
     # Genereeri commit sõnum
     if not message:
@@ -387,32 +399,39 @@ def get_commit_diff(commit_hash, filepath=None):
 
 
 def commit_new_work_to_git(dir_name):
-    """Lisab uue teose txt failid Git reposse originaal-OCR commitina."""
+    """Lisab uue teose txt ja json failid Git reposse originaal-OCR commitina."""
     try:
         repo = get_or_init_repo()
         dir_path = os.path.join(BASE_DIR, dir_name)
 
-        # Leia kõik txt failid kaustas
-        txt_files = []
+        # Leia kõik txt ja json failid kaustas
+        files_to_add = []
+        txt_count = 0
+        json_count = 0
         for f in os.listdir(dir_path):
             if f.endswith('.txt'):
                 relative_path = os.path.join(dir_name, f)
-                txt_files.append(relative_path)
+                files_to_add.append(relative_path)
+                txt_count += 1
+            elif f.endswith('.json'):
+                relative_path = os.path.join(dir_name, f)
+                files_to_add.append(relative_path)
+                json_count += 1
 
-        if not txt_files:
+        if not files_to_add:
             return False
 
         # Lisa failid indeksisse
-        repo.index.add(txt_files)
+        repo.index.add(files_to_add)
 
         # Tee commit
         author = Actor("Automaatne", "auto@vutt.local")
         repo.index.commit(
-            f"Originaal OCR: {dir_name} ({len(txt_files)} lehekülge)",
+            f"Originaal OCR: {dir_name} ({txt_count} lehekülge, {json_count} json)",
             author=author,
             committer=author
         )
-        print(f"GIT: Lisatud uus teos {dir_name} ({len(txt_files)} txt faili)")
+        print(f"GIT: Lisatud uus teos {dir_name} ({txt_count} txt, {json_count} json)")
         return True
     except Exception as e:
         print(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
