@@ -121,6 +121,6 @@ Files: `src/locales/{et,en}/*.json`
 - Wikidata integration (all fields including creators)
 - VIAF links
 - Collections (hierarchical)
-- JSON files in git
-- Metadata changes in Review page
-- Search filters: teoseTags merge + type multi-select
+- JSON files in git (txt + json same commit, _metadata.json tracked)
+- Metadata changes in Review page (yellow badge)
+- Search filters: type multi-select, facets preserve all options
