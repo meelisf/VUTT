@@ -356,8 +356,8 @@ const SearchPage: React.FC = () => {
     const availableWorks = (results?.hits && !workIdParam && !loading && uniqueWorkIds.size > 1)
         ? results.hits.map(hit => ({
             id: hit.work_id,
-            title: hit.pealkiri || hit.work_id,
-            year: hit.aasta,
+            title: hit.title || hit.pealkiri || hit.work_id,
+            year: hit.year ?? hit.aasta,
             author: Array.isArray(hit.autor) ? hit.autor[0] : hit.autor,
             count: workHitCounts[hit.work_id] || 1
         }))
@@ -863,7 +863,7 @@ const SearchPage: React.FC = () => {
                                         </span>
                                     </div>
                                     <h2 className="text-base font-bold text-gray-900 leading-snug mb-2">
-                                        {results.hits[0]?.pealkiri || t('status.titleMissing')}
+                                        {results.hits[0]?.title || results.hits[0]?.pealkiri || t('status.titleMissing')}
                                     </h2>
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                                         <span>
@@ -872,7 +872,7 @@ const SearchPage: React.FC = () => {
                                         </span>
                                         <span>
                                             <span className="text-gray-400">{t('labels.year')}</span>{' '}
-                                            <span className="font-medium">{results.hits[0]?.aasta || '...'}</span>
+                                            <span className="font-medium">{results.hits[0]?.year ?? results.hits[0]?.aasta ?? '...'}</span>
                                         </span>
                                         <span>
                                             <span className="text-gray-400">{t('labels.id')}</span>{' '}
@@ -929,7 +929,7 @@ const SearchPage: React.FC = () => {
                                                 <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex justify-between items-start gap-4">
                                                     <div className="flex-1 min-w-0">
                                                         <h2 className="text-lg font-bold text-gray-900 mb-1 leading-snug">
-                                                            {firstHit.pealkiri || t('status.titleMissing')}
+                                                            {firstHit.title || firstHit.pealkiri || t('status.titleMissing')}
                                                         </h2>
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
                                                             <button
@@ -951,7 +951,7 @@ const SearchPage: React.FC = () => {
                                                             <span className="text-gray-300">❧</span>
                                                             <button
                                                                 onClick={() => {
-                                                                    const year = firstHit.aasta?.toString();
+                                                                    const year = (firstHit.year ?? firstHit.aasta)?.toString();
                                                                     if (year) {
                                                                         setYearStart(year);
                                                                         setYearEnd(year);
@@ -967,7 +967,7 @@ const SearchPage: React.FC = () => {
                                                                 title={t('results.searchYearWorks')}
                                                             >
                                                                 <span className="uppercase text-gray-400 text-[10px]">{t('labels.year')}</span>
-                                                                {firstHit.aasta || '...'}
+                                                                {firstHit.year ?? firstHit.aasta ?? '...'}
                                                             </button>
                                                             
                                                             {/* Lisame Žanri ja Tüübi */}
@@ -1086,8 +1086,8 @@ const SearchPage: React.FC = () => {
                                                             const targetId = firstHit.work_id || workId;
                                                             setSelectedWork(targetId);
                                                             setSelectedWorkInfo({
-                                                                title: firstHit.pealkiri || targetId,
-                                                                year: firstHit.aasta,
+                                                                title: firstHit.title || firstHit.pealkiri || targetId,
+                                                                year: firstHit.year ?? firstHit.aasta,
                                                                 author: getAuthorDisplay(firstHit, t)
                                                             });
                                                             setSearchParams(prev => {

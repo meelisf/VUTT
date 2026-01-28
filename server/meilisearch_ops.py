@@ -1,5 +1,29 @@
 """
 Meilisearch operatsioonid ja sünkroonimine.
+
+=============================================================================
+ANDMEKIHTIDE ARHITEKTUUR
+=============================================================================
+
+See fail vastutab _metadata.json → Meilisearch kaardistamise eest.
+Meilisearchi kirjutatakse MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
+
+    _metadata.json     →  Meilisearch indeks
+    ─────────────────────────────────────────
+    title              →  title + pealkiri
+    year               →  year + aasta
+    location           →  location + location_object + koht
+    publisher          →  publisher + publisher_object + trükkal
+    creators[]         →  creators + autor + respondens + author_names + respondens_names
+    tags[]             →  tags + tags_et + tags_en + tags_object
+    genre              →  genre + genre_et + genre_en + genre_object
+    id (nanoid)        →  work_id
+
+Miks mõlemad? Tagasiühilduvus - frontend kasutab veel osaliselt eestikeelseid
+välju filtrites ja sortimises. Järk-järgult liigutakse ingliskeelsetele.
+
+Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
+=============================================================================
 """
 import os
 import json

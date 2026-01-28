@@ -1,3 +1,35 @@
+/**
+ * =============================================================================
+ * MEILISEARCH SERVICE - Andmekihtide Juhis
+ * =============================================================================
+ *
+ * Meilisearch indeks sisaldab MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
+ *
+ *   Ingliskeelne (EELISTATUD)  |  Eestikeelne (legacy)
+ *   ---------------------------|----------------------
+ *   title                      |  pealkiri
+ *   year                       |  aasta
+ *   location                   |  koht
+ *   publisher                  |  trükkal
+ *   creators[]                 |  autor, respondens
+ *   work_id (nanoid)           |  -
+ *
+ * KASUTAMISJUHISED:
+ *
+ * 1. Andmete LUGEMINE (attributesToRetrieve):
+ *    - Kasuta ingliskeelseid: title, year, location, publisher, creators
+ *    - Fallback vanadele: hit.title ?? hit.pealkiri
+ *
+ * 2. FILTRID ja SORTIMINE:
+ *    - Kasuta eestikeelseid (need on indekseeritud): aasta, lehekylje_number
+ *    - filter: [`aasta >= 1630`], sort: ['aasta:asc']
+ *
+ * 3. OTSING (attributesToSearchOn):
+ *    - Kasuta mõlemaid: ['title', 'pealkiri', 'authors_text', 'lehekylje_tekst']
+ *
+ * Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
+ * =============================================================================
+ */
 
 import { MeiliSearch } from 'meilisearch';
 import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';

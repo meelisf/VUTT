@@ -1,3 +1,27 @@
+/**
+ * =============================================================================
+ * TÜÜBID - Work, Page, Creator jne
+ * =============================================================================
+ *
+ * ANDMEKIHTIDE MÄRKUS:
+ *
+ * Work ja Page tüübid sisaldavad MÕLEMAD väljad (ingliskeelsed + eestikeelsed):
+ *
+ *   KASUTA (ingliskeelsed)     |  VÄLDI (eestikeelsed, @deprecated)
+ *   ---------------------------|--------------------------------------
+ *   work.title                 |  work.pealkiri
+ *   work.year                  |  work.aasta
+ *   work.location              |  work.koht
+ *   work.publisher             |  work.trükkal
+ *   work.creators[]            |  work.author, work.respondens
+ *
+ * Eestikeelsed väljad on märgitud @deprecated ja jäetud tagasiühilduvuseks.
+ * Uus kood peaks ALATI kasutama ingliskeelseid välju.
+ *
+ * Vt docs/DATA_ARCHITECTURE.md täieliku ülevaate jaoks.
+ * =============================================================================
+ */
+
 import { LinkedEntity } from './types/LinkedEntity';
 
 export enum PageStatus {

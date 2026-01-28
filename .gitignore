@@ -29,6 +29,4 @@ state/*.json
 !state/*.example
 !state/*.json.example
 
-# Documentation (internal)
-docs/
-CLAUDE.md
+# Note: docs/ and CLAUDE.md are now tracked in git
