@@ -139,7 +139,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     }
     
     onChange(entity);
-    setInputValue(result.label);
+    // Kui value on null (nt märksõnade lisamisel), tühjenda lahter
+    // Kui value on olemas (nt üksiku välja muutmisel), näita valitud teksti
+    setInputValue(value === null ? '' : result.label);
     setShowSuggestions(false);
     setIsLoading(false);
   };
@@ -149,15 +151,19 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       onChange(null);
       return;
     }
-    
+
     const entity: LinkedEntity = {
       id: null,
       label: inputValue.trim(),
       source: 'manual',
       labels: { et: inputValue.trim() }
     };
-    
+
     onChange(entity);
+    // Kui value on null (nt märksõnade lisamisel), tühjenda lahter
+    if (value === null) {
+      setInputValue('');
+    }
     setShowSuggestions(false);
   };
 
