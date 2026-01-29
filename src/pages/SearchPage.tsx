@@ -341,7 +341,7 @@ const SearchPage: React.FC = () => {
     useEffect(() => {
         // Kontrolli, kas URL-is on mõni otsinguga seotud parameeter
         // See on töökindlam kui väärtuste kontrollimine
-        const relevantParams = ['q', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type'];
+        const relevantParams = ['q', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type', 'author'];
         const hasActiveFilter = relevantParams.some(key => searchParams.has(key));
 
         if (hasActiveFilter) {
