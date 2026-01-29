@@ -1001,6 +1001,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(auth_error).encode('utf-8'))
                     return
                 
+                # Kasutaja eelistatud keel (vaikimisi 'et')
+                preferred_lang = data.get('lang', 'et')
+                if preferred_lang not in ('et', 'en'):
+                    preferred_lang = 'et'
+
                 # Sõnastikud kujul: label.lower() -> { label: "Orig", id: "Q..." | None }
                 # Eesmärk: Iga nime kohta hoida parimat teadmist (eelistatult ID-ga)
                 authors = {}
@@ -1009,11 +1014,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 printers = {}
                 types = {}
                 genres = {}
-                
+
                 def add_item(store, val):
-                    """Lisab väärtuse hoidlasse. Kui on LinkedEntity koos tõlgetega, lisab kõik tõlked."""
+                    """Lisab väärtuse hoidlasse. Kasutab eelistatud keele silti."""
                     if not val: return
-                    
+
                     # 1. Lihtne string
                     if isinstance(val, str):
                         label = val.strip()
@@ -1026,25 +1031,21 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # 2. Objekt (LinkedEntity)
                     if isinstance(val, dict):
                         id_code = val.get('id')
-                        labels = val.get('labels', {})
+                        labels_dict = val.get('labels', {})
 
-                        # Eelistame eesti ja inglise keele silte (UI keeled)
-                        # Fallback 'label' väljale ainult kui ET/EN puudub
-                        labels_to_add = []
-                        if isinstance(labels, dict):
-                            for lang in ('et', 'en'):
-                                label_text = labels.get(lang)
-                                if label_text and isinstance(label_text, str):
-                                    labels_to_add.append(label_text.strip())
+                        # Leia silt eelistatud keeles, fallback teisele UI keelele, siis põhisildile
+                        label_text = None
+                        if isinstance(labels_dict, dict):
+                            # Eelistatud keel esimesena
+                            fallback_lang = 'en' if preferred_lang == 'et' else 'et'
+                            label_text = labels_dict.get(preferred_lang) or labels_dict.get(fallback_lang)
 
-                        # Kui ei leitud ET/EN silte, kasuta peamist labelit (mis võib olla DE jm)
-                        if not labels_to_add:
-                            main_label = val.get('label', '').strip()
-                            if main_label:
-                                labels_to_add.append(main_label)
+                        # Kui tõlget ei leitud, kasuta põhisilti
+                        if not label_text:
+                            label_text = val.get('label', '').strip()
 
-                        # Lisa kõik leitud sildid
-                        for label_text in labels_to_add:
+                        if label_text and isinstance(label_text, str):
+                            label_text = label_text.strip()
                             key = label_text.lower()
                             if key not in store or (id_code and not store[key]['id']):
                                 store[key] = {'label': label_text, 'id': id_code}

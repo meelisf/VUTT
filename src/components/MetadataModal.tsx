@@ -127,7 +127,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
+        body: JSON.stringify({ auth_token: authToken, lang })
       });
       const data = await response.json();
       if (data.status === 'success') {
