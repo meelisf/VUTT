@@ -68,7 +68,12 @@ export async function searchViaf(query: string): Promise<ViafSearchResult[]> {
 
     if (!response.ok) throw new Error('VIAF search failed');
 
-    const data = await response.json();
+    // NB: VIAF ID-d võivad olla väga suured (>2^53), mis kaotavad täpsuse JSON.parse-is
+    // Seepärast asendame numbrilised viafID-d stringidega enne parsimist
+    let rawText = await response.text();
+    rawText = rawText.replace(/"ns2:viafID":(\d+)/g, '"ns2:viafID":"$1"');
+
+    const data = JSON.parse(rawText);
     const results: ViafSearchResult[] = [];
 
     // SRU vastuse struktuur
