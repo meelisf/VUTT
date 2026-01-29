@@ -53,7 +53,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken })
+          body: JSON.stringify({ auth_token: authToken, lang })
         });
         const data = await response.json();
         if (data.status === 'success') {
@@ -64,7 +64,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       }
     };
     fetchTags();
-  }, [authToken]);
+  }, [authToken, lang]);
 
   // Lae kõik olemasolevad märksõnad Meilisearchist
   useEffect(() => {
@@ -77,26 +77,34 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
   // Ühenda serveri soovitused ja Meilisearchi märksõnad
   const mergedTagSuggestions = React.useMemo(() => {
-    // Ühenda ja eemalda duplikaadid (labeli ja ID järgi)
+    // Ühenda ja eemalda duplikaadid (labeli JA ID järgi)
     // Eelistame serveri omasid (tagSuggestions), siis Meilisearchi omasid (allAvailableTags)
     const combined = [...tagSuggestions, ...allAvailableTags];
-    const unique = new Map();
-    
+    const uniqueByLabel = new Map();
+    const seenIds = new Set<string>();  // Jälgi nähtud Wikidata ID-sid
+
     combined.forEach(item => {
-      // Võti on label väiketähtedega. 
-      // Kui meil on juba kirje, siis uuendame ainult siis, kui uuel on ID ja vanal polnud.
+      // Kui see ID on juba nähtud, jäta vahele (vältimaks duplikaate eri labelitega)
+      if (item.id && seenIds.has(item.id)) {
+        return;
+      }
+      if (item.id) {
+        seenIds.add(item.id);
+      }
+
+      // Võti on label väiketähtedega
       const key = item.label.toLowerCase();
-      const existing = unique.get(key);
-      
+      const existing = uniqueByLabel.get(key);
+
       if (!existing) {
-        unique.set(key, item);
+        uniqueByLabel.set(key, item);
       } else if (!existing.id && item.id) {
         // Kui olemasoleval pole ID-d, aga uuel on, asenda (rikasta)
-        unique.set(key, item);
+        uniqueByLabel.set(key, item);
       }
     });
 
-    return Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label, lang));
+    return Array.from(uniqueByLabel.values()).sort((a, b) => a.label.localeCompare(b.label, lang));
   }, [tagSuggestions, allAvailableTags, lang]);
 
   const removeTag = (tagToRemove: string) => {
