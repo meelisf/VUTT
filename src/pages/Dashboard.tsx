@@ -262,7 +262,7 @@ const Dashboard: React.FC = () => {
           workStatus: statusParam || undefined,
           teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
           genre: selectedGenre ? [selectedGenre] : undefined,
-          type: selectedType || undefined,
+          type: selectedType ? [selectedType] : undefined,
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
           lang: i18n.language.split('-')[0]  // et-EE -> et
