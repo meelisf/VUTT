@@ -61,36 +61,58 @@ def clean_name_for_search(name):
     """
     Puhastab nime baaskujule.
     Eemaldab sulud (aga jätab sisu meelde main funktsiooni jaoks).
+    Wal(l)erius -> Walerius (mitte "Wal erius")
     """
-    # Eemaldame sulud puhastatud nime jaoks, aga jätame sisu meelde muus kohas
-    name_clean = re.sub(r'\(.*?\)', ' ', name)
-    name_clean = re.sub(r'\[.*?\]', ' ', name_clean)
-    
+    # Inline sulud (sõna sees, nt "Wal(l)erius") - eemalda sulud koos sisuga
+    name_clean = re.sub(r'(\w)\((\w+)\)(\w)', r'\1\3', name)
+
+    # Eraldiseisvad sulud (nt "(Carlhielm)") - asenda tühikuga
+    name_clean = re.sub(r'\s*\([^)]*\)\s*', ' ', name_clean)
+    name_clean = re.sub(r'\s*\[[^\]]*\]\s*', ' ', name_clean)
+
     clean = re.sub(r'\s+', ' ', name_clean).strip()
-    
+
     if ',' in clean:
         parts = clean.split(',', 1)
         if len(parts) == 2:
             clean = f"{parts[1].strip()} {parts[0].strip()}"
-            
+
     return clean.strip()
 
 def get_name_variants_from_parentheses(name):
     """
-    Eraldab sulgudest nimevariandid. 
+    Eraldab sulgudest nimevariandid.
     Näiteks: "Carlholm (Carlhielm), Gustavus" -> ["Gustavus Carlholm", "Gustavus Carlhielm"]
+    Näiteks: "Wal(l)erius, Laurentius" -> ["Laurentius Walerius", "Laurentius Wallerius"]
     """
     variants = []
-    
-    # Leia sisu sulgudes
+
+    # Inline sulud sõna sees (nt "Wal(l)erius")
+    inline_match = re.search(r'(\w+)\((\w+)\)(\w*)', name)
+    if inline_match:
+        prefix = inline_match.group(1)
+        optional = inline_match.group(2)
+        suffix = inline_match.group(3)
+
+        # Variant 1: ilma sulgude sisuta (Walerius)
+        name_v1 = name[:inline_match.start()] + prefix + suffix + name[inline_match.end():]
+        variants.append(clean_name_for_search(name_v1))
+
+        # Variant 2: koos sulgude sisuga (Wallerius)
+        name_v2 = name[:inline_match.start()] + prefix + optional + suffix + name[inline_match.end():]
+        variants.append(clean_name_for_search(name_v2))
+
+        return variants
+
+    # Eraldiseisvad sulud (nt "(Carlhielm)")
     matches = re.findall(r'\((.*?)\)', name)
     if not matches:
         return []
-        
+
     # Eemalda sulud algsest nimest, et saada "põhinimi"
     base_name = clean_name_for_search(name)
     variants.append(base_name)
-    
+
     for m in matches:
         # Kui sulgudes on ainult üks sõna (perekonnanimi), proovi seda asendada
         if len(m.split()) == 1 and ',' in name:
@@ -100,7 +122,7 @@ def get_name_variants_from_parentheses(name):
         else:
             # Muidu proovi sulgudes olevat asja eesnimena või eraldi
             variants.append(m.strip())
-            
+
     return variants
 
 def search_album(query, album_data):
@@ -222,7 +244,7 @@ def normalize_viaf_name(name):
     # Eemalda lõpust punkt
     name = name.rstrip('.')
 
-    # Eemalda daatumid (mitu formaati)
+    # Eemalda daatumid ja sajandid (mitu formaati)
     name = re.sub(r',?\s*\d{4}\s*-\s*\d{4}\.?\s*$', '', name)  # "1615-1690"
     name = re.sub(r',?\s*\d{4}\s*-\s*$', '', name)  # "1615-"
     name = re.sub(r',?\s*-\s*\d{4}\s*$', '', name)  # "-1690"
@@ -230,6 +252,9 @@ def normalize_viaf_name(name):
     name = re.sub(r',?\s*b\.\s*\d{4}\s*$', '', name)  # "b. 1615"
     name = re.sub(r',?\s*fl\.\s*\d{4}\s*$', '', name)  # "fl. 1650"
     name = re.sub(r',?\s*ca\.?\s*\d{4}\s*-\s*ca\.?\s*\d{4}\s*$', '', name)  # "ca. 1600-ca. 1650"
+    name = re.sub(r',?\s*ca\.?\s*\d{1,2}\.\s*Jh\.?\s*$', '', name)  # "ca. 17. Jh" (saksa sajand)
+    name = re.sub(r',?\s*\d{1,2}\.\s*Jh\.?\s*$', '', name)  # "17. Jh"
+    name = re.sub(r',?\s*\d{1,2}th\s+cent\.?\s*$', '', name, flags=re.IGNORECASE)  # "17th cent."
 
     # Kui on koma, pööra ümber: "Perenimi, Eesnimi" -> "Eesnimi Perenimi"
     if ',' in name:
@@ -651,12 +676,9 @@ def main():
         if viaf_results:
             for idx, res in enumerate(viaf_results[:5]):
                 style = Colors.BG_MAGENTA if idx == 0 else ""
-                # Näita nii normaliseeritud kui originaalnime
-                if res['label'] != res['raw_label']:
-                    name_display = f"{res['label']} (← {res['raw_label']})"
-                else:
-                    name_display = res['label']
-                print(f"    {style}V{idx+1}. {name_display} [VIAF:{res['viaf_id']}]{Colors.RESET}")
+                # Näita selgelt: VIAF originaal -> mis kirjutatakse metadatasse
+                print(f"    {style}V{idx+1}. {res['raw_label']} [VIAF:{res['viaf_id']}]{Colors.RESET}")
+                print(f"        {Colors.GREEN}→ kirjutatakse: \"{res['label']}\"{Colors.RESET}")
         else:
             print(f"    {Colors.RED}(VIAF-ist vasteid ei leitud){Colors.RESET}")
 

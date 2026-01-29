@@ -15,9 +15,9 @@ export function getEntityUrl(id: string | null | undefined, source?: string): st
     return `https://www.wikidata.org/wiki/${id}`;
   }
 
-  // VIAF koodid
-  if (source === 'viaf' || id.startsWith('viaf:')) {
-    const viafId = id.replace('viaf:', '');
+  // VIAF koodid (VIAF:12345 või viaf:12345)
+  if (source === 'viaf' || id.toUpperCase().startsWith('VIAF:')) {
+    const viafId = id.replace(/^viaf:/i, '');
     return `https://viaf.org/viaf/${viafId}`;
   }
 
