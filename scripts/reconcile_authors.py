@@ -32,8 +32,8 @@ ALBUM_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 # Wikidata API
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 
-# VIAF API
-VIAF_AUTOSUGGEST = "https://viaf.org/viaf/AutoSuggest"
+# VIAF API (SRU otsing, parem kui AutoSuggest ajalooliste nimede jaoks)
+VIAF_SEARCH = "https://viaf.org/viaf/search"
 
 # Värvid terminali jaoks
 class Colors:
@@ -214,14 +214,22 @@ def normalize_viaf_name(name):
     Normaliseerib VIAF nimekuju.
     'Turdinus, Petrus' -> 'Petrus Turdinus'
     'Gezelius, Johannes, 1615-1690' -> 'Johannes Gezelius'
+    'Schaefer, Johannes Henrici, d. 1682' -> 'Johannes Henrici Schaefer'
     """
     if not name:
         return name
 
-    # Eemalda daatumid lõpust (nt ", 1615-1690")
-    name = re.sub(r',?\s*\d{4}\s*-\s*\d{4}\s*$', '', name)
+    # Eemalda lõpust punkt
+    name = name.rstrip('.')
+
+    # Eemalda daatumid (mitu formaati)
+    name = re.sub(r',?\s*\d{4}\s*-\s*\d{4}\.?\s*$', '', name)  # "1615-1690"
     name = re.sub(r',?\s*\d{4}\s*-\s*$', '', name)  # "1615-"
     name = re.sub(r',?\s*-\s*\d{4}\s*$', '', name)  # "-1690"
+    name = re.sub(r',?\s*d\.\s*\d{4}\s*$', '', name)  # "d. 1682"
+    name = re.sub(r',?\s*b\.\s*\d{4}\s*$', '', name)  # "b. 1615"
+    name = re.sub(r',?\s*fl\.\s*\d{4}\s*$', '', name)  # "fl. 1650"
+    name = re.sub(r',?\s*ca\.?\s*\d{4}\s*-\s*ca\.?\s*\d{4}\s*$', '', name)  # "ca. 1600-ca. 1650"
 
     # Kui on koma, pööra ümber: "Perenimi, Eesnimi" -> "Eesnimi Perenimi"
     if ',' in name:
@@ -237,36 +245,79 @@ def normalize_viaf_name(name):
 
 def search_viaf(query):
     """
-    Otsib VIAF AutoSuggest API-st.
+    Otsib VIAF SRU API-st (parem kui AutoSuggest ajalooliste nimede jaoks).
     Tagastab listi: [{"viaf_id": "123", "label": "Petrus Turdinus", "raw_label": "Turdinus, Petrus", "sources": 5}, ...]
     """
-    headers = {"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"}
+    headers = {
+        "User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)",
+        "Accept": "application/json"
+    }
     try:
+        # SRU otsing - otsib nime kõikjalt
         response = requests.get(
-            VIAF_AUTOSUGGEST,
+            VIAF_SEARCH,
             params={"query": query},
             headers=headers,
-            timeout=10
+            timeout=15
         )
         response.raise_for_status()
         data = response.json()
 
         results = []
-        for item in data.get("result", [])[:5]:
-            viaf_id = item.get("viafid")
-            raw_label = item.get("term", item.get("displayForm", ""))
+
+        # SRU vastus on keerulisem struktuur
+        srw = data.get("searchRetrieveResponse", {})
+        records = srw.get("records", {})
+
+        # Võib olla üks kirje (dict) või mitu (list)
+        record_list = records.get("record", [])
+        if isinstance(record_list, dict):
+            record_list = [record_list]
+
+        for record in record_list[:5]:
+            record_data = record.get("recordData", {})
+            cluster = record_data.get("ns2:VIAFCluster", {})
+
+            if not cluster:
+                continue
+
+            viaf_id = cluster.get("ns2:viafID")
+            if not viaf_id:
+                continue
+
+            # Nimed on mainHeadings all
+            main_headings = cluster.get("ns2:mainHeadings", {})
+            heading_data = main_headings.get("ns2:data", [])
+            if isinstance(heading_data, dict):
+                heading_data = [heading_data]
+
+            # Võta esimene nimi (kõige rohkemate allikatega)
+            raw_label = ""
+            sources_count = 0
+            for hd in heading_data:
+                text = hd.get("ns2:text", "")
+                if text:
+                    raw_label = text
+                    # Allikad võivad olla list või dict
+                    src = hd.get("ns2:sources", {})
+                    if isinstance(src.get("ns2:s"), list):
+                        sources_count = len(src.get("ns2:s", []))
+                    else:
+                        sources_count = 1
+                    break
+
+            if not raw_label:
+                continue
+
             # Normaliseeri nimekuju
             label = normalize_viaf_name(raw_label)
-            # Allikate arv (mitu raamatukogu on selle kirje kinnitanud)
-            sources = item.get("score", 0)
 
-            if viaf_id and label:
-                results.append({
-                    "viaf_id": viaf_id,
-                    "label": label,
-                    "raw_label": raw_label,
-                    "sources": sources
-                })
+            results.append({
+                "viaf_id": str(viaf_id),
+                "label": label,
+                "raw_label": raw_label,
+                "sources": sources_count
+            })
 
         return results
     except Exception as e:
