@@ -39,6 +39,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const justSelectedRef = useRef(false); // Jälgib, kas soovitus just valiti
 
   // Sync internal input with external value
   useEffect(() => {
@@ -102,6 +103,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   }, [inputValue, showSuggestions, value, localSuggestions]);
 
   const handleSelect = async (result: WikidataSearchResult) => {
+    justSelectedRef.current = true; // Märgi, et valiti soovitus
     setIsLoading(true);
     
     let entity: LinkedEntity;
@@ -212,6 +214,18 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             setShowSuggestions(true);
           }}
           onFocus={() => setShowSuggestions(true)}
+          onBlur={() => {
+            // Kui kasutaja lahkub väljalt ja väärtus on muutunud, rakenda muudatus
+            // Kui just valiti soovitus, ära tee midagi (justSelectedRef)
+            if (justSelectedRef.current) {
+              justSelectedRef.current = false;
+              return;
+            }
+            const currentLabel = value ? (typeof value === 'string' ? value : value.label) : '';
+            if (inputValue.trim() !== currentLabel) {
+              handleManualEntry();
+            }
+          }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || `Otsi ${label?.toLowerCase() || 'väärtust'}...`}
           className={`w-full pl-10 ${entityUrl ? 'pr-16' : 'pr-10'} py-2 text-sm border rounded-md outline-none transition-all ${
@@ -256,6 +270,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               return (
               <button
                 key={result.id}
+                onMouseDown={() => { justSelectedRef.current = true; }}
                 onClick={() => handleSelect(result)}
                 className={`w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-50 flex flex-col ${
                   idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : ''
@@ -275,6 +290,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             )})}
             
             <button
+              onMouseDown={() => { justSelectedRef.current = true; }}
               onClick={handleManualEntry}
               className={`w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-2 text-gray-600 italic ${
                 selectedIndex === suggestions.length ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : ''

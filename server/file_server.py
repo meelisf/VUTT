@@ -1026,25 +1026,28 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # 2. Objekt (LinkedEntity)
                     if isinstance(val, dict):
                         id_code = val.get('id')
-                        main_label = val.get('label', '').strip()
-                        
-                        # Lisa põhisilt
-                        if main_label:
-                            key = main_label.lower()
-                            # Uuenda kui ID on olemas ja vanal polnud
-                            if key not in store or (id_code and not store[key]['id']):
-                                store[key] = {'label': main_label, 'id': id_code}
-                        
-                        # Lisa kõik tõlked 'labels' sõnastikust
                         labels = val.get('labels', {})
+
+                        # Eelistame eesti ja inglise keele silte (UI keeled)
+                        # Fallback 'label' väljale ainult kui ET/EN puudub
+                        labels_to_add = []
                         if isinstance(labels, dict):
-                            for lang, label_text in labels.items():
+                            for lang in ('et', 'en'):
+                                label_text = labels.get(lang)
                                 if label_text and isinstance(label_text, str):
-                                    label_text = label_text.strip()
-                                    key = label_text.lower()
-                                    # Sama loogika: eellista ID-ga varianti
-                                    if key not in store or (id_code and not store[key]['id']):
-                                        store[key] = {'label': label_text, 'id': id_code}
+                                    labels_to_add.append(label_text.strip())
+
+                        # Kui ei leitud ET/EN silte, kasuta peamist labelit (mis võib olla DE jm)
+                        if not labels_to_add:
+                            main_label = val.get('label', '').strip()
+                            if main_label:
+                                labels_to_add.append(main_label)
+
+                        # Lisa kõik leitud sildid
+                        for label_text in labels_to_add:
+                            key = label_text.lower()
+                            if key not in store or (id_code and not store[key]['id']):
+                                store[key] = {'label': label_text, 'id': id_code}
 
                 # Käime läbi kõik kataloogid ja kogume andmeid
                 for entry in os.scandir(BASE_DIR):
