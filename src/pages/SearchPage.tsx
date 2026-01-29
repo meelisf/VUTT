@@ -209,29 +209,42 @@ const SearchPage: React.FC = () => {
     useEffect(() => {
         const loadFilterData = async () => {
             try {
+                // Sõnavarad laeme alati
+                const vocabs = await getVocabularies();
+                setVocabularies(vocabs);
+
+                // Kontrolli, kas on aktiivseid sisufiltreid (v.a. aasta ja kollektsioon)
+                // Kui on filtrid, siis performSearch hoolitseb facetite eest ja me ei taha neid üle kirjutada
+                const hasActiveContentFilters = !!queryParam || !!workIdParam || !!authorParam || 
+                                              teoseTagsParam.length > 0 || genreParam.length > 0 || typeParam.length > 0;
+
+                if (hasActiveContentFilters) {
+                    return;
+                }
+
                 const facetLang = i18n.language.split('-')[0];
-                const [tags, genres, types, authors, vocabs] = await Promise.all([
+                const [tags, genres, types, authors] = await Promise.all([
                     getTeoseTagsFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getGenreFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getTypeFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
-                    getAuthorFacets(selectedCollection || undefined, yearStartParam, yearEndParam),
-                    getVocabularies()
+                    getAuthorFacets(selectedCollection || undefined, yearStartParam, yearEndParam)
                 ]);
+                
                 // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
                 const tagsWithSelected = mergeSelectedIntoTags(tags, teoseTagsParam);
                 const genresWithSelected = mergeSelectedIntoFacets(genres, genreParam);
                 const typesWithSelected = mergeSelectedIntoFacets(types, typeParam);
+                
                 setAvailableTeoseTags(tagsWithSelected);
                 setAvailableGenres(genresWithSelected);
                 setAvailableTypes(typesWithSelected);
                 setAvailableAuthors(authors);
-                setVocabularies(vocabs);
             } catch (e) {
                 console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
             }
         };
         loadFilterData();
-    }, [selectedCollection, i18n.language, yearStartParam, yearEndParam]);
+    }, [selectedCollection, i18n.language, yearStartParam, yearEndParam, queryParam, workIdParam, authorParam, teoseTagsParam.length, genreParam.length, typeParam.length]);
 
     // Sync local input with URL param when URL changes (e.g. back button)
     useEffect(() => {
