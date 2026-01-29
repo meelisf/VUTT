@@ -475,16 +475,11 @@ def main():
     for i, name in enumerate(todo):
         search_query = clean_name_for_search(name)
         
-        # Kuva nimi kollase taustaga ja diff, kui muutus
+        # Kuva nimi kollase taustaga
         name_display = f"{Colors.BG_YELLOW}{name}{Colors.RESET}"
-        if name != search_query:
-            diff_display = f" {Colors.BLUE}→ {search_query}{Colors.RESET}"
-        else:
-            diff_display = ""
+        print(f"\n[{i+1}/{len(todo)}] Nimi: {name_display} ({author_counts[name]} teost)")
 
-        print(f"\n[{i+1}/{len(todo)}] Nimi: {name_display}{diff_display} ({author_counts[name]} teost)")
-        
-        # Leia kontekst (kus failides esineb)
+        # Leia kontekst
         files = get_files_with_author(name)
         if not files:
             print("  Ei leidnud enam failidest (võib-olla muudeti eelmise sammuga).")
@@ -493,11 +488,8 @@ def main():
         print(f"  Esineb {len(files)} failis. Näiteks:")
         for f in files[:3]:
             print(f"    - {f['context']}")
-        
-        # Otsi Wikidatast
-        print(f"  Otsin Wikidatast: '{search_query}'")
-        
-        # KONTROLLI: Kas me oleme sarnast nime juba lahendanud?
+
+        # Kontrolli automaatselt eelmist vastet (ainult esimesel ringil)
         previous_match = None
         for processed_name, processed_id in state['processed'].items():
             if processed_id != "LOCAL" and clean_name_for_search(processed_name) == search_query:
@@ -508,7 +500,7 @@ def main():
             print(f"  LEITUD EELMINE OTSUS: '{processed_name}' oli seotud {previous_match}-ga.")
             auto_choice = input(f"  Kas soovid kasutada sama vastet ({previous_match})? [Y/n] > ").strip().lower()
             if auto_choice in ['', 'y']:
-                # Kui on AA ID
+                # ... (sama loogika mis enne, aga lühendatult siin kontekstis) ...
                 if str(previous_match).startswith('AA:'):
                      num = int(previous_match.split(':')[1])
                      entry = next((e for e in album_data if e.get('entry_number') == num), None)
@@ -522,11 +514,8 @@ def main():
                          save_state(state)
                          print(f"  Automaatselt seotud {previous_match} ({name_aa}) {count} failis.")
                          continue
-                # Kui on VIAF ID
                 elif str(previous_match).startswith('VIAF:'):
-                    # VIAF puhul kasutame state'is salvestatud nime (ei tee uut API päringut)
-                    # Leiame eelmise kirje, et saada nimi
-                    prev_label = clean_name_for_search(processed_name)  # Kasuta puhastatud nime
+                    prev_label = clean_name_for_search(processed_name)
                     new_entity = {"label": prev_label, "id": previous_match, "source": "viaf"}
                     count = 0
                     for f in files:
@@ -536,7 +525,6 @@ def main():
                     print(f"  Automaatselt seotud {previous_match} ({prev_label}) {count} failis.")
                     continue
                 else:
-                    # Wikidata ID puhul küsi Wikidatast
                     entity = get_wikidata_entity(previous_match)
                     if entity:
                          new_entity = {"label": entity['label'], "id": entity['id'], "source": "wikidata"}
@@ -548,48 +536,36 @@ def main():
                          print(f"  Automaatselt seotud {entity['id']} ({entity['label']}) {count} failis.")
                          continue
 
+        # Algne otsing
         results = search_wikidata(search_query)
+        # ... (Waterfall strateegia jääb siia vahele, aga lihtsuse mõttes jätame selle bloki samaks või tõstame funktsiooni, 
+        # aga antud juhul teeme lihtsa "esimene käivitus" loogika)
 
-        # Kui ei leidnud, proovi variatsioone (Waterfall strateegia)
+        # Kui ei leidnud, proovi variatsioone (Waterfall) - kopeerime olemasoleva loogika siia, et see töötaks esimesel korral
         if not results:
             def get_variants(base_str):
                 vars_list = []
-                
-                # Suffixite eemaldamine (Ladina vormid)
                 words = base_str.split()
                 if len(words) > 0:
                     first_name = words[0]
-                    # Petrus -> Peter/Petr, Gustavus -> Gustav
-                    if first_name.endswith('us'):
-                        vars_list.append(" ".join([first_name[:-2]] + words[1:]))
-                    if first_name.endswith('ius'):
-                        vars_list.append(" ".join([first_name[:-3]] + words[1:]))
+                    if first_name.endswith('us'): vars_list.append(" ".join([first_name[:-2]] + words[1:]))
+                    if first_name.endswith('ius'): vars_list.append(" ".join([first_name[:-3]] + words[1:]))
 
                 common_replacements = {
-                    'Jacob': 'Jakob', 'Jakob': 'Jacob',
-                    'Carl': 'Karl', 'Karl': 'Carl',
-                    'Eric': 'Erik', 'Erik': 'Eric', 'Ericus': 'Erik',
-                    'Nicolaus': 'Nikolaus', 'Nikolaus': 'Nicolaus', 'Nils': 'Nicolaus',
-                    'Marcus': 'Markus', 'Markus': 'Marcus',
-                    'Lucas': 'Lukas', 'Lukas': 'Lucas',
-                    'Friderico': 'Friedrich', 'Friedrich': 'Friderico',
-                    'Christian': 'Kristian', 'Kristian': 'Christian',
-                    'Gustav': 'Gustaf', 'Gustaf': 'Gustav',
-                    'Sueno': 'Sven', 'Sven': 'Sueno',
-                    'Laurentius': 'Lars', 'Lars': 'Laurentius',
-                    'Henricus': 'Henrik', 'Henrik': 'Henricus',
-                    'Georgius': 'Georg', 'Georg': 'Georgius',
-                    'Olaus': 'Olof', 'Olof': 'Olaus',
-                    'Petrus': 'Peter', 'Peter': 'Petrus'
+                    'Jacob': 'Jakob', 'Jakob': 'Jacob', 'Carl': 'Karl', 'Karl': 'Carl',
+                    'Eric': 'Erik', 'Erik': 'Eric', 'Ericus': 'Erik', 'Nicolaus': 'Nikolaus', 
+                    'Nikolaus': 'Nicolaus', 'Nils': 'Nicolaus', 'Marcus': 'Markus', 'Markus': 'Marcus',
+                    'Lucas': 'Lukas', 'Lukas': 'Lucas', 'Friderico': 'Friedrich', 'Friedrich': 'Friderico',
+                    'Christian': 'Kristian', 'Kristian': 'Christian', 'Gustav': 'Gustaf', 'Gustaf': 'Gustav',
+                    'Sueno': 'Sven', 'Sven': 'Sueno', 'Laurentius': 'Lars', 'Lars': 'Laurentius',
+                    'Henricus': 'Henrik', 'Henrik': 'Henricus', 'Georgius': 'Georg', 'Georg': 'Georgius',
+                    'Olaus': 'Olof', 'Olof': 'Olaus', 'Petrus': 'Peter', 'Peter': 'Petrus'
                 }
                 
-                # 1. Johannis/Johannes
-                if 'Johannis' in base_str:
-                    vars_list.append(base_str.replace('Johannis', 'Johannes'))
-                elif 'Johannes' in base_str:
-                    vars_list.append(base_str.replace('Johannes', 'Johannis'))
+                # ... (säilitame olemasoleva variatsioonide loogika) ...
+                if 'Johannis' in base_str: vars_list.append(base_str.replace('Johannis', 'Johannes'))
+                elif 'Johannes' in base_str: vars_list.append(base_str.replace('Johannes', 'Johannis'))
                     
-                # 2. C/K asendused
                 words = base_str.split()
                 new_words = []
                 changed = False
@@ -603,213 +579,223 @@ def main():
                          changed = True
                     else:
                         new_words.append(w)
-                
-                if changed:
-                    vars_list.append(" ".join(new_words))
+                if changed: vars_list.append(" ".join(new_words))
                 return vars_list
 
-            # Generaator
             search_queue = []
-            
-            # 0. SULGUDES OLEVAD NIMED (Nt Carlhielm)
             paren_variants = get_name_variants_from_parentheses(name)
             for pv in paren_variants:
                 if pv not in search_queue:
                     search_queue.append(pv)
                     search_queue.extend(get_variants(pv))
-            
-            # 1. Täisnime variatsioonid
             search_queue.extend(get_variants(search_query))
-            
-            # 2. Lühendatud vormid
             parts = search_query.split()
             short_forms = []
             if len(parts) > 2:
                 short_forms.append(" ".join(parts[:-1]))
                 short_forms.append(f"{parts[0]} {parts[-1]}")
-            
             ensis_removed = [p for p in parts if not p.lower().endswith('ensis')]
             if len(ensis_removed) < len(parts) and len(ensis_removed) >= 1:
                 short_forms.append(" ".join(ensis_removed))
             search_queue.extend(short_forms)
-            
-            # 3. Lühendatud vormide variatsioonid
-            for sf in short_forms:
-                search_queue.extend(get_variants(sf))
+            for sf in short_forms: search_queue.extend(get_variants(sf))
             
             unique_queue = []
             seen = set([search_query])
             for q in search_queue:
-                if q not in seen:
-                    unique_queue.append(q)
-                    seen.add(q)
+                if q not in seen: unique_queue.append(q); seen.add(q)
             
             for var in unique_queue:
-                print(f"    ...ei leidnud. Proovin: '{var}'")
-                results = search_wikidata(var)
-                if results:
+                # print(f"    ...ei leidnud. Proovin: '{var}'") # Liiga palju müra
+                res_tmp = search_wikidata(var)
+                if res_tmp:
+                    results = res_tmp
+                    # print(f"    Leitud variatsiooniga: '{var}'")
+                    search_query = var # Uuenda otsingusõna, et ka teised allikad kasutaksid paremat varianti
                     break
 
-        # Otsi Album Academicumist
+        # Algne päring teistest allikatest
         album_matches = search_album(search_query, album_data) if album_data else []
-
-        # Otsi VIAF-ist
-        print(f"  Otsin VIAF-ist: '{search_query}'")
         viaf_results = search_viaf(search_query)
 
-        # Kuva valikud (Album Academicum esimesena, et anda konteksti)
-        if album_matches:
-            print(f"\n  {Colors.BOLD}VALIKUD (ALBUM ACADEMICUM):{Colors.RESET}")
-            for idx, entry in enumerate(album_matches):
-                p = entry.get('person', {})
-                name_aa = p.get('name', {}).get('full')
-                death = p.get('death', {}).get('date') or "?"
-                origin = p.get('origin', {}).get('city') or "?"
-                num = entry.get('entry_number')
-                style = Colors.BG_BLUE if idx == 0 else ""
-                print(f"    {style}A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]{Colors.RESET}")
-        else:
-            print(f"\n  {Colors.RED}VALIKUD (ALBUM ACADEMICUM): (Vasteid ei leitud){Colors.RESET}")
+        # SISEMISE TSÜKLI ALGUS (et saaks uuesti otsida)
+        while True:
+            # Kuva hetke otsingusõna
+            print(f"\n  Otsingusõna: '{Colors.BOLD}{search_query}{Colors.RESET}'")
 
-        # Kuva valikud (VIAF)
-        print(f"\n  {Colors.BOLD}VALIKUD (VIAF):{Colors.RESET}")
-        if viaf_results:
-            for idx, res in enumerate(viaf_results[:5]):
-                style = Colors.BG_MAGENTA if idx == 0 else ""
-                # Näita selgelt: VIAF originaal -> mis kirjutatakse metadatasse
-                print(f"    {style}V{idx+1}. {res['raw_label']} [VIAF:{res['viaf_id']}]{Colors.RESET}")
-                print(f"        {Colors.GREEN}→ kirjutatakse: \"{res['label']}\"{Colors.RESET}")
-        else:
-            print(f"    {Colors.RED}(VIAF-ist vasteid ei leitud){Colors.RESET}")
-
-        # Kuva valikud (Wikidata)
-        print(f"\n  {Colors.BOLD}VALIKUD (WIKIDATA):{Colors.RESET}")
-        if results:
-            for idx, res in enumerate(results[:5]):
-                desc = res.get('description', '-')
-                style = Colors.BG_GREEN if idx == 0 else ""
-                print(f"    {style}{idx+1}. {res['label']} ({res['id']}) - {desc}{Colors.RESET}")
-        else:
-            print(f"    {Colors.RED}(Wikidatast vasteid ei leitud){Colors.RESET}")
-
-        print("\n    L. (Local) - Märgi lokaalseks (ei seo Wikidataga)")
-        print("    S. (Skip)  - Jäta vahele")
-        print("    M. (Manual ID) - Sisesta Q-kood käsitsi")
-        print("    R. (Rename) - Nimeta ümber")
-        print("    Q. (Quit) - Lõpeta")
-        
-        choice = input("\n  Valik > ").strip().lower()
-        
-        if choice == 'q':
-            print("Salvestan oleku ja lõpetan.")
-            break
-        
-        elif choice.startswith('a') and len(choice) > 1 and choice[1:].isdigit():
-            idx = int(choice[1:]) - 1
-            if 0 <= idx < len(album_matches):
-                entry = album_matches[idx]
-                num = entry.get('entry_number')
-                name_aa = entry.get('person', {}).get('name', {}).get('full')
-                new_entity = {
-                    "label": name_aa,
-                    "id": f"AA:{num}",
-                    "source": "album_academicum"
-                }
-                count = 0
-                for f in files:
-                    if update_file(f['path'], name, new_entity): count += 1
-                state['processed'][name] = f"AA:{num}"
-                save_state(state)
-                print(f"  Seotud Album Academicumiga (AA:{num}) {count} failis.")
-                continue
-
-        elif choice.startswith('v') and len(choice) > 1 and choice[1:].isdigit():
-            idx = int(choice[1:]) - 1
-            if 0 <= idx < len(viaf_results):
-                res = viaf_results[idx]
-                viaf_id = f"VIAF:{res['viaf_id']}"
-                new_entity = {
-                    "label": res['label'],  # Normaliseeritud nimekuju
-                    "id": viaf_id,
-                    "source": "viaf"
-                }
-                count = 0
-                for f in files:
-                    if update_file(f['path'], name, new_entity): count += 1
-                state['processed'][name] = viaf_id
-                save_state(state)
-                print(f"  Seotud VIAF-iga ({viaf_id}) nimega '{res['label']}' {count} failis.")
-                continue
-
-        elif choice == 's':
-            print("  Vahele jäetud.")
-            continue
-            
-        elif choice == 'l':
-            state['processed'][name] = "LOCAL"
-            save_state(state)
-            print("  Märgitud lokaalseks.")
-            
-        elif choice == 'r':
-            new_name = input("  Sisesta uus nimi > ").strip()
-            if new_name:
-                new_entity = {"label": new_name, "id": None, "source": "manual"}
-                count = 0
-                for f in files:
-                    if update_file(f['path'], name, new_entity): count += 1
-                print(f"  Nimi muudetud {count} failis.")
-        
-        elif choice == 'm':
-            manual_input = input("  Sisesta ID (Q123, VIAF:123) või permalink > ").strip()
-            
-            # Tuvasta permalinkidest ID
-            if 'viaf.org/viaf/' in manual_input:
-                match = re.search(r'viaf\.org/viaf/(\d+)', manual_input)
-                manual_id = f"VIAF:{match.group(1)}" if match else manual_input
-            elif 'wikidata.org/wiki/' in manual_input:
-                match = re.search(r'wikidata\.org/wiki/(Q\d+)', manual_input)
-                manual_id = match.group(1) if match else manual_input
+            # Kuva valikud (Album Academicum)
+            if album_matches:
+                print(f"\n  {Colors.BOLD}VALIKUD (ALBUM ACADEMICUM):{Colors.RESET}")
+                for idx, entry in enumerate(album_matches):
+                    p = entry.get('person', {})
+                    name_aa = p.get('name', {}).get('full')
+                    death = p.get('death', {}).get('date') or "?"
+                    origin = p.get('origin', {}).get('city') or "?"
+                    num = entry.get('entry_number')
+                    style = Colors.BG_BLUE if idx == 0 else ""
+                    print(f"    {style}A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]{Colors.RESET}")
             else:
-                manual_id = manual_input
+                print(f"\n  {Colors.RED}VALIKUD (ALBUM ACADEMICUM): (Vasteid ei leitud){Colors.RESET}")
 
-            if manual_id.upper().startswith('Q'):
-                q_code = manual_id.upper()
-                entity = get_wikidata_entity(q_code)
-                if entity:
-                    print(f"  Leiti Wikidatast: {entity['label']} - {entity['description']}")
-                    confirm = input(f"  Kas seome sellega? [Y/n] > ").strip().lower()
-                    if confirm in ['', 'y']:
-                        new_entity = {"label": entity['label'], "id": q_code, "source": "wikidata"}
-                        count = 0
-                        for f in files:
-                            if update_file(f['path'], name, new_entity): count += 1
-                        state['processed'][name] = q_code
-                        save_state(state)
-                        print(f"  Seotud {q_code}-ga {count} failis.")
+            # Kuva valikud (VIAF)
+            print(f"\n  {Colors.BOLD}VALIKUD (VIAF):{Colors.RESET}")
+            if viaf_results:
+                for idx, res in enumerate(viaf_results[:5]):
+                    style = Colors.BG_MAGENTA if idx == 0 else ""
+                    print(f"    {style}V{idx+1}. {res['raw_label']} [VIAF:{res['viaf_id']}]{Colors.RESET}")
+                    print(f"        {Colors.GREEN}→ kirjutatakse: \"{res['label']}\"{Colors.RESET}")
+            else:
+                print(f"    {Colors.RED}(VIAF-ist vasteid ei leitud){Colors.RESET}")
+
+            # Kuva valikud (Wikidata)
+            print(f"\n  {Colors.BOLD}VALIKUD (WIKIDATA):{Colors.RESET}")
+            if results:
+                for idx, res in enumerate(results[:5]):
+                    desc = res.get('description', '-')
+                    style = Colors.BG_GREEN if idx == 0 else ""
+                    print(f"    {style}{idx+1}. {res['label']} ({res['id']}) - {desc}{Colors.RESET}")
+            else:
+                print(f"    {Colors.RED}(Wikidatast vasteid ei leitud){Colors.RESET}")
+
+            print("\n    O. (Otsi)  - Otsi uue nimega (VIAF/Wiki/Album)")
+            print("    L. (Local) - Märgi lokaalseks (ei seo Wikidataga)")
+            print("    S. (Skip)  - Jäta vahele")
+            print("    M. (Manual ID) - Sisesta Q-kood käsitsi")
+            print("    R. (Rename) - Nimeta ümber")
+            print("    Q. (Quit) - Lõpeta")
+            
+            choice = input("\n  Valik > ").strip().lower()
+            
+            if choice == 'q':
+                print("Salvestan oleku ja lõpetan.")
+                sys.exit(0) # Välju täielikult
+            
+            elif choice == 'o':
+                new_query = input("  Sisesta uus otsingusõna > ").strip()
+                if new_query:
+                    search_query = new_query
+                    print(f"  Otsin uuesti: '{search_query}'...")
+                    results = search_wikidata(search_query)
+                    viaf_results = search_viaf(search_query)
+                    album_matches = search_album(search_query, album_data) if album_data else []
+                continue # Kordab while tsüklit uute tulemustega
+
+            elif choice.startswith('a') and len(choice) > 1 and choice[1:].isdigit():
+                idx = int(choice[1:]) - 1
+                if 0 <= idx < len(album_matches):
+                    entry = album_matches[idx]
+                    num = entry.get('entry_number')
+                    name_aa = entry.get('person', {}).get('name', {}).get('full')
+                    new_entity = {
+                        "label": name_aa,
+                        "id": f"AA:{num}",
+                        "source": "album_academicum"
+                    }
+                    count = 0
+                    for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                    state['processed'][name] = f"AA:{num}"
+                    save_state(state)
+                    print(f"  Seotud Album Academicumiga (AA:{num}) {count} failis.")
+                    break # Välju while tsüklist, mine järgmise nime juurde
+
+            elif choice.startswith('v') and len(choice) > 1 and choice[1:].isdigit():
+                idx = int(choice[1:]) - 1
+                if 0 <= idx < len(viaf_results):
+                    res = viaf_results[idx]
+                    viaf_id = f"VIAF:{res['viaf_id']}"
+                    new_entity = {
+                        "label": res['label'],
+                        "id": viaf_id,
+                        "source": "viaf"
+                    }
+                    count = 0
+                    for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                    state['processed'][name] = viaf_id
+                    save_state(state)
+                    print(f"  Seotud VIAF-iga ({viaf_id}) nimega '{res['label']}' {count} failis.")
+                    break
+
+            elif choice == 's':
+                print("  Vahele jäetud.")
+                break
+                
+            elif choice == 'l':
+                state['processed'][name] = "LOCAL"
+                save_state(state)
+                print("  Märgitud lokaalseks.")
+                break
+                
+            elif choice == 'r':
+                new_name = input("  Sisesta uus nimi > ").strip()
+                if new_name:
+                    new_entity = {"label": new_name, "id": None, "source": "manual"}
+                    count = 0
+                    for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                    print(f"  Nimi muudetud {count} failis.")
+                    # Rename puhul võime ka tsükli katkestada, sest failid on muudetud ja nimi ei pruugi enam 'todo' listiga klappida
+                    # Või siis märgime 'processed' ja liigume edasi
+                    state['processed'][name] = "RENAMED" 
+                    save_state(state)
+                    break
+            
+            elif choice == 'm':
+                manual_input = input("  Sisesta ID (Q123, VIAF:123) või permalink > ").strip()
+                
+                # Tuvasta permalinkidest ID
+                if 'viaf.org/viaf/' in manual_input:
+                    match = re.search(r'viaf\.org/viaf/(\d+)', manual_input)
+                    manual_id = f"VIAF:{match.group(1)}" if match else manual_input
+                elif 'wikidata.org/wiki/' in manual_input:
+                    match = re.search(r'wikidata\.org/wiki/(Q\d+)', manual_input)
+                    manual_id = match.group(1) if match else manual_input
                 else:
-                    print(f"  Ei leidnud Wikidatast üksust koodiga {q_code}.")
-            elif manual_id.upper().startswith('VIAF:'):
-                viaf_code = manual_id.split(':', 1)[1].strip()
-                label = input(f"  Sisesta nimi (vaikimisi '{name}') > ").strip() or name
-                new_entity = {"label": label, "id": viaf_code, "source": "viaf"}
+                    manual_id = manual_input
+
+                if manual_id.upper().startswith('Q'):
+                    q_code = manual_id.upper()
+                    entity = get_wikidata_entity(q_code)
+                    if entity:
+                        print(f"  Leiti Wikidatast: {entity['label']} - {entity['description']}")
+                        confirm = input(f"  Kas seome sellega? [Y/n] > ").strip().lower()
+                        if confirm in ['', 'y']:
+                            new_entity = {"label": entity['label'], "id": q_code, "source": "wikidata"}
+                            count = 0
+                            for f in files:
+                                if update_file(f['path'], name, new_entity): count += 1
+                            state['processed'][name] = q_code
+                            save_state(state)
+                            print(f"  Seotud {q_code}-ga {count} failis.")
+                            break
+                    else:
+                        print(f"  Ei leidnud Wikidatast üksust koodiga {q_code}.")
+                elif manual_id.upper().startswith('VIAF:'):
+                    viaf_code = manual_id.split(':', 1)[1].strip()
+                    label = input(f"  Sisesta nimi (vaikimisi '{name}') > ").strip() or name
+                    new_entity = {"label": label, "id": viaf_code, "source": "viaf"}
+                    count = 0
+                    for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                    state['processed'][name] = f"VIAF:{viaf_code}"
+                    save_state(state)
+                    print(f"  Seotud VIAF-iga ({viaf_code}) {count} failis.")
+                    break
+                else:
+                    print("  Tundmatu ID vorming. Kasuta Q123, VIAF:123 või kopeeri permalink.")
+
+            elif choice.isdigit() and 1 <= int(choice) <= len(results):
+                res = results[int(choice) - 1]
+                new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
                 count = 0
                 for f in files:
                     if update_file(f['path'], name, new_entity): count += 1
-                state['processed'][name] = f"VIAF:{viaf_code}"
+                state['processed'][name] = res['id']
                 save_state(state)
-                print(f"  Seotud VIAF-iga ({viaf_code}) {count} failis.")
-            else:
-                print("  Tundmatu ID vorming. Kasuta Q123, VIAF:123 või kopeeri permalink.")
+                print(f"  Seotud {res['id']}-ga {count} failis.")
+                break
 
-        elif choice.isdigit() and 1 <= int(choice) <= len(results):
-            res = results[int(choice) - 1]
-            new_entity = {"label": res['label'], "id": res['id'], "source": "wikidata"}
-            count = 0
-            for f in files:
-                if update_file(f['path'], name, new_entity): count += 1
-            state['processed'][name] = res['id']
-            save_state(state)
-            print(f"  Seotud {res['id']}-ga {count} failis.")
 
 if __name__ == '__main__':
     try:
