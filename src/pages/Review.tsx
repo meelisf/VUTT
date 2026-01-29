@@ -122,15 +122,18 @@ const Review: React.FC = () => {
     return Array.from(authors).sort();
   };
 
+  // Unikaalne võti iga muudatuse jaoks (commit + filepath)
+  const getEntryKey = (commit: RecentCommit) => `${commit.full_hash}:${commit.filepath}`;
+
   // Lae diff'i andmed lazy loading'uga
   const loadDiff = async (commit: RecentCommit) => {
-    const key = commit.full_hash;
-    
+    const key = getEntryKey(commit);
+
     // Kui juba on laetud, kasuta cache'i
     if (diffCache[key]) {
       return;
     }
-    
+
     setLoadingDiff(key);
     
     try {
@@ -166,7 +169,7 @@ const Review: React.FC = () => {
 
   // Ava/sulge diff
   const toggleDiff = (commit: RecentCommit) => {
-    const key = commit.full_hash;
+    const key = getEntryKey(commit);
     if (expandedCommit === key) {
       setExpandedCommit(null);
     } else {
@@ -319,12 +322,13 @@ const Review: React.FC = () => {
 
                 {/* Tabeli read */}
                 {commits.map((commit, index) => {
-                  const isExpanded = expandedCommit === commit.full_hash;
-                  const diffData = diffCache[commit.full_hash];
-                  const isLoadingThis = loadingDiff === commit.full_hash;
+                  const entryKey = getEntryKey(commit);
+                  const isExpanded = expandedCommit === entryKey;
+                  const diffData = diffCache[entryKey];
+                  const isLoadingThis = loadingDiff === entryKey;
                   
                   return (
-                    <div key={`${commit.commit_hash}-${index}`} className="border border-gray-100 rounded-lg overflow-hidden">
+                    <div key={entryKey} className="border border-gray-100 rounded-lg overflow-hidden">
                       {/* Peamine rida */}
                       <div 
                         className={`grid grid-cols-1 sm:grid-cols-12 gap-2 sm:gap-4 px-4 py-3 hover:bg-gray-50 cursor-pointer ${isExpanded ? 'bg-gray-50' : ''}`}
