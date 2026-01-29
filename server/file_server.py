@@ -1008,14 +1008,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Sõnastikud kujul: label.lower() -> { label: "Orig", id: "Q..." | None }
                 # Eesmärk: Iga nime kohta hoida parimat teadmist (eelistatult ID-ga)
+                # seen_ids: jälgib, millised Wikidata ID-d on juba lisatud (vältimaks duplikaate)
                 authors = {}
                 tags = {}
                 places = {}
                 printers = {}
                 types = {}
                 genres = {}
+                seen_ids = {}  # id -> store_name, et jälgida duplikaate üle kõigi hoidlate
 
-                def add_item(store, val):
+                def add_item(store, val, store_name=''):
                     """Lisab väärtuse hoidlasse. Kasutab eelistatud keele silti."""
                     if not val: return
 
@@ -1031,6 +1033,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # 2. Objekt (LinkedEntity)
                     if isinstance(val, dict):
                         id_code = val.get('id')
+
+                        # Kui see ID on juba samas hoidlas, ära lisa uuesti
+                        if id_code and (store_name, id_code) in seen_ids:
+                            return
+                        if id_code:
+                            seen_ids[(store_name, id_code)] = True
+
                         labels_dict = val.get('labels', {})
 
                         # Leia silt eelistatud keeles, fallback teisele UI keelele, siis põhisildile
@@ -1062,27 +1071,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                                     # Creators
                                     for creator in meta.get('creators', []):
-                                        add_item(authors, {'label': creator.get('name'), 'id': creator.get('id')})
+                                        add_item(authors, {'label': creator.get('name'), 'id': creator.get('id')}, 'authors')
 
                                     # Tags
-                                    for t in meta.get('tags', []): add_item(tags, t)
+                                    for t in meta.get('tags', []): add_item(tags, t, 'tags')
 
                                     # Location
-                                    add_item(places, meta.get('location'))
+                                    add_item(places, meta.get('location'), 'places')
 
                                     # Publisher
-                                    add_item(printers, meta.get('publisher'))
+                                    add_item(printers, meta.get('publisher'), 'printers')
 
                                     # Type
-                                    add_item(types, meta.get('type'))
+                                    add_item(types, meta.get('type'), 'types')
 
                                     # Genre
                                     g = meta.get('genre')
                                     if g:
                                         if isinstance(g, list):
-                                            for item in g: add_item(genres, item)
+                                            for item in g: add_item(genres, item, 'genres')
                                         else:
-                                            add_item(genres, g)
+                                            add_item(genres, g, 'genres')
                             except:
                                 pass
 
@@ -1097,7 +1106,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                             source = page_data.get('meta_content', page_data)
                                             page_tags = source.get('page_tags', source.get('tags', []))
                                             for pt in page_tags:
-                                                add_item(tags, pt)
+                                                add_item(tags, pt, 'tags')
                                     except:
                                         pass
                         except:
