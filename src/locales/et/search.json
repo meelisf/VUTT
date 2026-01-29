@@ -24,6 +24,9 @@
     "until": "Kuni",
     "work": "Teos",
     "allWorks": "Kõik teosed",
+    "author": "Autor",
+    "authorPlaceholder": "Sisesta autori nimi...",
+    "removeAuthorFilter": "Eemalda autori filter",
     "applyFilters": "Rakenda filtrid",
     "clearFilters": "Tühjenda filtrid"
   },

@@ -395,8 +395,64 @@ export const getTypeFacets = async (
   }
 };
 
+// Autorite facetid (author_names väljast)
+export const getAuthorFacets = async (
+  collection?: string,
+  yearStart?: number,
+  yearEnd?: number
+): Promise<{ value: string; count: number }[]> => {
+  checkMixedContent();
+  await ensureSettings();
+
+  try {
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) {
+      filter.push(`collections_hierarchy = "${collection}"`);
+    }
+    if (yearStart) {
+      filter.push(`aasta >= ${yearStart}`);
+    }
+    if (yearEnd) {
+      filter.push(`aasta <= ${yearEnd}`);
+    }
+
+    const response = await index.search('', {
+      filter,
+      limit: 0,
+      facets: ['author_names']
+    });
+
+    const facetDistribution = response.facetDistribution?.['author_names'] || {};
+
+    return Object.entries(facetDistribution)
+      .map(([value, count]) => ({ value, count: count as number }))
+      .sort((a, b) => b.count - a.count);
+  } catch (error) {
+    console.error("getAuthorFacets error:", error);
+    return [];
+  }
+};
+
+// Facetide vastuse tüüp
+export interface FacetDistribution {
+  genre_et?: Record<string, number>;
+  genre_en?: Record<string, number>;
+  tags_et?: Record<string, number>;
+  tags_en?: Record<string, number>;
+  type_et?: Record<string, number>;
+  type_en?: Record<string, number>;
+  teose_staatus?: Record<string, number>;
+}
+
+// Otsingu vastuse tüüp koos facetidega
+export interface SearchWorksResult {
+  works: Work[];
+  facets: FacetDistribution;
+  totalHits: number;
+}
+
 // Dashboardi otsing: otsib teoseid
-export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<Work[]> => {
+export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
   checkMixedContent();
   await ensureSettings();
 
@@ -464,6 +520,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       }
     }
 
+    // Vali facet väljad vastavalt keelele
+    const facetLang = options?.lang || 'et';
+    const genreFacetField = `genre_${facetLang}`;
+    const typeFacetField = `type_${facetLang}`;
+    const tagsFacetField = `tags_${facetLang}`;
+
     const searchParams: any = {
       attributesToRetrieve: [
         // V2 väljad
@@ -477,7 +539,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       ],
       attributesToSearchOn: ['title', 'authors_text', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
-      limit: 5000 // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
+      limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
+      // Küsime facetid dünaamiliseks filtrite uuendamiseks
+      facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
     };
 
     // Relevantsuse puhul EI kasuta distinct, et säilitada Meilisearchi relevantsuse järjekord
@@ -645,7 +709,18 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       });
     }
 
-    return works;
+    // Tagasta tulemused koos facetidega
+    const facetDistribution = response.facetDistribution || {};
+    return {
+      works,
+      facets: {
+        [`genre_${facetLang}`]: facetDistribution[genreFacetField],
+        [`type_${facetLang}`]: facetDistribution[typeFacetField],
+        [`tags_${facetLang}`]: facetDistribution[tagsFacetField],
+        teose_staatus: facetDistribution['teose_staatus']
+      } as FacetDistribution,
+      totalHits: response.estimatedTotalHits || works.length
+    };
 
   } catch (error: any) {
     console.error("Meilisearch error:", error);
@@ -1034,6 +1109,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       filter.push(`(${typeConditions})`);
     }
   }
+  // V2: Autori filter (creators massiivist tuletatud author_names väli)
+  if (options.author) {
+    filter.push(`author_names = "${options.author}"`);
+  }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
   const genreFacetField = options.lang ? `genre_${options.lang}` : 'genre_et';
@@ -1091,7 +1170,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search('', {
           filter: statsFilter,
           limit: 0,
-          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField],
+          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (teosed)
@@ -1143,7 +1222,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search(query, {
           filter,
           limit: STATS_LIMIT,
-          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField],
+          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField, 'author_names'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (kuvatavad teosed, distinct)
@@ -1175,13 +1254,14 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         [genreFacetField]: {},
         [typeFacetField]: {},
         [tagsFacetField]: {},
+        'author_names': {},
         'originaal_kataloog': {} // Seda me stats querys ei küsinud, aga võiks
       };
 
       statsResponse.hits.forEach((hit: any) => {
         if (!uniqueWorks.has(hit.work_id)) {
           uniqueWorks.add(hit.work_id);
-          
+
           // Helper stats
           const addToStats = (field: string, value: string | string[]) => {
              if (!value) return;
@@ -1195,6 +1275,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           addToStats(genreFacetField, hit[genreFacetField]);
           addToStats(typeFacetField, hit[typeFacetField]);
           addToStats(tagsFacetField, hit[tagsFacetField]);
+          addToStats('author_names', hit.author_names);
         }
       });
       

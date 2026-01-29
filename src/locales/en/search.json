@@ -24,6 +24,9 @@
     "until": "Until",
     "work": "Work",
     "allWorks": "All works",
+    "author": "Author",
+    "authorPlaceholder": "Enter author name...",
+    "removeAuthorFilter": "Remove author filter",
     "applyFilters": "Apply filters",
     "clearFilters": "Clear filters"
   },

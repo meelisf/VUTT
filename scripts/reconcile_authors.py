@@ -32,6 +32,9 @@ ALBUM_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 # Wikidata API
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 
+# VIAF API
+VIAF_AUTOSUGGEST = "https://viaf.org/viaf/AutoSuggest"
+
 # Värvid terminali jaoks
 class Colors:
     HEADER = '\033[95m'
@@ -42,6 +45,7 @@ class Colors:
     BG_GREEN = '\033[42m\033[30m' # Must tekst rohelisel taustal
     BG_BLUE = '\033[44m\033[37m'  # Valge tekst sinisel taustal
     BG_YELLOW = '\033[43m\033[30m' # Must tekst kollasel taustal
+    BG_MAGENTA = '\033[45m\033[37m' # Valge tekst magenta taustal (VIAF)
     RESET = '\033[0m'
 
 def load_album_data():
@@ -205,6 +209,70 @@ def search_wikidata(query):
         print(f"Viga Wikidata päringus: {e}")
         return []
 
+def normalize_viaf_name(name):
+    """
+    Normaliseerib VIAF nimekuju.
+    'Turdinus, Petrus' -> 'Petrus Turdinus'
+    'Gezelius, Johannes, 1615-1690' -> 'Johannes Gezelius'
+    """
+    if not name:
+        return name
+
+    # Eemalda daatumid lõpust (nt ", 1615-1690")
+    name = re.sub(r',?\s*\d{4}\s*-\s*\d{4}\s*$', '', name)
+    name = re.sub(r',?\s*\d{4}\s*-\s*$', '', name)  # "1615-"
+    name = re.sub(r',?\s*-\s*\d{4}\s*$', '', name)  # "-1690"
+
+    # Kui on koma, pööra ümber: "Perenimi, Eesnimi" -> "Eesnimi Perenimi"
+    if ',' in name:
+        parts = name.split(',', 1)
+        if len(parts) == 2:
+            surname = parts[0].strip()
+            firstname = parts[1].strip()
+            # Eemalda võimalikud lisad eesnimest (nt "Jr." või numbreid)
+            firstname = re.sub(r'\s+(Jr\.?|Sr\.?|I+V?|V?I*)$', '', firstname)
+            name = f"{firstname} {surname}"
+
+    return name.strip()
+
+def search_viaf(query):
+    """
+    Otsib VIAF AutoSuggest API-st.
+    Tagastab listi: [{"viaf_id": "123", "label": "Petrus Turdinus", "raw_label": "Turdinus, Petrus", "sources": 5}, ...]
+    """
+    headers = {"User-Agent": "VuttCatalog/1.0 (mailto:admin@example.com)"}
+    try:
+        response = requests.get(
+            VIAF_AUTOSUGGEST,
+            params={"query": query},
+            headers=headers,
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        results = []
+        for item in data.get("result", [])[:5]:
+            viaf_id = item.get("viafid")
+            raw_label = item.get("term", item.get("displayForm", ""))
+            # Normaliseeri nimekuju
+            label = normalize_viaf_name(raw_label)
+            # Allikate arv (mitu raamatukogu on selle kirje kinnitanud)
+            sources = item.get("score", 0)
+
+            if viaf_id and label:
+                results.append({
+                    "viaf_id": viaf_id,
+                    "label": label,
+                    "raw_label": raw_label,
+                    "sources": sources
+                })
+
+        return results
+    except Exception as e:
+        print(f"Viga VIAF päringus: {e}")
+        return []
+
 def get_files_with_author(author_name):
     """Leiab kõik failid, kus antud autor esineb stringina (ilma ID-ta)."""
     matches = []
@@ -364,9 +432,8 @@ def main():
             print(f"  LEITUD EELMINE OTSUS: '{processed_name}' oli seotud {previous_match}-ga.")
             auto_choice = input(f"  Kas soovid kasutada sama vastet ({previous_match})? [Y/n] > ").strip().lower()
             if auto_choice in ['', 'y']:
-                # Kui on AA ID, siis ära küsi Wikidatast
+                # Kui on AA ID
                 if str(previous_match).startswith('AA:'):
-                     # Leia AA kirje
                      num = int(previous_match.split(':')[1])
                      entry = next((e for e in album_data if e.get('entry_number') == num), None)
                      if entry:
@@ -379,6 +446,19 @@ def main():
                          save_state(state)
                          print(f"  Automaatselt seotud {previous_match} ({name_aa}) {count} failis.")
                          continue
+                # Kui on VIAF ID
+                elif str(previous_match).startswith('VIAF:'):
+                    # VIAF puhul kasutame state'is salvestatud nime (ei tee uut API päringut)
+                    # Leiame eelmise kirje, et saada nimi
+                    prev_label = clean_name_for_search(processed_name)  # Kasuta puhastatud nime
+                    new_entity = {"label": prev_label, "id": previous_match, "source": "viaf"}
+                    count = 0
+                    for f in files:
+                        if update_file(f['path'], name, new_entity): count += 1
+                    state['processed'][name] = previous_match
+                    save_state(state)
+                    print(f"  Automaatselt seotud {previous_match} ({prev_label}) {count} failis.")
+                    continue
                 else:
                     # Wikidata ID puhul küsi Wikidatast
                     entity = get_wikidata_entity(previous_match)
@@ -497,6 +577,10 @@ def main():
         # Otsi Album Academicumist
         album_matches = search_album(search_query, album_data) if album_data else []
 
+        # Otsi VIAF-ist
+        print(f"  Otsin VIAF-ist: '{search_query}'")
+        viaf_results = search_viaf(search_query)
+
         # Kuva valikud (Album Academicum esimesena, et anda konteksti)
         if album_matches:
             print(f"\n  {Colors.BOLD}VALIKUD (ALBUM ACADEMICUM):{Colors.RESET}")
@@ -510,6 +594,20 @@ def main():
                 print(f"    {style}A{idx+1}. {name_aa} (surn. {death}, pärit {origin}) [AA:{num}]{Colors.RESET}")
         else:
             print(f"\n  {Colors.RED}VALIKUD (ALBUM ACADEMICUM): (Vasteid ei leitud){Colors.RESET}")
+
+        # Kuva valikud (VIAF)
+        print(f"\n  {Colors.BOLD}VALIKUD (VIAF):{Colors.RESET}")
+        if viaf_results:
+            for idx, res in enumerate(viaf_results[:5]):
+                style = Colors.BG_MAGENTA if idx == 0 else ""
+                # Näita nii normaliseeritud kui originaalnime
+                if res['label'] != res['raw_label']:
+                    name_display = f"{res['label']} (← {res['raw_label']})"
+                else:
+                    name_display = res['label']
+                print(f"    {style}V{idx+1}. {name_display} [VIAF:{res['viaf_id']}]{Colors.RESET}")
+        else:
+            print(f"    {Colors.RED}(VIAF-ist vasteid ei leitud){Colors.RESET}")
 
         # Kuva valikud (Wikidata)
         print(f"\n  {Colors.BOLD}VALIKUD (WIKIDATA):{Colors.RESET}")
@@ -550,6 +648,24 @@ def main():
                 state['processed'][name] = f"AA:{num}"
                 save_state(state)
                 print(f"  Seotud Album Academicumiga (AA:{num}) {count} failis.")
+                continue
+
+        elif choice.startswith('v') and len(choice) > 1 and choice[1:].isdigit():
+            idx = int(choice[1:]) - 1
+            if 0 <= idx < len(viaf_results):
+                res = viaf_results[idx]
+                viaf_id = f"VIAF:{res['viaf_id']}"
+                new_entity = {
+                    "label": res['label'],  # Normaliseeritud nimekuju
+                    "id": viaf_id,
+                    "source": "viaf"
+                }
+                count = 0
+                for f in files:
+                    if update_file(f['path'], name, new_entity): count += 1
+                state['processed'][name] = viaf_id
+                save_state(state)
+                print(f"  Seotud VIAF-iga ({viaf_id}) nimega '{res['label']}' {count} failis.")
                 continue
 
         elif choice == 's':

@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets } from '../services/meiliService';
+import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText, User, X } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -161,6 +161,7 @@ const SearchPage: React.FC = () => {
     const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
     const genreParam = searchParams.get('genre')?.split(',').filter(Boolean) || [];
     const typeParam = searchParams.get('type')?.split(',').filter(Boolean) || [];
+    const authorParam = searchParams.get('author') || '';
 
     // Local state for input fields
     const [inputValue, setInputValue] = useState(queryParam);
@@ -182,6 +183,13 @@ const SearchPage: React.FC = () => {
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
     const [selectedTypes, setSelectedTypes] = useState<string[]>(typeParam);
 
+    // Autori filter
+    const [selectedAuthor, setSelectedAuthor] = useState<string>(authorParam);
+    const [authorInput, setAuthorInput] = useState<string>(authorParam);
+    const [availableAuthors, setAvailableAuthors] = useState<{ value: string; count: number }[]>([]);
+    const [showAuthorSuggestions, setShowAuthorSuggestions] = useState(false);
+    const authorInputRef = useRef<HTMLInputElement>(null);
+
     // Sõnavara (tõlgete jaoks)
     const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
 
@@ -202,10 +210,11 @@ const SearchPage: React.FC = () => {
         const loadFilterData = async () => {
             try {
                 const facetLang = i18n.language.split('-')[0];
-                const [tags, genres, types, vocabs] = await Promise.all([
+                const [tags, genres, types, authors, vocabs] = await Promise.all([
                     getTeoseTagsFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getGenreFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getTypeFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
+                    getAuthorFacets(selectedCollection || undefined, yearStartParam, yearEndParam),
                     getVocabularies()
                 ]);
                 // Lisa valitud filtrid nimekirja isegi kui count=0 (UX)
@@ -215,6 +224,7 @@ const SearchPage: React.FC = () => {
                 setAvailableTeoseTags(tagsWithSelected);
                 setAvailableGenres(genresWithSelected);
                 setAvailableTypes(typesWithSelected);
+                setAvailableAuthors(authors);
                 setVocabularies(vocabs);
             } catch (e) {
                 console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
@@ -231,7 +241,9 @@ const SearchPage: React.FC = () => {
         setSelectedTeoseTags(teoseTagsParam);
         setSelectedGenres(genreParam);
         setSelectedTypes(typeParam);
-    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(',')]);
+        setSelectedAuthor(authorParam);
+        setAuthorInput(authorParam);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
 
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
@@ -269,7 +281,8 @@ const SearchPage: React.FC = () => {
                           selectedWork ||
                           selectedTeoseTags.length > 0 ||
                           selectedGenres.length > 0 ||
-                          selectedTypes.length > 0;
+                          selectedTypes.length > 0 ||
+                          selectedAuthor;
 
         // Update URL params, which triggers the effect below
         setSearchParams(prev => {
@@ -284,6 +297,7 @@ const SearchPage: React.FC = () => {
                 prev.delete('teoseTags');
                 prev.delete('genre');
                 prev.delete('type');
+                prev.delete('author');
             } else {
                 // Seadista otsingusõna (või eemalda kui tühi)
                 if (inputValue.trim()) {
@@ -301,6 +315,7 @@ const SearchPage: React.FC = () => {
                 if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
                 if (selectedGenres.length > 0) prev.set('genre', selectedGenres.join(',')); else prev.delete('genre');
                 if (selectedTypes.length > 0) prev.set('type', selectedTypes.join(',')); else prev.delete('type');
+                if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
             }
             return prev;
         });
@@ -325,6 +340,7 @@ const SearchPage: React.FC = () => {
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
                 genre: genreParam.length > 0 ? genreParam : undefined,
                 type: typeParam.length > 0 ? typeParam : undefined,
+                author: authorParam || undefined,
                 collection: selectedCollection || undefined,
                 lang: i18n.language.split('-')[0]  // et-EE -> et
             };
@@ -333,7 +349,7 @@ const SearchPage: React.FC = () => {
         } else {
             setResults(null);
         }
-    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), selectedCollection, i18n.language]);
+    }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam, selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -365,11 +381,13 @@ const SearchPage: React.FC = () => {
                 const newGenres = processFacets(`genre_${lang}`);
                 const newTypes = processFacets(`type_${lang}`);
                 const newTags = processFacets(`tags_${lang}`).map(t => ({ tag: t.value, count: t.count }));
+                const newAuthors = processFacets('author_names');
 
                 // Merge: säilita olemasolevad valikud + uuenda countid + lisa valitud
                 setAvailableTeoseTags(prev => mergeTagsWithExisting(prev, newTags, selectedTeoseTags));
                 setAvailableGenres(prev => mergeFacetsWithExisting(prev, newGenres, selectedGenres));
                 setAvailableTypes(prev => mergeFacetsWithExisting(prev, newTypes, selectedTypes));
+                setAvailableAuthors(newAuthors);
             }
 
             // Only reset expanded groups if it's a new query (page 1) and not filtering by work
@@ -605,6 +623,34 @@ const SearchPage: React.FC = () => {
                                 <Filter size={20} />
                             </button>
                         </form>
+
+                        {/* Autori filter badge */}
+                        {selectedAuthor && (
+                            <div className="flex items-center gap-2 mt-3">
+                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium border border-primary-200">
+                                    <User size={14} />
+                                    <span className="truncate max-w-xs">{selectedAuthor}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedAuthor('');
+                                            setAuthorInput('');
+                                            setInputValue('');
+                                            setSearchParams(prev => {
+                                                prev.delete('author');
+                                                prev.delete('q');
+                                                prev.set('p', '1');
+                                                return prev;
+                                            });
+                                        }}
+                                        className="ml-1 hover:bg-primary-100 rounded-full p-0.5"
+                                        title={t('filters.removeAuthorFilter')}
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </Header>
@@ -817,6 +863,109 @@ const SearchPage: React.FC = () => {
                             </CollapsibleSection>
                         )}
 
+                        {/* Author Filter - autori valik autocomplete'iga */}
+                        <CollapsibleSection
+                            title={t('filters.author')}
+                            icon={<User size={14} />}
+                            defaultOpen={!!selectedAuthor}
+                            badge={selectedAuthor ? 1 : undefined}
+                        >
+                            <div className="relative">
+                                <input
+                                    ref={authorInputRef}
+                                    type="text"
+                                    value={authorInput}
+                                    onChange={(e) => {
+                                        setAuthorInput(e.target.value);
+                                        setShowAuthorSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowAuthorSuggestions(true)}
+                                    onBlur={() => {
+                                        // Viivitusega sulgemine, et klõps jõuaks registreeruda
+                                        setTimeout(() => setShowAuthorSuggestions(false), 200);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            if (authorInput.trim()) {
+                                                setSelectedAuthor(authorInput.trim());
+                                                setShowAuthorSuggestions(false);
+                                                // Käivita otsing kohe
+                                                setSearchParams(prev => {
+                                                    prev.set('author', authorInput.trim());
+                                                    prev.set('p', '1');
+                                                    return prev;
+                                                });
+                                            }
+                                        } else if (e.key === 'Escape') {
+                                            setShowAuthorSuggestions(false);
+                                        }
+                                    }}
+                                    placeholder={t('filters.authorPlaceholder')}
+                                    className="w-full p-2 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none"
+                                />
+                                {/* Autocomplete soovitused */}
+                                {showAuthorSuggestions && authorInput.length >= 2 && (
+                                    <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                        {availableAuthors
+                                            .filter(({ value }) =>
+                                                value.toLowerCase().includes(authorInput.toLowerCase())
+                                            )
+                                            .slice(0, 10)
+                                            .map(({ value, count }) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        setAuthorInput(value);
+                                                        setSelectedAuthor(value);
+                                                        setShowAuthorSuggestions(false);
+                                                        // Käivita otsing kohe
+                                                        setSearchParams(prev => {
+                                                            prev.set('author', value);
+                                                            prev.set('p', '1');
+                                                            return prev;
+                                                        });
+                                                    }}
+                                                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex justify-between items-center"
+                                                >
+                                                    <span className="truncate">{value}</span>
+                                                    <span className="text-xs text-gray-400 ml-2">({count})</span>
+                                                </button>
+                                            ))}
+                                        {availableAuthors.filter(({ value }) =>
+                                            value.toLowerCase().includes(authorInput.toLowerCase())
+                                        ).length === 0 && (
+                                            <div className="px-3 py-2 text-sm text-gray-400">
+                                                {t('status.noResults')}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {/* Kustuta nupp kui on valitud */}
+                                {selectedAuthor && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedAuthor('');
+                                            setAuthorInput('');
+                                            setInputValue('');
+                                            setSearchParams(prev => {
+                                                prev.delete('author');
+                                                prev.delete('q');
+                                                prev.set('p', '1');
+                                                return prev;
+                                            });
+                                        }}
+                                        className="mt-2 text-xs text-red-600 hover:text-red-700"
+                                    >
+                                        {t('filters.removeAuthorFilter')}
+                                    </button>
+                                )}
+                            </div>
+                        </CollapsibleSection>
+
                         {/* Work Filter - teose valik */}
                         {(availableWorks.length > 0 || selectedWork) && (
                             <CollapsibleSection
@@ -900,7 +1049,7 @@ const SearchPage: React.FC = () => {
                             >
                                 {t('filters.applyFilters')}
                             </button>
-                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0) && (
+                            {(yearStart || yearEnd || selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor) && (
                                 <button
                                     onClick={() => {
                                         // Taasta vaikeväärtused
@@ -912,6 +1061,8 @@ const SearchPage: React.FC = () => {
                                         setSelectedTeoseTags([]);
                                         setSelectedGenres([]);
                                         setSelectedTypes([]);
+                                        setSelectedAuthor('');
+                                        setAuthorInput('');
                                         setSearchParams(prev => {
                                             prev.delete('ys');
                                             prev.delete('ye');
@@ -920,6 +1071,7 @@ const SearchPage: React.FC = () => {
                                             prev.delete('teoseTags');
                                             prev.delete('genre');
                                             prev.delete('type');
+                                            prev.delete('author');
                                             prev.set('p', '1');
                                             return prev;
                                         });
@@ -1036,12 +1188,15 @@ const SearchPage: React.FC = () => {
                                                             <button
                                                                 onClick={() => {
                                                                     const authorName = getAuthorDisplay(firstHit, t);
-                                                                    setInputValue(authorName);
-                                                                    setSearchParams(prev => {
-                                                                        prev.set('q', authorName);
-                                                                        prev.set('p', '1');
-                                                                        return prev;
-                                                                    });
+                                                                    if (authorName && authorName !== t('status.unknown')) {
+                                                                        setSelectedAuthor(authorName);
+                                                                        setAuthorInput(authorName);
+                                                                        setSearchParams(prev => {
+                                                                            prev.set('author', authorName);
+                                                                            prev.set('p', '1');
+                                                                            return prev;
+                                                                        });
+                                                                    }
                                                                 }}
                                                                 className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
                                                                 title={t('results.searchAuthorWorks')}

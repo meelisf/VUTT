@@ -261,6 +261,7 @@ export interface ContentSearchOptions {
   type?: string[];        // V2: tüübi filter (mitu valikut OR loogikaga)
   collection?: string;    // V2: kollektsiooni filter
   lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
+  author?: string;        // V2: autori filter (creators massiivist)
 }
 
 /**
