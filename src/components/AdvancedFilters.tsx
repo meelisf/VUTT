@@ -7,10 +7,10 @@
  * - Märksõnade filter (tags/teose_tags)
  * - Tüübi filter (type)
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, BookOpen, FileType, CircleDot } from 'lucide-react';
-import { getGenreFacets, getTypeFacets, getTeoseTagsFacets } from '../services/meiliService';
+import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/meiliService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
 interface FacetItem {
@@ -38,6 +38,10 @@ interface AdvancedFiltersProps {
   yearEnd?: number;
   // Valikuline: kas panna alguses lahti
   defaultExpanded?: boolean;
+  // Dünaamilised facetid otsingutulemustest (live counts)
+  facets?: FacetDistribution;
+  // Keel facetide jaoks
+  lang?: 'et' | 'en';
 }
 
 const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
@@ -52,49 +56,67 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   collection,
   yearStart,
   yearEnd,
-  defaultExpanded = false
+  defaultExpanded = false,
+  facets,
+  lang: propLang
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = propLang || (i18n.language.split('-')[0] as 'et' | 'en') || 'et';
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Facetide ja sõnavara state
-  const [genres, setGenres] = useState<FacetItem[]>([]);
-  const [tags, setTags] = useState<{ tag: string; count: number }[]>([]);
-  const [types, setTypes] = useState<FacetItem[]>([]);
+  // Sõnavara state (tõlked)
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [vocabLoading, setVocabLoading] = useState(true);
 
   // Staatuse valikud (fikseeritud, mitte facet)
   const statusOptions: WorkStatus[] = ['Toores', 'Töös', 'Valmis'];
 
-  // Lae facetid ja sõnavara - uuesti kui kollektsioon või aasta vahemik muutub
-  useEffect(() => {
-    const loadFacets = async () => {
-      setLoading(true);
-      try {
-        const collectionFilter = collection || undefined;
-        // Kasutame keelt, mis on i18n kaudu määratud
-        const facetLang = lang.split('-')[0]; // 'et-EE' -> 'et'
+  // Kontrolli, kas facetid on laetud (props kaudu)
+  const hasFacets = facets && Object.keys(facets).length > 0;
+  const loading = vocabLoading || !hasFacets;
 
-        const [genreData, tagData, typeData, vocabs] = await Promise.all([
-          getGenreFacets(collectionFilter, facetLang, yearStart, yearEnd),
-          getTeoseTagsFacets(collectionFilter, facetLang, yearStart, yearEnd),
-          getTypeFacets(collectionFilter, facetLang, yearStart, yearEnd),
-          getVocabularies()
-        ]);
-        setGenres(genreData);
-        setTags(tagData);
-        setTypes(typeData);
+  // Lae sõnavara (ainult tõlked, mitte facetid)
+  useEffect(() => {
+    const loadVocabularies = async () => {
+      try {
+        const vocabs = await getVocabularies();
         setVocabularies(vocabs);
       } catch (e) {
-        console.warn('Facetide laadimine ebaõnnestus:', e);
+        console.warn('Sõnavara laadimine ebaõnnestus:', e);
       } finally {
-        setLoading(false);
+        setVocabLoading(false);
       }
     };
-    loadFacets();
-  }, [collection, lang, yearStart, yearEnd]);
+    loadVocabularies();
+  }, []);
+
+  // Teisenda facetid loendiks - kasuta props faceteid kui olemas
+  const genres = useMemo<FacetItem[]>(() => {
+    const genreKey = `genre_${lang}` as keyof FacetDistribution;
+    const genreData = facets?.[genreKey] as Record<string, number> | undefined;
+    if (!genreData) return [];
+    return Object.entries(genreData)
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [facets, lang]);
+
+  const tags = useMemo<{ tag: string; count: number }[]>(() => {
+    const tagsKey = `tags_${lang}` as keyof FacetDistribution;
+    const tagsData = facets?.[tagsKey] as Record<string, number> | undefined;
+    if (!tagsData) return [];
+    return Object.entries(tagsData)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [facets, lang]);
+
+  const types = useMemo<FacetItem[]>(() => {
+    const typeKey = `type_${lang}` as keyof FacetDistribution;
+    const typeData = facets?.[typeKey] as Record<string, number> | undefined;
+    if (!typeData) return [];
+    return Object.entries(typeData)
+      .map(([value, count]) => ({ value, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [facets, lang]);
 
   // Kontrolli, kas on aktiivne filter
   const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { searchWorks } from '../services/meiliService';
+import { searchWorks, FacetDistribution } from '../services/meiliService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
@@ -39,6 +39,7 @@ const Dashboard: React.FC = () => {
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
+  const [facets, setFacets] = useState<FacetDistribution>({});
   const [currentPage, setCurrentPage] = useState(pageParam);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -252,7 +253,7 @@ const Dashboard: React.FC = () => {
         const end = parseInt(yearEnd) || undefined;
 
         // Pass filter options to the API (including status filter - server-side)
-        const results = await searchWorks(queryParam, {
+        const result = await searchWorks(queryParam, {
           yearStart: start,
           yearEnd: end,
           sort: sort,
@@ -267,7 +268,8 @@ const Dashboard: React.FC = () => {
           onlyFirstPage: sort !== 'recent',
           lang: i18n.language.split('-')[0]  // et-EE -> et
         });
-        setWorks(results);
+        setWorks(result.works);
+        setFacets(result.facets);
 
         // Reset to page 1 when filters change (but not when page param changes)
         if (currentPage !== 1 && !searchParams.get('page')) {
@@ -549,6 +551,8 @@ const Dashboard: React.FC = () => {
                 collection={selectedCollection}
                 yearStart={parseInt(yearStart) || undefined}
                 yearEnd={parseInt(yearEnd) || undefined}
+                facets={facets}
+                lang={i18n.language.split('-')[0] as 'et' | 'en'}
               />
             </div>
           </div>
