@@ -500,7 +500,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           searchParams.sort = ['aasta:desc'];
           break;
         case 'az':
-          searchParams.sort = ['title:asc'];
+          searchParams.sort = ['pealkiri:asc'];  // Meilisearch kasutab eestikeelseid välju
           break;
         case 'recent':
           searchParams.sort = ['last_modified:desc'];
