@@ -212,6 +212,10 @@ def sync_work_to_meilisearch(dir_name):
     languages = metadata.get('languages', [])
 
     # 2. Leia leheküljed (pildid)
+    # NB: Lehekülje number (page_num) tuleneb pildi POSITSIOONIST tähestikuliselt
+    # sorteeritud nimekirjas, MITTE failinimest. See võimaldab lehekülgi ümber
+    # järjestada (nt kui avastatakse puuduv lk) ilma failinimesid muutmata.
+    # Näide: 001.jpg=lk1, 002.jpg=lk2. Kui lisada 001a.jpg, siis: 001.jpg=lk1, 001a.jpg=lk2, 002.jpg=lk3
     images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
     if not images:
         print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
