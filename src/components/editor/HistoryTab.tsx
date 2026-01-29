@@ -331,7 +331,13 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                       {/* Kuupäev */}
                       <div className="flex items-center gap-1 text-sm text-gray-600 flex-shrink-0">
                         <Clock size={12} className="text-gray-400" />
-                        {entry.formatted_date}
+                        {new Date(entry.date).toLocaleString('et-EE', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </div>
 
                       {/* Kasutaja */}
