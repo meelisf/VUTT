@@ -267,6 +267,9 @@ def sync_work_to_meilisearch(dir_name):
 
         page_statuses.append(page_meta['status'])
 
+        # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
+        page_tags_data = page_meta.get('tags', [])
+
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
@@ -281,18 +284,18 @@ def sync_work_to_meilisearch(dir_name):
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "page_tags": [l.lower() for l in get_primary_labels(page_meta.get('page_tags', []))],
-            "page_tags_et": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', []), 'et')],
-            "page_tags_en": [l.lower() for l in get_labels_by_lang(page_meta.get('page_tags', []), 'en')],
+            "page_tags": [l.lower() for l in get_primary_labels(page_tags_data)],
+            "page_tags_et": [l.lower() for l in get_labels_by_lang(page_tags_data, 'et')],
+            "page_tags_en": [l.lower() for l in get_labels_by_lang(page_tags_data, 'en')],
             "page_tags_suggest_et": [
                 f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}"
-                for t in page_meta.get('page_tags', [])
+                for t in page_tags_data
             ],
             "page_tags_suggest_en": [
                 f"{get_label(t, 'en')}|||{t.get('id') if isinstance(t, dict) else ''}"
-                for t in page_meta.get('page_tags', [])
+                for t in page_tags_data
             ],
-            "page_tags_object": page_meta.get('page_tags', []),
+            "page_tags_object": page_tags_data,
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
