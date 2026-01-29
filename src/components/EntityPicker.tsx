@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library } from 'lucide-react';
+import { Search, Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { searchViaf, ViafSearchResult } from '../services/viafService';
+import { searchGnd, GndSearchResult } from '../services/gndService';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -33,7 +34,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   localSuggestions = []
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean; isViaf?: boolean })[]>([]);
+  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean; isViaf?: boolean; isGnd?: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -92,9 +93,26 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
            console.error("Wikidata search error", e);
         }
 
-        // 3. Otsi VIAF-ist (ainult isikute puhul)
+        // 3. Otsi GND-st ja VIAF-ist (ainult isikute puhul)
+        let gndMatches: (WikidataSearchResult & { isGnd: boolean })[] = [];
         let viafMatches: (WikidataSearchResult & { isViaf: boolean })[] = [];
+
         if (type === 'person' || type === 'printer') {
+          // GND on stabiilsem kui VIAF, otsime sealt eelistatult
+          try {
+            const gndResults = await searchGnd(inputValue);
+            gndMatches = gndResults.map(g => ({
+              id: g.id,
+              label: g.label,
+              description: g.description,
+              url: g.url,
+              isGnd: true
+            }));
+          } catch (e) {
+            console.error("GND search error", e);
+          }
+
+          // VIAF kui varuvariant
           try {
             const viafResults = await searchViaf(inputValue);
             viafMatches = viafResults.map(v => ({
@@ -113,7 +131,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
         const filteredWikidata = wikidataMatches.filter(m => !localIds.has(m.id));
 
-        setSuggestions([...localMatches, ...viafMatches, ...filteredWikidata]);
+        // Järjekord: kohalik -> GND -> VIAF -> Wikidata
+        setSuggestions([...localMatches, ...gndMatches, ...viafMatches, ...filteredWikidata]);
         setIsLoading(false);
         setSelectedIndex(0);
       } else {
@@ -123,7 +142,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     return () => clearTimeout(timer);
   }, [inputValue, showSuggestions, value, localSuggestions]);
 
-  const handleSelect = async (result: WikidataSearchResult & { isViaf?: boolean }) => {
+  const handleSelect = async (result: WikidataSearchResult & { isViaf?: boolean; isGnd?: boolean }) => {
     justSelectedRef.current = true; // Märgi, et valiti soovitus
     setIsLoading(true);
 
@@ -135,6 +154,14 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             id: null,
             label: result.label,
             source: 'manual',
+            labels: { et: result.label }
+        };
+    } else if (result.isGnd || result.id.startsWith('GND:')) {
+        // GND valik
+        entity = {
+            id: result.id,
+            label: result.label,
+            source: 'gnd',
             labels: { et: result.label }
         };
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
@@ -306,6 +333,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           <div className="overflow-y-auto flex-1">
             {suggestions.map((result, idx) => {
               const isLocal = result.isLocal;
+              const isGnd = result.isGnd || result.id.startsWith('GND:');
               const isViaf = result.isViaf || result.id.startsWith('VIAF:');
               return (
               <button
@@ -319,13 +347,14 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     {isLocal && <Database size={12} className="text-amber-600" title={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
+                    {isGnd && <BookMarked size={12} className="text-orange-600" title="GND" />}
                     {isViaf && <Library size={12} className="text-purple-600" title="VIAF" />}
                     <span className="font-medium text-gray-900 text-sm">{result.label}</span>
                   </div>
-                  {!isLocal && <span className={`text-[10px] font-mono px-1 rounded ${isViaf ? 'text-purple-500 bg-purple-50' : 'text-gray-400 bg-gray-100'}`}>{result.id}</span>}
+                  {!isLocal && <span className={`text-[10px] font-mono px-1 rounded ${isGnd ? 'text-orange-500 bg-orange-50' : isViaf ? 'text-purple-500 bg-purple-50' : 'text-gray-400 bg-gray-100'}`}>{result.id}</span>}
                 </div>
                 {result.description && (
-                  <span className={`text-xs line-clamp-1 ${isLocal ? 'text-amber-600/80 italic' : isViaf ? 'text-purple-500/80' : 'text-gray-500'}`}>{result.description}</span>
+                  <span className={`text-xs line-clamp-1 ${isLocal ? 'text-amber-600/80 italic' : isGnd ? 'text-orange-500/80' : isViaf ? 'text-purple-500/80' : 'text-gray-500'}`}>{result.description}</span>
                 )}
               </button>
             )})}
@@ -349,7 +378,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           <div className="bg-gray-50 px-3 py-1.5 border-t border-gray-100 flex justify-between items-center shrink-0">
             <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider flex items-center gap-2">
               <span className="flex items-center gap-1"><Globe size={10} /> Wikidata</span>
-              {(type === 'person' || type === 'printer') && <span className="flex items-center gap-1"><Library size={10} className="text-purple-500" /> VIAF</span>}
+              {(type === 'person' || type === 'printer') && <>
+                <span className="flex items-center gap-1"><BookMarked size={10} className="text-orange-500" /> GND</span>
+                <span className="flex items-center gap-1"><Library size={10} className="text-purple-500" /> VIAF</span>
+              </>}
             </span>
             {selectedIndex < suggestions.length && suggestions[selectedIndex] && suggestions[selectedIndex].url && (
               <a

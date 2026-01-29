@@ -15,6 +15,12 @@ export function getEntityUrl(id: string | null | undefined, source?: string): st
     return `https://www.wikidata.org/wiki/${id}`;
   }
 
+  // GND koodid (GND:1202439284)
+  if (source === 'gnd' || id.toUpperCase().startsWith('GND:')) {
+    const gndId = id.replace(/^gnd:/i, '');
+    return `https://d-nb.info/gnd/${gndId}`;
+  }
+
   // VIAF koodid (VIAF:12345 või viaf:12345)
   if (source === 'viaf' || id.toUpperCase().startsWith('VIAF:')) {
     const viafId = id.replace(/^viaf:/i, '');
