@@ -69,13 +69,16 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         
         // 1. Otsi kohalikest soovitustest
         const normalizedInput = inputValue.toLowerCase();
+        const localDbText = lang === 'en' ? 'Local database' : 'Kohalik andmebaas';
+        const linkedText = lang === 'en' ? 'linked' : 'seotud';
+        const unlinkedText = lang === 'en' ? 'unlinked' : 'sidumata';
         const localMatches: (WikidataSearchResult & { isLocal: boolean })[] = localSuggestions
           .filter(s => s.label.toLowerCase().includes(normalizedInput))
           .slice(0, 5) // Piira kohalike arvu
           .map(s => ({
             id: s.id || ('local-' + s.label), // Kasuta päris ID-d kui on, muidu local-
             label: s.label,
-            description: s.id ? `Kohalik andmebaas (seotud: ${s.id})` : 'Kohalik andmebaas (sidumata)',
+            description: s.id ? `${localDbText} (${linkedText}: ${s.id})` : `${localDbText} (${unlinkedText})`,
             url: '',
             isLocal: true
           }));
@@ -278,7 +281,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {isLocal && <Database size={12} className="text-amber-600" title="Kohalik andmebaas" />}
+                    {isLocal && <Database size={12} className="text-amber-600" title={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
                     <span className="font-medium text-gray-900 text-sm">{result.label}</span>
                   </div>
                   {!isLocal && <span className="text-[10px] font-mono text-gray-400 bg-gray-100 px-1 rounded">{result.id}</span>}
