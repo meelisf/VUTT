@@ -1053,6 +1053,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Käime läbi kõik kataloogid ja kogume andmeid
                 for entry in os.scandir(BASE_DIR):
                     if entry.is_dir():
+                        # 1. Teose metaandmed (_metadata.json)
                         meta_path = os.path.join(entry.path, '_metadata.json')
                         if os.path.exists(meta_path):
                             try:
@@ -1083,7 +1084,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                         else:
                                             add_item(genres, g)
                             except:
-                                continue
+                                pass
+
+                        # 2. Lehekülje märksõnad (*.json failid, v.a _metadata.json)
+                        try:
+                            for page_file in os.scandir(entry.path):
+                                if page_file.name.endswith('.json') and page_file.name != '_metadata.json':
+                                    try:
+                                        with open(page_file.path, 'r', encoding='utf-8') as f:
+                                            page_data = json.load(f)
+                                            # Toeta nii vana kui uut formaati
+                                            source = page_data.get('meta_content', page_data)
+                                            page_tags = source.get('page_tags', source.get('tags', []))
+                                            for pt in page_tags:
+                                                add_item(tags, pt)
+                                    except:
+                                        pass
+                        except:
+                            pass
                 
                 # Vaikimisi väärtused (kui puuduvad, lisa ilma ID-ta, v.a kui tahame hardcodeda ID-sid)
                 defaults_places = ['Tartu', 'Pärnu']
