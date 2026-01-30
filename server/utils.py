@@ -40,6 +40,8 @@ def atomic_write_json(filepath, data, indent=2):
 
         # Atomic rename (asendab olemasoleva faili)
         os.replace(tmp_path, filepath)
+        # Sea õigused loetavaks kõigile (Docker/root probleemi vältimiseks)
+        os.chmod(filepath, 0o644)
     except Exception:
         # Kustuta temp fail kui os.replace() ebaõnnestus
         if tmp_path and os.path.exists(tmp_path):

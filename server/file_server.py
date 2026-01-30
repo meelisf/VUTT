@@ -426,9 +426,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     # Fallback: salvestame failid ilma Gitita
                     with open(txt_path, 'w', encoding='utf-8') as f:
                         f.write(text_content)
+                    os.chmod(txt_path, 0o644)
                     for add_path, add_content in additional_files:
                         with open(add_path, 'w', encoding='utf-8') as f:
                             f.write(add_content)
+                        os.chmod(add_path, 0o644)
                     print(f"Salvestatud (ilma Gitita): {txt_path}")
 
                 # Sünkrooni Meilisearchiga ENNE vastuse saatmist
@@ -618,7 +620,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Kirjutame taastatud sisu
                 with open(txt_path, 'w', encoding='utf-8') as f:
                     f.write(restored_content)
-                
+                os.chmod(txt_path, 0o644)
+
                 print(f"Taastatud versioon: {backup_filename} -> {safe_filename}")
                 
                 self.send_response(200)

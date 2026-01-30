@@ -217,6 +217,8 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
     # Kirjuta põhifail
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(content)
+    # Sea failiõigused loetavaks kõigile (Docker/root probleemi vältimiseks)
+    os.chmod(filepath, 0o644)
 
     # Kogu kõik failid indeksisse lisamiseks
     files_to_add = [relative_path]
@@ -226,6 +228,7 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
         for add_filepath, add_content in additional_files:
             with open(add_filepath, 'w', encoding='utf-8') as f:
                 f.write(add_content)
+            os.chmod(add_filepath, 0o644)
             add_relative = os.path.relpath(add_filepath, BASE_DIR)
             files_to_add.append(add_relative)
 
