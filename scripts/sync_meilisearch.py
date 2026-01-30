@@ -65,10 +65,12 @@ def get_meilisearch_pages(client):
 
     while True:
         # Kasuta get_documents API-t - see ei ole piiratud maxTotalHits'iga
+        # NB: work_id on nanoid (nt "58sah4"), teose_id on slug (nt "Ametikirjad_1632_1")
+        #     Kasutame work_id, sest see ühtib failisüsteemi _metadata.json id väljaga
         result = index.get_documents({
             'offset': offset,
             'limit': limit,
-            'fields': ['id', 'teose_id', 'lehekylje_number', 'lehekylje_pilt',
+            'fields': ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_pilt',
                        'teose_lehekylgede_arv', 'originaal_kataloog']
         })
 
@@ -84,17 +86,21 @@ def get_meilisearch_pages(client):
             else:
                 doc_dict = doc.__dict__ if hasattr(doc, '__dict__') else {}
 
-            # Kasuta teose_id + lehekylje_number composite key'na (mitte dokumendi id)
-            # See tagab ühilduvuse failisüsteemiga, kus ID genereeritakse samuti nii
-            teose_id = doc_dict.get('teose_id') or getattr(doc, 'teose_id', None)
+            # Kasuta work_id + lehekylje_number composite key'na (mitte dokumendi id)
+            # NB: work_id on nanoid, teose_id on slug - failisüsteemis kasutame nanoid'i
+            work_id = doc_dict.get('work_id') or getattr(doc, 'work_id', None)
+            teose_id_fallback = doc_dict.get('teose_id') or getattr(doc, 'teose_id', None)
             page_num = doc_dict.get('lehekylje_number') or getattr(doc, 'lehekylje_number', None)
             doc_id = doc_dict.get('id') or getattr(doc, 'id', None)  # Algne ID kustutamiseks
 
-            if teose_id and page_num:
-                composite_key = f"{teose_id}-{page_num}"
+            # Eelista work_id (nanoid), fallback teose_id (slug)
+            effective_id = work_id or teose_id_fallback
+
+            if effective_id and page_num:
+                composite_key = f"{effective_id}-{page_num}"
                 pages[composite_key] = {
                     'id': doc_id,  # Säilitame algse ID kustutamiseks
-                    'teose_id': teose_id,
+                    'teose_id': effective_id,  # work_id (nanoid) või teose_id (slug)
                     'lehekylje_number': page_num,
                     'lehekylje_pilt': doc_dict.get('lehekylje_pilt') or getattr(doc, 'lehekylje_pilt', None),
                     'teose_lehekylgede_arv': doc_dict.get('teose_lehekylgede_arv') or getattr(doc, 'teose_lehekylgede_arv', None),
