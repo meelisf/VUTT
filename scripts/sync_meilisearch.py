@@ -121,10 +121,11 @@ def get_filesystem_pages(data_dir):
     """Hangib kõik leheküljed failisüsteemist."""
     pages = {}  # id -> info
     works = {}  # teose_id -> {'dir_name': str, 'page_count': int, 'pages': list}
+    unreadable_metadata = []  # Loetamatud _metadata.json failid
 
     if not os.path.exists(data_dir):
         print(f"Hoiatus: Andmekaust '{data_dir}' ei eksisteeri")
-        return pages, works
+        return pages, works, unreadable_metadata
 
     for dir_name in sorted(os.listdir(data_dir)):
         dir_path = os.path.join(data_dir, dir_name)
@@ -151,8 +152,11 @@ def get_filesystem_pages(data_dir):
                     meta = json.load(f)
                     work_id = meta.get('id')  # nanoid
                     teose_id = sanitize_id(meta.get('teose_id') or meta.get('slug') or dir_name)
-            except:
-                pass
+            except PermissionError:
+                # Tõenäoliselt root omanduses fail (nt Docker/serveri poolt loodud)
+                unreadable_metadata.append((dir_name, 'Permission denied'))
+            except Exception as e:
+                unreadable_metadata.append((dir_name, str(e)))
 
         # Kasuta nanoid't kui olemas, muidu slug
         id_for_pages = work_id or teose_id
@@ -176,6 +180,17 @@ def get_filesystem_pages(data_dir):
                 'originaal_kataloog': dir_name,
             }
             works[id_for_pages]['pages'].append(page_id)
+
+    # Hoiata loetamatute metaandmete failide kohta
+    if unreadable_metadata:
+        print(f"\n⚠️  HOIATUS: {len(unreadable_metadata)} _metadata.json faili ei saa lugeda!")
+        print("   Need tööd kasutavad kaustanime ID-na (võib põhjustada sünkroniseerimisprobleeme):")
+        for dir_name, error in unreadable_metadata:
+            print(f"   - {dir_name}: {error}")
+        print("\n   LAHENDUS: Paranda failide õigused:")
+        print("   sudo chown $USER:$USER data/*/_metadata.json")
+        print("   sudo chmod 644 data/*/_metadata.json")
+        print()
 
     return pages, works
 
