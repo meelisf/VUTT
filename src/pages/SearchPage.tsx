@@ -1278,7 +1278,7 @@ const SearchPage: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="shrink-0 text-right">
-                                                        <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600" title="Teose ID">
+                                                        <span className="font-mono bg-gray-200 px-1.5 py-0.5 rounded text-xs text-gray-600" title={t('labels.workId')}>
                                                             {firstHit.work_id || workId}
                                                         </span>
                                                     </div>

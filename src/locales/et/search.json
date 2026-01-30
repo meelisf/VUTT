@@ -65,6 +65,7 @@
   "labels": {
     "author": "Autor:",
     "year": "Aasta:",
-    "id": "ID:"
+    "id": "ID:",
+    "workId": "Teose ID"
   }
 }

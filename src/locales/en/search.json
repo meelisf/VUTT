@@ -65,6 +65,7 @@
   "labels": {
     "author": "Author:",
     "year": "Year:",
-    "id": "ID:"
+    "id": "ID:",
+    "workId": "Work ID"
   }
 }
