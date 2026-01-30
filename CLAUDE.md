@@ -48,6 +48,8 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 |----------|---------|
 | `src/pages/` | Dashboard, Workspace, SearchPage, Statistics, Review, Admin |
 | `src/services/meiliService.ts` | All Meilisearch operations |
+| `src/services/collectionService.ts` | Collection helpers, color classes |
+| `src/contexts/CollectionContext.tsx` | Collection state (React Context) |
 | `src/components/EntityPicker.tsx` | Wikidata linked data picker |
 | `server/file_server.py` | Main HTTP server, all endpoints |
 | `server/git_ops.py` | Git version control |
@@ -65,6 +67,33 @@ All metadata fields support LinkedEntity objects:
 Supported: `genre`, `type`, `location`, `publisher`, `tags`, `creators[]`
 
 Links: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123` - no public URL)
+
+## Collections
+
+Hierarchical collections with configurable colors. State managed via `CollectionContext`.
+
+**Config:** `state/collections.json` (not in git, copy manually via scp)
+
+```json
+{
+  "academia-gustaviana": {
+    "name": { "et": "Academia Gustaviana", "en": "Academia Gustaviana" },
+    "parent": "universitas-dorpatensis-1",
+    "color": "amber"
+  }
+}
+```
+
+**Colors:** Tailwind color names (`red`, `amber`, `teal`, `violet`, etc.). Default: `indigo`.
+
+**Usage:**
+```tsx
+import { getCollectionColorClasses } from '../services/collectionService';
+const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
+// Returns: { bg: 'bg-amber-50', text: 'text-amber-700', ... }
+```
+
+Collection displayed in: Dashboard cards, Workspace info panel, SearchPage results, Header indicator.
 
 ## Authentication
 
@@ -120,7 +149,9 @@ Files: `src/locales/{et,en}/*.json`
 
 - Wikidata integration (all fields including creators)
 - VIAF links
-- Collections (hierarchical)
+- Collections (hierarchical, with colors)
+- Collection display in WorkCard, AnnotationsTab, SearchPage
 - JSON files in git (txt + json same commit, _metadata.json tracked)
 - Metadata changes in Review page (yellow badge)
 - Search filters: type multi-select, facets preserve all options
+- File permissions fix (chmod 644 after writes)
