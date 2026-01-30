@@ -63,9 +63,13 @@
   },
   "filters": {
     "advanced": "Täpsemad valikud",
+    "status": "Staatus",
     "genre": "Žanr",
+    "searchGenre": "Otsi žanrit...",
     "tags": "Märksõnad",
+    "searchTag": "Otsi märksõna...",
     "type": "Tüüp",
+    "searchType": "Otsi tüüpi...",
     "clearAdvanced": "Tühjenda täpsemad filtrid"
   }
 }

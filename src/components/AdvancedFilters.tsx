@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Tag, BookOpen, FileType, CircleDot } from 'lucide-react';
+import { ChevronDown, ChevronRight, Tag, BookOpen, FileType, CircleDot, Search } from 'lucide-react';
 import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/meiliService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
@@ -43,6 +43,88 @@ interface AdvancedFiltersProps {
   // Keel facetide jaoks
   lang?: 'et' | 'en';
 }
+
+interface FilterItem {
+  value: string;
+  label: string;
+  count: number;
+}
+
+interface FilterSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  items: FilterItem[];
+  selectedValues: string[];
+  onToggle: (value: string) => void;
+  searchPlaceholder: string;
+}
+
+const FilterSection: React.FC<FilterSectionProps> = ({
+  title,
+  icon,
+  items,
+  selectedValues,
+  onToggle,
+  searchPlaceholder
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const showSearch = items.length > 10;
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery) return items;
+    const lowerQuery = searchQuery.toLowerCase();
+    return items.filter(item => 
+      item.label.toLowerCase().includes(lowerQuery)
+    );
+  }, [items, searchQuery]);
+
+  return (
+    <div>
+      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        {icon}
+        {title}
+      </h4>
+      
+      {showSearch && (
+        <div className="relative mb-2">
+          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <Search size={14} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
+          />
+        </div>
+      )}
+
+      <div className={`flex flex-wrap gap-2 ${showSearch ? 'max-h-60 overflow-y-auto custom-scrollbar pr-1' : ''}`}>
+        {filteredItems.length === 0 ? (
+          <span className="text-sm text-gray-400 italic py-1">Ei leitud vasteid</span>
+        ) : (
+          filteredItems.map(({ value, label, count }) => {
+            const isSelected = selectedValues.includes(value);
+            return (
+              <button
+                key={value}
+                onClick={() => onToggle(value)}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
+                  isSelected
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {label} <span className="opacity-60 text-xs">({count})</span>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+};
 
 const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   selectedGenre,
@@ -90,33 +172,48 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     loadVocabularies();
   }, []);
 
-  // Teisenda facetid loendiks - kasuta props faceteid kui olemas
-  const genres = useMemo<FacetItem[]>(() => {
+  // Ettevalmistatud andmed FilterSection jaoks
+  const genreItems = useMemo<FilterItem[]>(() => {
     const genreKey = `genre_${lang}` as keyof FacetDistribution;
     const genreData = facets?.[genreKey] as Record<string, number> | undefined;
     if (!genreData) return [];
+    
     return Object.entries(genreData)
-      .map(([value, count]) => ({ value, count }))
+      .map(([value, count]) => ({ 
+        value, 
+        count,
+        label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
+      }))
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang]);
+  }, [facets, lang, vocabularies]);
 
-  const tags = useMemo<{ tag: string; count: number }[]>(() => {
+  const tagItems = useMemo<FilterItem[]>(() => {
     const tagsKey = `tags_${lang}` as keyof FacetDistribution;
     const tagsData = facets?.[tagsKey] as Record<string, number> | undefined;
     if (!tagsData) return [];
+    
     return Object.entries(tagsData)
-      .map(([tag, count]) => ({ tag, count }))
+      .map(([tag, count]) => ({ 
+        value: tag, 
+        label: tag, 
+        count 
+      }))
       .sort((a, b) => b.count - a.count);
   }, [facets, lang]);
 
-  const types = useMemo<FacetItem[]>(() => {
+  const typeItems = useMemo<FilterItem[]>(() => {
     const typeKey = `type_${lang}` as keyof FacetDistribution;
     const typeData = facets?.[typeKey] as Record<string, number> | undefined;
     if (!typeData) return [];
+    
     return Object.entries(typeData)
-      .map(([value, count]) => ({ value, count }))
+      .map(([value, count]) => ({ 
+        value, 
+        count,
+        label: vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
+      }))
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang]);
+  }, [facets, lang, vocabularies]);
 
   // Kontrolli, kas on aktiivne filter
   const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;
@@ -156,12 +253,12 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
       {/* Sisu */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-4">
+        <div className="px-4 pb-4 space-y-6">
           {loading ? (
             <div className="text-sm text-gray-400 py-2">{t('common:labels.loading')}</div>
           ) : (
             <>
-              {/* Staatus */}
+              {/* Staatus - jääb eraldi, kuna on väike ja staatiline */}
               <div>
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
                   <CircleDot size={12} />
@@ -193,106 +290,56 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               </div>
 
               {/* Žanr (genre) */}
-              {genres.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <BookOpen size={12} />
-                    {t('filters.genre', 'Žanr')}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {genres.map(({ value, count }) => {
-                      const isSelected = selectedGenre === value;
-                      // Proovi tõlkida ID järgi vocabist (legacy), muul juhul kasuta väärtust otse (V3 localized string)
-                      const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
-                      return (
-                        <button
-                          key={value}
-                          onClick={() => onGenreChange(isSelected ? null : value)}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {label} <span className="opacity-60">({count})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {genreItems.length > 0 && (
+                <FilterSection
+                  title={t('filters.genre', 'Žanr')}
+                  icon={<BookOpen size={12} />}
+                  items={genreItems}
+                  selectedValues={selectedGenre ? [selectedGenre] : []}
+                  onToggle={(val) => onGenreChange(selectedGenre === val ? null : val)}
+                  searchPlaceholder={t('filters.searchGenre', 'Otsi žanrit...')}
+                />
               )}
 
               {/* Märksõnad (tags) */}
-              {tags.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <Tag size={12} />
-                    {t('filters.tags', 'Märksõnad')}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map(({ tag, count }) => {
-                      const isSelected = selectedTags.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          onClick={() => toggleTag(tag)}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {tag} <span className="opacity-60">({count})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {tagItems.length > 0 && (
+                <FilterSection
+                  title={t('filters.tags', 'Märksõnad')}
+                  icon={<Tag size={12} />}
+                  items={tagItems}
+                  selectedValues={selectedTags}
+                  onToggle={toggleTag}
+                  searchPlaceholder={t('filters.searchTag', 'Otsi märksõna...')}
+                />
               )}
 
               {/* Tüüp (type) */}
-              {types.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                    <FileType size={12} />
-                    {t('filters.type', 'Tüüp')}
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {types.map(({ value, count }) => {
-                      const isSelected = selectedType === value;
-                      // Proovi tõlkida ID järgi vocabist (legacy), muul juhul kasuta väärtust otse
-                      const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
-                      return (
-                        <button
-                          key={value}
-                          onClick={() => onTypeChange(isSelected ? null : value)}
-                          className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                            isSelected
-                              ? 'bg-primary-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {label} <span className="opacity-60">({count})</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              {typeItems.length > 0 && (
+                <FilterSection
+                  title={t('filters.type', 'Tüüp')}
+                  icon={<FileType size={12} />}
+                  items={typeItems}
+                  selectedValues={selectedType ? [selectedType] : []}
+                  onToggle={(val) => onTypeChange(selectedType === val ? null : val)}
+                  searchPlaceholder={t('filters.searchType', 'Otsi tüüpi...')}
+                />
               )}
 
               {/* Tühjenda filtrid */}
               {hasActiveFilters && (
-                <button
-                  onClick={() => {
-                    onGenreChange(null);
-                    onTagsChange([]);
-                    onTypeChange(null);
-                    onStatusChange(null);
-                  }}
-                  className="text-sm text-red-600 hover:text-red-700 font-medium"
-                >
-                  {t('filters.clearAdvanced', 'Tühjenda täpsemad filtrid')}
-                </button>
+                <div className="pt-2 border-t border-gray-100">
+                  <button
+                    onClick={() => {
+                      onGenreChange(null);
+                      onTagsChange([]);
+                      onTypeChange(null);
+                      onStatusChange(null);
+                    }}
+                    className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                  >
+                    {t('filters.clearAdvanced', 'Tühjenda kõik filtrid')}
+                  </button>
+                </div>
               )}
             </>
           )}

@@ -63,9 +63,13 @@
   },
   "filters": {
     "advanced": "Advanced options",
+    "status": "Status",
     "genre": "Genre",
+    "searchGenre": "Search genre...",
     "tags": "Tags",
+    "searchTag": "Search tag...",
     "type": "Type",
+    "searchType": "Search type...",
     "clearAdvanced": "Clear advanced filters"
   }
 }

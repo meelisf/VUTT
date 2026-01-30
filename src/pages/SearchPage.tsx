@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText, User, X, FolderOpen } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, FileType, User, X, FolderOpen } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -141,6 +141,71 @@ const mergeSelectedIntoTags = (
         }
     }
     return merged;
+};
+
+// Abikomponent otsitava ja keritava filtri loendi jaoks
+const SearchableFilterList: React.FC<{
+    items: { value: string; label: string; count: number }[];
+    selectedValues: string[];
+    onToggle: (value: string) => void;
+    placeholder: string;
+    maxHeight?: string;
+    isRadio?: boolean;
+    renderItem?: (item: { value: string; label: string; count: number }, isSelected: boolean) => React.ReactNode;
+}> = ({ items, selectedValues, onToggle, placeholder, maxHeight = 'max-h-60', isRadio = false, renderItem }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const showSearch = items.length > 10;
+
+    const filteredItems = useMemo(() => {
+        if (!searchQuery) return items;
+        const lowerQuery = searchQuery.toLowerCase();
+        return items.filter(item => 
+            item.label.toLowerCase().includes(lowerQuery)
+        );
+    }, [items, searchQuery]);
+
+    return (
+        <div className="space-y-2">
+            {showSearch && (
+                <div className="relative mb-2">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={placeholder}
+                        className="w-full pl-8 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primary-500 bg-gray-50/50"
+                    />
+                </div>
+            )}
+            <div className={`space-y-1 overflow-y-scroll custom-scrollbar pr-1 ${showSearch ? 'h-60' : ''}`}>
+                {filteredItems.length === 0 ? (
+                    <div className="text-xs text-gray-400 italic py-2 px-1">Ei leitud vasteid</div>
+                ) : (
+                    filteredItems.map((item) => {
+                        const isSelected = selectedValues.includes(item.value);
+                        
+                        if (renderItem) return renderItem(item, isSelected);
+
+                        return (
+                            <label key={item.value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded group">
+                                <input
+                                    type={isRadio ? "radio" : "checkbox"}
+                                    checked={isSelected}
+                                    onChange={() => onToggle(item.value)}
+                                    className="text-primary-600 focus:ring-primary-500 rounded"
+                                />
+                                <span className={`text-sm flex-1 truncate ${isSelected ? 'text-primary-700 font-medium' : 'text-gray-700'}`}>
+                                    {item.label}
+                                </span>
+                                <span className="text-xs text-gray-400 group-hover:text-gray-600">({item.count})</span>
+                            </label>
+                        );
+                    })
+                )}
+            </div>
+        </div>
+    );
 };
 
 const SearchPage: React.FC = () => {
@@ -781,31 +846,22 @@ const SearchPage: React.FC = () => {
                                 defaultOpen={selectedGenres.length > 0}
                                 badge={selectedGenres.length || undefined}
                             >
-                                <div className="space-y-1">
-                                    {availableGenres.map(({ value, count }) => {
-                                        const lang = (i18n.language as 'et' | 'en') || 'et';
-                                        const label = vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value;
-                                        const isSelected = selectedGenres.includes(value);
-                                        return (
-                                            <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {
-                                                        if (isSelected) {
-                                                            setSelectedGenres(selectedGenres.filter(g => g !== value));
-                                                        } else {
-                                                            setSelectedGenres([...selectedGenres, value]);
-                                                        }
-                                                    }}
-                                                    className="text-primary-600 focus:ring-primary-500 rounded"
-                                                />
-                                                <span className="text-sm text-gray-700 flex-1">{label}</span>
-                                                <span className="text-xs text-gray-400">({count})</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+                                <SearchableFilterList
+                                    items={availableGenres.map(({ value, count }) => ({
+                                        value,
+                                        count,
+                                        label: vocabularies?.genres?.[value]?.[i18n.language.split('-')[0] as 'et' | 'en'] || vocabularies?.genres?.[value]?.et || value
+                                    }))}
+                                    selectedValues={selectedGenres}
+                                    onToggle={(value) => {
+                                        if (selectedGenres.includes(value)) {
+                                            setSelectedGenres(selectedGenres.filter(g => g !== value));
+                                        } else {
+                                            setSelectedGenres([...selectedGenres, value]);
+                                        }
+                                    }}
+                                    placeholder={t('filters.searchGenre', 'Otsi žanrit...')}
+                                />
                             </CollapsibleSection>
                         )}
 
@@ -817,29 +873,22 @@ const SearchPage: React.FC = () => {
                                 defaultOpen={selectedTeoseTags.length > 0}
                                 badge={selectedTeoseTags.length || undefined}
                             >
-                                <div className="space-y-1">
-                                    {availableTeoseTags.map(({ tag, count }) => {
-                                        const isSelected = selectedTeoseTags.includes(tag);
-                                        return (
-                                            <label key={tag} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {
-                                                        if (isSelected) {
-                                                            setSelectedTeoseTags(selectedTeoseTags.filter(t => t !== tag));
-                                                        } else {
-                                                            setSelectedTeoseTags([...selectedTeoseTags, tag]);
-                                                        }
-                                                    }}
-                                                    className="text-primary-600 focus:ring-primary-500 rounded"
-                                                />
-                                                <span className="text-sm text-gray-700 flex-1">{tag}</span>
-                                                <span className="text-xs text-gray-400">({count})</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+                                <SearchableFilterList
+                                    items={availableTeoseTags.map(({ tag, count }) => ({
+                                        value: tag,
+                                        label: tag,
+                                        count
+                                    }))}
+                                    selectedValues={selectedTeoseTags}
+                                    onToggle={(value) => {
+                                        if (selectedTeoseTags.includes(value)) {
+                                            setSelectedTeoseTags(selectedTeoseTags.filter(t => t !== value));
+                                        } else {
+                                            setSelectedTeoseTags([...selectedTeoseTags, value]);
+                                        }
+                                    }}
+                                    placeholder={t('filters.searchTag', 'Otsi märksõna...')}
+                                />
                             </CollapsibleSection>
                         )}
 
@@ -847,35 +896,26 @@ const SearchPage: React.FC = () => {
                         {availableTypes.length > 0 && (
                             <CollapsibleSection
                                 title={t('filters.type')}
-                                icon={<ScrollText size={14} />}
+                                icon={<FileType size={14} />}
                                 defaultOpen={selectedTypes.length > 0}
                                 badge={selectedTypes.length || undefined}
                             >
-                                <div className="space-y-1">
-                                    {availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => {
-                                        const lang = (i18n.language as 'et' | 'en') || 'et';
-                                        const label = vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value;
-                                        const isSelected = selectedTypes.includes(value);
-                                        return (
-                                            <label key={value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => {
-                                                        if (isSelected) {
-                                                            setSelectedTypes(selectedTypes.filter(t => t !== value));
-                                                        } else {
-                                                            setSelectedTypes([...selectedTypes, value]);
-                                                        }
-                                                    }}
-                                                    className="text-primary-600 focus:ring-primary-500 rounded"
-                                                />
-                                                <span className="text-sm text-gray-700 flex-1">{label}</span>
-                                                <span className="text-xs text-gray-400">({count})</span>
-                                            </label>
-                                        );
-                                    })}
-                                </div>
+                                <SearchableFilterList
+                                    items={availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => ({
+                                        value,
+                                        count,
+                                        label: vocabularies?.types?.[value]?.[i18n.language.split('-')[0] as 'et' | 'en'] || vocabularies?.types?.[value]?.et || value
+                                    }))}
+                                    selectedValues={selectedTypes}
+                                    onToggle={(value) => {
+                                        if (selectedTypes.includes(value)) {
+                                            setSelectedTypes(selectedTypes.filter(t => t !== value));
+                                        } else {
+                                            setSelectedTypes([...selectedTypes, value]);
+                                        }
+                                    }}
+                                    placeholder={t('filters.searchType', 'Otsi tüüpi...')}
+                                />
                             </CollapsibleSection>
                         )}
 
@@ -990,71 +1030,110 @@ const SearchPage: React.FC = () => {
                                 defaultOpen={!!selectedWork}
                                 badge={selectedWork ? 1 : undefined}
                             >
-                                <div className="space-y-1 max-h-48 overflow-y-auto">
-                                    <label className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                        <input
-                                            type="radio"
-                                            name="work"
-                                            value=""
-                                            checked={!selectedWork}
-                                            onChange={() => {
-                                                setSelectedWork('');
-                                                setSelectedWorkInfo(null);
-                                            }}
-                                            className="text-primary-600 focus:ring-primary-500"
-                                        />
-                                        <span className="text-sm text-gray-700">{t('filters.allWorks')}</span>
-                                    </label>
+                                <SearchableFilterList
+                                    items={[
+                                        { value: '', label: t('filters.allWorks'), count: 0 },
+                                        ...availableWorks.map(w => ({
+                                            value: w.id,
+                                            label: w.title,
+                                            count: w.count,
+                                            year: w.year,
+                                            author: w.author
+                                        }))
+                                    ]}
+                                    selectedValues={[selectedWork]}
+                                    isRadio={true}
+                                    onToggle={(value) => {
+                                        if (value === '') {
+                                            setSelectedWork('');
+                                            setSelectedWorkInfo(null);
+                                        } else {
+                                            const work = availableWorks.find(w => w.id === value);
+                                            if (work) {
+                                                setSelectedWork(work.id);
+                                                setSelectedWorkInfo({ title: work.title, year: work.year, author: work.author });
+                                            }
+                                        }
+                                    }}
+                                    placeholder={t('filters.searchWork', 'Otsi teost...')}
+                                    renderItem={(item, isSelected) => {
+                                        // Erijuht: "Kõik teosed"
+                                        if (item.value === '') {
+                                            return (
+                                                <label key="all" className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded group">
+                                                    <input
+                                                        type="radio"
+                                                        name="work"
+                                                        checked={!selectedWork}
+                                                        onChange={() => {
+                                                            setSelectedWork('');
+                                                            setSelectedWorkInfo(null);
+                                                        }}
+                                                        className="text-primary-600 focus:ring-primary-500"
+                                                    />
+                                                    <span className={`text-sm flex-1 ${!selectedWork ? 'text-primary-700 font-medium' : 'text-gray-700'}`}>
+                                                        {item.label}
+                                                    </span>
+                                                </label>
+                                            );
+                                        }
 
-                                    {availableWorks.map((work) => (
-                                        <label key={work.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                            <input
-                                                type="radio"
-                                                name="work"
-                                                value={work.id}
-                                                checked={selectedWork === work.id}
-                                                onChange={() => {
-                                                    setSelectedWork(work.id);
-                                                    setSelectedWorkInfo({ title: work.title, year: work.year, author: work.author });
-                                                }}
-                                                className="text-primary-600 focus:ring-primary-500 shrink-0"
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <span className="text-sm text-gray-700 block truncate" title={work.title}>
-                                                    {work.title}
+                                        // Tavaline teos
+                                        return (
+                                            <label key={item.value} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded group">
+                                                <input
+                                                    type="radio"
+                                                    name="work"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        const work = availableWorks.find(w => w.id === item.value);
+                                                        if (work) {
+                                                            setSelectedWork(work.id);
+                                                            setSelectedWorkInfo({ title: work.title, year: work.year, author: work.author });
+                                                        }
+                                                    }}
+                                                    className="text-primary-600 focus:ring-primary-500 shrink-0"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <span className={`text-sm block truncate ${isSelected ? 'text-primary-700 font-medium' : 'text-gray-700'}`} title={item.label}>
+                                                        {item.label}
+                                                    </span>
+                                                    <span className="text-xs text-gray-400 group-hover:text-gray-500">
+                                                        {(item as any).year}{(item as any).author ? ` · ${(item as any).author}` : ''}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full shrink-0 group-hover:bg-gray-200">
+                                                    {item.count}
                                                 </span>
-                                                <span className="text-xs text-gray-400">
-                                                    {work.year}{work.author ? ` · ${work.author}` : ''}
-                                                </span>
-                                            </div>
-                                            <span className="text-xs text-gray-400 bg-gray-100 px-1.5 rounded-full shrink-0">{work.count}</span>
-                                        </label>
-                                    ))}
+                                            </label>
+                                        );
+                                    }}
+                                />
 
-                                    {/* Näita valitud teost kui seda pole facetis */}
-                                    {selectedWork && !availableWorks.find((w) => w.id === selectedWork) && (
+                                {/* Näita valitud teost kui seda pole facetis (nt tullakse otselingiga) */}
+                                {selectedWork && !availableWorks.find((w) => w.id === selectedWork) && (
+                                    <div className="mt-2 pt-2 border-t border-gray-100">
                                         <label className="flex items-center gap-2 cursor-pointer bg-primary-50 p-1 rounded">
                                             <input
                                                 type="radio"
                                                 name="work"
-                                                value={selectedWork}
                                                 checked
                                                 readOnly
                                                 className="text-primary-600"
                                             />
                                             <div className="flex-1 min-w-0">
-                                                <span className="text-sm text-gray-700 font-medium block truncate" title={selectedWorkInfo?.title || selectedWork}>
+                                                <span className="text-sm text-primary-700 font-medium block truncate" title={selectedWorkInfo?.title || selectedWork}>
                                                     {selectedWorkInfo?.title || selectedWork}
                                                 </span>
                                                 {selectedWorkInfo && (
-                                                    <span className="text-xs text-gray-400">
+                                                    <span className="text-xs text-primary-600 opacity-70">
                                                         {selectedWorkInfo.year}{selectedWorkInfo.author ? ` · ${selectedWorkInfo.author}` : ''}
                                                     </span>
                                                 )}
                                             </div>
                                         </label>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </CollapsibleSection>
                         )}
 

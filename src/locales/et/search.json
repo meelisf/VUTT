@@ -26,6 +26,10 @@
     "allWorks": "Kõik teosed",
     "author": "Autor",
     "authorPlaceholder": "Sisesta autori nimi...",
+    "searchGenre": "Otsi žanrit...",
+    "searchTag": "Otsi märksõna...",
+    "searchType": "Otsi tüüpi...",
+    "searchWork": "Otsi teost...",
     "removeAuthorFilter": "Eemalda autori filter",
     "applyFilters": "Rakenda filtrid",
     "clearFilters": "Tühjenda filtrid"

@@ -26,6 +26,10 @@
     "allWorks": "All works",
     "author": "Author",
     "authorPlaceholder": "Enter author name...",
+    "searchGenre": "Search genre...",
+    "searchTag": "Search tag...",
+    "searchType": "Search type...",
+    "searchWork": "Search work...",
     "removeAuthorFilter": "Remove author filter",
     "applyFilters": "Apply filters",
     "clearFilters": "Clear filters"
