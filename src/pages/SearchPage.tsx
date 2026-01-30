@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText, User, X } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText, User, X, FolderOpen } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -1201,6 +1201,7 @@ const SearchPage: React.FC = () => {
                                                             {firstHit.title || t('status.titleMissing')}
                                                         </h2>
                                                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 font-medium">
+                                                            {/* Autor */}
                                                             <button
                                                                 onClick={() => {
                                                                     const authorName = getAuthorDisplay(firstHit, t);
@@ -1214,13 +1215,14 @@ const SearchPage: React.FC = () => {
                                                                         });
                                                                     }
                                                                 }}
-                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
+                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 transition-colors text-left"
                                                                 title={t('results.searchAuthorWorks')}
                                                             >
-                                                                <span className="uppercase text-gray-400 text-[10px]">{t('labels.author')}</span>
-                                                                {getAuthorDisplay(firstHit, t)}
+                                                                <User size={12} className="text-gray-400" />
+                                                                <span className="hover:underline">{getAuthorDisplay(firstHit, t)}</span>
                                                             </button>
-                                                            <span className="text-gray-300">❧</span>
+
+                                                            {/* Aasta */}
                                                             <button
                                                                 onClick={() => {
                                                                     const year = (firstHit.year ?? firstHit.aasta)?.toString();
@@ -1235,18 +1237,18 @@ const SearchPage: React.FC = () => {
                                                                         });
                                                                     }
                                                                 }}
-                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 hover:underline transition-colors text-left"
+                                                                className="text-gray-700 flex items-center gap-1 hover:text-primary-600 transition-colors text-left"
                                                                 title={t('results.searchYearWorks')}
                                                             >
-                                                                <span className="uppercase text-gray-400 text-[10px]">{t('labels.year')}</span>
-                                                                {firstHit.year ?? firstHit.aasta ?? '...'}
+                                                                <Calendar size={12} className="text-gray-400" />
+                                                                <span className="hover:underline">{firstHit.year ?? firstHit.aasta ?? '...'}</span>
                                                             </button>
-                                                            
-                                                            {/* Lisame Žanri ja Tüübi */}
+
+                                                            {/* Žanr */}
                                                             {(() => {
                                                                 const lang = i18n.language.split('-')[0];
                                                                 let label = getLabel(firstHit.genre_object, i18n.language);
-                                                                
+
                                                                 // Fallback: proovi leida stringist või sõnavarast
                                                                 if (!label && firstHit.genre && typeof firstHit.genre === 'string') {
                                                                     const val = firstHit.genre.toLowerCase();
@@ -1254,36 +1256,23 @@ const SearchPage: React.FC = () => {
                                                                 }
 
                                                                 if (!label) return null;
-                                                                
+
                                                                 return (
-                                                                    <>
-                                                                        <span className="text-gray-300">❧</span>
-                                                                        <span className="text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded text-[10px]">
-                                                                            {label}
-                                                                        </span>
-                                                                    </>
+                                                                    <span className="flex items-center gap-1 text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
+                                                                        <Tag size={10} className="text-gray-400" />
+                                                                        {label}
+                                                                    </span>
                                                                 );
                                                             })()}
-                                                            
-                                                            {(() => {
-                                                                const lang = i18n.language.split('-')[0];
-                                                                let label = getLabel(firstHit.type_object, i18n.language);
-                                                                
-                                                                // Fallback: proovi leida stringist või sõnavarast
-                                                                if (!label && firstHit.type && typeof firstHit.type === 'string') {
-                                                                    const val = firstHit.type.toLowerCase();
-                                                                    label = vocabularies?.types?.[val]?.[lang] || firstHit.type;
-                                                                }
 
-                                                                if (!label) return null;
-
+                                                            {/* Kollektsioon (tüübi asemel) */}
+                                                            {firstHit.collection && collections[firstHit.collection] && (() => {
+                                                                const colorClasses = getCollectionColorClasses(collections[firstHit.collection]);
                                                                 return (
-                                                                    <>
-                                                                        <span className="text-gray-300">❧</span>
-                                                                        <span className="text-gray-500 italic">
-                                                                            {label}
-                                                                        </span>
-                                                                    </>
+                                                                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${colorClasses.bg} ${colorClasses.text}`}>
+                                                                        <FolderOpen size={10} />
+                                                                        {getCollectionName(firstHit.collection, i18n.language.split('-')[0] as 'et' | 'en')}
+                                                                    </span>
                                                                 );
                                                             })()}
                                                         </div>
