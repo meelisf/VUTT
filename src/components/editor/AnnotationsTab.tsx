@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2 } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen } from 'lucide-react';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getWorkFullText, getAllTags } from '../../services/meiliService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
+import { useCollection } from '../../contexts/CollectionContext';
+import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -23,7 +25,7 @@ interface AnnotationsTabProps {
   lang: string;
 }
 
-const AnnotationsTab: React.FC<AnnotationsTabProps> = ({ 
+const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   work,
   page,
   page_tags,
@@ -38,6 +40,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 }) => {
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
+  const { collections, getCollectionName, getCollectionPath } = useCollection();
   const [newComment, setNewComment] = useState('');
   
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
@@ -283,7 +286,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       >
                         <User size={14} />
                       </button>
-                      <span 
+                      <span
                         className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
                         onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
                       >
@@ -305,6 +308,41 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Kollektsioon */}
+            {work.collection && collections[work.collection] && (() => {
+              const hierarchyIds = getCollectionHierarchy(collections, work.collection);
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.collection')}</span>
+                  <div className="flex items-center gap-2">
+                    <FolderOpen size={14} className="text-gray-400 shrink-0" />
+                    <div className="flex flex-wrap items-center gap-1 text-sm">
+                      {hierarchyIds.map((colId, idx, arr) => {
+                        const col = collections[colId];
+                        const colorClasses = getCollectionColorClasses(col);
+                        const name = col?.name[lang as 'et' | 'en'] || col?.name.et || colId;
+                        const isLast = idx === arr.length - 1;
+                        const isVirtualGroup = col?.type === 'virtual_group';
+
+                        return (
+                          <React.Fragment key={colId}>
+                            {idx > 0 && <span className="text-gray-300 select-none">›</span>}
+                            <span
+                              onClick={() => !isVirtualGroup && navigate(`/?collection=${encodeURIComponent(colId)}`)}
+                              className={`${isLast ? `${colorClasses.bg} ${colorClasses.text} ${colorClasses.hoverBg} px-1.5 py-0.5 rounded font-medium cursor-pointer` : 'text-gray-500 hover:text-gray-700'} transition-colors ${isVirtualGroup ? 'cursor-default' : 'cursor-pointer'}`}
+                              title={isVirtualGroup ? name : t('dashboard:workCard.filterByCollection', 'Filtreeri selle kollektsiooni järgi')}
+                            >
+                              {name}
+                            </span>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Links and Actions */}
             <div className="mt-4 pt-3 border-t border-gray-100 space-y-3">

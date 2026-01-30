@@ -17,6 +17,7 @@ import LoginModal from './LoginModal';
 import CollectionPicker from './CollectionPicker';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../services/collectionService';
 
 interface HeaderProps {
   /** Kuva täistekstotsingu nupp (vaikimisi true) */
@@ -37,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, logout } = useUser();
-  const { selectedCollection, getCollectionName } = useCollection();
+  const { selectedCollection, getCollectionName, collections } = useCollection();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
@@ -73,22 +74,27 @@ const Header: React.FC<HeaderProps> = ({
           <div className="h-6 w-px bg-gray-200 hidden sm:block" />
 
           {/* Kollektsiooni valija (laiem, et kollektsiooni nimi mahuks) */}
-          <button
-            onClick={() => setShowCollectionPicker(true)}
-            className={`hidden sm:flex items-center gap-2 text-sm px-3 py-1.5 rounded-md transition-colors border ${
-              selectedCollection
-                ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
-            }`}
-          >
-            <Library size={16} className={selectedCollection ? 'text-amber-600' : 'text-primary-600'} />
-            <span className="max-w-72 truncate font-medium">
-              {selectedCollection
-                ? getCollectionName(selectedCollection, lang)
-                : t('common:collections.all', 'Kõik tööd')}
-            </span>
-            <ChevronDown size={14} className={selectedCollection ? 'text-amber-500' : 'text-gray-400'} />
-          </button>
+          {(() => {
+            const colorClasses = selectedCollection ? getCollectionColorClasses(collections[selectedCollection]) : null;
+            return (
+              <button
+                onClick={() => setShowCollectionPicker(true)}
+                className={`hidden sm:flex items-center gap-2 text-sm px-3 py-1.5 rounded-md transition-colors border ${
+                  selectedCollection && colorClasses
+                    ? `${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} ${colorClasses.hoverBg}`
+                    : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                <Library size={16} className={selectedCollection && colorClasses ? colorClasses.text : 'text-primary-600'} />
+                <span className="max-w-72 truncate font-medium">
+                  {selectedCollection
+                    ? getCollectionName(selectedCollection, lang)
+                    : t('common:collections.all', 'Kõik tööd')}
+                </span>
+                <ChevronDown size={14} className={selectedCollection && colorClasses ? colorClasses.text : 'text-gray-400'} />
+              </button>
+            );
+          })()}
 
           {pageTitle && (
             <div className="flex items-center gap-2">

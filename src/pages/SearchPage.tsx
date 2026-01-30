@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
-import { getVocabularies, Vocabularies } from '../services/collectionService';
+import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
 import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, ScrollText, User, X } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
@@ -147,7 +147,7 @@ const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { selectedCollection, getCollectionName } = useCollection();
+    const { selectedCollection, getCollectionName, collections } = useCollection();
 
     // URL params control the actual search
     const queryParam = searchParams.get('q') || '';
@@ -683,19 +683,22 @@ const SearchPage: React.FC = () => {
                     <div className="space-y-2">
 
                         {/* Active Collection Indicator */}
-                        {selectedCollection && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                                <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1 flex items-center gap-2">
-                                    <Library size={14} /> {t('common:collections.activeFilter')}
-                                </h3>
-                                <p className="text-sm font-medium text-amber-900">
-                                    {getCollectionName(selectedCollection)}
-                                </p>
-                                <p className="text-xs text-amber-600 mt-1">
-                                    {t('common:collections.changeInHeader')}
-                                </p>
-                            </div>
-                        )}
+                        {selectedCollection && (() => {
+                            const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
+                            return (
+                                <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-3 mb-4`}>
+                                    <h3 className={`text-xs font-bold ${colorClasses.text} uppercase tracking-wide mb-1 flex items-center gap-2`}>
+                                        <Library size={14} /> {t('common:collections.activeFilter')}
+                                    </h3>
+                                    <p className={`text-sm font-medium ${colorClasses.text}`}>
+                                        {getCollectionName(selectedCollection)}
+                                    </p>
+                                    <p className={`text-xs ${colorClasses.text} opacity-70 mt-1`}>
+                                        {t('common:collections.changeInHeader')}
+                                    </p>
+                                </div>
+                            );
+                        })()}
 
                         {/* Search Scope */}
                         <CollapsibleSection

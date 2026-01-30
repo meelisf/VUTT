@@ -1,10 +1,12 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
+import { useCollection } from '../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../services/collectionService';
 
 interface WorkCardProps {
   work: Work;
@@ -18,6 +20,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   const { t, i18n } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
+  const { collections, getCollectionName } = useCollection();
 
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
@@ -245,6 +248,24 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             <BookOpen size={14} />
             <span>{work.page_count} {t('common:labels.pages')}</span>
           </div>
+          {/* Kollektsiooni badge */}
+          {work.collection && collections[work.collection] && (() => {
+            const colorClasses = getCollectionColorClasses(collections[work.collection]);
+            return (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate(`/?collection=${encodeURIComponent(work.collection!)}`);
+                }}
+                className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full cursor-pointer transition-colors max-w-full ${colorClasses.bg} ${colorClasses.text} ${colorClasses.hoverBg}`}
+                title={getCollectionName(work.collection, lang as 'et' | 'en')}
+              >
+                <FolderOpen size={12} className="shrink-0" />
+                <span className="truncate">{getCollectionName(work.collection, lang as 'et' | 'en')}</span>
+              </button>
+            );
+          })()}
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
@@ -261,7 +282,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           <a
             href={`/work/${work.id}/1`}
             onClick={handleOpenWorkspace}
-            className="text-sm font-medium text-primary-600 hover:text-primary-800 cursor-pointer"
+            className="text-sm font-medium text-primary-600 hover:text-primary-800 cursor-pointer shrink-0"
           >
             {t('workCard.openWorkspace')} &rarr;
           </a>

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { Collection, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
+import { Collection, buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
 
 interface CollectionPickerProps {
   // Variant 1: Headeris kasutatav (globaalne kontekst)
@@ -27,13 +27,14 @@ const TreeNode: React.FC<{
   const isExpanded = expandedIds.has(node.id);
   const hasChildren = node.children.length > 0;
   const isSelected = selectedId === node.id;
+  const colorClasses = getCollectionColorClasses(node.collection);
 
   return (
     <div>
       <div
         className={`
           w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors
-          ${isSelected ? 'bg-primary-100 text-primary-800' : 'hover:bg-gray-100'}
+          ${isSelected ? `${colorClasses.bg} ${colorClasses.text}` : 'hover:bg-gray-100'}
         `}
         style={{ paddingLeft: `${12 + level * 20}px` }}
       >
@@ -57,11 +58,11 @@ const TreeNode: React.FC<{
           onClick={() => onSelect(node.id)}
           className="flex items-center gap-2 flex-1 min-w-0"
         >
-          <FolderOpen size={18} className={isSelected ? 'text-primary-600' : 'text-gray-400'} />
+          <FolderOpen size={18} className={isSelected ? colorClasses.text : 'text-gray-400'} />
           <span className="flex-1 truncate text-left">
             {node.collection.name[lang] || node.collection.name.et}
           </span>
-          {isSelected && <Check size={18} className="text-primary-600" />}
+          {isSelected && <Check size={18} className={colorClasses.text} />}
         </button>
       </div>
 

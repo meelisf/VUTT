@@ -18,7 +18,7 @@ const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, isLoading: userLoading } = useUser();
-  const { selectedCollection } = useCollection();
+  const { selectedCollection, setSelectedCollection, collections } = useCollection();
   const [showAboutModal, setShowAboutModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
@@ -35,6 +35,7 @@ const Dashboard: React.FC = () => {
   const teoseTagsParam = searchParams.get('tags')?.split(',').filter(Boolean) || [];
   const genreParam = searchParams.get('genre') || null;
   const typeParam = searchParams.get('type') || null;
+  const collectionParam = searchParams.get('collection') || null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
 
   const [inputValue, setInputValue] = useState(queryParam);
@@ -86,6 +87,16 @@ const Dashboard: React.FC = () => {
     };
     loadAbout();
   }, [i18n.language]);
+
+  // Sünkroniseeri kollektsiooni URL parameeter kontekstiga
+  useEffect(() => {
+    // Kui URL-is on kollektsioon ja see on kehtiv, sea see kontekstis
+    if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
+      setSelectedCollection(collectionParam);
+    }
+    // Kui URL-is pole kollektsiooni, aga kontekstis on, tühjenda URL param (ära eemalda valikut)
+    // Seda ei tee, et säiliks kollektsiooni valik headeris
+  }, [collectionParam, collections]);
 
   // Taasta scroll positsioon pärast teoste laadimist
   useEffect(() => {
