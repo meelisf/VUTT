@@ -44,6 +44,32 @@ from .utils import (
 MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
 
+PEOPLE_FILE = os.path.join(BASE_DIR, 'state', 'people.json')
+
+
+def load_people_aliases():
+    """Laeb inimeste aliased JSON failist."""
+    if os.path.exists(PEOPLE_FILE):
+        try:
+            with open(PEOPLE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def get_creator_aliases(creators, people_data):
+    """Leiab isikutele aliased (nimevariandid)."""
+    aliases = []
+    for creator in creators:
+        creator_id = creator.get('id')
+        # Otsi ID järgi (nt Q123)
+        if creator_id and people_data.get(creator_id):
+            person = people_data[creator_id]
+            if person.get('aliases'):
+                aliases.extend(person['aliases'])
+    return aliases
+
 
 def load_collections():
     """Laeb kollektsioonide hierarhia."""
@@ -271,8 +297,15 @@ def sync_work_to_meilisearch(dir_name):
 
         page_statuses.append(page_meta['status'])
 
-        # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
+    # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
         page_tags_data = page_meta.get('tags', [])
+
+        # Lae inimeste aliased
+        people_data = load_people_aliases()
+        aliases = get_creator_aliases(creators, people_data)
+        
+        # authors_text sisaldab nüüd ka aliaseid, et otsing leiaks "Lorenz" kui nimi on "Laurentius"
+        authors_text = [c['name'] for c in creators if c.get('name')] + aliases
 
         doc = {
             "id": page_id,
@@ -331,7 +364,7 @@ def sync_work_to_meilisearch(dir_name):
             "type_object": work_type,
             "languages": languages,
             "creators": creators,
-            "authors_text": [c['name'] for c in creators if c.get('name')],
+            "authors_text": authors_text,
             "author_names": [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
             "respondens_names": [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
             "creator_ids": [c.get('id') for c in creators if c.get('id')]
