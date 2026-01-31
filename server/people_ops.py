@@ -41,16 +41,20 @@ def fetch_wikidata_aliases(wikidata_id):
             entity = data.get('entities', {}).get(wikidata_id, {})
             
             aliases = []
-            # Aliased (ka muudes keeltes)
+            TARGET_LANGS = ['et', 'en', 'de', 'la']
+
+            # Aliased (valitud keeltes)
             alias_data = entity.get('aliases', {})
-            for lang_aliases in alias_data.values():
-                for a in lang_aliases:
-                    aliases.append(a.get('value'))
+            for lang in TARGET_LANGS:
+                if lang in alias_data:
+                    for a in alias_data[lang]:
+                        aliases.append(a.get('value'))
             
-            # Sildid (labels) kui aliased
+            # Sildid (labels) (valitud keeltes)
             label_data = entity.get('labels', {})
-            for l in label_data.values():
-                aliases.append(l.get('value'))
+            for lang in TARGET_LANGS:
+                if lang in label_data:
+                    aliases.append(label_data[lang].get('value'))
             
             # Puhasta ja eemalda duplikaadid
             aliases = sorted(list(set([a for a in aliases if a])))
