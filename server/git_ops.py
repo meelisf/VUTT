@@ -261,12 +261,12 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
         return {"success": False, "error": str(e)}
 
 
-def get_file_git_history(relative_path, max_count=50):
+def get_file_git_history(paths, max_count=50):
     """
-    Tagastab faili Git ajaloo.
+    Tagastab faili(de) Git ajaloo.
 
     Args:
-        relative_path: Suhteline tee failini (BASE_DIR suhtes)
+        paths: Suhteline tee failini või failide list (BASE_DIR suhtes)
         max_count: Maksimaalne commitide arv
 
     Returns:
@@ -275,7 +275,7 @@ def get_file_git_history(relative_path, max_count=50):
     repo = get_or_init_repo()
 
     try:
-        commits = list(repo.iter_commits(paths=relative_path, max_count=max_count))
+        commits = list(repo.iter_commits(paths=paths, max_count=max_count))
     except:
         return []
 
@@ -343,13 +343,13 @@ def get_file_diff(relative_path, hash1, hash2):
         return None
 
 
-def get_commit_diff(commit_hash, filepath=None):
+def get_commit_diff(commit_hash, filepaths=None):
     """
     Tagastab ühe commiti diff'i (võrreldes parent commitiga).
 
     Args:
         commit_hash: Commit hash (täis- või lühike)
-        filepath: Valikuline failirada, et näidata ainult selle faili muutused
+        filepaths: Valikuline failirada või list radadest, et näidata ainult nende muutusi
 
     Returns:
         dict: {"diff": str, "additions": int, "deletions": int, "files": list}
@@ -365,13 +365,28 @@ def get_commit_diff(commit_hash, filepath=None):
         # Määra parent (esimese commiti puhul tühi puu)
         parent_hash = commit.parents[0].hexsha if commit.parents else EMPTY_TREE
 
-        if filepath:
-            diff_text = repo.git.diff(parent_hash, commit.hexsha, '--', filepath)
-        else:
-            diff_text = repo.git.diff(parent_hash, commit.hexsha)
+        # Koosta argumentide list
+        args = [parent_hash, commit.hexsha, '--']
+        if filepaths:
+            if isinstance(filepaths, list):
+                args.extend(filepaths)
+            else:
+                args.append(filepaths)
+        
+        # Käivita git diff
+        diff_text = repo.git.diff(*args)
         
         # Loe statistika
-        stat = repo.git.diff(parent_hash, commit.hexsha, '--numstat')
+        # numstat puhul peame samuti failid ette andma
+        stat_args = [parent_hash, commit.hexsha, '--numstat', '--']
+        if filepaths:
+            if isinstance(filepaths, list):
+                stat_args.extend(filepaths)
+            else:
+                stat_args.append(filepaths)
+                
+        stat = repo.git.diff(*stat_args)
+        
         additions = 0
         deletions = 0
         files = []

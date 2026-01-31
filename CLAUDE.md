@@ -95,6 +95,23 @@ const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
 
 Collection displayed in: Dashboard cards, Workspace info panel, SearchPage results, Header indicator.
 
+## Person Aliases & People Register
+
+To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius*), the system uses a central register.
+
+**File:** `state/people.json` (not in git, persistent storage)
+
+**Workflow:**
+1. Admin saves metadata with a Wikidata/GND ID.
+2. Server (`people_ops.py`) automatically fetches aliases in background (only for `et`, `en`, `de`, `la`).
+3. Aliases are saved to `state/people.json` under all associated IDs (cross-referencing).
+4. Meilisearch indexer (`meilisearch_ops.py`) reads this file and adds aliases to `authors_text` field.
+
+**Search:**
+- Users can search for any variant (e.g., "Ludenius").
+- Search result shows the canonical name from `_metadata.json` (e.g., "Lorenz Luden").
+- Author filter sidebar shows only the canonical names to avoid duplicates.
+
 ## Authentication
 
 - Roles: `editor` < `admin`

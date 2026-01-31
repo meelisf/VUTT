@@ -668,10 +668,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 safe_catalog = os.path.basename(original_catalog)
                 safe_filename = os.path.basename(target_filename)
-                relative_path = os.path.join(safe_catalog, safe_filename)
+                
+                # Jälgi nii .txt kui .json faile
+                txt_path = os.path.join(safe_catalog, safe_filename)
+                json_filename = os.path.splitext(safe_filename)[0] + '.json'
+                json_path = os.path.join(safe_catalog, json_filename)
+                
+                files_to_check = [txt_path, json_path]
 
-                # Küsime Git ajaloo
-                history = get_file_git_history(relative_path, max_count=50)
+                # Küsime Git ajaloo mõlema faili jaoks
+                history = get_file_git_history(files_to_check, max_count=50)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')
@@ -822,9 +828,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not commit_hash:
                     self.send_error(400, "Puudub 'commit_hash'")
                     return
+                
+                # Kui filepath on antud, arvuta ka json fail
+                filepaths = None
+                if filepath:
+                    if filepath.endswith('.txt'):
+                        json_path = filepath.rsplit('.', 1)[0] + '.json'
+                        filepaths = [filepath, json_path]
+                    else:
+                        filepaths = [filepath]
 
-                # Hangi diff
-                result = get_commit_diff(commit_hash, filepath)
+                # Hangi diff (toetab nüüd listi)
+                result = get_commit_diff(commit_hash, filepaths)
 
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')

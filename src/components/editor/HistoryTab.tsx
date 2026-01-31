@@ -180,19 +180,38 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const renderDiff = (diffText: string) => {
     const lines = diffText.split('\n');
     return lines.map((line, i) => {
-      // Jäta vahele diff päised ja tehniline info
-      if (line.startsWith('diff --git') ||
-          line.startsWith('index ') ||
-          line.startsWith('---') ||
-          line.startsWith('+++') ||
-          line.startsWith('@@') ||
-          line.startsWith('\\ No newline') ||
+      // Filtreeri välja mõned tehnilised read, aga jäta failinimed alles
+      if (line.startsWith('index ') ||
           line.startsWith('new file mode') ||
-          line.startsWith('old file mode')) {
+          line.startsWith('old file mode') ||
+          line.startsWith('\\ No newline')) {
         return null;
       }
 
       let className = 'text-gray-700';
+
+      if (line.startsWith('diff --git')) {
+        // Kuva failinimi esimese reana uue ploki alguses
+        const parts = line.split(' b/');
+        const filename = parts.length > 1 ? parts[1] : line;
+        return (
+          <div key={i} className="mt-3 mb-1 font-bold text-gray-900 border-b border-gray-200 pb-1">
+            {filename}
+          </div>
+        );
+      }
+      
+      if (line.startsWith('---') || line.startsWith('+++')) {
+        return null; // Peida need read, kuna me juba näitame failinime 'diff --git' realt
+      }
+
+      if (line.startsWith('@@')) {
+        return (
+          <div key={i} className="text-gray-400 text-[10px] mt-1 italic">
+            {line}
+          </div>
+        );
+      }
 
       if (line.startsWith('+')) {
         className = 'bg-green-100 text-green-800';
