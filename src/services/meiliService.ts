@@ -125,8 +125,8 @@ const fixIndexSettings = async () => {
     ]);
 
     const searchTask = await index.updateSearchableAttributes([
-      'title',
       'authors_text',
+      'title',
       'year',
       'location_search',
       'publisher_search',
