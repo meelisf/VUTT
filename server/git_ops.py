@@ -92,10 +92,10 @@ def get_work_info_from_folder(folder_name):
                 if creators:
                     praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
                     auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
-                    if praeses:
-                        info['author'] = praeses.get('name')
-                    elif auctor:
+                    if auctor:
                         info['author'] = auctor.get('name')
+                    elif praeses:
+                        info['author'] = praeses.get('name')
                     elif creators:
                         info['author'] = creators[0].get('name')
         except (json.JSONDecodeError, IOError):

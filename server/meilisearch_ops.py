@@ -178,14 +178,14 @@ def sync_work_to_meilisearch(dir_name):
     autor = ''
     respondens = ''
     if creators:
-        # Prioriteet: praeses > auctor > esimene isik
+        # Prioriteet: auctor > praeses > esimene isik
         praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
         auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
         resp = next((c for c in creators if c.get('role') == 'respondens'), None)
-        if praeses:
-            autor = praeses.get('name', '')
-        elif auctor:
+        if auctor:
             autor = auctor.get('name', '')
+        elif praeses:
+            autor = praeses.get('name', '')
         elif creators:
             first_creator = creators[0]
             if first_creator.get('role') not in ['respondens', 'gratulator', 'dedicator']:

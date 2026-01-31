@@ -89,7 +89,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     // Ehita creators massiiv olemasolevatest andmetest
     const initialCreators: Creator[] = [];
     if (work?.author || page.autor) {
-      initialCreators.push({ name: work?.author || page.autor || '', role: 'praeses' });
+      initialCreators.push({ name: work?.author || page.autor || '', role: 'auctor' });
     }
     if (work?.respondens || page.respondens) {
       initialCreators.push({ name: work?.respondens || page.respondens || '', role: 'respondens' });
@@ -176,7 +176,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         if (Array.isArray(m.creators) && m.creators.length > 0) {
           creators = m.creators;
         } else {
-          if (m.autor) creators.push({ name: m.autor, role: 'praeses' });
+          if (m.autor) creators.push({ name: m.autor, role: 'auctor' });
           if (m.respondens) creators.push({ name: m.respondens, role: 'respondens' });
         }
 
@@ -266,6 +266,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       const data = await response.json();
       if (data.status === 'success') {
         const praeses = cleanCreators.find(c => c.role === 'praeses');
+        const auctor = cleanCreators.find(c => c.role === 'auctor');
+        const mainAuthor = auctor || praeses || cleanCreators.find(c => c.role !== 'respondens');
         const respondens = cleanCreators.find(c => c.role === 'respondens');
 
         const locationLabel = typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label;
@@ -281,7 +283,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             type: metaForm.type || undefined,
             genre: metaForm.genre || undefined,
             creators: cleanCreators,
-            autor: praeses?.name,
+            autor: mainAuthor?.name,
             respondens: respondens?.name,
             tags: tagsArray,
             languages: metaForm.languages,
@@ -299,7 +301,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             type: metaForm.type || undefined,
             genre: metaForm.genre || undefined,
             creators: cleanCreators,
-            author: praeses?.name,
+            author: mainAuthor?.name,
             respondens: respondens?.name,
             tags: tagsArray,
             languages: metaForm.languages,
@@ -365,7 +367,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 type="button"
                 onClick={() => setMetaForm({
                   ...metaForm,
-                  creators: [...metaForm.creators, { name: '', role: 'praeses' as CreatorRole }]
+                  creators: [...metaForm.creators, { name: '', role: 'auctor' as CreatorRole }]
                 })}
                 className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1"
               >
