@@ -26,6 +26,7 @@ DATA_ROOT_DIR = os.getenv('VUTT_DATA_DIR', 'data')
 OUTPUT_FILE = 'output/meilisearch_data_per_page.jsonl'
 STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'state')
 COLLECTIONS_FILE = os.path.join(STATE_DIR, 'collections.json')
+PEOPLE_FILE = os.path.join(STATE_DIR, 'people.json')
 # --- LÕPP ---
 
 
@@ -56,6 +57,29 @@ def load_collections():
         with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
+
+
+def load_people_aliases():
+    """Laeb inimeste aliased JSON failist."""
+    if os.path.exists(PEOPLE_FILE):
+        try:
+            with open(PEOPLE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def get_creator_aliases(creators, people_data):
+    """Leiab isikutele aliased."""
+    aliases = []
+    for creator in creators:
+        creator_id = creator.get('id')
+        if creator_id and people_data.get(creator_id):
+            person = people_data[creator_id]
+            if person.get('aliases'):
+                aliases.extend(person['aliases'])
+    return aliases
 
 
 def get_collection_hierarchy(collections, collection_id):
@@ -349,7 +373,8 @@ def create_meilisearch_data_per_page():
 
     # Laeme kollektsioonid hierarhia jaoks
     collections = load_collections()
-    print(f"Laetud {len(collections)} kollektsiooni")
+    people_data = load_people_aliases()
+    print(f"Laetud {len(collections)} kollektsiooni ja {len(people_data)} isiku andmed")
 
     # Kogu andmed teose kaupa
     works_data = {}
@@ -362,6 +387,11 @@ def create_meilisearch_data_per_page():
 
         # Hangi metaandmed (v2 formaat)
         teose_id, doc_metadata = get_work_metadata(doc_path, dir_name, collections)
+
+        # Isikud ja aliased
+        creators = doc_metadata.get('creators', [])
+        aliases = get_creator_aliases(creators, people_data)
+        authors_text = doc_metadata.get('authors_text', []) + aliases
 
         # Leia pildifailid
         jpg_files = sorted([f for f in os.listdir(doc_path)
@@ -452,11 +482,11 @@ def create_meilisearch_data_per_page():
                 'collections_hierarchy': doc_metadata.get('collections_hierarchy', []),
 
                 # Isikud
-                'creators': doc_metadata.get('creators', []),
-                'authors_text': doc_metadata.get('authors_text', []),
-                'author_names': [c['name'] for c in doc_metadata.get('creators', []) if c.get('name') and c.get('role') != 'respondens'],
-                'respondens_names': [c['name'] for c in doc_metadata.get('creators', []) if c.get('name') and c.get('role') == 'respondens'],
-                'creator_ids': [c.get('id') for c in doc_metadata.get('creators', []) if c.get('id')],
+                'creators': creators,
+                'authors_text': authors_text,
+                'author_names': [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
+                'respondens_names': [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
+                'creator_ids': [c.get('id') for c in creators if c.get('id')],
 
                 # Täiendav klassifikatsioon (märksõnad)
                 'tags': get_primary_labels(doc_metadata.get('tags', [])), # Vaikimisi (et)

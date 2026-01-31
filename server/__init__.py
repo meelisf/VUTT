@@ -54,6 +54,11 @@ from .meilisearch_ops import (
     index_new_work, metadata_watcher_loop
 )
 
+# Inimeste/autorite andmed
+from .people_ops import (
+    load_people_data, save_people_data, process_creators_metadata, update_person_async
+)
+
 # Abifunktsioonid
 from .utils import (
     atomic_write_json,

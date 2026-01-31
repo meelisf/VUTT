@@ -36,6 +36,8 @@ from server import (
     get_commit_diff, get_recent_commits,
     # Meilisearch
     sync_work_to_meilisearch, metadata_watcher_loop,
+    # People/Authors
+    process_creators_metadata,
     # Utils
     atomic_write_json,
     sanitize_id, find_directory_by_id, generate_default_metadata,
@@ -909,6 +911,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"Admin '{user['username']}' uuendas metaandmeid (Git): {metadata_path} -> {git_result.get('commit_hash', '')[:8]}")
                 else:
                     print(f"Admin '{user['username']}' uuendas metaandmeid (Git ebaõnnestus): {metadata_path}")
+
+                # Automaatne isikute nimede rikastamine taustal
+                creators = current_meta.get('creators', [])
+                if creators:
+                    process_creators_metadata(creators)
 
                 # Sünkrooni Meilisearchiga ENNE vastuse saatmist
                 dir_name = os.path.basename(os.path.dirname(metadata_path))
