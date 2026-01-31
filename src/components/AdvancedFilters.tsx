@@ -68,7 +68,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   searchPlaceholder
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const showSearch = items.length > 10;
+  const showSearch = items.length > 8;
 
   const filteredItems = useMemo(() => {
     if (!searchQuery) return items;
@@ -80,13 +80,13 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
   return (
     <div>
-      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-        {icon}
+      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+        <span className="text-primary-600">{icon}</span>
         {title}
       </h4>
       
       {showSearch && (
-        <div className="relative mb-2">
+        <div className="relative mb-1.5">
           <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
             <Search size={14} className="text-gray-400" />
           </div>
@@ -95,32 +95,34 @@ const FilterSection: React.FC<FilterSectionProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
+            className="w-full pl-8 pr-3 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
           />
         </div>
       )}
 
-      <div className={`flex flex-wrap gap-2 ${showSearch ? 'max-h-60 overflow-y-auto custom-scrollbar pr-1' : ''}`}>
-        {filteredItems.length === 0 ? (
-          <span className="text-sm text-gray-400 italic py-1">Ei leitud vasteid</span>
-        ) : (
-          filteredItems.map(({ value, label, count }) => {
-            const isSelected = selectedValues.includes(value);
-            return (
-              <button
-                key={value}
-                onClick={() => onToggle(value)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
-                  isSelected
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {label} <span className="opacity-60 text-xs">({count})</span>
-              </button>
-            );
-          })
-        )}
+      <div className="max-h-32 overflow-y-auto custom-scrollbar pr-1">
+        <div className="flex flex-wrap gap-2">
+          {filteredItems.length === 0 ? (
+            <span className="text-sm text-gray-400 italic py-1">Ei leitud vasteid</span>
+          ) : (
+            filteredItems.map(({ value, label, count }) => {
+              const isSelected = selectedValues.includes(value);
+              return (
+                <button
+                  key={value}
+                  onClick={() => onToggle(value)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
+                    isSelected
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label} <span className="opacity-60 text-xs">({count})</span>
+                </button>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
@@ -238,7 +240,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       {/* Päis - klapitav */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors rounded-lg"
+        className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-gray-50 transition-colors rounded-lg"
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -253,7 +255,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
       {/* Sisu */}
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-6">
+        <div className="px-4 pb-4 space-y-3">
           {loading ? (
             <div className="text-sm text-gray-400 py-2">{t('common:labels.loading')}</div>
           ) : (
@@ -261,7 +263,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               {/* Staatus - jääb eraldi, kuna on väike ja staatiline */}
               <div>
                 <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <CircleDot size={12} />
+                  <CircleDot size={14} className="text-primary-600" />
                   {t('filters.status', 'Staatus')}
                 </h4>
                 <div className="flex flex-wrap gap-2">
