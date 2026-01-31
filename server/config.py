@@ -67,6 +67,7 @@ INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 PENDING_EDITS_FILE = os.path.join(_STATE_DIR, "pending_edits.json")
 COLLECTIONS_FILE = os.path.join(_STATE_DIR, "collections.json")
 VOCABULARIES_FILE = os.path.join(_STATE_DIR, "vocabularies.json")
+PEOPLE_FILE = os.path.join(_STATE_DIR, "people.json")
 
 # =========================================================
 # SERVERI SEADED

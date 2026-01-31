@@ -3,10 +3,9 @@ import json
 import threading
 import urllib.request
 import urllib.parse
-from .config import BASE_DIR
+from .config import BASE_DIR, PEOPLE_FILE
 from .utils import atomic_write_json
 
-PEOPLE_FILE = os.path.join(BASE_DIR, 'state', 'people.json')
 PEOPLE_LOCK = threading.Lock()
 
 # Wikidata nõuab User-Agent päist
