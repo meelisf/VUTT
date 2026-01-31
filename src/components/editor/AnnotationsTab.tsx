@@ -420,7 +420,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     className="px-2.5 py-1 text-sm text-green-800 hover:bg-green-100 transition-colors flex items-center gap-1"
                     title={`Otsi žanrit: ${label}`}
                   >
-                    {label.toLowerCase()}
+                    {label}
                     <Search size={12} className="opacity-50" />
                   </button>
                   {getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined) && (
@@ -460,7 +460,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
                   title="Otsi seda märksõna kogu korpusest"
                 >
-                  {label.toLowerCase()}
+                  {label}
                   <Search size={12} className="opacity-0 group-hover:opacity-50" />
                 </button>
                 

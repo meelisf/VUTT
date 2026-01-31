@@ -665,9 +665,11 @@ const SearchPage: React.FC = () => {
     };
 
     const groupedResults = getGroupedResults();
-    const uniqueWorksCount = results?.facetDistribution?.['work_id']
+    const uniqueWorksCount = results?.totalWorks ?? (
+        results?.facetDistribution?.['work_id']
         ? Object.keys(results.facetDistribution['work_id']).length
-        : Object.keys(groupedResults).length;
+        : Object.keys(groupedResults).length
+    );
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
