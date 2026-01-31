@@ -9,6 +9,11 @@ from .utils import atomic_write_json
 PEOPLE_FILE = os.path.join(BASE_DIR, 'state', 'people.json')
 PEOPLE_LOCK = threading.Lock()
 
+# Wikidata nõuab User-Agent päist
+HEADERS = {
+    'User-Agent': 'VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)'
+}
+
 def load_people_data():
     """Laeb inimeste andmed."""
     if os.path.exists(PEOPLE_FILE):
@@ -31,7 +36,8 @@ def fetch_wikidata_aliases(wikidata_id):
     
     url = f"https://www.wikidata.org/wiki/Special:EntityData/{wikidata_id}.json"
     try:
-        with urllib.request.urlopen(url, timeout=5) as response:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode('utf-8'))
             entity = data.get('entities', {}).get(wikidata_id, {})
             
@@ -83,7 +89,7 @@ def fetch_gnd_aliases(gnd_id):
     # GND ID-d on tavaliselt numbrid või sisaldavad tähti
     url = f"https://lobid.org/gnd/{gnd_id}.json"
     try:
-        req = urllib.request.Request(url)
+        req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=5) as response:
             data = json.loads(response.read().decode('utf-8'))
             
