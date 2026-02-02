@@ -74,5 +74,12 @@
     "hint": "Valik salvestub ja kehtib kõigis vaadetes",
     "activeFilter": "Aktiivne kollektsioon",
     "changeInHeader": "Muuda päises olevast valijast"
+  },
+  "notFound": {
+    "title": "Lehekülge ei leitud",
+    "description": "Otsitud lehekülge ei eksisteeri või on see teisaldatud.",
+    "home": "Avalehele",
+    "search": "Otsi teoseid",
+    "back": "Tagasi"
   }
 }

@@ -11,6 +11,7 @@ import Register from './pages/Register';
 import SetPassword from './pages/SetPassword';
 import Admin from './pages/Admin';
 import Review from './pages/Review';
+import NotFound from './pages/NotFound';
 
 const router = createBrowserRouter([
   {
@@ -45,6 +46,11 @@ const router = createBrowserRouter([
   {
     path: "/review",
     element: <Review />,
+  },
+  // 404 - catch-all marsruut (peab olema viimane)
+  {
+    path: "*",
+    element: <NotFound />,
   },
 ]);
 

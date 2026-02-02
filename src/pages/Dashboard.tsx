@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/meiliService';
+import { getCollectionColorClasses } from '../services/collectionService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
@@ -651,6 +652,31 @@ const Dashboard: React.FC = () => {
                           )}
                         </div>
                       )}
+
+                      {/* Collection Filter Indicator */}
+                      {selectedCollection && collections[selectedCollection] && (() => {
+                        const col = collections[selectedCollection];
+                        const colors = getCollectionColorClasses(col);
+                        const lang = i18n.language.split('-')[0] as 'et' | 'en';
+                        const name = col.name[lang] || col.name.et;
+                        
+                        return (
+                          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm transition-colors ${colors.bg} ${colors.text} ${colors.border}`}>
+                             <span className="font-medium max-w-[200px] truncate" title={name}>{name}</span>
+                             <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setSelectedCollection(null);
+                               }}
+                               className={`ml-1 p-0.5 rounded-full hover:bg-white/50 transition-colors`}
+                               title={t('common:buttons.cancel')}
+                             >
+                               <X size={14} />
+                             </button>
+                          </div>
+                        );
+                      })()}
+
                       <span className="text-sm text-gray-500">
                         {t('results.worksCount', { count: works.length })} {statusParam && t('results.filtered')} {totalPages > 1 && `• ${t('results.pageOf', { current: currentPage, total: totalPages })}`}
                       </span>

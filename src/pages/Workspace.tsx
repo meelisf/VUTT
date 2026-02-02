@@ -484,9 +484,9 @@ const Workspace: React.FC = () => {
       </div>
 
       {/* Split View Content */}
-      <div className="flex-1 flex overflow-hidden relative z-0">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative z-0">
         {/* Left: Image Viewer */}
-        <div className="w-1/2 h-full border-r border-gray-300 relative bg-slate-900">
+        <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
           {page.image_url ? (
             <ImageViewer src={page.image_url} />
@@ -498,7 +498,7 @@ const Workspace: React.FC = () => {
         </div>
 
         {/* Right: Text Editor */}
-        <div className="w-1/2 h-full bg-white relative flex flex-col">
+        <div className="w-full h-1/2 md:w-1/2 md:h-full bg-white relative flex flex-col">
           {/* Pending-edit staatuse banner */}
           {pendingEditInfo?.has_own_pending && (
             <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-sm text-amber-800">

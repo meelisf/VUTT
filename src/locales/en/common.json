@@ -74,5 +74,12 @@
     "hint": "Selection is saved and applies to all views",
     "activeFilter": "Active Collection",
     "changeInHeader": "Change from the selector in header"
+  },
+  "notFound": {
+    "title": "Page Not Found",
+    "description": "The page you are looking for does not exist or has been moved.",
+    "home": "Go to Home",
+    "search": "Search Works",
+    "back": "Go Back"
   }
 }
