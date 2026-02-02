@@ -35,6 +35,12 @@ const getFullImageUrl = (imagePath: string): string => {
   return `${IMAGE_BASE_URL}/${encodeURI(cleanPath)}`;
 };
 
+// Thumbnaili URL konstrueerimine (server leiab ise õige faili)
+const getThumbUrl = (workId: string): string => {
+  if (!workId) return '';
+  return `${IMAGE_BASE_URL}/${workId}/_thumb`;
+};
+
 // Check for Mixed Content (HTTPS vs HTTP)
 const checkMixedContent = () => {
   if (window.location.protocol === 'https:' && MEILI_HOST.startsWith('http:')) {
@@ -595,48 +601,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       });
     }
 
-    const workIds = uniqueHits.map((hit: any) => hit.work_id);
-
-    // Fetch first page data (thumbnail, tags) for all works
-    const firstPagesMap = new Map<string, { thumbnail_url: string; tags: string[]; page_tags?: string[] }>();
-
-    if (workIds.length > 0) {
-      // Batch the requests to avoid too-long filters (max ~100 IDs per batch)
-      const BATCH_SIZE = 100;
-      const batches: string[][] = [];
-      for (let i = 0; i < workIds.length; i += BATCH_SIZE) {
-        batches.push(workIds.slice(i, i + BATCH_SIZE));
-      }
-
-      // Execute batch queries in parallel
-      const batchPromises = batches.map(async (batchIds) => {
-        const batchResponse = await index.search('', {
-          filter: batchIds.map(id => `work_id = "${id}"`).join(' OR '),
-          limit: batchIds.length * 20, // Max 20 pages per work
-          sort: ['lehekylje_number:asc'],
-          attributesToRetrieve: ['work_id', 'lehekylje_pilt', 'lehekylje_number', 'tags']
-        });
-        return batchResponse.hits;
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-
-      // Process all results - take first (lowest page number) for each work
-      for (const hits of batchResults) {
-        for (const hit of hits as any[]) {
-          if (!firstPagesMap.has(hit.work_id)) {
-            firstPagesMap.set(hit.work_id, {
-              thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
-              tags: hit.tags || [],
-              page_tags: hit.page_tags || []
-            });
-          }
-        }
-      }
-    }
+    // NB: Kuna otsing kasutab 'lehekylje_number = 1' filtrit, tulevad
+    // esimese lehe andmed (tags, page_tags) juba kaasa põhipäringuga.
+    // Thumbnail tuleb serveripoolsest /_thumb endpointist (genereeritakse vajadusel).
 
     const works: Work[] = uniqueHits.map((hit: any) => {
-      const firstPageData = firstPagesMap.get(hit.work_id);
       return {
         // Identifikaatorid - kasuta AINULT nanoid
         id: hit.work_id,
@@ -674,9 +643,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
         // Lehekülje info
         page_count: hit.teose_lehekylgede_arv || 0,
-        thumbnail_url: firstPageData?.thumbnail_url || getFullImageUrl(hit.lehekylje_pilt),
+        thumbnail_url: getThumbUrl(hit.work_id),  // Kasuta thumbnaili URL-i (40x väiksem)
         work_status: hit.teose_staatus,
-        page_tags: firstPageData?.page_tags || hit.page_tags || [],
+        page_tags: hit.page_tags || [],
 
         // Tagasiühilduvus (filtrite/sortimise väljad)
         catalog_name: hit.originaal_kataloog || 'Unknown',
@@ -1049,7 +1018,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 
       // Lehekülje info
       page_count: hit.teose_lehekylgede_arv || 0,
-      thumbnail_url: getFullImageUrl(hit.lehekylje_pilt),
+      thumbnail_url: getThumbUrl(hit.work_id),  // Kasuta thumbnaili URL-i (40x väiksem)
 
       // Tagasiühilduvus (filtrite väljad)
       catalog_name: hit.originaal_kataloog,
