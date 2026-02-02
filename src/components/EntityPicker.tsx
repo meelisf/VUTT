@@ -346,9 +346,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {isLocal && <Database size={12} className="text-amber-600" title={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
-                    {isGnd && <BookMarked size={12} className="text-orange-600" title="GND" />}
-                    {isViaf && <Library size={12} className="text-purple-600" title="VIAF" />}
+                    {isLocal && <Database size={12} className="text-amber-600" aria-label={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
+                    {isGnd && <BookMarked size={12} className="text-orange-600" aria-label="GND" />}
+                    {isViaf && <Library size={12} className="text-purple-600" aria-label="VIAF" />}
                     <span className="font-medium text-gray-900 text-sm">{result.label}</span>
                   </div>
                   {!isLocal && <span className={`text-[10px] font-mono px-1 rounded ${isGnd ? 'text-orange-500 bg-orange-50' : isViaf ? 'text-purple-500 bg-purple-50' : 'text-gray-400 bg-gray-100'}`}>{result.id}</span>}

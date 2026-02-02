@@ -242,7 +242,7 @@ def sync_work_to_meilisearch(dir_name):
     # sorteeritud nimekirjas, MITTE failinimest. See võimaldab lehekülgi ümber
     # järjestada (nt kui avastatakse puuduv lk) ilma failinimesid muutmata.
     # Näide: 001.jpg=lk1, 002.jpg=lk2. Kui lisada 001a.jpg, siis: 001.jpg=lk1, 001a.jpg=lk2, 002.jpg=lk3
-    images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+    images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
     if not images:
         print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
         return False
@@ -419,7 +419,7 @@ def metadata_watcher_loop():
                         # Kontrollime kas on pilte
                         has_images = False
                         for f in os.listdir(entry.path):
-                            if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                            if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_'):
                                 has_images = True
                                 break
 

@@ -202,7 +202,7 @@ interface DashboardSearchOptions {
   // V2 väljad
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
   genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
-  type?: string; // Tüübi filter (impressum, manuscript, jne)
+  type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
   lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
 }
 

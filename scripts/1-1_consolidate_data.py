@@ -393,9 +393,9 @@ def create_meilisearch_data_per_page():
         aliases = get_creator_aliases(creators, people_data)
         authors_text = doc_metadata.get('authors_text', []) + aliases
 
-        # Leia pildifailid
+        # Leia pildifailid (v.a. thumbnailid)
         jpg_files = sorted([f for f in os.listdir(doc_path)
-                           if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+                           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
         if not jpg_files:
             continue
 

@@ -129,7 +129,7 @@ def get_page_number_from_txt(folder_name, txt_filename):
         folder_path = os.path.join(BASE_DIR, folder_name)
         if os.path.exists(folder_path):
             images = sorted([f for f in os.listdir(folder_path)
-                           if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+                           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
             _images_cache[folder_name] = images
         else:
             _images_cache[folder_name] = []

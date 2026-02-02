@@ -132,10 +132,10 @@ def get_filesystem_pages(data_dir):
         if not os.path.isdir(dir_path):
             continue
 
-        # Leia pildifailid
+        # Leia pildifailid (v.a. thumbnailid)
         image_files = sorted([
             f for f in os.listdir(dir_path)
-            if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+            if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
         ])
 
         if not image_files:

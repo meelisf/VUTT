@@ -42,8 +42,8 @@ export type CreatorRole = 'praeses' | 'respondens' | 'auctor' | 'gratulator' | '
 export interface Creator {
   name: string;
   role: CreatorRole;
-  id?: string | null;       // New: Wikidata ID
-  source?: 'wikidata' | 'manual'; // New: Linking source
+  id?: string | null;       // Wikidata ID, VIAF ID, GND ID, Album Academicum ID vms
+  source?: 'wikidata' | 'viaf' | 'gnd' | 'album_academicum' | 'manual'; // Linkimise allikas
   identifiers?: {
     gnd?: string;   // GND ID (Saksa rahvusbibliograafia)
     viaf?: string;  // VIAF ID

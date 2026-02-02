@@ -23,7 +23,7 @@ interface MetadataForm {
   title: string;
   year: number;
   type: string | null;
-  genre: string | LinkedEntity | LinkedEntity[] | null;
+  genre: string | LinkedEntity | null;  // EntityPicker toetab ainult üksikut väärtust
   tags: (string | LinkedEntity)[];
   location: string | LinkedEntity;
   publisher: string | LinkedEntity;
@@ -274,6 +274,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         const publisherLabel = typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label;
 
         // Teata parent komponendile uuendatud andmetest
+        // NB: Tüübiassertsioonid vajalikud, kuna metaForm kasutab ühtset formaati,
+        // aga Page/Work interface'id ootavad eraldi _object välju LinkedEntity tüübina.
+        // Runtime'is töötab, sest backend käsitleb mõlemat formaati.
+        // Abifunktsioon genre label'i ekstraktimiseks
+        const getGenreLabel = (g: typeof metaForm.genre): string | undefined => {
+          if (!g) return undefined;
+          if (typeof g === 'string') return g;
+          return g.label;
+        };
+
         onSaveSuccess(
           {
             title: metaForm.title,
@@ -281,48 +291,48 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             year: metaForm.year,
             aasta: metaForm.year,
             type: metaForm.type || undefined,
-            type_object: metaForm.type || undefined,
-            genre: metaForm.genre || undefined,
-            genre_object: metaForm.genre || undefined,
+            type_object: metaForm.type as unknown as LinkedEntity | undefined,
+            genre: getGenreLabel(metaForm.genre),
+            genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
             creators: cleanCreators,
             autor: mainAuthor?.name,
             respondens: respondens?.name,
-            tags: tagsArray,
-            tags_object: tagsArray,
+            tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
+            tags_object: tagsArray as LinkedEntity[],
             languages: metaForm.languages,
-            location: metaForm.location,
-            location_object: metaForm.location,
+            location: typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label,
+            location_object: metaForm.location as LinkedEntity,
             koht: locationLabel,
-            publisher: metaForm.publisher,
-            publisher_object: metaForm.publisher,
+            publisher: typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label,
+            publisher_object: metaForm.publisher as LinkedEntity,
             trükkal: publisherLabel,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collection: metaForm.collection
-          },
+          } as Partial<Page>,
           {
             title: metaForm.title,
             year: metaForm.year,
             type: metaForm.type || undefined,
-            type_object: metaForm.type || undefined,
-            genre: metaForm.genre || undefined,
-            genre_object: metaForm.genre || undefined,
+            type_object: metaForm.type as unknown as LinkedEntity | undefined,
+            genre: getGenreLabel(metaForm.genre),
+            genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
             creators: cleanCreators,
             author: mainAuthor?.name,
             respondens: respondens?.name,
-            tags: tagsArray,
-            tags_object: tagsArray, // Force update for AnnotationsTab
+            tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
+            tags_object: tagsArray as LinkedEntity[],
             languages: metaForm.languages,
-            location: metaForm.location,
-            location_object: metaForm.location, // Force update
+            location: typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label,
+            location_object: metaForm.location as LinkedEntity,
             koht: locationLabel,
-            publisher: metaForm.publisher,
-            publisher_object: metaForm.publisher, // Force update
+            publisher: typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label,
+            publisher_object: metaForm.publisher as LinkedEntity,
             trükkal: publisherLabel,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collection: metaForm.collection
-          }
+          } as Partial<Work>
         );
 
         setSaveStatus('success');
@@ -500,7 +510,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   label={t('metadata.type', 'Tüüp')}
                   type="topic"
                   value={metaForm.type}
-                  onChange={val => setMetaForm({ ...metaForm, type: val })}
+                  onChange={val => setMetaForm({ ...metaForm, type: val?.label || null })}
                   placeholder="nt: trükis, käsikiri"
                   lang={lang}
                   localSuggestions={suggestions.types}

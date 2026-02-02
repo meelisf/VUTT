@@ -172,7 +172,7 @@ const Statistics: React.FC = () => {
                         <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
-                            data={statusData}
+                            data={statusData as { name: string; value: number }[]}
                             cx="50%"
                             cy="50%"
                             innerRadius={80}

@@ -394,7 +394,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
                       {/* Originaal badge */}
                       {entry.is_original && (
-                        <Shield size={14} className="text-green-600 flex-shrink-0" title={t('history.originalOCR')} />
+                        <Shield size={14} className="text-green-600 flex-shrink-0" aria-label={t('history.originalOCR')} />
                       )}
 
                       {/* Kuupäev */}

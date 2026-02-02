@@ -330,7 +330,7 @@ const Workspace: React.FC = () => {
     let respondens = work?.respondens || page.respondens || '';
 
     if (work?.creators && work.creators.length > 0) {
-      const authorCreator = work.creators.find(c => c.role === 'praeses' || c.role === 'autor');
+      const authorCreator = work.creators.find(c => c.role === 'praeses' || c.role === 'auctor');
       if (authorCreator) author = authorCreator.name;
 
       const respondensCreator = work.creators.find(c => c.role === 'respondens');
