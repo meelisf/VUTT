@@ -10,6 +10,7 @@ import glob
 import shutil
 import threading
 import socketserver
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 # Impordi kõik vajalik server/ moodulitest
@@ -47,6 +48,113 @@ from server import (
 # Lukud failioperatsioonide jaoks (race condition'ide vältimine)
 metadata_lock = threading.RLock()  # _metadata.json operatsioonid
 page_json_lock = threading.RLock()  # Lehekülje .json failide operatsioonid
+
+# =========================================================
+# CACHE: Collections ja Vocabularies
+# Loetakse serveri stardil, taaslaaditakse perioodiliselt
+# =========================================================
+_cache_lock = threading.RLock()  # RLock lubab sama lõime poolt korduvat lukustamist
+_collections_cache = None
+_vocabularies_cache = None
+_cache_loaded_at = None
+CACHE_TTL_SECONDS = 300  # 5 minutit
+
+
+def _load_cache_internal():
+    """Laeb cache'i (sisekasutuseks, eeldab et lukk on võetud)."""
+    global _collections_cache, _vocabularies_cache, _cache_loaded_at
+
+    collections = {}
+    vocabularies = {}
+
+    if os.path.exists(COLLECTIONS_FILE):
+        try:
+            with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+                collections = json.load(f)
+        except Exception as e:
+            print(f"Collections cache laadimine ebaõnnestus: {e}")
+
+    if os.path.exists(VOCABULARIES_FILE):
+        try:
+            with open(VOCABULARIES_FILE, 'r', encoding='utf-8') as f:
+                vocabularies = json.load(f)
+        except Exception as e:
+            print(f"Vocabularies cache laadimine ebaõnnestus: {e}")
+
+    _collections_cache = collections
+    _vocabularies_cache = vocabularies
+    _cache_loaded_at = datetime.now()
+
+    print(f"Cache laetud: {len(collections)} kollektsiooni, {len(vocabularies)} sõnavara")
+
+
+def _is_cache_stale():
+    """Kontrollib kas cache on aegunud."""
+    if _collections_cache is None or _cache_loaded_at is None:
+        return True
+    return (datetime.now() - _cache_loaded_at).total_seconds() > CACHE_TTL_SECONDS
+
+
+def get_cached_collections():
+    """Tagastab cache'itud kollektsioonid, laeb vajadusel uuesti."""
+    with _cache_lock:
+        if _is_cache_stale():
+            _load_cache_internal()
+        return _collections_cache
+
+
+def get_cached_vocabularies():
+    """Tagastab cache'itud sõnavara, laeb vajadusel uuesti."""
+    with _cache_lock:
+        if _is_cache_stale():
+            _load_cache_internal()
+        return _vocabularies_cache
+
+
+def invalidate_cache():
+    """Tühjendab cache'i (kutsuda pärast failide muutmist)."""
+    global _collections_cache, _vocabularies_cache, _cache_loaded_at
+    with _cache_lock:
+        _collections_cache = None
+        _vocabularies_cache = None
+        _cache_loaded_at = None
+
+
+# Lae cache serveri stardil
+with _cache_lock:
+    _load_cache_internal()
+
+
+# =========================================================
+# ASYNC MEILISEARCH SYNC
+# Käivitab indekseerimise lõimede pool'is, et päring ei blokeeruks
+# =========================================================
+
+# Lõimede pool Meilisearch päringute jaoks
+# Max 10 samaaegset päringut - rohkem tekitaks Meilisearchile liiga suure koormuse
+MEILISEARCH_POOL_SIZE = 10
+_meilisearch_executor = ThreadPoolExecutor(
+    max_workers=MEILISEARCH_POOL_SIZE,
+    thread_name_prefix="meili_sync"
+)
+
+
+def _sync_work_task(dir_name):
+    """Meilisearch sync task (käivitatakse pool'is)."""
+    try:
+        sync_work_to_meilisearch(dir_name)
+    except Exception as e:
+        print(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
+
+
+def sync_work_to_meilisearch_async(dir_name):
+    """Käivitab Meilisearch sync'i lõimede pool'is.
+
+    Kasutaja päring ei pea ootama indekseerimise lõppu.
+    Vead logitakse, aga ei katkesta kasutaja tööd.
+    Pool piirab samaagsete päringute arvu (max 10).
+    """
+    _meilisearch_executor.submit(_sync_work_task, dir_name)
 
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     # TODO: Pärast kindla domeeni saamist piirata CORS lubatud domeenidele
@@ -159,7 +267,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"INVITE VALIDATE VIGA: {e}")
                 self.send_error(500, str(e))
 
-        # GET /collections - kollektsioonide puu (avalik)
+        # GET /collections - kollektsioonide puu (avalik, cache'itud)
         elif self.path == '/collections':
             try:
                 self.send_response(200)
@@ -167,10 +275,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 send_cors_headers(self)
                 self.end_headers()
 
-                collections = {}
-                if os.path.exists(COLLECTIONS_FILE):
-                    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
-                        collections = json.load(f)
+                collections = get_cached_collections()
 
                 response = {
                     "status": "success",
@@ -182,7 +287,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"COLLECTIONS VIGA: {e}")
                 self.send_error(500, str(e))
 
-        # GET /vocabularies - kontrollitud sõnavara (avalik)
+        # GET /vocabularies - kontrollitud sõnavara (avalik, cache'itud)
         elif self.path == '/vocabularies':
             try:
                 self.send_response(200)
@@ -190,10 +295,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 send_cors_headers(self)
                 self.end_headers()
 
-                vocabularies = {}
-                if os.path.exists(VOCABULARIES_FILE):
-                    with open(VOCABULARIES_FILE, 'r', encoding='utf-8') as f:
-                        vocabularies = json.load(f)
+                vocabularies = get_cached_vocabularies()
 
                 response = {
                     "status": "success",
@@ -435,8 +537,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         os.chmod(add_path, 0o644)
                     print(f"Salvestatud (ilma Gitita): {txt_path}")
 
-                # Sünkrooni Meilisearchiga ENNE vastuse saatmist
-                sync_work_to_meilisearch(safe_catalog)
+                # Sünkrooni Meilisearchiga TAUSTAL (kasutaja ei oota)
+                sync_work_to_meilisearch_async(safe_catalog)
 
                 # VASTUS
                 self.send_response(200)
@@ -1789,8 +1891,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     message=commit_message
                 )
 
-                # Uuenda Meilisearch
-                sync_work_to_meilisearch(os.path.basename(dir_path))
+                # Uuenda Meilisearch (taustal)
+                sync_work_to_meilisearch_async(os.path.basename(dir_path))
 
                 # Märgi muudatus kinnitatuks
                 update_pending_edit_status(edit_id, "approved", user["username"], comment)
@@ -1955,8 +2057,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                                 message=f"Kollektsioon: {os.path.basename(dir_path)}"
                             )
 
-                        # Sünkrooni Meilisearchiga
-                        sync_work_to_meilisearch(os.path.basename(dir_path))
+                        # Sünkrooni Meilisearchiga (taustal)
+                        sync_work_to_meilisearch_async(os.path.basename(dir_path))
 
                         updated += 1
 

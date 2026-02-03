@@ -154,6 +154,37 @@ Files: `src/locales/{et,en}/*.json`
 - Meilisearch: frontend uses search-only API key
 - Backend ports (7700, 8001, 8002) not exposed
 
+## Performance Optimizations
+
+Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
+
+**Async Meilisearch sync** (`file_server.py`)
+- `/save` ei blokeeru enam Meilisearch indekseerimist oodates
+- `ThreadPoolExecutor` (max 10 töötajat) piirab samaagseid päringuid
+- Kasutaja saab vastuse kohe pärast Git commit'i (~100-500ms vs varem kuni 30s)
+
+**Cache'imine**
+- `users.json` - laetakse stardil, uuendatakse ainult muudatuste korral (`auth.py`)
+- `collections.json`, `vocabularies.json` - cache TTL 5 min (`file_server.py`)
+- `people.json` - loetakse üks kord sync'i alguses, mitte iga lehe kohta (`meilisearch_ops.py`)
+
+**Automaatne puhastus (daemon threads)**
+- Aegunud sessioonid - iga 5 min (`auth.py`)
+- Tühjad rate limit IP kirjed - iga 10 min (`rate_limit.py`)
+
+**Konfigureeritavad konstandid:**
+```python
+# file_server.py
+MEILISEARCH_POOL_SIZE = 10      # Max samaagseid Meilisearch päringuid
+CACHE_TTL_SECONDS = 300          # Collections/vocabularies cache TTL
+
+# auth.py
+SESSION_CLEANUP_INTERVAL = 300   # Sessioonide puhastuse intervall
+
+# rate_limit.py
+RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
+```
+
 ## TODO
 
 | Task | Priority |
@@ -161,6 +192,14 @@ Files: `src/locales/{et,en}/*.json`
 | Automatic backup system | High (waiting for IT) |
 | JSON cleanup (page_number removal) | Low |
 | Code fallback removal | Low |
+
+### Skaleerimise TODO (kui koormus kasvab)
+
+| Task | Millal vaja |
+|------|-------------|
+| Vaheta `http.server` → FastAPI/Flask + gunicorn | Kui Python GIL hakkab piirama (>500 kasutajat) |
+| Lisa Redis sessioonide ja cache jaoks | Kui vaja mitut serveri instantsi (horisontaalne skaleerimine) |
+| Lisa metrics endpoint (Prometheus) | Kui vaja jälgida mälukasutust ja jõudlust tootmises |
 
 ## Implemented ✅
 
@@ -172,3 +211,4 @@ Files: `src/locales/{et,en}/*.json`
 - Metadata changes in Review page (yellow badge)
 - Search filters: type multi-select, facets preserve all options
 - File permissions fix (chmod 644 after writes)
+- Server performance optimizations (async Meilisearch, caching, cleanup threads)

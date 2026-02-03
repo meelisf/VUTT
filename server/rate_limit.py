@@ -11,6 +11,55 @@ from .config import RATE_LIMITS
 _rate_limit_store = {}
 _rate_limit_lock = threading.Lock()
 
+# Puhastuse intervall (sekundites)
+RATE_LIMIT_CLEANUP_INTERVAL = 600  # 10 minutit
+
+
+def _cleanup_rate_limit_store():
+    """Taustalõim, mis puhastab tühjad IP kirjed perioodiliselt."""
+    while True:
+        time.sleep(RATE_LIMIT_CLEANUP_INTERVAL)
+        try:
+            now = time.time()
+            total_removed = 0
+
+            with _rate_limit_lock:
+                for endpoint in list(_rate_limit_store.keys()):
+                    ips_to_remove = []
+
+                    for ip, timestamps in _rate_limit_store[endpoint].items():
+                        # Leia suurim window selle endpointi jaoks
+                        _, window_seconds = RATE_LIMITS.get(endpoint, (0, 3600))
+
+                        # Filtreeri aegunud timestamps
+                        valid_timestamps = [ts for ts in timestamps if now - ts < window_seconds]
+
+                        if not valid_timestamps:
+                            # Tühi list - eemalda IP
+                            ips_to_remove.append(ip)
+                        else:
+                            # Uuenda ainult kehtivate timestamp'idega
+                            _rate_limit_store[endpoint][ip] = valid_timestamps
+
+                    # Eemalda tühjad IP-d
+                    for ip in ips_to_remove:
+                        del _rate_limit_store[endpoint][ip]
+                        total_removed += 1
+
+                    # Eemalda tühi endpoint
+                    if not _rate_limit_store[endpoint]:
+                        del _rate_limit_store[endpoint]
+
+            if total_removed > 0:
+                print(f"Rate limit puhastus: eemaldatud {total_removed} IP kirjet")
+        except Exception as e:
+            print(f"Rate limit puhastuse viga: {e}")
+
+
+# Käivita puhastuse taustalõim
+_cleanup_thread = threading.Thread(target=_cleanup_rate_limit_store, daemon=True)
+_cleanup_thread.start()
+
 
 def get_client_ip(handler):
     """Tagastab kliendi IP aadressi, arvestades X-Real-IP ja X-Forwarded-For päiseid."""

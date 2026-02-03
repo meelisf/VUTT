@@ -255,6 +255,9 @@ def sync_work_to_meilisearch(dir_name):
         print(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
         work_id = slug  # Fallback slugile
 
+    # Lae inimeste aliased ÜKS KORD enne tsüklit (mitte iga lehe kohta!)
+    people_data = load_people_aliases()
+
     for i, img_name in enumerate(images):
         page_num = i + 1
         page_id = f"{work_id}-{page_num}"
@@ -300,8 +303,7 @@ def sync_work_to_meilisearch(dir_name):
     # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
         page_tags_data = page_meta.get('tags', [])
 
-        # Lae inimeste aliased
-        people_data = load_people_aliases()
+        # Kasuta eellaetud people_data (laetud enne tsüklit)
         aliases = get_creator_aliases(creators, people_data)
         
         # authors_text sisaldab nüüd ka aliaseid, et otsing leiaks "Lorenz" kui nimi on "Laurentius"

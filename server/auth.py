@@ -6,6 +6,7 @@ import os
 import hashlib
 import uuid
 import threading
+import time
 from datetime import datetime
 from .config import USERS_FILE, SESSION_DURATION
 from .utils import atomic_write_json
@@ -13,29 +14,89 @@ from .utils import atomic_write_json
 # Sessioonide hoidla (token -> user info)
 # NB: Serveri restart kustutab kõik sessioonid
 sessions = {}
+_sessions_lock = threading.Lock()
 
-# Lukk failioperatsioonide jaoks
+# Sessioonide puhastamise intervall (sekundites)
+SESSION_CLEANUP_INTERVAL = 300  # 5 minutit
+
+
+def _cleanup_expired_sessions():
+    """Taustalõim, mis puhastab aegunud sessioonid perioodiliselt."""
+    while True:
+        time.sleep(SESSION_CLEANUP_INTERVAL)
+        try:
+            now = datetime.now()
+            expired_tokens = []
+
+            with _sessions_lock:
+                for token, session in sessions.items():
+                    created_at = datetime.fromisoformat(session["created_at"])
+                    if now - created_at > SESSION_DURATION:
+                        expired_tokens.append(token)
+
+                for token in expired_tokens:
+                    del sessions[token]
+
+            if expired_tokens:
+                print(f"Sessioonide puhastus: eemaldatud {len(expired_tokens)} aegunud sessiooni (aktiivseid: {len(sessions)})")
+        except Exception as e:
+            print(f"Sessioonide puhastuse viga: {e}")
+
+
+# Käivita puhastuse taustalõim
+_cleanup_thread = threading.Thread(target=_cleanup_expired_sessions, daemon=True)
+_cleanup_thread.start()
+
+# =========================================================
+# KASUTAJATE CACHE
+# Hoiab kasutajad mälus, et vältida faili lugemist igal päringul
+# =========================================================
 users_lock = threading.RLock()
+_users_cache = None
+
+
+def _load_users_from_file():
+    """Laeb kasutajad failist (sisekasutuseks)."""
+    if not os.path.exists(USERS_FILE):
+        print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
+        print("Loo users.json fail koos kasutajatega. Näide:")
+        print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
+        print("Parooli hashi saad: echo -n 'parool' | sha256sum")
+        return {}
+
+    with open(USERS_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
 def load_users():
-    """Laeb kasutajad JSON failist."""
+    """Tagastab kasutajad cache'ist, laeb failist vajadusel."""
+    global _users_cache
     with users_lock:
-        if not os.path.exists(USERS_FILE):
-            print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
-            print("Loo users.json fail koos kasutajatega. Näide:")
-            print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
-            print("Parooli hashi saad: echo -n 'parool' | sha256sum")
-            return {}
-
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        if _users_cache is None:
+            _users_cache = _load_users_from_file()
+            print(f"Kasutajate cache laetud: {len(_users_cache)} kasutajat")
+        return _users_cache
 
 
 def save_users(users):
-    """Salvestab kasutajad JSON faili (atomic write)."""
+    """Salvestab kasutajad JSON faili ja uuendab cache'i."""
+    global _users_cache
     with users_lock:
         atomic_write_json(USERS_FILE, users)
+        _users_cache = users  # Uuenda cache kohe
+
+
+def reload_users_cache():
+    """Sunnib cache'i uuesti laadima failist."""
+    global _users_cache
+    with users_lock:
+        _users_cache = _load_users_from_file()
+        print(f"Kasutajate cache uuesti laetud: {len(_users_cache)} kasutajat")
+        return _users_cache
+
+
+# Lae cache serveri stardil
+load_users()
 
 
 def verify_user(username, password):
