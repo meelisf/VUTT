@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
-import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, FileType, User, X, FolderOpen } from 'lucide-react';
+import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, FileType, User, X, FolderOpen, Bookmark } from 'lucide-react';
 import { IMAGE_BASE_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
@@ -1339,8 +1339,8 @@ const SearchPage: React.FC = () => {
                                                                 if (!label) return null;
 
                                                                 return (
-                                                                    <span className="flex items-center gap-1 text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
-                                                                        <Tag size={10} className="text-gray-400" />
+                                                                    <span className="flex items-center gap-1 text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded">
+                                                                        <Bookmark size={10} className="fill-primary-200" />
                                                                         {label}
                                                                     </span>
                                                                 );
