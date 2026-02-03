@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Tag, BookOpen, FileType, CircleDot, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search } from 'lucide-react';
 import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/meiliService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
@@ -295,7 +295,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
               {genreItems.length > 0 && (
                 <FilterSection
                   title={t('filters.genre', 'Žanr')}
-                  icon={<BookOpen size={12} />}
+                  icon={<Bookmark size={12} />}
                   items={genreItems}
                   selectedValues={selectedGenre ? [selectedGenre] : []}
                   onToggle={(val) => onGenreChange(selectedGenre === val ? null : val)}

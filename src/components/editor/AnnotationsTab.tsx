@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark } from 'lucide-react';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
@@ -220,40 +220,6 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </div>
               )}
 
-              {/* Žanr (üksik) */}
-              {work.genre && (
-                <div>
-                  <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.genre')}</span>
-                  <div className="flex items-center gap-1.5">
-                    <span
-                      onClick={() => navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
-                      className="text-gray-900 hover:text-primary-600 hover:underline transition-colors cursor-pointer select-text"
-                      title={t('dashboard:workCard.searchGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
-                    >
-                      {getLabel(work.genre_object || work.genre, lang)}
-                    </span>
-                    {(() => {
-                      const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
-                      const url = getEntityUrl(genreObj?.id, genreObj?.source);
-                      return url && (
-                        <a
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                          title={genreObj?.id || ''}
-                        >
-                          <ExternalLink size={12} />
-                        </a>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
               {work.location && (
                 <div>
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
@@ -308,6 +274,38 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Žanr - eraldi sektsioon bookmark ikooniga */}
+            {work.genre && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.genre')}</span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
+                    className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                    title={t('dashboard:workCard.filterByGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
+                  >
+                    <Bookmark size={12} className="fill-primary-200" />
+                    {getLabel(work.genre_object || work.genre, lang)}
+                  </button>
+                  {(() => {
+                    const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
+                    const url = getEntityUrl(genreObj?.id, genreObj?.source);
+                    return url && (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                        title={genreObj?.id || ''}
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
 
             {/* Kollektsioon */}
             {work.collection && collections[work.collection] && (() => {

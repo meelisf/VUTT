@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -165,7 +165,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           src={work.thumbnail_url}
           alt={work.title}
           loading="lazy"
-          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+          onClick={!selectMode ? handleOpenWorkspace : undefined}
+          className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity ${!selectMode ? 'cursor-pointer' : ''}`}
         />
         {/* Žanrid pildi peal (max 3, kompaktne) */}
         {displayTags.length > 0 && (
@@ -269,6 +270,26 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
+          {/* Žanr vasakul - bookmark ikooniga */}
+          {work.genre ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Kasuta lokaliseeritud väärtust (facet key)
+                const genreLabel = getLabel(work.genre_object || work.genre, lang);
+                navigate(`/?genre=${encodeURIComponent(genreLabel)}`);
+              }}
+              className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+              title={t('workCard.filterByGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
+            >
+              <Bookmark size={11} className="fill-primary-200" />
+              {getLabel(work.genre_object || work.genre, lang)}
+            </button>
+          ) : (
+            <span />
+          )}
+          {/* Staatus paremal */}
           <button
             onClick={(e) => {
               e.preventDefault();
@@ -279,13 +300,6 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           >
             {t(`common:status.${workStatus}`)}
           </button>
-          <a
-            href={`/work/${work.id}/1`}
-            onClick={handleOpenWorkspace}
-            className="text-sm font-medium text-primary-600 hover:text-primary-800 cursor-pointer shrink-0"
-          >
-            {t('workCard.openWorkspace')} &rarr;
-          </a>
         </div>
       </div >
     </div >
