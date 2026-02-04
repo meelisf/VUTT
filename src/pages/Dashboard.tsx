@@ -8,8 +8,11 @@ import Header from '../components/Header';
 import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
+import BulkTagsPicker from '../components/BulkTagsPicker';
+import BulkGenrePicker from '../components/BulkGenrePicker';
+import { LinkedEntity } from '../types/LinkedEntity';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 
@@ -61,6 +64,8 @@ const Dashboard: React.FC = () => {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
   const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
+  const [showBulkTagsPicker, setShowBulkTagsPicker] = useState(false);
+  const [showBulkGenrePicker, setShowBulkGenrePicker] = useState(false);
   const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);  // Triggers re-fetch
 
@@ -368,6 +373,75 @@ const Dashboard: React.FC = () => {
     } finally {
       setBulkAssignLoading(false);
       setShowBulkCollectionPicker(false);
+    }
+  };
+
+  // Massiline märksõnade määramine
+  const handleBulkAssignTags = async (tags: LinkedEntity[], mode: 'add' | 'replace') => {
+    if (selectedWorkIds.size === 0) return;
+
+    setBulkAssignLoading(true);
+    try {
+      const token = localStorage.getItem('vutt_token');
+      const response = await fetch(`${FILE_API_URL}/works/bulk-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_token: token,
+          work_ids: Array.from(selectedWorkIds),
+          tags,
+          mode
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setSelectedWorkIds(new Set());
+        setSelectMode(false);
+        setRefreshCounter(prev => prev + 1);
+      } else {
+        alert(result.message || t('dashboard:bulkAssign.tagsError'));
+      }
+    } catch (e) {
+      console.error('Bulk tags assign failed:', e);
+      alert(t('dashboard:bulkAssign.tagsError'));
+    } finally {
+      setBulkAssignLoading(false);
+      setShowBulkTagsPicker(false);
+    }
+  };
+
+  // Massiline žanri määramine
+  const handleBulkAssignGenre = async (genre: LinkedEntity | null) => {
+    if (selectedWorkIds.size === 0) return;
+
+    setBulkAssignLoading(true);
+    try {
+      const token = localStorage.getItem('vutt_token');
+      const response = await fetch(`${FILE_API_URL}/works/bulk-genre`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          auth_token: token,
+          work_ids: Array.from(selectedWorkIds),
+          genre
+        })
+      });
+
+      const result = await response.json();
+      if (result.status === 'success') {
+        setSelectedWorkIds(new Set());
+        setSelectMode(false);
+        setRefreshCounter(prev => prev + 1);
+      } else {
+        alert(result.message || t('dashboard:bulkAssign.genreError'));
+      }
+    } catch (e) {
+      console.error('Bulk genre assign failed:', e);
+      alert(t('dashboard:bulkAssign.genreError'));
+    } finally {
+      setBulkAssignLoading(false);
+      setShowBulkGenrePicker(false);
     }
   };
 
@@ -839,7 +913,23 @@ const Dashboard: React.FC = () => {
             className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 hover:bg-primary-700 rounded-full font-medium transition-colors disabled:opacity-50"
           >
             <FolderInput size={18} />
-            {bulkAssignLoading ? t('common:labels.loading') : t('bulkAssign.assignCollection')}
+            {t('bulkAssign.assignCollection')}
+          </button>
+          <button
+            onClick={() => setShowBulkTagsPicker(true)}
+            disabled={bulkAssignLoading}
+            className="flex items-center gap-2 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 rounded-full font-medium transition-colors disabled:opacity-50"
+          >
+            <Tag size={18} />
+            {t('bulkAssign.assignTags')}
+          </button>
+          <button
+            onClick={() => setShowBulkGenrePicker(true)}
+            disabled={bulkAssignLoading}
+            className="flex items-center gap-2 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 rounded-full font-medium transition-colors disabled:opacity-50"
+          >
+            <BookOpen size={18} />
+            {t('bulkAssign.assignGenre')}
           </button>
           <button
             onClick={exitSelectMode}
@@ -858,6 +948,26 @@ const Dashboard: React.FC = () => {
           onClose={() => setShowBulkCollectionPicker(false)}
           showUnassigned={true}
           title={t('bulkAssign.selectCollection')}
+        />
+      )}
+
+      {/* Bulk Tags Picker Modal */}
+      {showBulkTagsPicker && (
+        <BulkTagsPicker
+          isOpen={showBulkTagsPicker}
+          onClose={() => setShowBulkTagsPicker(false)}
+          onSave={handleBulkAssignTags}
+          selectedCount={selectedWorkIds.size}
+        />
+      )}
+
+      {/* Bulk Genre Picker Modal */}
+      {showBulkGenrePicker && (
+        <BulkGenrePicker
+          isOpen={showBulkGenrePicker}
+          onClose={() => setShowBulkGenrePicker(false)}
+          onSave={handleBulkAssignGenre}
+          selectedCount={selectedWorkIds.size}
         />
       )}
     </div>

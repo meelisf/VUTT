@@ -340,6 +340,7 @@ const Workspace: React.FC = () => {
     const year = work?.year ?? page.year ?? page.aasta ?? 0;
     const place = getLabel(work?.location || page.location || '');
     const printer = getLabel(work?.publisher || page.publisher || '');
+    const languages = work?.languages || page.languages || [];
 
     const params = new URLSearchParams();
     params.set('ctx_ver', 'Z39.88-2004');
@@ -351,6 +352,7 @@ const Workspace: React.FC = () => {
     if (year) params.set('rft.date', year.toString());
     if (place) params.set('rft.place', place);
     if (printer) params.set('rft.pub', printer);
+    if (languages.length > 0) params.set('rft.language', languages.join(', '));
 
     return params.toString();
   };

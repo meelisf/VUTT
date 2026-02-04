@@ -22,7 +22,7 @@ interface MetadataModalProps {
 interface MetadataForm {
   title: string;
   year: number;
-  type: string | null;
+  type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
   genre: string | LinkedEntity | null;  // EntityPicker toetab ainult üksikut väärtust
   tags: (string | LinkedEntity)[];
   location: string | LinkedEntity;
@@ -277,7 +277,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         // NB: Tüübiassertsioonid vajalikud, kuna metaForm kasutab ühtset formaati,
         // aga Page/Work interface'id ootavad eraldi _object välju LinkedEntity tüübina.
         // Runtime'is töötab, sest backend käsitleb mõlemat formaati.
-        // Abifunktsioon genre label'i ekstraktimiseks
+        // Abifunktsioonid label'i ekstraktimiseks LinkedEntity objektidest
+        const getTypeLabel = (t: typeof metaForm.type): string | undefined => {
+          if (!t) return undefined;
+          if (typeof t === 'string') return t;
+          return t.label;
+        };
         const getGenreLabel = (g: typeof metaForm.genre): string | undefined => {
           if (!g) return undefined;
           if (typeof g === 'string') return g;
@@ -290,8 +295,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             pealkiri: metaForm.title,
             year: metaForm.year,
             aasta: metaForm.year,
-            type: metaForm.type || undefined,
-            type_object: metaForm.type as unknown as LinkedEntity | undefined,
+            type: getTypeLabel(metaForm.type),
+            type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
             genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
             creators: cleanCreators,
@@ -313,8 +318,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {
             title: metaForm.title,
             year: metaForm.year,
-            type: metaForm.type || undefined,
-            type_object: metaForm.type as unknown as LinkedEntity | undefined,
+            type: getTypeLabel(metaForm.type),
+            type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
             genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
             creators: cleanCreators,
@@ -510,7 +515,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   label={t('metadata.type', 'Tüüp')}
                   type="topic"
                   value={metaForm.type}
-                  onChange={val => setMetaForm({ ...metaForm, type: val?.label || null })}
+                  onChange={val => setMetaForm({ ...metaForm, type: val })}
                   placeholder="nt: trükis, käsikiri"
                   lang={lang}
                   localSuggestions={suggestions.types}

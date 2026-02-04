@@ -20,7 +20,8 @@
     "search": "Otsi",
     "edit": "Muuda",
     "delete": "Kustuta",
-    "reset": "Lähtesta"
+    "reset": "Lähtesta",
+    "remove": "Eemalda"
   },
   "status": {
     "Toores": "Toores",

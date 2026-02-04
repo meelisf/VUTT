@@ -20,7 +20,8 @@
     "search": "Search",
     "edit": "Edit",
     "delete": "Delete",
-    "reset": "Reset"
+    "reset": "Reset",
+    "remove": "Remove"
   },
   "status": {
     "Toores": "Raw",

@@ -1981,8 +1981,219 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_error(500, str(e))
 
         # =========================================================
-        # MASSILINE KOLLEKTSIOONI MÄÄRAMINE
+        # MASSILISED METAANDMETE UUENDUSED (admin)
         # =========================================================
+
+        elif self.path == '/works/bulk-tags':
+            # Määrab märksõnad mitmele teosele korraga (ainult admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                work_ids = data.get('work_ids', [])
+                tags = data.get('tags', [])  # LinkedEntity objektide list
+                mode = data.get('mode', 'add')  # 'add' või 'replace'
+
+                if not work_ids:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    return
+
+                if not tags and mode == 'replace':
+                    # Replace tühja listiga = eemalda kõik märksõnad
+                    pass
+                elif not tags:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "tags on kohustuslik"}).encode('utf-8'))
+                    return
+
+                updated = 0
+                failed = []
+
+                for work_id in work_ids:
+                    try:
+                        dir_path = find_directory_by_id(work_id)
+                        if not dir_path:
+                            failed.append({"id": work_id, "error": "Kausta ei leitud"})
+                            continue
+
+                        metadata_path = os.path.join(dir_path, '_metadata.json')
+
+                        with metadata_lock:
+                            current_meta = {}
+                            if os.path.exists(metadata_path):
+                                with open(metadata_path, 'r', encoding='utf-8') as f:
+                                    current_meta = json.load(f)
+
+                            if mode == 'replace':
+                                # Asenda kõik märksõnad
+                                current_meta['tags'] = tags
+                            else:
+                                # Lisa olemasolevatele (väldi duplikaate ID või labeli järgi)
+                                existing_tags = current_meta.get('tags', [])
+                                existing_ids = set()
+                                existing_labels = set()
+                                for t in existing_tags:
+                                    if isinstance(t, dict):
+                                        if t.get('id'):
+                                            existing_ids.add(t['id'])
+                                        existing_labels.add(t.get('label', '').lower())
+                                    elif isinstance(t, str):
+                                        existing_labels.add(t.lower())
+
+                                for new_tag in tags:
+                                    tag_id = new_tag.get('id') if isinstance(new_tag, dict) else None
+                                    tag_label = new_tag.get('label', '').lower() if isinstance(new_tag, dict) else str(new_tag).lower()
+
+                                    if tag_id and tag_id in existing_ids:
+                                        continue  # Sama ID juba olemas
+                                    if tag_label in existing_labels:
+                                        continue  # Sama label juba olemas
+
+                                    existing_tags.append(new_tag)
+                                    if tag_id:
+                                        existing_ids.add(tag_id)
+                                    existing_labels.add(tag_label)
+
+                                current_meta['tags'] = existing_tags
+
+                            json_content = json.dumps(current_meta, indent=2, ensure_ascii=False)
+                            save_with_git(
+                                filepath=metadata_path,
+                                content=json_content,
+                                username=user['username'],
+                                message=f"Märksõnad: {os.path.basename(dir_path)}"
+                            )
+
+                        sync_work_to_meilisearch_async(os.path.basename(dir_path))
+                        updated += 1
+
+                    except Exception as e:
+                        failed.append({"id": work_id, "error": str(e)})
+
+                tag_labels = ', '.join([t.get('label', str(t)) if isinstance(t, dict) else str(t) for t in tags[:3]])
+                if len(tags) > 3:
+                    tag_labels += f" (+{len(tags) - 3})"
+                print(f"Admin '{user['username']}' määras märksõnad [{tag_labels}] ({mode}) {updated} teosele")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": f"Uuendatud {updated} teost",
+                    "updated": updated,
+                    "failed": failed
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"BULK-TAGS VIGA: {e}")
+                import traceback
+                traceback.print_exc()
+                self.send_error(500, str(e))
+
+        elif self.path == '/works/bulk-genre':
+            # Määrab žanri mitmele teosele korraga (ainult admin)
+            try:
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                data = json.loads(post_data)
+
+                user, auth_error = require_token(data, min_role='admin')
+                if auth_error:
+                    self.send_response(401)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                    return
+
+                work_ids = data.get('work_ids', [])
+                genre = data.get('genre')  # LinkedEntity objekt või null
+
+                if not work_ids:
+                    self.send_response(400)
+                    self.send_header('Content-type', 'application/json')
+                    send_cors_headers(self)
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    return
+
+                updated = 0
+                failed = []
+
+                for work_id in work_ids:
+                    try:
+                        dir_path = find_directory_by_id(work_id)
+                        if not dir_path:
+                            failed.append({"id": work_id, "error": "Kausta ei leitud"})
+                            continue
+
+                        metadata_path = os.path.join(dir_path, '_metadata.json')
+
+                        with metadata_lock:
+                            current_meta = {}
+                            if os.path.exists(metadata_path):
+                                with open(metadata_path, 'r', encoding='utf-8') as f:
+                                    current_meta = json.load(f)
+
+                            # Uuenda žanri väli (võib olla null)
+                            current_meta['genre'] = genre
+
+                            json_content = json.dumps(current_meta, indent=2, ensure_ascii=False)
+                            save_with_git(
+                                filepath=metadata_path,
+                                content=json_content,
+                                username=user['username'],
+                                message=f"Žanr: {os.path.basename(dir_path)}"
+                            )
+
+                        sync_work_to_meilisearch_async(os.path.basename(dir_path))
+                        updated += 1
+
+                    except Exception as e:
+                        failed.append({"id": work_id, "error": str(e)})
+
+                genre_label = genre.get('label', str(genre)) if isinstance(genre, dict) else str(genre) if genre else 'eemaldatud'
+                print(f"Admin '{user['username']}' määras žanri '{genre_label}' {updated} teosele")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                send_cors_headers(self)
+                self.end_headers()
+
+                response = {
+                    "status": "success",
+                    "message": f"Uuendatud {updated} teost",
+                    "updated": updated,
+                    "failed": failed
+                }
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+
+            except Exception as e:
+                print(f"BULK-GENRE VIGA: {e}")
+                import traceback
+                traceback.print_exc()
+                self.send_error(500, str(e))
 
         elif self.path == '/works/bulk-collection':
             # Määrab kollektsiooni mitmele teosele korraga (ainult admin)
