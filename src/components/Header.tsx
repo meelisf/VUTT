@@ -46,14 +46,14 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+      <header className="bg-white border-b border-gray-200 px-3 py-2 sm:px-6 sm:py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
         {/* Vasak pool: logo, otsing, pealkiri */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link to="/" className="hover:opacity-80 transition-opacity flex items-center gap-2">
-            <img src="/logo.png" alt="VUTT Logo" className="h-8 w-auto" />
+            <img src="/logo.png" alt="VUTT Logo" className="h-6 sm:h-8 w-auto" />
             <div>
-              <h1 className="text-xl font-bold text-primary-900 tracking-tight leading-none">{t('common:app.name')}</h1>
-              <p className="text-[10px] text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">{t('common:app.subtitle')}</p>
+              <h1 className="text-base sm:text-xl font-bold text-primary-900 tracking-tight leading-none">{t('common:app.name')}</h1>
+              <p className="hidden sm:block text-[10px] text-gray-500 font-medium tracking-wide uppercase leading-none mt-0.5">{t('common:app.subtitle')}</p>
             </div>
           </Link>
 
@@ -105,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Parem pool: kasutajamenüü + keelevahetaja */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {user ? (
             <div className="relative">
               <button

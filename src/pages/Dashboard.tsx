@@ -450,7 +450,7 @@ const Dashboard: React.FC = () => {
       <Header />
 
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
 
           {/* Error Banner */}
           {error && (
@@ -482,10 +482,10 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Controls Row */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
                 {/* Year Filter */}
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
+                  <span className="hidden sm:inline text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -684,7 +684,7 @@ const Dashboard: React.FC = () => {
 
               return (
                 <>
-                  <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-3">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
                     <div className="flex items-center gap-4">
                       <h2 className="text-xl font-bold text-gray-800">{t('results.bookshelf')}</h2>
                       {/* Admin: Select mode toggle */}
@@ -787,10 +787,13 @@ const Dashboard: React.FC = () => {
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             <ChevronLeft size={18} />
-                            {t('common:buttons.previous')}
+                            <span className="hidden sm:inline">{t('common:buttons.previous')}</span>
                           </button>
 
-                          <div className="flex items-center gap-1 mx-2">
+                          {/* Mobiilne lehekülje indikaator */}
+                          <span className="sm:hidden text-sm font-medium text-gray-600">{currentPage}/{totalPages}</span>
+
+                          <div className="hidden sm:flex items-center gap-1 mx-2">
                             {getPageNumbers().map((page, idx) => (
                               page === '...' ? (
                                 <span key={`ellipsis-${idx}`} className="px-2 text-gray-400">...</span>
@@ -814,7 +817,7 @@ const Dashboard: React.FC = () => {
                             disabled={currentPage === totalPages}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
-                            {t('common:buttons.next')}
+                            <span className="hidden sm:inline">{t('common:buttons.next')}</span>
                             <ChevronRight size={18} />
                           </button>
                         </div>
@@ -850,8 +853,8 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 bg-gray-50 py-4 px-8 shrink-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between text-sm text-gray-500">
+      <footer className="border-t border-gray-200 bg-gray-50 py-4 px-4 sm:px-8 shrink-0">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center sm:justify-between gap-2 text-sm text-gray-500">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setShowAboutModal(true)}
@@ -902,7 +905,7 @@ const Dashboard: React.FC = () => {
 
       {/* Floating Action Bar - ilmub kui teosed on valitud */}
       {selectMode && selectedWorkIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-full shadow-xl flex items-center gap-4 z-40">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 sm:px-6 py-3 rounded-full shadow-xl flex flex-wrap items-center gap-2 sm:gap-4 z-40 max-w-[95vw]">
           <span className="font-medium">
             {t('bulkAssign.selectedCount', { count: selectedWorkIds.size })}
           </span>

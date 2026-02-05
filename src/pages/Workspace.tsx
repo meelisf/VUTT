@@ -12,6 +12,7 @@ import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History } from 'lucide-react';
+import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import { FILE_API_URL } from '../config';
 import { getLabel } from '../utils/metadataUtils';
 
@@ -362,8 +363,8 @@ const Workspace: React.FC = () => {
       {/* COinS for Zotero - peidetud span bibliograafiliste andmetega */}
       {page && <span className="Z3988" title={generateCoins() || ''} />}
 
-      {/* Top Navigation Bar */}
-      <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4 shrink-0 shadow-sm relative z-50">
+      {/* Top Navigation Bar (desktop only) */}
+      <div className="hidden md:flex h-12 bg-white border-b border-gray-200 items-center justify-between px-4 shrink-0 shadow-sm relative z-50">
         <div className="flex items-center gap-2">
           {/* Avaleht */}
           <button
@@ -485,8 +486,8 @@ const Workspace: React.FC = () => {
         </div>
       </div>
 
-      {/* Split View Content */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative z-0">
+      {/* Split View Content (desktop only) */}
+      <div className="hidden md:flex flex-1 flex-row overflow-hidden relative z-0">
         {/* Left: Image Viewer */}
         <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
@@ -538,6 +539,21 @@ const Workspace: React.FC = () => {
           />
           </div>
         </div>
+      </div>
+
+      {/* Mobiil: tab-põhine read-only vaade */}
+      <div className="md:hidden flex-1 overflow-hidden">
+        <WorkspaceMobileView
+          page={page}
+          work={work}
+          workId={workId!}
+          currentPageNum={currentPageNum}
+          onNavigatePage={navigatePage}
+          onNavigateBack={handleNavigateBack}
+          inputPage={inputPage}
+          onInputPageChange={setInputPage}
+          onPageInputSubmit={handlePageInputSubmit}
+        />
       </div>
 
       {/* Metaandmete muutmise modal */}

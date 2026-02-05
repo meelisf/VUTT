@@ -134,6 +134,11 @@
     "saved": "Edit submitted for review. An editor will review it.",
     "savedWithConflict": "Edit submitted for review. Note: Another user has already submitted an edit for the same page."
   },
+  "mobile": {
+    "imageTab": "Image",
+    "textTab": "Text",
+    "infoTab": "Info"
+  },
   "status": {
     "label": "Page status",
     "contributorDisabled": "Only editors can change the status"

@@ -134,6 +134,11 @@
     "saved": "Muudatus salvestatud ülevaatusele. Toimetaja vaatab selle üle.",
     "savedWithConflict": "Muudatus salvestatud ülevaatusele. NB: Teine kasutaja on samale lehele juba muudatuse esitanud."
   },
+  "mobile": {
+    "imageTab": "Pilt",
+    "textTab": "Tekst",
+    "infoTab": "Info"
+  },
   "status": {
     "label": "Lehekülje staatus",
     "contributorDisabled": "Staatust saab muuta ainult toimetaja"

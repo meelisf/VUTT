@@ -12,6 +12,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Puuteekraani pinch-to-zoom ja drag tugi
+  const touchStateRef = useRef<{
+    lastDist: number;
+    lastScale: number;
+    lastCenter: { x: number; y: number };
+    lastPos: { x: number; y: number };
+    isTouching: boolean;
+  }>({ lastDist: 0, lastScale: 1, lastCenter: { x: 0, y: 0 }, lastPos: { x: 0, y: 0 }, isTouching: false });
+
   const handleZoom = (delta: number) => {
     setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
   };
@@ -66,6 +75,60 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
     handleZoom(delta);
   }
 
+  // Puuteekraani sündmuste käsitlejad
+  const getTouchDist = (t1: React.Touch, t2: React.Touch) =>
+    Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+  const getTouchCenter = (t1: React.Touch, t2: React.Touch) => ({
+    x: (t1.clientX + t2.clientX) / 2,
+    y: (t1.clientY + t2.clientY) / 2,
+  });
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const ts = touchStateRef.current;
+    if (e.touches.length === 1) {
+      // Ühe sõrmega lohistamine
+      ts.isTouching = true;
+      ts.lastCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      ts.lastPos = { ...position };
+    } else if (e.touches.length === 2) {
+      // Kahe sõrmega pinch
+      ts.lastDist = getTouchDist(e.touches[0], e.touches[1]);
+      ts.lastScale = scale;
+      ts.lastCenter = getTouchCenter(e.touches[0], e.touches[1]);
+      ts.lastPos = { ...position };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    e.preventDefault(); // Blokeeri brauseri vaikimisi scroll/zoom
+    const ts = touchStateRef.current;
+
+    if (e.touches.length === 1 && ts.isTouching) {
+      // Ühe sõrmega lohistamine
+      const dx = e.touches[0].clientX - ts.lastCenter.x;
+      const dy = e.touches[0].clientY - ts.lastCenter.y;
+      setPosition({ x: ts.lastPos.x + dx, y: ts.lastPos.y + dy });
+    } else if (e.touches.length === 2) {
+      const newDist = getTouchDist(e.touches[0], e.touches[1]);
+      const newCenter = getTouchCenter(e.touches[0], e.touches[1]);
+
+      // Skaala muutus
+      const ratio = newDist / ts.lastDist;
+      const newScale = Math.max(0.5, Math.min(5, ts.lastScale * ratio));
+      setScale(newScale);
+
+      // Panniga liikumine pinch ajal
+      const dx = newCenter.x - ts.lastCenter.x;
+      const dy = newCenter.y - ts.lastCenter.y;
+      setPosition({ x: ts.lastPos.x + dx, y: ts.lastPos.y + dy });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStateRef.current.isTouching = false;
+  };
+
   // Prevent default browser drag behavior on image
   const preventDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -112,11 +175,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden flex items-center justify-center cursor-move"
+        style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         <div
           style={{
