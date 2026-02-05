@@ -33,12 +33,19 @@ from .registration import (
     validate_invite_token, use_invite_token, create_user_from_invite
 )
 
-# Pending edits
+# Pending edits (äriloogika)
 from .pending_edits import (
     load_pending_edits, save_pending_edits, create_pending_edit,
     get_pending_edit_by_id, get_pending_edits_for_page,
     get_user_pending_edit_for_page, update_pending_edit_status,
     check_base_text_conflict
+)
+
+# Pending edits (HTTP handlerid)
+from .pending_edits_handlers import (
+    handle_save_pending, handle_pending_edits_list,
+    handle_pending_edits_check, handle_pending_edits_approve,
+    handle_pending_edits_reject
 )
 
 # Git operatsioonid
