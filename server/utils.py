@@ -7,8 +7,13 @@ import json
 import secrets
 import string
 import tempfile
+import threading
 import unicodedata
 from .config import BASE_DIR
+
+# Jagatud lukud failioperatsioonide jaoks (race condition'ide vältimine)
+metadata_lock = threading.RLock()  # _metadata.json operatsioonid
+page_json_lock = threading.RLock()  # Lehekülje .json failide operatsioonid
 
 
 def atomic_write_json(filepath, data, indent=2):

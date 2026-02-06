@@ -74,9 +74,28 @@ from .http_helpers import (
 
 # Abifunktsioonid
 from .utils import (
-    atomic_write_json,
+    atomic_write_json, metadata_lock, page_json_lock,
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status,
     get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids,
     build_work_id_cache
+)
+
+# Git HTTP handlerid
+from .git_handlers import (
+    handle_backups, handle_restore, handle_git_history,
+    handle_git_restore, handle_git_diff, handle_commit_diff
+)
+
+# Admin HTTP handlerid
+from .admin_handlers import (
+    handle_admin_registrations, handle_admin_registrations_approve,
+    handle_admin_registrations_reject, handle_admin_users,
+    handle_admin_users_update_role, handle_admin_users_delete,
+    handle_invite_set_password
+)
+
+# Bulk operatsioonide HTTP handlerid
+from .bulk_handlers import (
+    handle_bulk_tags, handle_bulk_genre, handle_bulk_collection
 )
