@@ -323,6 +323,135 @@ const SearchPage: React.FC = () => {
         setAuthorInput(authorParam);
     }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
 
+    // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks, ehitatud otsingutulemustest)
+    const genreIdMap = useMemo(() => {
+      const map: Record<string, string> = {};
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const obj = (hit as any).genre_object;
+          if (!obj) continue;
+          const items = Array.isArray(obj) ? obj : [obj];
+          for (const item of items) {
+            if (item?.id && item?.labels) {
+              map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+            }
+          }
+        }
+      }
+      return map;
+    }, [results, i18n.language]);
+
+    // Pöördkaart: label → Q-kood (URL-i jaoks)
+    const genreLabelToId = useMemo(() => {
+      const map: Record<string, string> = {};
+      for (const [id, label] of Object.entries(genreIdMap)) map[label] = id;
+      return map;
+    }, [genreIdMap]);
+
+    // Q-koodi lahendamine: kui URL-is on Q-kood, teisenda see labeliks (filtrite kuvamiseks)
+    useEffect(() => {
+      if (selectedGenres.length === 0 || Object.keys(genreIdMap).length === 0) return;
+      const availableValues = new Set(availableGenres.map(g => g.value));
+      let changed = false;
+      const resolved = selectedGenres.map(g => {
+        if (availableValues.has(g)) return g;
+        // Q-kood → label
+        if (genreIdMap[g]) { changed = true; return genreIdMap[g]; }
+        // Vocabulary-põhine tõlge
+        if (vocabularies?.genres) {
+          const lang = i18n.language.split('-')[0];
+          const altLang = lang === 'et' ? 'en' : 'et';
+          for (const [, labels] of Object.entries(vocabularies.genres)) {
+            if (labels[altLang] === g) {
+              const curLabel = labels[lang] || labels['et'];
+              if (curLabel) { changed = true; return curLabel; }
+            }
+          }
+        }
+        return g;
+      });
+      if (changed) {
+        setSelectedGenres(resolved);
+        // URL-i uuendame Q-koodidega (mitte labelitega)
+        const urlGenres = resolved.map(g => genreLabelToId[g] || g);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('genre', urlGenres.join(','));
+        setSearchParams(newParams, { replace: true });
+      }
+    }, [selectedGenres, availableGenres, genreIdMap, vocabularies, i18n.language]);
+
+    // Tüübi keelteülene tõlge (vocabulary-põhine)
+    useEffect(() => {
+      if (selectedTypes.length === 0 || availableTypes.length === 0 || !vocabularies) return;
+      const lang = i18n.language.split('-')[0];
+      const altLang = lang === 'et' ? 'en' : 'et';
+      const availableValues = new Set(availableTypes.map(t => t.value));
+      let changed = false;
+      const translated = selectedTypes.map(t => {
+        if (availableValues.has(t)) return t;
+        if (vocabularies.types) {
+          for (const [, labels] of Object.entries(vocabularies.types)) {
+            if (labels[altLang] === t) {
+              const curLabel = labels[lang] || labels['et'];
+              if (curLabel) { changed = true; return curLabel; }
+            }
+          }
+        }
+        return t;
+      });
+      if (changed) {
+        setSelectedTypes(translated);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('type', translated.join(','));
+        setSearchParams(newParams, { replace: true });
+      }
+    }, [selectedTypes, availableTypes, vocabularies, i18n.language]);
+
+    // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
+    const tagsIdMap = useMemo(() => {
+      const map: Record<string, string> = {};
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const objs = (hit as any).tags_object;
+          if (!objs || !Array.isArray(objs)) continue;
+          for (const item of objs) {
+            if (item?.id && item?.labels) {
+              map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+            }
+          }
+        }
+      }
+      return map;
+    }, [results, i18n.language]);
+
+    // Pöördkaart: label → Q-kood (URL-i jaoks)
+    const tagsLabelToId = useMemo(() => {
+      const map: Record<string, string> = {};
+      for (const [id, label] of Object.entries(tagsIdMap)) map[label] = id;
+      return map;
+    }, [tagsIdMap]);
+
+    // Q-koodi lahendamine märksõnade jaoks
+    useEffect(() => {
+      if (selectedTeoseTags.length === 0 || Object.keys(tagsIdMap).length === 0) return;
+      const availableValues = new Set(availableTeoseTags.map(t => t.tag));
+      let changed = false;
+      const resolved = selectedTeoseTags.map(tag => {
+        if (availableValues.has(tag)) return tag;
+        if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
+        return tag;
+      });
+      if (changed) {
+        setSelectedTeoseTags(resolved);
+        const urlTags = resolved.map(t => tagsLabelToId[t] || t);
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('teoseTags', urlTags.join(','));
+        setSearchParams(newParams, { replace: true });
+      }
+    }, [selectedTeoseTags, availableTeoseTags, tagsIdMap, i18n.language]);
+
     // Laadi teose info kui workIdParam on määratud (nt tullakse Workspace'ist)
     useEffect(() => {
                 if (workIdParam && !selectedWorkInfo) {
@@ -390,8 +519,15 @@ const SearchPage: React.FC = () => {
                 if (yearEnd) prev.set('ye', yearEnd); else prev.delete('ye');
                 if (selectedScope && selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
-                if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.join(',')); else prev.delete('teoseTags');
-                if (selectedGenres.length > 0) prev.set('genre', selectedGenres.join(',')); else prev.delete('genre');
+                if (selectedTeoseTags.length > 0) {
+                    const urlTags = selectedTeoseTags.map(t => tagsLabelToId[t] || t);
+                    prev.set('teoseTags', urlTags.join(','));
+                } else prev.delete('teoseTags');
+                if (selectedGenres.length > 0) {
+                    // Kasuta Q-koode URL-is kui olemas
+                    const urlGenres = selectedGenres.map(g => genreLabelToId[g] || g);
+                    prev.set('genre', urlGenres.join(','));
+                } else prev.delete('genre');
                 if (selectedTypes.length > 0) prev.set('type', selectedTypes.join(',')); else prev.delete('type');
                 if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
             }

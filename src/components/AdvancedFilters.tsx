@@ -40,6 +40,10 @@ interface AdvancedFiltersProps {
   defaultExpanded?: boolean;
   // Dünaamilised facetid otsingutulemustest (live counts)
   facets?: FacetDistribution;
+  // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks)
+  genreIdMap?: Record<string, string>;
+  // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
+  tagsIdMap?: Record<string, string>;
   // Keel facetide jaoks
   lang?: 'et' | 'en';
 }
@@ -142,6 +146,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   yearEnd,
   defaultExpanded = false,
   facets,
+  genreIdMap,
+  tagsIdMap,
   lang: propLang
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
@@ -174,15 +180,42 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     loadVocabularies();
   }, []);
 
+  // Keelteülene tõlketabel: teise keele väärtus → praeguse keele väärtus
+  const crossLangGenreMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (vocabularies?.genres) {
+      const altLang = lang === 'et' ? 'en' : 'et';
+      for (const [, labels] of Object.entries(vocabularies.genres)) {
+        const altLabel = labels[altLang];
+        const curLabel = labels[lang] || labels['et'];
+        if (altLabel && curLabel && altLabel !== curLabel) map[altLabel] = curLabel;
+      }
+    }
+    return map;
+  }, [lang, vocabularies]);
+
+  const crossLangTypeMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (vocabularies?.types) {
+      const altLang = lang === 'et' ? 'en' : 'et';
+      for (const [, labels] of Object.entries(vocabularies.types)) {
+        const altLabel = labels[altLang];
+        const curLabel = labels[lang] || labels['et'];
+        if (altLabel && curLabel && altLabel !== curLabel) map[altLabel] = curLabel;
+      }
+    }
+    return map;
+  }, [lang, vocabularies]);
+
   // Ettevalmistatud andmed FilterSection jaoks
   const genreItems = useMemo<FilterItem[]>(() => {
     const genreKey = `genre_${lang}` as keyof FacetDistribution;
     const genreData = facets?.[genreKey] as Record<string, number> | undefined;
     if (!genreData) return [];
-    
+
     return Object.entries(genreData)
-      .map(([value, count]) => ({ 
-        value, 
+      .map(([value, count]) => ({
+        value,
         count,
         label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
       }))
@@ -217,6 +250,54 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       .sort((a, b) => b.count - a.count);
   }, [facets, lang, vocabularies]);
 
+  // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
+  const effectiveSelectedGenre = useMemo(() => {
+    if (!selectedGenre) return null;
+    if (genreItems.some(item => item.value === selectedGenre)) return selectedGenre;
+    // Q-kood → label (Wikidata žanrid)
+    if (genreIdMap?.[selectedGenre]) return genreIdMap[selectedGenre];
+    // Vocabulary-põhine tõlge (vocabularies-is defineeritud žanrid)
+    return crossLangGenreMap[selectedGenre] || selectedGenre;
+  }, [selectedGenre, genreItems, genreIdMap, crossLangGenreMap]);
+
+  const effectiveSelectedType = useMemo(() => {
+    if (!selectedType) return null;
+    if (typeItems.some(item => item.value === selectedType)) return selectedType;
+    return crossLangTypeMap[selectedType] || selectedType;
+  }, [selectedType, typeItems, crossLangTypeMap]);
+
+  // Efektiivsed valitud märksõnad: lahenda Q-koodid labeliteks
+  const effectiveSelectedTags = useMemo(() => {
+    if (selectedTags.length === 0 || !tagsIdMap) return selectedTags;
+    const tagValues = new Set(tagItems.map(item => item.value));
+    let changed = false;
+    const resolved = selectedTags.map(tag => {
+      if (tagValues.has(tag)) return tag;
+      if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
+      return tag;
+    });
+    return changed ? resolved : selectedTags;
+  }, [selectedTags, tagItems, tagsIdMap]);
+
+  // Tõlgi valitud žanr/tüüp/märksõnad praegusesse keelde (uuendab ka URL-i ja parent state'i)
+  useEffect(() => {
+    if (effectiveSelectedGenre && effectiveSelectedGenre !== selectedGenre) {
+      onGenreChange(effectiveSelectedGenre);
+    }
+  }, [effectiveSelectedGenre, selectedGenre]);
+
+  useEffect(() => {
+    if (effectiveSelectedType && effectiveSelectedType !== selectedType) {
+      onTypeChange(effectiveSelectedType);
+    }
+  }, [effectiveSelectedType, selectedType]);
+
+  useEffect(() => {
+    if (effectiveSelectedTags !== selectedTags) {
+      onTagsChange(effectiveSelectedTags);
+    }
+  }, [effectiveSelectedTags, selectedTags]);
+
   // Kontrolli, kas on aktiivne filter
   const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;
 
@@ -228,10 +309,10 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   }, [hasActiveFilters]);
 
   const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      onTagsChange(selectedTags.filter(t => t !== tag));
+    if (effectiveSelectedTags.includes(tag)) {
+      onTagsChange(effectiveSelectedTags.filter(t => t !== tag));
     } else {
-      onTagsChange([...selectedTags, tag]);
+      onTagsChange([...effectiveSelectedTags, tag]);
     }
   };
 
@@ -297,8 +378,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   title={t('filters.genre', 'Žanr')}
                   icon={<Bookmark size={12} />}
                   items={genreItems}
-                  selectedValues={selectedGenre ? [selectedGenre] : []}
-                  onToggle={(val) => onGenreChange(selectedGenre === val ? null : val)}
+                  selectedValues={effectiveSelectedGenre ? [effectiveSelectedGenre] : []}
+                  onToggle={(val) => onGenreChange(effectiveSelectedGenre === val ? null : val)}
                   searchPlaceholder={t('filters.searchGenre', 'Otsi žanrit...')}
                 />
               )}
@@ -309,7 +390,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   title={t('filters.tags', 'Märksõnad')}
                   icon={<Tag size={12} />}
                   items={tagItems}
-                  selectedValues={selectedTags}
+                  selectedValues={effectiveSelectedTags}
                   onToggle={toggleTag}
                   searchPlaceholder={t('filters.searchTag', 'Otsi märksõna...')}
                 />
@@ -321,8 +402,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   title={t('filters.type', 'Tüüp')}
                   icon={<FileType size={12} />}
                   items={typeItems}
-                  selectedValues={selectedType ? [selectedType] : []}
-                  onToggle={(val) => onTypeChange(selectedType === val ? null : val)}
+                  selectedValues={effectiveSelectedType ? [effectiveSelectedType] : []}
+                  onToggle={(val) => onTypeChange(effectiveSelectedType === val ? null : val)}
                   searchPlaceholder={t('filters.searchType', 'Otsi tüüpi...')}
                 />
               )}

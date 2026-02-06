@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/meiliService';
 import { getCollectionColorClasses } from '../services/collectionService';
@@ -154,6 +154,53 @@ const Dashboard: React.FC = () => {
     setCurrentPage(pageParam);
   }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam, pageParam]);
 
+  // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks)
+  const genreIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const obj = work.genre_object;
+      if (!obj) continue;
+      const items = Array.isArray(obj) ? obj : [obj];
+      for (const item of items) {
+        if (item?.id && item?.labels) {
+          map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+        }
+      }
+    }
+    return map;
+  }, [works, i18n.language]);
+
+  // Pöördkaart: label → Q-kood (URL-i jaoks)
+  const genreLabelToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [id, label] of Object.entries(genreIdMap)) map[label] = id;
+    return map;
+  }, [genreIdMap]);
+
+  // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
+  const tagsIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const objs = work.tags_object;
+      if (!objs || !Array.isArray(objs)) continue;
+      for (const item of objs) {
+        if (item?.id && item?.labels) {
+          map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+        }
+      }
+    }
+    return map;
+  }, [works, i18n.language]);
+
+  // Pöördkaart: label → Q-kood (URL-i jaoks)
+  const tagsLabelToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const [id, label] of Object.entries(tagsIdMap)) map[label] = id;
+    return map;
+  }, [tagsIdMap]);
+
   // Debounce input updates to URL
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -201,12 +248,12 @@ const Dashboard: React.FC = () => {
         changed = true;
       }
 
-      // Teose märksõnad
+      // Teose märksõnad (kasuta Q-koode URL-is kui olemas)
       const currentTagsParam = searchParams.get('tags') || '';
-      const newTagsParam = selectedTags.join(',');
-      if (newTagsParam !== currentTagsParam) {
-        if (newTagsParam) {
-          newParams.set('tags', newTagsParam);
+      const newTagsUrl = selectedTags.map(t => tagsLabelToId[t] || t).join(',');
+      if (newTagsUrl !== currentTagsParam) {
+        if (newTagsUrl) {
+          newParams.set('tags', newTagsUrl);
         } else {
           newParams.delete('tags');
         }
@@ -214,10 +261,12 @@ const Dashboard: React.FC = () => {
         resetPage = true;
       }
 
-      // Žanr
-      if (selectedGenre !== genreParam) {
-        if (selectedGenre) {
-          newParams.set('genre', selectedGenre);
+      // Žanr (kasuta Q-koodi URL-is kui olemas)
+      const genreUrlValue = selectedGenre ? (genreLabelToId[selectedGenre] || selectedGenre) : null;
+      const currentGenreUrl = genreParam;
+      if (genreUrlValue !== currentGenreUrl) {
+        if (genreUrlValue) {
+          newParams.set('genre', genreUrlValue);
         } else {
           newParams.delete('genre');
         }
@@ -258,7 +307,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam]);
+  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam, genreLabelToId, tagsLabelToId]);
 
   // Perform search when params change
   useEffect(() => {
@@ -638,6 +687,8 @@ const Dashboard: React.FC = () => {
                 yearStart={parseInt(yearStart) || undefined}
                 yearEnd={parseInt(yearEnd) || undefined}
                 facets={facets}
+                genreIdMap={genreIdMap}
+                tagsIdMap={tagsIdMap}
                 lang={i18n.language.split('-')[0] as 'et' | 'en'}
               />
             </div>

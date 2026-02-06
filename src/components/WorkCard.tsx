@@ -183,8 +183,9 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        // Navigeeri otsingusse selle märksõnaga
-                        navigate(`/?tags=${encodeURIComponent(label)}`);
+                        // Kasuta Q-koodi kui olemas (keelest sõltumatu), muidu labeli
+                        const tagUrlValue = tagId || label;
+                        navigate(`/?tags=${encodeURIComponent(tagUrlValue)}`);
                       }}
                       className="text-[10px] font-medium text-white px-1.5 py-0.5"
                       title={t('workCard.searchTag', { tag: label })}
@@ -276,9 +277,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Kasuta lokaliseeritud väärtust (facet key)
-                const genreLabel = getLabel(work.genre_object || work.genre, lang);
-                navigate(`/?genre=${encodeURIComponent(genreLabel)}`);
+                // Kasuta Q-koodi kui olemas (keelest sõltumatu), muidu labeli
+                const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
+                const genreUrlValue = genreObj?.id || getLabel(work.genre_object || work.genre, lang);
+                navigate(`/?genre=${encodeURIComponent(genreUrlValue)}`);
               }}
               className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
               title={t('workCard.filterByGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
