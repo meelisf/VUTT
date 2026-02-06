@@ -154,7 +154,8 @@ const Dashboard: React.FC = () => {
     setCurrentPage(pageParam);
   }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam, pageParam]);
 
-  // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks)
+  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (žanrid)
+  // Kasutatakse AdvancedFilters-is, et lahendada URL-i väärtus kuvamiseks
   const genreIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     const lang = i18n.language.split('-')[0];
@@ -163,22 +164,39 @@ const Dashboard: React.FC = () => {
       if (!obj) continue;
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
+        if (!item?.labels) continue;
+        const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+        // Q-kood → praeguse keele label
+        if (item.id) map[item.id] = currentLabel;
+        // Teise keele labelid → praeguse keele label
+        for (const labelVal of Object.values(item.labels)) {
+          if (labelVal && labelVal !== currentLabel) map[labelVal] = currentLabel;
+        }
+        if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
+      }
+    }
+    return map;
+  }, [works, i18n.language]);
+
+  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
+  const genreLabelToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const obj = work.genre_object;
+      if (!obj) continue;
+      const items = Array.isArray(obj) ? obj : [obj];
+      for (const item of items) {
         if (item?.id && item?.labels) {
-          map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+          const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+          map[currentLabel] = item.id;
         }
       }
     }
     return map;
   }, [works, i18n.language]);
 
-  // Pöördkaart: label → Q-kood (URL-i jaoks)
-  const genreLabelToId = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const [id, label] of Object.entries(genreIdMap)) map[label] = id;
-    return map;
-  }, [genreIdMap]);
-
-  // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
+  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
   const tagsIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     const lang = i18n.language.split('-')[0];
@@ -186,20 +204,34 @@ const Dashboard: React.FC = () => {
       const objs = work.tags_object;
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
-        if (item?.id && item?.labels) {
-          map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+        if (!item?.labels) continue;
+        const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+        if (item.id) map[item.id] = currentLabel;
+        for (const labelVal of Object.values(item.labels)) {
+          if (labelVal && labelVal !== currentLabel) map[labelVal] = currentLabel;
         }
+        if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
       }
     }
     return map;
   }, [works, i18n.language]);
 
-  // Pöördkaart: label → Q-kood (URL-i jaoks)
+  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
   const tagsLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const [id, label] of Object.entries(tagsIdMap)) map[label] = id;
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const objs = work.tags_object;
+      if (!objs || !Array.isArray(objs)) continue;
+      for (const item of objs) {
+        if (item?.id && item?.labels) {
+          const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+          map[currentLabel] = item.id;
+        }
+      }
+    }
     return map;
-  }, [tagsIdMap]);
+  }, [works, i18n.language]);
 
   // Debounce input updates to URL
   useEffect(() => {

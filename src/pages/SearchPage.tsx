@@ -323,7 +323,7 @@ const SearchPage: React.FC = () => {
         setAuthorInput(authorParam);
     }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
 
-    // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks, ehitatud otsingutulemustest)
+    // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (žanrid)
     const genreIdMap = useMemo(() => {
       const map: Record<string, string> = {};
       const lang = i18n.language.split('-')[0];
@@ -333,21 +333,38 @@ const SearchPage: React.FC = () => {
           if (!obj) continue;
           const items = Array.isArray(obj) ? obj : [obj];
           for (const item of items) {
-            if (item?.id && item?.labels) {
-              map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+            if (!item?.labels) continue;
+            const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+            if (item.id) map[item.id] = currentLabel;
+            for (const labelVal of Object.values(item.labels)) {
+              if (labelVal && labelVal !== currentLabel) map[labelVal as string] = currentLabel;
             }
+            if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
           }
         }
       }
       return map;
     }, [results, i18n.language]);
 
-    // Pöördkaart: label → Q-kood (URL-i jaoks)
+    // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
     const genreLabelToId = useMemo(() => {
       const map: Record<string, string> = {};
-      for (const [id, label] of Object.entries(genreIdMap)) map[label] = id;
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const obj = (hit as any).genre_object;
+          if (!obj) continue;
+          const items = Array.isArray(obj) ? obj : [obj];
+          for (const item of items) {
+            if (item?.id && item?.labels) {
+              const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+              map[currentLabel] = item.id;
+            }
+          }
+        }
+      }
       return map;
-    }, [genreIdMap]);
+    }, [results, i18n.language]);
 
     // Q-koodi lahendamine: kui URL-is on Q-kood, teisenda see labeliks (filtrite kuvamiseks)
     useEffect(() => {
@@ -408,7 +425,7 @@ const SearchPage: React.FC = () => {
       }
     }, [selectedTypes, availableTypes, vocabularies, i18n.language]);
 
-    // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
+    // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
     const tagsIdMap = useMemo(() => {
       const map: Record<string, string> = {};
       const lang = i18n.language.split('-')[0];
@@ -417,21 +434,37 @@ const SearchPage: React.FC = () => {
           const objs = (hit as any).tags_object;
           if (!objs || !Array.isArray(objs)) continue;
           for (const item of objs) {
-            if (item?.id && item?.labels) {
-              map[item.id] = item.labels[lang] || item.labels['et'] || item.label;
+            if (!item?.labels) continue;
+            const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+            if (item.id) map[item.id] = currentLabel;
+            for (const labelVal of Object.values(item.labels)) {
+              if (labelVal && labelVal !== currentLabel) map[labelVal as string] = currentLabel;
             }
+            if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
           }
         }
       }
       return map;
     }, [results, i18n.language]);
 
-    // Pöördkaart: label → Q-kood (URL-i jaoks)
+    // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
     const tagsLabelToId = useMemo(() => {
       const map: Record<string, string> = {};
-      for (const [id, label] of Object.entries(tagsIdMap)) map[label] = id;
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const objs = (hit as any).tags_object;
+          if (!objs || !Array.isArray(objs)) continue;
+          for (const item of objs) {
+            if (item?.id && item?.labels) {
+              const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+              map[currentLabel] = item.id;
+            }
+          }
+        }
+      }
       return map;
-    }, [tagsIdMap]);
+    }, [results, i18n.language]);
 
     // Q-koodi lahendamine märksõnade jaoks
     useEffect(() => {
