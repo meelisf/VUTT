@@ -32,7 +32,8 @@ import json
 import time
 import urllib.request
 import urllib.parse
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE
+from concurrent.futures import ThreadPoolExecutor
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PEOPLE_FILE
 from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,
@@ -43,9 +44,6 @@ from .utils import (
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
-
-PEOPLE_FILE = os.path.join(BASE_DIR, 'state', 'people.json')
-
 
 def load_people_aliases():
     """Laeb inimeste aliased JSON failist."""
@@ -395,6 +393,38 @@ def sync_work_to_meilisearch(dir_name):
 def index_new_work(dir_name, metadata):
     """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
     return sync_work_to_meilisearch(dir_name)
+
+
+# =========================================================
+# ASYNC MEILISEARCH SYNC
+# Käivitab indekseerimise lõimede pool'is, et päring ei blokeeruks
+# =========================================================
+
+# Lõimede pool Meilisearch päringute jaoks
+# Max 10 samaaegset päringut - rohkem tekitaks Meilisearchile liiga suure koormuse
+MEILISEARCH_POOL_SIZE = 10
+_meilisearch_executor = ThreadPoolExecutor(
+    max_workers=MEILISEARCH_POOL_SIZE,
+    thread_name_prefix="meili_sync"
+)
+
+
+def _sync_work_task(dir_name):
+    """Meilisearch sync task (käivitatakse pool'is)."""
+    try:
+        sync_work_to_meilisearch(dir_name)
+    except Exception as e:
+        print(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
+
+
+def sync_work_to_meilisearch_async(dir_name):
+    """Käivitab Meilisearch sync'i lõimede pool'is.
+
+    Kasutaja päring ei pea ootama indekseerimise lõppu.
+    Vead logitakse, aga ei katkesta kasutaja tööd.
+    Pool piirab samaagsete päringute arvu (max 10).
+    """
+    _meilisearch_executor.submit(_sync_work_task, dir_name)
 
 
 def metadata_watcher_loop():

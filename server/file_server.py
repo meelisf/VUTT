@@ -10,7 +10,6 @@ import glob
 import shutil
 import threading
 import socketserver
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 # Impordi kõik vajalik server/ moodulitest
@@ -19,6 +18,8 @@ from server import (
     BASE_DIR, PORT, SESSION_DURATION, COLLECTIONS_FILE, VOCABULARIES_FILE,
     # CORS
     send_cors_headers,
+    # HTTP helperid
+    send_json_response, read_request_data, require_auth_handler,
     # Rate limiting
     get_client_ip, check_rate_limit, rate_limit_response,
     # Autentimine
@@ -36,7 +37,7 @@ from server import (
     save_with_git, get_file_git_history, get_file_at_commit, get_file_diff,
     get_commit_diff, get_recent_commits,
     # Meilisearch
-    sync_work_to_meilisearch, metadata_watcher_loop,
+    sync_work_to_meilisearch, sync_work_to_meilisearch_async, metadata_watcher_loop,
     # People/Authors
     process_creators_metadata,
     # Utils
@@ -125,37 +126,6 @@ with _cache_lock:
     _load_cache_internal()
 
 
-# =========================================================
-# ASYNC MEILISEARCH SYNC
-# Käivitab indekseerimise lõimede pool'is, et päring ei blokeeruks
-# =========================================================
-
-# Lõimede pool Meilisearch päringute jaoks
-# Max 10 samaaegset päringut - rohkem tekitaks Meilisearchile liiga suure koormuse
-MEILISEARCH_POOL_SIZE = 10
-_meilisearch_executor = ThreadPoolExecutor(
-    max_workers=MEILISEARCH_POOL_SIZE,
-    thread_name_prefix="meili_sync"
-)
-
-
-def _sync_work_task(dir_name):
-    """Meilisearch sync task (käivitatakse pool'is)."""
-    try:
-        sync_work_to_meilisearch(dir_name)
-    except Exception as e:
-        print(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
-
-
-def sync_work_to_meilisearch_async(dir_name):
-    """Käivitab Meilisearch sync'i lõimede pool'is.
-
-    Kasutaja päring ei pea ootama indekseerimise lõppu.
-    Vead logitakse, aga ei katkesta kasutaja tööd.
-    Pool piirab samaagsete päringute arvu (max 10).
-    """
-    _meilisearch_executor.submit(_sync_work_task, dir_name)
-
 class RequestHandler(http.server.SimpleHTTPRequestHandler):
     # TODO: Pärast kindla domeeni saamist piirata CORS lubatud domeenidele
     # Praegu '*' lubab päringuid igalt poolt (sisevõrgus OK, avalikus mitte)
@@ -180,20 +150,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Autentimine on kohustuslik
                 auth_token = params.get('token', [None])[0]
                 if not auth_token:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Token puudub"}).encode('utf-8'))
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
                     return
-                
+
                 session = sessions.get(auth_token)
                 if not session:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Kehtetu token"}).encode('utf-8'))
+                    send_json_response(self, 401, {"status": "error", "message": "Kehtetu token"})
                     return
                 
                 current_user = session['user']
@@ -213,19 +175,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 
                 # Hangi commitid
                 commits = get_recent_commits(username=filter_user, limit=limit)
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-                
-                response = {
+
+                send_json_response(self, 200, {
                     "status": "success",
                     "commits": commits,
                     "is_admin": is_admin,
                     "filtered_by": filter_user
-                }
-                self.wfile.write(json.dumps(response).encode('utf-8'))
+                })
                 
             except Exception as e:
                 print(f"RECENT-EDITS VIGA: {e}")
@@ -240,11 +196,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             try:
                 token_data, error = validate_invite_token(token)
-
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
 
                 if token_data:
                     response = {
@@ -261,7 +212,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         "message": error
                     }
 
-                self.wfile.write(json.dumps(response).encode('utf-8'))
+                send_json_response(self, 200, response)
 
             except Exception as e:
                 print(f"INVITE VALIDATE VIGA: {e}")
@@ -270,18 +221,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         # GET /collections - kollektsioonide puu (avalik, cache'itud)
         elif self.path == '/collections':
             try:
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-
                 collections = get_cached_collections()
-
-                response = {
-                    "status": "success",
-                    "collections": collections
-                }
-                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                send_json_response(self, 200, {"status": "success", "collections": collections})
 
             except Exception as e:
                 print(f"COLLECTIONS VIGA: {e}")
@@ -290,18 +231,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         # GET /vocabularies - kontrollitud sõnavara (avalik, cache'itud)
         elif self.path == '/vocabularies':
             try:
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-
                 vocabularies = get_cached_vocabularies()
-
-                response = {
-                    "status": "success",
-                    "vocabularies": vocabularies
-                }
-                self.wfile.write(json.dumps(response, ensure_ascii=False).encode('utf-8'))
+                send_json_response(self, 200, {"status": "success", "vocabularies": vocabularies})
 
             except Exception as e:
                 print(f"VOCABULARIES VIGA: {e}")
@@ -321,28 +252,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     rate_limit_response(self, retry_after)
                     return
 
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 username = data.get('username', '').strip()
                 password = data.get('password', '')
                 
                 user = verify_user(username, password)
-                
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-                
+
                 if user:
-                    # Loome sessiooni ja tagastame tokeni
                     token = create_session(user)
-                    response = {"status": "success", "user": user, "token": token}
+                    send_json_response(self, 200, {"status": "success", "user": user, "token": token})
                 else:
-                    response = {"status": "error", "message": "Vale kasutajanimi või parool"}
-                
-                self.wfile.write(json.dumps(response).encode('utf-8'))
+                    send_json_response(self, 200, {"status": "error", "message": "Vale kasutajanimi või parool"})
                 
             except Exception as e:
                 print(f"LOGIN VIGA: {e}")
@@ -351,16 +272,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/verify-token':
             # Tokeni kehtivuse kontroll (lehe laadimisel)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 token = data.get('token', '').strip()
-
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
 
                 session = sessions.get(token)
                 if session:
@@ -368,13 +282,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     created_at = datetime.fromisoformat(session["created_at"])
                     if datetime.now() - created_at > SESSION_DURATION:
                         del sessions[token]
-                        response = {"status": "error", "valid": False, "message": "Sessioon aegunud (24h)"}
+                        send_json_response(self, 200, {"status": "error", "valid": False, "message": "Sessioon aegunud (24h)"})
                     else:
-                        response = {"status": "success", "user": session["user"], "valid": True}
+                        send_json_response(self, 200, {"status": "success", "user": session["user"], "valid": True})
                 else:
-                    response = {"status": "error", "valid": False, "message": "Token aegunud"}
-
-                self.wfile.write(json.dumps(response).encode('utf-8'))
+                    send_json_response(self, 200, {"status": "error", "valid": False, "message": "Token aegunud"})
 
             except Exception as e:
                 print(f"VERIFY-TOKEN VIGA: {e}")
@@ -391,20 +303,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     rate_limit_response(self, retry_after)
                     return
 
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 # Honeypot kontroll - kui täidetud, siis bot
                 honeypot = data.get('website', '')
                 if honeypot:
                     print(f"HONEYPOT: Tuvastatud bot IP-lt {client_ip}, website='{honeypot}'")
                     # Tagastame "edu" et bot arvaks, et õnnestus
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "success", "message": "Taotlus esitatud"}).encode('utf-8'))
+                    send_json_response(self, 200, {"status": "success", "message": "Taotlus esitatud"})
                     return
 
                 name = data.get('name', '').strip()
@@ -414,27 +320,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Valideerimine
                 if not name:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Nimi on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Nimi on kohustuslik"})
                     return
 
                 if not email or '@' not in email:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Kehtiv e-posti aadress on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Kehtiv e-posti aadress on kohustuslik"})
                     return
 
                 if not motivation:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Motivatsioon on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Motivatsioon on kohustuslik"})
                     return
 
                 # Lisa taotlus
@@ -458,18 +352,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif self.path == '/save':
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Autentimise kontroll - nõuab vähemalt 'editor' õigusi
-                user, auth_error = require_token(data, min_role='editor')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='editor')
+                if not user:
                     return
                 
                 print(f"SAVE: Kasutaja '{user['username']}' ({user['role']})")
@@ -560,18 +447,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/backups':
             # Varukoopiate loetelu päring
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Autentimise kontroll - nõuab vähemalt 'admin' õigusi
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
                 
                 original_catalog = data.get('original_path')
@@ -653,18 +533,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/restore':
             # Varukoopia taastamine
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Autentimise kontroll - nõuab 'admin' õigusi (serveripoolne kontroll!)
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
                 
                 original_catalog = data.get('original_path')
@@ -747,18 +620,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/git-history':
             # Git ajaloo päring - kõik sisselogitud kasutajad näevad ajalugu
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 # Autentimise kontroll - kõik sisselogitud kasutajad
-                user, auth_error = require_token(data, min_role='editor')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='editor')
+                if not user:
                     return
 
                 original_catalog = data.get('original_path')
@@ -781,17 +647,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Küsime Git ajaloo mõlema faili jaoks
                 history = get_file_git_history(files_to_check, max_count=50)
 
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                send_cors_headers(self)
-                self.end_headers()
-
-                response = {
+                send_json_response(self, 200, {
                     "status": "success",
                     "history": history,
                     "total": len(history)
-                }
-                self.wfile.write(json.dumps(response).encode('utf-8'))
+                })
 
             except Exception as e:
                 print(f"GIT-HISTORY VIGA: {e}")
@@ -800,18 +660,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/git-restore':
             # Git versiooni taastamine
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 # Autentimise kontroll - nõuab 'admin' õigusi
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 original_catalog = data.get('original_path')
@@ -860,18 +713,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/git-diff':
             # Git diff kahe commiti vahel
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 # Autentimise kontroll - nõuab 'admin' õigusi
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 original_catalog = data.get('original_path')
@@ -910,18 +756,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/commit-diff':
             # Ühe commiti diff (võrreldes parent commitiga)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 # Autentimise kontroll - kõik sisselogitud kasutajad näevad
-                user, auth_error = require_token(data, min_role='viewer')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='viewer')
+                if not user:
                     return
 
                 commit_hash = data.get('commit_hash')
@@ -970,17 +809,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/update-work-metadata':
             # Teose üldiste metaandmete (_metadata.json) uuendamine
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Autentimise kontroll - ainult admin saab muuta üldisi metaandmeid
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
                 
                 original_catalog = data.get('original_path')
@@ -988,11 +821,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 new_metadata = data.get('metadata')  # Sõnastik uute andmetega
 
                 if (not original_catalog and not work_id) or not new_metadata:
-                    self.send_response(400)
-                    send_cors_headers(self)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Puudub 'original_path'/'work_id' või 'metadata'"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Puudub 'original_path'/'work_id' või 'metadata'"})
                     return
                 
                 if original_catalog:
@@ -1056,28 +885,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/get-work-metadata':
             # Tagastab teose _metadata.json sisu otse failisüsteemist
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Nõuab vähemalt editori õigusi
-                user, auth_error = require_token(data, min_role='editor')
-                if auth_error:
-                    self.send_response(401)
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='editor')
+                if not user:
                     return
                 
                 original_catalog = data.get('original_path')
                 work_id = data.get('work_id')
                 
                 if not original_catalog and not work_id:
-                    self.send_response(400)
-                    send_cors_headers(self)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Puudub 'original_path' või 'work_id'"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Puudub 'original_path' või 'work_id'"})
                     return
 
                 if original_catalog:
@@ -1115,17 +934,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/get-metadata-suggestions':
             # Tagastab unikaalsed autorid, žanrid, kohad ja trükkalid soovitusteks koos ID-dega
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
                 
                 # Nõuab vähemalt editori õigusi
-                user, auth_error = require_token(data, min_role='editor')
-                if auth_error:
-                    self.send_response(401)
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='editor')
+                if not user:
                     return
                 
                 # Kasutaja eelistatud keel (vaikimisi 'et')
@@ -1275,17 +1088,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/registrations':
             # Tagastab ootel registreerimistaotlused (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 reg_data = load_pending_registrations()
@@ -1308,44 +1114,25 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/registrations/approve':
             # Kinnitab registreerimistaotluse ja loob invite tokeni (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 reg_id = data.get('registration_id')
                 if not reg_id:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "registration_id puudub"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "registration_id puudub"})
                     return
 
                 # Leia taotlus
                 reg = get_registration_by_id(reg_id)
                 if not reg:
-                    self.send_response(404)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlust ei leitud"}).encode('utf-8'))
+                    send_json_response(self, 404, {"status": "error", "message": "Taotlust ei leitud"})
                     return
 
                 if reg["status"] != "pending":
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlus on juba käsitletud"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Taotlus on juba käsitletud"})
                     return
 
                 # Uuenda staatus
@@ -1382,43 +1169,24 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/registrations/reject':
             # Lükkab registreerimistaotluse tagasi (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 reg_id = data.get('registration_id')
                 if not reg_id:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "registration_id puudub"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "registration_id puudub"})
                     return
 
                 reg = get_registration_by_id(reg_id)
                 if not reg:
-                    self.send_response(404)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlust ei leitud"}).encode('utf-8'))
+                    send_json_response(self, 404, {"status": "error", "message": "Taotlust ei leitud"})
                     return
 
                 if reg["status"] != "pending":
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Taotlus on juba käsitletud"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Taotlus on juba käsitletud"})
                     return
 
                 # Uuenda staatus
@@ -1448,17 +1216,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/users':
             # Tagastab kõigi kasutajate nimekirja (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 users = get_all_users()
@@ -1481,28 +1242,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/users/update-role':
             # Muudab kasutaja rolli (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 username = data.get('username')
                 new_role = data.get('new_role')
 
                 if not username or not new_role:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "username ja new_role on kohustuslikud"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "username ja new_role on kohustuslikud"})
                     return
 
                 success, message = update_user_role(username, new_role, user)
@@ -1525,27 +1275,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/users/delete':
             # Kustutab kasutaja (admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 username = data.get('username')
 
                 if not username:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "username on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "username on kohustuslik"})
                     return
 
                 success, message = delete_user(username, user)
@@ -1580,36 +1319,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     rate_limit_response(self, retry_after)
                     return
 
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
                 token = data.get('token', '').strip()
                 password = data.get('password', '')
 
                 if not token:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Token puudub"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Token puudub"})
                     return
 
                 if not password or len(password) < 12:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Parool peab olema vähemalt 12 tähemärki"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Parool peab olema vähemalt 12 tähemärki"})
                     return
 
                 # Lihtsa parooli kontroll
                 if len(set(password)) < 4:  # Liiga vähe erinevaid tähemärke
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Parool on liiga lihtne - kasuta rohkem erinevaid tähemärke"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Parool on liiga lihtne - kasuta rohkem erinevaid tähemärke"})
                     return
 
                 # Keela numbrijadad, korduvad mustrid ja näidisparoolid
@@ -1618,11 +1343,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     'minukassarmastabkala', 'mycatloveseatingfish'  # Näidisparoolid vihjest
                 ]
                 if password.lower() in simple_patterns or password == password[0] * len(password):
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "Parool on liiga lihtne - vali tugevam parool"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "Parool on liiga lihtne - vali tugevam parool"})
                     return
 
                 # Loo kasutaja
@@ -1678,17 +1399,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/works/bulk-tags':
             # Määrab märksõnad mitmele teosele korraga (ainult admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 work_ids = data.get('work_ids', [])
@@ -1696,22 +1410,14 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 mode = data.get('mode', 'add')  # 'add' või 'replace'
 
                 if not work_ids:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "work_ids on kohustuslik"})
                     return
 
                 if not tags and mode == 'replace':
                     # Replace tühja listiga = eemalda kõik märksõnad
                     pass
                 elif not tags:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "tags on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "tags on kohustuslik"})
                     return
 
                 updated = 0
@@ -1805,28 +1511,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/works/bulk-genre':
             # Määrab žanri mitmele teosele korraga (ainult admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 work_ids = data.get('work_ids', [])
                 genre = data.get('genre')  # LinkedEntity objekt või null
 
                 if not work_ids:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "work_ids on kohustuslik"})
                     return
 
                 updated = 0
@@ -1889,28 +1584,17 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/works/bulk-collection':
             # Määrab kollektsiooni mitmele teosele korraga (ainult admin)
             try:
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length)
-                data = json.loads(post_data)
+                data = read_request_data(self)
 
-                user, auth_error = require_token(data, min_role='admin')
-                if auth_error:
-                    self.send_response(401)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps(auth_error).encode('utf-8'))
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
                     return
 
                 work_ids = data.get('work_ids', [])
                 collection = data.get('collection')  # None = eemalda kollektsioon
 
                 if not work_ids:
-                    self.send_response(400)
-                    self.send_header('Content-type', 'application/json')
-                    send_cors_headers(self)
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"status": "error", "message": "work_ids on kohustuslik"}).encode('utf-8'))
+                    send_json_response(self, 400, {"status": "error", "message": "work_ids on kohustuslik"})
                     return
 
                 # Valideeri kollektsioon (kui pole None/null)

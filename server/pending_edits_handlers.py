@@ -4,12 +4,11 @@ Pending-edits HTTP handlerid.
 Eraldatud file_server.py-st. Äriloogika on server/pending_edits.py-s,
 siin on ainult HTTP request/response käsitlus.
 """
-import json
 import os
 import glob
 
-from .cors import send_cors_headers
-from .auth import require_token
+from .http_helpers import send_json_response, read_request_data, require_auth
+from .meilisearch_ops import sync_work_to_meilisearch_async
 from .pending_edits import (
     load_pending_edits, create_pending_edit, get_pending_edit_by_id,
     get_pending_edits_for_page, get_user_pending_edit_for_page,
@@ -19,31 +18,13 @@ from .git_ops import save_with_git
 from .utils import find_directory_by_id
 
 
-def send_json_response(handler, status_code, data):
-    """Saadab JSON-vastuse koos CORS päistega."""
-    handler.send_response(status_code)
-    handler.send_header('Content-type', 'application/json')
-    send_cors_headers(handler)
-    handler.end_headers()
-    handler.wfile.write(json.dumps(data).encode('utf-8'))
-
-
-def _read_request_data(handler):
-    """Loeb ja parsib POST body JSON-ina."""
-    content_length = int(handler.headers['Content-Length'])
-    post_data = handler.rfile.read(content_length)
-    return json.loads(post_data)
-
-
 def handle_save_pending(handler):
     """Salvestab kaastöölise muudatuse pending-olekusse."""
     try:
-        data = _read_request_data(handler)
+        data = read_request_data(handler)
 
-        # Nõuab vähemalt contributor õigusi
-        user, auth_error = require_token(data, min_role='contributor')
-        if auth_error:
-            send_json_response(handler, 401, auth_error)
+        user = require_auth(handler, data, min_role='contributor')
+        if not user:
             return
 
         work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
@@ -87,11 +68,10 @@ def handle_save_pending(handler):
 def handle_pending_edits_list(handler):
     """Tagastab ootel muudatused (toimetaja+)."""
     try:
-        data = _read_request_data(handler)
+        data = read_request_data(handler)
 
-        user, auth_error = require_token(data, min_role='editor')
-        if auth_error:
-            send_json_response(handler, 401, auth_error)
+        user = require_auth(handler, data, min_role='editor')
+        if not user:
             return
 
         edits_data = load_pending_edits()
@@ -115,11 +95,10 @@ def handle_pending_edits_list(handler):
 def handle_pending_edits_check(handler):
     """Kontrollib, kas lehel on ootel muudatusi (contributor näeb oma muudatust)."""
     try:
-        data = _read_request_data(handler)
+        data = read_request_data(handler)
 
-        user, auth_error = require_token(data, min_role='contributor')
-        if auth_error:
-            send_json_response(handler, 401, auth_error)
+        user = require_auth(handler, data, min_role='contributor')
+        if not user:
             return
 
         work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
@@ -154,11 +133,10 @@ def handle_pending_edits_check(handler):
 def handle_pending_edits_approve(handler):
     """Kinnitab pending-edit (toimetaja+)."""
     try:
-        data = _read_request_data(handler)
+        data = read_request_data(handler)
 
-        user, auth_error = require_token(data, min_role='editor')
-        if auth_error:
-            send_json_response(handler, 401, auth_error)
+        user = require_auth(handler, data, min_role='editor')
+        if not user:
             return
 
         edit_id = data.get('edit_id')
@@ -220,9 +198,7 @@ def handle_pending_edits_approve(handler):
         )
 
         # Uuenda Meilisearch (taustal)
-        # Hiline import, et vältida ringviiteid (funktsioon on file_server.py-s, mis käivitatakse __main__-ina)
-        import __main__ as _main
-        _main.sync_work_to_meilisearch_async(os.path.basename(dir_path))
+        sync_work_to_meilisearch_async(os.path.basename(dir_path))
 
         # Märgi muudatus kinnitatuks
         update_pending_edit_status(edit_id, "approved", user["username"], comment)
@@ -244,11 +220,10 @@ def handle_pending_edits_approve(handler):
 def handle_pending_edits_reject(handler):
     """Lükkab pending-edit tagasi (toimetaja+)."""
     try:
-        data = _read_request_data(handler)
+        data = read_request_data(handler)
 
-        user, auth_error = require_token(data, min_role='editor')
-        if auth_error:
-            send_json_response(handler, 401, auth_error)
+        user = require_auth(handler, data, min_role='editor')
+        if not user:
             return
 
         edit_id = data.get('edit_id')

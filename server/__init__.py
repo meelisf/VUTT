@@ -58,12 +58,18 @@ from .git_ops import (
 # Meilisearch operatsioonid
 from .meilisearch_ops import (
     send_to_meilisearch, sync_work_to_meilisearch,
+    sync_work_to_meilisearch_async,
     index_new_work, metadata_watcher_loop
 )
 
 # Inimeste/autorite andmed
 from .people_ops import (
     load_people_data, save_people_data, process_creators_metadata, update_person_async
+)
+
+# HTTP helperid
+from .http_helpers import (
+    send_json_response, read_request_data, require_auth as require_auth_handler
 )
 
 # Abifunktsioonid
