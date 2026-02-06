@@ -11,6 +11,7 @@ from datetime import datetime
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
 from .config import BASE_DIR, get_logger
+from .utils import sanitize_id
 
 logger = get_logger(__name__)
 
