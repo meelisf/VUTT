@@ -29,7 +29,7 @@ from server import (
     handle_pending_edits_check, handle_pending_edits_approve,
     handle_pending_edits_reject,
     # Git
-    save_with_git, get_recent_commits,
+    save_with_git, get_recent_commits, run_git_fsck,
     # Git HTTP handlerid
     handle_backups, handle_restore, handle_git_history,
     handle_git_restore, handle_git_diff, handle_commit_diff,
@@ -38,6 +38,7 @@ from server import (
     handle_admin_registrations_reject, handle_admin_users,
     handle_admin_users_update_role, handle_admin_users_delete,
     handle_invite_set_password,
+    handle_admin_git_failures, handle_admin_git_health,
     # Bulk operatsioonide HTTP handlerid
     handle_bulk_tags, handle_bulk_genre, handle_bulk_collection,
     # Meilisearch
@@ -562,12 +563,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Sünkrooni Meilisearchiga TAUSTAL (kasutaja ei oota)
                 sync_work_to_meilisearch_async(safe_catalog)
 
-                send_json_response(self, 200, {
+                response = {
                     "status": "success",
                     "commit_hash": git_result.get("commit_hash", "")[:8] if git_result.get("success") else None,
                     "is_first_commit": git_result.get("is_first_commit", False),
                     "json_created": json_saved
-                })
+                }
+                if not git_result.get("success"):
+                    response["warning"] = "Fail salvestatud, aga versiooniajalukku ei jõudnud (git commit ebaõnnestus)"
+
+                send_json_response(self, 200, response)
 
             except Exception as e:
                 print(f"VIGA SERVERIS: {e}")
@@ -759,6 +764,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/users/delete':
             handle_admin_users_delete(self)
 
+        elif self.path == '/admin/git-failures':
+            handle_admin_git_failures(self)
+
+        elif self.path == '/admin/git-health':
+            handle_admin_git_health(self)
+
         elif self.path == '/invite/set-password':
             handle_invite_set_password(self)
 
@@ -828,6 +839,15 @@ if __name__ == '__main__':
 
     # Ehita Work ID cache kiiremaks failide leidmiseks
     build_work_id_cache()
+
+    # Kontrolli git repo terviklikkust stardil
+    print("Git repo terviklikkuse kontroll...")
+    fsck_result = run_git_fsck()
+    if fsck_result["ok"]:
+        print("Git repo terviklikkus: OK")
+    else:
+        print(f"HOIATUS: Git repo terviklikkuse kontroll leidis vigu!")
+        print(f"  Vead: {fsck_result['errors']}")
 
     # Käivita metaandmete jälgija taustalõimena
     watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)

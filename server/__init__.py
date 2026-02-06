@@ -52,7 +52,7 @@ from .pending_edits_handlers import (
 from .git_ops import (
     get_or_init_repo, save_with_git, get_file_git_history,
     get_file_at_commit, get_file_diff, get_commit_diff, commit_new_work_to_git,
-    get_recent_commits
+    get_recent_commits, get_git_failures, clear_git_failures, run_git_fsck
 )
 
 # Meilisearch operatsioonid
@@ -92,7 +92,8 @@ from .admin_handlers import (
     handle_admin_registrations, handle_admin_registrations_approve,
     handle_admin_registrations_reject, handle_admin_users,
     handle_admin_users_update_role, handle_admin_users_delete,
-    handle_invite_set_password
+    handle_invite_set_password,
+    handle_admin_git_failures, handle_admin_git_health
 )
 
 # Bulk operatsioonide HTTP handlerid

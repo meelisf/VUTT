@@ -808,6 +808,12 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       }
       throw new Error(`File server error: ${response.status}`);
     }
+
+    // Kontrolli git commit hoiatust vastuses
+    const result = await response.json().catch(() => ({}));
+    if (result.warning) {
+      console.warn("Git commit hoiatus:", result.warning);
+    }
     return true;
   } catch (e: any) {
     console.error("Failed to save to file system:", e);

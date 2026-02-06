@@ -4,13 +4,22 @@ Git versioonihalduse operatsioonid.
 import os
 import json
 import re
+import subprocess
+import threading
+from collections import deque
+from datetime import datetime
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
-from .config import BASE_DIR
-from .utils import sanitize_id
+from .config import BASE_DIR, get_logger
+
+logger = get_logger(__name__)
 
 # Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
 _git_repo = None
+
+# Git commit ebaõnnestumiste jälgimine (viimased 100)
+_git_failures = deque(maxlen=100)
+_git_failures_lock = threading.Lock()
 
 # Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))
 _work_ids_cache = {}
@@ -166,26 +175,81 @@ def get_or_init_repo():
 
     try:
         _git_repo = Repo(BASE_DIR)
-        print(f"Git repo leitud: {BASE_DIR}")
+        logger.info(f"Git repo leitud: {BASE_DIR}")
     except InvalidGitRepositoryError:
         _git_repo = Repo.init(BASE_DIR)
-        print(f"Git repo initsialiseeritud: {BASE_DIR}")
+        logger.info(f"Git repo initsialiseeritud: {BASE_DIR}")
 
         # Loome .gitignore, et ignoreerida pilte ja muid suuri faile
         gitignore_path = os.path.join(BASE_DIR, '.gitignore')
         if not os.path.exists(gitignore_path):
             with open(gitignore_path, 'w') as f:
                 f.write("# VUTT Git versioonihaldus\n")
-                f.write("# Jälgime ainult .txt faile\n")
+                f.write("# Jälgime .txt ja .json faile, ignoreerime pilte\n")
                 f.write("*.jpg\n")
                 f.write("*.jpeg\n")
                 f.write("*.png\n")
                 f.write("*.backup.*\n")  # Vanad backup failid
-                f.write("_metadata.json\n")  # Metaandmed eraldi
-                f.write("*.json\n")  # Lehekülje metaandmed
-            print("Loodud .gitignore")
+            logger.info("Loodud .gitignore")
 
     return _git_repo
+
+
+def _record_git_failure(filepath, username, error):
+    """Salvestab git commit ebaõnnestumise info."""
+    with _git_failures_lock:
+        _git_failures.append({
+            "timestamp": datetime.now().isoformat(),
+            "filepath": filepath,
+            "username": username,
+            "error": str(error)
+        })
+
+
+def get_git_failures():
+    """Tagastab viimased git commit ebaõnnestumised."""
+    with _git_failures_lock:
+        return list(_git_failures)
+
+
+def clear_git_failures():
+    """Tühjendab ebaõnnestumiste nimekirja."""
+    with _git_failures_lock:
+        _git_failures.clear()
+
+
+def run_git_fsck():
+    """
+    Käivitab 'git fsck' repo terviklikkuse kontrolliks.
+
+    Returns:
+        dict: {"ok": bool, "output": str, "errors": str}
+    """
+    repo = get_or_init_repo()
+    try:
+        result = subprocess.run(
+            ["git", "fsck", "--full"],
+            cwd=repo.working_dir,
+            capture_output=True,
+            text=True,
+            timeout=300  # 5 min max
+        )
+        ok = result.returncode == 0
+        if not ok:
+            logger.error(f"Git fsck leidis vigu: {result.stderr}")
+        else:
+            logger.info("Git fsck: repo terviklikkus OK")
+        return {
+            "ok": ok,
+            "output": result.stdout,
+            "errors": result.stderr
+        }
+    except subprocess.TimeoutExpired:
+        logger.error("Git fsck aegus (>5 min)")
+        return {"ok": False, "output": "", "errors": "Aegunud (timeout 5 min)"}
+    except Exception as e:
+        logger.error(f"Git fsck viga: {e}")
+        return {"ok": False, "output": "", "errors": str(e)}
 
 
 def save_with_git(filepath, content, username, message=None, additional_files=None):
@@ -250,14 +314,15 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
             author=author,
             committer=author
         )
-        print(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
+        logger.info(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
         return {
             "success": True,
             "commit_hash": commit.hexsha,
             "is_first_commit": is_first_commit
         }
     except GitCommandError as e:
-        print(f"Git commit viga: {e}")
+        logger.error(f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {e}")
+        _record_git_failure(relative_path, username, e)
         return {"success": False, "error": str(e)}
 
 
@@ -317,7 +382,7 @@ def get_file_at_commit(relative_path, commit_hash):
         content = repo.git.show(f"{commit_hash}:{relative_path}")
         return content
     except GitCommandError as e:
-        print(f"Git show viga: {e}")
+        logger.error(f"Git show viga: {e}")
         return None
 
 
@@ -339,7 +404,7 @@ def get_file_diff(relative_path, hash1, hash2):
         diff = repo.git.diff(hash1, hash2, '--', relative_path)
         return diff
     except GitCommandError as e:
-        print(f"Git diff viga: {e}")
+        logger.error(f"Git diff viga: {e}")
         return None
 
 
@@ -409,10 +474,10 @@ def get_commit_diff(commit_hash, filepaths=None):
             "files": files
         }
     except GitCommandError as e:
-        print(f"Git commit diff viga: {e}")
+        logger.error(f"Git commit diff viga: {e}")
         return None
     except Exception as e:
-        print(f"Commiti diff viga: {e}")
+        logger.error(f"Commiti diff viga: {e}")
         return None
 
 
@@ -449,10 +514,10 @@ def commit_new_work_to_git(dir_name):
             author=author,
             committer=author
         )
-        print(f"GIT: Lisatud uus teos {dir_name} ({txt_count} txt, {json_count} json)")
+        logger.info(f"GIT: Lisatud uus teos {dir_name} ({txt_count} txt, {json_count} json)")
         return True
     except Exception as e:
-        print(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
+        logger.error(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
         return False
 
 
@@ -553,7 +618,7 @@ def get_recent_commits(username=None, limit=50):
                 break
                 
         except Exception as e:
-            print(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
+            logger.warning(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
             continue
     
     return results

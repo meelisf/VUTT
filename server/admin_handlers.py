@@ -9,6 +9,8 @@ Eraldatud file_server.py-st. Sisaldab:
 - /admin/users/update-role - rolli muutmine
 - /admin/users/delete - kasutaja kustutamine
 - /invite/set-password - parooli seadmine invite tokeniga
+- /admin/git-health - git repo tervislikkuse kontroll
+- /admin/git-failures - git commit ebaõnnestumised
 """
 import json
 
@@ -21,6 +23,7 @@ from .registration import (
     validate_invite_token, create_user_from_invite
 )
 from .auth import get_all_users, update_user_role, delete_user
+from .git_ops import get_git_failures, clear_git_failures, run_git_fsck
 
 
 def handle_admin_registrations(handler):
@@ -269,4 +272,57 @@ def handle_invite_set_password(handler):
 
     except Exception as e:
         print(f"SET PASSWORD VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_git_failures(handler):
+    """Tagastab viimased git commit ebaõnnestumised (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        action = data.get('action', 'list')
+
+        if action == 'clear':
+            clear_git_failures()
+            send_json_response(handler, 200, {
+                "status": "success",
+                "message": "Ebaõnnestumiste nimekiri tühjendatud"
+            })
+        else:
+            failures = get_git_failures()
+            send_json_response(handler, 200, {
+                "status": "success",
+                "failures": failures,
+                "count": len(failures)
+            })
+
+    except Exception as e:
+        print(f"GIT FAILURES VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_git_health(handler):
+    """Käivitab git fsck ja tagastab tulemuse (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        result = run_git_fsck()
+
+        send_json_response(handler, 200, {
+            "status": "success",
+            "git_ok": result["ok"],
+            "output": result["output"],
+            "errors": result["errors"]
+        })
+
+    except Exception as e:
+        print(f"GIT HEALTH VIGA: {e}")
         handler.send_error(500, str(e))
