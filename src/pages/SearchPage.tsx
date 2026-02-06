@@ -6,7 +6,7 @@ import { searchContent, searchWorkHits, getWorkMetadata, getTeoseTagsFacets, get
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchHit, ContentSearchResponse, ContentSearchOptions, Annotation } from '../types';
 import { Search, Loader2, AlertTriangle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Filter, Calendar, Layers, Tag, MessageSquare, FileText, BookOpen, Library, FileType, User, X, FolderOpen, Bookmark } from 'lucide-react';
-import { IMAGE_BASE_URL } from '../config';
+import { IMAGE_BASE_URL, FILE_API_URL } from '../config';
 import Header from '../components/Header';
 import CollapsibleSection from '../components/CollapsibleSection';
 import { useCollection } from '../contexts/CollectionContext';
@@ -254,6 +254,7 @@ const SearchPage: React.FC = () => {
     const [availableAuthors, setAvailableAuthors] = useState<{ value: string; count: number }[]>([]);
     const [showAuthorSuggestions, setShowAuthorSuggestions] = useState(false);
     const authorInputRef = useRef<HTMLInputElement>(null);
+    const [aliasMap, setAliasMap] = useState<Record<string, string>>({});
 
     // Sõnavara (tõlgete jaoks)
     const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
@@ -274,9 +275,15 @@ const SearchPage: React.FC = () => {
     useEffect(() => {
         const loadFilterData = async () => {
             try {
-                // Sõnavarad laeme alati
-                const vocabs = await getVocabularies();
+                // Sõnavarad ja aliased laeme alati
+                const [vocabs, aliasRes] = await Promise.all([
+                    getVocabularies(),
+                    fetch(`${FILE_API_URL}/people-aliases`).then(r => r.ok ? r.json() : null).catch(() => null)
+                ]);
                 setVocabularies(vocabs);
+                if (aliasRes?.status === 'success' && aliasRes.aliases) {
+                    setAliasMap(aliasRes.aliases);
+                }
 
                 // Kontrolli, kas on aktiivseid sisufiltreid (v.a. aasta ja kollektsioon)
                 // Kui on filtrid, siis performSearch hoolitseb facetite eest ja me ei taha neid üle kirjutada
@@ -1193,11 +1200,13 @@ const SearchPage: React.FC = () => {
                                         if (e.key === 'Enter') {
                                             e.preventDefault();
                                             if (authorInput.trim()) {
-                                                setSelectedAuthor(authorInput.trim());
+                                                // Kui input vastab aliasele, kasuta kanoonilist nime
+                                                const resolved = aliasMap[authorInput.trim()] || authorInput.trim();
+                                                setAuthorInput(resolved);
+                                                setSelectedAuthor(resolved);
                                                 setShowAuthorSuggestions(false);
-                                                // Käivita otsing kohe
                                                 setSearchParams(prev => {
-                                                    prev.set('author', authorInput.trim());
+                                                    prev.set('author', resolved);
                                                     prev.set('p', '1');
                                                     return prev;
                                                 });
@@ -1210,14 +1219,33 @@ const SearchPage: React.FC = () => {
                                     className="w-full p-2 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none"
                                 />
                                 {/* Autocomplete soovitused */}
-                                {showAuthorSuggestions && authorInput.length >= 2 && (
+                                {showAuthorSuggestions && authorInput.length >= 2 && (() => {
+                                    const input = authorInput.toLowerCase();
+                                    // 1. Kanonilised nimed mis vastavad otse
+                                    const directMatches = availableAuthors.filter(({ value }) =>
+                                        value.toLowerCase().includes(input)
+                                    );
+                                    // 2. Aliase kaudu leitud kanonilised nimed (koos vastanud aliasega)
+                                    const aliasMatches: { value: string; count: number; matchedAlias: string }[] = [];
+                                    const directNames = new Set(directMatches.map(m => m.value));
+                                    for (const [alias, canonical] of Object.entries(aliasMap)) {
+                                        if (alias.toLowerCase().includes(input) && !directNames.has(canonical)) {
+                                            // Leia count kanoniliste autorite hulgast
+                                            const authorEntry = availableAuthors.find(a => a.value === canonical);
+                                            if (authorEntry && !aliasMatches.some(m => m.value === canonical)) {
+                                                aliasMatches.push({ value: canonical, count: authorEntry.count, matchedAlias: alias });
+                                                directNames.add(canonical); // Väldi duplikaate
+                                            }
+                                        }
+                                    }
+                                    const allMatches = [
+                                        ...directMatches.map(m => ({ ...m, matchedAlias: '' })),
+                                        ...aliasMatches
+                                    ].slice(0, 10);
+
+                                    return (
                                     <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                                        {availableAuthors
-                                            .filter(({ value }) =>
-                                                value.toLowerCase().includes(authorInput.toLowerCase())
-                                            )
-                                            .slice(0, 10)
-                                            .map(({ value, count }) => (
+                                        {allMatches.map(({ value, count, matchedAlias }) => (
                                                 <button
                                                     key={value}
                                                     type="button"
@@ -1226,7 +1254,6 @@ const SearchPage: React.FC = () => {
                                                         setAuthorInput(value);
                                                         setSelectedAuthor(value);
                                                         setShowAuthorSuggestions(false);
-                                                        // Käivita otsing kohe
                                                         setSearchParams(prev => {
                                                             prev.set('author', value);
                                                             prev.set('p', '1');
@@ -1235,19 +1262,23 @@ const SearchPage: React.FC = () => {
                                                     }}
                                                     className="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex justify-between items-center"
                                                 >
-                                                    <span className="truncate">{value}</span>
+                                                    <span className="truncate">
+                                                        {value}
+                                                        {matchedAlias && (
+                                                            <span className="text-gray-400 text-xs ml-1">← {matchedAlias}</span>
+                                                        )}
+                                                    </span>
                                                     <span className="text-xs text-gray-400 ml-2">({count})</span>
                                                 </button>
                                             ))}
-                                        {availableAuthors.filter(({ value }) =>
-                                            value.toLowerCase().includes(authorInput.toLowerCase())
-                                        ).length === 0 && (
+                                        {allMatches.length === 0 && (
                                             <div className="px-3 py-2 text-sm text-gray-400">
                                                 {t('status.noResults')}
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                    );
+                                })()}
                                 {/* Kustuta nupp kui on valitud */}
                                 {selectedAuthor && (
                                     <button

@@ -44,7 +44,7 @@ from server import (
     # Meilisearch
     sync_work_to_meilisearch, sync_work_to_meilisearch_async, metadata_watcher_loop,
     # People/Authors
-    process_creators_metadata,
+    load_people_data, process_creators_metadata,
     # Utils
     metadata_lock,
     find_directory_by_id, build_work_id_cache
@@ -121,12 +121,60 @@ def invalidate_cache():
     """Tühjendab cache'i (kutsuda pärast failide muutmist)."""
     global _collections_cache, _vocabularies_cache, _cache_loaded_at
     global _suggestions_cache, _suggestions_cache_at
+    global _people_aliases_cache, _people_aliases_cache_at
     with _cache_lock:
         _collections_cache = None
         _vocabularies_cache = None
         _cache_loaded_at = None
         _suggestions_cache = {}
         _suggestions_cache_at = None
+        _people_aliases_cache = None
+        _people_aliases_cache_at = None
+
+
+# =========================================================
+# CACHE: People aliases (alias → kanooniline nimi)
+# =========================================================
+_people_aliases_cache = None
+_people_aliases_cache_at = None
+PEOPLE_ALIASES_CACHE_TTL = 300  # 5 min
+
+
+def _build_people_aliases():
+    """Ehitab alias→kanooniline nimi kaardi people.json'ist."""
+    people_data = load_people_data()
+    alias_map = {}
+    # Jälgime juba nähtud isikuid (primary_name), et vältida duplikaate
+    seen = set()
+    for person_id, info in people_data.items():
+        primary = info.get('primary_name', '')
+        aliases = info.get('aliases', [])
+        if not primary or primary in seen:
+            # Duplikaat (sama isik mitme ID all) — jätame vahele kui juba töödeldud
+            if primary in seen:
+                # Aga lisame siiski aliased, mis pole veel kaardis
+                for alias in aliases:
+                    if alias != primary and alias not in alias_map:
+                        alias_map[alias] = primary
+                continue
+            continue
+        seen.add(primary)
+        for alias in aliases:
+            if alias != primary:
+                alias_map[alias] = primary
+    return alias_map
+
+
+def get_cached_people_aliases():
+    """Tagastab cache'itud people aliases kaardi."""
+    global _people_aliases_cache, _people_aliases_cache_at
+    with _cache_lock:
+        if _people_aliases_cache is None or _people_aliases_cache_at is None or \
+           (datetime.now() - _people_aliases_cache_at).total_seconds() > PEOPLE_ALIASES_CACHE_TTL:
+            _people_aliases_cache = _build_people_aliases()
+            _people_aliases_cache_at = datetime.now()
+            print(f"People aliases cache laetud: {len(_people_aliases_cache)} aliast")
+        return _people_aliases_cache
 
 
 def _build_suggestions(preferred_lang):
@@ -386,6 +434,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"VOCABULARIES VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /people-aliases - alias→kanooniline nimi kaart (avalik, cache'itud)
+        elif self.path == '/people-aliases':
+            try:
+                aliases = get_cached_people_aliases()
+                send_json_response(self, 200, {"status": "success", "aliases": aliases})
+
+            except Exception as e:
+                print(f"PEOPLE ALIASES VIGA: {e}")
                 self.send_error(500, str(e))
 
         else:
