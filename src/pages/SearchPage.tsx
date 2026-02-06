@@ -323,6 +323,9 @@ const SearchPage: React.FC = () => {
         setAuthorInput(authorParam);
     }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
 
+    // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega)
+    const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
+
     // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (žanrid)
     const genreIdMap = useMemo(() => {
       const map: Record<string, string> = {};
@@ -334,12 +337,19 @@ const SearchPage: React.FC = () => {
           const items = Array.isArray(obj) ? obj : [obj];
           for (const item of items) {
             if (!item?.labels) continue;
-            const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+            const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+            const currentLabel = cap(rawLabel);
             if (item.id) map[item.id] = currentLabel;
             for (const labelVal of Object.values(item.labels)) {
-              if (labelVal && labelVal !== currentLabel) map[labelVal as string] = currentLabel;
+              if (labelVal) {
+                map[labelVal as string] = currentLabel;
+                map[cap(labelVal as string)] = currentLabel;
+              }
             }
-            if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
+            if (item.label) {
+              map[item.label] = currentLabel;
+              map[cap(item.label)] = currentLabel;
+            }
           }
         }
       }
@@ -357,8 +367,9 @@ const SearchPage: React.FC = () => {
           const items = Array.isArray(obj) ? obj : [obj];
           for (const item of items) {
             if (item?.id && item?.labels) {
-              const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
-              map[currentLabel] = item.id;
+              const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+              map[rawLabel] = item.id;
+              map[cap(rawLabel)] = item.id;
             }
           }
         }
@@ -398,16 +409,19 @@ const SearchPage: React.FC = () => {
       }
     }, [selectedGenres, availableGenres, genreIdMap, vocabularies, i18n.language]);
 
-    // Tüübi keelteülene tõlge (vocabulary-põhine)
+    // Tüübi keelteülene tõlge (Q-koodi-põhine, nagu žanril)
     useEffect(() => {
-      if (selectedTypes.length === 0 || availableTypes.length === 0 || !vocabularies) return;
-      const lang = i18n.language.split('-')[0];
-      const altLang = lang === 'et' ? 'en' : 'et';
+      if (selectedTypes.length === 0 || Object.keys(typeIdMap).length === 0) return;
       const availableValues = new Set(availableTypes.map(t => t.value));
       let changed = false;
-      const translated = selectedTypes.map(t => {
+      const resolved = selectedTypes.map(t => {
         if (availableValues.has(t)) return t;
-        if (vocabularies.types) {
+        // Q-kood → label
+        if (typeIdMap[t]) { changed = true; return typeIdMap[t]; }
+        // Vocabulary-põhine fallback
+        if (vocabularies?.types) {
+          const lang = i18n.language.split('-')[0];
+          const altLang = lang === 'et' ? 'en' : 'et';
           for (const [, labels] of Object.entries(vocabularies.types)) {
             if (labels[altLang] === t) {
               const curLabel = labels[lang] || labels['et'];
@@ -418,12 +432,14 @@ const SearchPage: React.FC = () => {
         return t;
       });
       if (changed) {
-        setSelectedTypes(translated);
+        setSelectedTypes(resolved);
+        // URL-i uuendame Q-koodidega (mitte labelitega)
+        const urlTypes = resolved.map(t => typeLabelToId[t] || t);
         const newParams = new URLSearchParams(searchParams);
-        newParams.set('type', translated.join(','));
+        newParams.set('type', urlTypes.join(','));
         setSearchParams(newParams, { replace: true });
       }
-    }, [selectedTypes, availableTypes, vocabularies, i18n.language]);
+    }, [selectedTypes, availableTypes, typeIdMap, vocabularies, i18n.language]);
 
     // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
     const tagsIdMap = useMemo(() => {
@@ -435,12 +451,19 @@ const SearchPage: React.FC = () => {
           if (!objs || !Array.isArray(objs)) continue;
           for (const item of objs) {
             if (!item?.labels) continue;
-            const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+            const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+            const currentLabel = cap(rawLabel);
             if (item.id) map[item.id] = currentLabel;
             for (const labelVal of Object.values(item.labels)) {
-              if (labelVal && labelVal !== currentLabel) map[labelVal as string] = currentLabel;
+              if (labelVal) {
+                map[labelVal as string] = currentLabel;
+                map[cap(labelVal as string)] = currentLabel;
+              }
             }
-            if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
+            if (item.label) {
+              map[item.label] = currentLabel;
+              map[cap(item.label)] = currentLabel;
+            }
           }
         }
       }
@@ -457,8 +480,60 @@ const SearchPage: React.FC = () => {
           if (!objs || !Array.isArray(objs)) continue;
           for (const item of objs) {
             if (item?.id && item?.labels) {
-              const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
-              map[currentLabel] = item.id;
+              const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+              map[rawLabel] = item.id;
+              map[cap(rawLabel)] = item.id;
+            }
+          }
+        }
+      }
+      return map;
+    }, [results, i18n.language]);
+
+    // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (tüüp)
+    const typeIdMap = useMemo(() => {
+      const map: Record<string, string> = {};
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const obj = (hit as any).type_object;
+          if (!obj) continue;
+          const items = Array.isArray(obj) ? obj : [obj];
+          for (const item of items) {
+            if (!item?.labels) continue;
+            const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+            const currentLabel = cap(rawLabel);
+            if (item.id) map[item.id] = currentLabel;
+            for (const labelVal of Object.values(item.labels)) {
+              if (labelVal) {
+                map[labelVal as string] = currentLabel;
+                map[cap(labelVal as string)] = currentLabel;
+              }
+            }
+            if (item.label) {
+              map[item.label] = currentLabel;
+              map[cap(item.label)] = currentLabel;
+            }
+          }
+        }
+      }
+      return map;
+    }, [results, i18n.language]);
+
+    // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks, tüüp)
+    const typeLabelToId = useMemo(() => {
+      const map: Record<string, string> = {};
+      const lang = i18n.language.split('-')[0];
+      if (results?.hits) {
+        for (const hit of results.hits) {
+          const obj = (hit as any).type_object;
+          if (!obj) continue;
+          const items = Array.isArray(obj) ? obj : [obj];
+          for (const item of items) {
+            if (item?.id && item?.labels) {
+              const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+              map[rawLabel] = item.id;
+              map[cap(rawLabel)] = item.id;
             }
           }
         }
@@ -561,7 +636,10 @@ const SearchPage: React.FC = () => {
                     const urlGenres = selectedGenres.map(g => genreLabelToId[g] || g);
                     prev.set('genre', urlGenres.join(','));
                 } else prev.delete('genre');
-                if (selectedTypes.length > 0) prev.set('type', selectedTypes.join(',')); else prev.delete('type');
+                if (selectedTypes.length > 0) {
+                    const urlTypes = selectedTypes.map(t => typeLabelToId[t] || t);
+                    prev.set('type', urlTypes.join(','));
+                } else prev.delete('type');
                 if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
             }
             return prev;

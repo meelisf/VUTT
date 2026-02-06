@@ -44,6 +44,8 @@ interface AdvancedFiltersProps {
   genreIdMap?: Record<string, string>;
   // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
   tagsIdMap?: Record<string, string>;
+  // Q-kood → praeguse keele label kaart (Wikidata tüüpide jaoks)
+  typeIdMap?: Record<string, string>;
   // Keel facetide jaoks
   lang?: 'et' | 'en';
 }
@@ -148,6 +150,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   facets,
   genreIdMap,
   tagsIdMap,
+  typeIdMap,
   lang: propLang
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
@@ -207,48 +210,73 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     return map;
   }, [lang, vocabularies]);
 
+  // Abifunktsioon: ühenda facet-itemid, mis lahenduvad samale labelile (nt "Oratsioon" → "Oration")
+  // Meilisearchi facetis võivad esineda eestikeelsed fallback-labelid (ilma tõlketa teosed)
+  const mergeFacetItems = (
+    items: FilterItem[],
+    idMap?: Record<string, string>
+  ): FilterItem[] => {
+    if (!idMap) return items;
+    const merged = new Map<string, FilterItem>();
+    for (const item of items) {
+      // Lahenda tegelik label (nt "Oratsioon" → "Oration" kui genreIdMap sisaldab seda)
+      const resolvedLabel = idMap[item.value] || item.label;
+      const existing = merged.get(resolvedLabel);
+      if (existing) {
+        // Liida arv, kasuta lahendatud labeli väärtust
+        existing.count += item.count;
+      } else {
+        merged.set(resolvedLabel, { value: resolvedLabel, label: resolvedLabel, count: item.count });
+      }
+    }
+    return Array.from(merged.values());
+  };
+
   // Ettevalmistatud andmed FilterSection jaoks
   const genreItems = useMemo<FilterItem[]>(() => {
     const genreKey = `genre_${lang}` as keyof FacetDistribution;
     const genreData = facets?.[genreKey] as Record<string, number> | undefined;
     if (!genreData) return [];
 
-    return Object.entries(genreData)
+    const raw = Object.entries(genreData)
       .map(([value, count]) => ({
         value,
         count,
         label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
-      }))
+      }));
+    return mergeFacetItems(raw, genreIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies]);
+  }, [facets, lang, vocabularies, genreIdMap]);
 
   const tagItems = useMemo<FilterItem[]>(() => {
     const tagsKey = `tags_${lang}` as keyof FacetDistribution;
     const tagsData = facets?.[tagsKey] as Record<string, number> | undefined;
     if (!tagsData) return [];
-    
-    return Object.entries(tagsData)
-      .map(([tag, count]) => ({ 
-        value: tag, 
-        label: tag, 
-        count 
-      }))
+
+    const raw = Object.entries(tagsData)
+      .map(([tag, count]) => ({
+        value: tag,
+        label: tag,
+        count
+      }));
+    return mergeFacetItems(raw, tagsIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang]);
+  }, [facets, lang, tagsIdMap]);
 
   const typeItems = useMemo<FilterItem[]>(() => {
     const typeKey = `type_${lang}` as keyof FacetDistribution;
     const typeData = facets?.[typeKey] as Record<string, number> | undefined;
     if (!typeData) return [];
-    
-    return Object.entries(typeData)
-      .map(([value, count]) => ({ 
-        value, 
+
+    const raw = Object.entries(typeData)
+      .map(([value, count]) => ({
+        value,
         count,
         label: vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
-      }))
+      }));
+    return mergeFacetItems(raw, typeIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies]);
+  }, [facets, lang, vocabularies, typeIdMap]);
 
   // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
   const effectiveSelectedGenre = useMemo(() => {
@@ -263,8 +291,11 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   const effectiveSelectedType = useMemo(() => {
     if (!selectedType) return null;
     if (typeItems.some(item => item.value === selectedType)) return selectedType;
+    // Q-kood → label (Wikidata tüübid)
+    if (typeIdMap?.[selectedType]) return typeIdMap[selectedType];
+    // Vocabulary-põhine fallback
     return crossLangTypeMap[selectedType] || selectedType;
-  }, [selectedType, typeItems, crossLangTypeMap]);
+  }, [selectedType, typeItems, typeIdMap, crossLangTypeMap]);
 
   // Efektiivsed valitud märksõnad: lahenda Q-koodid labeliteks
   const effectiveSelectedTags = useMemo(() => {

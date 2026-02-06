@@ -96,12 +96,14 @@ const fixIndexSettings = async () => {
       'publisher',
       'genre_ids',
       'tags_ids',
+      'type_ids',
       'creator_ids',
       'creators',
       'author_names',      // Mitte-respondens loojate nimed filtreerimiseks
       'respondens_names',  // Respondens loojate nimed filtreerimiseks
       'type',
       'type_et', 'type_en',
+      'type_ids',
       'genre',
       'genre_et', 'genre_en',
       'collection',
@@ -519,20 +521,20 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       }).join(' OR ');
       filter.push(options.genre.length === 1 ? genreConditions : `(${genreConditions})`);
     }
-    // V2: Tüübi filter (OR loogika - otsime mõlemast keelest)
+    // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
     if (options?.type && options.type.length > 0) {
-      const typeConditions = options.type.map(t => `(type_et = "${t}" OR type_en = "${t}")`).join(' OR ');
+      const typeConditions = options.type.map(t => {
+        if (isQCode(t)) return `type_ids = "${t}"`;
+        return `(type_et = "${t}" OR type_en = "${t}")`;
+      }).join(' OR ');
       filter.push(options.type.length === 1 ? typeConditions : `(${typeConditions})`);
     }
 
     // Vali facet väljad vastavalt keelele
     const facetLang = options?.lang || 'et';
-    const altLang = facetLang === 'et' ? 'en' : 'et';
     const genreFacetField = `genre_${facetLang}`;
     const typeFacetField = `type_${facetLang}`;
     const tagsFacetField = `tags_${facetLang}`;
-    // Teise keele facetid tüübi tõlkimiseks (žanr kasutab nüüd Q-koode)
-    const typeAltFacetField = `type_${altLang}`;
 
     const searchParams: any = {
       attributesToRetrieve: [
@@ -548,8 +550,8 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       attributesToSearchOn: ['title', 'authors_text', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
       limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
-      // Küsime facetid dünaamiliseks filtrite uuendamiseks (+ tüübi teise keele facetid tõlkimiseks)
-      facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus', typeAltFacetField]
+      // Küsime facetid dünaamiliseks filtrite uuendamiseks
+      facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
     };
 
     // Relevantsuse puhul EI kasuta distinct, et säilitada Meilisearchi relevantsuse järjekord
@@ -1080,9 +1082,12 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     }).join(' OR ');
     filter.push(options.genre.length === 1 ? genreConditions : `(${genreConditions})`);
   }
-  // V2: Tüübi filter (OR loogika - otsime mõlemast keelest)
+  // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
   if (options.type && options.type.length > 0) {
-    const typeConditions = options.type.map(t => `(type_et = "${t}" OR type_en = "${t}")`).join(' OR ');
+    const typeConditions = options.type.map(t => {
+      if (isQCode(t)) return `type_ids = "${t}"`;
+      return `(type_et = "${t}" OR type_en = "${t}")`;
+    }).join(' OR ');
     filter.push(options.type.length === 1 ? typeConditions : `(${typeConditions})`);
   }
   // V2: Autori filter (creators massiivist tuletatud author_names väli)
@@ -1092,12 +1097,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
   const facetLang = options.lang || 'et';
-  const altLang = facetLang === 'et' ? 'en' : 'et';
   const genreFacetField = `genre_${facetLang}`;
   const typeFacetField = `type_${facetLang}`;
   const tagsFacetField = `tags_${facetLang}`;
-  // Teise keele facetid tüübi tõlkimiseks (žanr kasutab nüüd Q-koode)
-  const typeAltFacetField = `type_${altLang}`;
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
@@ -1150,7 +1152,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search('', {
           filter: statsFilter,
           limit: 0,
-          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names', typeAltFacetField],
+          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (teosed)

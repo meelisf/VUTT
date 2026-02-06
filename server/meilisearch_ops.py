@@ -362,6 +362,7 @@ def sync_work_to_meilisearch(dir_name):
             "type_et": get_labels_by_lang(work_type, 'et'),
             "type_en": get_labels_by_lang(work_type, 'en'),
             "type_object": work_type,
+            "type_ids": get_all_ids(work_type),
             "languages": languages,
             "creators": creators,
             "authors_text": authors_text,

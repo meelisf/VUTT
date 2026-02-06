@@ -154,6 +154,9 @@ const Dashboard: React.FC = () => {
     setCurrentPage(pageParam);
   }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam, pageParam]);
 
+  // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega, vt server/utils.py capitalize_first)
+  const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
+
   // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (žanrid)
   // Kasutatakse AdvancedFilters-is, et lahendada URL-i väärtus kuvamiseks
   const genreIdMap = useMemo(() => {
@@ -165,14 +168,21 @@ const Dashboard: React.FC = () => {
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
         if (!item?.labels) continue;
-        const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
-        // Q-kood → praeguse keele label
+        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const currentLabel = cap(rawLabel);
+        // Q-kood → praeguse keele label (suurtähega, nagu facetis)
         if (item.id) map[item.id] = currentLabel;
-        // Teise keele labelid → praeguse keele label
+        // Teise keele labelid → praeguse keele label (mõlemad variandid)
         for (const labelVal of Object.values(item.labels)) {
-          if (labelVal && labelVal !== currentLabel) map[labelVal] = currentLabel;
+          if (labelVal) {
+            map[labelVal] = currentLabel;
+            map[cap(labelVal)] = currentLabel;
+          }
         }
-        if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
+        if (item.label) {
+          map[item.label] = currentLabel;
+          map[cap(item.label)] = currentLabel;
+        }
       }
     }
     return map;
@@ -188,8 +198,10 @@ const Dashboard: React.FC = () => {
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
         if (item?.id && item?.labels) {
-          const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
-          map[currentLabel] = item.id;
+          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+          // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
+          map[rawLabel] = item.id;
+          map[cap(rawLabel)] = item.id;
         }
       }
     }
@@ -205,12 +217,20 @@ const Dashboard: React.FC = () => {
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
         if (!item?.labels) continue;
-        const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const currentLabel = cap(rawLabel);
+        // Q-kood → praeguse keele label (suurtähega, nagu facetis)
         if (item.id) map[item.id] = currentLabel;
         for (const labelVal of Object.values(item.labels)) {
-          if (labelVal && labelVal !== currentLabel) map[labelVal] = currentLabel;
+          if (labelVal) {
+            map[labelVal] = currentLabel;
+            map[cap(labelVal)] = currentLabel;
+          }
         }
-        if (item.label && item.label !== currentLabel) map[item.label] = currentLabel;
+        if (item.label) {
+          map[item.label] = currentLabel;
+          map[cap(item.label)] = currentLabel;
+        }
       }
     }
     return map;
@@ -225,8 +245,58 @@ const Dashboard: React.FC = () => {
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
         if (item?.id && item?.labels) {
-          const currentLabel = item.labels[lang] || item.labels['et'] || item.label;
-          map[currentLabel] = item.id;
+          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+          // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
+          map[rawLabel] = item.id;
+          map[cap(rawLabel)] = item.id;
+        }
+      }
+    }
+    return map;
+  }, [works, i18n.language]);
+
+  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (tüüp)
+  const typeIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const obj = (work as any).type_object;
+      if (!obj) continue;
+      // type_object on üksik objekt (mitte massiiv)
+      const items = Array.isArray(obj) ? obj : [obj];
+      for (const item of items) {
+        if (!item?.labels) continue;
+        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const currentLabel = cap(rawLabel);
+        if (item.id) map[item.id] = currentLabel;
+        for (const labelVal of Object.values(item.labels)) {
+          if (labelVal) {
+            map[labelVal as string] = currentLabel;
+            map[cap(labelVal as string)] = currentLabel;
+          }
+        }
+        if (item.label) {
+          map[item.label] = currentLabel;
+          map[cap(item.label)] = currentLabel;
+        }
+      }
+    }
+    return map;
+  }, [works, i18n.language]);
+
+  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks, tüüp)
+  const typeLabelToId = useMemo(() => {
+    const map: Record<string, string> = {};
+    const lang = i18n.language.split('-')[0];
+    for (const work of works) {
+      const obj = (work as any).type_object;
+      if (!obj) continue;
+      const items = Array.isArray(obj) ? obj : [obj];
+      for (const item of items) {
+        if (item?.id && item?.labels) {
+          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+          map[rawLabel] = item.id;
+          map[cap(rawLabel)] = item.id;
         }
       }
     }
@@ -306,10 +376,12 @@ const Dashboard: React.FC = () => {
         resetPage = true;
       }
 
-      // Tüüp
-      if (selectedType !== typeParam) {
-        if (selectedType) {
-          newParams.set('type', selectedType);
+      // Tüüp (kasuta Q-koodi URL-is kui olemas)
+      const typeUrlValue = selectedType ? (typeLabelToId[selectedType] || selectedType) : null;
+      const currentTypeUrl = typeParam;
+      if (typeUrlValue !== currentTypeUrl) {
+        if (typeUrlValue) {
+          newParams.set('type', typeUrlValue);
         } else {
           newParams.delete('type');
         }
@@ -339,7 +411,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam, genreLabelToId, tagsLabelToId]);
+  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
 
   // Perform search when params change
   useEffect(() => {
@@ -721,6 +793,7 @@ const Dashboard: React.FC = () => {
                 facets={facets}
                 genreIdMap={genreIdMap}
                 tagsIdMap={tagsIdMap}
+                typeIdMap={typeIdMap}
                 lang={i18n.language.split('-')[0] as 'et' | 'en'}
               />
             </div>

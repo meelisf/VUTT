@@ -59,6 +59,7 @@ FILTERABLE_ATTRS = [
     'type',
     'type_en',
     'type_et',
+    'type_ids',
     'work_id',
     'year',
 ]
