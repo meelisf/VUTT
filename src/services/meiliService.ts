@@ -1264,13 +1264,13 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       // Lisa work_id facet (lehekülgede arvud) otse Meilisearchist
       calculatedFacets['work_id'] = pageCountResponse.facetDistribution?.['work_id'] || {};
 
-      totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size; // estimatedTotalHits on distinct query puhul ebatäpne vanemates versioonides
-      // Kasutame usaldusväärsemat numbrit: distinct response estimated hits peaks olema teoste arv
-      
-      // Workaround: Kui stats limit oli piisav, on uniqueWorks.size täpne. 
-      // Kui stats limit löödi lõhki, on distinctResponse.estimatedTotalHits parem (kuigi see võib olla page count).
-      // Meilisearchi käitumine estimatedTotalHits + distinct osas on versiooniti erinev.
-      // Eeldame praegu, et uniqueWorks.size on "vähemalt nii palju".
+      // Kui stats-päring mahtus limiiti, on uniqueWorks.size täpne ja ühtib facetidega.
+      // Kui limiit löödi lõhki, kasutame distinctResponse.estimatedTotalHits (ligikaudne).
+      if ((statsResponse.estimatedTotalHits || 0) <= STATS_LIMIT) {
+        totalWorks = uniqueWorks.size;
+      } else {
+        totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size;
+      }
 
       const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
