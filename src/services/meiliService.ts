@@ -723,7 +723,7 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
 
       // Lehekülje andmed
       page_number: parseInt(hit.lehekylje_number),
-      text_content: hit.lehekylje_tekst || '',
+      text_content: hit.text_content || hit.lehekylje_tekst || '',
       image_url: getFullImageUrl(hit.lehekylje_pilt),
       status: hit.status || PageStatus.RAW,
       comments: hit.comments || [],
@@ -1113,7 +1113,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
@@ -1213,7 +1213,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1316,7 +1316,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1379,7 +1379,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
       filter: `work_id = "${teoseId}"`,
       sort: ['lehekylje_number:asc'],
       limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
-      attributesToRetrieve: ['lehekylje_tekst', 'lehekylje_number', 'title', 'autor', 'aasta']
+      attributesToRetrieve: ['lehekylje_tekst', 'text_content', 'lehekylje_number', 'title', 'autor', 'aasta']
     });
 
     if (response.hits.length === 0) {
@@ -1393,7 +1393,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
 
     // Liidame kõik leheküljed kokku, eraldades need "--- lk ---" märgendiga
     const fullText = response.hits
-      .map((hit: any) => hit.lehekylje_tekst || '')
+      .map((hit: any) => hit.text_content || hit.lehekylje_tekst || '')
       .join('\n\n--- lk ---\n\n');
 
     return { text: fullText, title, author, year };
