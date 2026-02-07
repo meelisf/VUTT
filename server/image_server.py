@@ -43,9 +43,11 @@ def get_first_image(work_path):
     """Leiab esimese pildi teose kataloogist (sorteeritud tähestikuliselt).
 
     Ignoreerib _thumb_*.jpg ja muud _ algusega faile.
+    Toetab JPG ja PNG formaate.
     """
-    pattern = os.path.join(work_path, "*.jpg")
-    all_images = glob.glob(pattern)
+    all_images = []
+    for ext in ("*.jpg", "*.png"):
+        all_images.extend(glob.glob(os.path.join(work_path, ext)))
 
     # Filtreeri välja _ algusega failid (thumbnailid, metadata jne)
     images = [f for f in all_images if not os.path.basename(f).startswith('_')]
@@ -117,8 +119,10 @@ def get_or_create_thumbnail(work_path):
         print(f"[THUMB] Kataloogis pole pilte: {work_path}")
         return None
 
-    first_image_name = os.path.basename(first_image)  # nt "0001.jpg"
-    expected_thumb_name = f"_thumb_{first_image_name}"
+    first_image_name = os.path.basename(first_image)  # nt "0001.jpg" või "0001.png"
+    # Thumbnaili nimi alati .jpg, kuna generate_thumbnail salvestab JPEG-na
+    thumb_base = os.path.splitext(first_image_name)[0]
+    expected_thumb_name = f"_thumb_{thumb_base}.jpg"
     expected_thumb_path = os.path.join(work_path, expected_thumb_name)
 
     # 2. Leia olemasolevad thumbnailid
