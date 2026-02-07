@@ -27,7 +27,7 @@ const router = createBrowserRouter([
     element: <Statistics />,
   },
   {
-    path: "/work/:workId/:pageNum",
+    path: "/work/:workId/:pageNum?",
     element: <Workspace />,
   },
   // Kasutajahalduse route'id

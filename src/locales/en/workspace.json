@@ -4,7 +4,8 @@
     "page": "Page",
     "of": "/",
     "goToPage": "Go to page",
-    "toFirstPage": "Go to start of work"
+    "toFirstPage": "Go to start of work",
+    "copyPermalink": "Copy link to work"
   },
   "tabs": {
     "edit": "Edit",

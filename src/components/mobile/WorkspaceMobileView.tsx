@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen } from 'lucide-react';
+import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
@@ -43,6 +43,15 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   const { collections, getCollectionPath } = useCollection();
   const lang = (i18n.language as 'et' | 'en') || 'et';
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyPermalink = () => {
+    if (!workId) return;
+    const permalinkUrl = `${window.location.origin}/work/${workId}`;
+    navigator.clipboard.writeText(permalinkUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -57,9 +66,18 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
             <Home size={16} />
           </button>
           <span className="text-xs text-gray-500">ID:</span>
-          <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+          <button
+            onClick={handleCopyPermalink}
+            className="group flex items-center gap-1 font-mono text-gray-700 bg-gray-100 active:bg-gray-200 px-1.5 py-0.5 rounded text-xs transition-colors"
+            title={t('navigation.copyPermalink', 'Kopeeri permalink (vutt:ID)')}
+          >
             {workId}
-          </span>
+            {copied ? (
+              <Check size={10} className="text-green-600" />
+            ) : (
+              <Copy size={10} className="text-gray-400" />
+            )}
+          </button>
         </div>
 
         {/* Lehekülje navigatsioon */}

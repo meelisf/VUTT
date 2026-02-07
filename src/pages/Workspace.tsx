@@ -11,7 +11,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History, Copy, Check } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import { FILE_API_URL } from '../config';
 import { getLabel } from '../utils/metadataUtils';
@@ -28,6 +28,16 @@ const Workspace: React.FC = () => {
   const [page, setPage] = useState<Page | null>(null);
   const [work, setWork] = useState<Work | undefined>(undefined);
   const [editorChanges, setEditorChanges] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyPermalink = () => {
+    if (!workId) return;
+    const permalinkUrl = `${window.location.origin}/work/${workId}`;
+    navigator.clipboard.writeText(permalinkUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const [currentStatus, setCurrentStatus] = useState<PageStatus | null>(null);
   const statusDirty = page && currentStatus ? currentStatus !== page.status : false;
   const hasUnsavedChanges = editorChanges || statusDirty;
@@ -387,9 +397,18 @@ const Workspace: React.FC = () => {
           <div className="h-6 w-px bg-gray-300"></div>
           <div className="flex items-center gap-1 text-sm">
             <span className="text-gray-500">ID:</span>
-            <span className="font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded text-xs">
+            <button
+              onClick={handleCopyPermalink}
+              className="group flex items-center gap-1.5 font-mono text-gray-700 bg-gray-100 hover:bg-gray-200 px-1.5 py-0.5 rounded text-xs transition-colors"
+              title={t('workspace:navigation.copyPermalink', 'Kopeeri permalink (vutt:ID)')}
+            >
               {workId}
-            </span>
+              {copied ? (
+                <Check size={12} className="text-green-600" />
+              ) : (
+                <Copy size={12} className="text-gray-400 group-hover:text-gray-600" />
+              )}
+            </button>
           </div>
         </div>
 

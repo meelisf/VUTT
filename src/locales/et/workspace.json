@@ -4,7 +4,8 @@
     "page": "Lk",
     "of": "/",
     "goToPage": "Mine lehele",
-    "toFirstPage": "Mine teose algusesse"
+    "toFirstPage": "Mine teose algusesse",
+    "copyPermalink": "Kopeeri teose püsiviide"
   },
   "tabs": {
     "edit": "Muuda",
