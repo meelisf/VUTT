@@ -40,6 +40,11 @@ _metadata.json (V2 English)     →  Meilisearch (Estonian fields)  →  Fronten
 title, year, creators[]            pealkiri, aasta, autor            title, year
 ```
 
+**Text Search vs Editor Text:**
+Meilisearch index contains two text fields to balance search accuracy and editor integrity:
+- `lehekylje_tekst`: **Cleaned for search**. Hyphens at line-ends removed (`Spen- \ner` → `Spener`), markdown (`*`), code-switch (`~`), marginalia (`[[m:]]`) and footnotes (`[^n]`) removed. Searchable.
+- `text_content`: **Raw for editor**. Original text with all markers. Retrievable but not searchable.
+
 Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change Meilisearch schema without full reindex.
 
 ## Key Files

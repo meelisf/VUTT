@@ -377,7 +377,8 @@ def sync_work_to_meilisearch(dir_name):
             "year": year,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": clean_text_for_search(page_text),
+            "lehekylje_tekst": clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)
+            "text_content": page_text,                          # REDAKTORI JAOKS (algne tekst koos kõigi märkidega)
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],

@@ -530,7 +530,8 @@ def create_meilisearch_data_per_page():
                 # Lehekülje andmed
                 'teose_lehekylgede_arv': teose_lehekylgede_arv,
                 'lehekylje_number': page_index + 1,
-                'lehekylje_tekst': clean_text_for_search(page_text),
+                'lehekylje_tekst': clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)
+                'text_content': page_text,                          # REDAKTORI JAOKS (algne tekst koos kõigi märkidega)
                 'lehekylje_pilt': image_path,
                 'originaal_kataloog': dir_name,
 

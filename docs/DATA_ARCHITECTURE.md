@@ -70,12 +70,29 @@ VUTT süsteemis on **kolm andmekihti**:
 |------|-----------|
 | `id` | `{work_id}-{page_num}` (nt "cymbv7-1") |
 | `lehekylje_number` | Lehekülje number (1, 2, 3...) |
-| `lehekylje_tekst` | Transkribeeritud tekst |
+| `lehekylje_tekst` | **Otsinguväli:** Puhastatud tekst (ilma poolituste ja vormindusmärgita). Kasutatakse ainult Meilisearchi otsinguks. |
+| `text_content` | **Kuvamisväli:** Algne (toores) tekst koos vormindusmärkidega (`~`, `*`, `[[m:]]`). Kasutatakse redaktoris. |
 | `lehekylje_pilt` | Pildi suhteline tee |
 | `status` | Lehekülje staatus (Toores/Töös/Parandatud/Valmis) |
 | `teose_staatus` | Teose koondstaatus |
 | `page_tags` | Lehekülje märksõnad |
 | `comments` | Kommentaarid |
+
+### Tekstiväljade eristamine
+
+Kuna transkribeeritud tekst sisaldab palju vormindusmärke ja poolitusi, on otsingu efektiivsuse tagamiseks kasutusel kaks eraldi välja:
+
+1. **`lehekylje_tekst` (Otsingu jaoks):**
+   - Eemaldatakse Markdown märgid (`**`, `*`).
+   - Eemaldatakse koodivahetuse märgid (`~`).
+   - Eemaldatakse ääremärkuste ja viidete tähised (`[[m:]]`, `[^n]`).
+   - **Liidetakse rea lõpu poolitused:** `Spen-\ner` muutub `Spener`.
+   - See väli on Meilisearchis märgitud kui `searchableAttribute`.
+
+2. **`text_content` (Redaktori jaoks):**
+   - Säilitatakse tekst täpselt nii, nagu see on failisüsteemis (`.txt` failis).
+   - Seda välja kuvatakse kasutajale muutmiseks.
+   - See väli **ei ole** Meilisearchis otsitav, et vältida "müra" (nt otsingutulemused märkidele `~` või `[[`).
 
 ### Isikute väljad (creators)
 
