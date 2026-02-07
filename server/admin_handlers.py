@@ -24,7 +24,7 @@ from .registration import (
 )
 from .auth import get_all_users, update_user_role, delete_user
 from .git_ops import get_git_failures, clear_git_failures, run_git_fsck
-from .people_ops import refresh_all_people_safe
+from .people_ops import refresh_all_people_safe, get_refresh_status
 
 
 def handle_admin_registrations(handler):
@@ -351,4 +351,24 @@ def handle_admin_people_refresh(handler):
 
     except Exception as e:
         print(f"PEOPLE REFRESH VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_people_refresh_status(handler):
+    """Tagastab isikute aliaste uuendamise staatuse (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        status = get_refresh_status()
+        send_json_response(handler, 200, {
+            "status": "success",
+            **status
+        })
+
+    except Exception as e:
+        print(f"PEOPLE REFRESH STATUS VIGA: {e}")
         handler.send_error(500, str(e))

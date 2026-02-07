@@ -54,7 +54,8 @@
     "title": "Isikute register",
     "count": "Registreeritud isikuid",
     "refreshAliases": "Uuenda aliaseid",
-    "refreshStarted": "Uuendamine käivitatud",
-    "refreshError": "Uuendamise käivitamine ebaõnnestus"
+    "refreshStarted": "Uuendamine käimas...",
+    "refreshDone": "Valmis: {{updated}}/{{total}} uuendatud, {{errors}} viga",
+    "refreshError": "Uuendamine ebaõnnestus"
   }
 }

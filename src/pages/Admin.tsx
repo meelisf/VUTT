@@ -321,9 +321,40 @@ const Admin: React.FC = () => {
     }
   };
 
+  const pollRefreshStatus = async () => {
+    const poll = async () => {
+      try {
+        const response = await fetch(`${FILE_API_URL}/admin/people-refresh-status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auth_token: authToken })
+        });
+        const data = await response.json();
+
+        if (data.state === 'done') {
+          setPeopleMessage(t('people.refreshDone', { updated: data.updated, errors: data.errors, total: data.total }));
+          setPeopleRefreshing(false);
+          loadPeopleCount();
+          return;
+        } else if (data.state === 'error') {
+          setPeopleMessage(t('people.refreshError'));
+          setPeopleRefreshing(false);
+          return;
+        }
+        // Veel käib — polli uuesti 3s pärast
+        setTimeout(poll, 3000);
+      } catch {
+        setPeopleMessage(t('people.refreshError'));
+        setPeopleRefreshing(false);
+      }
+    };
+    // Esimene poll 2s pärast käivitust
+    setTimeout(poll, 2000);
+  };
+
   const handlePeopleRefresh = async () => {
     setPeopleRefreshing(true);
-    setPeopleMessage(null);
+    setPeopleMessage(t('people.refreshStarted'));
 
     try {
       const response = await fetch(`${FILE_API_URL}/admin/people-refresh`, {
@@ -335,14 +366,14 @@ const Admin: React.FC = () => {
       const data = await response.json();
 
       if (data.status === 'success') {
-        setPeopleMessage(t('people.refreshStarted'));
+        pollRefreshStatus();
       } else {
         setPeopleMessage(data.message || t('people.refreshError'));
+        setPeopleRefreshing(false);
       }
     } catch (e) {
       console.error('People refresh error:', e);
       setPeopleMessage(t('people.refreshError'));
-    } finally {
       setPeopleRefreshing(false);
     }
   };

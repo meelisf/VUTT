@@ -247,14 +247,29 @@ def refresh_all_people():
 # Lukk, et vältida mitut samaaegset refresh'i
 _refresh_running = threading.Lock()
 
+# Viimase refresh'i staatus (mälus)
+_refresh_status = {"state": "idle"}  # idle | running | done | error
+
+
+def get_refresh_status():
+    """Tagastab viimase refresh'i staatuse."""
+    return dict(_refresh_status)
+
 
 def refresh_all_people_safe():
     """Käivitab refresh_all_people() kui teine ei jookse juba."""
+    global _refresh_status
     if not _refresh_running.acquire(blocking=False):
         print("PEOPLE REFRESH: Juba käimas, jätan vahele")
         return None
     try:
-        return refresh_all_people()
+        _refresh_status = {"state": "running"}
+        result = refresh_all_people()
+        _refresh_status = {"state": "done", **result}
+        return result
+    except Exception as e:
+        _refresh_status = {"state": "error", "message": str(e)}
+        raise
     finally:
         _refresh_running.release()
 

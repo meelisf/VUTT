@@ -54,7 +54,8 @@
     "title": "People Register",
     "count": "Registered people",
     "refreshAliases": "Refresh aliases",
-    "refreshStarted": "Refresh started",
-    "refreshError": "Failed to start refresh"
+    "refreshStarted": "Refreshing...",
+    "refreshDone": "Done: {{updated}}/{{total}} updated, {{errors}} errors",
+    "refreshError": "Refresh failed"
   }
 }

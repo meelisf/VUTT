@@ -39,7 +39,7 @@ from server import (
     handle_admin_users_update_role, handle_admin_users_delete,
     handle_invite_set_password,
     handle_admin_git_failures, handle_admin_git_health,
-    handle_admin_people_refresh,
+    handle_admin_people_refresh, handle_admin_people_refresh_status,
     # Bulk operatsioonide HTTP handlerid
     handle_bulk_tags, handle_bulk_genre, handle_bulk_collection,
     # Meilisearch
@@ -899,6 +899,9 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/people-refresh':
             handle_admin_people_refresh(self)
             invalidate_cache()  # People cache invalideerumine
+
+        elif self.path == '/admin/people-refresh-status':
+            handle_admin_people_refresh_status(self)
 
         elif self.path == '/invite/set-password':
             handle_invite_set_password(self)
