@@ -97,16 +97,29 @@ def recompress_jpg(jpg_path, quality, dry_run=True):
         return old_size, None
 
     try:
+        # Salvesta ajutisse faili, et saaks võrrelda suurust
+        tmp_path = jpg_path + '.tmp'
         with Image.open(jpg_path) as img:
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            img.save(jpg_path, 'JPEG', quality=quality, optimize=True)
-            os.chmod(jpg_path, 0o644)
+            img.save(tmp_path, 'JPEG', quality=quality, optimize=True)
 
-        new_size = os.path.getsize(jpg_path)
+        new_size = os.path.getsize(tmp_path)
+
+        if new_size >= old_size:
+            # Rekompressioon ei aidanud — jätame originaali alles
+            os.remove(tmp_path)
+            return old_size, old_size  # Muutust pole
+
+        # Asenda originaal
+        os.replace(tmp_path, jpg_path)
+        os.chmod(jpg_path, 0o644)
         return old_size, new_size
 
     except Exception as e:
+        # Puhasta ajutine fail vea korral
+        if os.path.exists(jpg_path + '.tmp'):
+            os.remove(jpg_path + '.tmp')
         print(f"  VIGA: {jpg_path}: {e}")
         return None
 
@@ -155,6 +168,7 @@ def main():
     print(f"\nSuured JPG-d (>{SIZE_THRESHOLD_MB}MB): {len(large_jpgs)} tk")
 
     jpg_saved = 0
+    jpg_skipped = 0
     for jpg_path in large_jpgs:
         rel = os.path.relpath(jpg_path, BASE_DIR)
         result = recompress_jpg(jpg_path, RECOMPRESS_QUALITY, dry_run)
@@ -164,8 +178,12 @@ def main():
                 print(f"  {rel}: {fmt_size(old_size)}")
             else:
                 saved = old_size - new_size
-                jpg_saved += saved
-                print(f"  {rel}: {fmt_size(old_size)} → {fmt_size(new_size)} (−{fmt_size(saved)})")
+                if saved == 0:
+                    jpg_skipped += 1
+                    print(f"  {rel}: {fmt_size(old_size)} → vahele jäetud (poleks väiksem)")
+                else:
+                    jpg_saved += saved
+                    print(f"  {rel}: {fmt_size(old_size)} → {fmt_size(new_size)} (−{fmt_size(saved)})")
 
     # --- Kokkuvõte ---
     print(f"\n{'=' * 40}")
@@ -176,7 +194,7 @@ def main():
     else:
         total_saved = png_saved + jpg_saved
         print(f"PNG kokkuhoid: {fmt_size(png_saved)}")
-        print(f"JPG kokkuhoid: {fmt_size(jpg_saved)}")
+        print(f"JPG kokkuhoid: {fmt_size(jpg_saved)} ({jpg_skipped} faili vahele jäetud)")
         print(f"KOKKU säästetud: {fmt_size(total_saved)}")
         print(f"\nNüüd käivita: python3 scripts/sync_meilisearch.py --apply")
 
