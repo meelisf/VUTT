@@ -41,9 +41,13 @@ def sanitize_id(text):
 
 
 def clean_text_for_search(text):
-    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid."""
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused."""
     if not text:
         return ""
+    
+    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner" või "spen- \ner" -> "spener")
+    # See peab toimuma ESIMESENA, et liita sõna kokku
+    text = re.sub(r'-\s*\n\s*', '', text)
     
     # 1. Bold/Italic (*)
     text = text.replace('*', ' ')

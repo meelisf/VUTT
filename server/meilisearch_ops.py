@@ -47,9 +47,13 @@ from .git_ops import commit_new_work_to_git
 import re
 
 def clean_text_for_search(text):
-    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid."""
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused."""
     if not text:
         return ""
+    
+    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner" või "spen- \ner" -> "spener")
+    # See peab toimuma ESIMESENA, et liita sõna kokku enne muude märkide eemaldamist
+    text = re.sub(r'-\s*\n\s*', '', text)
     
     # Asenda erimärgid tühikuga, et vältida sõnade kokkukleepumist ja müra
     
