@@ -42,7 +42,7 @@ def fetch_wikidata_aliases(wikidata_id):
             entity = data.get('entities', {}).get(wikidata_id, {})
             
             aliases = []
-            TARGET_LANGS = ['et', 'en', 'de', 'la']
+            TARGET_LANGS = ['et', 'en', 'de', 'la', 'mul']
 
             # Aliased (valitud keeltes)
             alias_data = entity.get('aliases', {})
