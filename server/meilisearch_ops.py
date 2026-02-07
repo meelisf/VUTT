@@ -44,6 +44,35 @@ from .utils import (
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
+import re
+
+def clean_text_for_search(text):
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid."""
+    if not text:
+        return ""
+    
+    # Asenda erimärgid tühikuga, et vältida sõnade kokkukleepumist ja müra
+    
+    # 1. Bold/Italic (*) - asenda kõik tärnid tühikuga
+    text = text.replace('*', ' ')
+    
+    # 2. Koodivahetus (~)
+    text = text.replace('~', ' ')
+    
+    # 3. Ääremärkuse markerid [[m: ja ]]
+    text = text.replace('[[m:', ' ').replace(']]', ' ')
+    
+    # 4. Leheküljevahetus --lk--
+    text = text.replace('--lk--', ' ')
+    
+    # 5. Joonealused viited [^...] - eemaldame viite markeri
+    # Nt [^1] -> " "
+    text = re.sub(r'\[\^\d+\]', ' ', text)
+    
+    # 6. Eemalda üleliigsed tühikud (pole kriitiline Meilisearchile, aga viisakas)
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
 
 def load_people_aliases():
     """Laeb inimeste aliased JSON failist."""
@@ -344,7 +373,7 @@ def sync_work_to_meilisearch(dir_name):
             "year": year,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": page_text,
+            "lehekylje_tekst": clean_text_for_search(page_text),
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],

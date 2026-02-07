@@ -40,6 +40,32 @@ def sanitize_id(text):
     return sanitized
 
 
+def clean_text_for_search(text):
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid."""
+    if not text:
+        return ""
+    
+    # 1. Bold/Italic (*)
+    text = text.replace('*', ' ')
+    
+    # 2. Koodivahetus (~)
+    text = text.replace('~', ' ')
+    
+    # 3. Ääremärkuse markerid [[m: ja ]]
+    text = text.replace('[[m:', ' ').replace(']]', ' ')
+    
+    # 4. Leheküljevahetus --lk--
+    text = text.replace('--lk--', ' ')
+    
+    # 5. Joonealused viited [^...]
+    text = re.sub(r'\[\^\d+\]', ' ', text)
+    
+    # 6. Eemalda üleliigsed tühikud
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    return text
+
+
 def calculate_work_status(page_statuses):
     """Arvutab teose koondstaatuse lehekülgede staatuste põhjal."""
     if not page_statuses:
@@ -500,7 +526,7 @@ def create_meilisearch_data_per_page():
                 # Lehekülje andmed
                 'teose_lehekylgede_arv': teose_lehekylgede_arv,
                 'lehekylje_number': page_index + 1,
-                'lehekylje_tekst': page_text,
+                'lehekylje_tekst': clean_text_for_search(page_text),
                 'lehekylje_pilt': image_path,
                 'originaal_kataloog': dir_name,
 
