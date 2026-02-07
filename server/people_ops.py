@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import threading
 import urllib.request
 import urllib.parse
@@ -125,14 +126,14 @@ def fetch_gnd_aliases(gnd_id):
         print(f"GND fetch error ({gnd_id}): {e}")
         return None
 
-def update_person_async(creator_id, source=None):
-    """Uuendab isiku andmeid taustal."""
+def update_person_async(creator_id, source=None, force=False):
+    """Uuendab isiku andmeid taustal. force=True jätab aliaste kontrolli vahele."""
     def task():
         with PEOPLE_LOCK:
             people_data = load_people_data()
-            
-            # Kui juba olemas, ei tee midagi (praegu)
-            if creator_id in people_data:
+
+            # Kui juba olemas ja force pole, ei tee midagi
+            if not force and creator_id in people_data:
                 # Kontrollime kas aliased on olemas, kui ei, siis proovime täiendada
                 if people_data[creator_id].get('aliases'):
                     return
@@ -170,3 +171,105 @@ def process_creators_metadata(creators):
         c_source = creator.get('source')
         if c_id:
             update_person_async(c_id, c_source)
+
+
+def refresh_all_people():
+    """Uuendab kõigi isikute aliased Wikidatast/GND-st.
+
+    Deduplitseerib primary_name järgi, eelistab Wikidata ID-d GND-le.
+    Tagastab: {"updated": N, "errors": N, "total": N}
+    """
+    with PEOPLE_LOCK:
+        people_data = load_people_data()
+
+    # Deduplitseeri: primary_name → parim ID + source
+    seen = {}  # primary_name → (id, source)
+    for person_id, info in people_data.items():
+        primary = info.get('primary_name', '')
+        if not primary:
+            continue
+        ids = info.get('ids', {})
+        # Eelistame Wikidata ID-d
+        wikidata_id = ids.get('wikidata')
+        gnd_id = ids.get('gnd')
+        if primary not in seen:
+            if wikidata_id:
+                seen[primary] = (wikidata_id, 'wikidata')
+            elif gnd_id:
+                seen[primary] = (gnd_id, 'gnd')
+            else:
+                seen[primary] = (person_id, None)
+        else:
+            # Uuenda kui leiame parema ID (Wikidata > GND)
+            current_id, current_source = seen[primary]
+            if wikidata_id and current_source != 'wikidata':
+                seen[primary] = (wikidata_id, 'wikidata')
+
+    total = len(seen)
+    updated = 0
+    errors = 0
+
+    print(f"PEOPLE REFRESH: Alustan {total} isiku uuendamist...")
+
+    for primary_name, (best_id, source) in seen.items():
+        try:
+            new_info = None
+            if best_id.startswith('Q'):
+                new_info = fetch_wikidata_aliases(best_id)
+            elif source == 'gnd' or (len(best_id) > 5 and best_id.isdigit()):
+                new_info = fetch_gnd_aliases(best_id)
+
+            if new_info:
+                with PEOPLE_LOCK:
+                    people_data = load_people_data()
+                    # Uuenda peamine kirje
+                    people_data[best_id] = new_info
+                    # Uuenda cross-reference kirjed
+                    for key, val in new_info.get('ids', {}).items():
+                        if val and val != best_id:
+                            people_data[val] = new_info
+                    save_people_data(people_data)
+                updated += 1
+            else:
+                errors += 1
+        except Exception as e:
+            print(f"PEOPLE REFRESH: Viga isikul {best_id} ({primary_name}): {e}")
+            errors += 1
+
+        # Rate limit: 1 päring sekundis
+        time.sleep(1)
+
+    result = {"updated": updated, "errors": errors, "total": total}
+    print(f"PEOPLE REFRESH: Valmis — {updated} uuendatud, {errors} viga, {total} kokku")
+    return result
+
+
+# Lukk, et vältida mitut samaaegset refresh'i
+_refresh_running = threading.Lock()
+
+
+def refresh_all_people_safe():
+    """Käivitab refresh_all_people() kui teine ei jookse juba."""
+    if not _refresh_running.acquire(blocking=False):
+        print("PEOPLE REFRESH: Juba käimas, jätan vahele")
+        return None
+    try:
+        return refresh_all_people()
+    finally:
+        _refresh_running.release()
+
+
+PEOPLE_REFRESH_INTERVAL = 86400  # 24h
+PEOPLE_REFRESH_INITIAL_DELAY = 300  # 5 min pärast starti
+
+
+def people_refresh_loop():
+    """Daemon loop: uuendab people.json aliased iga 24h."""
+    time.sleep(PEOPLE_REFRESH_INITIAL_DELAY)
+    print("PEOPLE REFRESH: Taustalõim käivitunud")
+    while True:
+        try:
+            refresh_all_people_safe()
+        except Exception as e:
+            print(f"PEOPLE REFRESH LOOP: Viga: {e}")
+        time.sleep(PEOPLE_REFRESH_INTERVAL)

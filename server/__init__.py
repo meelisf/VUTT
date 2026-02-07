@@ -64,7 +64,8 @@ from .meilisearch_ops import (
 
 # Inimeste/autorite andmed
 from .people_ops import (
-    load_people_data, save_people_data, process_creators_metadata, update_person_async
+    load_people_data, save_people_data, process_creators_metadata, update_person_async,
+    refresh_all_people, refresh_all_people_safe, people_refresh_loop
 )
 
 # HTTP helperid
@@ -93,7 +94,8 @@ from .admin_handlers import (
     handle_admin_registrations_reject, handle_admin_users,
     handle_admin_users_update_role, handle_admin_users_delete,
     handle_invite_set_password,
-    handle_admin_git_failures, handle_admin_git_health
+    handle_admin_git_failures, handle_admin_git_health,
+    handle_admin_people_refresh
 )
 
 # Bulk operatsioonide HTTP handlerid

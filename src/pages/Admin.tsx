@@ -15,7 +15,9 @@ import {
   Mail,
   MessageSquare,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  BookUser,
+  RefreshCw
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -73,6 +75,11 @@ const Admin: React.FC = () => {
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  // Isikute register
+  const [peopleCount, setPeopleCount] = useState<number | null>(null);
+  const [peopleRefreshing, setPeopleRefreshing] = useState(false);
+  const [peopleMessage, setPeopleMessage] = useState<string | null>(null);
+
   // Kontrolli ligipääsu
   useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -91,6 +98,13 @@ const Admin: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'users' && authToken && user?.role === 'admin' && users.length === 0) {
       loadUsers();
+    }
+  }, [activeTab, authToken, user]);
+
+  // Lae isikute arv
+  useEffect(() => {
+    if (activeTab === 'users' && authToken && user?.role === 'admin' && peopleCount === null) {
+      loadPeopleCount();
     }
   }, [activeTab, authToken, user]);
 
@@ -288,6 +302,48 @@ const Admin: React.FC = () => {
       setUsersError(t('users.connectionError'));
     } finally {
       setRoleUpdating(null);
+    }
+  };
+
+  // =========================================================
+  // ISIKUTE REGISTER
+  // =========================================================
+
+  const loadPeopleCount = async () => {
+    try {
+      const response = await fetch(`${FILE_API_URL}/people-register`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        setPeopleCount(data.people?.length ?? 0);
+      }
+    } catch (e) {
+      console.error('Load people count error:', e);
+    }
+  };
+
+  const handlePeopleRefresh = async () => {
+    setPeopleRefreshing(true);
+    setPeopleMessage(null);
+
+    try {
+      const response = await fetch(`${FILE_API_URL}/admin/people-refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_token: authToken })
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'success') {
+        setPeopleMessage(t('people.refreshStarted'));
+      } else {
+        setPeopleMessage(data.message || t('people.refreshError'));
+      }
+    } catch (e) {
+      console.error('People refresh error:', e);
+      setPeopleMessage(t('people.refreshError'));
+    } finally {
+      setPeopleRefreshing(false);
     }
   };
 
@@ -525,6 +581,7 @@ const Admin: React.FC = () => {
         )}
 
         {activeTab === 'users' && (
+          <div className="space-y-8">
           <section>
             <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
               <Users size={20} className="text-primary-600" />
@@ -642,6 +699,43 @@ const Admin: React.FC = () => {
               </div>
             )}
           </section>
+
+          {/* Isikute register */}
+          <section>
+            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+              <BookUser size={20} className="text-primary-600" />
+              {t('people.title')}
+            </h2>
+            <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  {t('people.count')}: {peopleCount !== null ? (
+                    <span className="font-medium text-gray-900">{peopleCount}</span>
+                  ) : (
+                    <Loader2 size={14} className="inline animate-spin" />
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {peopleMessage && (
+                    <span className="text-sm text-green-600">{peopleMessage}</span>
+                  )}
+                  <button
+                    onClick={handlePeopleRefresh}
+                    disabled={peopleRefreshing}
+                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-primary-400 transition-colors flex items-center gap-2 text-sm"
+                  >
+                    {peopleRefreshing ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <RefreshCw size={16} />
+                    )}
+                    {t('people.refreshAliases')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+          </div>
         )}
 
       </main>

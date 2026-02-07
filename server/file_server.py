@@ -39,12 +39,13 @@ from server import (
     handle_admin_users_update_role, handle_admin_users_delete,
     handle_invite_set_password,
     handle_admin_git_failures, handle_admin_git_health,
+    handle_admin_people_refresh,
     # Bulk operatsioonide HTTP handlerid
     handle_bulk_tags, handle_bulk_genre, handle_bulk_collection,
     # Meilisearch
     sync_work_to_meilisearch, sync_work_to_meilisearch_async, metadata_watcher_loop,
     # People/Authors
-    load_people_data, process_creators_metadata,
+    load_people_data, process_creators_metadata, people_refresh_loop,
     # Utils
     metadata_lock,
     find_directory_by_id, build_work_id_cache
@@ -895,6 +896,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/admin/git-health':
             handle_admin_git_health(self)
 
+        elif self.path == '/admin/people-refresh':
+            handle_admin_people_refresh(self)
+            invalidate_cache()  # People cache invalideerumine
+
         elif self.path == '/invite/set-password':
             handle_invite_set_password(self)
 
@@ -977,6 +982,10 @@ if __name__ == '__main__':
     # Käivita metaandmete jälgija taustalõimena
     watcher_thread = threading.Thread(target=metadata_watcher_loop, daemon=True)
     watcher_thread.start()
+
+    # Käivita isikute aliaste perioodiline uuendamine (24h tsükkel, algab 5 min pärast starti)
+    people_thread = threading.Thread(target=people_refresh_loop, daemon=True)
+    people_thread.start()
 
     # Kasutame SafeThreadingHTTPServer mitme päringu samaaegseks teenindamiseks
     server = SafeThreadingHTTPServer(('0.0.0.0', PORT), RequestHandler)

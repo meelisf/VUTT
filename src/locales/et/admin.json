@@ -49,5 +49,12 @@
     "submitted": "Esitatud",
     "hasConflict": "Konflikt",
     "viewDetails": "Vaata detaile"
+  },
+  "people": {
+    "title": "Isikute register",
+    "count": "Registreeritud isikuid",
+    "refreshAliases": "Uuenda aliaseid",
+    "refreshStarted": "Uuendamine käivitatud",
+    "refreshError": "Uuendamise käivitamine ebaõnnestus"
   }
 }

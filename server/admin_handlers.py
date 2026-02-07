@@ -24,6 +24,7 @@ from .registration import (
 )
 from .auth import get_all_users, update_user_role, delete_user
 from .git_ops import get_git_failures, clear_git_failures, run_git_fsck
+from .people_ops import refresh_all_people_safe
 
 
 def handle_admin_registrations(handler):
@@ -325,4 +326,29 @@ def handle_admin_git_health(handler):
 
     except Exception as e:
         print(f"GIT HEALTH VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_people_refresh(handler):
+    """Käivitab isikute aliaste uuendamise taustalõimes (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        import threading
+        thread = threading.Thread(target=refresh_all_people_safe, daemon=True)
+        thread.start()
+
+        print(f"Admin '{user['username']}' käivitas isikute aliaste uuendamise")
+
+        send_json_response(handler, 200, {
+            "status": "success",
+            "message": "Uuendamine käivitatud"
+        })
+
+    except Exception as e:
+        print(f"PEOPLE REFRESH VIGA: {e}")
         handler.send_error(500, str(e))
