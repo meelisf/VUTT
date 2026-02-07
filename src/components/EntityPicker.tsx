@@ -93,6 +93,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             isLocal: true
           }));
 
+        // Ehita localIds kohe pärast localMatches'i, et kasutada registri filtreerimises
+        const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
+
         // 2. Otsi kohalikust isikute registrist (aliased)
         let registerMatches: (WikidataSearchResult & { isLocal: boolean; isRegister: boolean })[] = [];
         if ((type === 'person' || type === 'printer') && peopleRegister.length > 0) {
@@ -176,7 +179,6 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         }
 
         // Eemalda duplikaadid: kui kohalikul/registril on SAMA ID mis kaugel, jäta kohalik
-        const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
         const registerIds = new Set(registerMatches.map(m => m.id));
         const allLocalIds = new Set([...localIds, ...registerIds]);
         const filteredWikidata = wikidataMatches.filter(m => !allLocalIds.has(m.id));
