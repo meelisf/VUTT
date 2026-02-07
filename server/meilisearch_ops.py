@@ -69,6 +69,33 @@ def get_creator_aliases(creators, people_data):
     return aliases
 
 
+def normalize_creator(creator, people_data):
+    """Normaliseerib isiku nime ja ID people.json kaudu.
+
+    Tagastab (kanooniline_nimi, eelistatud_id) tuple.
+    Eelistab Wikidata Q-koodi teiste ID-de üle.
+    """
+    cid = creator.get('id')
+    name = creator.get('name', '')
+
+    if not cid or not people_data or cid not in people_data:
+        return name, cid
+
+    person = people_data[cid]
+    canonical_name = person.get('primary_name', name)
+
+    # Eelistatavalt Wikidata Q-kood
+    ids = person.get('ids', {})
+    wikidata_id = ids.get('wikidata')
+    if wikidata_id:
+        # Veendu et Q-prefiks on olemas
+        best_id = wikidata_id if wikidata_id.startswith('Q') else f'Q{wikidata_id}'
+    else:
+        best_id = cid
+
+    return canonical_name, best_id
+
+
 def load_collections():
     """Laeb kollektsioonide hierarhia."""
     if os.path.exists(COLLECTIONS_FILE):
@@ -366,9 +393,9 @@ def sync_work_to_meilisearch(dir_name):
             "languages": languages,
             "creators": creators,
             "authors_text": authors_text,
-            "author_names": [c['name'] for c in creators if c.get('name') and c.get('role') != 'respondens'],
-            "respondens_names": [c['name'] for c in creators if c.get('name') and c.get('role') == 'respondens'],
-            "creator_ids": [c.get('id') for c in creators if c.get('id')]
+            "author_names": [normalize_creator(c, people_data)[0] for c in creators if c.get('name') and c.get('role') != 'respondens'],
+            "respondens_names": [normalize_creator(c, people_data)[0] for c in creators if c.get('name') and c.get('role') == 'respondens'],
+            "creator_ids": [normalize_creator(c, people_data)[1] for c in creators if c.get('id')]
             # NB: pealkiri, koht, trükkal eemaldatud - kasuta title, location, publisher
         }
 

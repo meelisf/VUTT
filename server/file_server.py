@@ -122,6 +122,7 @@ def invalidate_cache():
     global _collections_cache, _vocabularies_cache, _cache_loaded_at
     global _suggestions_cache, _suggestions_cache_at
     global _people_aliases_cache, _people_aliases_cache_at
+    global _people_register_cache, _people_register_cache_at
     with _cache_lock:
         _collections_cache = None
         _vocabularies_cache = None
@@ -130,6 +131,8 @@ def invalidate_cache():
         _suggestions_cache_at = None
         _people_aliases_cache = None
         _people_aliases_cache_at = None
+        _people_register_cache = None
+        _people_register_cache_at = None
 
 
 # =========================================================
@@ -137,6 +140,8 @@ def invalidate_cache():
 # =========================================================
 _people_aliases_cache = None
 _people_aliases_cache_at = None
+_people_register_cache = None
+_people_register_cache_at = None
 PEOPLE_ALIASES_CACHE_TTL = 300  # 5 min
 
 
@@ -175,6 +180,58 @@ def get_cached_people_aliases():
             _people_aliases_cache_at = datetime.now()
             print(f"People aliases cache laetud: {len(_people_aliases_cache)} aliast")
         return _people_aliases_cache
+
+
+def _build_people_register():
+    """Ehitab deduplitseeritud isikute nimekirja people.json'ist.
+
+    Tagastab listi: [{ primary_name, aliases, ids }, ...]
+    Deduplitseerib primary_name järgi (sama isik võib olla mitme ID all).
+    """
+    people_data = load_people_data()
+    seen = {}  # primary_name -> index registris
+    register = []
+
+    for person_id, info in people_data.items():
+        primary = info.get('primary_name', '')
+        if not primary:
+            continue
+
+        if primary in seen:
+            # Lisa puuduvad aliased olemasolevale kirjele
+            existing = register[seen[primary]]
+            existing_aliases_set = set(existing['aliases'])
+            for alias in info.get('aliases', []):
+                if alias != primary and alias not in existing_aliases_set:
+                    existing['aliases'].append(alias)
+                    existing_aliases_set.add(alias)
+            # Lisa puuduvad ID-d
+            for id_type, id_val in info.get('ids', {}).items():
+                if id_val and id_type not in existing['ids']:
+                    existing['ids'][id_type] = id_val
+            continue
+
+        entry = {
+            'primary_name': primary,
+            'aliases': [a for a in info.get('aliases', []) if a != primary],
+            'ids': dict(info.get('ids', {}))
+        }
+        seen[primary] = len(register)
+        register.append(entry)
+
+    return register
+
+
+def get_cached_people_register():
+    """Tagastab cache'itud people register nimekirja."""
+    global _people_register_cache, _people_register_cache_at
+    with _cache_lock:
+        if _people_register_cache is None or _people_register_cache_at is None or \
+           (datetime.now() - _people_register_cache_at).total_seconds() > PEOPLE_ALIASES_CACHE_TTL:
+            _people_register_cache = _build_people_register()
+            _people_register_cache_at = datetime.now()
+            print(f"People register cache laetud: {len(_people_register_cache)} isikut")
+        return _people_register_cache
 
 
 def _build_suggestions(preferred_lang):
@@ -444,6 +501,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"PEOPLE ALIASES VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /people-register - deduplitseeritud isikute nimekiri (avalik, cache'itud)
+        elif self.path == '/people-register':
+            try:
+                register = get_cached_people_register()
+                send_json_response(self, 200, {"status": "success", "people": register})
+
+            except Exception as e:
+                print(f"PEOPLE REGISTER VIGA: {e}")
                 self.send_error(500, str(e))
 
         else:

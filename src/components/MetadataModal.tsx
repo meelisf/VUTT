@@ -5,7 +5,7 @@ import { getVocabularies, Vocabularies, Collections } from '../services/collecti
 import { Creator, CreatorRole, Page, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
-import EntityPicker from './EntityPicker';
+import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
 
 interface MetadataModalProps {
@@ -75,6 +75,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     types: SuggestionItem[];
     genres: SuggestionItem[];
   }>({ authors: [], tags: [], places: [], printers: [], types: [], genres: [] });
+  const [peopleRegister, setPeopleRegister] = useState<PeopleRegisterEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
@@ -115,8 +116,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     const vocabs = await getVocabularies();
     setVocabularies(vocabs);
 
-    // Lae soovitused
+    // Lae soovitused ja isikute register paralleelselt
     fetchSuggestions();
+    fetchPeopleRegister();
 
     // Lae serverist värskeim metadata
     await fetchServerMetadata();
@@ -143,6 +145,18 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       }
     } catch (e) {
       console.error("Viga soovituste laadimisel", e);
+    }
+  };
+
+  const fetchPeopleRegister = async () => {
+    try {
+      const response = await fetch(`${FILE_API_URL}/people-register`);
+      const data = await response.json();
+      if (data.status === 'success') {
+        setPeopleRegister(data.people || []);
+      }
+    } catch (e) {
+      console.error("Viga isikute registri laadimisel", e);
     }
   };
 
@@ -417,8 +431,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                         } : creator.name}
                         onChange={(val) => {
                           const newCreators = [...metaForm.creators];
-                          newCreators[index] = { 
-                            ...creator, 
+                          newCreators[index] = {
+                            ...creator,
                             name: val?.label || '',
                             id: val?.id || null,
                             source: val?.source || 'manual'
@@ -428,6 +442,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                         placeholder={t('metadata.creatorName', 'Nimi')}
                         lang={lang}
                         localSuggestions={suggestions.authors}
+                        peopleRegister={peopleRegister}
                       />
                     </div>
                     <select
@@ -500,6 +515,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   onChange={val => setMetaForm({ ...metaForm, publisher: val || '' })}
                   lang={lang}
                   localSuggestions={suggestions.printers}
+                  peopleRegister={peopleRegister}
                 />
               </div>
             </div>

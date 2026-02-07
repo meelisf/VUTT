@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked } from 'lucide-react';
+import { Search, Globe, User, Users, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { searchViaf, ViafSearchResult } from '../services/viafService';
 import { searchGnd, GndSearchResult } from '../services/gndService';
@@ -12,6 +12,12 @@ interface SuggestionItem {
   id: string | null;
 }
 
+export interface PeopleRegisterEntry {
+  primary_name: string;
+  aliases: string[];
+  ids: { wikidata?: string; gnd?: string; viaf?: string };
+}
+
 interface EntityPickerProps {
   label?: string;
   placeholder?: string;
@@ -21,6 +27,7 @@ interface EntityPickerProps {
   className?: string;
   lang?: string; // Current UI language
   localSuggestions?: SuggestionItem[]; // List of existing values from database
+  peopleRegister?: PeopleRegisterEntry[]; // Kohalik isikute register aliaste otsinguks
 }
 
 const EntityPicker: React.FC<EntityPickerProps> = ({
@@ -31,10 +38,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   onChange,
   className = '',
   lang = 'et',
-  localSuggestions = []
+  localSuggestions = [],
+  peopleRegister = []
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean; isViaf?: boolean; isGnd?: boolean })[]>([]);
+  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean; isViaf?: boolean; isGnd?: boolean; isRegister?: boolean })[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -85,7 +93,47 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             isLocal: true
           }));
 
-        // 2. Otsi Wikidatast
+        // 2. Otsi kohalikust isikute registrist (aliased)
+        let registerMatches: (WikidataSearchResult & { isLocal: boolean; isRegister: boolean })[] = [];
+        if ((type === 'person' || type === 'printer') && peopleRegister.length > 0) {
+          const registerText = lang === 'en' ? 'People register' : 'Isikute register';
+          const aliasText = lang === 'en' ? 'alias' : 'alias';
+          const seenRegisterIds = new Set<string>();
+
+          for (const person of peopleRegister) {
+            // Otsi nii primary_name kui aliaste hulgast
+            const nameMatch = person.primary_name.toLowerCase().includes(normalizedInput);
+            const matchingAlias = person.aliases.find(a => a.toLowerCase().includes(normalizedInput));
+
+            if (nameMatch || matchingAlias) {
+              // ID eelistus: wikidata > gnd > viaf
+              const bestId = person.ids.wikidata ? `Q${person.ids.wikidata.replace(/^Q/, '')}` :
+                             person.ids.gnd ? `GND:${person.ids.gnd}` :
+                             person.ids.viaf ? `VIAF:${person.ids.viaf}` : null;
+              if (!bestId || seenRegisterIds.has(bestId)) continue;
+              seenRegisterIds.add(bestId);
+
+              // Ära lisa kui sama ID juba kohalikes soovitustes
+              if (localIds.has(bestId)) continue;
+
+              const desc = matchingAlias && !nameMatch
+                ? `${registerText} (${aliasText}: ${matchingAlias})`
+                : `${registerText}`;
+
+              registerMatches.push({
+                id: bestId,
+                label: person.primary_name,
+                description: desc,
+                url: '',
+                isLocal: true,
+                isRegister: true
+              });
+            }
+          }
+          registerMatches = registerMatches.slice(0, 5);
+        }
+
+        // 3. Otsi Wikidatast
         let wikidataMatches: WikidataSearchResult[] = [];
         try {
            wikidataMatches = await searchWikidata(inputValue);
@@ -93,7 +141,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
            console.error("Wikidata search error", e);
         }
 
-        // 3. Otsi GND-st ja VIAF-ist (ainult isikute puhul)
+        // 4. Otsi GND-st ja VIAF-ist (ainult isikute puhul)
         let gndMatches: (WikidataSearchResult & { isGnd: boolean })[] = [];
         let viafMatches: (WikidataSearchResult & { isViaf: boolean })[] = [];
 
@@ -127,12 +175,16 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           }
         }
 
-        // Eemalda duplikaadid: kui kohalikul on SAMA ID mis kaugel, jäta kohalik
+        // Eemalda duplikaadid: kui kohalikul/registril on SAMA ID mis kaugel, jäta kohalik
         const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
-        const filteredWikidata = wikidataMatches.filter(m => !localIds.has(m.id));
+        const registerIds = new Set(registerMatches.map(m => m.id));
+        const allLocalIds = new Set([...localIds, ...registerIds]);
+        const filteredWikidata = wikidataMatches.filter(m => !allLocalIds.has(m.id));
+        const filteredGnd = gndMatches.filter(m => !allLocalIds.has(m.id));
+        const filteredViaf = viafMatches.filter(m => !allLocalIds.has(m.id));
 
-        // Järjekord: kohalik -> GND -> VIAF -> Wikidata
-        setSuggestions([...localMatches, ...gndMatches, ...viafMatches, ...filteredWikidata]);
+        // Järjekord: kohalik -> register -> GND -> VIAF -> Wikidata
+        setSuggestions([...localMatches, ...registerMatches, ...filteredGnd, ...filteredViaf, ...filteredWikidata]);
         setIsLoading(false);
         setSelectedIndex(0);
       } else {
@@ -140,7 +192,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [inputValue, showSuggestions, value, localSuggestions]);
+  }, [inputValue, showSuggestions, value, localSuggestions, peopleRegister]);
 
   const handleSelect = async (result: WikidataSearchResult & { isViaf?: boolean; isGnd?: boolean }) => {
     justSelectedRef.current = true; // Märgi, et valiti soovitus
@@ -333,6 +385,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           <div className="overflow-y-auto flex-1">
             {suggestions.map((result, idx) => {
               const isLocal = result.isLocal;
+              const isRegister = result.isRegister;
               const isGnd = result.isGnd || result.id.startsWith('GND:');
               const isViaf = result.isViaf || result.id.startsWith('VIAF:');
               return (
@@ -346,7 +399,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    {isLocal && <Database size={12} className="text-amber-600" aria-label={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
+                    {isRegister && <Users size={12} className="text-teal-600" aria-label={lang === 'en' ? 'People register' : 'Isikute register'} />}
+                    {isLocal && !isRegister && <Database size={12} className="text-amber-600" aria-label={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
                     {isGnd && <BookMarked size={12} className="text-orange-600" aria-label="GND" />}
                     {isViaf && <Library size={12} className="text-purple-600" aria-label="VIAF" />}
                     <span className="font-medium text-gray-900 text-sm">{result.label}</span>
@@ -354,7 +408,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                   {!isLocal && <span className={`text-[10px] font-mono px-1 rounded ${isGnd ? 'text-orange-500 bg-orange-50' : isViaf ? 'text-purple-500 bg-purple-50' : 'text-gray-400 bg-gray-100'}`}>{result.id}</span>}
                 </div>
                 {result.description && (
-                  <span className={`text-xs line-clamp-1 ${isLocal ? 'text-amber-600/80 italic' : isGnd ? 'text-orange-500/80' : isViaf ? 'text-purple-500/80' : 'text-gray-500'}`}>{result.description}</span>
+                  <span className={`text-xs line-clamp-1 ${isRegister ? 'text-teal-600/80 italic' : isLocal ? 'text-amber-600/80 italic' : isGnd ? 'text-orange-500/80' : isViaf ? 'text-purple-500/80' : 'text-gray-500'}`}>{result.description}</span>
                 )}
               </button>
             )})}
