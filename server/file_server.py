@@ -51,6 +51,8 @@ from server import (
     find_directory_by_id, build_work_id_cache
 )
 
+from server.metadata_handler import handle_metadata_request
+
 # =========================================================
 # CACHE: Collections, Vocabularies ja Suggestions
 # Loetakse serveri stardil, taaslaaditakse perioodiliselt
@@ -512,6 +514,15 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"PEOPLE REGISTER VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /meta/work/{id} - dünaamilised metasildid robotitele
+        elif self.path.startswith('/meta/work/'):
+            try:
+                work_id = self.path.split('/meta/work/')[1].split('?')[0]
+                handle_metadata_request(self, work_id)
+            except Exception as e:
+                print(f"METADATA HANDLER VIGA: {e}")
                 self.send_error(500, str(e))
 
         else:
