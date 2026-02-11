@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
+import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
-import Workspace from './pages/Workspace';
-import Statistics from './pages/Statistics';
-import SearchPage from './pages/SearchPage';
-// Kasutajahalduse lehed
-import Register from './pages/Register';
-import SetPassword from './pages/SetPassword';
-import Admin from './pages/Admin';
-import Review from './pages/Review';
-import NotFound from './pages/NotFound';
+
+// Lazy-loaded lehed (laetakse ainult vajaduse korral)
+const Workspace = lazy(() => import('./pages/Workspace'));
+const Statistics = lazy(() => import('./pages/Statistics'));
+const SearchPage = lazy(() => import('./pages/SearchPage'));
+const Register = lazy(() => import('./pages/Register'));
+const SetPassword = lazy(() => import('./pages/SetPassword'));
+const Admin = lazy(() => import('./pages/Admin'));
+const Review = lazy(() => import('./pages/Review'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+
+// Suspense fallback laadimise ajaks
+const PageLoader = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
+  </div>
+);
+
+// Suspense wrapper lazy-loaded lehtede jaoks
+const Lazy = ({ children }: { children: React.ReactNode }) => (
+  <Suspense fallback={<PageLoader />}>{children}</Suspense>
+);
 
 const router = createBrowserRouter([
   {
@@ -20,37 +34,37 @@ const router = createBrowserRouter([
   },
   {
     path: "/search",
-    element: <SearchPage />,
+    element: <Lazy><SearchPage /></Lazy>,
   },
   {
     path: "/stats",
-    element: <Statistics />,
+    element: <Lazy><Statistics /></Lazy>,
   },
   {
     path: "/work/:workId/:pageNum?",
-    element: <Workspace />,
+    element: <Lazy><Workspace /></Lazy>,
   },
   // Kasutajahalduse route'id
   {
     path: "/register",
-    element: <Register />,
+    element: <Lazy><Register /></Lazy>,
   },
   {
     path: "/set-password",
-    element: <SetPassword />,
+    element: <Lazy><SetPassword /></Lazy>,
   },
   {
     path: "/admin",
-    element: <Admin />,
+    element: <Lazy><Admin /></Lazy>,
   },
   {
     path: "/review",
-    element: <Review />,
+    element: <Lazy><Review /></Lazy>,
   },
   // 404 - catch-all marsruut (peab olema viimane)
   {
     path: "*",
-    element: <NotFound />,
+    element: <Lazy><NotFound /></Lazy>,
   },
 ]);
 
