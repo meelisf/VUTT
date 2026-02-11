@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -80,6 +80,14 @@ const Admin: React.FC = () => {
   const [peopleCount, setPeopleCount] = useState<number | null>(null);
   const [peopleRefreshing, setPeopleRefreshing] = useState(false);
   const [peopleMessage, setPeopleMessage] = useState<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Puhasta polling timer unmount'il
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
 
   // Kontrolli ligipääsu
   useEffect(() => {
@@ -343,14 +351,14 @@ const Admin: React.FC = () => {
           return;
         }
         // Veel käib — polli uuesti 3s pärast
-        setTimeout(poll, 3000);
+        pollTimerRef.current = setTimeout(poll, 3000);
       } catch {
         setPeopleMessage(t('people.refreshError'));
         setPeopleRefreshing(false);
       }
     };
     // Esimene poll 2s pärast käivitust
-    setTimeout(poll, 2000);
+    pollTimerRef.current = setTimeout(poll, 2000);
   };
 
   const handlePeopleRefresh = async () => {

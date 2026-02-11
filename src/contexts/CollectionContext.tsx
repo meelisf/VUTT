@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { getCollections, Collections, Collection } from '../services/collectionService';
 
 interface CollectionContextType {
@@ -46,24 +46,24 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
   }, []);
 
   // Salvesta valik localStorage'i
-  const setSelectedCollection = (id: string | null) => {
+  const setSelectedCollection = useCallback((id: string | null) => {
     setSelectedCollectionState(id);
     if (id) {
       localStorage.setItem(STORAGE_KEY, id);
     } else {
       localStorage.removeItem(STORAGE_KEY);
     }
-  };
+  }, []);
 
   // Tagasta kollektsiooni nimi keele järgi
-  const getCollectionName = (id: string, lang: 'et' | 'en' = 'et'): string => {
+  const getCollectionName = useCallback((id: string, lang: 'et' | 'en' = 'et'): string => {
     const collection = collections[id];
     if (!collection) return id;
     return collection.name[lang] || collection.name.et || id;
-  };
+  }, [collections]);
 
   // Tagasta kollektsiooni hierarhia nimede massiivina
-  const getCollectionPath = (id: string, lang: 'et' | 'en' = 'et'): string[] => {
+  const getCollectionPath = useCallback((id: string, lang: 'et' | 'en' = 'et'): string[] => {
     const path: string[] = [];
     let currentId: string | undefined = id;
 
@@ -78,19 +78,19 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
     }
 
     return path;
-  };
+  }, [collections]);
+
+  const value = useMemo(() => ({
+    selectedCollection,
+    setSelectedCollection,
+    collections,
+    isLoading,
+    getCollectionName,
+    getCollectionPath
+  }), [selectedCollection, setSelectedCollection, collections, isLoading, getCollectionName, getCollectionPath]);
 
   return (
-    <CollectionContext.Provider
-      value={{
-        selectedCollection,
-        setSelectedCollection,
-        collections,
-        isLoading,
-        getCollectionName,
-        getCollectionPath
-      }}
-    >
+    <CollectionContext.Provider value={value}>
       {children}
     </CollectionContext.Provider>
   );

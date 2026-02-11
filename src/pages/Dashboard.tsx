@@ -73,8 +73,9 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
 
-  // Laadime "Projektist" HTML faili
+  // Laadime "Projektist" HTML faili alles modaali avamisel (lazy load)
   useEffect(() => {
+    if (!showAboutModal || aboutHtml) return;
     const loadAbout = async () => {
       try {
         const lang = i18n.language.split('-')[0];
@@ -93,7 +94,7 @@ const Dashboard: React.FC = () => {
       }
     };
     loadAbout();
-  }, [i18n.language]);
+  }, [showAboutModal]);
 
   // Sünkroniseeri kollektsiooni URL parameeter kontekstiga
   useEffect(() => {

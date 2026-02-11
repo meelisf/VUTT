@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
@@ -69,7 +69,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
-  const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/login`, {
         method: 'POST',
@@ -93,17 +93,21 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login error:', e);
       return { success: false, error: 'Serveriga ühendamine ebaõnnestus' };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
     setAuthToken(null);
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user, authToken, login, logout, isLoading
+  }), [user, authToken, login, logout, isLoading]);
 
   return (
-    <UserContext.Provider value={{ user, authToken, login, logout, isLoading }}>
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );
