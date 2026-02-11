@@ -5,15 +5,27 @@ import { CollectionProvider } from './contexts/CollectionContext';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 
+// Lazy import koos automaatse uuesti laadimisega, kui chunk on pärast uut buildi muutunud
+function lazyRetry(importFn: () => Promise<any>) {
+  return lazy(() =>
+    importFn().catch(() => {
+      // Chunk puudub (uus build) → lae leht uuesti, et saada uus index.html
+      window.location.reload();
+      // Tagasta tühi promise, et vältida React viga enne reload'i
+      return new Promise(() => {});
+    })
+  );
+}
+
 // Lazy-loaded lehed (laetakse ainult vajaduse korral)
-const Workspace = lazy(() => import('./pages/Workspace'));
-const Statistics = lazy(() => import('./pages/Statistics'));
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const Register = lazy(() => import('./pages/Register'));
-const SetPassword = lazy(() => import('./pages/SetPassword'));
-const Admin = lazy(() => import('./pages/Admin'));
-const Review = lazy(() => import('./pages/Review'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+const Workspace = lazyRetry(() => import('./pages/Workspace'));
+const Statistics = lazyRetry(() => import('./pages/Statistics'));
+const SearchPage = lazyRetry(() => import('./pages/SearchPage'));
+const Register = lazyRetry(() => import('./pages/Register'));
+const SetPassword = lazyRetry(() => import('./pages/SetPassword'));
+const Admin = lazyRetry(() => import('./pages/Admin'));
+const Review = lazyRetry(() => import('./pages/Review'));
+const NotFound = lazyRetry(() => import('./pages/NotFound'));
 
 // Suspense fallback laadimise ajaks
 const PageLoader = () => (
