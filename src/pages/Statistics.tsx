@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface StatusCount {
@@ -20,7 +21,7 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t } = useTranslation(['statistics', 'common']);
-  const { selectedCollection, getCollectionName } = useCollection();
+  const { selectedCollection, getCollectionName, collections } = useCollection();
 
   const [isLoading, setIsLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(0);
@@ -121,15 +122,18 @@ const Statistics: React.FC = () => {
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
 
         {/* Collection Filter Indicator */}
-        {selectedCollection && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
-            <Library className="text-amber-600" size={20} />
-            <div>
-              <span className="text-sm text-amber-700">{t('common:collections.activeFilter')}:</span>
-              <span className="ml-2 font-bold text-amber-900">{getCollectionName(selectedCollection)}</span>
+        {selectedCollection && (() => {
+          const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
+          return (
+            <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-4 flex items-center gap-3`}>
+              <Library className={colorClasses.text} size={20} />
+              <div>
+                <span className={`text-sm ${colorClasses.text}`}>{t('common:collections.activeFilter')}:</span>
+                <span className={`ml-2 font-bold ${colorClasses.text}`}>{getCollectionName(selectedCollection)}</span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
