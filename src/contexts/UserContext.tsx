@@ -28,11 +28,15 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Tokeni verifitseerimine serverist
   const verifyToken = async (token: string): Promise<User | null> => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(`${FILE_API_URL}/verify-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await response.json();
       if (data.status === 'success' && data.valid && data.user) {
         return data.user;
