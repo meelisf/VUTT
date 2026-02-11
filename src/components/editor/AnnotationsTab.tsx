@@ -8,6 +8,7 @@ import { getEntityUrl } from '../../utils/entityUrl';
 import { getWorkFullText, getAllTags } from '../../services/meiliService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 
@@ -53,7 +54,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     const fetchTags = async () => {
       if (!authToken) return;
       try {
-        const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
+        const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ auth_token: authToken, lang })

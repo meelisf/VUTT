@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Page } from '../../types';
 import { FILE_API_URL } from '../../config';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
 // Git ajaloo kirje tüüp
 interface GitHistoryEntry {
@@ -89,7 +90,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const imagePath = page.image_url.split('/').pop() || '';
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
-      const response = await fetch(`${FILE_API_URL}/git-history`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/git-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,7 +136,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
       const filepath = `${page.original_path}/${txtFilename}`;
 
-      const response = await fetch(`${FILE_API_URL}/commit-diff`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -301,7 +302,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       const imagePath = page.image_url.split('/').pop() || '';
       const txtFilename = imagePath.replace(/\.(jpg|jpeg|png|gif)$/i, '.txt');
 
-      const response = await fetch(`${FILE_API_URL}/git-restore`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,7 +310,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
           file_name: txtFilename,
           commit_hash: entry.full_hash,
           auth_token: authToken
-        })
+        }),
+        timeout: 30000
       });
 
       const data = await response.json();

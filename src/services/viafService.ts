@@ -3,6 +3,8 @@
  * Kasutab SRU otsingut, mis leiab isikuid kõikide nimekujude järgi.
  */
 
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
 export interface ViafSearchResult {
   id: string;        // "VIAF:12345" formaadis
   viafId: string;    // Ainult number "12345"
@@ -60,10 +62,11 @@ export async function searchViaf(query: string): Promise<ViafSearchResult[]> {
   if (!query || query.length < 2) return [];
 
   try {
-    const response = await fetch(`${VIAF_SEARCH_URL}?query=${encodeURIComponent(query)}`, {
+    const response = await fetchWithTimeout(`${VIAF_SEARCH_URL}?query=${encodeURIComponent(query)}`, {
       headers: {
         'Accept': 'application/json'
-      }
+      },
+      timeout: 15000
     });
 
     if (!response.ok) throw new Error('VIAF search failed');

@@ -4,6 +4,7 @@ import { BookOpen, X, Loader2, Check, Trash2 } from 'lucide-react';
 import EntityPicker from './EntityPicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 
@@ -44,7 +45,7 @@ const BulkGenrePicker: React.FC<BulkGenrePickerProps> = ({
     setIsLoadingSuggestions(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auth_token: token, lang })

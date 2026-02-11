@@ -8,6 +8,8 @@
  * - Sisaldab Wikidata linke
  */
 
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
 export interface GndSearchResult {
   id: string;        // "GND:1202439284" formaadis
   gndId: string;     // Ainult number "1202439284"
@@ -34,7 +36,7 @@ export async function searchGnd(query: string): Promise<GndSearchResult[]> {
       size: '5'
     });
 
-    const response = await fetch(`${GND_SEARCH_URL}?${params.toString()}`);
+    const response = await fetchWithTimeout(`${GND_SEARCH_URL}?${params.toString()}`, { timeout: 15000 });
     if (!response.ok) throw new Error('GND search failed');
 
     const data = await response.json();

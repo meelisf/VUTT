@@ -2,6 +2,8 @@
  * Service for interacting with Wikidata API to find and retrieve linked data entities.
  */
 
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
 export interface WikidataSearchResult {
   id: string;
   label: string;
@@ -30,7 +32,7 @@ export async function searchWikidata(query: string, lang: string = 'et'): Promis
   });
 
   try {
-    const response = await fetch(`${WIKIDATA_API_URL}?${params.toString()}`);
+    const response = await fetchWithTimeout(`${WIKIDATA_API_URL}?${params.toString()}`, { timeout: 15000 });
     if (!response.ok) throw new Error('Wikidata search failed');
     
     const data = await response.json();
@@ -64,7 +66,7 @@ export async function getEntityLabels(id: string): Promise<Record<string, string
   });
 
   try {
-    const response = await fetch(`${WIKIDATA_API_URL}?${params.toString()}`);
+    const response = await fetchWithTimeout(`${WIKIDATA_API_URL}?${params.toString()}`, { timeout: 15000 });
     if (!response.ok) throw new Error('Wikidata fetch failed');
     
     const data = await response.json();

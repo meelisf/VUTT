@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 const Register: React.FC = () => {
   const { t } = useTranslation(['register', 'common']);
@@ -53,7 +54,7 @@ const Register: React.FC = () => {
     setErrorMessage('');
 
     try {
-      const response = await fetch(`${FILE_API_URL}/register`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

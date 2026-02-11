@@ -19,6 +19,7 @@
 import { MeiliSearch } from 'meilisearch';
 import { Page, Work, PageStatus, WorkStatus, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX, IMAGE_BASE_URL, FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 // Initialize Meilisearch client
 const client = new MeiliSearch({
@@ -801,10 +802,11 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       payload.auth_token = auth.token;
     }
 
-    const response = await fetch(`${FILE_API_URL}/save`, {
+    const response = await fetchWithTimeout(`${FILE_API_URL}/save`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      timeout: 30000
     });
 
     if (!response.ok) {
@@ -849,7 +851,7 @@ export const checkPendingEdits = async (
   authToken: string
 ): Promise<PendingEditInfo> => {
   try {
-    const response = await fetch(`${FILE_API_URL}/pending-edits/check`, {
+    const response = await fetchWithTimeout(`${FILE_API_URL}/pending-edits/check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -885,7 +887,7 @@ export const savePageAsPending = async (
   authToken: string
 ): Promise<{ success: boolean; editId?: string; hasOtherPending?: boolean; error?: string }> => {
   try {
-    const response = await fetch(`${FILE_API_URL}/save-pending`, {
+    const response = await fetchWithTimeout(`${FILE_API_URL}/save-pending`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -894,7 +896,8 @@ export const savePageAsPending = async (
         lehekylje_number: lehekyljeNumber,
         original_text: originalText,
         new_text: newText
-      })
+      }),
+      timeout: 30000
     });
 
     const data = await response.json();

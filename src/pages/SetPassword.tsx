@@ -4,6 +4,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Key, Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface TokenInfo {
   valid: boolean;
@@ -42,7 +43,7 @@ const SetPassword: React.FC = () => {
       }
 
       try {
-        const response = await fetch(`${FILE_API_URL}/invite/${token}`);
+        const response = await fetchWithTimeout(`${FILE_API_URL}/invite/${token}`);
         const data = await response.json();
 
         if (data.status === 'success' && data.valid) {
@@ -107,7 +108,7 @@ const SetPassword: React.FC = () => {
     setErrorMessage('');
 
     try {
-      const response = await fetch(`${FILE_API_URL}/invite/set-password`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/invite/set-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password })

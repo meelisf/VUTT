@@ -30,6 +30,7 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface RecentCommit {
   commit_hash: string;
@@ -98,7 +99,7 @@ const Review: React.FC = () => {
         url += `&user=${encodeURIComponent(selectedUser)}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url);
       const data = await response.json();
 
       if (data.status === 'success') {
@@ -137,7 +138,7 @@ const Review: React.FC = () => {
     setLoadingDiff(key);
     
     try {
-      const response = await fetch(`${FILE_API_URL}/commit-diff`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

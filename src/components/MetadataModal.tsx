@@ -7,6 +7,7 @@ import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -126,7 +127,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
   const fetchSuggestions = async () => {
     try {
-      const response = await fetch(`${FILE_API_URL}/get-metadata-suggestions`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auth_token: authToken, lang })
@@ -150,7 +151,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
   const fetchPeopleRegister = async () => {
     try {
-      const response = await fetch(`${FILE_API_URL}/people-register`);
+      const response = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
       const data = await response.json();
       if (data.status === 'success') {
         setPeopleRegister(data.people || []);
@@ -167,7 +168,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     }
 
     try {
-      const response = await fetch(`${FILE_API_URL}/get-work-metadata`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/get-work-metadata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -271,10 +272,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         payload.original_path = page.originaal_kataloog;
       }
 
-      const response = await fetch(`${FILE_API_URL}/update-work-metadata`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/update-work-metadata`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        timeout: 30000
       });
 
       const data = await response.json();

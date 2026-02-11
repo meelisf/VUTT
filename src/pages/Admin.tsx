@@ -22,6 +22,7 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface Registration {
   id: string;
@@ -113,7 +114,7 @@ const Admin: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/registrations`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auth_token: authToken })
@@ -139,7 +140,7 @@ const Admin: React.FC = () => {
     setInviteResult(null);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/registrations/approve`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -176,7 +177,7 @@ const Admin: React.FC = () => {
     setProcessingId(regId);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/registrations/reject`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -218,7 +219,7 @@ const Admin: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/users`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auth_token: authToken })
@@ -244,7 +245,7 @@ const Admin: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/users/update-role`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/update-role`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -280,7 +281,7 @@ const Admin: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/users/delete`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -311,7 +312,7 @@ const Admin: React.FC = () => {
 
   const loadPeopleCount = async () => {
     try {
-      const response = await fetch(`${FILE_API_URL}/people-register`);
+      const response = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
       const data = await response.json();
       if (data.status === 'success') {
         setPeopleCount(data.people?.length ?? 0);
@@ -324,7 +325,7 @@ const Admin: React.FC = () => {
   const pollRefreshStatus = async () => {
     const poll = async () => {
       try {
-        const response = await fetch(`${FILE_API_URL}/admin/people-refresh-status`, {
+        const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh-status`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ auth_token: authToken })
@@ -357,10 +358,11 @@ const Admin: React.FC = () => {
     setPeopleMessage(t('people.refreshStarted'));
 
     try {
-      const response = await fetch(`${FILE_API_URL}/admin/people-refresh`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
+        body: JSON.stringify({ auth_token: authToken }),
+        timeout: 30000
       });
 
       const data = await response.json();

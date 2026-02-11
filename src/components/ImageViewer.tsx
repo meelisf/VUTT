@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ZoomIn, ZoomOut, RotateCcw, Move, Download } from 'lucide-react';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface ImageViewerProps {
   src: string;
@@ -33,7 +34,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
   const handleDownload = async () => {
     if (!src) return;
     try {
-      const response = await fetch(src);
+      const response = await fetchWithTimeout(src, { timeout: 30000 });
       if (!response.ok) throw new Error("Fetch failed");
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);

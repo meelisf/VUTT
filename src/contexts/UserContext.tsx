@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface User {
   username: string;
@@ -28,15 +29,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Tokeni verifitseerimine serverist
   const verifyToken = async (token: string): Promise<User | null> => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      const response = await fetch(`${FILE_API_URL}/verify-token`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/verify-token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
-        signal: controller.signal
+        timeout: 5000
       });
-      clearTimeout(timeoutId);
       const data = await response.json();
       if (data.status === 'success' && data.valid && data.user) {
         return data.user;
@@ -73,7 +71,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const login = async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const response = await fetch(`${FILE_API_URL}/login`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

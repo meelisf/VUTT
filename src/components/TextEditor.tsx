@@ -7,6 +7,7 @@ import { Save, Loader2, Edit3, ChevronRight, Eye, X } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 // Erimärgi tüüp
 interface SpecialCharacter {
@@ -108,7 +109,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   useEffect(() => {
     const loadSpecialCharacters = async () => {
       try {
-        const response = await fetch('/special_characters.json');
+        const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });
         if (response.ok) {
           const data = await response.json();
           setSpecialCharacters(data.characters || []);
@@ -125,7 +126,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const loadTranscriptionGuide = async () => {
       try {
         const fileSuffix = lang === 'en' ? '_en' : '';
-        const response = await fetch(`/transcription_guide${fileSuffix}.html`);
+        const response = await fetchWithTimeout(`/transcription_guide${fileSuffix}.html`, { timeout: 5000 });
         if (response.ok) {
           const html = await response.text();
           const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);

@@ -15,6 +15,7 @@ import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -78,7 +79,7 @@ const Dashboard: React.FC = () => {
       try {
         const lang = i18n.language.split('-')[0];
         const fileSuffix = lang === 'en' ? '_en' : '';
-        const response = await fetch(`/about${fileSuffix}.html`);
+        const response = await fetchWithTimeout(`/about${fileSuffix}.html`, { timeout: 5000 });
         if (response.ok) {
           const html = await response.text();
           const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
@@ -500,14 +501,15 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetch(`${FILE_API_URL}/works/bulk-collection`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           collection: collectionId
-        })
+        }),
+        timeout: 30000
       });
 
       const result = await response.json();
@@ -536,7 +538,7 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetch(`${FILE_API_URL}/works/bulk-tags`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -544,7 +546,8 @@ const Dashboard: React.FC = () => {
           work_ids: Array.from(selectedWorkIds),
           tags,
           mode
-        })
+        }),
+        timeout: 30000
       });
 
       const result = await response.json();
@@ -571,14 +574,15 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetch(`${FILE_API_URL}/works/bulk-genre`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           genre
-        })
+        }),
+        timeout: 30000
       });
 
       const result = await response.json();

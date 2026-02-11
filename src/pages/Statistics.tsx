@@ -5,6 +5,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface StatusCount {
   name: string;
@@ -45,7 +46,7 @@ const Statistics: React.FC = () => {
           filter.push(`collections_hierarchy = "${selectedCollection}"`);
         }
 
-        const statusResponse = await fetch(`${MEILI_HOST}/indexes/teosed/search`, {
+        const statusResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
