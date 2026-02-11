@@ -8,9 +8,11 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose?: () => void;
   allowClose?: boolean;
+  /** Teade, mis kuvatakse vormi kohal (nt sessioon aegunud) */
+  message?: string;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = true }) => {
+const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = true, message }) => {
   const { t } = useTranslation(['auth', 'common']);
   const { login } = useUser();
   const [username, setUsername] = useState('');
@@ -52,6 +54,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, allowClose = t
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {message && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
+              <AlertCircle size={18} className="text-amber-600 flex-shrink-0" />
+              {message}
+            </div>
+          )}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
               <AlertCircle size={18} />

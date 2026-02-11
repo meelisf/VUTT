@@ -37,7 +37,7 @@ const Header: React.FC<HeaderProps> = ({
   children
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user, logout } = useUser();
+  const { user, logout, sessionExpired, clearSessionExpired } = useUser();
   const { selectedCollection, getCollectionName, collections } = useCollection();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -181,7 +181,14 @@ const Header: React.FC<HeaderProps> = ({
       {/* Valikuline lisa-sisu (nt otsinguväli) */}
       {children}
 
-      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
+      <LoginModal
+        isOpen={showLoginModal || sessionExpired}
+        onClose={() => {
+          setShowLoginModal(false);
+          clearSessionExpired();
+        }}
+        message={sessionExpired ? t('auth:sessionExpired') : undefined}
+      />
       <CollectionPicker isOpen={showCollectionPicker} onClose={() => setShowCollectionPicker(false)} />
     </>
   );

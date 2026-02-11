@@ -812,7 +812,9 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       if (errorData.message?.includes('Autentimine') || response.status === 401) {
-        throw new Error('Autentimine ebaõnnestus. Palun logi välja ja uuesti sisse.');
+        const err = new Error('AUTH_EXPIRED');
+        (err as any).status = 401;
+        throw err;
       }
       throw new Error(`File server error: ${response.status}`);
     }
@@ -824,6 +826,10 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
     }
     return true;
   } catch (e: any) {
+    // Lase 401 vead läbi — Workspace käsitleb neid
+    if (e.message === 'AUTH_EXPIRED' || e.status === 401) {
+      throw e;
+    }
     console.error("Failed to save to file system:", e);
     alert(`Hoiatus: ${e.message || 'Failisüsteemi kirjutamine ebaõnnestus.'}`);
     return false;

@@ -11,14 +11,15 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, Settings, History, Copy, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, LogIn, Settings, History, Copy, Check } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
+import LoginModal from '../components/LoginModal';
 import { FILE_API_URL } from '../config';
 import { getLabel } from '../utils/metadataUtils';
 
 const Workspace: React.FC = () => {
-  const { t, i18n } = useTranslation(['workspace', 'common']);
-  const { user, authToken, logout } = useUser();
+  const { t, i18n } = useTranslation(['workspace', 'common', 'auth']);
+  const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
   const { collections } = useCollection();
   const lang = (i18n.language as 'et' | 'en') || 'et';
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
@@ -61,8 +62,9 @@ const Workspace: React.FC = () => {
   // Salvestamata muudatuste kinnitusdialoogi olek
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
 
-  // Kasutaja menüü olek
+  // Kasutaja menüü ja login modaali olek
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -228,10 +230,18 @@ const Workspace: React.FC = () => {
 
     // Toimetaja/admin muudatused salvestatakse otse
     const pageWithStatus = { ...updatedPage, status: currentStatus || updatedPage.status };
-    const savedPage = await savePage(pageWithStatus, t('history.action.saved_changes'), user.name, { token: authToken });
-    setPage(savedPage);
-    setCurrentStatus(savedPage.status);
-    setEditorChanges(false);
+    try {
+      const savedPage = await savePage(pageWithStatus, t('history.action.saved_changes'), user.name, { token: authToken });
+      setPage(savedPage);
+      setCurrentStatus(savedPage.status);
+      setEditorChanges(false);
+    } catch (e: any) {
+      if (e.message === 'AUTH_EXPIRED' || e.status === 401) {
+        // Token aegunud salvestamise ajal — ava LoginModal
+        logout();
+        setShowLoginModal(true);
+      }
+    }
   };
 
   const navigatePage = useCallback((delta: number) => {
@@ -494,13 +504,21 @@ const Workspace: React.FC = () => {
                       className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
                     >
                       <LogOut size={16} />
-                      {t('common:buttons.logout')}
+                      {t('auth:login.logout')}
                     </button>
                   </div>
                 </>
               )}
             </div>
-          ) : null}
+          ) : (
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 font-medium text-sm transition-colors"
+            >
+              <LogIn size={16} />
+              {t('auth:login.title')}
+            </button>
+          )}
           <LanguageSwitcher />
         </div>
       </div>
@@ -597,6 +615,16 @@ const Workspace: React.FC = () => {
         onConfirm={handleConfirmLeave}
         onCancel={handleCancelLeave}
         variant="warning"
+      />
+
+      {/* Login modaal (sessioon aegunud või käsitsi avatud) */}
+      <LoginModal
+        isOpen={showLoginModal || sessionExpired}
+        onClose={() => {
+          setShowLoginModal(false);
+          clearSessionExpired();
+        }}
+        message={sessionExpired ? t('auth:sessionExpired') : undefined}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
@@ -14,6 +14,8 @@ interface UserContextType {
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
+  sessionExpired: boolean;
+  clearSessionExpired: () => void;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -25,6 +27,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const tokenCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tokeni verifitseerimine serverist
   const verifyToken = async (token: string): Promise<User | null> => {
@@ -69,6 +73,41 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     initAuth();
   }, []);
 
+  // Perioodiline tokeni kontroll (iga 5 min)
+  useEffect(() => {
+    // Puhasta eelmine intervall
+    if (tokenCheckRef.current) {
+      clearInterval(tokenCheckRef.current);
+      tokenCheckRef.current = null;
+    }
+
+    // Käivita ainult kui kasutaja on sisse logitud
+    if (!authToken || !user) return;
+
+    tokenCheckRef.current = setInterval(async () => {
+      const valid = await verifyToken(authToken);
+      if (!valid) {
+        // Token aegunud — logi välja ja märgi sessioon aegunuks
+        setUser(null);
+        setAuthToken(null);
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(STORAGE_KEY);
+        setSessionExpired(true);
+      }
+    }, 5 * 60 * 1000); // 5 minutit
+
+    return () => {
+      if (tokenCheckRef.current) {
+        clearInterval(tokenCheckRef.current);
+        tokenCheckRef.current = null;
+      }
+    };
+  }, [authToken, user]);
+
+  const clearSessionExpired = useCallback(() => {
+    setSessionExpired(false);
+  }, []);
+
   const login = useCallback(async (username: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/login`, {
@@ -103,8 +142,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const value = useMemo(() => ({
-    user, authToken, login, logout, isLoading
-  }), [user, authToken, login, logout, isLoading]);
+    user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired
+  }), [user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired]);
 
   return (
     <UserContext.Provider value={value}>
