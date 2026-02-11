@@ -540,7 +540,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const searchParams: any = {
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'work_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -619,8 +619,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         // Teose andmed
         title: hit.title || 'Pealkiri puudub',
         year: hit.year ?? hit.aasta ?? 0,
-        location: hit.location_object || hit.location || '',
-        publisher: hit.publisher_object || hit.publisher || '',
+        location: hit.location || '',
+        location_object: hit.location,
+        publisher: hit.publisher || '',
+        publisher_object: hit.publisher,
 
         // V2 taksonoomia
         type: hit.type,
@@ -737,8 +739,10 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       // Teose andmed
       title: hit.title,
       year: hit.year ?? hit.aasta,
-      location: hit.location_object || hit.location,
-      publisher: hit.publisher_object || hit.publisher,
+      location: hit.location,
+      location_object: hit.location,
+      publisher: hit.publisher,
+      publisher_object: hit.publisher,
       type: hit.type,
       type_object: hit.type_object,
       genre: hit.genre_object || hit.genre,
@@ -987,7 +991,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'title', 'year', 'location', 'location_object', 'publisher', 'publisher_object',
+        'work_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -1009,10 +1013,10 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       // Teose andmed
       title: hit.title || '',
       year: hit.year ?? hit.aasta ?? 0,
-      location: hit.location_object || hit.location || '',
-      location_object: hit.location_object,
-      publisher: hit.publisher_object || hit.publisher || '',
-      publisher_object: hit.publisher_object,
+      location: hit.location || '',
+      location_object: hit.location,
+      publisher: hit.publisher || '',
+      publisher_object: hit.publisher,
 
       // V2 taksonoomia
       type: hit.type,
