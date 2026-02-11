@@ -1010,7 +1010,9 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       title: hit.title || '',
       year: hit.year ?? hit.aasta ?? 0,
       location: hit.location_object || hit.location || '',
+      location_object: hit.location_object,
       publisher: hit.publisher_object || hit.publisher || '',
+      publisher_object: hit.publisher_object,
 
       // V2 taksonoomia
       type: hit.type,
