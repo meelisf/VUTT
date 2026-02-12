@@ -37,8 +37,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { user, authToken } = useUser();
   const lang = i18n.language || 'et';
   const [activeTab, setActiveTab] = useState<TabType>('edit');
-  // Default to 'read' mode for non-logged-in users (readOnly), 'edit' for logged-in users
-  const [viewMode, setViewMode] = useState<ViewMode>(readOnly ? 'read' : 'edit');
+  // Salvesta viewMode localStorage'sse, et see säiliks lehekülgede vahel liikudes
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (readOnly) return 'read';
+    const saved = localStorage.getItem('vutt_viewMode');
+    return saved === 'read' ? 'read' : 'edit';
+  });
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('vutt_viewMode', mode);
+  }, []);
 
   const [text, setText] = useState(page.text_content);
   const [status, setStatus] = useState(page.status);
@@ -303,15 +311,15 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 {/* View Mode Toggle - ICONS */}
                 <div className="flex bg-gray-100 p-0.5 rounded-md border border-gray-200">
                   <button
-                    onClick={() => setViewMode('edit')}
+                    onClick={() => handleViewModeChange('edit')}
                     disabled={readOnly}
-                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'edit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'edit' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     <Edit3 size={16} />
                   </button>
                   <button
-                    onClick={() => setViewMode('read')}
-                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'read' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    onClick={() => handleViewModeChange('read')}
+                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'read' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
                   >
                     <Eye size={16} />
                   </button>
