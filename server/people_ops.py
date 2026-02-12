@@ -90,8 +90,9 @@ def fetch_wikidata_aliases(wikidata_id):
 
 def fetch_gnd_aliases(gnd_id):
     """Küsub nimevariante GND-st (lobid.org API)."""
-    # GND ID-d on tavaliselt numbrid või sisaldavad tähti
-    url = f"https://lobid.org/gnd/{gnd_id}.json"
+    # Eemalda "GND:" prefiks kui olemas (frontend salvestab kujul "GND:123456789")
+    clean_id = gnd_id.replace('GND:', '').replace('gnd:', '')
+    url = f"https://lobid.org/gnd/{clean_id}.json"
     try:
         req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=5) as response:
@@ -108,7 +109,7 @@ def fetch_gnd_aliases(gnd_id):
             primary_name = data.get('preferredName', gnd_id)
             
             # Teised ID-d
-            ids = {'gnd': gnd_id}
+            ids = {'gnd': clean_id}
             same_as = data.get('sameAs', [])
             for item in same_as:
                 id_url = item.get('id', '')
