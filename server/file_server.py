@@ -45,7 +45,7 @@ from server import (
     # Meilisearch
     sync_work_to_meilisearch, sync_work_to_meilisearch_async, metadata_watcher_loop,
     # People/Authors
-    load_people_data, process_creators_metadata, people_refresh_loop,
+    load_people_data, process_creators_metadata, update_person_async, people_refresh_loop,
     # Utils
     metadata_lock,
     find_directory_by_id, build_work_id_cache
@@ -771,6 +771,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 creators = current_meta.get('creators', [])
                 if creators:
                     process_creators_metadata(creators)
+
+                # Trükkali aliaste rikastamine (trükkalid on ka mitme nimega)
+                publisher_obj = current_meta.get('publisher')
+                if isinstance(publisher_obj, dict) and publisher_obj.get('id'):
+                    update_person_async(publisher_obj['id'], publisher_obj.get('source'))
 
                 # Sünkrooni Meilisearchiga ENNE vastuse saatmist
                 dir_name = os.path.basename(os.path.dirname(metadata_path))

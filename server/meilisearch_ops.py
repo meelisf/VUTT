@@ -363,9 +363,15 @@ def sync_work_to_meilisearch(dir_name):
 
         # Kasuta eellaetud people_data (laetud enne tsüklit)
         aliases = get_creator_aliases(creators, people_data)
-        
+
         # authors_text sisaldab nüüd ka aliaseid, et otsing leiaks "Lorenz" kui nimi on "Laurentius"
         authors_text = [c['name'] for c in creators if c.get('name')] + aliases
+
+        # Trükkali aliased (trükkalid on ka mitme nimega)
+        publisher_aliases = []
+        pub_id = get_id(publisher)
+        if pub_id and people_data.get(pub_id):
+            publisher_aliases = people_data[pub_id].get('aliases', [])
 
         doc = {
             "id": page_id,
@@ -412,7 +418,7 @@ def sync_work_to_meilisearch(dir_name):
             "publisher": get_label(publisher),
             "publisher_object": publisher,
             "publisher_id": get_id(publisher),
-            "publisher_search": get_all_labels(publisher),
+            "publisher_search": get_all_labels(publisher) + publisher_aliases,
             "genre": get_label(genre),
             "genre_et": get_labels_by_lang(genre, 'et'),
             "genre_en": get_labels_by_lang(genre, 'en'),
