@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
 import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/meiliService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
@@ -439,9 +439,35 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 />
               )}
 
-              {/* Tühjenda filtrid */}
+              {/* Aktiivsed filtrid + tühjenda */}
               {hasActiveFilters && (
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t border-gray-100 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedStatus && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                        {t(`common:status.${selectedStatus}`)}
+                        <button onClick={() => onStatusChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                      </span>
+                    )}
+                    {effectiveSelectedGenre && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                        {effectiveSelectedGenre}
+                        <button onClick={() => onGenreChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                      </span>
+                    )}
+                    {effectiveSelectedTags.map(tag => (
+                      <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                        {tag}
+                        <button onClick={() => toggleTag(tag)} className="hover:text-primary-900"><X size={12} /></button>
+                      </span>
+                    ))}
+                    {effectiveSelectedType && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                        {effectiveSelectedType}
+                        <button onClick={() => onTypeChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={() => {
                       onGenreChange(null);
@@ -449,7 +475,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                       onTypeChange(null);
                       onStatusChange(null);
                     }}
-                    className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                    className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
                   >
                     {t('filters.clearAdvanced', 'Tühjenda kõik filtrid')}
                   </button>
