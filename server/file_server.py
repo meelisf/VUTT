@@ -8,6 +8,7 @@ import json
 import os
 import threading
 import socketserver
+import unicodedata
 from datetime import datetime
 
 # Impordi kõik vajalik server/ moodulitest
@@ -646,6 +647,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Andmed frontendist
                 text_content = data.get('text_content')
+                if text_content:
+                    # NFC normaliseerimine: kombineerivad märgid → eelkomponeeritud koodipunktid
+                    # (nt kreeka ypsilon + gravis → üks ὺ koodipunkt)
+                    text_content = unicodedata.normalize('NFC', text_content)
                 meta_content = data.get('meta_content')
                 original_catalog = data.get('original_path')
                 target_filename = data.get('file_name')
