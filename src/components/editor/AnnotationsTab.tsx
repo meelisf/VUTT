@@ -370,7 +370,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `${work.id}.txt`;
+                    // Failinimeks: aasta-autor-pealkiri_esimesed_sõnad-id.txt
+                    const slugify = (s: string) => s.replace(/[^a-zA-ZäöüõÄÖÜÕ0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40);
+                    const nameParts = [year, slugify(author), slugify(title)].filter(Boolean);
+                    a.download = `${nameParts.join('-')}-${work.id}.txt`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);

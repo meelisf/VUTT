@@ -50,6 +50,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedRef = useRef(false); // Jälgib, kas soovitus just valiti
+  const localSuggestionsRef = useRef(localSuggestions);
+  localSuggestionsRef.current = localSuggestions;
+  const peopleRegisterRef = useRef(peopleRegister);
+  peopleRegisterRef.current = peopleRegister;
 
   // Sync internal input with external value
   useEffect(() => {
@@ -82,7 +86,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         const localDbText = lang === 'en' ? 'Local database' : 'Kohalik andmebaas';
         const linkedText = lang === 'en' ? 'linked' : 'seotud';
         const unlinkedText = lang === 'en' ? 'unlinked' : 'sidumata';
-        const localMatches: (WikidataSearchResult & { isLocal: boolean })[] = localSuggestions
+        const localMatches: (WikidataSearchResult & { isLocal: boolean })[] = localSuggestionsRef.current
           .filter(s => s.label.toLowerCase().includes(normalizedInput))
           .slice(0, 5) // Piira kohalike arvu
           .map(s => ({
@@ -98,12 +102,12 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
         // 2. Otsi kohalikust isikute registrist (aliased)
         let registerMatches: (WikidataSearchResult & { isLocal: boolean; isRegister: boolean })[] = [];
-        if ((type === 'person' || type === 'printer') && peopleRegister.length > 0) {
+        if ((type === 'person' || type === 'printer') && peopleRegisterRef.current.length > 0) {
           const registerText = lang === 'en' ? 'People register' : 'Isikute register';
           const aliasText = lang === 'en' ? 'alias' : 'alias';
           const seenRegisterIds = new Set<string>();
 
-          for (const person of peopleRegister) {
+          for (const person of peopleRegisterRef.current) {
             // Otsi nii primary_name kui aliaste hulgast
             const nameMatch = person.primary_name.toLowerCase().includes(normalizedInput);
             const matchingAlias = person.aliases.find(a => a.toLowerCase().includes(normalizedInput));
@@ -194,7 +198,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [inputValue, showSuggestions, value, localSuggestions, peopleRegister]);
+  }, [inputValue, showSuggestions, value]);
 
   const handleSelect = async (result: WikidataSearchResult & { isViaf?: boolean; isGnd?: boolean }) => {
     justSelectedRef.current = true; // Märgi, et valiti soovitus
