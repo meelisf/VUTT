@@ -31,6 +31,7 @@
     "searchType": "Search type...",
     "searchWork": "Search work...",
     "removeAuthorFilter": "Remove author filter",
+    "removeFilter": "Remove filter",
     "applyFilters": "Apply filters",
     "clearFilters": "Clear filters"
   },

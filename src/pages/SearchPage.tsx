@@ -212,7 +212,7 @@ const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
-    const { selectedCollection, getCollectionName, collections } = useCollection();
+    const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
 
     // URL params control the actual search
     const queryParam = searchParams.get('q') || '';
@@ -958,31 +958,75 @@ const SearchPage: React.FC = () => {
                             </button>
                         </form>
 
-                        {/* Autori filter badge */}
-                        {selectedAuthor && (
-                            <div className="flex items-center gap-2 mt-3">
-                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium border border-primary-200">
-                                    <User size={14} />
-                                    <span className="truncate max-w-xs">{selectedAuthor}</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setSelectedAuthor('');
-                                            setAuthorInput('');
-                                            setInputValue('');
-                                            setSearchParams(prev => {
-                                                prev.delete('author');
-                                                prev.delete('q');
-                                                prev.set('p', '1');
-                                                return prev;
-                                            });
-                                        }}
-                                        className="ml-1 hover:bg-primary-100 rounded-full p-0.5"
-                                        title={t('filters.removeAuthorFilter')}
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
+                        {/* Aktiivsed filtrid otsinguriba all */}
+                        {(selectedAuthor || selectedWork || selectedCollection) && (
+                            <div className="flex flex-wrap items-center gap-2 mt-3">
+                                {/* Teose filter badge */}
+                                {selectedWork && (
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium border border-amber-200">
+                                        <FileText size={14} />
+                                        <span className="truncate max-w-xs">{selectedWorkInfo?.title || selectedWork}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedWork('');
+                                                setSelectedWorkInfo(null);
+                                                setSearchParams(prev => {
+                                                    prev.delete('work');
+                                                    prev.set('p', '1');
+                                                    return prev;
+                                                });
+                                            }}
+                                            className="ml-1 hover:bg-amber-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+                                {/* Autori filter badge */}
+                                {selectedAuthor && (
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium border border-primary-200">
+                                        <User size={14} />
+                                        <span className="truncate max-w-xs">{selectedAuthor}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedAuthor('');
+                                                setAuthorInput('');
+                                                setInputValue('');
+                                                setSearchParams(prev => {
+                                                    prev.delete('author');
+                                                    prev.delete('q');
+                                                    prev.set('p', '1');
+                                                    return prev;
+                                                });
+                                            }}
+                                            className="ml-1 hover:bg-primary-100 rounded-full p-0.5"
+                                            title={t('filters.removeAuthorFilter')}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
+                                {/* Kollektsiooni filter badge — paremal */}
+                                {selectedCollection && (() => {
+                                    const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
+                                    return (
+                                        <div className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 ${colorClasses.bg} ${colorClasses.text} rounded-full text-sm font-medium border ${colorClasses.border}`}>
+                                            <Library size={14} />
+                                            <span className="truncate max-w-xs">{getCollectionName(selectedCollection)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedCollection(null)}
+                                                className="ml-1 hover:opacity-70 rounded-full p-0.5"
+                                                title={t('filters.removeFilter')}
+                                            >
+                                                <X size={14} />
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>
@@ -1002,24 +1046,6 @@ const SearchPage: React.FC = () => {
                     </div>
 
                     <div className="space-y-2">
-
-                        {/* Active Collection Indicator */}
-                        {selectedCollection && (() => {
-                            const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
-                            return (
-                                <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-3 mb-4`}>
-                                    <h3 className={`text-xs font-bold ${colorClasses.text} uppercase tracking-wide mb-1 flex items-center gap-2`}>
-                                        <Library size={14} /> {t('common:collections.activeFilter')}
-                                    </h3>
-                                    <p className={`text-sm font-medium ${colorClasses.text}`}>
-                                        {getCollectionName(selectedCollection)}
-                                    </p>
-                                    <p className={`text-xs ${colorClasses.text} opacity-70 mt-1`}>
-                                        {t('common:collections.changeInHeader')}
-                                    </p>
-                                </div>
-                            );
-                        })()}
 
                         {/* Search Scope */}
                         <CollapsibleSection
