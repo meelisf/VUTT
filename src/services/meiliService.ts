@@ -431,12 +431,18 @@ export const getAuthorFacets = async (
     const response = await index.search('', {
       filter,
       limit: 0,
-      facets: ['author_names']
+      facets: ['author_names', 'respondens_names']
     });
 
-    const facetDistribution = response.facetDistribution?.['author_names'] || {};
+    // Liida author_names ja respondens_names kokku
+    const authorFacets = response.facetDistribution?.['author_names'] || {};
+    const respondensFacets = response.facetDistribution?.['respondens_names'] || {};
+    const merged: Record<string, number> = { ...authorFacets };
+    for (const [name, count] of Object.entries(respondensFacets)) {
+      merged[name] = (merged[name] || 0) + (count as number);
+    }
 
-    return Object.entries(facetDistribution)
+    return Object.entries(merged)
       .map(([value, count]) => ({ value, count: count as number }))
       .sort((a, b) => b.count - a.count);
   } catch (error) {
@@ -1105,9 +1111,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
     }).join(' OR ');
     filter.push(options.type.length === 1 ? typeConditions : `(${typeConditions})`);
   }
-  // V2: Autori filter (creators massiivist tuletatud author_names väli)
+  // V2: Autori filter (kõik creators: author_names + respondens_names)
   if (options.author) {
-    filter.push(`author_names = "${options.author}"`);
+    filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
   }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
@@ -1167,7 +1173,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search('', {
           filter: statsFilter,
           limit: 0,
-          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names'],
+          facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names', 'respondens_names'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (teosed)
@@ -1183,6 +1189,15 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       ]);
 
       facetDistribution = statsResponse.facetDistribution || {};
+      // Liida respondens_names → author_names kokku
+      if (facetDistribution['respondens_names']) {
+        const merged = { ...(facetDistribution['author_names'] || {}) };
+        for (const [name, count] of Object.entries(facetDistribution['respondens_names'])) {
+          merged[name] = (merged[name] || 0) + (count as number);
+        }
+        facetDistribution['author_names'] = merged;
+        delete facetDistribution['respondens_names'];
+      }
       totalWorks = statsResponse.estimatedTotalHits || 0; // estimatedTotalHits on täpne kui pole query stringi
 
       // Hit count on alati lehekülgede arv (aga siin me ei tea seda täpselt ilma lisapäringuta,
@@ -1219,7 +1234,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search(query, {
           filter,
           limit: STATS_LIMIT,
-          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField, 'author_names'],
+          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField, 'author_names', 'respondens_names'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (kuvatavad teosed, distinct)
@@ -1273,6 +1288,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           addToStats(typeFacetField, hit[typeFacetField]);
           addToStats(tagsFacetField, hit[tagsFacetField]);
           addToStats('author_names', hit.author_names);
+          addToStats('author_names', hit.respondens_names);
         }
       });
       
