@@ -423,6 +423,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Admin näeb kõiki, tavaline kasutaja ainult oma muudatusi
                 filter_user = params.get('user', [None])[0]
                 limit = int(params.get('limit', [30])[0])
+                offset = int(params.get('offset', [0])[0])
 
                 # Kui pole admin ja üritab teiste muudatusi vaadata
                 if not is_admin and filter_user and filter_user != current_user.get('username'):
@@ -432,12 +433,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if not is_admin and not filter_user:
                     filter_user = current_user.get('username')
 
-                # Hangi commitid
-                commits = get_recent_commits(username=filter_user, limit=limit)
+                # Hangi commitid (tagastab dict: {commits, has_more})
+                result = get_recent_commits(username=filter_user, limit=limit, skip=offset)
 
                 send_json_response(self, 200, {
                     "status": "success",
-                    "commits": commits,
+                    "commits": result["commits"],
+                    "has_more": result["has_more"],
                     "is_admin": is_admin,
                     "filtered_by": filter_user
                 })

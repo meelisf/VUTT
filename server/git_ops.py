@@ -522,42 +522,47 @@ def commit_new_work_to_git(dir_name):
         return False
 
 
-def get_recent_commits(username=None, limit=50):
+def get_recent_commits(username=None, limit=50, skip=0):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.
-    
+
     Args:
         username: Kui määratud, tagastab ainult selle kasutaja commitid
-        limit: Maksimaalne commitide arv
-    
+        limit: Maksimaalne tulemuste arv
+        skip: Mitu tulemust algusest vahele jätta (pagineerimine)
+
     Returns:
-        list: Commitide nimekiri koos teose ja lehekülje infoga
+        dict: {"commits": list, "has_more": bool}
     """
     repo = get_or_init_repo()
-    
+
     try:
-        all_commits = list(repo.iter_commits(max_count=limit * 3))  # Võtame rohkem, et filtreerimise järel piisaks
+        # Võtame piisavalt commiteid, arvestades skip + limit + puhver filtreerimiseks
+        max_commits = (skip + limit) * 3 + 50
+        all_commits = list(repo.iter_commits(max_count=max_commits))
     except:
-        return []
-    
+        return {"commits": [], "has_more": False}
+
     results = []
     seen_files = set()  # Vältimaks duplikaate sama faili kohta
-    
+    skipped = 0
+    has_more = False
+
     for commit in all_commits:
         # Filtreeri kasutaja järgi (kui määratud)
         if username and commit.author.name != username:
             continue
-        
+
         # Jäta vahele automaatsed commitid
         if commit.author.name == "Automaatne":
             continue
-        
+
         # Leia muudetud failid selles commitis
         try:
             # Optimeerimine: Kasutame stats.files, et saada ainult failinimed
             # See väldib kulukat sisu võrdlemist (diff)
             file_paths = list(commit.stats.files.keys())
-            
+
             for filepath in file_paths:
                 if not filepath:
                     continue
@@ -596,6 +601,11 @@ def get_recent_commits(username=None, limit=50):
                     continue
                 seen_files.add(file_key)
 
+                # Jäta esimesed `skip` tulemust vahele
+                if skipped < skip:
+                    skipped += 1
+                    continue
+
                 results.append({
                     "commit_hash": commit.hexsha[:8],
                     "full_hash": commit.hexsha,
@@ -611,15 +621,17 @@ def get_recent_commits(username=None, limit=50):
                     "filepath": filepath,
                     "change_type": change_type  # "page" või "metadata"
                 })
-                
+
+                # Kui limit täis, proovi leida veel üks tulemus has_more jaoks
                 if len(results) >= limit:
+                    has_more = True
                     break
-            
+
             if len(results) >= limit:
                 break
-                
+
         except Exception as e:
             logger.warning(f"Viga commiti {commit.hexsha[:8]} töötlemisel: {e}")
             continue
-    
-    return results
+
+    return {"commits": results, "has_more": has_more}

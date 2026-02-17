@@ -24,6 +24,8 @@
   "changeType": {
     "metadata": "Metadata"
   },
+  "loadMore": "Load more",
+  "loadingMore": "Loading...",
   "diff": {
     "loading": "Loading changes...",
     "additions": "added",

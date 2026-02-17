@@ -24,6 +24,8 @@
   "changeType": {
     "metadata": "Metaandmed"
   },
+  "loadMore": "Laadi veel",
+  "loadingMore": "Laadin...",
   "diff": {
     "loading": "Laadin muudatusi...",
     "additions": "lisatud",

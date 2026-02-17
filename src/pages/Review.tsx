@@ -62,6 +62,7 @@ const Review: React.FC = () => {
 
   const [commits, setCommits] = useState<RecentCommit[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [filterUser, setFilterUser] = useState<string | null>(null);
@@ -70,6 +71,9 @@ const Review: React.FC = () => {
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
   const [diffCache, setDiffCache] = useState<Record<string, DiffData>>({});
   const [loadingDiff, setLoadingDiff] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [allUsers, setAllUsers] = useState<string[]>([]);
 
   // Kontrolli ligipääsu (oota kuni kasutaja andmed on laetud)
   useEffect(() => {
@@ -81,19 +85,47 @@ const Review: React.FC = () => {
   // Lae muudatused kui kasutaja on olemas
   useEffect(() => {
     if (user && token) {
-      loadRecentEdits();
+      // Kasutajafiltri vahetamine nullib nimekirja
+      setCommits([]);
+      setOffset(0);
+      setHasMore(false);
+      loadRecentEdits(0, false);
     }
   }, [user, token, selectedUser]);
 
-  const loadRecentEdits = async () => {
+  // Lae kõigi kasutajate nimekiri admin jaoks
+  useEffect(() => {
+    if (!user || !token) return;
+    fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auth_token: token })
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === 'success' && data.users) {
+          const usernames = data.users.map((u: { username: string }) => u.username).sort();
+          setAllUsers(usernames);
+        }
+      })
+      .catch(() => {
+        // Fallback: kasutame getUniqueAuthors() — allUsers jääb tühjaks
+      });
+  }, [user, token]);
+
+  const loadRecentEdits = async (fromOffset: number, append: boolean) => {
     if (!token) return;
-    
-    setLoading(true);
+
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
 
     try {
-      let url = `${FILE_API_URL}/recent-edits?token=${token}&limit=50`;
-      
+      let url = `${FILE_API_URL}/recent-edits?token=${token}&limit=50&offset=${fromOffset}`;
+
       // Kui admin on valinud konkreetse kasutaja
       if (selectedUser) {
         url += `&user=${encodeURIComponent(selectedUser)}`;
@@ -103,9 +135,15 @@ const Review: React.FC = () => {
       const data = await response.json();
 
       if (data.status === 'success') {
-        setCommits(data.commits);
+        if (append) {
+          setCommits(prev => [...prev, ...data.commits]);
+        } else {
+          setCommits(data.commits);
+        }
         setIsAdmin(data.is_admin);
         setFilterUser(data.filtered_by);
+        setHasMore(data.has_more);
+        setOffset(fromOffset + data.commits.length);
       } else {
         setError(data.message || t('error'));
       }
@@ -114,7 +152,12 @@ const Review: React.FC = () => {
       setError(t('error'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = () => {
+    loadRecentEdits(offset, true);
   };
 
   // Grupeeri commitid kasutaja järgi (ainult admin jaoks)
@@ -333,7 +376,7 @@ const Review: React.FC = () => {
                           {t('filters.all')}
                         </button>
                         <div className="border-t border-gray-100 my-1" />
-                        {getUniqueAuthors().map(author => (
+                        {(allUsers.length > 0 ? allUsers : getUniqueAuthors()).map(author => (
                           <button
                             key={author}
                             onClick={() => { setSelectedUser(author); setShowUserFilter(false); }}
@@ -388,12 +431,12 @@ const Review: React.FC = () => {
                 </div>
 
                 {/* Tabeli read */}
-                {commits.map((commit, index) => {
+                {commits.map((commit) => {
                   const entryKey = getEntryKey(commit);
                   const isExpanded = expandedCommit === entryKey;
                   const diffData = diffCache[entryKey];
                   const isLoadingThis = loadingDiff === entryKey;
-                  
+
                   return (
                     <div key={entryKey} className="border border-gray-100 rounded-lg overflow-hidden">
                       {/* Peamine rida */}
@@ -525,6 +568,26 @@ const Review: React.FC = () => {
                     </div>
                   );
                 })}
+
+                {/* "Laadi veel" nupp */}
+                {hasMore && (
+                  <div className="pt-4 flex justify-center">
+                    <button
+                      onClick={handleLoadMore}
+                      disabled={loadingMore}
+                      className="flex items-center gap-2 px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {loadingMore ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          {t('loadingMore')}
+                        </>
+                      ) : (
+                        t('loadMore')
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
