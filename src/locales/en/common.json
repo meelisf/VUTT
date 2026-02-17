@@ -52,7 +52,12 @@
   "errors": {
     "connectionFailed": "Failed to connect to server",
     "unknownError": "Unknown error",
-    "loginFailed": "Login failed"
+    "loginFailed": "Login failed",
+    "boundaryTitle": "Something went wrong",
+    "boundaryDescription": "An unexpected error occurred in the application. Try reloading the page.",
+    "boundaryReload": "Reload",
+    "boundaryHome": "Go to Home",
+    "boundaryDetails": "Error details"
   },
   "language": {
     "switchTo": "Switch language to {{lang}}",

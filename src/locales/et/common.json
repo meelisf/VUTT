@@ -52,7 +52,12 @@
   "errors": {
     "connectionFailed": "Serveriga ühendamine ebaõnnestus",
     "unknownError": "Tundmatu viga",
-    "loginFailed": "Sisselogimine ebaõnnestus"
+    "loginFailed": "Sisselogimine ebaõnnestus",
+    "boundaryTitle": "Midagi läks valesti",
+    "boundaryDescription": "Rakenduses tekkis ootamatu viga. Proovige lehekülge uuesti laadida.",
+    "boundaryReload": "Lae uuesti",
+    "boundaryHome": "Avalehele",
+    "boundaryDetails": "Veateade"
   },
   "language": {
     "switchTo": "Vaheta keeleks {{lang}}",

@@ -108,21 +108,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Ctrl+S salvestamine
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (!isSaving && !readOnly) {
-          handleSave();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSaving, readOnly, handleSave]);
-
   // Teavitame parent komponenti muudatuste olekust (ainult lokaalsed muudatused)
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges);
@@ -243,6 +228,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsSaving(false);
     }
   }, [page, text, status, comments, page_tags, onSave]);
+
+  // Ctrl+S salvestamine
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!isSaving && !readOnly) {
+          handleSave();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSaving, readOnly, handleSave]);
 
   const handleScroll = (e: React.UIEvent<HTMLElement>) => {
     if (lineNumbersRef.current) {

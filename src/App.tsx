@@ -4,6 +4,7 @@ import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
+import RouteErrorBoundary from './components/RouteErrorBoundary';
 
 // Lazy import koos automaatse uuesti laadimisega, kui chunk on pärast uut buildi muutunud
 function lazyRetry(importFn: () => Promise<any>) {
@@ -43,40 +44,49 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: <Dashboard />,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/search",
     element: <Lazy><SearchPage /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/stats",
     element: <Lazy><Statistics /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/work/:workId/:pageNum?",
     element: <Lazy><Workspace /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   // Kasutajahalduse route'id
   {
     path: "/register",
     element: <Lazy><Register /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/set-password",
     element: <Lazy><SetPassword /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/admin",
     element: <Lazy><Admin /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   {
     path: "/review",
     element: <Lazy><Review /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
   // 404 - catch-all marsruut (peab olema viimane)
   {
     path: "*",
     element: <Lazy><NotFound /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
   },
 ]);
 
