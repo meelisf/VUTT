@@ -3,15 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/meiliService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, Edit3, ChevronRight, Eye, X } from 'lucide-react';
+import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2 } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
+import CharSetEditor from './editor/CharSetEditor';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 // Erimärgi tüüp
 interface SpecialCharacter {
-  row: number;
+  row?: number;
   character: string;
   name?: string;
   keyboard_code?: number | null;
@@ -57,7 +58,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   // Erimärkide state
   const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
+  const [isCustomChars, setIsCustomChars] = useState(false);
   const [showCharPanel, setShowCharPanel] = useState(true);
+  const [showCharEditor, setShowCharEditor] = useState(false);
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
 
@@ -113,10 +116,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
 
-  // Laadime erimärgid JSON failist
+  // Laadime erimärgid: sisselogitud kasutajal isiklik komplekt, muidu globaalne
   useEffect(() => {
     const loadSpecialCharacters = async () => {
       try {
+        if (authToken) {
+          const response = await fetchWithTimeout(`/user-chars?token=${authToken}`, { timeout: 5000 });
+          if (response.ok) {
+            const data = await response.json();
+            setSpecialCharacters(data.characters || []);
+            setIsCustomChars(data.is_custom || false);
+            return;
+          }
+        }
+        // Fallback: globaalne vaikimisi
         const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });
         if (response.ok) {
           const data = await response.json();
@@ -127,7 +140,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     };
     loadSpecialCharacters();
-  }, []);
+  }, [authToken]);
 
   // Laadime transkribeerimise juhendi HTML failist
   useEffect(() => {
@@ -425,6 +438,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <ChevronRight size={12} />
                     </div>
                     {t('editor.specialChars')}
+                    {isCustomChars && (
+                      <span className="text-[10px] text-primary-500 font-normal">✦</span>
+                    )}
+                    {user && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setShowCharEditor(true); }}
+                        className="ml-auto text-gray-400 hover:text-gray-600 transition-colors"
+                        title={t('editor.editChars', 'Kohanda märgikomplekti')}
+                      >
+                        <Settings2 size={12} />
+                      </button>
+                    )}
                   </summary>
 
                   <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
@@ -454,6 +480,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   </div>
                 </details>
               </div>
+            )}
+
+            {/* CharSet Editor Modal */}
+            {showCharEditor && authToken && (
+              <CharSetEditor
+                characters={specialCharacters}
+                isCustom={isCustomChars}
+                authToken={authToken}
+                onClose={() => setShowCharEditor(false)}
+                onSaved={(chars, custom) => {
+                  setSpecialCharacters(chars);
+                  setIsCustomChars(custom);
+                }}
+              />
             )}
 
             {/* Guide Modal */}

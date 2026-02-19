@@ -158,6 +158,11 @@
     "specialChars": "Special characters & guide",
     "openGuide": "Open transcription guide",
     "guideTitle": "Transcription guide",
+    "editChars": "Customize character set",
+    "pasteChar": "Paste symbol...",
+    "addChar": "Add",
+    "resetChars": "Reset to defaults",
+    "noChars": "No characters added",
     "tooltips": {
       "bold": "Bold",
       "italic": "Italic",

@@ -158,6 +158,11 @@
     "specialChars": "Erimärgid ja juhend",
     "openGuide": "Ava transkribeerimise juhend",
     "guideTitle": "Transkribeerimise juhend",
+    "editChars": "Kohanda märgikomplekti",
+    "pasteChar": "Kleebi sümbol...",
+    "addChar": "Lisa",
+    "resetChars": "Lähtesta vaikimisi",
+    "noChars": "Märke pole lisatud",
     "tooltips": {
       "bold": "Paks kiri",
       "italic": "Kaldkiri",

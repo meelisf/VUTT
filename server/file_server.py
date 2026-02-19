@@ -528,6 +528,50 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"METADATA HANDLER VIGA: {e}")
                 self.send_error(500, str(e))
 
+        # GET /user-chars - kasutaja isiklikud erimärgid (auth nõutav)
+        elif self.path.startswith('/user-chars'):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+
+                auth_token = params.get('token', [None])[0]
+                if not auth_token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+
+                session = sessions.get(auth_token)
+                if not session:
+                    send_json_response(self, 401, {"status": "error", "message": "Kehtetu token"})
+                    return
+
+                username = session['user']['username']
+                user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
+                chars_file = os.path.join(user_chars_dir, f"{username}.json")
+
+                if os.path.exists(chars_file):
+                    with open(chars_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    send_json_response(self, 200, {
+                        "status": "success",
+                        "characters": data.get("characters", []),
+                        "is_custom": True
+                    })
+                else:
+                    # Kasutajal pole isiklikku komplekti → tagasta globaalne vaikimisi
+                    global_file = os.path.join(os.path.dirname(os.path.dirname(COLLECTIONS_FILE)), 'public', 'special_characters.json')
+                    with open(global_file, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    send_json_response(self, 200, {
+                        "status": "success",
+                        "characters": data.get("characters", []),
+                        "is_custom": False
+                    })
+
+            except Exception as e:
+                print(f"USER-CHARS GET VIGA: {e}")
+                self.send_error(500, str(e))
+
         else:
             self.send_error(404)
 
@@ -963,6 +1007,44 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path == '/works/bulk-collection':
             handle_bulk_collection(self)
             invalidate_cache()
+
+        # POST /user-chars - salvesta kasutaja isiklikud erimärgid
+        elif self.path == '/user-chars':
+            try:
+                data = read_request_data(self)
+
+                user = require_auth_handler(self, data, min_role='contributor')
+                if not user:
+                    return
+
+                username = user['username']
+                user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
+                os.makedirs(user_chars_dir, exist_ok=True)
+                chars_file = os.path.join(user_chars_dir, f"{username}.json")
+
+                # reset: True → kustuta isiklik fail, kasuta globaalset vaikimisi
+                if data.get('reset'):
+                    if os.path.exists(chars_file):
+                        os.remove(chars_file)
+                    send_json_response(self, 200, {"status": "success", "reset": True})
+                    return
+
+                characters = data.get('characters', [])
+
+                # Valideeri: igal elemendil peab olema 'character' väli
+                for item in characters:
+                    if not isinstance(item, dict) or not item.get('character'):
+                        send_json_response(self, 400, {"status": "error", "message": "Vigased andmed: 'character' väli puudub"})
+                        return
+
+                with open(chars_file, 'w', encoding='utf-8') as f:
+                    json.dump({"characters": characters}, f, ensure_ascii=False, indent=2)
+
+                send_json_response(self, 200, {"status": "success"})
+
+            except Exception as e:
+                print(f"USER-CHARS POST VIGA: {e}")
+                self.send_error(500, str(e))
 
         else:
             self.send_error(404)
