@@ -58,7 +58,7 @@ def create_pending_edit(work_id, lehekylje_number, user, original_text, new_text
     other_pending = False
 
     for idx, edit in enumerate(data["pending_edits"]):
-        if edit["work_id"] == work_id and edit["lehekylje_number"] == lehekylje_number:
+        if edit.get("work_id") == work_id and edit["lehekylje_number"] == lehekylje_number:
             if edit["status"] == "pending":
                 if edit["user"] == user["username"]:
                     # Sama kasutaja - kirjutame üle
@@ -119,7 +119,7 @@ def get_pending_edits_for_page(work_id, lehekylje_number):
     data = load_pending_edits()
     return [
         edit for edit in data["pending_edits"]
-        if edit["work_id"] == work_id
+        if edit.get("work_id") == work_id
         and edit["lehekylje_number"] == lehekylje_number
         and edit["status"] == "pending"
     ]
@@ -129,7 +129,7 @@ def get_user_pending_edit_for_page(work_id, lehekylje_number, username):
     """Tagastab kasutaja ootel muudatuse konkreetse lehe jaoks."""
     data = load_pending_edits()
     for edit in data["pending_edits"]:
-        if (edit["work_id"] == work_id
+        if (edit.get("work_id") == work_id
             and edit["lehekylje_number"] == lehekylje_number
             and edit["user"] == username
             and edit["status"] == "pending"):

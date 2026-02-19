@@ -27,7 +27,7 @@ def handle_save_pending(handler):
         if not user:
             return
 
-        work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
+        work_id = data.get('work_id')
         lehekylje_number = data.get('lehekylje_number')
         original_text = data.get('original_text', '')
         new_text = data.get('new_text', '')
@@ -101,7 +101,7 @@ def handle_pending_edits_check(handler):
         if not user:
             return
 
-        work_id = data.get('work_id') or data.get('teose_id')  # work_id eelistatud
+        work_id = data.get('work_id')
         lehekylje_number = data.get('lehekylje_number')
 
         if not work_id or lehekylje_number is None:
