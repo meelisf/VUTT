@@ -29,7 +29,7 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
       const res = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: authToken, characters: newChars }),
+        body: JSON.stringify({ auth_token: authToken, characters: newChars }),
         timeout: 10000,
       });
       if (!res.ok) {
@@ -76,7 +76,7 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
       await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: authToken, reset: true }),
+        body: JSON.stringify({ auth_token: authToken, reset: true }),
         timeout: 10000,
       });
       // Hangi globaalsed vaikimisi märgid
