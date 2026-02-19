@@ -49,7 +49,12 @@ from server import (
     load_people_data, process_creators_metadata, update_person_async, people_refresh_loop,
     # Utils
     metadata_lock,
-    find_directory_by_id, build_work_id_cache
+    find_directory_by_id, build_work_id_cache,
+    # Upload
+    UPLOAD_ENABLED,
+    sanitize_slug, check_slug_conflict,
+    create_upload, list_uploads, get_upload,
+    mark_page_deleted, cancel_upload
 )
 
 from server.metadata_handler import handle_metadata_request
@@ -569,6 +574,27 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"USER-CHARS GET VIGA: {e}")
                 self.send_error(500, str(e))
 
+        # GET /admin/uploads - aktiivsed üleslaadimised (admin)
+        elif self.path.startswith('/admin/uploads'):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                params = parse_qs(urlparse(self.path).query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+                send_json_response(self, 200, {"status": "success", "uploads": list_uploads()})
+            except Exception as e:
+                print(f"GET /admin/uploads VIGA: {e}")
+                self.send_error(500, str(e))
+
         else:
             self.send_error(404)
 
@@ -1005,6 +1031,76 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             handle_bulk_collection(self)
             invalidate_cache()
 
+        # =========================================================
+        # UPLOAD ENDPOINTID (vt server/upload_ops.py)
+        # =========================================================
+
+        elif self.path == '/admin/upload/create':
+            # Loo uus upload staging (kontroll slug unikaalsuse üle)
+            try:
+                data = read_request_data(self)
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                title = data.get('title', '').strip()
+                year = str(data.get('year', '')).strip()
+                if not title or not year:
+                    send_json_response(self, 400, {"status": "error", "message": "Pealkiri ja aasta on kohustuslikud"})
+                    return
+
+                slug = data.get('slug', '').strip() or sanitize_slug(title)
+
+                if check_slug_conflict(year, slug):
+                    send_json_response(self, 409, {
+                        "status": "error",
+                        "message": f"Kaust data/{year}_{slug}/ on juba olemas",
+                        "conflict": True,
+                        "suggested_slug": slug
+                    })
+                    return
+
+                state = create_upload(data)
+                send_json_response(self, 201, {"status": "success", "upload": state})
+
+            except Exception as e:
+                print(f"POST /admin/upload/create VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path.startswith('/admin/upload/') and self.path.endswith('/delete-page'):
+            # Märgi leht kustututaks (deleted: true state.json-is)
+            try:
+                data = read_request_data(self)
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                parts = self.path.split('/')
+                upload_id = parts[3] if len(parts) >= 4 else None
+                filename = data.get('filename', '').strip()
+
+                if not upload_id or not filename:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id ja filename on kohustuslikud"})
+                    return
+
+                deleted = data.get('deleted', True)
+                ok = mark_page_deleted(upload_id, filename, deleted)
+                if not ok:
+                    send_json_response(self, 404, {"status": "error", "message": "Upload või leht ei leitud"})
+                    return
+
+                send_json_response(self, 200, {"status": "success", "filename": filename, "deleted": deleted})
+
+            except Exception as e:
+                print(f"POST /admin/upload/.../delete-page VIGA: {e}")
+                self.send_error(500, str(e))
+
         # POST /user-chars - salvesta kasutaja isiklikud erimärgid
         elif self.path == '/user-chars':
             try:
@@ -1043,6 +1139,51 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"USER-CHARS POST VIGA: {e}")
                 self.send_error(500, str(e))
 
+        else:
+            self.send_error(404)
+
+
+    def do_DELETE(self):
+        # DELETE /admin/upload/{id} - tühista upload + koristus
+        if self.path.startswith('/admin/upload/'):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                params = parse_qs(urlparse(self.path).query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                parts = self.path.split('?')[0].split('/')
+                upload_id = parts[3] if len(parts) >= 4 else None
+
+                if not upload_id:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id puudub"})
+                    return
+
+                state = get_upload(upload_id)
+                if not state:
+                    send_json_response(self, 404, {"status": "error", "message": "Upload ei leitud"})
+                    return
+
+                # NB: etapp 2 lisab SFTP/SSH koristuse OCR serveris
+                ok = cancel_upload(upload_id)
+                if not ok:
+                    send_json_response(self, 500, {"status": "error", "message": "Tühistamine ebaõnnestus"})
+                    return
+
+                send_json_response(self, 200, {"status": "success", "id": upload_id})
+
+            except Exception as e:
+                print(f"DELETE /admin/upload VIGA: {e}")
+                self.send_error(500, str(e))
         else:
             self.send_error(404)
 

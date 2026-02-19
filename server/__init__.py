@@ -9,6 +9,7 @@ from .config import (
     INVITE_TOKENS_FILE, PENDING_EDITS_FILE, ALLOWED_ORIGINS,
     RATE_LIMITS, SESSION_DURATION, MEILI_URL, MEILI_KEY, INDEX_NAME,
     COLLECTIONS_FILE, VOCABULARIES_FILE,
+    UPLOAD_ENABLED,
     get_logger
 )
 
@@ -101,4 +102,11 @@ from .admin_handlers import (
 # Bulk operatsioonide HTTP handlerid
 from .bulk_handlers import (
     handle_bulk_tags, handle_bulk_genre, handle_bulk_collection
+)
+
+# Upload operatsioonid (admin teose lisamine PDF/piltidest)
+from .upload_ops import (
+    sanitize_slug, check_slug_conflict,
+    create_upload, list_uploads, get_upload,
+    mark_page_deleted, cancel_upload
 )
