@@ -399,8 +399,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 key={result.id}
                 onMouseDown={() => { justSelectedRef.current = true; }}
                 onClick={() => handleSelect(result)}
-                className={`w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-50 flex flex-col ${
-                  idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' : ''
+                className={`w-full text-left px-4 py-2 border-b border-gray-50 flex flex-col ${
+                  idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
+                  isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
+                  isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
+                  'hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
