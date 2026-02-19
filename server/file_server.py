@@ -558,13 +558,10 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         "is_custom": True
                     })
                 else:
-                    # Kasutajal pole isiklikku komplekti → tagasta globaalne vaikimisi
-                    global_file = os.path.join(os.path.dirname(os.path.dirname(COLLECTIONS_FILE)), 'public', 'special_characters.json')
-                    with open(global_file, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
+                    # Kasutajal pole isiklikku komplekti → frontend laeb ise globaalse
                     send_json_response(self, 200, {
                         "status": "success",
-                        "characters": data.get("characters", []),
+                        "characters": [],
                         "is_custom": False
                     })
 

@@ -125,16 +125,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars?token=${authToken}`, { timeout: 5000 });
           if (response.ok) {
             const data = await response.json();
-            setSpecialCharacters(data.characters || []);
-            setIsCustomChars(data.is_custom || false);
-            return;
+            if (data.is_custom) {
+              // Kasutajal on isiklik komplekt — kasuta seda
+              setSpecialCharacters(data.characters || []);
+              setIsCustomChars(true);
+              return;
+            }
+            // is_custom: false — lae globaalne (ei return, langeb läbi)
           }
         }
-        // Fallback: globaalne vaikimisi
+        // Fallback: globaalne vaikimisi (sisselogimata kasutaja või pole isiklikku komplekti)
         const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });
         if (response.ok) {
           const data = await response.json();
           setSpecialCharacters(data.characters || []);
+          setIsCustomChars(false);
         }
       } catch (e) {
         console.warn('Erimärkide laadimine ebaõnnestus:', e);
