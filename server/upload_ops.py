@@ -109,6 +109,9 @@ def create_upload(meta: dict) -> dict:
                  collection, languages, tags, tags_object
     """
     upload_id = generate_nanoid()
+    while os.path.isdir(_upload_dir(upload_id)):
+        upload_id = generate_nanoid()
+
     year = str(meta.get('year', ''))
     slug = meta.get('slug', sanitize_slug(meta.get('title', '')))
 
