@@ -26,12 +26,16 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
   const save = async (newChars: SpecialCharacter[], customFlag = true) => {
     setIsSaving(true);
     try {
-      await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: authToken, characters: newChars }),
         timeout: 10000,
       });
+      if (!res.ok) {
+        console.error('Erimärkide salvestamine ebaõnnestus:', res.status);
+        return;
+      }
       onSaved(newChars, customFlag);
     } catch (e) {
       console.error('Erimärkide salvestamine ebaõnnestus:', e);
