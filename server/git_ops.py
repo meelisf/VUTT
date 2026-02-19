@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import threading
+import time
 from collections import deque
 from datetime import datetime
 from git import Repo, Actor
@@ -297,9 +298,6 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
             add_relative = os.path.relpath(add_filepath, BASE_DIR)
             files_to_add.append(add_relative)
 
-    # Lisa kõik failid indeksisse
-    repo.index.add(files_to_add)
-
     # Genereeri commit sõnum
     if not message:
         if is_first_commit:
@@ -307,24 +305,31 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
         else:
             message = f"Muuda: {relative_path}"
 
-    # Tee commit
+    # Tee commit koos retry-ga git index.lock kollisiooni korral
     author = Actor(username, f"{username}@vutt.local")
-    try:
-        commit = repo.index.commit(
-            message,
-            author=author,
-            committer=author
-        )
-        logger.info(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
-        return {
-            "success": True,
-            "commit_hash": commit.hexsha,
-            "is_first_commit": is_first_commit
-        }
-    except GitCommandError as e:
-        logger.error(f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {e}")
-        _record_git_failure(relative_path, username, e)
-        return {"success": False, "error": str(e)}
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            repo.index.add(files_to_add)
+            commit = repo.index.commit(
+                message,
+                author=author,
+                committer=author
+            )
+            logger.info(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
+            return {
+                "success": True,
+                "commit_hash": commit.hexsha,
+                "is_first_commit": is_first_commit
+            }
+        except GitCommandError as e:
+            if attempt < max_retries - 1 and "index.lock" in str(e):
+                logger.warning(f"Git index lukus, proovin uuesti ({attempt + 1}/{max_retries}): {relative_path}")
+                time.sleep(0.15 * (attempt + 1))
+                continue
+            logger.error(f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {e}")
+            _record_git_failure(relative_path, username, e)
+            return {"success": False, "error": str(e)}
 
 
 def get_file_git_history(paths, max_count=50):
