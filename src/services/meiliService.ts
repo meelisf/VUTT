@@ -51,145 +51,6 @@ const checkMixedContent = () => {
   }
 };
 
-// Promise to ensure we only run settings update once per session (lazily)
-let settingsPromise: Promise<any> | null = null;
-
-// Funktsioon indeksi seadistuste parandamiseks
-const fixIndexSettings = async () => {
-  try {
-    let currentSettings: string[] | null = null;
-    let sortableSettings: string[] | null = null;
-    let filterableSettings: string[] | null = null;
-    let currentDistinct: string | null = null;
-    let currentRankingRules: string[] | null = null;
-    try {
-      currentSettings = await index.getSearchableAttributes();
-      sortableSettings = await index.getSortableAttributes();
-      filterableSettings = await index.getFilterableAttributes();
-      currentDistinct = await index.getDistinctAttribute();
-      currentRankingRules = await index.getRankingRules();
-    } catch (e) {
-      // Indeksit ei pruugi veel eksisteerida
-    }
-
-    const requiredSearch = ['page_tags', 'comments.text', 'lehekylje_tekst', 'respondens'];
-    const requiredSort = ['last_modified'];
-    const requiredFilter = ['work_id', 'teose_staatus', 'tags', 'creators', 'publisher', 'author_names', 'respondens_names']; // Filtreeritavad väljad
-    // Kontrollime, kas exactness on esimesel kohal (meie soovitud järjekord)
-    const needsRankingUpdate = !currentRankingRules || currentRankingRules[0] !== 'exactness';
-
-    const needsSearchUpdate = !currentSettings || requiredSearch.some(r => !currentSettings.includes(r));
-    const needsSortUpdate = !sortableSettings || requiredSort.some(r => !sortableSettings.includes(r));
-    const needsFilterUpdate = !filterableSettings || requiredFilter.some(r => !filterableSettings.includes(r));
-    const needsDistinctReset = currentDistinct !== null; // Eemaldame globaalse distinct seadistuse
-
-    if (!needsSearchUpdate && !needsSortUpdate && !needsFilterUpdate && !needsDistinctReset && !needsRankingUpdate) {
-      return true;
-    }
-
-    const filterTask = await index.updateFilterableAttributes([
-      // V2/V3 väljad
-      'work_id',  // nanoid - eelistatud routing jaoks
-      'year',
-      'title',
-      'location_id',
-      'publisher_id',
-      'publisher',
-      'genre_ids',
-      'tags_ids',
-      'type_ids',
-      'creator_ids',
-      'creators',
-      'author_names',      // Mitte-respondens loojate nimed filtreerimiseks
-      'respondens_names',  // Respondens loojate nimed filtreerimiseks
-      'type',
-      'type_et', 'type_en',
-      'type_ids',
-      'genre',
-      'genre_et', 'genre_en',
-      'collection',
-      'collections_hierarchy',
-      'authors_text',
-      'languages',
-      // Tagasiühilduvus (Meilisearch indeksi skeem)
-      'aasta',
-      'autor',
-      'respondens',
-      'lehekylje_number',
-      'originaal_kataloog',
-      'page_tags',
-      'page_tags_et', 'page_tags_en',
-      'page_tags_suggest_et', 'page_tags_suggest_en',
-      'status',
-      'teose_staatus',
-      'tags',
-      'tags_et', 'tags_en'
-    ]);
-
-    await index.updateSortableAttributes([
-      'aasta',
-      'lehekylje_number',
-      'last_modified',
-      'title'
-    ]);
-
-    const searchTask = await index.updateSearchableAttributes([
-      'authors_text',
-      'title',
-      'year',
-      'location_search',
-      'publisher_search',
-      'genre_search',
-      'tags_search',
-      'series_title',
-      'autor',
-      'respondens',
-      'aasta',
-      'originaal_kataloog',
-      'lehekylje_tekst',
-      'page_tags',
-      'comments.text'
-    ]);
-
-    // Increase max values per facet to ensure we get page counts for all works
-    await index.updateSettings({
-      faceting: {
-        maxValuesPerFacet: 5000
-      },
-      pagination: {
-        maxTotalHits: 10000
-      },
-      // Eemaldame globaalse distinct seadistuse (kasutame ainult päringutes kus vaja)
-      distinctAttribute: null,
-      // Ranking rules: exactness kõrgemal, et täpsed vasted tuleksid enne
-      // Vaikimisi: ["words", "typo", "proximity", "attribute", "sort", "exactness"]
-      // Muudame: exactness enne words, et "Oratio de liberatione urbis Rigae" 
-      // tuleks enne teksti, kus on "Riga" mitu korda mainitud
-      rankingRules: [
-        "exactness",  // Täpne vaste kõige olulisem
-        "words",      // Mitu otsingusõna vastab
-        "typo",       // Kirjavead
-        "proximity",  // Sõnade lähedus
-        "attribute",  // Välja prioriteet (title > autor > respondens)
-        "sort"        // Kasutaja sorteerimine
-      ]
-    });
-
-    await index.waitForTask(filterTask.taskUid);
-    await index.waitForTask(searchTask.taskUid);
-    return true;
-  } catch (e) {
-    console.warn("Ei suutnud indeksi seadistusi automaatselt parandada:", e);
-    return false;
-  }
-};
-
-const ensureSettings = () => {
-  if (!settingsPromise) {
-    settingsPromise = fixIndexSettings();
-  }
-  return settingsPromise;
-};
 
 // Wikidata Q-koodi tuvastamine (nt "Q12345")
 const isQCode = (val: string) => /^Q\d+$/.test(val);
@@ -273,7 +134,6 @@ export const getTeoseTagsFacets = async (
   yearEnd?: number
 ): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
-  await ensureSettings();
 
   // Vali õige väli vastavalt keelele
   // Kasutame alati keelespetsiifilisi välju (tags_et, tags_en)
@@ -322,7 +182,6 @@ export const getGenreFacets = async (
   yearEnd?: number
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
-  await ensureSettings();
 
   // Kasutame alati keelespetsiifilisi välju (genre_et, genre_en)
   const facetField = `genre_${lang}`;
@@ -369,7 +228,6 @@ export const getTypeFacets = async (
   yearEnd?: number
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
-  await ensureSettings();
 
   // Kasutame alati keelespetsiifilisi välju (type_et, type_en)
   const facetField = `type_${lang}`;
@@ -414,7 +272,6 @@ export const getAuthorFacets = async (
   yearEnd?: number
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
-  await ensureSettings();
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -472,7 +329,6 @@ export interface SearchWorksResult {
 // Dashboardi otsing: otsib teoseid
 export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
   checkMixedContent();
-  await ensureSettings();
 
   try {
     const filter: string[] = [];
@@ -1070,7 +926,6 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 // Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
 export const searchContent = async (query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
   checkMixedContent();
-  await ensureSettings();
 
   const limit = options.workId ? 20 : 10; // Teose piires rohkem vasteid lehel
   const offset = (page - 1) * limit;
@@ -1330,7 +1185,6 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 // Laadi ühe teose kõik otsingutulemused (akordioni avamiseks)
 export const searchWorkHits = async (query: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
   checkMixedContent();
-  await ensureSettings();
 
   const filter: string[] = [`work_id = "${workId}"`];
 
