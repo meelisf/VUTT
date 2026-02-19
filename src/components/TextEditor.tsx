@@ -9,6 +9,7 @@ import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { FILE_API_URL } from '../config';
 
 // Erimärgi tüüp
 interface SpecialCharacter {
@@ -121,7 +122,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const loadSpecialCharacters = async () => {
       try {
         if (authToken) {
-          const response = await fetchWithTimeout(`/user-chars?token=${authToken}`, { timeout: 5000 });
+          const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars?token=${authToken}`, { timeout: 5000 });
           if (response.ok) {
             const data = await response.json();
             setSpecialCharacters(data.characters || []);

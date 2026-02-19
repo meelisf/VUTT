@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, RotateCcw, Loader2 } from 'lucide-react';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { FILE_API_URL } from '../../config';
 
 interface SpecialCharacter {
   character: string;
@@ -25,7 +26,7 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
   const save = async (newChars: SpecialCharacter[], customFlag = true) => {
     setIsSaving(true);
     try {
-      await fetchWithTimeout('/user-chars', {
+      await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: authToken, characters: newChars }),
@@ -68,14 +69,14 @@ const CharSetEditor: React.FC<CharSetEditorProps> = ({ characters, isCustom, aut
   const handleReset = async () => {
     setIsSaving(true);
     try {
-      await fetchWithTimeout('/user-chars', {
+      await fetchWithTimeout(`${FILE_API_URL}/user-chars`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: authToken, reset: true }),
         timeout: 10000,
       });
       // Hangi globaalsed vaikimisi märgid
-      const res = await fetchWithTimeout(`/user-chars?token=${authToken}`, { timeout: 5000 });
+      const res = await fetchWithTimeout(`${FILE_API_URL}/user-chars?token=${authToken}`, { timeout: 5000 });
       const data = await res.json();
       if (data.characters) {
         setChars(data.characters);
