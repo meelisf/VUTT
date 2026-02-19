@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 
 // Line-by-Line Strict Renderer with Stateful Styling
 // This component guarantees 1:1 alignment with the editor's gutter numbers
@@ -18,6 +18,49 @@ interface Token {
 }
 
 const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Kopeerimise pealtkuulamine: reavahetuse asemel tühik, v.a. poolitused (- või ⸗)
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const handleCopy = (e: ClipboardEvent) => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) return;
+
+            const range = selection.getRangeAt(0);
+            const fragment = range.cloneContents();
+            const lineDivs = Array.from(fragment.childNodes).filter(
+                n => n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === 'DIV'
+            );
+
+            if (lineDivs.length < 2) return; // Ühe rea valik — brauser käitleb ise
+
+            const lines = lineDivs.map(n =>
+                ((n as Element).textContent || '').replace(/\u00a0/g, '') // eemalda &nbsp; tühjadelt ridadelt
+            );
+
+            let result = '';
+            for (let i = 0; i < lines.length; i++) {
+                if (i === 0) {
+                    result = lines[i];
+                } else if (result.endsWith('-') || result.endsWith('⸗')) {
+                    result += lines[i]; // poolitus — liida otse, ilma tühikuta
+                } else if (result.endsWith(' ') || lines[i].startsWith(' ')) {
+                    result += lines[i]; // tühik juba olemas — ära lisa uut
+                } else {
+                    result += ' ' + lines[i];
+                }
+            }
+
+            e.clipboardData?.setData('text/plain', result.trim());
+            e.preventDefault();
+        };
+
+        container.addEventListener('copy', handleCopy);
+        return () => container.removeEventListener('copy', handleCopy);
+    }, []);
 
     // Helper to escape HTML safely
     const escapeHtml = (text: string) => {
@@ -180,6 +223,7 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
 
     return (
         <div
+            ref={containerRef}
             className="markdown-preview min-h-full bg-white p-6 text-[18px] text-gray-900 overflow-x-auto"
             style={{
                 fontFamily: 'Georgia, Cambria, "Times New Roman", Times, serif',
