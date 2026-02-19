@@ -81,9 +81,18 @@ def sanitize_slug(text: str) -> str:
 
 
 def check_slug_conflict(year, slug: str) -> bool:
-    """Tagastab True kui data/{year}_{slug}/ juba eksisteerib."""
-    target = os.path.join(BASE_DIR, f"{year}_{slug}")
-    return os.path.isdir(target)
+    """
+    Tagastab True kui year+slug on juba kasutusel:
+    1. data/{year}_{slug}/ eksisteerib (imporditud teos)
+    2. mõni aktiivne upload kasutab sama year+slug (paralleelne üleslaadimine)
+    """
+    if os.path.isdir(os.path.join(BASE_DIR, f"{year}_{slug}")):
+        return True
+    for state in list_uploads():
+        m = state.get('meta', {})
+        if str(m.get('year')) == str(year) and m.get('slug') == slug:
+            return True
+    return False
 
 
 # =========================================================
