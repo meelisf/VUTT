@@ -272,7 +272,7 @@ def sync_work_to_meilisearch(dir_name):
             autor = praeses.get('name', '')
         elif creators:
             first_creator = creators[0]
-            if first_creator.get('role') not in ['respondens', 'gratulator', 'dedicator']:
+            if first_creator.get('role') not in ['respondens', 'gratulator', 'dedicator', 'editor', 'aui']:
                 autor = first_creator.get('name', '')
         if resp:
             respondens = resp.get('name', '')

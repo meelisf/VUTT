@@ -36,7 +36,7 @@ export type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 // =========================================================
 
 // Isiku roll teoses
-export type CreatorRole = 'praeses' | 'respondens' | 'auctor' | 'gratulator' | 'dedicator' | 'editor';
+export type CreatorRole = 'praeses' | 'respondens' | 'auctor' | 'gratulator' | 'dedicator' | 'editor' | 'aui';
 
 // Isik teoses
 export interface Creator {

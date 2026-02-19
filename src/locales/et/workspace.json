@@ -91,7 +91,8 @@
       "auctor": "Autor",
       "gratulator": "Õnnitleja",
       "dedicator": "Pühendaja",
-      "editor": "Toimetaja"
+      "editor": "Toimetaja",
+      "aui": "Eessõna/järelsõna autor"
     },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",
