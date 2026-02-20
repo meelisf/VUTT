@@ -458,6 +458,27 @@ def sync_work_to_meilisearch(dir_name):
     return False
 
 
+def delete_work_from_meilisearch(work_id):
+    """Kustutab kõik teose dokumendid Meilisearchi indeksist filtri järgi."""
+    if not MEILI_KEY:
+        return False
+    url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents/delete"
+    body = {"filter": f'work_id = "{work_id}"'}
+    data = json.dumps(body).encode('utf-8')
+    req = urllib.request.Request(url, data=data, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    try:
+        with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            task_uid = res_data.get('taskUid')
+            if task_uid:
+                return wait_for_task(task_uid)
+    except Exception as e:
+        print(f"Viga Meilisearchi kustutamisel: {e}")
+    return False
+
+
 def index_new_work(dir_name, metadata):
     """Loob lehekülgede dokumendid ja saadab Meilisearchi."""
     return sync_work_to_meilisearch(dir_name)

@@ -6,6 +6,7 @@ Kasutab server/ mooduleid abifunktsioonide jaoks.
 import http.server
 import json
 import os
+import shutil
 import threading
 import socketserver
 import unicodedata
@@ -49,7 +50,11 @@ from server import (
     load_people_data, process_creators_metadata, update_person_async, people_refresh_loop,
     # Utils
     metadata_lock,
-    find_directory_by_id, build_work_id_cache,
+    find_directory_by_id, build_work_id_cache, WORK_ID_CACHE,
+    # Git (kustutamine)
+    delete_work_from_git,
+    # Meilisearch (kustutamine)
+    delete_work_from_meilisearch,
     # Upload
     UPLOAD_ENABLED,
     sanitize_slug, check_slug_conflict,
@@ -1366,6 +1371,71 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:
                 print(f"DELETE /admin/upload VIGA: {e}")
                 self.send_error(500, str(e))
+        # DELETE /admin/work/{work_id} - kustuta teos (prügikast + git + meilisearch)
+        elif self.path.startswith('/admin/work/'):
+            try:
+                from urllib.parse import urlparse, parse_qs
+                params = parse_qs(urlparse(self.path).query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+
+                parts = self.path.split('?')[0].split('/')
+                work_id = parts[3] if len(parts) >= 4 else None
+                if not work_id:
+                    send_json_response(self, 400, {"status": "error", "message": "work_id puudub"})
+                    return
+
+                folder_path = find_directory_by_id(work_id)
+                if not folder_path:
+                    send_json_response(self, 404, {"status": "error", "message": "Teos ei leitud"})
+                    return
+
+                # Loe pealkiri git commit sõnumiks
+                meta_path = os.path.join(folder_path, '_metadata.json')
+                title = work_id
+                try:
+                    with open(meta_path, 'r', encoding='utf-8') as f:
+                        meta = json.load(f)
+                        title = meta.get('title', work_id)
+                except Exception:
+                    pass
+
+                folder_name = os.path.basename(folder_path)
+
+                # Loo prügikast ja liiguta JPG failid
+                # NB: '._trash' algab punktiga → metadata_watcher_loop ignoreerib seda alati
+                trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
+                os.makedirs(trash_dir, exist_ok=True)
+                # Liiguta JPG-d — kui see ebaõnnestub, KATKESTA (ära kustuta andmeid ilma varukoopita)
+                for fname in os.listdir(folder_path):
+                    if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                        shutil.move(os.path.join(folder_path, fname), os.path.join(trash_dir, fname))
+
+                # Eemalda kaust failisüsteemist (txt/json on gitis jälgitud → delete_work_from_git stage'ib need)
+                shutil.rmtree(folder_path)
+
+                # Git commit (staged deletions jälgitud failidele)
+                delete_work_from_git(folder_name, title, work_id)
+
+                # Meilisearch kustutamine
+                delete_work_from_meilisearch(work_id)
+
+                # Cache invalidatsioon
+                if work_id in WORK_ID_CACHE:
+                    del WORK_ID_CACHE[work_id]
+
+                send_json_response(self, 200, {"status": "success"})
+
+            except Exception as e:
+                print(f"DELETE /admin/work VIGA: {e}")
+                self.send_error(500, str(e))
+
         else:
             self.send_error(404)
 

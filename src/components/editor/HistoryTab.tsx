@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   History,
   RotateCcw,
@@ -10,9 +11,10 @@ import {
   ChevronRight,
   Plus,
   Minus,
-  Clock
+  Clock,
+  Trash2
 } from 'lucide-react';
-import { Page } from '../../types';
+import { Page, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
@@ -37,6 +39,7 @@ interface DiffData {
 
 interface HistoryTabProps {
   page: Page;
+  work?: Work;
   user: any;
   authToken: string | null;
   onRestore: (content: string) => void;
@@ -45,12 +48,14 @@ interface HistoryTabProps {
 
 const HistoryTab: React.FC<HistoryTabProps> = ({
   page,
+  work,
   user,
   authToken,
   onRestore,
   readOnly
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const navigate = useNavigate();
 
   // Git ajaloo state
   const [gitHistory, setGitHistory] = useState<GitHistoryEntry[]>([]);
@@ -65,6 +70,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   // Rate limit state
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const RATE_LIMIT_MS = 5000; // 5 sekundit
+
+  // Teose kustutamise state
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadGitHistory = async () => {
     // Rate limit kontroll
@@ -330,6 +340,27 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
   };
 
+  const handleDeleteWork = async () => {
+    if (!work) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/work/${work.work_id}?token=${authToken}`,
+        { method: 'DELETE', timeout: 10000 }
+      );
+      if (res.ok) {
+        navigate('/');
+      } else {
+        setDeleteError(t('management.deleteWorkError'));
+      }
+    } catch {
+      setDeleteError(t('management.deleteWorkError'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const isAdmin = user?.role === 'admin';
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
@@ -508,6 +539,50 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       ) : (
         <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500">
           {t('history.loginToView')}
+        </div>
+      )}
+
+      {/* Teose haldus — ainult adminile */}
+      {isAdmin && work && (
+        <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
+            <Trash2 size={15} className="text-red-500" />
+            <h4 className="font-bold text-gray-800 text-sm">{t('management.title')}</h4>
+          </div>
+          <div className="p-5">
+            {!deleteConfirm ? (
+              <button
+                onClick={() => setDeleteConfirm(true)}
+                className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+              >
+                {t('management.deleteWork')}
+              </button>
+            ) : (
+              <div className="bg-red-50 border border-red-200 rounded p-3 space-y-3">
+                <p className="text-sm text-red-800">
+                  {t('management.deleteWorkConfirmMessage', { title: work.title })}
+                </p>
+                {deleteError && (
+                  <p className="text-sm text-red-600 font-medium">{deleteError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDeleteWork}
+                    disabled={deleting}
+                    className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin inline" /> : t('management.deleteWorkConfirm')}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteConfirm(false); setDeleteError(null); }}
+                    className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    {t('management.deleteWorkCancel')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

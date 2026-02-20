@@ -53,14 +53,16 @@ from .pending_edits_handlers import (
 from .git_ops import (
     get_or_init_repo, save_with_git, get_file_git_history,
     get_file_at_commit, get_file_diff, get_commit_diff, commit_new_work_to_git,
-    get_recent_commits, get_git_failures, clear_git_failures, run_git_fsck
+    get_recent_commits, get_git_failures, clear_git_failures, run_git_fsck,
+    delete_work_from_git
 )
 
 # Meilisearch operatsioonid
 from .meilisearch_ops import (
     send_to_meilisearch, sync_work_to_meilisearch,
     sync_work_to_meilisearch_async,
-    index_new_work, metadata_watcher_loop
+    index_new_work, metadata_watcher_loop,
+    delete_work_from_meilisearch
 )
 
 # Inimeste/autorite andmed
@@ -80,7 +82,7 @@ from .utils import (
     sanitize_id, find_directory_by_id, generate_default_metadata,
     normalize_genre, calculate_work_status,
     get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids,
-    build_work_id_cache
+    build_work_id_cache, WORK_ID_CACHE
 )
 
 # Git HTTP handlerid

@@ -527,6 +527,30 @@ def commit_new_work_to_git(dir_name):
         return False
 
 
+def delete_work_from_git(folder_name, work_title, work_id):
+    """
+    Eemaldab teose jälgitud failid gitist ja teeb commit.
+    JPG-d peavad olema ENNE seda liigutatud prügikasti.
+    Kasutab git add -u (ainult jälgitud failid: txt, json, _metadata.json).
+    """
+    try:
+        repo = get_or_init_repo()
+        # Stage deletions (ainult jälgitud failid)
+        repo.git.add('-u', folder_name)
+        # Kontrolli kas on midagi stageitud
+        if not repo.index.diff('HEAD'):
+            logger.info(f"GIT: Teosel {folder_name} polnud jälgitud faile, commit vahele jäetud")
+            return False
+        actor = Actor("VUTT Server", "vutt@server.local")
+        msg = f"Kustuta teos: {work_title} [{work_id}]"
+        repo.index.commit(msg, author=actor, committer=actor)
+        logger.info(f"GIT: Kustutatud teos {folder_name} [{work_id}]")
+        return True
+    except Exception as e:
+        logger.error(f"GIT viga teose kustutamisel ({folder_name}): {e}")
+        return False
+
+
 def get_recent_commits(username=None, limit=50, skip=0):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.

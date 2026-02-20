@@ -11,7 +11,7 @@
     "edit": "Muuda",
     "annotations": "Annotatsioonid",
     "info": "Info ja annotatsioonid",
-    "history": "Ajalugu"
+    "history": "Haldus"
   },
   "editor": {
     "placeholder": "Tekst puudub...",
@@ -61,6 +61,14 @@
     },
     "adminOnly": "Varukoopiate taastamine on saadaval ainult administraatoritele.",
     "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\"."
+  },
+  "management": {
+    "title": "Teose haldus",
+    "deleteWork": "Kustuta teos",
+    "deleteWorkConfirmMessage": "Kas oled kindel, et soovid kustutada teose \"{{title}}\"? Pildifailid säilitatakse 90 päeva, tekst on gitist taastatav.",
+    "deleteWorkConfirm": "Jah, kustuta",
+    "deleteWorkCancel": "Tühista",
+    "deleteWorkError": "Kustutamine ebaõnnestus"
   },
   "metadata": {
     "title": "Metaandmed",

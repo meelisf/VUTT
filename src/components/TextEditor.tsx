@@ -546,6 +546,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         {activeTab === 'history' && (
           <HistoryTab
             page={page}
+            work={work}
             user={user}
             authToken={authToken}
             onRestore={(content) => {

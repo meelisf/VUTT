@@ -11,7 +11,7 @@
     "edit": "Edit",
     "annotations": "Annotations",
     "info": "Info & Annotations",
-    "history": "History"
+    "history": "Manage"
   },
   "editor": {
     "placeholder": "No text...",
@@ -61,6 +61,14 @@
     },
     "adminOnly": "Version restoration is only available to administrators.",
     "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes."
+  },
+  "management": {
+    "title": "Work management",
+    "deleteWork": "Delete work",
+    "deleteWorkConfirmMessage": "Are you sure you want to delete \"{{title}}\"? Image files are kept for 90 days, text is recoverable from git.",
+    "deleteWorkConfirm": "Yes, delete",
+    "deleteWorkCancel": "Cancel",
+    "deleteWorkError": "Deletion failed"
   },
   "metadata": {
     "title": "Metadata",
