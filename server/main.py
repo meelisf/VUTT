@@ -371,10 +371,15 @@ async def backups(user=Depends(require_role("admin"))):
     return {"status": "success", "backups": get_recent_commits(limit=50)["commits"]}
 
 @app.post("/recent-edits")
+@app.get("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
-    data = await get_json_data(request)
+    # Toetame nii GET (query params) kui POST (json body)
+    if request.method == "POST":
+        data = await get_json_data(request)
+    else:
+        data = {}
+    
     is_admin = user['role'] == 'admin'
-    # Kasutame andmeid body-st või query-st
     f_user = data.get('user') or request.query_params.get('user')
     limit = int(data.get('limit') or request.query_params.get('limit', 30))
     offset = int(data.get('offset') or request.query_params.get('offset', 0))
@@ -389,35 +394,51 @@ async def recent_edits(request: Request, user=Depends(get_user)):
 async def git_history(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     from .git_ops import get_file_git_history
-    path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', '')))
-    return {"status": "success", "history": get_file_git_history(path)}
+    # Puhastame tee: eemaldame võimaliku 'data/' eesliite ja võtame ainult kataloogi + faili
+    catalog = os.path.basename(data.get('original_path', ''))
+    filename = os.path.basename(data.get('file_name', ''))
+    rel_path = os.path.join(catalog, filename)
+    
+    print(f"GIT-HISTORY: Küsin ajalugu failile: {rel_path} (algne: {data.get('original_path')}/{data.get('file_name')})")
+    history = get_file_git_history(rel_path)
+    print(f"GIT-HISTORY: Leitud {len(history)} sissekannet")
+    return {"status": "success", "history": history}
 
 @app.post("/git-diff")
 async def git_diff(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     from .git_ops import get_file_diff
-    path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', '')))
-    return {"status": "success", "diff": get_file_diff(path, data.get('commit_hash'))}
-
-@app.post("/git-restore")
-async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
-    data = await get_json_data(request)
-    from .git_ops import get_file_at_commit
     catalog = os.path.basename(data.get('original_path', ''))
     filename = os.path.basename(data.get('file_name', ''))
-    path = os.path.join(BASE_DIR, catalog, filename)
-    content = get_file_at_commit(path, data.get('commit_hash'))
-    if content is None: raise HTTPException(status_code=400, detail="Versiooni ei leitud")
-    
-    save_with_git(path, content, user['username'], message=f"Taastatud versioon: {data.get('commit_hash')[:8]}")
-    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
-    return {"status": "success", "content": content}
+    rel_path = os.path.join(catalog, filename)
+    return {"status": "success", "diff": get_file_diff(rel_path, data.get('commit_hash'))}
 
 @app.post("/commit-diff")
-async def commit_diff(request: Request, user=Depends(require_role("admin"))):
+async def commit_diff(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     from .git_ops import get_commit_diff
-    return {"status": "success", "diff": get_commit_diff(data.get('commit_hash'))}
+    
+    commit_hash = data.get('commit_hash')
+    filepath = data.get('filepath', '')
+    
+    # Kui filepath on olemas, puhastame selle (GitPython tahab suhetlist teed BASE_DIR suhtes)
+    clean_filepath = None
+    if filepath:
+        # Kui tee algab BASE_DIR-iga, eemaldame selle
+        if filepath.startswith(BASE_DIR):
+            clean_filepath = os.path.relpath(filepath, BASE_DIR)
+        else:
+            # Muul juhul eeldame, et see on juba suhteline või vajab puhastamist
+            parts = filepath.strip('/').split('/')
+            if len(parts) >= 2:
+                clean_filepath = os.path.join(parts[-2], parts[-1])
+    
+    print(f"COMMIT-DIFF: Hash={commit_hash}, File={clean_filepath} (algne: {filepath})")
+    diff_res = get_commit_diff(commit_hash, filepaths=clean_filepath)
+    
+    if diff_res:
+        return {"status": "success", **diff_res}
+    return {"status": "error", "message": "Diffi laadimine ebaõnnestus"}
 
 @app.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
