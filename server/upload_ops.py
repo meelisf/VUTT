@@ -967,7 +967,7 @@ def import_as_work(upload_id: str) -> dict:
                 open(local_txt, 'w').close()
             os.chmod(local_txt, 0o644)
 
-            page_json = {"status": "Toores", "page_tags": [], "comments": [], "history": []}
+            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
             with open(local_json, 'w', encoding='utf-8') as f:
                 json.dump(page_json, f, ensure_ascii=False, indent=2)
             os.chmod(local_json, 0o644)

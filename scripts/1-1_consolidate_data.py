@@ -423,9 +423,30 @@ def create_meilisearch_data_per_page():
         aliases = get_creator_aliases(creators, people_data)
         authors_text = doc_metadata.get('authors_text', []) + aliases
 
-        # Leia pildifailid (v.a. thumbnailid)
-        jpg_files = sorted([f for f in os.listdir(doc_path)
-                           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
+        # Leia pildifailid (v.a. thumbnailid), sordi sequence järgi
+        def _seq(img_name):
+            jp = os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json')
+            if os.path.exists(jp):
+                try:
+                    with open(jp, 'r', encoding='utf-8') as fj:
+                        d = json.load(fj)
+                        s = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                        if s is not None:
+                            return int(s)
+                except Exception:
+                    pass
+            return float('inf')
+
+        all_imgs = [f for f in os.listdir(doc_path)
+                    if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+        alpha_sorted = sorted(all_imgs)
+        alpha_pos = {f: i for i, f in enumerate(alpha_sorted)}
+
+        def _eff_seq(img_name):
+            s = _seq(img_name)
+            return (alpha_pos[img_name] + 1) * 100 if s == float('inf') else s
+
+        jpg_files = sorted(all_imgs, key=lambda f: (_eff_seq(f), f))
         if not jpg_files:
             continue
 
