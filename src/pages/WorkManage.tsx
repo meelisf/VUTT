@@ -576,10 +576,9 @@ const WorkManage: React.FC = () => {
               </div>
             )}
           </div>
-        )}
 
-        {/* Ohutsoon — alati nähtav */}
-        <div className="bg-white rounded-xl border border-red-200 shadow-sm">
+          {/* Ohutsoon — prügikasti tabi all */}
+          <div className="bg-white rounded-xl border border-red-200 shadow-sm">
           <div className="flex items-center gap-2 px-5 py-4 border-b border-red-100">
             <AlertTriangle size={16} className="text-red-500" />
             <h2 className="font-semibold text-red-800">{t('manage.dangerZone')}</h2>
@@ -627,6 +626,7 @@ const WorkManage: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
       </div>
     </div>
