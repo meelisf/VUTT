@@ -55,29 +55,26 @@ def process_work_dir(dir_path, dry_run=False):
                 print(f"  VIGA JSON lugemisel {json_path}: {e}")
                 continue
 
-            # Toeta nii vana (meta_content wrapper) kui uut formaati
+            # Kui sequence on juba olemas (mis tahes väärtusega), jäta rahule.
+            # Ära kirjuta üle — see rikuks nanoid-nimeliste või ümber tõstetud
+            # lehtede hoolikalt seadistatud järjekorra.
+            src = data.get('meta_content', data)
+            if src.get('sequence') is not None:
+                skipped += 1
+                continue
+
+            # Sequence puudub — lisa tähestikulise positsiooni järgi
             if 'meta_content' in data:
-                # Vana formaat: sequence läheb meta_content alla
-                existing = data['meta_content'].get('sequence')
-                if existing == sequence:
-                    skipped += 1
-                    continue
                 if not dry_run:
                     data['meta_content']['sequence'] = sequence
                     with open(json_path, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
-                updated += 1
             else:
-                # Uus formaat: sequence otse objektis
-                existing = data.get('sequence')
-                if existing == sequence:
-                    skipped += 1
-                    continue
                 if not dry_run:
                     data['sequence'] = sequence
                     with open(json_path, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
-                updated += 1
+            updated += 1
         else:
             # JSON puudub — loo minimaalne fail
             new_data = {

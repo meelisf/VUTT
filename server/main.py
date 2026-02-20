@@ -481,11 +481,12 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
             seq_after_val = _get_page_sequence(os.path.join(path, os.path.splitext(images[idx+1])[0] + '.json')) if idx + 1 < len(images) else (after_page_num + 1) * 100
             new_seq = (int(seq_before) + int(seq_after_val)) // 2
 
-    # Salvesta pildifail ainulaadse nimega (kontrolli kolliisiooni)
+    # Salvesta pildifail ainulaadse nimega ({folder_name}-{nanoid}, kontrolli kolliisiooni)
     new_id = generate_nanoid()
-    while os.path.exists(os.path.join(path, f"{new_id}{ext}")):
+    new_filename = f"{folder_name}-{new_id}{ext}"
+    while os.path.exists(os.path.join(path, new_filename)):
         new_id = generate_nanoid()
-    new_filename = f"{new_id}{ext}"
+        new_filename = f"{folder_name}-{new_id}{ext}"
     new_img_path = os.path.join(path, new_filename)
     with open(new_img_path, 'wb') as f:
         f.write(content)
