@@ -9,9 +9,9 @@ from fastapi.responses import JSONResponse, HTMLResponse
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock
-from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async
-from .people_ops import people_refresh_loop, load_people_data, process_creators_metadata
-from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git
+from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
+from .people_ops import people_refresh_loop, load_people_data, process_creators_metadata, get_refresh_status, refresh_all_people_safe
+from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, clear_git_failures, get_git_failures
 from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
@@ -68,7 +68,6 @@ async def get_user(request: Request, min_role: str = "contributor"):
     token = request.query_params.get("token")
     if not token:
         try:
-            # Loeme body ja salvestame selle requesti külge, et seda saaks uuesti lugeda
             body_bytes = await request.body()
             if body_bytes:
                 body_data = json.loads(body_bytes)
@@ -224,10 +223,8 @@ async def admin_trash_restore(work_id: str, user=Depends(require_role("admin")))
 async def admin_git_failures(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
     if data.get('action') == 'clear':
-        from .git_ops import clear_git_failures
         clear_git_failures()
         return {"status": "success"}
-    from .git_ops import get_git_failures
     return {"status": "success", "failures": get_git_failures()}
 
 @app.post("/admin/git-health")
@@ -236,14 +233,69 @@ async def admin_git_health(user=Depends(require_role("admin"))):
 
 @app.post("/admin/people-refresh")
 async def admin_people_refresh(user=Depends(require_role("admin"))):
-    from .people_ops import refresh_all_people_safe
     threading.Thread(target=refresh_all_people_safe, daemon=True).start()
     return {"status": "success"}
 
 @app.post("/admin/people-refresh-status")
 async def admin_people_refresh_status(user=Depends(require_role("admin"))):
-    from .people_ops import get_refresh_status
     return {"status": "success", **get_refresh_status()}
+
+@app.post("/admin/work/{work_id}/delete")
+@app.delete("/admin/work/{work_id}")
+async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
+    import shutil
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    folder_name = os.path.basename(path)
+    # Loe pealkiri git commit sõnumiks
+    meta_path = os.path.join(path, '_metadata.json')
+    title = work_id
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+            title = meta.get('title', work_id)
+    except: pass
+    
+    # Liiguta JPG-d prügikasti
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
+    os.makedirs(trash_dir, exist_ok=True)
+    for fname in os.listdir(path):
+        if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+            shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
+    
+    shutil.rmtree(path)
+    delete_work_from_git(folder_name, title, work_id)
+    delete_work_from_meilisearch(work_id)
+    if work_id in build_work_id_cache(): pass # Värskendab cache'i
+    return {"status": "success"}
+
+# =========================================================
+# PENDING-EDITS (KAASTÖÖLISTE MUUDATUSED)
+# =========================================================
+
+@app.post("/save-pending")
+async def save_pending(request: Request, user=Depends(require_role("contributor"))):
+    from .pending_edits import create_pending_edit
+    data = await get_json_data(request)
+    success, edit_id, other_pending = create_pending_edit(
+        data.get('work_id'), data.get('lehekylje_number'),
+        user['username'], data.get('original_text'), data.get('new_text')
+    )
+    return {"status": "success", "edit_id": edit_id, "has_other_pending": other_pending}
+
+@app.post("/pending-edits/check")
+async def pending_check(request: Request, user=Depends(get_user)):
+    data = await get_json_data(request)
+    from .pending_edits import get_pending_edits_for_page, get_user_pending_edit_for_page
+    work_id, page_num = data.get('work_id'), data.get('lehekylje_number')
+    all_pending = get_pending_edits_for_page(work_id, page_num)
+    own_pending = get_user_pending_edit_for_page(work_id, page_num, user['username'])
+    return {
+        "status": "success",
+        "has_own_pending": own_pending is not None,
+        "own_pending_edit": own_pending,
+        "other_pending_count": len([e for e in all_pending if e['username'] != user['username']])
+    }
 
 # =========================================================
 # ANDMETE SALVESTAMINE JA META
@@ -269,7 +321,8 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 @app.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    meta_path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path')), '_metadata.json')
+    path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
+    meta_path = os.path.join(path, '_metadata.json')
     with metadata_lock:
         with open(meta_path, 'r', encoding='utf-8') as f: meta = json.load(f)
         meta.update(data.get('metadata', {}))
@@ -282,9 +335,10 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
 @app.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
-    path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')), '_metadata.json')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f: return {"status": "success", "metadata": json.load(f)}
+    path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
+    meta_path = os.path.join(path, '_metadata.json')
+    if os.path.exists(meta_path):
+        with open(meta_path, 'r', encoding='utf-8') as f: return {"status": "success", "metadata": json.load(f)}
     return {"status": "success", "metadata": {}}
 
 @app.post("/get-metadata-suggestions")
@@ -322,6 +376,36 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
             else: cur = data.get('tags', [])
             meta['tags'] = cur
             save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk tags: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+    invalidate_cache()
+    return {"status": "success"}
+
+@app.post("/works/bulk-genre")
+async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    for work_id in data.get('work_ids', []):
+        path = find_directory_by_id(work_id)
+        if not path: continue
+        meta_path = os.path.join(path, '_metadata.json')
+        with metadata_lock:
+            with open(meta_path, 'r', encoding='utf-8') as f: meta = json.load(f)
+            meta['genre'] = data.get('genre')
+            save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk genre: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+    invalidate_cache()
+    return {"status": "success"}
+
+@app.post("/works/bulk-collection")
+async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    for work_id in data.get('work_ids', []):
+        path = find_directory_by_id(work_id)
+        if not path: continue
+        meta_path = os.path.join(path, '_metadata.json')
+        with metadata_lock:
+            with open(meta_path, 'r', encoding='utf-8') as f: meta = json.load(f)
+            meta['collection'] = data.get('collection')
+            save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk coll: {work_id}")
             background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
     invalidate_cache()
     return {"status": "success"}
@@ -384,11 +468,7 @@ async def admin_upload_import(upload_id: str, user=Depends(require_role("admin")
     if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     try:
         result = import_as_work(upload_id)
-        
-        # UUENDAME CACHE-I: See on kriitiline, et uus Nanoid üles leitaks!
-        from .utils import build_work_id_cache
         build_work_id_cache()
-        
         return {"status": "success", **result}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
 
@@ -414,19 +494,13 @@ async def people_aliases(): return {"status": "success", "aliases": get_cached_p
 @app.get("/people-register")
 async def people_register(): return {"status": "success", "people": get_cached_people_register()}
 
-# =========================================================
-# KASUTAJA ERIMÄRGID
-# =========================================================
-
 @app.get("/user-chars")
 async def get_user_chars(request: Request, user=Depends(get_user)):
     from .config import COLLECTIONS_FILE
     user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
     chars_file = os.path.join(user_chars_dir, f"{user['username']}.json")
-
     if os.path.exists(chars_file):
-        with open(chars_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+        with open(chars_file, 'r', encoding='utf-8') as f: data = json.load(f)
         return {"status": "success", "characters": data.get("characters", []), "is_custom": True}
     return {"status": "success", "characters": [], "is_custom": False}
 
@@ -437,14 +511,10 @@ async def save_user_chars(request: Request, user=Depends(get_user)):
     user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
     os.makedirs(user_chars_dir, exist_ok=True)
     chars_file = os.path.join(user_chars_dir, f"{user['username']}.json")
-
     if data.get('reset'):
         if os.path.exists(chars_file): os.remove(chars_file)
         return {"status": "success", "reset": True}
-
-    characters = data.get('characters', [])
-    with open(chars_file, 'w', encoding='utf-8') as f:
-        json.dump({"characters": characters}, f, ensure_ascii=False, indent=2)
+    with open(chars_file, 'w', encoding='utf-8') as f: json.dump({"characters": data.get('characters', [])}, f, ensure_ascii=False, indent=2)
     return {"status": "success"}
 
 @app.get("/meta/work/{work_id}")
@@ -470,4 +540,4 @@ async def health(): return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8003)
+    uvicorn.run(app, host="0.0.0.0", port=8002)
