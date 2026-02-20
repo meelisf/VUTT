@@ -356,6 +356,13 @@ const Upload: React.FC = () => {
     if (!uploadId || !authToken) return;
     setUploadError('');
 
+    // Näita kohe laadimise indikaatorit (polling pole veel vastanud)
+    setPollResult((prev) => ({
+      ready: 0, total: 0, expected_pages: null, files: [],
+      ...(prev ?? {}),
+      status: 'uploading',
+    }));
+
     // Alusta kiire pollinguga saatmise ajaks
     startPolling(uploadId, POLL_FAST_MS);
 
