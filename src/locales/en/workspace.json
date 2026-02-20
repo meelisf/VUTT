@@ -62,7 +62,7 @@
   },
   "manage": {
     "title": "Page management",
-    "backToWork": "← Back to work",
+    "backToWork": "Back to work",
     "manageWork": "Manage work",
     "pages": "Pages",
     "loadError": "Failed to load pages",

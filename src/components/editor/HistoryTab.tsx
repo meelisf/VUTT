@@ -12,7 +12,7 @@ import {
   Plus,
   Minus,
   Clock,
-  Settings
+  Wrench
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
@@ -519,20 +519,14 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
       {/* Teose haldus — ainult adminile */}
       {isAdmin && work && (
-        <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
-            <Settings size={15} className="text-gray-500" />
-            <h4 className="font-bold text-gray-800 text-sm">{t('management.title')}</h4>
-          </div>
-          <div className="p-5">
-            <button
-              onClick={() => navigate(`/work/${work.work_id}/manage`)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-            >
-              <Settings size={14} />
-              {t('manage.managePageLink')}
-            </button>
-          </div>
+        <div className="mt-6">
+          <button
+            onClick={() => navigate(`/work/${work.work_id}/manage`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-amber-100 text-amber-600 border border-amber-200 bg-amber-50 rounded transition-colors"
+          >
+            <Wrench size={14} />
+            {t('manage.manageWork')}
+          </button>
         </div>
       )}
     </div>

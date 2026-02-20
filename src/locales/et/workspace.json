@@ -62,7 +62,7 @@
   },
   "manage": {
     "title": "Lehekülgede haldus",
-    "backToWork": "← Tagasi teosele",
+    "backToWork": "Tagasi teosele",
     "manageWork": "Halda teost",
     "pages": "Leheküljed",
     "loadError": "Lehekülgede laadimine ebaõnnestus",

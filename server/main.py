@@ -258,15 +258,26 @@ def _get_page_sequence(json_path: str) -> float:
 
 
 def _get_sorted_images(dir_path: str) -> list[str]:
-    """Tagastab sequence järgi sorteeritud piltide nimekirja."""
+    """Tagastab sequence järgi sorteeritud piltide nimekirja.
+    Fallback: tähestikuline positsioon × 100 kui sequence puudub.
+    NB: float('inf') fallback läheks katki kui mõni leht HAS sequence —
+    siis float('inf') lehed sorteeritaks uue lehe järele, mitte ette.
+    """
     images = [
         f for f in os.listdir(dir_path)
         if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
     ]
-    return sorted(images, key=lambda f: (
-        _get_page_sequence(os.path.join(dir_path, os.path.splitext(f)[0] + '.json')),
-        f
-    ))
+    # Esmane tähestikuline sort positsioonifallback'i jaoks
+    alpha_sorted = sorted(images)
+    alpha_pos = {f: i for i, f in enumerate(alpha_sorted)}
+
+    def effective_seq(f: str) -> int:
+        s = _get_page_sequence(os.path.join(dir_path, os.path.splitext(f)[0] + '.json'))
+        if s == float('inf'):
+            return (alpha_pos[f] + 1) * 100  # positsioonipõhine fallback
+        return int(s)
+
+    return sorted(images, key=lambda f: (effective_seq(f), f))
 
 
 def _rebalance_sequences(dir_path: str):
@@ -424,10 +435,14 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
     page_count = len(images)
 
     def seq_of(idx):
+        """Tagastab lehe effective sequence; fallback: positsioon × 100."""
         if idx < 0 or idx >= len(images):
             return None
         base = os.path.splitext(images[idx])[0]
-        return _get_page_sequence(os.path.join(path, base + '.json'))
+        s = _get_page_sequence(os.path.join(path, base + '.json'))
+        if s == float('inf'):
+            return (idx + 1) * 100  # images on juba sorteeritud, positsioon on korrektne
+        return int(s)
 
     if after_page_num == -1 or after_page_num >= page_count:
         # Lõppu
