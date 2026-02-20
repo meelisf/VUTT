@@ -9,8 +9,10 @@ echo "🔄 [1/4] Uuendan koodi Gitist..."
 git pull
 
 echo "🐳 [2/4] Ehitan ja taaskäivitan Docker konteinerid (sh. Python serverid)..."
+# --no-cache tagab, et Python koodi muutused jõuavad alati konteinerisse
 # --remove-orphans eemaldab vanad/üleliigsed konteinerid (nt vana nginx)
-docker compose up -d --build --remove-orphans
+docker compose build --no-cache backend
+docker compose up -d --remove-orphans
 
 echo "⏳ [3/4] Ootan teenuste käivitumist (5s)..."
 sleep 5
