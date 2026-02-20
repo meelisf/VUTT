@@ -206,6 +206,32 @@ RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
 | Lisa Redis sessioonide ja cache jaoks | Kui vaja mitut serveri instantsi (horisontaalne skaleerimine) |
 | Lisa metrics endpoint (Prometheus) | Kui vaja jälgida mälukasutust ja jõudlust tootmises |
 
+## Upload Workflow (Admin)
+
+Admin saab lisada uue teose PDF-i või pildina (`/upload`). Kolmeastmeline viisard:
+
+**Samm 1 — Metaandmed:** pealkiri, aasta, slug (kaustanimi), kollektsioon.
+
+**Samm 2 — Faili üleslaadimine:** PDF, JPG või PNG.
+- Failitüüp tuvastatakse **magic bytes** alusel (`_detect_file_type()` in `upload_ops.py`), mitte failinime järgi
+- **PDF:** `pdfinfo` → lehekülgede arv → SFTP → `AUTO-OCR/{id}/slug.pdf` → OCR server lõhub lehekülgedeks
+- **JPG/PNG:** SFTP otse → `AUTO-OCR/{id}/slug/slug_pg_001.jpg` → OCR server teeb OCR ilma PDF-i lahti lõhkumata (PNG teisendatakse JPEG-iks Pillowiga)
+- Kuni üleslaadimise lõpuni: "Sulge — jätkan hiljem" sulgeb viisardi ilma uploadi katkestamata; kasutaja näeb pooleliolevate nimekirja
+- "Katkesta üleslaadimine ja kustuta" kustutab ka OCR serveri staging kausta
+
+**Samm 3 — Ülevaatus:** OCR server töötleb taustal. Polling iga 2–5s. Pisipiltide ruudustik, võimalik üksikuid lehekülgi kustutada.
+
+**Import:** "Impordi VUTT-i" → `import_as_work()`:
+1. SFTP: laeb alla JPG + TXT OCR serverist → `data/{slug}/`
+2. Loob `_metadata.json` + lehekülgede `.json` failid
+3. Git commit (originaal OCR)
+4. Meilisearch sync (**sünkroonne** — ootab lõpuni, et teos oleks kohe kättesaadav)
+5. Navigeerib otse teose lehele
+
+**Staging:** `uploads/{upload_id}/state.json` + `thumbs/`. Pooleliolevad uploadid säilivad üle seansi.
+
+**Key file:** `server/upload_ops.py` — `create_upload`, `save_and_transfer_to_ocr`, `poll_and_sync_thumbs`, `import_as_work`, `cancel_upload`
+
 ## Implemented ✅
 
 - Wikidata integration (all fields including creators)
@@ -217,3 +243,4 @@ RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
 - Search filters: type multi-select, facets preserve all options
 - File permissions fix (chmod 644 after writes)
 - Server performance optimizations (async Meilisearch, caching, cleanup threads)
+- Upload wizard: PDF + JPG/PNG, OCR server integration, pooleliolevate haldus
