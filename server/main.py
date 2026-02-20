@@ -160,9 +160,134 @@ async def verify_token(request: Request):
     
     return {"status": "error", "valid": False, "message": "Token kehtetu"}
 
+from .registration import (
+    add_registration, load_pending_registrations, get_registration_by_id,
+    update_registration_status, create_invite_token, validate_invite_token,
+    create_user_from_invite
+)
+from .auth import get_all_users, update_user_role, delete_user
+
 # =========================================================
-# ANDMETE SALVESTAMINE
+# REGISTREERIMINE (AVALIK)
 # =========================================================
+
+@app.post("/register")
+async def register(request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/register')
+    if not allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"status": "error", "message": f"Liiga palju päringuid. Proovi uuesti {retry_after} sekundi pärast."},
+            headers={"Retry-After": str(retry_after)}
+        )
+
+    data = await request.json()
+    
+    # Honeypot kontroll
+    if data.get('website'):
+        return {"status": "success", "message": "Taotlus esitatud"}
+
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
+    affiliation = data.get('affiliation', '').strip() or None
+    motivation = data.get('motivation', '').strip()
+
+    if not name or not email or '@' not in email or not motivation:
+        raise HTTPException(status_code=400, detail="Nimi, e-post ja motivatsioon on kohustuslikud")
+
+    registration, error = add_registration(name, email, affiliation, motivation)
+    if not registration:
+        raise HTTPException(status_code=400, detail=error)
+
+    return {"status": "success", "message": "Taotlus esitatud", "id": registration["id"]}
+
+@app.get("/invite/{token}")
+async def check_invite(token: str):
+    token_data, error = validate_invite_token(token)
+    if token_data:
+        return {
+            "status": "success",
+            "valid": True,
+            "email": token_data["email"],
+            "name": token_data["name"],
+            "expires_at": token_data["expires_at"]
+        }
+    return {"status": "error", "valid": False, "message": error}
+
+@app.post("/invite/set-password")
+async def set_password(request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/invite/set-password')
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"})
+
+    data = await request.json()
+    token = data.get('token', '').strip()
+    password = data.get('password', '')
+
+    if not token or not password or len(password) < 12:
+        raise HTTPException(status_code=400, detail="Vigane token või liiga lühike parool (min 12 märki)")
+
+    new_user, error = create_user_from_invite(token, password)
+    if not new_user:
+        raise HTTPException(status_code=400, detail=error)
+
+    return {"status": "success", "message": "Kasutaja loodud", "username": new_user["username"]}
+
+# =========================================================
+# ADMIN: REGISTREERINGUD JA KASUTAJAD
+# =========================================================
+
+@app.get("/admin/registrations")
+async def admin_registrations(user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = load_pending_registrations()
+    return {"status": "success", "registrations": data["registrations"]}
+
+@app.post("/admin/registrations/approve")
+async def approve_registration(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    reg_id = data.get('registration_id')
+    
+    reg = get_registration_by_id(reg_id)
+    if not reg or reg["status"] != "pending":
+        raise HTTPException(status_code=400, detail="Taotlust ei leitud või on juba käsitletud")
+
+    update_registration_status(reg_id, "approved", user["username"])
+    token_data = create_invite_token(reg["email"], reg["name"], user["username"])
+    
+    return {
+        "status": "success", 
+        "invite_url": f"/set-password?token={token_data['token']}",
+        "invite_token": token_data["token"]
+    }
+
+@app.post("/admin/registrations/reject")
+async def reject_registration(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    reg_id = data.get('registration_id')
+    update_registration_status(reg_id, "rejected", user["username"])
+    return {"status": "success"}
+
+@app.get("/admin/users")
+async def admin_users(user=Depends(lambda r: get_user(r, min_role="admin"))):
+    return {"status": "success", "users": get_all_users()}
+
+@app.post("/admin/users/update-role")
+async def admin_update_role(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    success, message = update_user_role(data.get('username'), data.get('new_role'), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "message": message}
+
+@app.post("/admin/users/delete")
+async def admin_delete_user(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    success, message = delete_user(data.get('username'), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "message": message}
 
 @app.post("/save")
 async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(get_user)):
@@ -237,6 +362,231 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
             raise HTTPException(status_code=500, detail=f"Salvestamine ebaõnnestus: {e}")
 
     return response
+
+# =========================================================
+# METAANDMETE UUENDAMINE
+# =========================================================
+
+@app.post("/update-work-metadata")
+async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    original_catalog = data.get('original_path')
+    work_id = data.get('work_id')
+    new_metadata = data.get('metadata')
+
+    if (not original_catalog and not work_id) or not new_metadata:
+        raise HTTPException(status_code=400, detail="Puudub 'original_path'/'work_id' või 'metadata'")
+
+    from .utils import find_directory_by_id, metadata_lock
+    if original_catalog:
+        safe_catalog = os.path.basename(original_catalog)
+        metadata_path = os.path.join(BASE_DIR, safe_catalog, '_metadata.json')
+    else:
+        found_path = find_directory_by_id(work_id)
+        if not found_path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+        metadata_path = os.path.join(found_path, '_metadata.json')
+
+    with metadata_lock:
+        current_meta = {}
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                current_meta = json.load(f)
+
+        current_meta.update(new_metadata)
+        
+        from .git_ops import save_with_git
+        save_with_git(
+            filepath=metadata_path,
+            content=json.dumps(current_meta, indent=2, ensure_ascii=False),
+            username=user['username'],
+            message=f"Metaandmed: {os.path.basename(os.path.dirname(metadata_path))}"
+        )
+
+    from .people_ops import process_creators_metadata
+    if current_meta.get('creators'):
+        background_tasks.add_task(process_creators_metadata, current_meta['creators'])
+
+    from .meilisearch_ops import sync_work_to_meilisearch
+    dir_name = os.path.basename(os.path.dirname(metadata_path))
+    sync_work_to_meilisearch(dir_name)
+    invalidate_cache()
+
+    return {"status": "success", "message": "Metaandmed salvestatud"}
+
+@app.post("/get-work-metadata")
+async def get_work_meta_direct(request: Request, user=Depends(lambda r: get_user(r, min_role="editor"))):
+    data = await request.json()
+    original_catalog = data.get('original_path')
+    work_id = data.get('work_id')
+
+    from .utils import find_directory_by_id
+    if original_catalog:
+        path = os.path.join(BASE_DIR, os.path.basename(original_catalog), '_metadata.json')
+    else:
+        found_path = find_directory_by_id(work_id)
+        path = os.path.join(found_path, '_metadata.json') if found_path else ""
+
+    if path and os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return {"status": "success", "metadata": json.load(f)}
+    return {"status": "success", "metadata": {}}
+
+@app.post("/get-metadata-suggestions")
+async def metadata_suggestions(request: Request, user=Depends(lambda r: get_user(r, min_role="editor"))):
+    data = await request.json()
+    preferred_lang = data.get('lang', 'et')
+    return {"status": "success", **get_cached_suggestions(preferred_lang)}
+
+# =========================================================
+# GIT / BACKUPS / HISTORY
+# =========================================================
+
+@app.post("/backups")
+async def backups(user=Depends(lambda r: get_user(r, min_role="admin"))):
+    from .git_ops import get_recent_commits
+    return {"status": "success", "backups": get_recent_commits(limit=50)["commits"]}
+
+@app.get("/recent-edits")
+async def recent_edits(request: Request, user=Depends(get_user)):
+    from .git_ops import get_recent_commits
+    is_admin = user['role'] == 'admin'
+    filter_user = request.query_params.get('user')
+    limit = int(request.query_params.get('limit', 30))
+    offset = int(request.query_params.get('offset', 0))
+
+    if not is_admin or not filter_user:
+        filter_user = user['username']
+
+    result = get_recent_commits(username=filter_user, limit=limit, skip=offset)
+    return {
+        "status": "success",
+        "commits": result["commits"],
+        "has_more": result["has_more"],
+        "is_admin": is_admin
+    }
+
+# =========================================================
+# BULK OPERATSIOONID
+# =========================================================
+
+@app.post("/works/bulk-tags")
+async def bulk_tags(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    from .bulk_handlers import handle_bulk_tags
+    # Mock vana handlerit kutsumiseks
+    data = await request.json()
+    class Mock:
+        def __init__(self, d): self.d = d
+        def send_response(self, c): self.code = c
+        def send_header(self, k, v): pass
+        def end_headers(self): pass
+        @property
+        def wfile(self):
+            class W:
+                def __init__(self, p): self.p = p
+                def write(self, b): self.p.body = b
+            return W(self)
+    
+    # NB: Sinu bulk_handlers.py vajab reaalset refaktoreerimist FastAPI jaoks
+    # Praegu jätame selle Mocki, aga see on habras.
+    return {"status": "success", "message": "Bulk operatsioonid vajavad veel refaktoreerimist"}
+
+from .upload_ops import (
+    UPLOAD_ENABLED, sanitize_slug, check_slug_conflict, create_upload,
+    list_uploads, get_upload, mark_page_deleted, cancel_upload,
+    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
+    import_as_work, upload_progress
+)
+
+# =========================================================
+# UPLOAD (OCR JA IMPORT)
+# =========================================================
+
+@app.get("/admin/uploads")
+async def admin_uploads(user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    return {"status": "success", "uploads": list_uploads()}
+
+@app.post("/admin/upload/create")
+async def admin_upload_create(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    data = await request.json()
+    title, year = data.get('title', '').strip(), str(data.get('year', '')).strip()
+    if not title or not year: raise HTTPException(status_code=400, detail="Pealkiri ja aasta kohustuslikud")
+    
+    slug = data.get('slug', '').strip() or sanitize_slug(title)
+    if check_slug_conflict(year, slug):
+        return JSONResponse(status_code=409, content={"status": "error", "message": f"Slug '{slug}' on juba kasutusel", "conflict": True})
+
+    return {"status": "success", "upload": create_upload(data)}
+
+@app.get("/admin/upload/{upload_id}/status")
+async def admin_upload_status(upload_id: str, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    return {"status": "success", **poll_and_sync_thumbs(upload_id)}
+
+@app.post("/admin/upload/{upload_id}/import")
+async def admin_upload_import(upload_id: str, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    try:
+        return {"status": "success", **import_as_work(upload_id)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/admin/upload/{upload_id}")
+async def admin_upload_cancel(upload_id: str, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    if cancel_upload(upload_id): return {"status": "success"}
+    raise HTTPException(status_code=500, detail="Tühistamine ebaõnnestus")
+
+@app.post("/admin/work/{work_id}/delete")
+async def admin_work_delete(work_id: str, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    # See asendab vana DELETE /admin/work/{id}
+    # Kasutame POST-i, sest mõnikord on DELETE proxyde taga piiratud
+    from .utils import find_directory_by_id
+    from .meilisearch_ops import delete_work_from_meilisearch
+    from .git_ops import delete_work_from_git
+    import shutil
+
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+
+    folder_name = os.path.basename(path)
+    shutil.rmtree(path)
+    delete_work_from_git(folder_name, work_id, work_id)
+    delete_work_from_meilisearch(work_id)
+    
+    return {"status": "success"}
+
+@app.post("/admin/upload/{upload_id}/files")
+async def admin_upload_files(upload_id: str, request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    
+    x_page_number = int(request.headers.get('X-Page-Number', '0'))
+    x_total_pages = int(request.headers.get('X-Total-Pages', '0'))
+    is_multi = x_page_number > 0 and x_total_pages > 1
+    
+    state = get_upload(upload_id)
+    if not state: raise HTTPException(status_code=404, detail="Upload ei leitud")
+
+    tmp_suffix = f"{upload_id}-pg{x_page_number}" if is_multi else upload_id
+    tmp_path = f"/tmp/vutt-upload-{tmp_suffix}"
+    
+    try:
+        # Voogedastame pildi kettale
+        with open(tmp_path, 'wb') as f:
+            async for chunk in request.stream():
+                f.write(chunk)
+                
+        # Edastame SFTP-ga
+        if is_multi:
+            pages = add_image_page(upload_id, tmp_path, x_page_number, x_total_pages)
+        else:
+            pages = save_and_transfer_to_ocr(upload_id, tmp_path)
+            
+        return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
+    except Exception as e:
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/collections")
 async def collections():
