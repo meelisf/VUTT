@@ -107,7 +107,7 @@ def _build_people_aliases():
 def get_cached_people_aliases():
     global _people_aliases_cache, _people_aliases_cache_at
     with _cache_lock:
-        if _people_aliases_cache is None or _people_aliases_cache_at is None or 
+        if _people_aliases_cache is None or _people_aliases_cache_at is None or \
            (datetime.now() - _people_aliases_cache_at).total_seconds() > PEOPLE_ALIASES_CACHE_TTL:
             _people_aliases_cache = _build_people_aliases()
             _people_aliases_cache_at = datetime.now()
@@ -138,7 +138,7 @@ def _build_people_register():
 def get_cached_people_register():
     global _people_register_cache, _people_register_cache_at
     with _cache_lock:
-        if _people_register_cache is None or _people_register_cache_at is None or 
+        if _people_register_cache is None or _people_register_cache_at is None or \
            (datetime.now() - _people_register_cache_at).total_seconds() > PEOPLE_ALIASES_CACHE_TTL:
             _people_register_cache = _build_people_register()
             _people_register_cache_at = datetime.now()
