@@ -31,5 +31,5 @@ RUN mkdir -p /data
 EXPOSE 8001
 EXPOSE 8002
 
-# Run both Python servers
-CMD ["/bin/bash", "-c", "python3 -m server.file_server & python3 -m server.image_server & wait"]
+# Run both Python servers (FastAPI + Image Server)
+CMD ["/bin/bash", "-c", "python3 -m uvicorn server.main:app --host 0.0.0.0 --port 8002 & python3 -m server.image_server & wait"]
