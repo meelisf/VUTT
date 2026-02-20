@@ -563,7 +563,11 @@ const Upload: React.FC = () => {
               <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                 <h2 className="font-semibold text-gray-800 mb-3 text-sm">{t('pending.title')}</h2>
                 <div className="space-y-2">
-                  {pendingUploads.map((u) => (
+                  {pendingUploads.map((u) => {
+                    const canResume = ['pending', 'uploading', 'processing', 'reviewing', 'done'].includes(u.status);
+                    const isError = u.status === 'error';
+                    const isImported = u.status === 'imported';
+                    return (
                     <div
                       key={u.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-200"
@@ -571,10 +575,10 @@ const Upload: React.FC = () => {
                       <div>
                         <p className="font-medium text-gray-900 text-sm">{u.meta.title}</p>
                         <p className="text-xs text-gray-500">
-                          {u.meta.year} · data/{u.meta.year}_{u.meta.slug}/ ·{' '}
+                          {u.meta.year} · data/{u.meta.slug}/ ·{' '}
                           <span
                             className={`font-medium ${
-                              u.status === 'done'
+                              u.status === 'done' || u.status === 'imported'
                                 ? 'text-green-600'
                                 : u.status === 'error'
                                 ? 'text-red-500'
@@ -585,14 +589,37 @@ const Upload: React.FC = () => {
                           </span>
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleResume(u)}
-                        className="text-sm font-medium text-primary-600 hover:text-primary-800 px-3 py-1.5 rounded-md hover:bg-primary-50 transition-colors"
-                      >
-                        {t('pending.resume')}
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {canResume && (
+                          <button
+                            onClick={() => handleResume(u)}
+                            className="text-sm font-medium text-primary-600 hover:text-primary-800 px-3 py-1.5 rounded-md hover:bg-primary-50 transition-colors"
+                          >
+                            {t('pending.resume')}
+                          </button>
+                        )}
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(t('cancelConfirm'))) return;
+                            await fetchWithTimeout(
+                              `${FILE_API_URL}/admin/upload/${u.id}?token=${authToken}`,
+                              { method: 'DELETE' }
+                            ).catch(() => {});
+                            setPendingUploads((prev) => prev.filter((p) => p.id !== u.id));
+                          }}
+                          className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                            isError || isImported
+                              ? 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                              : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
+                          }`}
+                          title={t('cancel')}
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : null}
