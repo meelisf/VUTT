@@ -376,6 +376,39 @@ async def people_aliases(): return {"status": "success", "aliases": get_cached_p
 @app.get("/people-register")
 async def people_register(): return {"status": "success", "people": get_cached_people_register()}
 
+# =========================================================
+# KASUTAJA ERIMÄRGID
+# =========================================================
+
+@app.get("/user-chars")
+async def get_user_chars(request: Request, user=Depends(get_user)):
+    from .config import COLLECTIONS_FILE
+    user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
+    chars_file = os.path.join(user_chars_dir, f"{user['username']}.json")
+
+    if os.path.exists(chars_file):
+        with open(chars_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return {"status": "success", "characters": data.get("characters", []), "is_custom": True}
+    return {"status": "success", "characters": [], "is_custom": False}
+
+@app.post("/user-chars")
+async def save_user_chars(request: Request, user=Depends(get_user)):
+    from .config import COLLECTIONS_FILE
+    data = await get_json_data(request)
+    user_chars_dir = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
+    os.makedirs(user_chars_dir, exist_ok=True)
+    chars_file = os.path.join(user_chars_dir, f"{user['username']}.json")
+
+    if data.get('reset'):
+        if os.path.exists(chars_file): os.remove(chars_file)
+        return {"status": "success", "reset": True}
+
+    characters = data.get('characters', [])
+    with open(chars_file, 'w', encoding='utf-8') as f:
+        json.dump({"characters": characters}, f, ensure_ascii=False, indent=2)
+    return {"status": "success"}
+
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str):
     from .metadata_handler import handle_metadata_request
