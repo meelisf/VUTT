@@ -702,6 +702,9 @@ const Upload: React.FC = () => {
               ) : null}
               {t('step1.continue')}
             </button>
+            <p className="text-xs text-gray-400 text-center mt-2">
+              ⏱ {t('step1.timeEstimate')}
+            </p>
           </div>
         )}
 

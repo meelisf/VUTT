@@ -1256,6 +1256,33 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"POST /admin/upload/.../delete-page VIGA: {e}")
                 self.send_error(500, str(e))
 
+        elif self.path.startswith('/admin/upload/') and self.path.endswith('/import'):
+            # POST /admin/upload/{id}/import — impordi teos VUTT-i
+            try:
+                from server.upload_ops import import_as_work
+                data = read_request_data(self)
+                user = require_auth_handler(self, data, min_role='admin')
+                if not user:
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                parts = self.path.split('/')
+                upload_id = parts[3] if len(parts) >= 5 else None
+                if not upload_id:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id puudub"})
+                    return
+
+                result = import_as_work(upload_id)
+                send_json_response(self, 200, {"status": "success", **result})
+
+            except ValueError as ve:
+                send_json_response(self, 400, {"status": "error", "message": str(ve)})
+            except Exception as e:
+                print(f"POST /admin/upload/.../import VIGA: {e}")
+                self.send_error(500, str(e))
+
         # POST /user-chars - salvesta kasutaja isiklikud erimärgid
         elif self.path == '/user-chars':
             try:

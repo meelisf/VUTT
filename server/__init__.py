@@ -112,4 +112,6 @@ from .upload_ops import (
     # Etapp 2: SFTP transport ja OCR jälgimine
     upload_progress,
     save_and_transfer_to_ocr, poll_and_sync_thumbs, get_ocr_status,
+    # Etapp 4: import VUTT-i
+    import_as_work,
 )

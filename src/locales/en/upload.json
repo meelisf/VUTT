@@ -24,7 +24,8 @@
     "collectionNone": "— select collection —",
     "languagesLabel": "Languages (optional)",
     "continue": "Continue to upload",
-    "required": "Required field"
+    "required": "Required field",
+    "timeEstimate": "Upload and OCR processing takes about 10 minutes."
   },
   "step2": {
     "title": "Upload PDF",

@@ -24,7 +24,8 @@
     "collectionNone": "— vali kollektsioon —",
     "languagesLabel": "Keeled (valikuline)",
     "continue": "Jätka üleslaadimisele",
-    "required": "Kohustuslik väli"
+    "required": "Kohustuslik väli",
+    "timeEstimate": "Üleslaadimine ja OCR töötlemine võtab umbes 10 minutit."
   },
   "step2": {
     "title": "Laadi üles PDF",

@@ -641,6 +641,185 @@ def get_ocr_status(upload_id: str) -> dict:
     }
 
 
+def import_as_work(upload_id: str) -> dict:
+    """
+    Impordib OCR-itud teose VUTT andmebaasi.
+
+    1. Laeb alla JPG+TXT failid OCR serverist (SFTP)
+    2. Loob data/{slug}/ struktuuri
+    3. Loob _metadata.json ja lehekülgede JSON-id
+    4. Git commit (originaal OCR)
+    5. Meilisearch sünk (async)
+    6. Koristab OCR serveri staging kausta
+    7. Märgib upload 'imported'-ks
+
+    Tagastab: {"work_id": "...", "slug": "..."}
+    Viskab ValueError kui midagi läheb valesti.
+    """
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        state = _read_state(upload_id)
+    if not state:
+        raise ValueError("Upload ei leitud")
+
+    current_status = state.get('status')
+    if current_status not in ('done', 'reviewing'):
+        raise ValueError(
+            f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{current_status}'"
+        )
+
+    meta = state['meta']
+    title = meta['title']
+    slug = meta['slug']
+    collection = meta.get('collection') or None
+    languages = meta.get('languages') or []
+    try:
+        year = int(str(meta.get('year', '')))
+    except (ValueError, TypeError):
+        year = None
+
+    # Filtreeri: ainult OCR-iga, mitte-kustutatud lehed
+    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
+    if not importable:
+        raise ValueError("Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
+    importable.sort(key=lambda f: f['page'])
+
+    # Genereeri work_id (nanoid)
+    work_id = generate_nanoid()
+
+    # Sihtkoha kaust data/{slug}/
+    work_dir = os.path.join(BASE_DIR, slug)
+    if os.path.exists(work_dir):
+        raise ValueError(f"Kaust data/{slug}/ on juba olemas")
+    os.makedirs(work_dir)
+
+    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+
+    sftp = None
+    try:
+        sftp = _sftp_open(upload_id)
+
+        # Leia tegelikud remote failinimed
+        try:
+            remote_items = sftp.listdir(remote_work)
+        except Exception as e:
+            raise ValueError(f"Ei saa lugeda OCR kausta: {e}")
+
+        # Map: page_num → jpg_filename
+        jpg_map = {}
+        for item in remote_items:
+            if item.endswith('.jpg') and '_pg_' in item:
+                pn = _extract_page_num(item.rsplit('.', 1)[0])
+                if pn > 0:
+                    jpg_map[pn] = item
+
+        # Lae alla iga soovitud leht
+        downloaded = 0
+        for entry in importable:
+            pn = entry['page']
+            if pn not in jpg_map:
+                logger.warning(f"import {upload_id}: lk {pn} JPG puudub, vahele jäetud")
+                continue
+
+            jpg_name = jpg_map[pn]
+            txt_name = jpg_name.replace('.jpg', '.txt')
+
+            local_jpg = os.path.join(work_dir, f"{pn:03d}.jpg")
+            local_txt = os.path.join(work_dir, f"{pn:03d}.txt")
+            local_json = os.path.join(work_dir, f"{pn:03d}.json")
+
+            sftp.get(f"{remote_work}/{jpg_name}", local_jpg)
+            os.chmod(local_jpg, 0o644)
+
+            try:
+                sftp.get(f"{remote_work}/{txt_name}", local_txt)
+            except FileNotFoundError:
+                open(local_txt, 'w').close()
+            os.chmod(local_txt, 0o644)
+
+            page_json = {"status": "Toores", "page_tags": [], "comments": [], "history": []}
+            with open(local_json, 'w', encoding='utf-8') as f:
+                json.dump(page_json, f, ensure_ascii=False, indent=2)
+            os.chmod(local_json, 0o644)
+            downloaded += 1
+
+        sftp.close()
+        sftp = None
+
+        if downloaded == 0:
+            raise ValueError("Ühtegi lehekülge ei õnnestunud alla laadida")
+
+    except ValueError:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise
+    except Exception as e:
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise ValueError(f"Failide allalaadimine ebaõnnestus: {e}")
+    finally:
+        if sftp:
+            try:
+                sftp.close()
+            except Exception:
+                pass
+
+    # _metadata.json
+    metadata = {
+        "id": work_id,
+        "slug": slug,
+        "title": title,
+        "creators": [],
+        "tags": [],
+        "collection": collection,
+        "languages": languages,
+    }
+    if year is not None:
+        metadata["year"] = year
+    meta_path = os.path.join(work_dir, '_metadata.json')
+    with open(meta_path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+    os.chmod(meta_path, 0o644)
+
+    # Git commit
+    try:
+        from .git_ops import commit_new_work_to_git
+        commit_new_work_to_git(slug)
+        logger.info(f"import {upload_id}: git commit OK ({slug})")
+    except Exception as e:
+        logger.warning(f"import {upload_id}: git commit ebaõnnestus: {e}")
+
+    # Meilisearch sünk (async, ei blokeeri)
+    try:
+        from .meilisearch_ops import sync_work_to_meilisearch_async
+        sync_work_to_meilisearch_async(slug)
+    except Exception as e:
+        logger.warning(f"import {upload_id}: meilisearch sync ebaõnnestus: {e}")
+
+    # Uuenda upload state → 'imported'
+    with state_lock:
+        s = _read_state(upload_id)
+        if s:
+            s['status'] = 'imported'
+            s['work_id'] = work_id
+            _write_state(upload_id, s)
+
+    # Koristame OCR serveri (mitte kriitiline)
+    remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    try:
+        transport = get_or_create_ssh(upload_id)
+        chan = transport.open_session()
+        chan.set_combine_stderr(True)
+        chan.exec_command(f'rm -rf "{remote_staging}"')
+        chan.recv_exit_status()
+        chan.close()
+        close_ssh(upload_id)
+        logger.info(f"import {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
+    except Exception as e:
+        logger.warning(f"import {upload_id}: OCR koristamine ebaõnnestus: {e}")
+
+    logger.info(f"import {upload_id}: valmis → work_id={work_id}, slug={slug}, lehed={downloaded}")
+    return {"work_id": work_id, "slug": slug}
+
+
 def cancel_upload(upload_id: str) -> bool:
     """
     Tühistab upload'i: suleb SSH, koristab OCR serveri staging kausta ja
