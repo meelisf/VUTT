@@ -460,29 +460,139 @@ async def recent_edits(request: Request, user=Depends(get_user)):
     }
 
 # =========================================================
-# BULK OPERATSIOONID
+# PENDING-EDITS (KAASTÖÖLISTE MUUDATUSED)
 # =========================================================
 
-@app.post("/works/bulk-tags")
-async def bulk_tags(request: Request, user=Depends(lambda r: get_user(r, min_role="admin"))):
-    from .bulk_handlers import handle_bulk_tags
-    # Mock vana handlerit kutsumiseks
-    data = await request.json()
+@app.post("/save-pending")
+async def save_pending(request: Request, user=Depends(lambda r: get_user(r, min_role="contributor"))):
+    from .pending_edits_handlers import handle_save_pending
+    # Mocking for old handler compatibility
     class Mock:
-        def __init__(self, d): self.d = d
+        def __init__(self, r): self.r = r
         def send_response(self, c): self.code = c
         def send_header(self, k, v): pass
         def end_headers(self): pass
+        def wfile_write(self, b): self.body = b
         @property
         def wfile(self):
             class W:
                 def __init__(self, p): self.p = p
                 def write(self, b): self.p.body = b
             return W(self)
+    m = Mock(request)
+    # Siinkohal peame olema ettevaatlikud, sest vana handler loeb request.rfile
+    # FastAPI-s on parem kutsuda otse äriloogikat server/pending_edits.py-st
+    from .pending_edits import create_pending_edit
+    data = await request.json()
+    success, edit_id, other_pending = create_pending_edit(
+        data.get('work_id'), data.get('lehekylje_number'),
+        user['username'], data.get('original_text'), data.get('new_text')
+    )
+    return {"status": "success", "edit_id": edit_id, "has_other_pending": other_pending}
+
+@app.post("/pending-edits/check")
+async def pending_check(request: Request, user=Depends(get_user)):
+    data = await request.json()
+    from .pending_edits import get_pending_edits_for_page, get_user_pending_edit_for_page
+    work_id, page_num = data.get('work_id'), data.get('lehekylje_number')
+    all_pending = get_pending_edits_for_page(work_id, page_num)
+    own_pending = get_user_pending_edit_for_page(work_id, page_num, user['username'])
+    return {
+        "status": "success",
+        "has_own_pending": own_pending is not None,
+        "own_pending_edit": own_pending,
+        "other_pending_count": len([e for e in all_pending if e['username'] != user['username']])
+    }
+
+# =========================================================
+# BULK OPERATSIOONID
+# =========================================================
+
+@app.post("/works/bulk-tags")
+async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    work_ids = data.get('work_ids', [])
+    tags = data.get('tags', [])
+    mode = data.get('mode', 'add') # 'add', 'remove', 'replace'
+
+    from .utils import find_directory_by_id, metadata_lock
+    from .git_ops import save_with_git
+    from .meilisearch_ops import sync_work_to_meilisearch_async
+
+    count = 0
+    for work_id in work_ids:
+        path = find_directory_by_id(work_id)
+        if not path: continue
+        meta_path = os.path.join(path, '_metadata.json')
+        
+        with metadata_lock:
+            if not os.path.exists(meta_path): continue
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            
+            current_tags = meta.get('tags', [])
+            # Lihtsustatud siltide haldus (toetab nii stringe kui LinkedEntity objekte)
+            if mode == 'add':
+                for t in tags:
+                    if t not in current_tags: current_tags.append(t)
+            elif mode == 'replace':
+                current_tags = tags
+            
+            meta['tags'] = current_tags
+            save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk tags: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+            count += 1
     
-    # NB: Sinu bulk_handlers.py vajab reaalset refaktoreerimist FastAPI jaoks
-    # Praegu jätame selle Mocki, aga see on habras.
-    return {"status": "success", "message": "Bulk operatsioonid vajavad veel refaktoreerimist"}
+    invalidate_cache()
+    return {"status": "success", "message": f"Uuendatud {count} teost"}
+
+@app.post("/works/bulk-genre")
+async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    work_ids, genre = data.get('work_ids', []), data.get('genre')
+    from .utils import find_directory_by_id, metadata_lock
+    from .git_ops import save_with_git
+    from .meilisearch_ops import sync_work_to_meilisearch_async
+
+    count = 0
+    for work_id in work_ids:
+        path = find_directory_by_id(work_id)
+        if not path: continue
+        meta_path = os.path.join(path, '_metadata.json')
+        with metadata_lock:
+            if not os.path.exists(meta_path): continue
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            meta['genre'] = genre
+            save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk genre: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+            count += 1
+    invalidate_cache()
+    return {"status": "success", "message": f"Uuendatud {count} teost"}
+
+@app.post("/works/bulk-collection")
+async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(lambda r: get_user(r, min_role="admin"))):
+    data = await request.json()
+    work_ids, collection = data.get('work_ids', []), data.get('collection')
+    from .utils import find_directory_by_id, metadata_lock
+    from .git_ops import save_with_git
+    from .meilisearch_ops import sync_work_to_meilisearch_async
+
+    count = 0
+    for work_id in work_ids:
+        path = find_directory_by_id(work_id)
+        if not path: continue
+        meta_path = os.path.join(path, '_metadata.json')
+        with metadata_lock:
+            if not os.path.exists(meta_path): continue
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            meta['collection'] = collection
+            save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk collection: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+            count += 1
+    invalidate_cache()
+    return {"status": "success", "message": f"Uuendatud {count} teost"}
 
 # =========================================================
 # UPLOAD (OCR JA IMPORT)
