@@ -128,7 +128,8 @@ UPLOAD_ENABLED = os.getenv("UPLOAD_ENABLED", "false").lower() == "true"
 
 OCR_SERVER_HOST = os.getenv("OCR_SERVER_HOST", "172.17.120.146")
 OCR_SERVER_USER = os.getenv("OCR_SERVER_USER", "mf")
-OCR_SERVER_PATH = os.getenv("OCR_SERVER_PATH", "/home/mf/Dokumendid/LLM/AUTO-OCR")
+# Juurkaust OCR serveris — AUTO-OCR/ ja VIGASED/ on selle alamkaustad
+OCR_SERVER_PATH = os.getenv("OCR_SERVER_PATH", "/home/mf/Dokumendid/LLM")
 
 # Uploads staging kaust VUTT juurkataloogis (väljaspool data/)
 UPLOADS_DIR = os.path.join(_PROJECT_ROOT, "uploads")

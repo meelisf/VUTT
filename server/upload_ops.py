@@ -486,7 +486,7 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
         sftp = _sftp_open(upload_id)
 
         # --- Kontrolli VIGASED kausta ---
-        vigased_path = f"{OCR_SERVER_PATH}/VIGASED/{year}-{slug}.pdf"
+        vigased_path = f"{OCR_SERVER_PATH}/VIGASED/{slug}.pdf"
         try:
             sftp.stat(vigased_path)
             # PDF on vigane — OCR teenus teisaldas selle
