@@ -73,6 +73,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
   // Teose kustutamise state
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -552,7 +553,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
           <div className="p-5">
             {!deleteConfirm ? (
               <button
-                onClick={() => setDeleteConfirm(true)}
+                onClick={() => { setDeleteConfirm(true); setDeleteInput(''); }}
                 className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
               >
                 {t('management.deleteWork')}
@@ -562,19 +563,27 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                 <p className="text-sm text-red-800">
                   {t('management.deleteWorkConfirmMessage', { title: work.title })}
                 </p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={(e) => setDeleteInput(e.target.value)}
+                  placeholder={t('management.deleteWorkInputPlaceholder', { word: t('management.deleteWorkConfirmWord') })}
+                  className="w-full px-3 py-2 text-sm border border-red-200 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                  autoFocus
+                />
                 {deleteError && (
                   <p className="text-sm text-red-600 font-medium">{deleteError}</p>
                 )}
                 <div className="flex gap-2">
                   <button
                     onClick={handleDeleteWork}
-                    disabled={deleting}
-                    className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50 transition-colors"
+                    disabled={deleting || deleteInput !== t('management.deleteWorkConfirmWord')}
+                    className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     {deleting ? <Loader2 size={14} className="animate-spin inline" /> : t('management.deleteWorkConfirm')}
                   </button>
                   <button
-                    onClick={() => { setDeleteConfirm(false); setDeleteError(null); }}
+                    onClick={() => { setDeleteConfirm(false); setDeleteError(null); setDeleteInput(''); }}
                     className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
                   >
                     {t('management.deleteWorkCancel')}

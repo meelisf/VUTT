@@ -13,18 +13,6 @@
     "info": "Info ja annotatsioonid",
     "history": "Haldus"
   },
-  "editor": {
-    "placeholder": "Tekst puudub...",
-    "unsavedChanges": "Salvestamata muudatused",
-    "saving": "Salvestan...",
-    "saved": "Salvestatud",
-    "saveError": "Salvestamine ebaõnnestus",
-    "save": "Salvesta",
-    "lastModified": "Viimati muudetud",
-    "by": "muutja",
-    "readOnly": "Ainult lugemine",
-    "readOnlyHint": "Logi sisse, et teksti muuta"
-  },
   "history": {
     "title": "Varasemate versioonide ajalugu",
     "gitHistory": "Versiooniajalugu",
@@ -68,7 +56,9 @@
     "deleteWorkConfirmMessage": "Kas oled kindel, et soovid kustutada teose \"{{title}}\"? Pildifailid säilitatakse 90 päeva, tekst on gitist taastatav.",
     "deleteWorkConfirm": "Jah, kustuta",
     "deleteWorkCancel": "Tühista",
-    "deleteWorkError": "Kustutamine ebaõnnestus"
+    "deleteWorkError": "Kustutamine ebaõnnestus",
+    "deleteWorkConfirmWord": "kustutan",
+    "deleteWorkInputPlaceholder": "Kustutamiseks trüki siia \"{{word}}\""
   },
   "metadata": {
     "title": "Metaandmed",

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
+from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, get_refresh_status, refresh_all_people_safe
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
 from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
@@ -431,21 +432,7 @@ async def save_user_chars(request: Request, user=Depends(get_user)):
 
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str):
-    from .metadata_handler import handle_metadata_request
-    class Mock:
-        def __init__(self): self.body = b""
-        def send_response(self, c): pass
-        def send_header(self, k, v): pass
-        def end_headers(self): pass
-        @property
-        def wfile(self):
-            class W:
-                def __init__(self, p): self.p = p
-                def write(self, b): self.p.body += b
-            return W(self)
-    mock = Mock()
-    handle_metadata_request(mock, work_id)
-    return HTMLResponse(content=mock.body.decode('utf-8'))
+    return HTMLResponse(content=build_meta_html(work_id))
 
 @app.get("/health")
 async def health(): return {"status": "ok"}

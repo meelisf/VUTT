@@ -13,18 +13,6 @@
     "info": "Info & Annotations",
     "history": "Manage"
   },
-  "editor": {
-    "placeholder": "No text...",
-    "unsavedChanges": "Unsaved changes",
-    "saving": "Saving...",
-    "saved": "Saved",
-    "saveError": "Save failed",
-    "save": "Save",
-    "lastModified": "Last modified",
-    "by": "by",
-    "readOnly": "Read only",
-    "readOnlyHint": "Log in to edit text"
-  },
   "history": {
     "title": "Previous versions history",
     "gitHistory": "Version history",
@@ -68,7 +56,9 @@
     "deleteWorkConfirmMessage": "Are you sure you want to delete \"{{title}}\"? Image files are kept for 90 days, text is recoverable from git.",
     "deleteWorkConfirm": "Yes, delete",
     "deleteWorkCancel": "Cancel",
-    "deleteWorkError": "Deletion failed"
+    "deleteWorkError": "Deletion failed",
+    "deleteWorkConfirmWord": "delete",
+    "deleteWorkInputPlaceholder": "Type \"{{word}}\" here to confirm"
   },
   "metadata": {
     "title": "Metadata",

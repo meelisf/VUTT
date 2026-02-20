@@ -1,15 +1,17 @@
 import os
 import json
 import html
-from server import BASE_DIR, find_directory_by_id
+from .config import BASE_DIR
+from .utils import find_directory_by_id
 
 def _escape(text):
     """Escapib teksti HTML atribuutides kasutamiseks."""
     return html.escape(text, quote=True)
 
-def handle_metadata_request(handler, work_id):
+def build_meta_html(work_id: str) -> str:
     """
     Genereerib sotsiaalmeedia robotitele HTML-i koos metaandmetega.
+    Tagastab HTML-i stringina.
     """
     found_path = find_directory_by_id(work_id)
 
@@ -35,12 +37,10 @@ def handle_metadata_request(handler, work_id):
         # Kasutame spetsiaalset thumbnaili otspunkti, mis genereerib väikese pildi
         image_url = f"https://vutt.utlib.ut.ee/api/images/{work_id}/_thumb"
 
-    # Escapime metaandmed HTML-i jaoks
     safe_title = _escape(title)
     safe_desc = _escape(description)
 
-    # Genereerime minimaliseeritud HTML-i
-    page_html = f"""<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -67,8 +67,3 @@ def handle_metadata_request(handler, work_id):
     Ümbersuunamine teosele... <a href="https://vutt.utlib.ut.ee/work/{work_id}">{safe_title}</a>
 </body>
 </html>"""
-
-    handler.send_response(200)
-    handler.send_header('Content-Type', 'text/html; charset=utf-8')
-    handler.end_headers()
-    handler.wfile.write(page_html.encode('utf-8'))
