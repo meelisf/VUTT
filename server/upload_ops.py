@@ -902,10 +902,11 @@ def import_as_work(upload_id: str) -> dict:
     except Exception as e:
         logger.warning(f"import {upload_id}: git commit ebaõnnestus: {e}")
 
-    # Meilisearch sünk (async, ei blokeeri)
+    # Meilisearch sünk (sünkroonne — ootame lõpuni, et teos oleks kohe kättesaadav)
     try:
-        from .meilisearch_ops import sync_work_to_meilisearch_async
-        sync_work_to_meilisearch_async(slug)
+        from .meilisearch_ops import sync_work_to_meilisearch
+        sync_work_to_meilisearch(slug)
+        logger.info(f"import {upload_id}: meilisearch sync OK ({slug})")
     except Exception as e:
         logger.warning(f"import {upload_id}: meilisearch sync ebaõnnestus: {e}")
 
