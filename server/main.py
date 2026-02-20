@@ -8,6 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
+from .utils import build_work_id_cache
+from .meilisearch_ops import metadata_watcher_loop
+from .people_ops import people_refresh_loop, load_people_data
+from .git_ops import run_git_fsck
 from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
