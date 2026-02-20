@@ -339,13 +339,29 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
         return True
 
 
+def _detect_file_type(path: str) -> str:
+    """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png' või 'unknown'."""
+    with open(path, 'rb') as f:
+        header = f.read(8)
+    if header[:4] == b'%PDF':
+        return 'pdf'
+    if header[:2] == b'\xff\xd8':
+        return 'jpeg'
+    if header[:8] == b'\x89PNG\r\n\x1a\n':
+        return 'png'
+    return 'unknown'
+
+
 def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
     """
-    Loeb PDF lehekülgede arvu (pdfinfo), uuendab state.json ja käivitab
-    daemon threadi SFTP edastuseks OCR serverisse.
+    Edastab faili OCR serverisse SFTP kaudu.
+
+    - PDF: pdfinfo → lehekülgede arv → staging kausta → OCR server lõhub ise lahti
+    - JPG/PNG: pannakse otse remote work kausta {slug}_pg_001.jpg nimega
+      (OCR server leiab pildi rglob-iga ja teeb OCR-i ilma PDF-i lahti lõhkumata)
 
     Tagastab expected_pages (int).
-    Tõstab ValueError kui PDF on vigane või pdfinfo ebaõnnestub.
+    Tõstab ValueError kui fail on vigane või toetamata formaadis.
     """
     state_lock = _get_upload_lock(upload_id)
     with state_lock:
@@ -356,6 +372,98 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
     year = state['meta']['year']
     slug = state['meta']['slug']
 
+    # --- Tuvasta faili tüüp ---
+    file_type = _detect_file_type(tmp_path)
+
+    if file_type in ('jpeg', 'png'):
+        # Pildi puhul: laadi otse remote work kausta, OCR server teeb ise üles
+        pages = 1
+        file_size = os.path.getsize(tmp_path)
+        upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
+
+        remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+        remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+        remote_img_name = f"{slug}_pg_001.jpg"
+
+        with state_lock:
+            s = _read_state(upload_id)
+            s['expected_pages'] = pages
+            s['status'] = 'uploading'
+            _write_state(upload_id, s)
+
+        def _sftp_transfer_image():
+            sftp = None
+            try:
+                sftp = _sftp_open(upload_id)
+                # Loo staging + work kaustad
+                for remote_dir in (remote_staging_abs, remote_work_abs):
+                    try:
+                        sftp.stat(remote_dir)
+                    except FileNotFoundError:
+                        sftp.mkdir(remote_dir)
+
+                remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
+                remote_dst = f"{remote_work_abs}/{remote_img_name}"
+
+                def _progress(transferred, total):
+                    upload_progress[upload_id]['bytes_sent'] = transferred
+                    upload_progress[upload_id]['bytes_total'] = total
+
+                # Konverteeri JPEG-iks kui PNG
+                if file_type == 'png':
+                    from PIL import Image
+                    conv_path = tmp_path + '.conv.jpg'
+                    with Image.open(tmp_path) as img:
+                        img.convert('RGB').save(conv_path, 'JPEG', quality=95)
+                    sftp.put(conv_path, remote_tmp, callback=_progress)
+                    os.unlink(conv_path)
+                else:
+                    sftp.put(tmp_path, remote_tmp, callback=_progress)
+
+                sftp.rename(remote_tmp, remote_dst)
+                logger.info(f"Pilt edastatud OCR serverisse: {upload_id} ({remote_img_name})")
+
+                with state_lock:
+                    s = _read_state(upload_id)
+                    if s:
+                        s['status'] = 'processing'
+                        _write_state(upload_id, s)
+
+            except Exception as e:
+                logger.error(f"SFTP pilt {upload_id}: {e}")
+                upload_progress[upload_id]['error'] = str(e)
+                with state_lock:
+                    s = _read_state(upload_id)
+                    if s:
+                        s['status'] = 'error'
+                        s['error_message'] = str(e)
+                        _write_state(upload_id, s)
+            finally:
+                if sftp:
+                    try:
+                        sftp.close()
+                    except Exception:
+                        pass
+                try:
+                    os.unlink(tmp_path)
+                except Exception:
+                    pass
+
+        thread = threading.Thread(target=_sftp_transfer_image, daemon=True, name=f"sftp-img-{upload_id}")
+        thread.start()
+        return pages
+
+    elif file_type == 'unknown':
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        raise ValueError(
+            "Toetamata failivorming. Palun laadi üles PDF, JPG või PNG fail."
+        )
+
+    # file_type == 'pdf' → tavapärane PDF flow allpool
+
     # --- Loe lehekülgede arv pdfinfo abil ---
     try:
         result = subprocess.run(
@@ -363,7 +471,14 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
-            raise ValueError(f"pdfinfo viga: {result.stderr.strip() or 'tundmatu viga'}")
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+            raise ValueError(
+                "Vigane PDF — fail ei ole korrektne PDF-dokument. "
+                "Kontrolli, et laadid üles õige faili (PDF, JPG või PNG)."
+            )
 
         pages = None
         for line in result.stdout.splitlines():
@@ -371,12 +486,12 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
                 pages = int(line.split(':', 1)[1].strip())
                 break
         if pages is None:
-            raise ValueError("pdfinfo: 'Pages:' välja ei leitud väljundis")
+            raise ValueError("PDF lehekülgede arvu ei õnnestunud tuvastada")
 
     except FileNotFoundError:
         raise ValueError("pdfinfo pole paigaldatud (apt install poppler-utils)")
     except subprocess.TimeoutExpired:
-        raise ValueError("pdfinfo timeout — PDF on liiga suur või kahjustatud")
+        raise ValueError("PDF analüüs võttis liiga kaua — fail on liiga suur või kahjustatud")
 
     # --- Uuenda state.json ja progress ---
     file_size = os.path.getsize(tmp_path)

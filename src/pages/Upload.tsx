@@ -17,6 +17,8 @@ import {
   AlertTriangle,
   X,
   RotateCcw,
+  Info,
+  ListTodo,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -223,6 +225,7 @@ const Upload: React.FC = () => {
   // --- Samm 2 ---
   const [dragging, setDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [fileUploading, setFileUploading] = useState(false); // lipp: fail on valitud ja upload käib
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Samm 3 ---
@@ -355,6 +358,7 @@ const Upload: React.FC = () => {
   async function handleFileUpload(file: File) {
     if (!uploadId || !authToken) return;
     setUploadError('');
+    setFileUploading(true); // näita kohe spinner/bänner, sõltumata pollingust
 
     // Näita kohe laadimise indikaatorit (polling pole veel vastanud)
     setPollResult((prev) => ({
@@ -379,11 +383,13 @@ const Upload: React.FC = () => {
       const d = await r.json();
       if (!r.ok) {
         setUploadError(d.message || t('errors.uploadFailed'));
+        setFileUploading(false);
         stopPolling();
       }
       // 202 — SFTP transfer algas taustal, polling jätkab
     } catch {
       setUploadError(t('errors.uploadFailed'));
+      setFileUploading(false);
       stopPolling();
     }
   }
@@ -445,6 +451,7 @@ const Upload: React.FC = () => {
         return;
       }
       stopPolling();
+      setFileUploading(false);
       // Suuna tööle
       navigate(`/work/${d.work_id}`);
     } catch {
@@ -455,7 +462,31 @@ const Upload: React.FC = () => {
   }
 
   // ---------------------------------------------------------------------------
-  // Tühistamine
+  // Sulge viisard (upload jääb taustal tööle)
+  // ---------------------------------------------------------------------------
+  function handleClose() {
+    stopPolling();
+    setUploadId(null);
+    setStep(1);
+    setPollResult(null);
+    setFileUploading(false);
+    setTitle('');
+    setYear('');
+    setSlug('');
+    setSlugManual(false);
+    setLocalDeleted(new Set());
+    setOcrStartedAt(null);
+    // Värskenda pooleliolevate nimekirja
+    if (authToken) {
+      fetchWithTimeout(`${FILE_API_URL}/admin/uploads?token=${authToken}`)
+        .then((r) => r.json())
+        .then((d) => setPendingUploads(d.uploads || []))
+        .catch(() => {});
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tühistamine (DELETE — kustutab uploadi serverist)
   // ---------------------------------------------------------------------------
   async function handleCancel() {
     if (!window.confirm(t('cancelConfirm'))) return;
@@ -468,6 +499,7 @@ const Upload: React.FC = () => {
     setUploadId(null);
     setStep(1);
     setPollResult(null);
+    setFileUploading(false);
     setTitle('');
     setYear('');
     setSlug('');
@@ -498,10 +530,12 @@ const Upload: React.FC = () => {
 
     if (['reviewing', 'done', 'processing'].includes(saved.status)) {
       setStep(3);
+      setFileUploading(true);
       setOcrStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
       startPolling(saved.id, POLL_SLOW_MS);
     } else if (saved.status === 'uploading') {
       setStep(2);
+      setFileUploading(true);
       startPolling(saved.id, POLL_FAST_MS);
     } else {
       setStep(2); // pending — faili pole veel saadetud
@@ -629,6 +663,17 @@ const Upload: React.FC = () => {
         {/* Sammuindikaator */}
         <StepIndicator step={step} labels={stepLabels} />
 
+        {/* Püsiv teade: samm 2 ja 3 ajal */}
+        {step >= 2 && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-xl text-sm text-blue-900 flex items-start gap-3 shadow-sm">
+            <Info size={18} className="shrink-0 mt-0.5 text-blue-600" />
+            <div>
+              <p className="font-semibold mb-0.5">{t('notice.title')}</p>
+              <p className="text-blue-800">{t('notice.body')}</p>
+            </div>
+          </div>
+        )}
+
         {/* ------------------------------------------------------------------ */}
         {/* SAMM 1: Metaandmed                                                  */}
         {/* ------------------------------------------------------------------ */}
@@ -752,16 +797,17 @@ const Upload: React.FC = () => {
             </div>
 
             {/* Upload progress (kui SFTP käib) */}
-            {(status === 'uploading' || status === 'processing') ? (
+            {fileUploading ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Loader2 size={20} className="animate-spin text-primary-600 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-800">
-                      {status === 'uploading' ? t('step2.uploading') : t('step2.processing')}
-                    </p>
-                    <p className="text-xs text-gray-500">{t('step2.waitNote')}</p>
-                  </div>
+                  <p className="text-sm font-medium text-gray-800">
+                    {status === 'uploading' ? t('step2.uploading') : t('step2.processing')}
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
+                  <Info size={16} className="shrink-0 mt-0.5" />
+                  <span>{t('step2.canLeaveNote')}</span>
                 </div>
 
                 {/* Progress bar (ainult upload ajaks) */}
@@ -812,12 +858,12 @@ const Upload: React.FC = () => {
                   <p className="text-sm font-medium text-gray-700">
                     {dragging ? t('step2.dropzoneActive') : t('step2.dropzone')}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PDF</p>
+                  <p className="text-xs text-gray-400 mt-1">PDF · JPG · PNG</p>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,application/pdf"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -871,6 +917,14 @@ const Upload: React.FC = () => {
                 </span>
               )}
             </div>
+
+            {/* Info: OCR käib taustal, saab lahkuda */}
+            {fileUploading && !ocrTimedOut && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
+                <Info size={16} className="shrink-0 mt-0.5" />
+                <span>{t('step3.canLeaveNote')}</span>
+              </div>
+            )}
 
             {/* OCR timeout hoiatus */}
             {ocrTimedOut && (
@@ -927,16 +981,41 @@ const Upload: React.FC = () => {
           </div>
         )}
 
-        {/* Tühista nupp (samm 2 ja 3) */}
+        {/* Alumised nupud (samm 2 ja 3) */}
         {step > 1 && (
-          <div className="mt-4 flex justify-center">
-            <button
-              onClick={handleCancel}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors"
-            >
-              <Trash2 size={14} />
-              {t('cancel')}
-            </button>
+          <div className="mt-4 space-y-2">
+            {fileUploading ? (
+              /* Upload käib taustal — näita "Sulge" ja "Katkesta" eraldi */
+              <>
+                <button
+                  onClick={handleClose}
+                  className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-700 hover:bg-primary-50 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                >
+                  <ListTodo size={15} />
+                  {t('closeAndMonitor')}
+                </button>
+                <div className="flex justify-center">
+                  <button
+                    onClick={handleCancel}
+                    className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 size={12} />
+                    {t('cancelUpload')}
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Faili pole veel valitud — lihtsalt katkesta viisard */
+              <div className="flex justify-center">
+                <button
+                  onClick={handleCancel}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors"
+                >
+                  <X size={14} />
+                  {t('cancelWizard')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -35,6 +35,7 @@
     "uploading": "Edastatakse OCR serverisse...",
     "processing": "OCR server töötleb PDF-i...",
     "waitNote": "See võib võtta mõne minuti.",
+    "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab umbes 10 minutit. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
     "progressLabel": "Edastus: {{pct}}%"
   },
   "step3": {
@@ -48,6 +49,7 @@
     "expectedPages": "Oodatud: {{n}} lk",
     "done": "OCR lõpetatud",
     "processing": "OCR käib...",
+    "canLeaveNote": "OCR töötlemine käib taustal — see võtab umbes 10 minutit. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
     "importBtn": "Impordi VUTT-i",
     "importDisabled": "Vaja vähemalt 1 valmis lehekülge",
     "timeoutWarning": "OCR töötlemine võtab kaua aega. Saad importida olemasolevad lehed.",
@@ -55,8 +57,15 @@
     "importSuccess": "Teos imporditud!",
     "importError": "Importimine ebaõnnestus"
   },
+  "notice": {
+    "title": "Üleslaadimine ja töötlemine võtab umbes 10 minutit",
+    "body": "Pärast PDF-i lisamist käivitub OCR töötlemine taustal. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse automaatselt."
+  },
+  "closeAndMonitor": "Sulge — vaatan progressi hiljem",
+  "cancelUpload": "Katkesta üleslaadimine ja kustuta",
+  "cancelWizard": "Katkesta ja mine tagasi",
   "cancel": "Tühista ja alusta otsast",
-  "cancelConfirm": "Kas oled kindel? Pooleliolev töö kaotatakse.",
+  "cancelConfirm": "Kas oled kindel? Üleslaadimine katkestatakse ja kõik andmed kustutatakse.",
   "errors": {
     "createFailed": "Staging loomine ebaõnnestus",
     "uploadFailed": "Faili üleslaadimine ebaõnnestus",
