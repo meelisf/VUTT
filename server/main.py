@@ -330,35 +330,66 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
 # UPLOAD (OCR JA IMPORT)
 # =========================================================
 
-@app.post("/admin/uploads")
+@app.get("/admin/uploads")
 async def admin_uploads(user=Depends(require_role("admin"))):
-    if not UPLOAD_ENABLED: raise HTTPException(status_code=503)
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     return {"status": "success", "uploads": list_uploads()}
 
 @app.post("/admin/upload/create")
 async def admin_upload_create(request: Request, user=Depends(require_role("admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     data = await get_json_data(request)
-    slug = data.get('slug') or sanitize_slug(data.get('title', ''))
-    if check_slug_conflict(data.get('year'), slug): return JSONResponse(status_code=409, content={"status": "error", "conflict": True})
+    title, year = data.get('title', '').strip(), str(data.get('year', '')).strip()
+    if not title or not year: raise HTTPException(status_code=400, detail="Pealkiri ja aasta kohustuslikud")
+    slug = data.get('slug', '').strip() or sanitize_slug(title)
+    if check_slug_conflict(year, slug):
+        return JSONResponse(status_code=409, content={"status": "error", "message": f"Slug '{slug}' on juba kasutusel", "conflict": True})
     return {"status": "success", "upload": create_upload(data)}
 
-@app.post("/admin/upload/{upload_id}/status")
+@app.get("/admin/upload/{upload_id}/status")
 async def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     return {"status": "success", **poll_and_sync_thumbs(upload_id)}
+
+@app.get("/admin/upload/{upload_id}/thumb/{page_num}")
+async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
+    from .config import UPLOADS_DIR
+    from fastapi.responses import FileResponse
+    thumb_path = os.path.join(UPLOADS_DIR, upload_id, 'thumbs', f"{page_num:03d}.jpg")
+    if not os.path.isfile(thumb_path): raise HTTPException(status_code=404)
+    return FileResponse(thumb_path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
 
 @app.post("/admin/upload/{upload_id}/files")
 async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     x_pg, x_total = int(request.headers.get('X-Page-Number', '0')), int(request.headers.get('X-Total-Pages', '0'))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
     with open(tmp_path, 'wb') as f:
         async for chunk in request.stream(): f.write(chunk)
-    pages = add_image_page(upload_id, tmp_path, x_pg, x_total) if x_pg > 0 else save_and_transfer_to_ocr(upload_id, tmp_path)
-    return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
+    try:
+        pages = add_image_page(upload_id, tmp_path, x_pg, x_total) if x_pg > 0 else save_and_transfer_to_ocr(upload_id, tmp_path)
+        return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
+    except Exception as e:
+        if os.path.exists(tmp_path): os.unlink(tmp_path)
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/admin/upload/{upload_id}/delete-page")
+async def admin_upload_delete_page(upload_id: str, request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    if mark_page_deleted(upload_id, data.get('filename'), data.get('deleted', True)): return {"status": "success"}
+    raise HTTPException(status_code=404)
 
 @app.post("/admin/upload/{upload_id}/import")
 async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
     try: return {"status": "success", **import_as_work(upload_id)}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/admin/upload/{upload_id}")
+async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
+    if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
+    if cancel_upload(upload_id): return {"status": "success"}
+    raise HTTPException(status_code=500, detail="Tühistamine ebaõnnestus")
 
 # =========================================================
 # AVALIKUD JA ÜLDISED
