@@ -490,6 +490,7 @@ const WorkManage: React.FC = () => {
 
         {/* TAB: Prügikast */}
         {activeTab === 'trash' && (
+          <>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-800">{t('manage.tabTrash')}</h2>
@@ -626,6 +627,7 @@ const WorkManage: React.FC = () => {
             )}
           </div>
         </div>
+          </>
         )}
 
       </div>
