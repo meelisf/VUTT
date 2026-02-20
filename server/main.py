@@ -26,8 +26,8 @@ from .upload_ops import (
     import_as_work, upload_progress
 )
 
-# Impordime vahemälu funktsioonid file_serverist (ajutiselt)
-from .file_server import (
+# Impordime vahemälu funktsioonid uuest cache moodulist
+from .cache import (
     get_cached_collections,
     get_cached_vocabularies,
     get_cached_people_aliases,
