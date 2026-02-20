@@ -7,22 +7,12 @@ from fastapi import FastAPI, Request, HTTPException, Depends, status, Background
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR
-from .utils import build_work_id_cache
-from .meilisearch_ops import metadata_watcher_loop
-from .people_ops import people_refresh_loop, load_people_data
-from .git_ops import run_git_fsck
-
-# Impordime vahemälu funktsioonid (et vältida koodi dubleerimist)
-# NB: Kuna file_server.py-s on need defineeritud, impordime sealt.
-# Tulevikus võiks need liigutada nt server/cache.py alla.
-from .file_server import (
-    get_cached_collections,
-    get_cached_vocabularies,
-    get_cached_people_aliases,
-    get_cached_people_register,
-    get_cached_suggestions,
-    invalidate_cache
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
+from .upload_ops import (
+    sanitize_slug, check_slug_conflict, create_upload,
+    list_uploads, get_upload, mark_page_deleted, cancel_upload,
+    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
+    import_as_work, upload_progress
 )
 
 @asynccontextmanager
@@ -489,13 +479,6 @@ async def bulk_tags(request: Request, user=Depends(lambda r: get_user(r, min_rol
     # NB: Sinu bulk_handlers.py vajab reaalset refaktoreerimist FastAPI jaoks
     # Praegu jätame selle Mocki, aga see on habras.
     return {"status": "success", "message": "Bulk operatsioonid vajavad veel refaktoreerimist"}
-
-from .upload_ops import (
-    UPLOAD_ENABLED, sanitize_slug, check_slug_conflict, create_upload,
-    list_uploads, get_upload, mark_page_deleted, cancel_upload,
-    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work, upload_progress
-)
 
 # =========================================================
 # UPLOAD (OCR JA IMPORT)
