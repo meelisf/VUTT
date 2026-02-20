@@ -245,29 +245,45 @@ async def admin_people_refresh_status(user=Depends(require_role("admin"))):
 async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
     import shutil
     path = find_directory_by_id(work_id)
-    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    if not path:
+        print(f"KUSTUTAMINE: Ei leidnud teost ID-ga {work_id}")
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    
     folder_name = os.path.basename(path)
+    print(f"KUSTUTAMINE: Kasutaja {user['username']} kustutab {folder_name} ({work_id})")
+    
     # Loe pealkiri git commit sõnumiks
     meta_path = os.path.join(path, '_metadata.json')
     title = work_id
     try:
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            meta = json.load(f)
-            title = meta.get('title', work_id)
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+                title = meta.get('title', work_id)
     except: pass
     
-    # Liiguta JPG-d prügikasti
-    trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
-    os.makedirs(trash_dir, exist_ok=True)
-    for fname in os.listdir(path):
-        if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
-            shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
-    
-    shutil.rmtree(path)
-    delete_work_from_git(folder_name, title, work_id)
-    delete_work_from_meilisearch(work_id)
-    if work_id in build_work_id_cache(): pass # Värskendab cache'i
-    return {"status": "success"}
+    try:
+        # Liiguta JPG-d prügikasti
+        trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
+        os.makedirs(trash_dir, exist_ok=True)
+        for fname in os.listdir(path):
+            if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
+        
+        # Eemalda kaust
+        shutil.rmtree(path)
+        
+        # Git ja Meilisearch
+        delete_work_from_git(folder_name, title, work_id)
+        delete_work_from_meilisearch(work_id)
+        
+        # Värskenda cache
+        build_work_id_cache()
+        
+        return {"status": "success", "message": f"Teos {title} kustutatud"}
+    except Exception as e:
+        print(f"KUSTUTAMISE VIGA: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =========================================================
 # PENDING-EDITS (KAASTÖÖLISTE MUUDATUSED)
@@ -354,11 +370,54 @@ async def metadata_suggestions(request: Request, user=Depends(require_role("edit
 async def backups(user=Depends(require_role("admin"))):
     return {"status": "success", "backups": get_recent_commits(limit=50)["commits"]}
 
-@app.get("/recent-edits")
+@app.post("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
-    f_user = request.query_params.get('user') if user['role'] == 'admin' else user['username']
-    res = get_recent_commits(username=f_user, limit=int(request.query_params.get('limit', 30)), skip=int(request.query_params.get('offset', 0)))
-    return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": user['role'] == 'admin'}
+    data = await get_json_data(request)
+    is_admin = user['role'] == 'admin'
+    # Kasutame andmeid body-st või query-st
+    f_user = data.get('user') or request.query_params.get('user')
+    limit = int(data.get('limit') or request.query_params.get('limit', 30))
+    offset = int(data.get('offset') or request.query_params.get('offset', 0))
+
+    if not is_admin or not f_user:
+        f_user = user['username']
+
+    res = get_recent_commits(username=f_user, limit=limit, skip=offset)
+    return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_admin}
+
+@app.post("/git-history")
+async def git_history(request: Request, user=Depends(require_role("editor"))):
+    data = await get_json_data(request)
+    from .git_ops import get_file_git_history
+    path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', '')))
+    return {"status": "success", "history": get_file_git_history(path)}
+
+@app.post("/git-diff")
+async def git_diff(request: Request, user=Depends(require_role("editor"))):
+    data = await get_json_data(request)
+    from .git_ops import get_file_diff
+    path = os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', '')))
+    return {"status": "success", "diff": get_file_diff(path, data.get('commit_hash'))}
+
+@app.post("/git-restore")
+async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+    data = await get_json_data(request)
+    from .git_ops import get_file_at_commit
+    catalog = os.path.basename(data.get('original_path', ''))
+    filename = os.path.basename(data.get('file_name', ''))
+    path = os.path.join(BASE_DIR, catalog, filename)
+    content = get_file_at_commit(path, data.get('commit_hash'))
+    if content is None: raise HTTPException(status_code=400, detail="Versiooni ei leitud")
+    
+    save_with_git(path, content, user['username'], message=f"Taastatud versioon: {data.get('commit_hash')[:8]}")
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    return {"status": "success", "content": content}
+
+@app.post("/commit-diff")
+async def commit_diff(request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    from .git_ops import get_commit_diff
+    return {"status": "success", "diff": get_commit_diff(data.get('commit_hash'))}
 
 @app.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
