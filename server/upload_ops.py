@@ -206,15 +206,14 @@ def sanitize_slug(text: str) -> str:
 
 def check_slug_conflict(year, slug: str) -> bool:
     """
-    Tagastab True kui year+slug on juba kasutusel:
-    1. data/{year}_{slug}/ eksisteerib (imporditud teos)
-    2. mõni aktiivne upload kasutab sama year+slug (paralleelne üleslaadimine)
+    Tagastab True kui slug on juba kasutusel:
+    1. data/{slug}/ eksisteerib (imporditud teos)
+    2. mõni aktiivne upload kasutab sama slug-i (paralleelne üleslaadimine)
     """
-    if os.path.isdir(os.path.join(BASE_DIR, f"{year}_{slug}")):
+    if os.path.isdir(os.path.join(BASE_DIR, slug)):
         return True
     for state in list_uploads():
-        m = state.get('meta', {})
-        if str(m.get('year')) == str(year) and m.get('slug') == slug:
+        if state.get('meta', {}).get('slug') == slug:
             return True
     return False
 
@@ -266,7 +265,7 @@ def create_upload(meta: dict) -> dict:
         },
         "expected_pages": None,
         "remote_staging_path": f"AUTO-OCR/{upload_id}",
-        "remote_work_path": f"AUTO-OCR/{upload_id}/{year}-{slug}",
+        "remote_work_path": f"AUTO-OCR/{upload_id}/{slug}",
         "files": [],
         "created_at": datetime.now().isoformat()
     }
@@ -391,8 +390,8 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
 
     # Remote teed (OCR_SERVER_PATH on absoluutne tee OCR serveris)
     remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
-    remote_pdf_name = f"{year}-{slug}.pdf"
-    remote_pdf_tmp_name = f"{year}-{slug}.pdf.tmp"
+    remote_pdf_name = f"{slug}.pdf"
+    remote_pdf_tmp_name = f"{slug}.pdf.tmp"
 
     # --- Daemon thread SFTP edastuseks ---
     def _sftp_transfer():

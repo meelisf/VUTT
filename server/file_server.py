@@ -1141,7 +1141,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 if check_slug_conflict(year, slug):
                     send_json_response(self, 409, {
                         "status": "error",
-                        "message": f"Kaust data/{year}_{slug}/ on juba olemas",
+                        "message": f"Kaust data/{slug}/ on juba olemas",
                         "conflict": True,
                         "suggested_slug": slug
                     })

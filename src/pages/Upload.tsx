@@ -196,7 +196,7 @@ const ThumbCard: React.FC<{
 
 const Upload: React.FC = () => {
   const { t, i18n } = useTranslation(['upload', 'common']);
-  const { user, authToken } = useUser();
+  const { user, authToken, isLoading: authLoading } = useUser();
   const { collections } = useCollection();
   const navigate = useNavigate();
   const lang = (i18n.language as 'et' | 'en') || 'et';
@@ -234,11 +234,12 @@ const Upload: React.FC = () => {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Auth redirect
+  // Auth redirect — oota async initAuth() lõppu enne suunamist
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (authLoading) return;
     if (!user || user.role !== 'admin') navigate('/');
-  }, [user, navigate]);
+  }, [user, navigate, authLoading]);
 
   // ---------------------------------------------------------------------------
   // Laadi pooleliolevad üleslaadimised
@@ -256,8 +257,8 @@ const Upload: React.FC = () => {
   // Slug auto-genereerimine pealkirjast
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!slugManual) setSlug(sanitizeSlug(title));
-  }, [title, slugManual]);
+    if (!slugManual) setSlug(sanitizeSlug((year ? year + '-' : '') + title));
+  }, [title, year, slugManual]);
 
   useEffect(() => {
     setSlugConflict(false);
@@ -332,7 +333,7 @@ const Upload: React.FC = () => {
         if (d.conflict) {
           setSlugConflict(true);
           setStep1Error(
-            t('step1.slugConflict', { year, slug }).replace('{{year}}', year).replace('{{slug}}', slug)
+            t('step1.slugConflict').replace('{{slug}}', slug)
           );
         } else {
           setStep1Error(d.message || t('errors.createFailed'));
@@ -652,7 +653,7 @@ const Upload: React.FC = () => {
               >
                 {slugConflict
                   ? step1Error
-                  : t('step1.slugHint').replace('{{year}}', year || '…').replace('{{slug}}', slug || '…')}
+                  : t('step1.slugHint').replace('{{slug}}', slug || '…')}
               </p>
             </div>
 
