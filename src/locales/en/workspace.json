@@ -81,6 +81,19 @@
     "addPageSuccess": "Page added",
     "dangerZone": "Danger zone",
     "managePageLink": "Manage work",
+    "tabPages": "Pages",
+    "tabTrash": "Trash",
+    "trash": {
+      "load": "Load deleted pages",
+      "empty": "No deleted pages",
+      "loadError": "Failed to load",
+      "deletedAt": "Deleted",
+      "deletedBy": "Deleted by",
+      "restore": "Restore",
+      "restoring": "Restoring...",
+      "restoreSuccess": "Page {{name}} restored",
+      "restoreError": "Restore failed"
+    },
     "pageStatus": {
       "Valmis": "Done",
       "Toores": "Raw",

@@ -81,6 +81,19 @@
     "addPageSuccess": "Leht lisatud",
     "dangerZone": "Ohutsoon",
     "managePageLink": "Halda teost",
+    "tabPages": "Leheküljed",
+    "tabTrash": "Prügikast",
+    "trash": {
+      "load": "Lae kustutatud lehed",
+      "empty": "Kustutatud lehekülgi pole",
+      "loadError": "Laadimine ebaõnnestus",
+      "deletedAt": "Kustutatud",
+      "deletedBy": "Kustutaja",
+      "restore": "Taasta",
+      "restoring": "Taastan...",
+      "restoreSuccess": "Leht {{name}} taastatud",
+      "restoreError": "Taastamine ebaõnnestus"
+    },
     "pageStatus": {
       "Valmis": "Valmis",
       "Toores": "Toores",

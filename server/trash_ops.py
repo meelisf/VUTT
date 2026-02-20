@@ -48,29 +48,34 @@ def list_deleted_works():
         }
 
         try:
+            # Otsi ainult "Kustuta teos:" commite — välistab kustutatud lehekülgede kirjed
             log_output = repo.git.log(
                 '--all', '--oneline',
-                '--grep', f'\\[{work_id}\\]'
+                '--grep', f'Kustuta teos:.*\\[{work_id}\\]'
             ).strip()
-            if log_output:
-                # Võta esimene rida (uusim commit)
-                first_line = log_output.split('\n')[0]
-                commit_hash = first_line.split(' ', 1)[0]
-                commit_msg = first_line.split(' ', 1)[1] if ' ' in first_line else ''
+            if not log_output:
+                # Ei leitud teose kustutamise committi — ainult leheküljed kustutati, mitte teos
+                continue
 
-                title_match = re.match(
-                    r'Kustuta teos: (.+?) \[' + re.escape(work_id) + r'\]',
-                    commit_msg
-                )
-                if title_match:
-                    item['title'] = title_match.group(1)
+            # Võta esimene rida (uusim commit)
+            first_line = log_output.split('\n')[0]
+            commit_hash = first_line.split(' ', 1)[0]
+            commit_msg = first_line.split(' ', 1)[1] if ' ' in first_line else ''
 
-                commit = repo.commit(commit_hash)
-                item['commit_hash'] = commit_hash
-                item['deleted_at'] = commit.committed_datetime.isoformat()
-                item['deleted_by'] = commit.author.name
+            title_match = re.match(
+                r'Kustuta teos: (.+?) \[' + re.escape(work_id) + r'\]',
+                commit_msg
+            )
+            if title_match:
+                item['title'] = title_match.group(1)
+
+            commit = repo.commit(commit_hash)
+            item['commit_hash'] = commit_hash
+            item['deleted_at'] = commit.committed_datetime.isoformat()
+            item['deleted_by'] = commit.author.name
         except Exception as e:
             logger.warning(f"TRASH: Ei leidnud commiti teosel {work_id}: {e}")
+            continue
 
         deleted_works.append(item)
 
@@ -175,3 +180,120 @@ def restore_deleted_work(work_id):
         logger.warning(f"TRASH: Prügikasti kustutamine ebaõnnestus: {e}")
 
     return {'ok': True, 'folder_name': folder_name, 'title': title}
+
+
+def list_deleted_pages(work_id, folder_name):
+    """Loetleb teose kustutatud leheküljed (._trash/{work_id}/pages/)."""
+    trash_pages_dir = os.path.join(TRASH_DIR, work_id, 'pages')
+    if not os.path.exists(trash_pages_dir):
+        return []
+
+    repo = get_or_init_repo()
+    pages = []
+
+    for fname in sorted(os.listdir(trash_pages_dir)):
+        if not fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+            continue
+        base = os.path.splitext(fname)[0]
+
+        item = {
+            'filename': fname,
+            'base_name': base,
+            'deleted_at': None,
+            'deleted_by': None,
+            'commit_hash': None,
+        }
+
+        try:
+            log_output = repo.git.log(
+                '--all', '--oneline',
+                '--grep', f'{folder_name}/{base}'
+            ).strip()
+            if log_output:
+                first_line = log_output.split('\n')[0]
+                commit_hash = first_line.split(' ', 1)[0]
+                commit = repo.commit(commit_hash)
+                item['commit_hash'] = commit_hash
+                item['deleted_at'] = commit.committed_datetime.isoformat()
+                item['deleted_by'] = commit.author.name
+        except Exception as e:
+            logger.warning(f"TRASH: Ei leidnud leheküljecommiti {folder_name}/{base}: {e}")
+
+        pages.append(item)
+
+    return pages
+
+
+def restore_deleted_page(work_id, folder_name, filename):
+    """
+    Taastab kustutatud lehekülje prügikastist.
+
+    1. Leia kustutamise commit gitist
+    2. git checkout {commit}^ -- folder/base.txt .json
+    3. Liiguta JPG tagasi teose kausta
+    4. Git commit
+    5. Meilisearch sync
+    """
+    base = os.path.splitext(filename)[0]
+    trash_pages_dir = os.path.join(TRASH_DIR, work_id, 'pages')
+    img_path = os.path.join(trash_pages_dir, filename)
+
+    if not os.path.exists(img_path):
+        return {'ok': False, 'error': 'Kustutatud faili ei leitud prügikastis'}
+
+    work_path = os.path.join(BASE_DIR, folder_name)
+    if not os.path.exists(work_path):
+        return {'ok': False, 'error': 'Teose kataloog ei leitud'}
+
+    repo = get_or_init_repo()
+
+    # 1. Leia kustutamise commit
+    try:
+        log_output = repo.git.log(
+            '--all', '--oneline',
+            '--grep', f'{folder_name}/{base}'
+        ).strip()
+        if not log_output:
+            return {'ok': False, 'error': 'Git kustutamise committi ei leitud'}
+        first_line = log_output.split('\n')[0]
+        commit_hash = first_line.split(' ', 1)[0]
+    except Exception as e:
+        return {'ok': False, 'error': f'Git otsing ebaõnnestus: {e}'}
+
+    # 2. Taasta .txt ja .json parent commitist
+    restored = []
+    for ext in ['.txt', '.json']:
+        rel_path = f"{folder_name}/{base}{ext}"
+        try:
+            repo.git.checkout(f'{commit_hash}^', '--', rel_path)
+            restored.append(ext)
+        except Exception as e:
+            logger.warning(f"TRASH: Ei saanud taastada {rel_path}: {e}")
+
+    if not restored:
+        return {'ok': False, 'error': 'Faile ei õnnestunud gitist taastada'}
+
+    # 3. Liiguta JPG tagasi teose kausta
+    try:
+        shutil.move(img_path, os.path.join(work_path, filename))
+    except Exception as e:
+        return {'ok': False, 'error': f'Pildi liigutamine ebaõnnestus: {e}'}
+
+    # 4. Git commit
+    try:
+        actor = Actor("VUTT Server", "vutt@server.local")
+        repo.index.commit(
+            f"Taasta leht: {folder_name}/{base} [{work_id}]",
+            author=actor, committer=actor
+        )
+        logger.info(f"TRASH: Taastatud leht {folder_name}/{base}")
+    except Exception as e:
+        logger.warning(f"TRASH: Taastamise commit ebaõnnestus: {e}")
+
+    # 5. Meilisearch sync
+    try:
+        sync_work_to_meilisearch(folder_name)
+    except Exception as e:
+        logger.warning(f"TRASH: Meilisearch sync ebaõnnestus: {e}")
+
+    return {'ok': True}

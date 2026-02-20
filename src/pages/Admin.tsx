@@ -279,7 +279,7 @@ const Admin: React.FC = () => {
         setRestoreMessage(t('trash.restoreSuccess', { title: data.title || title }));
         setTrashItems(prev => prev.filter(item => item.work_id !== workId));
       } else {
-        setRestoreMessage(`${t('trash.restoreError')}: ${data.message}`);
+        setRestoreMessage(`${t('trash.restoreError')}: ${data.detail || data.message || t('common:error.unknown')}`);
       }
     } catch {
       setRestoreMessage(t('trash.restoreError'));

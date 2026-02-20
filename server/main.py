@@ -193,6 +193,24 @@ async def admin_trash_restore(work_id: str, user=Depends(require_role("admin")))
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success", "title": res.get('title')}
 
+@app.get("/admin/work/{work_id}/trash-pages")
+async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
+    """Loetleb teose kustutatud leheküljed."""
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    from .trash_ops import list_deleted_pages
+    return {"status": "success", "pages": list_deleted_pages(work_id, os.path.basename(path))}
+
+@app.post("/admin/work/{work_id}/trash-pages/{filename}/restore")
+async def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("admin"))):
+    """Taastab kustutatud lehekülje prügikastist."""
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    from .trash_ops import restore_deleted_page
+    res = restore_deleted_page(work_id, os.path.basename(path), filename)
+    if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
+    return {"status": "success"}
+
 @app.post("/admin/git-failures")
 async def admin_git_failures(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
