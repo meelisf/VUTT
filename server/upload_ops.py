@@ -579,8 +579,8 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
     current_status = state.get('status', 'pending')
     expected_pages = state.get('expected_pages')
 
-    # Uploading/pending/error: SFTP-d pole vaja
-    if current_status in ('pending', 'uploading', 'error', 'imported'):
+    # Uploading/pending/collecting_images/error: SFTP-d pole vaja
+    if current_status in ('pending', 'uploading', 'error', 'imported', 'collecting_images'):
         return {
             "status": current_status,
             "ready": 0,
@@ -734,6 +734,121 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
                 sftp.close()
             except Exception:
                 pass
+
+
+def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages: int) -> int:
+    """
+    Lisab ühe pildilehe multi-image üleslaadimisse (sünkroonne SFTP).
+
+    - Kui page_number == 1, lähtestatakse received_pages loendur.
+    - Kui kõik lehed edastatud (received_pages >= total_pages), muutub staatus 'processing'-ks.
+    - Tagastab total_pages.
+    - Tõstab ValueError kui failitüüp vale või SFTP ebaõnnestub.
+    """
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        state = _read_state(upload_id)
+    if not state:
+        raise ValueError(f"Upload {upload_id} ei leitud")
+
+    current_status = state.get('status')
+    if current_status not in ('pending', 'collecting_images'):
+        raise ValueError(
+            f"Upload on olekus '{current_status}' — lehte ei saa lisada. "
+            "Oodatav: 'pending' või 'collecting_images'."
+        )
+
+    slug = state['meta']['slug']
+    file_type = _detect_file_type(tmp_path)
+
+    if file_type == 'unknown':
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        raise ValueError("Toetamata failivorming. Palun laadi üles JPG või PNG fail.")
+
+    if file_type == 'pdf':
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+        raise ValueError("Multi-page režiim ei toeta PDF-e — kasuta PDF puhul üksikut üleslaadimist.")
+
+    remote_img_name = f"{slug}_pg_{page_number:03d}.jpg"
+    remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+
+    # Uuenda state → collecting_images; lk 1 puhul lähtesta loendur
+    with state_lock:
+        s = _read_state(upload_id)
+        if s['status'] == 'pending' or page_number == 1:
+            s['status'] = 'collecting_images'
+            s['expected_pages'] = total_pages
+            s['received_pages'] = 0
+        _write_state(upload_id, s)
+
+    # Sünkroonne SFTP (blokeerib kuni fail on OCR serveris)
+    sftp = None
+    try:
+        sftp = _sftp_open(upload_id)
+
+        for remote_dir in (remote_staging_abs, remote_work_abs):
+            try:
+                sftp.stat(remote_dir)
+            except FileNotFoundError:
+                sftp.mkdir(remote_dir)
+
+        remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
+        remote_dst = f"{remote_work_abs}/{remote_img_name}"
+
+        if file_type == 'png':
+            from PIL import Image
+            conv_path = tmp_path + '.conv.jpg'
+            with Image.open(tmp_path) as img:
+                img.convert('RGB').save(conv_path, 'JPEG', quality=95)
+            sftp.put(conv_path, remote_tmp)
+            os.unlink(conv_path)
+        else:
+            sftp.put(tmp_path, remote_tmp)
+
+        sftp.rename(remote_tmp, remote_dst)
+        logger.info(f"Multi-image: lk {page_number}/{total_pages} edastatud → {upload_id} ({remote_img_name})")
+
+        # Inkrementeeri loendur; kui kõik valmis → processing
+        with state_lock:
+            s = _read_state(upload_id)
+            if s:
+                received = s.get('received_pages', 0) + 1
+                s['received_pages'] = received
+                if received >= total_pages:
+                    s['status'] = 'processing'
+                    logger.info(f"Multi-image: kõik {total_pages} lehte edastatud → processing ({upload_id})")
+                _write_state(upload_id, s)
+
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"SFTP multi-image {upload_id} lk {page_number}: {e}")
+        with state_lock:
+            s = _read_state(upload_id)
+            if s:
+                s['status'] = 'error'
+                s['error_message'] = str(e)
+                _write_state(upload_id, s)
+        raise ValueError(f"Faili edastamine ebaõnnestus: {e}")
+    finally:
+        if sftp:
+            try:
+                sftp.close()
+            except Exception:
+                pass
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
+
+    return total_pages
 
 
 def get_ocr_status(upload_id: str) -> dict:

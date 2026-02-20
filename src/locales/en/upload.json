@@ -28,15 +28,20 @@
     "timeEstimate": "Upload and OCR processing takes about 10 minutes."
   },
   "step2": {
-    "title": "Upload PDF",
-    "dropzone": "Drag PDF here or click to select file",
+    "title": "Upload PDF or images",
+    "dropzone": "Drag PDF, JPG or PNG here, or click to select files",
     "dropzoneActive": "Drop it!",
     "accepted": "PDF received, transferring to OCR server...",
     "uploading": "Transferring to OCR server...",
-    "processing": "OCR server is processing the PDF...",
+    "uploadingMulti": "Transferring file {{current}}/{{total}} to OCR server...",
+    "processing": "OCR server is processing...",
     "waitNote": "This may take a few minutes.",
     "canLeaveNote": "Upload and OCR processing runs in the background — this takes about 10 minutes. You can safely leave this page and return later, your progress is saved.",
-    "progressLabel": "Transfer: {{pct}}%"
+    "progressLabel": "Transfer: {{pct}}%",
+    "multipleImagesNote": "Multiple images are uploaded sequentially — do not close this page.",
+    "collectingImages": "Images not fully uploaded — please select all files again.",
+    "multiFilesSelected": "{{n}} images selected (sorted by name):",
+    "uploadAllBtn": "Upload all"
   },
   "step3": {
     "title": "Review",
@@ -75,6 +80,7 @@
   "status": {
     "pending": "Pending",
     "uploading": "Uploading",
+    "collecting_images": "Uploading images",
     "processing": "Processing",
     "reviewing": "Reviewing",
     "done": "Done",

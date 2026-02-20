@@ -28,15 +28,20 @@
     "timeEstimate": "Üleslaadimine ja OCR töötlemine võtab umbes 10 minutit."
   },
   "step2": {
-    "title": "Laadi üles PDF",
-    "dropzone": "Lohista PDF siia või klõpsa failide valimiseks",
+    "title": "Laadi üles PDF või pildid",
+    "dropzone": "Lohista PDF, JPG või PNG siia, või klõpsa failide valimiseks",
     "dropzoneActive": "Lase lahti!",
     "accepted": "PDF vastu võetud, edastatakse OCR serverisse...",
     "uploading": "Edastatakse OCR serverisse...",
-    "processing": "OCR server töötleb PDF-i...",
+    "uploadingMulti": "Edastatakse faili {{current}}/{{total}} OCR serverisse...",
+    "processing": "OCR server töötleb...",
     "waitNote": "See võib võtta mõne minuti.",
     "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab umbes 10 minutit. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
-    "progressLabel": "Edastus: {{pct}}%"
+    "progressLabel": "Edastus: {{pct}}%",
+    "multipleImagesNote": "Mitu pilti laetakse üles järjestikuselt — ärge sulgege lehte.",
+    "collectingImages": "Pildid üles laadimata — vali kõik failid uuesti.",
+    "multiFilesSelected": "{{n}} pilti valitud (sorditud nime järgi):",
+    "uploadAllBtn": "Laadi kõik üles"
   },
   "step3": {
     "title": "Ülevaatus",
@@ -75,6 +80,7 @@
   "status": {
     "pending": "Ootel",
     "uploading": "Üles laadimisel",
+    "collecting_images": "Pilte laadimas",
     "processing": "Töötleb",
     "reviewing": "Ülevaatamisel",
     "done": "Valmis",

@@ -228,6 +228,11 @@ const Upload: React.FC = () => {
   const [fileUploading, setFileUploading] = useState(false); // lipp: fail on valitud ja upload käib
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Multi-image üleslaadimine ---
+  const [pendingMultiFiles, setPendingMultiFiles] = useState<File[]>([]); // valitud, aga veel mitte üles laaditud
+  const [multiCurrentNum, setMultiCurrentNum] = useState(0);
+  const [multiTotalNum, setMultiTotalNum] = useState(0);
+
   // --- Samm 3 ---
   const [localDeleted, setLocalDeleted] = useState<Set<number>>(new Set());
   const [importLoading, setImportLoading] = useState(false);
@@ -291,7 +296,7 @@ const Upload: React.FC = () => {
           const d: PollResult = await r.json();
           setPollResult(d);
 
-          // Liigu samm 3-sse kui OCR hakkab tööle
+          // Liigu samm 3-sse kui OCR hakkab tööle (collecting_images jääb sammu 2-sse)
           if (['processing', 'reviewing', 'done'].includes(d.status)) {
             setStep(3);
             if (ocrStartedAt === null) setOcrStartedAt(Date.now());
@@ -394,11 +399,79 @@ const Upload: React.FC = () => {
     }
   }
 
+  // Mitme JPG/PNG faili järjestikuline üleslaadimine
+  async function handleMultipleImageUpload(files: File[]) {
+    if (!uploadId || !authToken) return;
+    setUploadError('');
+    setFileUploading(true);
+    setMultiTotalNum(files.length);
+    setMultiCurrentNum(0);
+    setPendingMultiFiles([]);
+
+    for (let i = 0; i < files.length; i++) {
+      setMultiCurrentNum(i + 1);
+      try {
+        const r = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/upload/${uploadId}/files?token=${authToken}`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Filename': encodeURIComponent(files[i].name),
+              'X-Page-Number': String(i + 1),
+              'X-Total-Pages': String(files.length),
+            },
+            body: files[i],
+            timeout: 300_000,
+          }
+        );
+        const d = await r.json();
+        if (!r.ok) {
+          setUploadError(d.message || t('errors.uploadFailed'));
+          setFileUploading(false);
+          return;
+        }
+      } catch {
+        setUploadError(t('errors.uploadFailed'));
+        setFileUploading(false);
+        return;
+      }
+    }
+
+    // Kõik failid üles laaditud → alusta pollingut
+    startPolling(uploadId, POLL_FAST_MS);
+  }
+
+  // Faili(de) valik — eraldab PDF vs üks pilt vs mitu pilti
+  function handleFilesSelected(files: File[]) {
+    if (files.length === 0) return;
+    setUploadError('');
+
+    if (files.length === 1) {
+      handleFileUpload(files[0]);
+      return;
+    }
+
+    // Mitu faili — ainult pildid lubatud
+    const images = files.filter((f) => {
+      const n = f.name.toLowerCase();
+      return n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.png');
+    });
+
+    if (images.length !== files.length) {
+      setUploadError('Mitme faili puhul on lubatud ainult JPG/PNG pildid (mitte PDF).');
+      return;
+    }
+
+    // Sorteeri nime järgi ja näita eelvaate nimekirja
+    const sorted = [...images].sort((a, b) => a.name.localeCompare(b.name));
+    setPendingMultiFiles(sorted);
+  }
+
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload(file);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) handleFilesSelected(files);
   }
 
   // ---------------------------------------------------------------------------
@@ -476,6 +549,9 @@ const Upload: React.FC = () => {
     setSlugManual(false);
     setLocalDeleted(new Set());
     setOcrStartedAt(null);
+    setPendingMultiFiles([]);
+    setMultiCurrentNum(0);
+    setMultiTotalNum(0);
     // Värskenda pooleliolevate nimekirja
     if (authToken) {
       fetchWithTimeout(`${FILE_API_URL}/admin/uploads?token=${authToken}`)
@@ -506,6 +582,9 @@ const Upload: React.FC = () => {
     setSlugManual(false);
     setLocalDeleted(new Set());
     setOcrStartedAt(null);
+    setPendingMultiFiles([]);
+    setMultiCurrentNum(0);
+    setMultiTotalNum(0);
   }
 
   // ---------------------------------------------------------------------------
@@ -537,6 +616,8 @@ const Upload: React.FC = () => {
       setStep(2);
       setFileUploading(true);
       startPolling(saved.id, POLL_FAST_MS);
+    } else if (saved.status === 'collecting_images') {
+      setStep(2); // Piltide üleslaadimine katkes — kasutaja peab failid uuesti valima
     } else {
       setStep(2); // pending — faili pole veel saadetud
     }
@@ -802,16 +883,31 @@ const Upload: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <Loader2 size={20} className="animate-spin text-primary-600 shrink-0" />
                   <p className="text-sm font-medium text-gray-800">
-                    {status === 'uploading' ? t('step2.uploading') : t('step2.processing')}
+                    {multiTotalNum > 1
+                      ? t('step2.uploadingMulti')
+                          .replace('{{current}}', String(multiCurrentNum))
+                          .replace('{{total}}', String(multiTotalNum))
+                      : status === 'uploading'
+                      ? t('step2.uploading')
+                      : t('step2.processing')}
                   </p>
                 </div>
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
-                  <Info size={16} className="shrink-0 mt-0.5" />
-                  <span>{t('step2.canLeaveNote')}</span>
-                </div>
 
-                {/* Progress bar (ainult upload ajaks) */}
-                {status === 'uploading' && progress && progress.bytes_total > 0 && (
+                {/* Multi-image: ära lahku hoiatus */}
+                {multiTotalNum > 1 ? (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <span>{t('step2.multipleImagesNote')}</span>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
+                    <Info size={16} className="shrink-0 mt-0.5" />
+                    <span>{t('step2.canLeaveNote')}</span>
+                  </div>
+                )}
+
+                {/* Progress bar (ainult üksiku faili upload ajaks) */}
+                {multiTotalNum <= 1 && status === 'uploading' && progress && progress.bytes_total > 0 && (
                   <div>
                     <div className="flex justify-between text-xs text-gray-500 mb-1">
                       <span>{t('step2.progressLabel').replace('{{pct}}', String(progressPct))}</span>
@@ -829,6 +925,18 @@ const Upload: React.FC = () => {
                   </div>
                 )}
 
+                {/* Multi-image progress bar */}
+                {multiTotalNum > 1 && (
+                  <div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className="bg-primary-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${Math.round(((multiCurrentNum - 1) / multiTotalNum) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Veateade progressis */}
                 {progress?.error && (
                   <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
@@ -837,9 +945,50 @@ const Upload: React.FC = () => {
                   </div>
                 )}
               </div>
+            ) : pendingMultiFiles.length > 0 ? (
+              /* Mitu pilti valitud — näita nimekirja ja "Laadi üles" nuppu */
+              <>
+                <p className="text-sm text-gray-700 mb-2">
+                  {t('step2.multiFilesSelected').replace('{{n}}', String(pendingMultiFiles.length))}
+                </p>
+                <ul className="mb-4 max-h-48 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100 text-sm">
+                  {pendingMultiFiles.map((f, i) => (
+                    <li key={i} className="px-3 py-1.5 flex items-center gap-2 text-gray-700">
+                      <span className="text-xs text-gray-400 w-5 text-right shrink-0">{i + 1}.</span>
+                      <span className="font-mono truncate">{f.name}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  onClick={() => handleMultipleImageUpload(pendingMultiFiles)}
+                  className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm mb-2"
+                >
+                  <FileUp size={16} />
+                  {t('step2.uploadAllBtn')}
+                </button>
+                <button
+                  onClick={() => setPendingMultiFiles([])}
+                  className="w-full text-sm text-gray-400 hover:text-gray-700 py-1 transition-colors"
+                >
+                  {t('cancelWizard')} (vali uuesti)
+                </button>
+                {uploadError && (
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    <AlertTriangle size={14} className="inline mr-1" />
+                    {uploadError}
+                  </div>
+                )}
+              </>
             ) : (
               /* Drag & drop tsoon */
               <>
+                {/* collecting_images resume teade */}
+                {status === 'collecting_images' && (
+                  <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <span>{t('step2.collectingImages')}</span>
+                  </div>
+                )}
                 <div
                   onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                   onDragLeave={() => setDragging(false)}
@@ -858,16 +1007,19 @@ const Upload: React.FC = () => {
                   <p className="text-sm font-medium text-gray-700">
                     {dragging ? t('step2.dropzoneActive') : t('step2.dropzone')}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">PDF · JPG · PNG</p>
+                  <p className="text-xs text-gray-400 mt-1">PDF · JPG · PNG · mitu JPG/PNG korraga</p>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  multiple
                   className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file);
+                    const files = Array.from(e.target.files ?? []);
+                    if (files.length > 0) handleFilesSelected(files);
+                    // Lähtesta input et sama failivalik toimiks uuesti
+                    e.target.value = '';
                   }}
                 />
 

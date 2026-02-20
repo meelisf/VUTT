@@ -61,7 +61,7 @@ from server import (
     sanitize_slug, check_slug_conflict,
     create_upload, list_uploads, get_upload,
     mark_page_deleted, cancel_upload,
-    save_and_transfer_to_ocr, poll_and_sync_thumbs, get_ocr_status,
+    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs, get_ocr_status,
 )
 
 from server.metadata_handler import handle_metadata_request
@@ -1197,11 +1197,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     send_json_response(self, 400, {"status": "error", "message": "upload_id puudub"})
                     return
 
+                # Loe multi-image päised
+                x_page_number = int(self.headers.get('X-Page-Number', '0') or '0')
+                x_total_pages = int(self.headers.get('X-Total-Pages', '0') or '0')
+                is_multi_image = x_page_number > 0 and x_total_pages > 1
+
                 state = get_upload(upload_id)
                 if not state:
                     send_json_response(self, 404, {"status": "error", "message": "Upload ei leitud"})
                     return
-                if state.get('status') != 'pending':
+
+                allowed_statuses = ('pending', 'collecting_images') if is_multi_image else ('pending',)
+                if state.get('status') not in allowed_statuses:
                     send_json_response(self, 409, {
                         "status": "error",
                         "message": f"Upload on juba olekus '{state.get('status')}' — faili ei saa uuesti saata"
@@ -1214,7 +1221,8 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     return
 
                 # Salvesta fail /tmp-sse (voogedastus kettale)
-                tmp_path = f"/tmp/vutt-upload-{upload_id}"
+                tmp_suffix = f"{upload_id}-pg{x_page_number}" if is_multi_image else upload_id
+                tmp_path = f"/tmp/vutt-upload-{tmp_suffix}"
                 with open(tmp_path, 'wb') as f:
                     remaining = content_length
                     while remaining > 0:
@@ -1224,9 +1232,12 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         f.write(chunk)
                         remaining -= len(chunk)
 
-                # Valideeri ja käivita SFTP transfer (daemon thread)
+                # Käivita SFTP transfer
                 try:
-                    pages = save_and_transfer_to_ocr(upload_id, tmp_path)
+                    if is_multi_image:
+                        pages = add_image_page(upload_id, tmp_path, x_page_number, x_total_pages)
+                    else:
+                        pages = save_and_transfer_to_ocr(upload_id, tmp_path)
                     send_json_response(self, 202, {
                         "status": "accepted",
                         "upload_id": upload_id,
