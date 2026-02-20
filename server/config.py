@@ -15,6 +15,20 @@ from datetime import timedelta
 # Logide kaust
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGS_DIR = os.path.join(_PROJECT_ROOT, "logs")
+
+# Lae .env fail os.environ-isse (enne kõiki os.getenv() kutseid)
+# Süsteemi muutujad on prioriteetsemad — .env kirjutab ainult puuduvad
+_env_path = os.path.join(_PROJECT_ROOT, ".env")
+if os.path.exists(_env_path):
+    with open(_env_path, 'r') as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and '=' in _line and not _line.startswith('#'):
+                _k, _v = _line.split('=', 1)
+                _k = _k.strip()
+                _v = _v.strip().strip('"').strip("'")
+                if _k not in os.environ:
+                    os.environ[_k] = _v
 os.makedirs(_LOGS_DIR, exist_ok=True)
 
 # Logging formaat
