@@ -25,6 +25,7 @@ from .registration import (
 from .auth import get_all_users, update_user_role, delete_user
 from .git_ops import get_git_failures, clear_git_failures, run_git_fsck
 from .people_ops import refresh_all_people_safe, get_refresh_status
+from .trash_ops import list_deleted_works, restore_deleted_work
 
 
 def handle_admin_registrations(handler):
@@ -371,4 +372,48 @@ def handle_admin_people_refresh_status(handler):
 
     except Exception as e:
         print(f"PEOPLE REFRESH STATUS VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_trash(handler):
+    """Loetleb prügikastis olevad kustutatud teosed (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        items = list_deleted_works()
+        send_json_response(handler, 200, {"status": "success", "items": items})
+
+    except Exception as e:
+        print(f"ADMIN TRASH VIGA: {e}")
+        handler.send_error(500, str(e))
+
+
+def handle_admin_trash_restore(handler, work_id):
+    """Taastab kustutatud teose prügikastist (admin)."""
+    try:
+        data = read_request_data(handler)
+
+        user = require_auth(handler, data, min_role='admin')
+        if not user:
+            return
+
+        result = restore_deleted_work(work_id)
+        if result['ok']:
+            send_json_response(handler, 200, {
+                "status": "success",
+                "folder_name": result.get('folder_name'),
+                "title": result.get('title')
+            })
+        else:
+            send_json_response(handler, 400, {
+                "status": "error",
+                "message": result['error']
+            })
+
+    except Exception as e:
+        print(f"ADMIN TRASH RESTORE VIGA: {e}")
         handler.send_error(500, str(e))

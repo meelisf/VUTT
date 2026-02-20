@@ -3,7 +3,8 @@
   "tabs": {
     "registrations": "Registrations",
     "users": "Users",
-    "pending": "Pending Edits"
+    "pending": "Pending Edits",
+    "trash": "Trash"
   },
   "registrations": {
     "title": "Registration Requests",
@@ -57,5 +58,21 @@
     "refreshStarted": "Refreshing...",
     "refreshDone": "Done: {{updated}}/{{total}} updated, {{errors}} errors",
     "refreshError": "Refresh failed"
+  },
+  "trash": {
+    "tab": "Trash",
+    "title": "Deleted works",
+    "empty": "Trash is empty",
+    "load": "Load trash",
+    "loadError": "Failed to load trash",
+    "deletedAt": "Deleted",
+    "deletedBy": "Deleted by",
+    "jpgCount": "{{count}} images",
+    "restore": "Restore",
+    "restoring": "Restoring...",
+    "restoreSuccess": "Work \"{{title}}\" restored",
+    "restoreError": "Restore failed",
+    "unknownDate": "Unknown date",
+    "unknownUser": "Unknown"
   }
 }

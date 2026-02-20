@@ -42,6 +42,7 @@ from server import (
     handle_invite_set_password,
     handle_admin_git_failures, handle_admin_git_health,
     handle_admin_people_refresh, handle_admin_people_refresh_status,
+    handle_admin_trash, handle_admin_trash_restore,
     # Bulk operatsioonide HTTP handlerid
     handle_bulk_tags, handle_bulk_genre, handle_bulk_collection,
     # Meilisearch
@@ -1081,6 +1082,18 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
         elif self.path == '/admin/people-refresh-status':
             handle_admin_people_refresh_status(self)
+
+        elif self.path == '/admin/trash':
+            handle_admin_trash(self)
+
+        elif self.path.startswith('/admin/trash/') and self.path.endswith('/restore'):
+            # /admin/trash/{work_id}/restore
+            parts = self.path.split('/')
+            work_id = parts[3] if len(parts) >= 5 else None
+            if work_id:
+                handle_admin_trash_restore(self, work_id)
+            else:
+                self.send_error(400)
 
         elif self.path == '/invite/set-password':
             handle_invite_set_password(self)

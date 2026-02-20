@@ -98,7 +98,8 @@ from .admin_handlers import (
     handle_admin_users_update_role, handle_admin_users_delete,
     handle_invite_set_password,
     handle_admin_git_failures, handle_admin_git_health,
-    handle_admin_people_refresh, handle_admin_people_refresh_status
+    handle_admin_people_refresh, handle_admin_people_refresh_status,
+    handle_admin_trash, handle_admin_trash_restore
 )
 
 # Bulk operatsioonide HTTP handlerid

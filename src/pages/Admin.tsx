@@ -17,7 +17,9 @@ import {
   Trash2,
   AlertTriangle,
   BookUser,
-  RefreshCw
+  RefreshCw,
+  RotateCcw,
+  Image
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -57,7 +59,7 @@ const Admin: React.FC = () => {
   const { user, authToken, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState<'registrations' | 'users'>('registrations');
+  const [activeTab, setActiveTab] = useState<'registrations' | 'users' | 'trash'>('registrations');
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +77,22 @@ const Admin: React.FC = () => {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  // Prügikast
+  interface DeletedWork {
+    work_id: string;
+    title: string;
+    deleted_at: string | null;
+    deleted_by: string | null;
+    commit_hash: string | null;
+    jpg_count: number;
+  }
+  const [trashItems, setTrashItems] = useState<DeletedWork[]>([]);
+  const [trashLoading, setTrashLoading] = useState(false);
+  const [trashError, setTrashError] = useState<string | null>(null);
+  const [trashLoaded, setTrashLoaded] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
 
   // Isikute register
   const [peopleCount, setPeopleCount] = useState<number | null>(null);
@@ -114,6 +132,13 @@ const Admin: React.FC = () => {
   useEffect(() => {
     if (activeTab === 'users' && authToken && user?.role === 'admin' && peopleCount === null) {
       loadPeopleCount();
+    }
+  }, [activeTab, authToken, user]);
+
+  // Lae prügikast kui tab on aktiivne
+  useEffect(() => {
+    if (activeTab === 'trash' && authToken && user?.role === 'admin' && !trashLoaded) {
+      loadTrash();
     }
   }, [activeTab, authToken, user]);
 
@@ -206,6 +231,60 @@ const Admin: React.FC = () => {
       setError('Serveriga ühendamine ebaõnnestus');
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // =========================================================
+  // PRÜGIKAST
+  // =========================================================
+
+  const loadTrash = async () => {
+    setTrashLoading(true);
+    setTrashError(null);
+    try {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/trash`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auth_token: authToken })
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        setTrashItems(data.items);
+        setTrashLoaded(true);
+      } else {
+        setTrashError(t('trash.loadError'));
+      }
+    } catch {
+      setTrashError(t('trash.loadError'));
+    } finally {
+      setTrashLoading(false);
+    }
+  };
+
+  const handleRestore = async (workId: string, title: string) => {
+    setRestoringId(workId);
+    setRestoreMessage(null);
+    try {
+      const response = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/trash/${workId}/restore`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ auth_token: authToken }),
+          timeout: 30000
+        }
+      );
+      const data = await response.json();
+      if (data.status === 'success') {
+        setRestoreMessage(t('trash.restoreSuccess', { title: data.title || title }));
+        setTrashItems(prev => prev.filter(item => item.work_id !== workId));
+      } else {
+        setRestoreMessage(`${t('trash.restoreError')}: ${data.message}`);
+      }
+    } catch {
+      setRestoreMessage(t('trash.restoreError'));
+    } finally {
+      setRestoringId(null);
     }
   };
 
@@ -445,6 +524,22 @@ const Admin: React.FC = () => {
             >
               <Users size={18} />
               {t('tabs.users')}
+            </button>
+            <button
+              onClick={() => setActiveTab('trash')}
+              className={`py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
+                activeTab === 'trash'
+                  ? 'border-primary-600 text-primary-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Trash2 size={18} />
+              {t('tabs.trash')}
+              {trashItems.length > 0 && (
+                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">
+                  {trashItems.length}
+                </span>
+              )}
             </button>
           </nav>
         </div>
@@ -778,6 +873,107 @@ const Admin: React.FC = () => {
           </section>
           </div>
         )}
+
+        {/* PRÜGIKAST TAB */}
+        {activeTab === 'trash' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                <Trash2 size={20} className="text-gray-500" />
+                {t('trash.title')}
+              </h2>
+              <button
+                onClick={() => { setTrashLoaded(false); loadTrash(); }}
+                disabled={trashLoading}
+                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
+              >
+                {trashLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                {t('trash.load')}
+              </button>
+            </div>
+
+            {restoreMessage && (
+              <div className={`p-3 rounded-lg text-sm border ${
+                restoreMessage.includes(t('trash.restoreError').split(':')[0])
+                  ? 'bg-red-50 border-red-200 text-red-700'
+                  : 'bg-green-50 border-green-200 text-green-700'
+              }`}>
+                {restoreMessage}
+              </div>
+            )}
+
+            {trashError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {trashError}
+              </div>
+            )}
+
+            {trashLoading && (
+              <div className="flex items-center gap-2 text-gray-500 py-8 justify-center">
+                <Loader2 size={20} className="animate-spin" />
+              </div>
+            )}
+
+            {!trashLoading && trashLoaded && trashItems.length === 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
+                {t('trash.empty')}
+              </div>
+            )}
+
+            {trashItems.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('common:labels.title')}</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('trash.deletedAt')}</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('trash.deletedBy')}</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600"></th>
+                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-600"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {trashItems.map(item => (
+                      <tr key={item.work_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="text-sm font-medium text-gray-900">{item.title}</div>
+                          <div className="text-xs text-gray-400 font-mono">{item.work_id}</div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.deleted_at
+                            ? new Date(item.deleted_at).toLocaleString('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                            : t('trash.unknownDate')}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {item.deleted_by || t('trash.unknownUser')}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
+                            <Image size={12} />
+                            {t('trash.jpgCount', { count: item.jpg_count })}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleRestore(item.work_id, item.title)}
+                            disabled={restoringId === item.work_id}
+                            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1 ml-auto"
+                          >
+                            {restoringId === item.work_id
+                              ? <><Loader2 size={12} className="animate-spin" />{t('trash.restoring')}</>
+                              : <><RotateCcw size={12} />{t('trash.restore')}</>
+                            }
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
 
       </main>
     </div>

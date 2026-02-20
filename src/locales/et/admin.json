@@ -3,7 +3,8 @@
   "tabs": {
     "registrations": "Taotlused",
     "users": "Kasutajad",
-    "pending": "Ootel muudatused"
+    "pending": "Ootel muudatused",
+    "trash": "Prügikast"
   },
   "registrations": {
     "title": "Registreerimistaotlused",
@@ -57,5 +58,21 @@
     "refreshStarted": "Uuendamine käimas...",
     "refreshDone": "Valmis: {{updated}}/{{total}} uuendatud, {{errors}} viga",
     "refreshError": "Uuendamine ebaõnnestus"
+  },
+  "trash": {
+    "tab": "Prügikast",
+    "title": "Kustutatud teosed",
+    "empty": "Prügikast on tühi",
+    "load": "Lae prügikast",
+    "loadError": "Prügikasti laadimine ebaõnnestus",
+    "deletedAt": "Kustutatud",
+    "deletedBy": "Kustutaja",
+    "jpgCount": "{{count}} pilti",
+    "restore": "Taasta",
+    "restoring": "Taastamine...",
+    "restoreSuccess": "Teos \"{{title}}\" taastatud",
+    "restoreError": "Taastamine ebaõnnestus",
+    "unknownDate": "Kuupäev teadmata",
+    "unknownUser": "Teadmata"
   }
 }
