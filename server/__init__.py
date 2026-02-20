@@ -114,7 +114,7 @@ from .upload_ops import (
     mark_page_deleted, cancel_upload,
     # Etapp 2: SFTP transport ja OCR jälgimine
     upload_progress,
-    save_and_transfer_to_ocr, poll_and_sync_thumbs, get_ocr_status,
+    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs, get_ocr_status,
     # Etapp 4: import VUTT-i
     import_as_work,
 )
