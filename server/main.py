@@ -382,7 +382,14 @@ async def admin_upload_delete_page(upload_id: str, request: Request, user=Depend
 @app.post("/admin/upload/{upload_id}/import")
 async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
     if not UPLOAD_ENABLED: raise HTTPException(status_code=503, detail="Upload keelatud")
-    try: return {"status": "success", **import_as_work(upload_id)}
+    try:
+        result = import_as_work(upload_id)
+        
+        # UUENDAME CACHE-I: See on kriitiline, et uus Nanoid üles leitaks!
+        from .utils import build_work_id_cache
+        build_work_id_cache()
+        
+        return {"status": "success", **result}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
 
 @app.delete("/admin/upload/{upload_id}")
