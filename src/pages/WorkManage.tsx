@@ -199,8 +199,11 @@ const WorkManage: React.FC = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-500">{t('common:errors.notLoggedIn', 'Logi sisse')}</p>
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="flex items-center justify-center mt-24">
+          <p className="text-gray-500">{t('common:errors.notLoggedIn', 'Logi sisse')}</p>
+        </div>
       </div>
     );
   }
