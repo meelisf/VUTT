@@ -748,7 +748,7 @@ const Upload: React.FC = () => {
               {' · '}
               {year}
               {' · '}
-              <span className="font-mono text-xs">data/{year}_{slug}/</span>
+              <span className="font-mono text-xs">data/{slug}/</span>
             </div>
 
             {/* Upload progress (kui SFTP käib) */}
