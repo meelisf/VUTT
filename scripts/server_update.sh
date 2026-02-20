@@ -23,5 +23,4 @@ docker compose ps
 echo "✅ Uuendamine valmis!"
 echo "   NB: Backend on nüüd FastAPI põhine (pordil 8002)."
 echo "   Kui andmebaas vajab täitmist, käivita: ./scripts/server_seed_data.sh"
-echo "   Kui andmebaas vajab täitmist, käivita: ./scripts/server_seed_data.sh"
 echo "   Kui frontend vajab uuendamist, lae 'dist' kaust oma arvutist üles (rsync)."
