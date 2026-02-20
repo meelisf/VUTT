@@ -1,0 +1,74 @@
+{
+  "title": "Add work",
+  "nav": "Upload",
+  "steps": {
+    "metadata": "Metadata",
+    "upload": "Upload",
+    "review": "Review"
+  },
+  "pending": {
+    "title": "Pending uploads",
+    "resume": "Resume",
+    "empty": "No pending uploads"
+  },
+  "step1": {
+    "title": "Work metadata",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. Disputatio philosophica de...",
+    "yearLabel": "Year",
+    "yearPlaceholder": "e.g. 1695",
+    "slugLabel": "Folder name (slug)",
+    "slugHint": "Folder will be created: data/{{year}}_{{slug}}/",
+    "slugConflict": "Folder data/{{year}}_{{slug}}/ already exists — change the slug",
+    "collectionLabel": "Collection (optional)",
+    "collectionNone": "— select collection —",
+    "languagesLabel": "Languages (optional)",
+    "continue": "Continue to upload",
+    "required": "Required field"
+  },
+  "step2": {
+    "title": "Upload PDF",
+    "dropzone": "Drag PDF here or click to select file",
+    "dropzoneActive": "Drop it!",
+    "accepted": "PDF received, transferring to OCR server...",
+    "uploading": "Transferring to OCR server...",
+    "processing": "OCR server is processing the PDF...",
+    "waitNote": "This may take a few minutes.",
+    "progressLabel": "Transfer: {{pct}}%"
+  },
+  "step3": {
+    "title": "Review",
+    "ocrReady": "OCR ready",
+    "ocrProcessing": "Processing...",
+    "deleted": "Deleted",
+    "restore": "Restore",
+    "delete": "Delete",
+    "readyCount": "{{ready}} / {{total}} pages with OCR",
+    "expectedPages": "Expected: {{n}} pages",
+    "done": "OCR complete",
+    "processing": "OCR running...",
+    "importBtn": "Import to VUTT",
+    "importDisabled": "Need at least 1 ready page",
+    "timeoutWarning": "OCR processing is taking a long time. You can import the available pages.",
+    "forceImport": "Import available pages",
+    "importSuccess": "Work imported!",
+    "importError": "Import failed"
+  },
+  "cancel": "Cancel and start over",
+  "cancelConfirm": "Are you sure? The current upload will be discarded.",
+  "errors": {
+    "createFailed": "Failed to create staging",
+    "uploadFailed": "File upload failed",
+    "networkError": "Network error — please try again",
+    "invalidPdf": "Invalid PDF — file cannot be read"
+  },
+  "status": {
+    "pending": "Pending",
+    "uploading": "Uploading",
+    "processing": "Processing",
+    "reviewing": "Reviewing",
+    "done": "Done",
+    "error": "Error",
+    "imported": "Imported"
+  }
+}

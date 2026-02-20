@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Search, LogOut, LogIn, History, Settings, ChevronDown, Library } from 'lucide-react';
+import { Search, LogOut, LogIn, History, Settings, ChevronDown, Library, Upload } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import LoginModal from './LoginModal';
 import CollectionPicker from './CollectionPicker';
@@ -142,14 +142,24 @@ const Header: React.FC<HeaderProps> = ({
                     </Link>
 
                     {user.role === 'admin' && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Settings size={16} />
-                        {t('common:nav.admin')}
-                      </Link>
+                      <>
+                        <Link
+                          to="/upload"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Upload size={16} />
+                          {t('common:nav.upload', 'Laadi üles')}
+                        </Link>
+                        <Link
+                          to="/admin"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Settings size={16} />
+                          {t('common:nav.admin')}
+                        </Link>
+                      </>
                     )}
 
                     <div className="border-t border-gray-100 my-1" />

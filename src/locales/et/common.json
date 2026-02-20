@@ -70,7 +70,8 @@
   },
   "nav": {
     "review": "Muudatused",
-    "admin": "Admin"
+    "admin": "Admin",
+    "upload": "Laadi üles"
   },
   "collections": {
     "title": "Vali kollektsioon",

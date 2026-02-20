@@ -1,0 +1,74 @@
+{
+  "title": "Lisa teos",
+  "nav": "Laadi üles",
+  "steps": {
+    "metadata": "Metaandmed",
+    "upload": "Üleslaadimine",
+    "review": "Ülevaatus"
+  },
+  "pending": {
+    "title": "Pooleliolevad üleslaadimised",
+    "resume": "Jätka",
+    "empty": "Pooleliolevaid üleslaadimisi pole"
+  },
+  "step1": {
+    "title": "Teose metaandmed",
+    "titleLabel": "Pealkiri",
+    "titlePlaceholder": "nt Disputatio philosophica de...",
+    "yearLabel": "Aasta",
+    "yearPlaceholder": "nt 1695",
+    "slugLabel": "Kaustanimi (slug)",
+    "slugHint": "Kaust luuakse: data/{{year}}_{{slug}}/",
+    "slugConflict": "Kaust data/{{year}}_{{slug}}/ on juba olemas — muuda slug-i",
+    "collectionLabel": "Kollektsioon (valikuline)",
+    "collectionNone": "— vali kollektsioon —",
+    "languagesLabel": "Keeled (valikuline)",
+    "continue": "Jätka üleslaadimisele",
+    "required": "Kohustuslik väli"
+  },
+  "step2": {
+    "title": "Laadi üles PDF",
+    "dropzone": "Lohista PDF siia või klõpsa failide valimiseks",
+    "dropzoneActive": "Lase lahti!",
+    "accepted": "PDF vastu võetud, edastatakse OCR serverisse...",
+    "uploading": "Edastatakse OCR serverisse...",
+    "processing": "OCR server töötleb PDF-i...",
+    "waitNote": "See võib võtta mõne minuti.",
+    "progressLabel": "Edastus: {{pct}}%"
+  },
+  "step3": {
+    "title": "Ülevaatus",
+    "ocrReady": "OCR valmis",
+    "ocrProcessing": "Töötleb...",
+    "deleted": "Kustutatud",
+    "restore": "Taasta",
+    "delete": "Kustuta",
+    "readyCount": "{{ready}} / {{total}} lehekülge OCR-ga",
+    "expectedPages": "Oodatud: {{n}} lk",
+    "done": "OCR lõpetatud",
+    "processing": "OCR käib...",
+    "importBtn": "Impordi VUTT-i",
+    "importDisabled": "Vaja vähemalt 1 valmis lehekülge",
+    "timeoutWarning": "OCR töötlemine võtab kaua aega. Saad importida olemasolevad lehed.",
+    "forceImport": "Impordi olemasolevad lehed",
+    "importSuccess": "Teos imporditud!",
+    "importError": "Importimine ebaõnnestus"
+  },
+  "cancel": "Tühista ja alusta otsast",
+  "cancelConfirm": "Kas oled kindel? Pooleliolev töö kaotatakse.",
+  "errors": {
+    "createFailed": "Staging loomine ebaõnnestus",
+    "uploadFailed": "Faili üleslaadimine ebaõnnestus",
+    "networkError": "Võrgu viga — proovi uuesti",
+    "invalidPdf": "Vigane PDF — faili ei saa lugeda"
+  },
+  "status": {
+    "pending": "Ootel",
+    "uploading": "Üles laadimisel",
+    "processing": "Töötleb",
+    "reviewing": "Ülevaatamisel",
+    "done": "Valmis",
+    "error": "Viga",
+    "imported": "Imporditud"
+  }
+}

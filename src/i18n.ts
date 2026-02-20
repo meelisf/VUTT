@@ -12,6 +12,7 @@ import etStatistics from './locales/et/statistics.json';
 import etAdmin from './locales/et/admin.json';
 import etRegister from './locales/et/register.json';
 import etReview from './locales/et/review.json';
+import etUpload from './locales/et/upload.json';
 
 import enCommon from './locales/en/common.json';
 import enAuth from './locales/en/auth.json';
@@ -22,6 +23,7 @@ import enStatistics from './locales/en/statistics.json';
 import enAdmin from './locales/en/admin.json';
 import enRegister from './locales/en/register.json';
 import enReview from './locales/en/review.json';
+import enUpload from './locales/en/upload.json';
 
 const resources = {
   et: {
@@ -34,6 +36,7 @@ const resources = {
     admin: etAdmin,
     register: etRegister,
     review: etReview,
+    upload: etUpload,
   },
   en: {
     common: enCommon,
@@ -45,6 +48,7 @@ const resources = {
     admin: enAdmin,
     register: enRegister,
     review: enReview,
+    upload: enUpload,
   },
 };
 
@@ -55,7 +59,7 @@ i18n
     resources,
     fallbackLng: 'et',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review'],
+    ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload'],
 
     detection: {
       order: ['localStorage'],

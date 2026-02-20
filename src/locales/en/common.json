@@ -70,7 +70,8 @@
   },
   "nav": {
     "review": "Changes",
-    "admin": "Admin"
+    "admin": "Admin",
+    "upload": "Upload"
   },
   "collections": {
     "title": "Select Collection",
