@@ -8,11 +8,19 @@ services:
       - VUTT_DATA_DIR=/data
       - MEILISEARCH_URL=http://meilisearch:7700
       - MEILISEARCH_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+      - UPLOAD_ENABLED=${UPLOAD_ENABLED:-false}
+      - OCR_SERVER_HOST=${OCR_SERVER_HOST:-172.17.120.146}
+      - OCR_SERVER_USER=${OCR_SERVER_USER:-mf}
+      - OCR_SERVER_PATH=${OCR_SERVER_PATH:-/home/mf/Dokumendid/LLM/AUTO-OCR}
     volumes:
       # Mountime andmed hostilt konteinerisse
       - ./data:/data
       # Mountime olekufailid (kasutajad, tokenid jms)
       - ./state:/app/state
+      # Upload staging kaust
+      - ./uploads:/app/uploads
+      # SSH võti OCR serverisse ühendumiseks (read-only)
+      - ~/.ssh:/root/.ssh:ro
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
     # Avame localhostile host Nginxi jaoks
     ports:

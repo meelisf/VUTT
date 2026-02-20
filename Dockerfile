@@ -3,7 +3,7 @@ FROM python:3.9-slim
 WORKDIR /app
 
 # Install git (required for GitPython)
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends git poppler-utils openssh-client && rm -rf /var/lib/apt/lists/*
 
 # Mark /data as safe directory for Git (mounted volume has different owner)
 RUN git config --global --add safe.directory /data
