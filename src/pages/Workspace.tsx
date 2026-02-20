@@ -11,7 +11,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, LogIn, Settings, History, Copy, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, LogIn, Settings, History, Copy, Check, Upload } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { FILE_API_URL } from '../config';
@@ -489,14 +489,24 @@ const Workspace: React.FC = () => {
                       {t('common:nav.review')}
                     </Link>
                     {user.role === 'admin' && (
-                      <Link
-                        to="/admin"
-                        onClick={() => setShowUserMenu(false)}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        <Settings size={16} />
-                        {t('common:nav.admin')}
-                      </Link>
+                      <>
+                        <Link
+                          to="/upload"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Upload size={16} />
+                          {t('common:nav.upload')}
+                        </Link>
+                        <Link
+                          to="/admin"
+                          onClick={() => setShowUserMenu(false)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        >
+                          <Settings size={16} />
+                          {t('common:nav.admin')}
+                        </Link>
+                      </>
                     )}
                     <div className="border-t border-gray-100 my-1" />
                     <button
