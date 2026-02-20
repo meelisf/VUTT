@@ -108,5 +108,8 @@ from .bulk_handlers import (
 from .upload_ops import (
     sanitize_slug, check_slug_conflict,
     create_upload, list_uploads, get_upload,
-    mark_page_deleted, cancel_upload
+    mark_page_deleted, cancel_upload,
+    # Etapp 2: SFTP transport ja OCR jälgimine
+    upload_progress,
+    save_and_transfer_to_ocr, poll_and_sync_thumbs, get_ocr_status,
 )

@@ -54,7 +54,8 @@ from server import (
     UPLOAD_ENABLED,
     sanitize_slug, check_slug_conflict,
     create_upload, list_uploads, get_upload,
-    mark_page_deleted, cancel_upload
+    mark_page_deleted, cancel_upload,
+    save_and_transfer_to_ocr, poll_and_sync_thumbs, get_ocr_status,
 )
 
 from server.metadata_handler import handle_metadata_request
@@ -574,6 +575,89 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 print(f"USER-CHARS GET VIGA: {e}")
                 self.send_error(500, str(e))
 
+        # GET /admin/upload/{id}/status - OCR/SFTP olek (admin)
+        elif self.path.startswith('/admin/upload/') and '/status' in self.path:
+            try:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                parts = parsed.path.strip('/').split('/')
+                # /admin/upload/{id}/status → parts = ['admin','upload','{id}','status']
+                upload_id = parts[2] if len(parts) >= 4 else None
+                if not upload_id:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id puudub"})
+                    return
+
+                result = poll_and_sync_thumbs(upload_id)
+                if result.get('error') and 'Upload ei leitud' in result['error']:
+                    send_json_response(self, 404, {"status": "error", "message": result['error']})
+                    return
+                send_json_response(self, 200, {"status": "success", **result})
+
+            except Exception as e:
+                print(f"GET /admin/upload/.../status VIGA: {e}")
+                self.send_error(500, str(e))
+
+        # GET /admin/upload/{id}/thumb/{n} - pisipilt (admin)
+        elif self.path.startswith('/admin/upload/') and '/thumb/' in self.path:
+            try:
+                from urllib.parse import urlparse, parse_qs
+                from server.config import UPLOADS_DIR
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+
+                parts = parsed.path.strip('/').split('/')
+                # /admin/upload/{id}/thumb/{n} → parts = ['admin','upload','{id}','thumb','{n}']
+                upload_id = parts[2] if len(parts) >= 5 else None
+                page_str = parts[4] if len(parts) >= 5 else None
+                if not upload_id or not page_str:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id või leheküljenumber puudub"})
+                    return
+
+                try:
+                    page_num = int(page_str)
+                except ValueError:
+                    send_json_response(self, 400, {"status": "error", "message": "Vigane leheküljenumber"})
+                    return
+
+                thumb_path = os.path.join(UPLOADS_DIR, upload_id, 'thumbs', f"{page_num:03d}.jpg")
+                if not os.path.isfile(thumb_path):
+                    self.send_error(404)
+                    return
+
+                with open(thumb_path, 'rb') as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/jpeg')
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Cache-Control', 'private, max-age=300')
+                self.end_headers()
+                self.wfile.write(data)
+
+            except Exception as e:
+                print(f"GET /admin/upload/.../thumb/... VIGA: {e}")
+                self.send_error(500, str(e))
+
         # GET /admin/uploads - aktiivsed üleslaadimised (admin)
         elif self.path.startswith('/admin/uploads'):
             try:
@@ -1068,6 +1152,77 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
 
             except Exception as e:
                 print(f"POST /admin/upload/create VIGA: {e}")
+                self.send_error(500, str(e))
+
+        elif self.path.startswith('/admin/upload/') and '/files' in self.path:
+            # POST /admin/upload/{id}/files — voogedasta PDF OCR serverisse
+            try:
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(self.path)
+                params = parse_qs(parsed.query)
+                token = params.get('token', [None])[0]
+                if not token:
+                    send_json_response(self, 401, {"status": "error", "message": "Token puudub"})
+                    return
+                session = sessions.get(token)
+                if not session or session['user'].get('role') != 'admin':
+                    send_json_response(self, 401, {"status": "error", "message": "Admin õigused nõutavad"})
+                    return
+                if not UPLOAD_ENABLED:
+                    send_json_response(self, 503, {"status": "error", "message": "Upload on praegu keelatud"})
+                    return
+
+                parts = parsed.path.strip('/').split('/')
+                # /admin/upload/{id}/files → parts = ['admin','upload','{id}','files']
+                upload_id = parts[2] if len(parts) >= 4 else None
+                if not upload_id:
+                    send_json_response(self, 400, {"status": "error", "message": "upload_id puudub"})
+                    return
+
+                state = get_upload(upload_id)
+                if not state:
+                    send_json_response(self, 404, {"status": "error", "message": "Upload ei leitud"})
+                    return
+                if state.get('status') != 'pending':
+                    send_json_response(self, 409, {
+                        "status": "error",
+                        "message": f"Upload on juba olekus '{state.get('status')}' — faili ei saa uuesti saata"
+                    })
+                    return
+
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length <= 0:
+                    send_json_response(self, 400, {"status": "error", "message": "Content-Length puudub või on 0"})
+                    return
+
+                # Salvesta fail /tmp-sse (voogedastus kettale)
+                tmp_path = f"/tmp/vutt-upload-{upload_id}"
+                with open(tmp_path, 'wb') as f:
+                    remaining = content_length
+                    while remaining > 0:
+                        chunk = self.rfile.read(min(65536, remaining))
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        remaining -= len(chunk)
+
+                # Valideeri ja käivita SFTP transfer (daemon thread)
+                try:
+                    pages = save_and_transfer_to_ocr(upload_id, tmp_path)
+                    send_json_response(self, 202, {
+                        "status": "accepted",
+                        "upload_id": upload_id,
+                        "expected_pages": pages,
+                    })
+                except ValueError as ve:
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
+                    send_json_response(self, 400, {"status": "error", "message": str(ve)})
+
+            except Exception as e:
+                print(f"POST /admin/upload/.../files VIGA: {e}")
                 self.send_error(500, str(e))
 
         elif self.path.startswith('/admin/upload/') and self.path.endswith('/delete-page'):

@@ -2,17 +2,19 @@
 Upload operatsioonid — teose lisamine PDF/piltidest OCR kaudu.
 
 Etapp 1: staging haldus, state.json loogika, slug kontroll.
-Etapp 2 lisab: SFTP transport, polling, thumbnailid, import.
+Etapp 2: SFTP transport, polling, thumbnailid, OCR jälgimine.
+Etapp 4 lisab: import_as_work, cleanup_upload.
 """
 import json
 import os
 import re
 import shutil
+import subprocess
 import threading
 import unicodedata
 from datetime import datetime
 
-from .config import BASE_DIR, UPLOADS_DIR, get_logger
+from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, get_logger
 from .utils import generate_nanoid
 
 logger = get_logger(__name__)
@@ -20,6 +22,18 @@ logger = get_logger(__name__)
 # Lock per upload_id — kaitseb samaaegset state.json lugemist/kirjutamist
 _upload_locks: dict = {}
 _locks_lock = threading.Lock()
+
+# =========================================================
+# MÄLUPÕHINE PROGRESS (SFTP üleslaadimise jälgimine)
+# Kettale kirjutatakse alles pärast edastuse lõppu.
+# =========================================================
+upload_progress: dict = {}  # {upload_id: {"bytes_sent": 0, "bytes_total": 0, "error": None}}
+
+# =========================================================
+# PÜSIVAD SSH ÜHENDUSED (üks per upload_id)
+# =========================================================
+_ssh_connections: dict = {}
+_ssh_lock = threading.Lock()
 
 
 def _get_upload_lock(upload_id: str) -> threading.Lock:
@@ -64,6 +78,116 @@ def _valid_upload_id(upload_id: str) -> bool:
 def _valid_filename(filename: str) -> bool:
     """Valideerib failinime (ainult a-z0-9._-, keelatud .. ja /)."""
     return bool(re.match(r'^[a-z0-9._-]+$', filename)) and '..' not in filename
+
+
+# =========================================================
+# SSH / SFTP UTILIIDID (etapp 2)
+# =========================================================
+
+def _load_ssh_key():
+    """Laeb SSH privaatvõtme tavalistest asukohtadest (~/.ssh/)."""
+    try:
+        import paramiko
+    except ImportError:
+        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
+
+    key_paths = [
+        ("ed25519", os.path.expanduser("~/.ssh/id_ed25519")),
+        ("ecdsa",   os.path.expanduser("~/.ssh/id_ecdsa")),
+        ("rsa",     os.path.expanduser("~/.ssh/id_rsa")),
+    ]
+    for key_type, path in key_paths:
+        if not os.path.exists(path):
+            continue
+        try:
+            if key_type == "ed25519":
+                return paramiko.Ed25519Key.from_private_key_file(path)
+            elif key_type == "ecdsa":
+                return paramiko.ECDSAKey.from_private_key_file(path)
+            else:
+                return paramiko.RSAKey.from_private_key_file(path)
+        except Exception as e:
+            logger.warning(f"SSH võtme laadimine ebaõnnestus ({path}): {e}")
+
+    raise FileNotFoundError("SSH privaatvõtit ei leitud (~/.ssh/id_ed25519 ega teised)")
+
+
+def get_or_create_ssh(upload_id: str):
+    """
+    Tagastab püsiva paramiko.Transport objekti antud upload_id jaoks.
+    Loob uue ühenduse kui puudub või on katkine.
+    """
+    try:
+        import paramiko
+    except ImportError:
+        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
+
+    with _ssh_lock:
+        transport = _ssh_connections.get(upload_id)
+        if transport and transport.is_active():
+            return transport
+
+        # Sulge vana katkine ühendus
+        if transport:
+            try:
+                transport.close()
+            except Exception:
+                pass
+
+        logger.info(f"SSH: loob ühenduse {OCR_SERVER_USER}@{OCR_SERVER_HOST} (upload {upload_id})")
+        transport = paramiko.Transport((OCR_SERVER_HOST, 22))
+        transport.set_keepalive(30)
+        transport.connect()
+        key = _load_ssh_key()
+        transport.auth_publickey(OCR_SERVER_USER, key)
+        _ssh_connections[upload_id] = transport
+        return transport
+
+
+def close_ssh(upload_id: str):
+    """Suleb ja eemaldab SSH ühenduse."""
+    with _ssh_lock:
+        transport = _ssh_connections.pop(upload_id, None)
+    if transport:
+        try:
+            transport.close()
+        except Exception:
+            pass
+
+
+def _sftp_open(upload_id: str):
+    """
+    Loob SFTP seansi püsivalt SSH transpordilt.
+    Proovib uuesti üks kord kui ühendus on katkine.
+    """
+    try:
+        import paramiko
+    except ImportError:
+        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
+
+    for attempt in range(2):
+        try:
+            transport = get_or_create_ssh(upload_id)
+            return paramiko.SFTPClient.from_transport(transport)
+        except Exception:
+            if attempt == 0:
+                close_ssh(upload_id)  # Eemalda katkine ühendus, proovi uuesti
+            else:
+                raise
+
+
+def _extract_page_num(base: str) -> int:
+    """
+    Eraldab leheküljenumbri OCR failinimest.
+    '{year}-{slug}_pg_001' → 1
+    """
+    parts = base.rsplit('_pg_', 1)
+    if len(parts) == 2:
+        try:
+            return int(parts[1])
+        except ValueError:
+            pass
+    return 0
 
 
 # =========================================================
@@ -216,10 +340,312 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
         return True
 
 
+def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
+    """
+    Loeb PDF lehekülgede arvu (pdfinfo), uuendab state.json ja käivitab
+    daemon threadi SFTP edastuseks OCR serverisse.
+
+    Tagastab expected_pages (int).
+    Tõstab ValueError kui PDF on vigane või pdfinfo ebaõnnestub.
+    """
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        state = _read_state(upload_id)
+    if not state:
+        raise ValueError(f"Upload {upload_id} ei leitud")
+
+    year = state['meta']['year']
+    slug = state['meta']['slug']
+
+    # --- Loe lehekülgede arv pdfinfo abil ---
+    try:
+        result = subprocess.run(
+            ['pdfinfo', tmp_path],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode != 0:
+            raise ValueError(f"pdfinfo viga: {result.stderr.strip() or 'tundmatu viga'}")
+
+        pages = None
+        for line in result.stdout.splitlines():
+            if line.startswith('Pages:'):
+                pages = int(line.split(':', 1)[1].strip())
+                break
+        if pages is None:
+            raise ValueError("pdfinfo: 'Pages:' välja ei leitud väljundis")
+
+    except FileNotFoundError:
+        raise ValueError("pdfinfo pole paigaldatud (apt install poppler-utils)")
+    except subprocess.TimeoutExpired:
+        raise ValueError("pdfinfo timeout — PDF on liiga suur või kahjustatud")
+
+    # --- Uuenda state.json ja progress ---
+    file_size = os.path.getsize(tmp_path)
+    upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
+
+    with state_lock:
+        state = _read_state(upload_id)
+        state['expected_pages'] = pages
+        state['status'] = 'uploading'
+        _write_state(upload_id, state)
+
+    # Remote teed (OCR_SERVER_PATH on absoluutne tee OCR serveris)
+    remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    remote_pdf_name = f"{year}-{slug}.pdf"
+    remote_pdf_tmp_name = f"{year}-{slug}.pdf.tmp"
+
+    # --- Daemon thread SFTP edastuseks ---
+    def _sftp_transfer():
+        sftp = None
+        try:
+            sftp = _sftp_open(upload_id)
+
+            # Loo staging kaust OCR serveris
+            try:
+                sftp.stat(remote_staging_abs)
+            except FileNotFoundError:
+                sftp.mkdir(remote_staging_abs)
+
+            remote_tmp = f"{remote_staging_abs}/{remote_pdf_tmp_name}"
+            remote_pdf = f"{remote_staging_abs}/{remote_pdf_name}"
+
+            def _progress(transferred, total):
+                upload_progress[upload_id]['bytes_sent'] = transferred
+                upload_progress[upload_id]['bytes_total'] = total
+
+            sftp.put(tmp_path, remote_tmp, callback=_progress)
+            sftp.rename(remote_tmp, remote_pdf)
+
+            logger.info(f"SFTP upload valmis: {upload_id} ({pages} lk, {file_size} B)")
+
+            with state_lock:
+                s = _read_state(upload_id)
+                if s:
+                    s['status'] = 'processing'
+                    _write_state(upload_id, s)
+
+        except Exception as e:
+            logger.error(f"SFTP transfer {upload_id}: {e}")
+            upload_progress[upload_id]['error'] = str(e)
+            with state_lock:
+                s = _read_state(upload_id)
+                if s:
+                    s['status'] = 'error'
+                    s['error_message'] = str(e)
+                    _write_state(upload_id, s)
+        finally:
+            if sftp:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+
+    thread = threading.Thread(target=_sftp_transfer, daemon=True, name=f"sftp-{upload_id}")
+    thread.start()
+    return pages
+
+
+def poll_and_sync_thumbs(upload_id: str) -> dict:
+    """
+    Küsib SFTP kaudu OCR serveri kausta, tuvastab valmis JPG+TXT paarid,
+    laeb alla uued pisipildid (Pillow thumbnail 400x600) ja uuendab state.json.
+
+    Tagastab: {status, ready, total, expected_pages, files, progress, error?}
+    """
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        state = _read_state(upload_id)
+    if not state:
+        return {"error": "Upload ei leitud"}
+
+    current_status = state.get('status', 'pending')
+    expected_pages = state.get('expected_pages')
+
+    # Uploading/pending/error: SFTP-d pole vaja
+    if current_status in ('pending', 'uploading', 'error', 'imported'):
+        return {
+            "status": current_status,
+            "ready": 0,
+            "total": 0,
+            "expected_pages": expected_pages,
+            "files": state.get('files', []),
+            "progress": upload_progress.get(upload_id, {}),
+            "error": state.get('error_message'),
+        }
+
+    year = state['meta']['year']
+    slug = state['meta']['slug']
+    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+    thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
+
+    sftp = None
+    try:
+        sftp = _sftp_open(upload_id)
+
+        # --- Kontrolli VIGASED kausta ---
+        vigased_path = f"{OCR_SERVER_PATH}/VIGASED/{year}-{slug}.pdf"
+        try:
+            sftp.stat(vigased_path)
+            # PDF on vigane — OCR teenus teisaldas selle
+            err_msg = "PDF on vigane — OCR teenus ei suutnud seda töödelda"
+            with state_lock:
+                s = _read_state(upload_id)
+                if s and s.get('status') != 'error':
+                    s['status'] = 'error'
+                    s['error_message'] = err_msg
+                    _write_state(upload_id, s)
+            return {
+                "status": "error",
+                "error": err_msg,
+                "ready": 0,
+                "total": 0,
+                "expected_pages": expected_pages,
+                "files": state.get('files', []),
+                "progress": upload_progress.get(upload_id, {}),
+            }
+        except FileNotFoundError:
+            pass  # OK — PDF pole vigane
+
+        # --- SFTP ls remote work path ---
+        try:
+            remote_files = sftp.listdir(remote_work)
+        except FileNotFoundError:
+            # Töökaust pole veel loodud (OCR pole alustanud)
+            return {
+                "status": "processing",
+                "ready": 0,
+                "total": 0,
+                "expected_pages": expected_pages,
+                "files": state.get('files', []),
+                "progress": upload_progress.get(upload_id, {}),
+            }
+
+        # --- Leia JPG-d ja TXT-d ---
+        jpg_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith('.jpg')}
+        txt_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith('.txt')}
+        ready_bases = jpg_bases & txt_bases  # Mõlemad olemas = OCR valmis
+
+        # --- Laadi alla UUED valmis JPG-d (ainult mille jaoks on ka TXT) ---
+        os.makedirs(thumbs_dir, exist_ok=True)
+        existing_thumbs = set(os.listdir(thumbs_dir))
+
+        for base in sorted(ready_bases):
+            page_num = _extract_page_num(base)
+            if page_num <= 0:
+                continue
+            thumb_name = f"{page_num:03d}.jpg"
+            if thumb_name in existing_thumbs:
+                continue
+            tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
+            if os.path.exists(tmp_thumb):
+                continue  # Teise threadi poolt juba allalaadimisel
+
+            try:
+                sftp.get(f"{remote_work}/{base}.jpg", tmp_thumb)
+                from PIL import Image
+                with Image.open(tmp_thumb) as img:
+                    img.thumbnail((400, 600), Image.LANCZOS)
+                    img.save(os.path.join(thumbs_dir, thumb_name), "JPEG", quality=85)
+                os.unlink(tmp_thumb)
+                existing_thumbs.add(thumb_name)
+                logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
+            except Exception as e:
+                logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
+                try:
+                    os.unlink(tmp_thumb)
+                except Exception:
+                    pass
+
+        # --- Ehita files massiiv ---
+        all_page_nums = sorted(
+            {_extract_page_num(b) for b in jpg_bases if _extract_page_num(b) > 0}
+        )
+        ready_page_nums = {_extract_page_num(b) for b in ready_bases if _extract_page_num(b) > 0}
+        existing_deleted = {f['page']: f.get('deleted', False) for f in state.get('files', [])}
+
+        new_files = [
+            {
+                "page": pn,
+                "filename": f"{pn:03d}.jpg",
+                "has_ocr": pn in ready_page_nums,
+                "deleted": existing_deleted.get(pn, False),
+            }
+            for pn in all_page_nums
+        ]
+
+        # --- Uus staatus ---
+        ready_count = len(ready_page_nums)
+        new_status = current_status
+        if expected_pages and ready_count >= expected_pages:
+            new_status = 'done'
+        elif all_page_nums:
+            new_status = 'reviewing'
+
+        # --- Uuenda state.json ---
+        with state_lock:
+            s = _read_state(upload_id)
+            if s:
+                s['files'] = new_files
+                if new_status != s.get('status'):
+                    s['status'] = new_status
+                _write_state(upload_id, s)
+
+        return {
+            "status": new_status,
+            "ready": ready_count,
+            "total": len(all_page_nums),
+            "expected_pages": expected_pages,
+            "files": new_files,
+            "progress": upload_progress.get(upload_id, {}),
+        }
+
+    except Exception as e:
+        logger.error(f"poll_and_sync_thumbs {upload_id}: {e}")
+        return {
+            "status": current_status,
+            "ready": 0,
+            "total": 0,
+            "expected_pages": expected_pages,
+            "files": state.get('files', []),
+            "error": str(e),
+            "progress": upload_progress.get(upload_id, {}),
+        }
+    finally:
+        if sftp:
+            try:
+                sftp.close()
+            except Exception:
+                pass
+
+
+def get_ocr_status(upload_id: str) -> dict:
+    """
+    Tagastab state.json info + mälupõhise progressi (ilma SFTP-ta).
+    Kasutatakse uploading-staatuses kui SFTP transfer on käimas.
+    """
+    lock = _get_upload_lock(upload_id)
+    with lock:
+        state = _read_state(upload_id)
+    if not state:
+        return {"error": "Upload ei leitud"}
+    return {
+        "status": state.get('status'),
+        "expected_pages": state.get('expected_pages'),
+        "files": state.get('files', []),
+        "progress": upload_progress.get(upload_id, {}),
+        "meta": state.get('meta', {}),
+        "error": state.get('error_message'),
+    }
+
+
 def cancel_upload(upload_id: str) -> bool:
     """
-    Tühistab upload'i ja kustutab lokaalse staging kausta.
-    NB: SFTP/SSH koristus OCR serveris lisatakse etapp 2-s.
+    Tühistab upload'i: suleb SSH, koristab OCR serveri staging kausta ja
+    kustutab lokaalse staging kausta.
     Tagastab True kui õnnestus.
     """
     if not _valid_upload_id(upload_id):
@@ -229,10 +655,32 @@ def cancel_upload(upload_id: str) -> bool:
     if not os.path.isdir(upload_path):
         return False
 
+    # Loe state et teada remote_staging_path ja staatus
+    lock = _get_upload_lock(upload_id)
+    with lock:
+        state = _read_state(upload_id)
+
+    # SSH koristus OCR serveris (kui oli juba kaugemale jõutud kui 'pending')
+    if state and state.get('status') not in ('pending', 'error'):
+        remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+        try:
+            transport = get_or_create_ssh(upload_id)
+            chan = transport.open_session()
+            chan.set_combine_stderr(True)
+            chan.exec_command(f'rm -rf "{remote_staging}"')
+            chan.recv_exit_status()
+            chan.close()
+            logger.info(f"OCR serveri kaust koristatud: {remote_staging}")
+        except Exception as e:
+            logger.warning(f"cancel_upload SSH koristus ebaõnnestus {upload_id}: {e}")
+
+    close_ssh(upload_id)
+
     try:
         shutil.rmtree(upload_path)
         with _locks_lock:
             _upload_locks.pop(upload_id, None)
+        upload_progress.pop(upload_id, None)
         logger.info(f"Upload tühistatud: {upload_id}")
         return True
     except Exception as e:
