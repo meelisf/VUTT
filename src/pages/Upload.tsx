@@ -321,7 +321,7 @@ const Upload: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: authToken,
+          auth_token: authToken,
           title: title.trim(),
           year: year.trim(),
           slug,
@@ -397,7 +397,7 @@ const Upload: React.FC = () => {
     await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: authToken, filename }),
+      body: JSON.stringify({ auth_token: authToken, filename }),
     }).catch(() => {});
   }
 
@@ -411,7 +411,7 @@ const Upload: React.FC = () => {
     await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: authToken, filename, deleted: false }),
+      body: JSON.stringify({ auth_token: authToken, filename, deleted: false }),
     }).catch(() => {});
   }
 
@@ -428,7 +428,7 @@ const Upload: React.FC = () => {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token: authToken }),
+          body: JSON.stringify({ auth_token: authToken }),
           timeout: 60_000,
         }
       );
