@@ -205,6 +205,47 @@ async def admin_delete_user(request: Request, user=Depends(require_role("admin")
     return {"status": "success"}
 
 # =========================================================
+# ADMIN: PRÜGIKAST, GIT JA TERVIS
+# =========================================================
+
+@app.post("/admin/trash")
+async def admin_trash(user=Depends(require_role("admin"))):
+    from .trash_ops import list_deleted_works
+    return {"status": "success", "items": list_deleted_works()}
+
+@app.post("/admin/trash/{work_id}/restore")
+async def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
+    from .trash_ops import restore_deleted_work
+    res = restore_deleted_work(work_id)
+    if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
+    return {"status": "success", "title": res.get('title')}
+
+@app.post("/admin/git-failures")
+async def admin_git_failures(request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    if data.get('action') == 'clear':
+        from .git_ops import clear_git_failures
+        clear_git_failures()
+        return {"status": "success"}
+    from .git_ops import get_git_failures
+    return {"status": "success", "failures": get_git_failures()}
+
+@app.post("/admin/git-health")
+async def admin_git_health(user=Depends(require_role("admin"))):
+    return {"status": "success", "git_ok": run_git_fsck()["ok"]}
+
+@app.post("/admin/people-refresh")
+async def admin_people_refresh(user=Depends(require_role("admin"))):
+    from .people_ops import refresh_all_people_safe
+    threading.Thread(target=refresh_all_people_safe, daemon=True).start()
+    return {"status": "success"}
+
+@app.post("/admin/people-refresh-status")
+async def admin_people_refresh_status(user=Depends(require_role("admin"))):
+    from .people_ops import get_refresh_status
+    return {"status": "success", **get_refresh_status()}
+
+# =========================================================
 # ANDMETE SALVESTAMINE JA META
 # =========================================================
 
