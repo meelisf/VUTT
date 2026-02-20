@@ -12,11 +12,12 @@ import {
   Plus,
   Minus,
   Clock,
-  Trash2
+  Settings
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+// FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
 interface GitHistoryEntry {
@@ -70,12 +71,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   // Rate limit state
   const [lastLoadTime, setLastLoadTime] = useState<number>(0);
   const RATE_LIMIT_MS = 5000; // 5 sekundit
-
-  // Teose kustutamise state
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
-  const [deleteInput, setDeleteInput] = useState('');
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const loadGitHistory = async () => {
     // Rate limit kontroll
@@ -341,27 +336,6 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
   };
 
-  const handleDeleteWork = async () => {
-    if (!work) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${work.work_id}?token=${authToken}`,
-        { method: 'DELETE', timeout: 10000 }
-      );
-      if (res.ok) {
-        navigate('/');
-      } else {
-        setDeleteError(t('management.deleteWorkError'));
-      }
-    } catch {
-      setDeleteError(t('management.deleteWorkError'));
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   const isAdmin = user?.role === 'admin';
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
@@ -547,50 +521,17 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       {isAdmin && work && (
         <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm">
           <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
-            <Trash2 size={15} className="text-red-500" />
+            <Settings size={15} className="text-gray-500" />
             <h4 className="font-bold text-gray-800 text-sm">{t('management.title')}</h4>
           </div>
           <div className="p-5">
-            {!deleteConfirm ? (
-              <button
-                onClick={() => { setDeleteConfirm(true); setDeleteInput(''); }}
-                className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
-              >
-                {t('management.deleteWork')}
-              </button>
-            ) : (
-              <div className="bg-red-50 border border-red-200 rounded p-3 space-y-3">
-                <p className="text-sm text-red-800">
-                  {t('management.deleteWorkConfirmMessage', { title: work.title })}
-                </p>
-                <input
-                  type="text"
-                  value={deleteInput}
-                  onChange={(e) => setDeleteInput(e.target.value)}
-                  placeholder={t('management.deleteWorkInputPlaceholder', { word: t('management.deleteWorkConfirmWord') })}
-                  className="w-full px-3 py-2 text-sm border border-red-200 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
-                  autoFocus
-                />
-                {deleteError && (
-                  <p className="text-sm text-red-600 font-medium">{deleteError}</p>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleDeleteWork}
-                    disabled={deleting || deleteInput !== t('management.deleteWorkConfirmWord')}
-                    className="px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {deleting ? <Loader2 size={14} className="animate-spin inline" /> : t('management.deleteWorkConfirm')}
-                  </button>
-                  <button
-                    onClick={() => { setDeleteConfirm(false); setDeleteError(null); setDeleteInput(''); }}
-                    className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
-                  >
-                    {t('management.deleteWorkCancel')}
-                  </button>
-                </div>
-              </div>
-            )}
+            <button
+              onClick={() => navigate(`/work/${work.work_id}/manage`)}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+            >
+              <Settings size={14} />
+              {t('manage.managePageLink')}
+            </button>
           </div>
         </div>
       )}

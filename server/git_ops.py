@@ -551,6 +551,55 @@ def delete_work_from_git(folder_name, work_title, work_id):
         return False
 
 
+def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str) -> bool:
+    """
+    Stage'ib lehe .txt ja .json kustutamise gitist ja teeb commit.
+    .jpg peab olema ENNE seda liigutatud prügikasti (ei ole git-tracked).
+
+    Args:
+        folder_name: Kausta nimi (nt "1632-1")
+        base_name: Faili põhinimi ilma laiendita (nt "lk_003")
+        commit_msg: Commit sõnum
+
+    Returns:
+        bool: True kui õnnestus
+    """
+    try:
+        repo = get_or_init_repo()
+        # Stage ainult selle lehe failid (txt + json)
+        files_to_remove = []
+        for ext in ['.txt', '.json']:
+            rel_path = os.path.join(folder_name, base_name + ext)
+            abs_path = os.path.join(BASE_DIR, rel_path)
+            if os.path.exists(abs_path):
+                # Eemalda failisüsteemist ja stage kustutamine
+                try:
+                    repo.index.remove([rel_path])
+                    os.remove(abs_path)
+                    files_to_remove.append(rel_path)
+                except Exception as e:
+                    logger.warning(f"GIT: Ei saanud eemaldada {rel_path}: {e}")
+                    # Proovi git rm otse
+                    try:
+                        repo.git.rm('--cached', rel_path)
+                        os.remove(abs_path)
+                        files_to_remove.append(rel_path)
+                    except Exception as e2:
+                        logger.error(f"GIT: Faili eemaldamine ebaõnnestus {rel_path}: {e2}")
+
+        if not files_to_remove:
+            logger.info(f"GIT: Teosel {folder_name}/{base_name} polnud jälgitud faile, commit vahele jäetud")
+            return False
+
+        actor = Actor("VUTT Server", "vutt@server.local")
+        repo.index.commit(commit_msg, author=actor, committer=actor)
+        logger.info(f"GIT: Kustutatud leht {folder_name}/{base_name}")
+        return True
+    except Exception as e:
+        logger.error(f"GIT viga lehe kustutamisel ({folder_name}/{base_name}): {e}")
+        return False
+
+
 def get_recent_commits(username=None, limit=50, skip=0):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.

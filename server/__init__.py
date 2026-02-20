@@ -42,19 +42,12 @@ from .pending_edits import (
     check_base_text_conflict
 )
 
-# Pending edits (HTTP handlerid)
-from .pending_edits_handlers import (
-    handle_save_pending, handle_pending_edits_list,
-    handle_pending_edits_check, handle_pending_edits_approve,
-    handle_pending_edits_reject
-)
-
 # Git operatsioonid
 from .git_ops import (
     get_or_init_repo, save_with_git, get_file_git_history,
     get_file_at_commit, get_file_diff, get_commit_diff, commit_new_work_to_git,
     get_recent_commits, get_git_failures, clear_git_failures, run_git_fsck,
-    delete_work_from_git
+    delete_work_from_git, delete_page_from_git
 )
 
 # Meilisearch operatsioonid
@@ -71,11 +64,6 @@ from .people_ops import (
     refresh_all_people, refresh_all_people_safe, people_refresh_loop, get_refresh_status
 )
 
-# HTTP helperid
-from .http_helpers import (
-    send_json_response, read_request_data, require_auth as require_auth_handler
-)
-
 # Abifunktsioonid
 from .utils import (
     atomic_write_json, metadata_lock, page_json_lock,
@@ -83,28 +71,6 @@ from .utils import (
     normalize_genre, calculate_work_status,
     get_label, get_id, get_all_labels, get_primary_labels, get_labels_by_lang, get_all_ids,
     build_work_id_cache, WORK_ID_CACHE
-)
-
-# Git HTTP handlerid
-from .git_handlers import (
-    handle_backups, handle_restore, handle_git_history,
-    handle_git_restore, handle_git_diff, handle_commit_diff
-)
-
-# Admin HTTP handlerid
-from .admin_handlers import (
-    handle_admin_registrations, handle_admin_registrations_approve,
-    handle_admin_registrations_reject, handle_admin_users,
-    handle_admin_users_update_role, handle_admin_users_delete,
-    handle_invite_set_password,
-    handle_admin_git_failures, handle_admin_git_health,
-    handle_admin_people_refresh, handle_admin_people_refresh_status,
-    handle_admin_trash, handle_admin_trash_restore
-)
-
-# Bulk operatsioonide HTTP handlerid
-from .bulk_handlers import (
-    handle_bulk_tags, handle_bulk_genre, handle_bulk_collection
 )
 
 # Upload operatsioonid (admin teose lisamine PDF/piltidest)

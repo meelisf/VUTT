@@ -296,11 +296,24 @@ def sync_work_to_meilisearch(dir_name):
     languages = metadata.get('languages', [])
 
     # 2. Leia leheküljed (pildid)
-    # NB: Lehekülje number (page_num) tuleneb pildi POSITSIOONIST tähestikuliselt
-    # sorteeritud nimekirjas, MITTE failinimest. See võimaldab lehekülgi ümber
-    # järjestada (nt kui avastatakse puuduv lk) ilma failinimesid muutmata.
-    # Näide: 001.jpg=lk1, 002.jpg=lk2. Kui lisada 001a.jpg, siis: 001.jpg=lk1, 001a.jpg=lk2, 002.jpg=lk3
-    images = sorted([f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
+    # NB: Lehekülje number (page_num) tuleneb pildi POSITSIOONIST SEQUENCE järgi sorteeritud
+    # nimekirjas, MITTE failinimest. Sequence on .json failis (100, 200, 300...).
+    # Tähestikuline sort on fallback kui sequence puudub.
+    def _get_page_sequence(img_name):
+        json_path = os.path.join(dir_path, os.path.splitext(img_name)[0] + '.json')
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    d = json.load(f)
+                    seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                    if seq is not None:
+                        return int(seq)
+            except Exception:
+                pass
+        return float('inf')  # fallback: lõppu
+
+    images_list = [f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+    images = sorted(images_list, key=lambda f: (_get_page_sequence(f), f))
     if not images:
         print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
         return False

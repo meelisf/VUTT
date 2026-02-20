@@ -60,6 +60,33 @@
     "deleteWorkConfirmWord": "kustutan",
     "deleteWorkInputPlaceholder": "Kustutamiseks trüki siia \"{{word}}\""
   },
+  "manage": {
+    "title": "Lehekülgede haldus",
+    "backToWork": "← Tagasi teosele",
+    "manageWork": "Halda teost",
+    "pages": "Leheküljed",
+    "loadError": "Lehekülgede laadimine ebaõnnestus",
+    "noPages": "Teoses pole lehekülgi",
+    "deletePage": "Kustuta leht",
+    "deletePageConfirm": "Kas oled kindel, et soovid kustutada lehe {{num}}? Pildifail säilitatakse, tekst on gitist taastatav.",
+    "deletePageError": "Lehe kustutamine ebaõnnestus",
+    "addPage": "Lisa leht",
+    "addPageTitle": "Lisa uus lehekülg",
+    "addPagePosition": "Asend",
+    "addPageToEnd": "Lõppu",
+    "addPageAfter": "Pärast lk {{num}}",
+    "addPageFile": "Vali fail (JPG/PNG)",
+    "addPageSubmit": "Lisa leht",
+    "addPageError": "Lehe lisamine ebaõnnestus",
+    "addPageSuccess": "Leht lisatud",
+    "dangerZone": "Ohutsoon",
+    "managePageLink": "Halda teost",
+    "pageStatus": {
+      "Valmis": "Valmis",
+      "Toores": "Toores",
+      "Kontrollitud": "Kontrollitud"
+    }
+  },
   "metadata": {
     "title": "Metaandmed",
     "editMetadata": "Muuda metaandmeid",

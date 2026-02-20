@@ -60,6 +60,33 @@
     "deleteWorkConfirmWord": "delete",
     "deleteWorkInputPlaceholder": "Type \"{{word}}\" here to confirm"
   },
+  "manage": {
+    "title": "Page management",
+    "backToWork": "← Back to work",
+    "manageWork": "Manage work",
+    "pages": "Pages",
+    "loadError": "Failed to load pages",
+    "noPages": "No pages in this work",
+    "deletePage": "Delete page",
+    "deletePageConfirm": "Are you sure you want to delete page {{num}}? The image file will be kept, text is recoverable from git.",
+    "deletePageError": "Failed to delete page",
+    "addPage": "Add page",
+    "addPageTitle": "Add new page",
+    "addPagePosition": "Position",
+    "addPageToEnd": "At the end",
+    "addPageAfter": "After page {{num}}",
+    "addPageFile": "Choose file (JPG/PNG)",
+    "addPageSubmit": "Add page",
+    "addPageError": "Failed to add page",
+    "addPageSuccess": "Page added",
+    "dangerZone": "Danger zone",
+    "managePageLink": "Manage work",
+    "pageStatus": {
+      "Valmis": "Done",
+      "Toores": "Raw",
+      "Kontrollitud": "Checked"
+    }
+  },
   "metadata": {
     "title": "Metadata",
     "editMetadata": "Edit metadata",

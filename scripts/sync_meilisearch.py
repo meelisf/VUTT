@@ -132,11 +132,25 @@ def get_filesystem_pages(data_dir):
         if not os.path.isdir(dir_path):
             continue
 
-        # Leia pildifailid (v.a. thumbnailid)
-        image_files = sorted([
-            f for f in os.listdir(dir_path)
-            if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
-        ])
+        # Leia pildifailid (v.a. thumbnailid), sordi sequence järgi
+        def _get_sequence(img_name):
+            json_path = os.path.join(dir_path, os.path.splitext(img_name)[0] + '.json')
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        d = json.load(f)
+                        seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                        if seq is not None:
+                            return int(seq)
+                except Exception:
+                    pass
+            return float('inf')
+
+        image_files = sorted(
+            [f for f in os.listdir(dir_path)
+             if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')],
+            key=lambda f: (_get_sequence(f), f)
+        )
 
         if not image_files:
             continue

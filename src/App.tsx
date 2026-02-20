@@ -27,6 +27,7 @@ const SetPassword = lazyRetry(() => import('./pages/SetPassword'));
 const Admin = lazyRetry(() => import('./pages/Admin'));
 const Upload = lazyRetry(() => import('./pages/Upload'));
 const Review = lazyRetry(() => import('./pages/Review'));
+const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
 const NotFound = lazyRetry(() => import('./pages/NotFound'));
 
 // Suspense fallback laadimise ajaks
@@ -55,6 +56,11 @@ const router = createBrowserRouter([
   {
     path: "/stats",
     element: <Lazy><Statistics /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/work/:workId/manage",
+    element: <Lazy><WorkManage /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {

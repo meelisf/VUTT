@@ -8,11 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
-from .utils import build_work_id_cache, find_directory_by_id, metadata_lock
+from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, get_refresh_status, refresh_all_people_safe
-from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
+from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
 from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
@@ -240,6 +240,271 @@ async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
     return {"status": "success"}
 
 # =========================================================
+# LEHEKÜLGEDE HALDUS (admin)
+# =========================================================
+
+def _get_page_sequence(json_path: str) -> float:
+    """Loeb sequence välja .json failist. Tagastab float('inf') kui puudub."""
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                if seq is not None:
+                    return int(seq)
+        except Exception:
+            pass
+    return float('inf')
+
+
+def _get_sorted_images(dir_path: str) -> list[str]:
+    """Tagastab sequence järgi sorteeritud piltide nimekirja."""
+    images = [
+        f for f in os.listdir(dir_path)
+        if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
+    ]
+    return sorted(images, key=lambda f: (
+        _get_page_sequence(os.path.join(dir_path, os.path.splitext(f)[0] + '.json')),
+        f
+    ))
+
+
+def _rebalance_sequences(dir_path: str):
+    """Nummerdab kõigi lehtede sequence väärtused ümber sammuga 100."""
+    images = _get_sorted_images(dir_path)
+    for i, img_name in enumerate(images):
+        base = os.path.splitext(img_name)[0]
+        json_path = os.path.join(dir_path, base + '.json')
+        new_seq = (i + 1) * 100
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    d = json.load(f)
+                if 'meta_content' in d:
+                    d['meta_content']['sequence'] = new_seq
+                else:
+                    d['sequence'] = new_seq
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(d, f, indent=2, ensure_ascii=False)
+                os.chmod(json_path, 0o644)
+            except Exception:
+                pass
+        else:
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump({'sequence': new_seq, 'status': 'Toores'}, f, indent=2)
+            os.chmod(json_path, 0o644)
+
+
+@app.get("/admin/work/{work_id}/pages")
+async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
+    """Tagastab teose lehekülgede nimekirja halduseks (sequence järgi sorditud)."""
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    folder_name = os.path.basename(path)
+
+    images = _get_sorted_images(path)
+    pages = []
+    for i, img_name in enumerate(images):
+        base = os.path.splitext(img_name)[0]
+        json_path = os.path.join(path, base + '.json')
+        txt_path = os.path.join(path, base + '.txt')
+
+        status = 'Toores'
+        sequence = (i + 1) * 100
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    d = json.load(f)
+                src = d.get('meta_content', d)
+                status = src.get('status', 'Toores')
+                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                if seq is not None:
+                    sequence = int(seq)
+            except Exception:
+                pass
+
+        pages.append({
+            'page_num': i + 1,
+            'sequence': sequence,
+            'base_name': base,
+            'filename': img_name,
+            'lehekylje_pilt': f"{folder_name}/{img_name}",
+            'status': status,
+            'has_text': os.path.exists(txt_path) and os.path.getsize(txt_path) > 0
+        })
+
+    return {"status": "success", "pages": pages}
+
+
+@app.delete("/admin/work/{work_id}/page/{page_num}")
+async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("admin"))):
+    """Kustutab teose lehekülje: liigutab .jpg prügikasti, kustutab .txt ja .json gitist."""
+    import shutil
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    folder_name = os.path.basename(path)
+
+    images = _get_sorted_images(path)
+    if page_num < 1 or page_num > len(images):
+        raise HTTPException(status_code=404, detail=f"Lehekülge {page_num} ei leitud")
+
+    img_name = images[page_num - 1]
+    base = os.path.splitext(img_name)[0]
+
+    # Liiguta .jpg prügikasti
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
+    os.makedirs(trash_dir, exist_ok=True)
+    img_path = os.path.join(path, img_name)
+    if os.path.exists(img_path):
+        shutil.move(img_path, os.path.join(trash_dir, img_name))
+
+    # Kustuta .txt ja .json gitist
+    commit_msg = f"Kustuta leht {page_num}: {folder_name}/{base} [{work_id}]"
+    delete_page_from_git(folder_name, base, commit_msg)
+
+    # Sünkroniseeri Meilisearch (leheküljed renumberdatakse)
+    sync_work_to_meilisearch(folder_name)
+
+    new_page_count = len(_get_sorted_images(path))
+    return {"status": "success", "new_page_count": new_page_count}
+
+
+@app.post("/admin/work/{work_id}/add-page")
+async def admin_add_page(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """
+    Lisab teosele uue lehekülje (JPG/PNG).
+    Body: multipart — file (JPG/PNG), after_page_num (int, 0=algusesse, -1=lõppu)
+    Laienduspunkt: ocr_requested (bool, praegu ignoreeritakse)
+    """
+    import shutil
+    from fastapi import UploadFile, Form
+    from fastapi.datastructures import FormData
+
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    folder_name = os.path.basename(path)
+
+    # Parse multipart
+    try:
+        form: FormData = await request.form()
+        file: UploadFile = form.get('file')
+        after_page_num = int(form.get('after_page_num', -1))
+        # ocr_requested = form.get('ocr_requested', 'false').lower() == 'true'  # tulevikuks
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
+
+    if not file:
+        raise HTTPException(status_code=400, detail="Fail puudub")
+
+    # Kontrolli failitüüpi
+    content = await file.read()
+    if content[:4] == b'\xff\xd8\xff\xe0' or content[:4] == b'\xff\xd8\xff\xe1':
+        ext = '.jpg'
+    elif content[:8] == b'\x89PNG\r\n\x1a\n':
+        # Teisenda PNG → JPG
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(content))
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=95)
+            content = buf.getvalue()
+        except ImportError:
+            pass
+        ext = '.jpg'
+    elif content[:4] == b'%PDF':
+        raise HTTPException(status_code=400, detail="PDF pole toetatud, kasuta JPG/PNG")
+    else:
+        raise HTTPException(status_code=400, detail="Toetatud formaadid: JPG, PNG")
+
+    # Arvuta uus sequence
+    images = _get_sorted_images(path)
+    page_count = len(images)
+
+    def seq_of(idx):
+        if idx < 0 or idx >= len(images):
+            return None
+        base = os.path.splitext(images[idx])[0]
+        return _get_page_sequence(os.path.join(path, base + '.json'))
+
+    if after_page_num == -1 or after_page_num >= page_count:
+        # Lõppu
+        last_seq = seq_of(page_count - 1)
+        if last_seq == float('inf') or last_seq is None:
+            new_seq = (page_count + 1) * 100
+        else:
+            new_seq = int(last_seq) + 100
+    elif after_page_num == 0:
+        # Algusesse
+        first_seq = seq_of(0)
+        if first_seq == float('inf') or first_seq is None:
+            new_seq = 50
+        else:
+            new_seq = int(first_seq) // 2
+            if new_seq <= 0:
+                _rebalance_sequences(path)
+                images = _get_sorted_images(path)
+                new_seq = 50
+    else:
+        # Vahele: pärast after_page_num-ndat (1-indekseeritud)
+        idx = after_page_num - 1
+        seq_before = seq_of(idx)
+        seq_after = seq_of(idx + 1)
+        if seq_before == float('inf') or seq_before is None:
+            seq_before = after_page_num * 100
+        if seq_after == float('inf') or seq_after is None:
+            seq_after = (after_page_num + 1) * 100
+        new_seq = (int(seq_before) + int(seq_after)) // 2
+        if new_seq <= int(seq_before):
+            # Ruumi pole — tasakaalusta
+            _rebalance_sequences(path)
+            images = _get_sorted_images(path)
+            idx = after_page_num - 1
+            seq_before = _get_page_sequence(os.path.join(path, os.path.splitext(images[idx])[0] + '.json')) if idx < len(images) else after_page_num * 100
+            seq_after_val = _get_page_sequence(os.path.join(path, os.path.splitext(images[idx+1])[0] + '.json')) if idx + 1 < len(images) else (after_page_num + 1) * 100
+            new_seq = (int(seq_before) + int(seq_after_val)) // 2
+
+    # Salvesta pildifail ainulaadse nimega
+    new_id = generate_nanoid()
+    new_filename = f"{new_id}{ext}"
+    new_img_path = os.path.join(path, new_filename)
+    with open(new_img_path, 'wb') as f:
+        f.write(content)
+    os.chmod(new_img_path, 0o644)
+
+    # Loo tühi .txt
+    base = os.path.splitext(new_filename)[0]
+    txt_path = os.path.join(path, base + '.txt')
+    with open(txt_path, 'w', encoding='utf-8') as f:
+        f.write('')
+    os.chmod(txt_path, 0o644)
+
+    # Loo minimaalne .json sequence'ga
+    json_path = os.path.join(path, base + '.json')
+    page_meta = {'sequence': new_seq, 'status': 'Toores'}
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(page_meta, f, indent=2, ensure_ascii=False)
+    os.chmod(json_path, 0o644)
+
+    # Git commit
+    txt_rel = os.path.join(folder_name, base + '.txt')
+    json_rel = os.path.join(folder_name, base + '.json')
+    save_with_git(
+        txt_path, '',
+        user['username'],
+        message=f"Lisa leht: {folder_name}/{base} [sequence={new_seq}]",
+        additional_files=[(json_path, json.dumps(page_meta, indent=2, ensure_ascii=False))]
+    )
+
+    # Sünkroniseeri Meilisearch
+    sync_work_to_meilisearch(folder_name)
+
+    new_page_count = len(_get_sorted_images(path))
+    return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
+
+# =========================================================
 # TOIMETAMINE JA SALVESTAMINE
 # =========================================================
 
@@ -254,7 +519,18 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     additional = []
     if data.get('meta_content'):
         json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
-        additional.append((json_path, json.dumps(data['meta_content'], indent=2, ensure_ascii=False)))
+        meta_content = data['meta_content']
+        # Säilita sequence väli kui on olemas (ära lase salvestamisel üle kirjutada)
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    existing = json.load(f)
+                existing_seq = existing.get('sequence') or existing.get('meta_content', {}).get('sequence')
+                if existing_seq is not None and meta_content.get('sequence') is None:
+                    meta_content['sequence'] = existing_seq
+            except Exception:
+                pass
+        additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
 
     git_result = save_with_git(txt_path, text, user['username'], additional_files=additional if additional else None)
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
