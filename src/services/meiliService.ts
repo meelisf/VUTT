@@ -60,9 +60,10 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
+  const workId = hit.work_id || hit.id;
   return {
-    id: hit.id,
-    work_id: hit.work_id,
+    id: hit.id || hit.work_id,
+    work_id: workId,
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
     location: hit.location || hit.koht || '',
@@ -85,9 +86,9 @@ const normalizeWork = (hit: any): Work => {
     relations: hit.relations,
     ester_id: hit.ester_id,
     external_url: hit.external_url,
-    page_count: hit.page_count || 0,
-    thumbnail_url: getThumbUrl(hit.work_id),
-    work_status: hit.work_status,
+    page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
+    thumbnail_url: getThumbUrl(workId),
+    work_status: hit.work_status || hit.teose_staatus,
     page_tags: hit.page_tags || []
   };
 };
@@ -485,7 +486,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const searchParams: any = {
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'title', 'year', 'location', 'publisher',
+        'id', 'work_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
