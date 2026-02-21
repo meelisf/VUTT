@@ -60,9 +60,9 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  const workId = hit.work_id || hit.id; // Dashboardis on see alati nanoid
+  const workId = hit.work_id || hit.teose_id || hit.id; // Fallback: nanoid -> slug -> lehe id
   return {
-    id: workId, // Navigatsiooniks kasutame nanoid'i
+    id: workId,
     work_id: workId,
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
@@ -486,7 +486,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     const searchParams: any = {
       attributesToRetrieve: [
         // V2 väljad
-        'id', 'work_id', 'title', 'year', 'location', 'publisher',
+        'id', 'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
