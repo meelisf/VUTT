@@ -70,7 +70,7 @@ def get_meilisearch_pages(client):
         result = index.get_documents({
             'offset': offset,
             'limit': limit,
-            'fields': ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_pilt',
+            'fields': ['id', 'work_id', 'lehekylje_number', 'lehekylje_pilt',
                        'teose_lehekylgede_arv', 'originaal_kataloog']
         })
 

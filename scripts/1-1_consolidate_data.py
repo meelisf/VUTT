@@ -506,7 +506,6 @@ def create_meilisearch_data_per_page():
                 # Identifikaatorid
                 'id': page_id,
                 'work_id': doc_metadata.get('id'),  # Nanoid (PEAB olemas olema)
-                'teose_id': teose_id,               # Slug (kausta nimi)
 
                 # Teose andmed (lamedaks lüüdud otsinguks ja kuvamiseks)
                 'title': doc_metadata.get('title', ''),
