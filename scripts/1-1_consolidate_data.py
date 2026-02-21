@@ -454,9 +454,9 @@ def create_meilisearch_data_per_page():
 
         pages = []
         # Kasuta nanoid't page ID-s (kui olemas), muidu fallback slugile
-        work_id = doc_metadata.get('id') or teose_id
+        work_id_for_keys = doc_metadata.get('id') or teose_id
         for page_index, jpg_filename in enumerate(jpg_files):
-            page_id = f"{work_id}-{page_index + 1}"
+            page_id = f"{work_id_for_keys}-{page_index + 1}"
             base_name = os.path.splitext(jpg_filename)[0]
 
             # Loe tekst
@@ -505,7 +505,7 @@ def create_meilisearch_data_per_page():
             meili_doc = {
                 # Identifikaatorid
                 'id': page_id,
-                'work_id': doc_metadata.get('id'),  # Nanoid (PEAB olemas olema)
+                'work_id': work_id_for_keys,  # Kasuta nanoidi või slug'i (nagu page_id-s)
 
                 # Teose andmed (lamedaks lüüdud otsinguks ja kuvamiseks)
                 'title': doc_metadata.get('title', ''),

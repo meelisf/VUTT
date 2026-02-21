@@ -60,9 +60,16 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
+  // Ohutusmeede: kui work_id puudub, tuleta see primaarvõtmest (id)
+  let workId = hit.work_id;
+  if (!workId && hit.id) {
+    const lastDashIndex = hit.id.lastIndexOf('-');
+    workId = lastDashIndex !== -1 ? hit.id.substring(0, lastDashIndex) : hit.id;
+  }
+
   return {
     id: hit.id,
-    work_id: hit.work_id,
+    work_id: workId,
     title: hit.title || 'Pealkiri puudub',
     year: hit.year ?? 0,
     location: hit.location || '',
@@ -96,9 +103,15 @@ const normalizeWork = (hit: any): Work => {
  * Normaliseerib Meilisearchist tulnud lehekülje (Page) andmed.
  */
 const normalizePage = (hit: any): Page => {
+  let workId = hit.work_id;
+  if (!workId && hit.id) {
+    const lastDashIndex = hit.id.lastIndexOf('-');
+    workId = lastDashIndex !== -1 ? hit.id.substring(0, lastDashIndex) : hit.id;
+  }
+
   return {
     id: hit.id,
-    work_id: hit.work_id,
+    work_id: workId,
     page_number: hit.lehekylje_number || 0,
     text_content: hit.lehekylje_tekst || hit.text_content || '',
     image_url: getFullImageUrl(hit.lehekylje_pilt || ''),
@@ -130,9 +143,15 @@ const normalizePage = (hit: any): Page => {
  * Normaliseerib sisulise otsingu tulemused.
  */
 const normalizeContentSearchHit = (hit: any): ContentSearchHit => {
+  let workId = hit.work_id;
+  if (!workId && hit.id) {
+    const lastDashIndex = hit.id.lastIndexOf('-');
+    workId = lastDashIndex !== -1 ? hit.id.substring(0, lastDashIndex) : hit.id;
+  }
+
   return {
     ...hit,
-    work_id: hit.work_id,
+    work_id: workId,
     title: hit.title,
     year: hit.year,
     location: hit.location,
