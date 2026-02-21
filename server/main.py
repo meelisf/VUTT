@@ -1,13 +1,16 @@
 import os
 import json
+import shutil
 import threading
 import unicodedata
+from datetime import datetime
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException, Depends, status, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Depends, status, BackgroundTasks, UploadFile
+from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
@@ -30,6 +33,8 @@ from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
     get_cached_people_register, get_cached_suggestions, invalidate_cache
 )
+from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
+from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -106,7 +111,6 @@ async def verify_token(request: Request):
     token = data.get("token", "").strip()
     session = sessions.get(token)
     if session:
-        from datetime import datetime
         if datetime.now() - datetime.fromisoformat(session["created_at"]) > SESSION_DURATION:
             del sessions[token]
             return {"status": "error", "valid": False, "message": "Sessioon aegunud"}
@@ -183,12 +187,10 @@ async def admin_delete_user(request: Request, user=Depends(require_role("admin")
 
 @app.post("/admin/trash")
 async def admin_trash(user=Depends(require_role("admin"))):
-    from .trash_ops import list_deleted_works
     return {"status": "success", "items": list_deleted_works()}
 
 @app.post("/admin/trash/{work_id}/restore")
 async def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
-    from .trash_ops import restore_deleted_work
     res = restore_deleted_work(work_id, username=user['username'])
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success", "title": res.get('title')}
@@ -198,7 +200,6 @@ async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
     """Loetleb teose kustutatud leheküljed."""
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    from .trash_ops import list_deleted_pages
     return {"status": "success", "pages": list_deleted_pages(work_id, os.path.basename(path))}
 
 @app.post("/admin/work/{work_id}/trash-pages/{filename}/restore")
@@ -206,7 +207,6 @@ async def admin_restore_page(work_id: str, filename: str, user=Depends(require_r
     """Taastab kustutatud lehekülje prügikastist."""
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    from .trash_ops import restore_deleted_page
     res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user['username'])
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success"}
@@ -234,7 +234,6 @@ async def admin_people_refresh_status(user=Depends(require_role("admin"))):
 
 @app.delete("/admin/work/{work_id}")
 async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
-    import shutil
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
@@ -261,69 +260,6 @@ async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
 # LEHEKÜLGEDE HALDUS (admin)
 # =========================================================
 
-def _get_page_sequence(json_path: str) -> float:
-    """Loeb sequence välja .json failist. Tagastab float('inf') kui puudub."""
-    if os.path.exists(json_path):
-        try:
-            with open(json_path, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                if seq is not None:
-                    return int(seq)
-        except Exception:
-            pass
-    return float('inf')
-
-
-def _get_sorted_images(dir_path: str) -> list[str]:
-    """Tagastab sequence järgi sorteeritud piltide nimekirja.
-    Fallback: tähestikuline positsioon × 100 kui sequence puudub.
-    NB: float('inf') fallback läheks katki kui mõni leht HAS sequence —
-    siis float('inf') lehed sorteeritaks uue lehe järele, mitte ette.
-    """
-    images = [
-        f for f in os.listdir(dir_path)
-        if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
-    ]
-    # Esmane tähestikuline sort positsioonifallback'i jaoks
-    alpha_sorted = sorted(images)
-    alpha_pos = {f: i for i, f in enumerate(alpha_sorted)}
-
-    def effective_seq(f: str) -> int:
-        s = _get_page_sequence(os.path.join(dir_path, os.path.splitext(f)[0] + '.json'))
-        if s == float('inf'):
-            return (alpha_pos[f] + 1) * 100  # positsioonipõhine fallback
-        return int(s)
-
-    return sorted(images, key=lambda f: (effective_seq(f), f))
-
-
-def _rebalance_sequences(dir_path: str):
-    """Nummerdab kõigi lehtede sequence väärtused ümber sammuga 100."""
-    images = _get_sorted_images(dir_path)
-    for i, img_name in enumerate(images):
-        base = os.path.splitext(img_name)[0]
-        json_path = os.path.join(dir_path, base + '.json')
-        new_seq = (i + 1) * 100
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    d = json.load(f)
-                if 'meta_content' in d:
-                    d['meta_content']['sequence'] = new_seq
-                else:
-                    d['sequence'] = new_seq
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(d, f, indent=2, ensure_ascii=False)
-                os.chmod(json_path, 0o644)
-            except Exception:
-                pass
-        else:
-            with open(json_path, 'w', encoding='utf-8') as f:
-                json.dump({'sequence': new_seq, 'status': 'Toores'}, f, indent=2)
-            os.chmod(json_path, 0o644)
-
-
 @app.get("/admin/work/{work_id}/pages")
 async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
     """Tagastab teose lehekülgede nimekirja halduseks (sequence järgi sorditud)."""
@@ -331,7 +267,7 @@ async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
 
-    images = _get_sorted_images(path)
+    images = get_sorted_images(path)
     pages = []
     for i, img_name in enumerate(images):
         base = os.path.splitext(img_name)[0]
@@ -368,12 +304,11 @@ async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
 @app.delete("/admin/work/{work_id}/page/{page_num}")
 async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("admin"))):
     """Kustutab teose lehekülje: liigutab .jpg prügikasti, kustutab .txt ja .json gitist."""
-    import shutil
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
 
-    images = _get_sorted_images(path)
+    images = get_sorted_images(path)
     if page_num < 1 or page_num > len(images):
         raise HTTPException(status_code=404, detail=f"Lehekülge {page_num} ei leitud")
 
@@ -394,7 +329,7 @@ async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_ro
     # Sünkroniseeri Meilisearch (leheküljed renumberdatakse)
     sync_work_to_meilisearch(folder_name)
 
-    new_page_count = len(_get_sorted_images(path))
+    new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count}
 
 
@@ -405,10 +340,6 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
     Body: multipart — file (JPG/PNG), after_page_num (int, 0=algusesse, -1=lõppu)
     Laienduspunkt: ocr_requested (bool, praegu ignoreeritakse)
     """
-    import shutil
-    from fastapi import UploadFile, Form
-    from fastapi.datastructures import FormData
-
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
@@ -421,6 +352,7 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         # ocr_requested = form.get('ocr_requested', 'false').lower() == 'true'  # tulevikuks
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
+
 
     if not file:
         raise HTTPException(status_code=400, detail="Fail puudub")
@@ -449,7 +381,7 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         raise HTTPException(status_code=400, detail="Toetatud formaadid: JPG, PNG")
 
     # Arvuta uus sequence
-    images = _get_sorted_images(path)
+    images = get_sorted_images(path)
     page_count = len(images)
 
     def seq_of(idx):
@@ -457,7 +389,7 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         if idx < 0 or idx >= len(images):
             return None
         base = os.path.splitext(images[idx])[0]
-        s = _get_page_sequence(os.path.join(path, base + '.json'))
+        s = get_page_sequence(os.path.join(path, base + '.json'))
         if s == float('inf'):
             return (idx + 1) * 100  # images on juba sorteeritud, positsioon on korrektne
         return int(s)
@@ -477,8 +409,8 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         else:
             new_seq = int(first_seq) // 2
             if new_seq <= 0:
-                _rebalance_sequences(path)
-                images = _get_sorted_images(path)
+                rebalance_sequences(path)
+                images = get_sorted_images(path)
                 new_seq = 50
     else:
         # Vahele: pärast after_page_num-ndat (1-indekseeritud)
@@ -492,11 +424,11 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         new_seq = (int(seq_before) + int(seq_after)) // 2
         if new_seq <= int(seq_before):
             # Ruumi pole — tasakaalusta
-            _rebalance_sequences(path)
-            images = _get_sorted_images(path)
+            rebalance_sequences(path)
+            images = get_sorted_images(path)
             idx = after_page_num - 1
-            seq_before = _get_page_sequence(os.path.join(path, os.path.splitext(images[idx])[0] + '.json')) if idx < len(images) else after_page_num * 100
-            seq_after_val = _get_page_sequence(os.path.join(path, os.path.splitext(images[idx+1])[0] + '.json')) if idx + 1 < len(images) else (after_page_num + 1) * 100
+            seq_before = get_page_sequence(os.path.join(path, os.path.splitext(images[idx])[0] + '.json')) if idx < len(images) else after_page_num * 100
+            seq_after_val = get_page_sequence(os.path.join(path, os.path.splitext(images[idx+1])[0] + '.json')) if idx + 1 < len(images) else (after_page_num + 1) * 100
             new_seq = (int(seq_before) + int(seq_after_val)) // 2
 
     # Salvesta pildifail ainulaadse nimega ({folder_name}-{work_id}-{nanoid}, kontrolli kolliisiooni)
@@ -537,7 +469,7 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
     # Sünkroniseeri Meilisearch
     sync_work_to_meilisearch(folder_name)
 
-    new_page_count = len(_get_sorted_images(path))
+    new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
 
 # =========================================================
@@ -703,8 +635,6 @@ async def admin_upload_status(upload_id: str, user=Depends(require_role("admin")
 
 @app.get("/admin/upload/{upload_id}/thumb/{page_num}")
 async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
-    from .config import UPLOADS_DIR
-    from fastapi.responses import FileResponse
     path = os.path.join(UPLOADS_DIR, upload_id, 'thumbs', f"{page_num:03d}.jpg")
     if not os.path.isfile(path): raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg")
@@ -749,7 +679,6 @@ async def people_register(): return {"status": "success", "people": get_cached_p
 
 @app.get("/user-chars")
 async def get_user_chars(request: Request, user=Depends(get_user)):
-    from .config import COLLECTIONS_FILE
     path = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars', f"{user['username']}.json")
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f: return {"status": "success", "characters": json.load(f).get("characters", []), "is_custom": True}
@@ -757,7 +686,6 @@ async def get_user_chars(request: Request, user=Depends(get_user)):
 
 @app.post("/user-chars")
 async def save_user_chars(request: Request, user=Depends(get_user)):
-    from .config import COLLECTIONS_FILE
     data = await get_json_data(request)
     dir_path = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_chars')
     os.makedirs(dir_path, exist_ok=True)
