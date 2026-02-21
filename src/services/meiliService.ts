@@ -60,16 +60,14 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  const workId = hit.work_id;
-
   return {
     id: hit.id,
-    work_id: workId,
-    title: hit.title || hit.pealkiri || 'Pealkiri puudub',
-    year: hit.year ?? hit.aasta ?? 0,
-    location: hit.location || hit.koht || '',
+    work_id: hit.work_id,
+    title: hit.title || 'Pealkiri puudub',
+    year: hit.year ?? 0,
+    location: hit.location || '',
     location_object: hit.location_object,
-    publisher: hit.publisher || hit.trükkal || '',
+    publisher: hit.publisher || '',
     publisher_object: hit.publisher_object,
     type: hit.type,
     type_object: hit.type_object,
@@ -88,7 +86,7 @@ const normalizeWork = (hit: any): Work => {
     ester_id: hit.ester_id,
     external_url: hit.external_url,
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
-    thumbnail_url: getThumbUrl(workId),
+    thumbnail_url: getThumbUrl(hit.work_id),
     work_status: hit.work_status || hit.teose_staatus,
     page_tags: hit.page_tags || []
   };
@@ -109,11 +107,11 @@ const normalizePage = (hit: any): Page => {
     page_tags: hit.page_tags || hit.tags || [],
     history: hit.history || [],
     // Denormaliseeritud teose andmed
-    title: hit.title || hit.pealkiri,
-    year: hit.year ?? hit.aasta,
-    location: hit.location || hit.koht,
+    title: hit.title,
+    year: hit.year,
+    location: hit.location,
     location_object: hit.location_object,
-    publisher: hit.publisher || hit.trükkal,
+    publisher: hit.publisher,
     publisher_object: hit.publisher_object,
     type: hit.type,
     type_object: hit.type_object,
@@ -134,6 +132,7 @@ const normalizePage = (hit: any): Page => {
 const normalizeContentSearchHit = (hit: any): ContentSearchHit => {
   return {
     ...hit,
+    work_id: hit.work_id,
     title: hit.title,
     year: hit.year,
     location: hit.location,
@@ -486,7 +485,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       attributesToRetrieve: [
-        'id', 'work_id', 'title', 'year', 'location', 'publisher',
+        'id', 'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -881,7 +880,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'title', 'year', 'location', 'publisher',
+        'work_id', 'teose_id', 'id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -1017,7 +1016,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+        attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
@@ -1028,7 +1027,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       const totalHits = response.estimatedTotalHits || 0;
 
       return {
-        hits: response.hits as any,
+        hits: response.hits.map(normalizeContentSearchHit),
         totalHits: totalHits,
         totalWorks: 1,
         totalPages: Math.ceil(totalHits / limit),
@@ -1065,7 +1064,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
@@ -1089,7 +1088,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       // Kui tahame teada teose lehekülgede arvu, peame seda küsima.
       // Sirvimisel 'hitCount' pole tavaliselt vajalik või on see teose kogulehekülgede arv.
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
-        ...hit,
+        ...normalizeContentSearchHit(hit),
         hitCount: hit.teose_lehekylgede_arv || 1 // Fallback
       }));
       
@@ -1126,7 +1125,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1154,8 +1153,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
       };
 
       statsResponse.hits.forEach((hit: any) => {
-        if (!uniqueWorks.has(hit.work_id)) {
-          uniqueWorks.add(hit.work_id);
+        const workId = hit.work_id || hit.teose_id;
+        if (workId && !uniqueWorks.has(workId)) {
+          uniqueWorks.add(workId);
 
           // Helper stats
           const addToStats = (field: string, value: string | string[]) => {
@@ -1188,8 +1188,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 
       const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
-        ...hit,
-        hitCount: workHitCounts[hit.work_id] || 1
+        ...normalizeContentSearchHit(hit),
+        hitCount: workHitCounts[hit.work_id || hit.teose_id] || 1
       }));
 
       return {
@@ -1229,7 +1229,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'teose_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1239,7 +1239,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
       attributesToSearchOn: attributesToSearchOn
     });
 
-    return response.hits as ContentSearchHit[];
+    return response.hits.map(normalizeContentSearchHit);
   } catch (e: any) {
     console.error('searchWorkHits error:', e);
     throw e;
