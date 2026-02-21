@@ -60,13 +60,16 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  if (!hit.work_id) {
-    console.error('normalizeWork: hit.work_id puudub!', hit);
+  // Nanoid on meie süsteemis kas 'work_id' väljas või 'id' (formaat: nanoid-number) alguses.
+  const workId = hit.work_id || (typeof hit.id === 'string' ? hit.id.split('-')[0] : hit.id);
+
+  if (!workId) {
+    console.error('normalizeWork: Teose ID-d ei leitud!', hit);
   }
 
   return {
-    id: hit.id, // Meilisearchi primary key (work_id-lk)
-    work_id: hit.work_id, // Nanoid
+    id: hit.id,
+    work_id: workId,
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
     location: hit.location || hit.koht || '',
@@ -488,14 +491,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       attributesToRetrieve: [
-        // V2 väljad
-        'id', 'work_id', 'teose_id', 'title', 'year', 'location', 'publisher',
+        'id', 'work_id', 'title', 'year', 'location', 'publisher',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
-        // Filtrite/sortimise väljad (eesti keeles Meilisearchi skeemis)
-        'originaal_kataloog', 'year',
-        'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
+        'originaal_kataloog', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
