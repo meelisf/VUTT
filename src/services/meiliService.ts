@@ -60,9 +60,9 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  const workId = hit.work_id || hit.id;
+  const workId = hit.work_id || hit.id; // Dashboardis on see alati nanoid
   return {
-    id: hit.id || hit.work_id,
+    id: workId, // Navigatsiooniks kasutame nanoid'i
     work_id: workId,
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
