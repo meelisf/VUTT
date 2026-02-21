@@ -189,7 +189,7 @@ async def admin_trash(user=Depends(require_role("admin"))):
 @app.post("/admin/trash/{work_id}/restore")
 async def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
     from .trash_ops import restore_deleted_work
-    res = restore_deleted_work(work_id)
+    res = restore_deleted_work(work_id, username=user['username'])
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success", "title": res.get('title')}
 
@@ -207,7 +207,7 @@ async def admin_restore_page(work_id: str, filename: str, user=Depends(require_r
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
     from .trash_ops import restore_deleted_page
-    res = restore_deleted_page(work_id, os.path.basename(path), filename)
+    res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user['username'])
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success"}
 
@@ -252,7 +252,7 @@ async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
             shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
     
     shutil.rmtree(path)
-    delete_work_from_git(folder_name, title, work_id)
+    delete_work_from_git(folder_name, title, work_id, username=user['username'])
     delete_work_from_meilisearch(work_id)
     build_work_id_cache()
     return {"status": "success"}
@@ -389,7 +389,7 @@ async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_ro
 
     # Kustuta .txt ja .json gitist
     commit_msg = f"Kustuta leht {page_num}: {folder_name}/{base} [{work_id}]"
-    delete_page_from_git(folder_name, base, commit_msg)
+    delete_page_from_git(folder_name, base, commit_msg, username=user['username'])
 
     # Sünkroniseeri Meilisearch (leheküljed renumberdatakse)
     sync_work_to_meilisearch(folder_name)

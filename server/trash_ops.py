@@ -84,7 +84,7 @@ def list_deleted_works():
     return deleted_works
 
 
-def restore_deleted_work(work_id):
+def restore_deleted_work(work_id, username="VUTT Server"):
     """
     Taastab kustutatud teose prügikastist.
 
@@ -157,7 +157,7 @@ def restore_deleted_work(work_id):
         title_match = re.match(r'Kustuta teos: (.+?) \[', commit_msg)
         if title_match:
             title = title_match.group(1)
-        actor = Actor("VUTT Server", "vutt@server.local")
+        actor = Actor(username, f"{username}@vutt.local")
         restore_msg = f"Taasta teos: {title} [{work_id}]"
         repo.index.commit(restore_msg, author=actor, committer=actor)
         logger.info(f"TRASH: Taastatud teos {folder_name} [{work_id}]")
@@ -224,7 +224,7 @@ def list_deleted_pages(work_id, folder_name):
     return pages
 
 
-def restore_deleted_page(work_id, folder_name, filename):
+def restore_deleted_page(work_id, folder_name, filename, username="VUTT Server"):
     """
     Taastab kustutatud lehekülje prügikastist.
 
@@ -281,7 +281,7 @@ def restore_deleted_page(work_id, folder_name, filename):
 
     # 4. Git commit
     try:
-        actor = Actor("VUTT Server", "vutt@server.local")
+        actor = Actor(username, f"{username}@vutt.local")
         repo.index.commit(
             f"Taasta leht: {folder_name}/{base} [{work_id}]",
             author=actor, committer=actor

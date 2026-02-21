@@ -527,7 +527,7 @@ def commit_new_work_to_git(dir_name):
         return False
 
 
-def delete_work_from_git(folder_name, work_title, work_id):
+def delete_work_from_git(folder_name, work_title, work_id, username="VUTT Server"):
     """
     Eemaldab teose jälgitud failid gitist ja teeb commit.
     JPG-d peavad olema ENNE seda liigutatud prügikasti.
@@ -541,7 +541,7 @@ def delete_work_from_git(folder_name, work_title, work_id):
         if not repo.index.diff('HEAD'):
             logger.info(f"GIT: Teosel {folder_name} polnud jälgitud faile, commit vahele jäetud")
             return False
-        actor = Actor("VUTT Server", "vutt@server.local")
+        actor = Actor(username, f"{username}@vutt.local")
         msg = f"Kustuta teos: {work_title} [{work_id}]"
         repo.index.commit(msg, author=actor, committer=actor)
         logger.info(f"GIT: Kustutatud teos {folder_name} [{work_id}]")
@@ -551,7 +551,7 @@ def delete_work_from_git(folder_name, work_title, work_id):
         return False
 
 
-def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str) -> bool:
+def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str, username: str = "VUTT Server") -> bool:
     """
     Stage'ib lehe .txt ja .json kustutamise gitist ja teeb commit.
     .jpg peab olema ENNE seda liigutatud prügikasti (ei ole git-tracked).
@@ -560,6 +560,7 @@ def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str) -> b
         folder_name: Kausta nimi (nt "1632-1")
         base_name: Faili põhinimi ilma laiendita (nt "lk_003")
         commit_msg: Commit sõnum
+        username: Commit'i autor (vaikimisi "VUTT Server")
 
     Returns:
         bool: True kui õnnestus
@@ -591,7 +592,7 @@ def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str) -> b
             logger.info(f"GIT: Teosel {folder_name}/{base_name} polnud jälgitud faile, commit vahele jäetud")
             return False
 
-        actor = Actor("VUTT Server", "vutt@server.local")
+        actor = Actor(username, f"{username}@vutt.local")
         repo.index.commit(commit_msg, author=actor, committer=actor)
         logger.info(f"GIT: Kustutatud leht {folder_name}/{base_name}")
         return True
