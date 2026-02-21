@@ -50,7 +50,6 @@ FILTERABLE_ATTRS = [
     'tags_en',
     'tags_et',
     'tags_ids',
-    'teose_id',
     'teose_staatus',
     'title',
     'type',

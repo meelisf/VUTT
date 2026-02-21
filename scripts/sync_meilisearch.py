@@ -87,20 +87,16 @@ def get_meilisearch_pages(client):
                 doc_dict = doc.__dict__ if hasattr(doc, '__dict__') else {}
 
             # Kasuta work_id + lehekylje_number composite key'na (mitte dokumendi id)
-            # NB: work_id on nanoid, teose_id on slug - failisüsteemis kasutame nanoid'i
+            # NB: work_id on nanoid (alati olemas)
             work_id = doc_dict.get('work_id') or getattr(doc, 'work_id', None)
-            teose_id_fallback = doc_dict.get('teose_id') or getattr(doc, 'teose_id', None)
             page_num = doc_dict.get('lehekylje_number') or getattr(doc, 'lehekylje_number', None)
             doc_id = doc_dict.get('id') or getattr(doc, 'id', None)  # Algne ID kustutamiseks
 
-            # Eelista work_id (nanoid), fallback teose_id (slug)
-            effective_id = work_id or teose_id_fallback
-
-            if effective_id and page_num:
-                composite_key = f"{effective_id}-{page_num}"
+            if work_id and page_num:
+                composite_key = f"{work_id}-{page_num}"
                 pages[composite_key] = {
                     'id': doc_id,  # Säilitame algse ID kustutamiseks
-                    'teose_id': effective_id,  # work_id (nanoid) või teose_id (slug)
+                    'work_id': work_id,
                     'lehekylje_number': page_num,
                     'lehekylje_pilt': doc_dict.get('lehekylje_pilt') or getattr(doc, 'lehekylje_pilt', None),
                     'teose_lehekylgede_arv': doc_dict.get('teose_lehekylgede_arv') or getattr(doc, 'teose_lehekylgede_arv', None),
@@ -155,27 +151,28 @@ def get_filesystem_pages(data_dir):
         if not image_files:
             continue
 
-        # Hangi work_id (nanoid) ja teose_id (slug) _metadata.json failist
+        # Hangi nanoid (id) _metadata.json failist
         metadata_path = os.path.join(dir_path, '_metadata.json')
         work_id = None  # nanoid
-        teose_id = sanitize_id(dir_name)  # slug fallback
 
         if os.path.exists(metadata_path):
             try:
                 with open(metadata_path, 'r', encoding='utf-8') as f:
                     meta = json.load(f)
                     work_id = meta.get('id')  # nanoid
-                    teose_id = sanitize_id(meta.get('teose_id') or meta.get('slug') or dir_name)
             except PermissionError:
                 # Tõenäoliselt root omanduses fail (nt Docker/serveri poolt loodud)
                 unreadable_metadata.append((dir_name, 'Permission denied'))
             except Exception as e:
                 unreadable_metadata.append((dir_name, str(e)))
 
-        # Kasuta nanoid't kui olemas, muidu slug
-        id_for_pages = work_id or teose_id
+        if not work_id:
+            # Kui nanoid puudub, siis see on viga või uus teos ilma metaandmeteta
+            # Kasutaja sõnul peaks see alati olemas olema.
+            # Kasutame fallbackina slug'i, et skript ei krahhiks, aga hoiatame.
+            work_id = sanitize_id(dir_name)
 
-        works[id_for_pages] = {
+        works[work_id] = {
             'dir_name': dir_name,
             'page_count': len(image_files),
             'pages': []
@@ -183,17 +180,17 @@ def get_filesystem_pages(data_dir):
 
         for page_index, image_file in enumerate(image_files):
             page_num = page_index + 1
-            page_id = f"{id_for_pages}-{page_num}"
+            page_id = f"{work_id}-{page_num}"
             image_path = os.path.join(dir_name, image_file)
 
             pages[page_id] = {
-                'teose_id': id_for_pages,
+                'work_id': work_id,
                 'lehekylje_number': page_num,
                 'lehekylje_pilt': image_path,
                 'teose_lehekylgede_arv': len(image_files),
                 'originaal_kataloog': dir_name,
             }
-            works[id_for_pages]['pages'].append(page_id)
+            works[work_id]['pages'].append(page_id)
 
     # Hoiata loetamatute metaandmete failide kohta
     if unreadable_metadata:
@@ -229,7 +226,7 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
         if meili_count != fs_count:
             to_update_count.append({
                 'id': page_id,
-                'teose_id': fs_pages[page_id]['teose_id'],
+                'work_id': fs_pages[page_id]['work_id'],
                 'old_count': meili_count,
                 'new_count': fs_count
             })
@@ -248,13 +245,13 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
         # Grupeeri teose kaupa
         delete_by_work = {}
         for page_id in to_delete:
-            teose_id = meili_pages[page_id].get('teose_id', 'unknown')
-            if teose_id not in delete_by_work:
-                delete_by_work[teose_id] = []
-            delete_by_work[teose_id].append(page_id)
+            work_id = meili_pages[page_id].get('work_id', 'unknown')
+            if work_id not in delete_by_work:
+                delete_by_work[work_id] = []
+            delete_by_work[work_id].append(page_id)
 
-        for teose_id, page_ids in sorted(delete_by_work.items()):
-            orig_kataloog = meili_pages[page_ids[0]].get('originaal_kataloog', teose_id)
+        for work_id, page_ids in sorted(delete_by_work.items()):
+            orig_kataloog = meili_pages[page_ids[0]].get('originaal_kataloog', work_id)
             print(f"   {orig_kataloog}: {len(page_ids)} lk")
             for pid in sorted(page_ids)[:5]:  # Näita max 5
                 print(f"      - {pid}")
@@ -269,13 +266,13 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
         # Grupeeri teose kaupa
         add_by_work = {}
         for page_id in to_add:
-            teose_id = fs_pages[page_id].get('teose_id', 'unknown')
-            if teose_id not in add_by_work:
-                add_by_work[teose_id] = []
-            add_by_work[teose_id].append(page_id)
+            work_id = fs_pages[page_id].get('work_id', 'unknown')
+            if work_id not in add_by_work:
+                add_by_work[work_id] = []
+            add_by_work[work_id].append(page_id)
 
-        for teose_id, page_ids in sorted(add_by_work.items()):
-            orig_kataloog = fs_pages[page_ids[0]].get('originaal_kataloog', teose_id)
+        for work_id, page_ids in sorted(add_by_work.items()):
+            orig_kataloog = fs_pages[page_ids[0]].get('originaal_kataloog', work_id)
             print(f"   {orig_kataloog}: {len(page_ids)} lk")
     else:
         print("\n✅ Lisatavaid lehekülgi pole")
@@ -286,17 +283,17 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
         # Grupeeri teose kaupa
         works_to_update = {}
         for item in to_update_count:
-            teose_id = item['teose_id']
-            if teose_id not in works_to_update:
-                works_to_update[teose_id] = {
+            work_id = item['work_id']
+            if work_id not in works_to_update:
+                works_to_update[work_id] = {
                     'old': item['old_count'],
                     'new': item['new_count'],
                     'count': 0
                 }
-            works_to_update[teose_id]['count'] += 1
+            works_to_update[work_id]['count'] += 1
 
-        for teose_id, info in sorted(works_to_update.items()):
-            print(f"   {teose_id}: {info['old']} → {info['new']} lk")
+        for work_id, info in sorted(works_to_update.items()):
+            print(f"   {work_id}: {info['old']} → {info['new']} lk")
     else:
         print("\n✅ Lehekülgede arvud on korrektsed")
 
@@ -334,15 +331,15 @@ def compare_and_sync(meili_pages, fs_pages, fs_works, apply_changes=False):
             # Grupeeri teose kaupa
             updates_by_work = {}
             for item in to_update_count:
-                teose_id = item['teose_id']
-                if teose_id not in updates_by_work:
-                    updates_by_work[teose_id] = item['new_count']
+                work_id = item['work_id']
+                if work_id not in updates_by_work:
+                    updates_by_work[work_id] = item['new_count']
 
             # Uuenda kõik teose leheküljed
-            for teose_id, new_count in updates_by_work.items():
+            for work_id, new_count in updates_by_work.items():
                 # Hangi kõik selle teose leheküljed
                 result = index.search('', {
-                    'filter': f'teose_id = "{teose_id}"',
+                    'filter': f'work_id = "{work_id}"',
                     'limit': 1000
                 })
                 updates = [{'id': hit['id'], 'teose_lehekylgede_arv': new_count} for hit in result['hits']]

@@ -505,8 +505,8 @@ def create_meilisearch_data_per_page():
             meili_doc = {
                 # Identifikaatorid
                 'id': page_id,
-                'work_id': doc_metadata.get('id') or teose_id,  # Nanoid, fallback slug
-                'teose_id': teose_id,               # Slug (tagasiühilduvus)
+                'work_id': doc_metadata.get('id'),  # Nanoid (PEAB olemas olema)
+                'teose_id': teose_id,               # Slug (kausta nimi)
 
                 # Teose andmed (lamedaks lüüdud otsinguks ja kuvamiseks)
                 'title': doc_metadata.get('title', ''),
