@@ -572,14 +572,40 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
 
+# Lubatud metaandmete väljad (v2 standard)
+ALLOWED_METADATA_FIELDS = {
+    "title", "year", "location", "publisher", "creators", "tags", 
+    "collection", "type", "genre", "languages", "ester_id", "external_url",
+    "location_object", "publisher_object", "type_object", "genre_object", "tags_object",
+    "series", "relations"
+}
+
 @app.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
     path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
     meta_path = os.path.join(path, '_metadata.json')
+    
+    incoming_meta = data.get('metadata', {})
+    
     with metadata_lock:
-        with open(meta_path, 'r', encoding='utf-8') as f: meta = json.load(f)
-        meta.update(data.get('metadata', {}))
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r', encoding='utf-8') as f: 
+                meta = json.load(f)
+        else:
+            meta = {}
+            
+        # Puhastame sissetulevad andmed - lubame ainult v2 välju
+        clean_meta = {k: v for k, v in incoming_meta.items() if k in ALLOWED_METADATA_FIELDS}
+        
+        # Säilitame olemasolevad väljad, mida sissetulevas sõnumis pole (nt id, slug)
+        # aga asendame sissetulevad v2 väljad
+        meta.update(clean_meta)
+        
+        # Eemaldame igaks juhuks vanad v1 väljad, kui need peaksid failis veel olema
+        for v1_field in ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]:
+            meta.pop(v1_field, None)
+
         save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
     if meta.get('creators'): background_tasks.add_task(process_creators_metadata, meta['creators'])
     sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))

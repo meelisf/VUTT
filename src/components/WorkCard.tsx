@@ -106,31 +106,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       );
     }
 
-    // Fallback vanadele väljadele
-    return (
-      <div className="flex items-center gap-2 text-sm text-gray-600">
-        <User size={14} className="shrink-0" />
-        <Link
-          to={`/?author=${encodeURIComponent(work.author || '')}`}
-          onClick={(e) => e.stopPropagation()}
-          className="hover:text-primary-600 transition-colors truncate hover:underline"
-        >
-          {work.author}
-        </Link>
-        {work.respondens && (
-          <>
-            <span className="text-gray-400">/</span>
-            <Link
-              to={`/?respondens=${encodeURIComponent(work.respondens)}`}
-              onClick={(e) => e.stopPropagation()}
-              className="hover:text-primary-600 transition-colors truncate hover:underline"
-            >
-              {work.respondens}
-            </Link>
-          </>
-        )}
-      </div>
-    );
+    return null;
   };
 
   return (

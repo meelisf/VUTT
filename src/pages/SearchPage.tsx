@@ -813,7 +813,7 @@ const SearchPage: React.FC = () => {
         ? results.hits.map(hit => ({
             id: hit.work_id,
             title: hit.title || hit.work_id,
-            year: hit.year ?? hit.aasta,
+            year: hit.year,
             author: Array.isArray(hit.autor) ? hit.autor[0] : hit.autor,
             count: workHitCounts[hit.work_id] || 1
         }))
@@ -1526,7 +1526,7 @@ const SearchPage: React.FC = () => {
                                         </span>
                                         <span>
                                             <span className="text-gray-400">{t('labels.year')}</span>{' '}
-                                            <span className="font-medium">{results.hits[0]?.year ?? results.hits[0]?.aasta ?? '...'}</span>
+                                            <span className="font-medium">{results.hits[0]?.year ?? '...'}</span>
                                         </span>
                                         <span>
                                             <span className="text-gray-400">{t('labels.id')}</span>{' '}
@@ -1610,7 +1610,7 @@ const SearchPage: React.FC = () => {
                                                             {/* Aasta */}
                                                             <button
                                                                 onClick={() => {
-                                                                    const year = (firstHit.year ?? firstHit.aasta)?.toString();
+                                                                    const year = firstHit.year?.toString();
                                                                     if (year) {
                                                                         setYearStart(year);
                                                                         setYearEnd(year);

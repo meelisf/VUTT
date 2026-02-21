@@ -26,10 +26,8 @@ MEILI_URLS = [
 MEILI_URLS = list(dict.fromkeys([u for u in MEILI_URLS if u]))
 
 FILTERABLE_ATTRS = [
-    'aasta',
     'author_names',
     'authors_text',
-    'autor',
     'collection',
     'collections_hierarchy',
     'creator_ids',
@@ -40,12 +38,12 @@ FILTERABLE_ATTRS = [
     'genre_ids',
     'languages',
     'lehekylje_number',
+    'location',
     'location_id',
     'originaal_kataloog',
     'page_tags',
     'publisher',
     'publisher_id',
-    'respondens',
     'respondens_names',
     'status',
     'tags',
@@ -55,7 +53,6 @@ FILTERABLE_ATTRS = [
     'teose_id',
     'teose_staatus',
     'title',
-    'trükkal',
     'type',
     'type_en',
     'type_et',

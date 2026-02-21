@@ -55,6 +55,92 @@ const checkMixedContent = () => {
 // Wikidata Q-koodi tuvastamine (nt "Q12345")
 const isQCode = (val: string) => /^Q\d+$/.test(val);
 
+/**
+ * Normaliseerib Meilisearchist tulnud teose (Work) andmed.
+ * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
+ */
+const normalizeWork = (hit: any): Work => {
+  return {
+    id: hit.id,
+    work_id: hit.work_id,
+    title: hit.title || hit.pealkiri || 'Pealkiri puudub',
+    year: hit.year ?? hit.aasta ?? 0,
+    location: hit.location || hit.koht || '',
+    location_object: hit.location_object,
+    publisher: hit.publisher || hit.trükkal || '',
+    publisher_object: hit.publisher_object,
+    type: hit.type,
+    type_object: hit.type_object,
+    genre: hit.genre,
+    genre_object: hit.genre_object,
+    collection: hit.collection,
+    collections_hierarchy: hit.collections_hierarchy,
+    creators: hit.creators || [],
+    authors_text: hit.authors_text || [],
+    tags: hit.tags || [],
+    tags_object: hit.tags_object,
+    languages: hit.languages || [],
+    series: hit.series,
+    series_title: hit.series_title,
+    relations: hit.relations,
+    ester_id: hit.ester_id,
+    external_url: hit.external_url,
+    page_count: hit.page_count || 0,
+    thumbnail_url: getThumbUrl(hit.work_id),
+    work_status: hit.work_status,
+    page_tags: hit.page_tags || []
+  };
+};
+
+/**
+ * Normaliseerib Meilisearchist tulnud lehekülje (Page) andmed.
+ */
+const normalizePage = (hit: any): Page => {
+  return {
+    id: hit.id,
+    work_id: hit.work_id,
+    page_number: hit.lehekylje_number || 0,
+    text_content: hit.lehekylje_tekst || hit.text_content || '',
+    image_url: getFullImageUrl(hit.lehekylje_pilt || ''),
+    status: (hit.status as PageStatus) || PageStatus.RAW,
+    comments: hit.comments || [],
+    page_tags: hit.page_tags || hit.tags || [],
+    history: hit.history || [],
+    // Denormaliseeritud teose andmed
+    title: hit.title || hit.pealkiri,
+    year: hit.year ?? hit.aasta,
+    location: hit.location || hit.koht,
+    location_object: hit.location_object,
+    publisher: hit.publisher || hit.trükkal,
+    publisher_object: hit.publisher_object,
+    type: hit.type,
+    type_object: hit.type_object,
+    genre: hit.genre,
+    genre_object: hit.genre_object,
+    collection: hit.collection,
+    collections_hierarchy: hit.collections_hierarchy,
+    creators: hit.creators,
+    languages: hit.languages,
+    ester_id: hit.ester_id,
+    external_url: hit.external_url
+  };
+};
+
+/**
+ * Normaliseerib sisulise otsingu tulemused.
+ */
+const normalizeContentSearchHit = (hit: any): ContentSearchHit => {
+  return {
+    ...hit,
+    title: hit.title,
+    year: hit.year,
+    location: hit.location,
+    publisher: hit.publisher,
+    lehekylje_number: hit.lehekylje_number,
+    lehekylje_tekst: hit.lehekylje_tekst || hit.text_content || ''
+  };
+};
+
 // Interface for dashboard search options
 interface DashboardSearchOptions {
   yearStart?: number;
@@ -146,10 +232,10 @@ export const getTeoseTagsFacets = async (
       filter.push(`collections_hierarchy = "${collection}"`);
     }
     if (yearStart) {
-      filter.push(`aasta >= ${yearStart}`);
+      filter.push(`year >= ${yearStart}`);
     }
     if (yearEnd) {
-      filter.push(`aasta <= ${yearEnd}`);
+      filter.push(`year <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -192,10 +278,10 @@ export const getGenreFacets = async (
       filter.push(`collections_hierarchy = "${collection}"`);
     }
     if (yearStart) {
-      filter.push(`aasta >= ${yearStart}`);
+      filter.push(`year >= ${yearStart}`);
     }
     if (yearEnd) {
-      filter.push(`aasta <= ${yearEnd}`);
+      filter.push(`year <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -238,10 +324,10 @@ export const getTypeFacets = async (
       filter.push(`collections_hierarchy = "${collection}"`);
     }
     if (yearStart) {
-      filter.push(`aasta >= ${yearStart}`);
+      filter.push(`year >= ${yearStart}`);
     }
     if (yearEnd) {
-      filter.push(`aasta <= ${yearEnd}`);
+      filter.push(`year <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -279,10 +365,10 @@ export const getAuthorFacets = async (
       filter.push(`collections_hierarchy = "${collection}"`);
     }
     if (yearStart) {
-      filter.push(`aasta >= ${yearStart}`);
+      filter.push(`year >= ${yearStart}`);
     }
     if (yearEnd) {
-      filter.push(`aasta <= ${yearEnd}`);
+      filter.push(`year <= ${yearEnd}`);
     }
 
     const response = await index.search('', {
@@ -341,22 +427,19 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     // Apply server-side filters if provided
     if (options?.yearStart) {
-      filter.push(`aasta >= ${options.yearStart}`);
+      filter.push(`year >= ${options.yearStart}`);
     }
     if (options?.yearEnd) {
-      filter.push(`aasta <= ${options.yearEnd}`);
+      filter.push(`year <= ${options.yearEnd}`);
     }
     if (options?.author) {
-      // Otsi nii author_names (v2 list) kui autor (v1 string) väljalt
-      filter.push(`(author_names = "${options.author}" OR autor = "${options.author}")`);
+      filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
     }
     if (options?.respondens) {
-      // Otsi nii respondens_names (v2 list) kui respondens (v1 string) väljalt
-      filter.push(`(respondens_names = "${options.respondens}" OR respondens = "${options.respondens}")`);
+      filter.push(`respondens_names = "${options.respondens}"`);
     }
     if (options?.printer) {
-      // Otsi nii publisher (v2) kui trükkal (v1) väljalt
-      filter.push(`(publisher = "${options.printer}" OR trükkal = "${options.printer}")`);
+      filter.push(`publisher = "${options.printer}"`);
     }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
@@ -407,10 +490,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         // Filtrite/sortimise väljad (eesti keeles Meilisearchi skeemis)
-        'originaal_kataloog', 'autor', 'respondens', 'aasta',
+        'originaal_kataloog', 'year',
         'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
-      attributesToSearchOn: ['title', 'authors_text', 'autor', 'respondens'], // Dashboard otsib pealkirjast ja autoritest
+      attributesToSearchOn: ['title', 'authors_text'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
       limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
@@ -431,24 +514,24 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
           // Meilisearch kasutab relevantsust kui sort pole määratud
           break;
         case 'year_asc':
-          searchParams.sort = ['aasta:asc'];
+          searchParams.sort = ['year:asc'];
           break;
         case 'year_desc':
-          searchParams.sort = ['aasta:desc'];
+          searchParams.sort = ['year:desc'];
           break;
         case 'az':
-          searchParams.sort = ['pealkiri:asc'];  // Meilisearch kasutab eestikeelseid välju
+          searchParams.sort = ['title:asc'];
           break;
         case 'recent':
           searchParams.sort = ['last_modified:desc'];
           break;
         default:
-          searchParams.sort = ['aasta:asc'];
+          searchParams.sort = ['year:asc'];
           break;
       }
     } else {
       // Vaikimisi sorteeri aasta järgi kasvavalt (kui sort pole määratud)
-      searchParams.sort = ['aasta:asc'];
+      searchParams.sort = ['year:asc'];
     }
 
     const response = await index.search(query, searchParams);
@@ -472,61 +555,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     // esimese lehe andmed (tags, page_tags) juba kaasa põhipäringuga.
     // Thumbnail tuleb serveripoolsest /_thumb endpointist (genereeritakse vajadusel).
 
-    const works: Work[] = uniqueHits.map((hit: any) => {
-      return {
-        // Identifikaatorid - kasuta AINULT nanoid
-        id: hit.work_id,
-        work_id: hit.work_id,
-
-        // Teose andmed
-        title: hit.title || 'Pealkiri puudub',
-        year: hit.year ?? hit.aasta ?? 0,
-        location: hit.location || '',
-        location_object: hit.location,
-        publisher: hit.publisher || '',
-        publisher_object: hit.publisher,
-
-        // V2 taksonoomia
-        type: hit.type,
-        type_object: hit.type_object,
-        genre: hit.genre_object || hit.genre,
-        genre_object: hit.genre_object,
-        collection: hit.collection,
-        collections_hierarchy: hit.collections_hierarchy || [],
-
-        // V2 isikud
-        creators: hit.creators || [],
-        authors_text: hit.authors_text || [],
-
-        // V2 märksõnad
-        tags: hit.tags || [],
-        tags_object: hit.tags_object || [],
-        languages: hit.languages || ['lat'],
-
-        // Seosed
-        series: hit.series,
-        series_title: hit.series_title,
-
-        // Välised lingid
-        ester_id: hit.ester_id,
-        external_url: hit.external_url,
-
-        // Lehekülje info
-        page_count: hit.teose_lehekylgede_arv || 0,
-        thumbnail_url: getThumbUrl(hit.work_id),  // Kasuta thumbnaili URL-i (40x väiksem)
-        work_status: hit.teose_staatus,
-        page_tags: hit.page_tags || [],
-
-        // Tagasiühilduvus (filtrite/sortimise väljad)
-        catalog_name: hit.originaal_kataloog || 'Unknown',
-        author: hit.autor || (hit.creators?.[0]?.name) || 'Teadmata autor',
-        respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
-        aasta: hit.aasta ?? hit.year,
-
-        // Ajutine väli sorteerimiseks
-        last_modified: hit.last_modified
-      } as Work;
-    });
+    const works: Work[] = uniqueHits.map(normalizeWork);
 
     // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
     // seega sorteerime frontendis uuesti (v.a. relevance, kus säilitame Meilisearchi järjekorra)
@@ -858,7 +887,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         // Filtrite/sortimise väljad
-        'originaal_kataloog', 'autor', 'respondens', 'aasta',
+        'originaal_kataloog', 'year',
         'lehekylje_pilt', 'teose_lehekylgede_arv'
       ],
       limit: 1
@@ -932,8 +961,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   const filter: string[] = [];
 
   if (options.workId) filter.push(`work_id = "${options.workId}"`);
-  if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
-  if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
+  if (options.yearStart) filter.push(`year >= ${options.yearStart}`);
+  if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
   // Teose märksõnade filter (AND loogika)
   // Q-kood → tags_ids, label → bilinguaalne OR
@@ -989,7 +1018,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
@@ -1037,8 +1066,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
-          sort: ['aasta:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
       ]);
@@ -1098,7 +1127,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1188,8 +1217,8 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
 
   const filter: string[] = [`work_id = "${workId}"`];
 
-  if (options.yearStart) filter.push(`aasta >= ${options.yearStart}`);
-  if (options.yearEnd) filter.push(`aasta <= ${options.yearEnd}`);
+  if (options.yearStart) filter.push(`year >= ${options.yearStart}`);
+  if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
@@ -1201,7 +1230,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'autor', 'aasta', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
@@ -1264,7 +1293,7 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
       filter: `work_id = "${teoseId}"`,
       sort: ['lehekylje_number:asc'],
       limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
-      attributesToRetrieve: ['lehekylje_tekst', 'text_content', 'lehekylje_number', 'title', 'autor', 'aasta']
+      attributesToRetrieve: ['lehekylje_tekst', 'text_content', 'lehekylje_number', 'title', 'year']
     });
 
     if (response.hits.length === 0) {
@@ -1273,8 +1302,8 @@ export const getWorkFullText = async (teoseId: string): Promise<{ text: string; 
 
     const firstHit = response.hits[0] as any;
     const title = firstHit.title || 'Tundmatu';
-    const author = firstHit.autor || 'Tundmatu';
-    const year = firstHit.aasta || 0;
+    const author = firstHit.creators?.[0]?.name || 'Tundmatu';
+    const year = firstHit.year || 0;
 
     // Liidame kõik leheküljed kokku, eraldades need "--- lk ---" märgendiga
     const fullText = response.hits

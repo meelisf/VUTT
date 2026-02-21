@@ -358,7 +358,7 @@ const Workspace: React.FC = () => {
       if (respondensCreator) respondens = respondensCreator.name;
     }
 
-    const year = work?.year ?? page.year ?? page.aasta ?? 0;
+    const year = work?.year ?? page.year ?? 0;
     const place = getLabel(work?.location || page.location || '');
     const printer = getLabel(work?.publisher || page.publisher || '');
     const languages = work?.languages || page.languages || [];

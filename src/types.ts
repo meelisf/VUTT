@@ -132,26 +132,6 @@ export interface Work {
   thumbnail_url: string;
   work_status?: WorkStatus;
   page_tags?: string[];     // Esimese lehekülje tagid
-
-  // =========================================================
-  // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
-  // Ainult tagasiühilduvuseks Meilisearchi skeemiga.
-  // Eemaldatakse tulevikus.
-  // =========================================================
-  /** @deprecated Kasuta `catalog_name` asemel */
-  catalog_name?: string;
-  /** @deprecated Kasuta `creators.find(c => c.role === 'praeses')` */
-  author?: string;
-  /** @deprecated Kasuta `creators.find(c => c.role === 'respondens')` */
-  respondens?: string;
-  /** @deprecated Kasuta `location` */
-  koht?: string;
-  /** @deprecated Kasuta `publisher` */
-  trükkal?: string;
-  /** @deprecated Kasuta `title` */
-  pealkiri?: string;
-  /** @deprecated Kasuta `year` */
-  aasta?: number;
 }
 
 // =========================================================
@@ -293,19 +273,6 @@ export interface ContentSearchHit {
   tags?: string[]; // Added support for V3
   tags_object?: LinkedEntity[];
   page_tags?: (string | LinkedEntity)[]; // Per-page tags
-
-
-  // =========================================================
-  // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
-  // =========================================================
-  /** @deprecated Kasuta `title` */
-  pealkiri?: string;
-  /** @deprecated Kasuta `creators` */
-  autor?: string;
-  /** @deprecated Kasuta `year` */
-  aasta?: number | string;
-  /** @deprecated */
-  originaal_kataloog?: string;
 
   comments?: Annotation[];
 

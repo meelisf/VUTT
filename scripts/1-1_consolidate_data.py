@@ -586,40 +586,11 @@ def create_meilisearch_data_per_page():
             if doc_metadata.get('relations'):
                 meili_doc['relations'] = doc_metadata['relations']
 
-            # Tagasiühilduvus (ajutine - eemaldada hiljem)
-            meili_doc['pealkiri'] = doc_metadata.get('title', '')
-            meili_doc['aasta'] = doc_metadata.get('year')
-            meili_doc['koht'] = get_label(doc_metadata.get('location'))
-            meili_doc['trükkal'] = get_label(doc_metadata.get('publisher'))
-            
             # V3 bibliograafia (täisobjektid dünaamilise UI jaoks)
             meili_doc['location'] = doc_metadata.get('location')
             meili_doc['publisher'] = doc_metadata.get('publisher')
             meili_doc['location_search'] = get_all_labels(doc_metadata.get('location'))
             meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher'))
-
-            # Autor ja respondens (denormaliseeritud tagasiühilduvuseks)
-            creators = doc_metadata.get('creators', [])
-            
-            # Autor: praeses > auctor > esimene mitterespondent
-            autor_name = ''
-            praeses = next((c for c in creators if c.get('role') == 'praeses'), None)
-            auctor = next((c for c in creators if c.get('role') == 'auctor'), None)
-            
-            if praeses:
-                autor_name = praeses.get('name', '')
-            elif auctor:
-                autor_name = auctor.get('name', '')
-            elif creators:
-                # Fallback: esimene isik, kes pole respondens
-                first = next((c for c in creators if c.get('role') not in ['respondens', 'gratulator', 'dedicator']), None)
-                if first:
-                    autor_name = first.get('name', '')
-            
-            meili_doc['autor'] = autor_name
-            
-            respondents = [c for c in creators if c.get('role') == 'respondens']
-            meili_doc['respondens'] = respondents[0]['name'] if respondents else ''
 
             pages.append(meili_doc)
 
