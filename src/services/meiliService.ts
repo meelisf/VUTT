@@ -60,7 +60,8 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  // Ohutusmeede: kui work_id puudub, tuleta see primaarvõtmest (id)
+  // Garanterime work_id olemasolu: kui puudub, tuletame primaarvõtmest (id)
+  // id on tavaliselt kujul "nanoid-lk" (nt "ms2ufe-1")
   let workId = hit.work_id;
   if (!workId && hit.id) {
     const lastDashIndex = hit.id.lastIndexOf('-');
@@ -93,7 +94,7 @@ const normalizeWork = (hit: any): Work => {
     ester_id: hit.ester_id,
     external_url: hit.external_url,
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
-    thumbnail_url: getThumbUrl(hit.work_id),
+    thumbnail_url: getThumbUrl(workId),
     work_status: hit.work_status || hit.teose_staatus,
     page_tags: hit.page_tags || []
   };
