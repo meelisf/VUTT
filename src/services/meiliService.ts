@@ -60,10 +60,18 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  const workId = hit.work_id || hit.teose_id || hit.id; // Fallback: nanoid -> slug -> lehe id
+  // Järjekord: nanoid (work_id) -> slug (teose_id) -> lehe id-st esimene pool (id) -> kataloogi nimi (originaal_kataloog)
+  const workId = hit.work_id || hit.teose_id || (hit.id && typeof hit.id === 'string' ? hit.id.split('-')[0] : null) || hit.originaal_kataloog;
+  
+  if (!workId) {
+    console.error('normalizeWork: ID-d ei leitud!', hit);
+  }
+
+  const finalId = workId || 'unknown_work';
+
   return {
-    id: workId,
-    work_id: workId,
+    id: finalId,
+    work_id: finalId,
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
     location: hit.location || hit.koht || '',
@@ -1119,7 +1127,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search(query, {
           filter,
           limit: STATS_LIMIT,
-          attributesToRetrieve: ['work_id', genreFacetField, typeFacetField, tagsFacetField, 'author_names', 'respondens_names'],
+          attributesToRetrieve: ['id', 'work_id', 'teose_id', 'title', 'year', 'location', 'publisher', 'creators', 'genre_object', 'type_object', 'collection', 'collections_hierarchy', 'author_names', 'respondens_names', 'tags_object'],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (kuvatavad teosed, distinct)
