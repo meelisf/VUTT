@@ -954,9 +954,10 @@ def import_as_work(upload_id: str) -> dict:
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
-            local_jpg = os.path.join(work_dir, f"{pn:03d}.jpg")
-            local_txt = os.path.join(work_dir, f"{pn:03d}.txt")
-            local_json = os.path.join(work_dir, f"{pn:03d}.json")
+            base_name = f"{slug}-{work_id}-{pn:03d}"
+            local_jpg = os.path.join(work_dir, f"{base_name}.jpg")
+            local_txt = os.path.join(work_dir, f"{base_name}.txt")
+            local_json = os.path.join(work_dir, f"{base_name}.json")
 
             sftp.get(f"{remote_work}/{jpg_name}", local_jpg)
             os.chmod(local_jpg, 0o644)
