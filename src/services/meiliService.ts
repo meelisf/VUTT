@@ -60,28 +60,13 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  // Järjekord: nanoid (work_id) -> slug (teose_id) -> lehe id-st esimene pool (id) -> kataloogi nimi (originaal_kataloog)
-  let workId = hit.work_id || hit.teose_id;
-  
-  if (!workId && hit.id && typeof hit.id === 'string') {
-    workId = hit.id.split('-')[0];
+  if (!hit.work_id) {
+    console.error('normalizeWork: hit.work_id puudub!', hit);
   }
-  
-  if (!workId) {
-    workId = hit.originaal_kataloog;
-  }
-
-  // Kui ikka pole või on väärtus 'undefined' (stringina või tüübina)
-  if (!workId || workId === 'undefined' || workId === 'null') {
-    console.error('normalizeWork: Valiidset ID-d ei leitud!', hit);
-    workId = 'unknown_work';
-  }
-
-  const finalId = String(workId);
 
   return {
-    id: finalId,
-    work_id: finalId,
+    id: hit.id, // Meilisearchi primary key (work_id-lk)
+    work_id: hit.work_id, // Nanoid
     title: hit.title || hit.pealkiri || 'Pealkiri puudub',
     year: hit.year ?? hit.aasta ?? 0,
     location: hit.location || hit.koht || '',
@@ -914,12 +899,11 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 
     if (response.hits.length === 0) return undefined;
     const hit: any = response.hits[0];
-    const finalWorkId = hit.work_id || hit.teose_id || (hit.id && typeof hit.id === 'string' ? hit.id.split('-')[0] : hit.id) || workId;
 
     return {
       // Identifikaatorid
-      id: String(finalWorkId),
-      work_id: String(finalWorkId),
+      id: hit.id,
+      work_id: hit.work_id,
 
       // Teose andmed
       title: hit.title || '',
