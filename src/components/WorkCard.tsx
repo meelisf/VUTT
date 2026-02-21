@@ -37,7 +37,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
     e.preventDefault();
-    navigate(`/work/${work.id}/1`);
+    navigate(`/work/${work.work_id}/1`);
   };
 
   // Staatuse badge stiilid
@@ -199,7 +199,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       <div className="p-4 flex-1 flex flex-col">
         <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight line-clamp-2">
           <a
-            href={`/work/${work.id}/1`}
+            href={`/work/${work.work_id}/1`}
             onClick={handleOpenWorkspace}
             className="hover:text-primary-600 transition-colors cursor-pointer"
           >
