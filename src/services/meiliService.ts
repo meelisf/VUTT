@@ -61,13 +61,23 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  */
 const normalizeWork = (hit: any): Work => {
   // Järjekord: nanoid (work_id) -> slug (teose_id) -> lehe id-st esimene pool (id) -> kataloogi nimi (originaal_kataloog)
-  const workId = hit.work_id || hit.teose_id || (hit.id && typeof hit.id === 'string' ? hit.id.split('-')[0] : null) || hit.originaal_kataloog;
+  let workId = hit.work_id || hit.teose_id;
+  
+  if (!workId && hit.id && typeof hit.id === 'string') {
+    workId = hit.id.split('-')[0];
+  }
   
   if (!workId) {
-    console.error('normalizeWork: ID-d ei leitud!', hit);
+    workId = hit.originaal_kataloog;
   }
 
-  const finalId = workId || 'unknown_work';
+  // Kui ikka pole või on väärtus 'undefined' (stringina või tüübina)
+  if (!workId || workId === 'undefined' || workId === 'null') {
+    console.error('normalizeWork: Valiidset ID-d ei leitud!', hit);
+    workId = 'unknown_work';
+  }
+
+  const finalId = String(workId);
 
   return {
     id: finalId,
@@ -904,11 +914,12 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 
     if (response.hits.length === 0) return undefined;
     const hit: any = response.hits[0];
+    const finalWorkId = hit.work_id || hit.teose_id || (hit.id && typeof hit.id === 'string' ? hit.id.split('-')[0] : hit.id) || workId;
 
     return {
       // Identifikaatorid
-      id: hit.id || hit.work_id,
-      work_id: hit.work_id,
+      id: String(finalWorkId),
+      work_id: String(finalWorkId),
 
       // Teose andmed
       title: hit.title || '',
