@@ -44,6 +44,10 @@ export interface SearchFiltersProps {
     // Sõnavara ja aliased
     vocabularies: Vocabularies | null;
     aliasMap: Record<string, string>;
+    // Q-kood → praeguse keele label (tulemuste genre/type/tags_object-ist)
+    genreIdMap?: Record<string, string>;
+    typeIdMap?: Record<string, string>;
+    tagsIdMap?: Record<string, string>;
     loading: boolean;
 
     // Callback-id
@@ -69,7 +73,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     selectedAuthor, authorInput, showAuthorSuggestions,
     selectedWork, selectedWorkInfo, showFiltersMobile,
     availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks,
-    vocabularies, aliasMap, loading,
+    vocabularies, aliasMap, genreIdMap, typeIdMap, tagsIdMap, loading,
     onScopeChange, onYearStartChange, onYearEndChange,
     onGenreToggle, onTypeToggle, onTagToggle,
     onAuthorInputChange, onShowAuthorSuggestions, onAuthorSelect, onAuthorClear,
@@ -102,20 +106,32 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     defaultOpen={true}
                     badge={selectedScope !== 'all' ? 1 : undefined}
                 >
-                    <div className="space-y-2">
-                        {(['all', 'original', 'annotation'] as const).map(scope => (
-                            <label key={scope} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
-                                <input
-                                    type="radio"
-                                    name="scope"
-                                    value={scope}
-                                    checked={selectedScope === scope}
-                                    onChange={() => onScopeChange(scope)}
-                                    className="text-primary-600 focus:ring-primary-500"
-                                />
-                                <span className="text-sm text-gray-700">{t(`filters.scope${scope.charAt(0).toUpperCase() + scope.slice(1)}`)}</span>
-                            </label>
-                        ))}
+                    <div className="space-y-1">
+                        {(['all', 'original', 'annotation'] as const).map(scope => {
+                            const isSelected = selectedScope === scope;
+                            const isRestricted = scope !== 'all';
+                            return (
+                                <label key={scope} className={`flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded transition-colors ${
+                                    isSelected && isRestricted
+                                        ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-200'
+                                        : isSelected
+                                        ? 'bg-primary-50 text-primary-700'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                }`}>
+                                    <input
+                                        type="radio"
+                                        name="scope"
+                                        value={scope}
+                                        checked={isSelected}
+                                        onChange={() => onScopeChange(scope)}
+                                        className={isSelected && isRestricted ? 'text-orange-600 focus:ring-orange-400' : 'text-primary-600 focus:ring-primary-500'}
+                                    />
+                                    <span className={`text-sm ${isSelected ? 'font-semibold' : ''}`}>
+                                        {t(`filters.scope${scope.charAt(0).toUpperCase() + scope.slice(1)}`)}
+                                    </span>
+                                </label>
+                            );
+                        })}
                     </div>
                 </CollapsibleSection>
 
@@ -160,7 +176,9 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                             items={availableGenres.map(({ value, count }) => ({
                                 value,
                                 count,
-                                label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
+                                // Q-kood: lahenda genreIdMap kaudu (tulemuste genre_object-ist)
+                                // Label: otsi sõnavarast (vocabularies on keyed by Latin ID, mitte label/Q-kood — seega enamasti fallback)
+                                label: genreIdMap?.[value] || vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
                             }))}
                             selectedValues={selectedGenres}
                             onToggle={onGenreToggle}
@@ -178,7 +196,12 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                         badge={selectedTeoseTags.length || undefined}
                     >
                         <SearchableFilterList
-                            items={availableTeoseTags.map(({ tag, count }) => ({ value: tag, label: tag, count }))}
+                            items={availableTeoseTags.map(({ tag, count }) => ({
+                                value: tag,
+                                // Q-kood: lahenda tagsIdMap kaudu; label: kuva nii nagu on
+                                label: tagsIdMap?.[tag] || tag,
+                                count
+                            }))}
                             selectedValues={selectedTeoseTags}
                             onToggle={onTagToggle}
                             placeholder={t('filters.searchTag', 'Otsi märksõna...')}
@@ -198,7 +221,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                             items={availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => ({
                                 value,
                                 count,
-                                label: vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
+                                label: typeIdMap?.[value] || vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
                             }))}
                             selectedValues={selectedTypes}
                             onToggle={onTypeToggle}

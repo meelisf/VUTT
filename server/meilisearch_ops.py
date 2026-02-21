@@ -401,9 +401,10 @@ def sync_work_to_meilisearch(dir_name):
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "page_tags": [l.lower() for l in get_primary_labels(page_tags_data)],
-            "page_tags_et": [l.lower() for l in get_labels_by_lang(page_tags_data, 'et')],
-            "page_tags_en": [l.lower() for l in get_labels_by_lang(page_tags_data, 'en')],
+            "page_tags": get_primary_labels(page_tags_data),          # Eesti label, capitalize_first (teose tags-iga ühtlane)
+            "page_tags_et": get_labels_by_lang(page_tags_data, 'et'), # Eesti label, capitalize_first
+            "page_tags_en": get_labels_by_lang(page_tags_data, 'en'), # Inglise label, capitalize_first
+            "page_tags_ids": get_all_ids(page_tags_data),              # Q-koodid (filtreeritav, nagu tags_ids)
             "page_tags_suggest_et": [
                 f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}"
                 for t in page_tags_data

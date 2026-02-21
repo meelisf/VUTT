@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { searchContent, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
-import { Search, Loader2, Filter, Library, FileText, User, X } from 'lucide-react';
+import { Search, Loader2, Filter, Library, FileText, User, X, Layers } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
@@ -147,13 +147,21 @@ const SearchPage: React.FC = () => {
     }, [results, i18n.language]);
 
     // Lahenda Q-koodid labeliteks (žanrid)
+    // Viga: Q-kood lisatakse availableGenres-i fallback-ina → availableValues.has('Q...') === true → lahendus möödub
+    // Parandus: Q-koodid läbivad genreIdMap lahenduse ENNE availableValues kontrolli
     useEffect(() => {
-        if (selectedGenres.length === 0 || Object.keys(genreIdMap).length === 0) return;
-        const availableValues = new Set(availableGenres.map(g => g.value));
+        if (selectedGenres.length === 0) return;
+        const isQ = (s: string) => /^Q\d+$/.test(s);
+        const labelValues = new Set(availableGenres.filter(g => !isQ(g.value)).map(g => g.value));
         let changed = false;
         const resolved = selectedGenres.map(g => {
-            if (availableValues.has(g)) return g;
-            if (genreIdMap[g]) { changed = true; return genreIdMap[g]; }
+            if (isQ(g)) {
+                // Q-kood: proovi lahendada genreIdMap kaudu (tulemuste genre_object-ist)
+                if (genreIdMap[g]) { changed = true; return genreIdMap[g]; }
+                return g; // Ei saa veel lahendada (tulemused puuduvad)
+            }
+            if (labelValues.has(g)) return g;
+            if (genreIdMap[g] && genreIdMap[g] !== g) { changed = true; return genreIdMap[g]; }
             if (vocabularies?.genres) {
                 const lang = i18n.language.split('-')[0];
                 const altLang = lang === 'et' ? 'en' : 'et';
@@ -215,14 +223,19 @@ const SearchPage: React.FC = () => {
         return map;
     }, [results, i18n.language]);
 
-    // Lahenda Q-koodid labeliteks (tüüp)
+    // Lahenda Q-koodid labeliteks (tüüp) — sama loogika kui žanride puhul
     useEffect(() => {
-        if (selectedTypes.length === 0 || Object.keys(typeIdMap).length === 0) return;
-        const availableValues = new Set(availableTypes.map(t => t.value));
+        if (selectedTypes.length === 0) return;
+        const isQ = (s: string) => /^Q\d+$/.test(s);
+        const labelValues = new Set(availableTypes.filter(t => !isQ(t.value)).map(t => t.value));
         let changed = false;
         const resolved = selectedTypes.map(t => {
-            if (availableValues.has(t)) return t;
-            if (typeIdMap[t]) { changed = true; return typeIdMap[t]; }
+            if (isQ(t)) {
+                if (typeIdMap[t]) { changed = true; return typeIdMap[t]; }
+                return t;
+            }
+            if (labelValues.has(t)) return t;
+            if (typeIdMap[t] && typeIdMap[t] !== t) { changed = true; return typeIdMap[t]; }
             if (vocabularies?.types) {
                 const lang = i18n.language.split('-')[0];
                 const altLang = lang === 'et' ? 'en' : 'et';
@@ -282,23 +295,31 @@ const SearchPage: React.FC = () => {
         return map;
     }, [results, i18n.language]);
 
-    // Lahenda Q-koodid labeliteks (märksõnad)
+    // Lahenda Q-koodid labeliteks + normaliseeri URL Q-koodideks (märksõnad)
     useEffect(() => {
-        if (selectedTeoseTags.length === 0 || Object.keys(tagsIdMap).length === 0) return;
-        const availableValues = new Set(availableTeoseTags.map(t => t.tag));
+        if (selectedTeoseTags.length === 0) return;
+        const isQ = (s: string) => /^Q\d+$/.test(s);
+        const labelValues = new Set(availableTeoseTags.filter(t => !isQ(t.tag)).map(t => t.tag));
         let changed = false;
         const resolved = selectedTeoseTags.map(tag => {
-            if (availableValues.has(tag)) return tag;
-            if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
+            if (isQ(tag)) {
+                if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
+                return tag;
+            }
+            if (labelValues.has(tag)) return tag;
+            if (tagsIdMap[tag] && tagsIdMap[tag] !== tag) { changed = true; return tagsIdMap[tag]; }
             return tag;
         });
-        if (changed) {
-            setSelectedTeoseTags(resolved);
+        // URL normaliseerimine: konverdi labelid Q-koodideks kui tagsLabelToId on teada
+        const urlNormalized = resolved.map(t => tagsLabelToId[t] || t);
+        const urlNeedsUpdate = urlNormalized.join(',') !== teoseTagsParam.join(',');
+        if (changed) setSelectedTeoseTags(resolved);
+        if (changed || urlNeedsUpdate) {
             const newParams = new URLSearchParams(searchParams);
-            newParams.set('teoseTags', resolved.map(t => tagsLabelToId[t] || t).join(','));
+            newParams.set('teoseTags', urlNormalized.join(','));
             setSearchParams(newParams, { replace: true });
         }
-    }, [selectedTeoseTags, availableTeoseTags, tagsIdMap, i18n.language]);
+    }, [selectedTeoseTags, availableTeoseTags, tagsIdMap, tagsLabelToId, i18n.language]);
 
     // Laadi teose info kui tullakse work-filter-iga (nt Workspace'ist)
     useEffect(() => {
@@ -502,8 +523,26 @@ const SearchPage: React.FC = () => {
                         </form>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(selectedAuthor || selectedWork || selectedCollection) && (
+                        {(selectedAuthor || selectedWork || selectedCollection || scopeParam !== 'all') && (
                             <div className="flex flex-wrap items-center gap-2 mt-3">
+                                {/* Scope chip — nähtav hoiatus kui otsitakse ainult osa dokumendist */}
+                                {scopeParam !== 'all' && (
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full text-sm font-medium border border-orange-200">
+                                        <Layers size={14} />
+                                        <span>{t(`filters.scope${scopeParam.charAt(0).toUpperCase() + scopeParam.slice(1)}`)}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedScope('all');
+                                                setSearchParams(prev => { prev.delete('scope'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-1 hover:bg-orange-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                )}
                                 {selectedWork && (
                                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium border border-amber-200">
                                         <FileText size={14} />
@@ -579,6 +618,9 @@ const SearchPage: React.FC = () => {
                     availableWorks={availableWorks}
                     vocabularies={vocabularies}
                     aliasMap={aliasMap}
+                    genreIdMap={genreIdMap}
+                    typeIdMap={typeIdMap}
+                    tagsIdMap={tagsIdMap}
                     loading={loading}
                     onScopeChange={setSelectedScope}
                     onYearStartChange={setYearStart}
