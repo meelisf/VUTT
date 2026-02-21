@@ -60,12 +60,7 @@ const isQCode = (val: string) => /^Q\d+$/.test(val);
  * Tagab, et kasutatakse ainult V2 välju ja puuduvad andmed on asendatud vaikeväärtustega.
  */
 const normalizeWork = (hit: any): Work => {
-  // Nanoid on meie süsteemis kas 'work_id' väljas või 'id' (formaat: nanoid-number) alguses.
-  const workId = hit.work_id || (typeof hit.id === 'string' ? hit.id.split('-')[0] : hit.id);
-
-  if (!workId) {
-    console.error('normalizeWork: Teose ID-d ei leitud!', hit);
-  }
+  const workId = hit.work_id;
 
   return {
     id: hit.id,
