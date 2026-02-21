@@ -43,7 +43,6 @@ def main():
     # UUENDUS: Lisasime V3 väljad ja täiendavad seaded
     task = client.index(INDEX_NAME).update_settings({
         'searchableAttributes': [
-            # V2/V3 väljad
             'title',
             'authors_text',
             'year',
@@ -52,13 +51,6 @@ def main():
             'genre_search',
             'tags_search',
             'series_title',
-            # Tagasiühilduvus
-            'pealkiri',
-            'autor',
-            'respondens',
-            'aasta',
-            'teose_id',
-            'originaal_kataloog',
             'lehekylje_tekst',
             'page_tags',
             'page_tags_et',
@@ -66,11 +58,11 @@ def main():
             'comments.text'
         ],
         'filterableAttributes': [
-            # V2/V3 väljad
             'work_id',
             'year',
             'title',
             'location_id',
+            'location',
             'publisher_id',
             'publisher',
             'genre_ids',
@@ -78,7 +70,7 @@ def main():
             'creator_ids',
             'creators',
             'type',
-            'type_et', 'type_en', # Keeltepõhised filtrid
+            'type_et', 'type_en',
             'genre',
             'genre_et', 'genre_en',
             'collection',
@@ -87,12 +79,6 @@ def main():
             'author_names',
             'respondens_names',
             'languages',
-            # Tagasiühilduvus
-            'aasta',
-            'autor',
-            'respondens',
-            'trükkal',
-            'teose_id',
             'lehekylje_number',
             'originaal_kataloog',
             'page_tags',
@@ -106,10 +92,10 @@ def main():
             'tags_et', 'tags_en'
         ],
         'sortableAttributes': [
-            'aasta', 
+            'year', 
             'lehekylje_number',
             'last_modified',
-            'pealkiri'
+            'title'
         ],
         'rankingRules': [
             "exactness",
