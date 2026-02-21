@@ -172,6 +172,7 @@ interface DashboardSearchOptions {
   printer?: string; // trükkal
   workStatus?: WorkStatus; // Teose koondstaatuse filter
   teoseTags?: string[]; // Teose märksõnad (AND loogika)
+  pageTags?: string[]; // Lehekülje märksõnad (AND loogika, page_tags_ids)
   onlyFirstPage?: boolean;
   // V2 väljad
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
@@ -990,6 +991,17 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         filter.push(`tags_ids = "${tag}"`);
       } else {
         filter.push(`(tags_et = "${tag}" OR tags_en = "${tag}")`);
+      }
+    }
+  }
+  // Lehekülje märksõnade filter (AND loogika)
+  // Q-kood → page_tags_ids, label → bilinguaalne OR
+  if (options.pageTags && options.pageTags.length > 0) {
+    for (const tag of options.pageTags) {
+      if (isQCode(tag)) {
+        filter.push(`page_tags_ids = "${tag}"`);
+      } else {
+        filter.push(`(page_tags_et = "${tag}" OR page_tags_en = "${tag}")`);
       }
     }
   }

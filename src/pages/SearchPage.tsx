@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { searchContent, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
-import { Search, Loader2, Filter, Library, FileText, User, X, Layers } from 'lucide-react';
+import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag } from 'lucide-react';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
@@ -26,6 +26,7 @@ const SearchPage: React.FC = () => {
     const yearEndParam = searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined;
     const scopeParam = (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all';
     const teoseTagsParam = searchParams.get('teoseTags')?.split(',').filter(Boolean) || [];
+    const pageTagsParam = searchParams.get('pageTags')?.split(',').filter(Boolean) || [];
     const genreParam = searchParams.get('genre')?.split(',').filter(Boolean) || [];
     const typeParam = searchParams.get('type')?.split(',').filter(Boolean) || [];
     const authorParam = searchParams.get('author') || '';
@@ -39,6 +40,7 @@ const SearchPage: React.FC = () => {
     const [selectedWorkInfo, setSelectedWorkInfo] = useState<{ title: string; year?: string | number; author?: string } | null>(null);
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
+    const [selectedPageTags, setSelectedPageTags] = useState<string[]>(pageTagsParam);
     const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
     const [selectedGenres, setSelectedGenres] = useState<string[]>(genreParam);
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
@@ -95,11 +97,12 @@ const SearchPage: React.FC = () => {
         if (scopeParam) setSelectedScope(scopeParam);
         setSelectedWork(workIdParam);
         setSelectedTeoseTags(teoseTagsParam);
+        setSelectedPageTags(pageTagsParam);
         setSelectedGenres(genreParam);
         setSelectedTypes(typeParam);
         setSelectedAuthor(authorParam);
         setAuthorInput(authorParam);
-    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
+    }, [queryParam, scopeParam, workIdParam, teoseTagsParam.join(','), pageTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam]);
 
     // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega)
     const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
@@ -277,6 +280,23 @@ const SearchPage: React.FC = () => {
         return map;
     }, [results, i18n.language]);
 
+    // Q-kood → praeguse keele label (lehekülje märksõnad, page_tags_object põhjal)
+    const pageTagsIdMap = useMemo(() => {
+        const map: Record<string, string> = {};
+        const lang = i18n.language.split('-')[0];
+        if (!results?.hits) return map;
+        for (const hit of results.hits) {
+            const objs = (hit as any).page_tags_object;
+            if (!objs || !Array.isArray(objs)) continue;
+            for (const item of objs) {
+                if (!item?.id || !item?.labels) continue;
+                const label = item.labels[lang] || item.labels['et'] || item.label || item.id;
+                map[item.id] = cap(label);
+            }
+        }
+        return map;
+    }, [results, i18n.language]);
+
     // Label → Q-kood (URL-i jaoks, märksõnad)
     const tagsLabelToId = useMemo(() => {
         const map: Record<string, string> = {};
@@ -341,7 +361,7 @@ const SearchPage: React.FC = () => {
 
     // Otsimine URL parameetrite muutumisel
     useEffect(() => {
-        const relevantParams = ['q', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type', 'author'];
+        const relevantParams = ['q', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author'];
         if (relevantParams.some(key => searchParams.has(key))) {
             const options: ContentSearchOptions = {
                 yearStart: yearStartParam,
@@ -349,6 +369,7 @@ const SearchPage: React.FC = () => {
                 scope: scopeParam,
                 workId: workIdParam || undefined,
                 teoseTags: teoseTagsParam.length > 0 ? teoseTagsParam : undefined,
+                pageTags: pageTagsParam.length > 0 ? pageTagsParam : undefined,
                 genre: genreParam.length > 0 ? genreParam : undefined,
                 type: typeParam.length > 0 ? typeParam : undefined,
                 author: authorParam || undefined,
@@ -360,7 +381,7 @@ const SearchPage: React.FC = () => {
             setResults(null);
         }
     }, [searchParams, queryParam, pageParam, workIdParam, yearStartParam, yearEndParam, scopeParam,
-        teoseTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam, selectedCollection, i18n.language]);
+        teoseTagsParam.join(','), pageTagsParam.join(','), genreParam.join(','), typeParam.join(','), authorParam, selectedCollection, i18n.language]);
 
     const performSearch = async (searchQuery: string, page: number, options: ContentSearchOptions) => {
         setLoading(true);
@@ -402,11 +423,11 @@ const SearchPage: React.FC = () => {
         if (e) e.preventDefault();
         const hasFilters = (yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ||
             selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
-            selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
+            selectedPageTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
 
         setSearchParams(prev => {
             if (!inputValue.trim() && !hasFilters) {
-                ['q', 'p', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
+                ['q', 'p', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
             } else {
                 if (inputValue.trim()) prev.set('q', inputValue); else prev.delete('q');
                 prev.set('p', '1');
@@ -415,6 +436,7 @@ const SearchPage: React.FC = () => {
                 if (selectedScope !== 'all') prev.set('scope', selectedScope); else prev.delete('scope');
                 if (selectedWork) prev.set('work', selectedWork); else prev.delete('work');
                 if (selectedTeoseTags.length > 0) prev.set('teoseTags', selectedTeoseTags.map(t => tagsLabelToId[t] || t).join(',')); else prev.delete('teoseTags');
+                if (selectedPageTags.length > 0) prev.set('pageTags', selectedPageTags.join(',')); else prev.delete('pageTags');
                 if (selectedGenres.length > 0) prev.set('genre', selectedGenres.map(g => genreLabelToId[g] || g).join(',')); else prev.delete('genre');
                 if (selectedTypes.length > 0) prev.set('type', selectedTypes.map(t => typeLabelToId[t] || t).join(',')); else prev.delete('type');
                 if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
@@ -427,10 +449,10 @@ const SearchPage: React.FC = () => {
     const handleClearFilters = () => {
         setYearStart('1630'); setYearEnd('1710'); setSelectedScope('all');
         setSelectedWork(''); setSelectedWorkInfo(null);
-        setSelectedTeoseTags([]); setSelectedGenres([]); setSelectedTypes([]);
+        setSelectedTeoseTags([]); setSelectedPageTags([]); setSelectedGenres([]); setSelectedTypes([]);
         setSelectedAuthor(''); setAuthorInput('');
         setSearchParams(prev => {
-            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
+            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
             prev.set('p', '1');
             return prev;
         });
@@ -523,7 +545,7 @@ const SearchPage: React.FC = () => {
                         </form>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(selectedAuthor || selectedWork || selectedCollection || scopeParam !== 'all') && (
+                        {(selectedAuthor || selectedWork || selectedCollection || scopeParam !== 'all' || pageTagsParam.length > 0) && (
                             <div className="flex flex-wrap items-center gap-2 mt-3">
                                 {/* Scope chip — nähtav hoiatus kui otsitakse ainult osa dokumendist */}
                                 {scopeParam !== 'all' && (
@@ -543,6 +565,29 @@ const SearchPage: React.FC = () => {
                                         </button>
                                     </div>
                                 )}
+                                {pageTagsParam.map(tag => (
+                                    <div key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm font-medium border border-teal-200">
+                                        <Tag size={14} />
+                                        <span>{pageTagsIdMap[tag] || tag}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = pageTagsParam.filter(t => t !== tag);
+                                                setSelectedPageTags(next);
+                                                setSearchParams(prev => {
+                                                    if (next.length > 0) prev.set('pageTags', next.join(','));
+                                                    else prev.delete('pageTags');
+                                                    prev.set('p', '1');
+                                                    return prev;
+                                                });
+                                            }}
+                                            className="ml-1 hover:bg-teal-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    </div>
+                                ))}
                                 {selectedWork && (
                                     <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium border border-amber-200">
                                         <FileText size={14} />

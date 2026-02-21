@@ -458,7 +458,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             return (
               <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group overflow-hidden">
                 <button
-                  onClick={() => navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
+                  onClick={() => tagId
+                    ? navigate(`/search?pageTags=${encodeURIComponent(tagId)}`)
+                    : navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
                   className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
                   title="Otsi seda märksõna kogu korpusest"
                 >
