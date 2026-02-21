@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { searchContent, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
@@ -15,6 +15,7 @@ import { mergeFacetsWithExisting, mergeTagsWithExisting, mergeSelectedIntoFacets
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
 
@@ -41,6 +42,10 @@ const SearchPage: React.FC = () => {
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [selectedTeoseTags, setSelectedTeoseTags] = useState<string[]>(teoseTagsParam);
     const [selectedPageTags, setSelectedPageTags] = useState<string[]>(pageTagsParam);
+    // Q-kood → label kaardistus, mis säilib ka kui tulemused on tühjad
+    const [knownPageTagsLabels, setKnownPageTagsLabels] = useState<Record<string, string>>(
+        (location.state as any)?.pageTagsLabels || {}
+    );
     const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
     const [selectedGenres, setSelectedGenres] = useState<string[]>(genreParam);
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
@@ -296,6 +301,13 @@ const SearchPage: React.FC = () => {
         }
         return map;
     }, [results, i18n.language]);
+
+    // Kogu teadaolevaid labeleid — säilib ka tühjade tulemuste korral
+    useEffect(() => {
+        if (Object.keys(pageTagsIdMap).length > 0) {
+            setKnownPageTagsLabels(prev => ({ ...prev, ...pageTagsIdMap }));
+        }
+    }, [pageTagsIdMap]);
 
     // Label → Q-kood (URL-i jaoks, märksõnad)
     const tagsLabelToId = useMemo(() => {
@@ -568,7 +580,7 @@ const SearchPage: React.FC = () => {
                                 {pageTagsParam.map(tag => (
                                     <div key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm font-medium border border-teal-200">
                                         <Tag size={14} />
-                                        <span>{pageTagsIdMap[tag] || tag}</span>
+                                        <span>{knownPageTagsLabels[tag] || pageTagsIdMap[tag] || tag}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
