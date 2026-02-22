@@ -299,6 +299,15 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     return crossLangGenreMap[selectedGenre] || selectedGenre;
   }, [selectedGenre, genreItems, genreIdMap, crossLangGenreMap]);
 
+  // item.value formaadis (Q-kood) — FilterSection selectedValues ja onToggle jaoks
+  const selectedGenreItemValue = useMemo(() => {
+    if (!selectedGenre) return null;
+    if (genreItems.some(item => item.value === selectedGenre)) return selectedGenre;
+    const qcode = genreLabelToId?.[selectedGenre];
+    if (qcode && genreItems.some(item => item.value === qcode)) return qcode;
+    return null;
+  }, [selectedGenre, genreItems, genreLabelToId]);
+
   const effectiveSelectedType = useMemo(() => {
     if (!selectedType) return null;
     const found = typeItems.find(item => item.value === selectedType);
@@ -308,6 +317,14 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     // Vocabulary-põhine fallback
     return crossLangTypeMap[selectedType] || selectedType;
   }, [selectedType, typeItems, typeIdMap, crossLangTypeMap]);
+
+  const selectedTypeItemValue = useMemo(() => {
+    if (!selectedType) return null;
+    if (typeItems.some(item => item.value === selectedType)) return selectedType;
+    const qcode = typeLabelToId?.[selectedType];
+    if (qcode && typeItems.some(item => item.value === qcode)) return qcode;
+    return null;
+  }, [selectedType, typeItems, typeLabelToId]);
 
   // Efektiivsed valitud märksõnad: lahenda Q-koodid labeliteks
   const effectiveSelectedTags = useMemo(() => {
@@ -421,8 +438,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   title={t('filters.genre', 'Žanr')}
                   icon={<Bookmark size={12} />}
                   items={genreItems}
-                  selectedValues={effectiveSelectedGenre ? [effectiveSelectedGenre] : []}
-                  onToggle={(val) => onGenreChange(effectiveSelectedGenre === val ? null : val)}
+                  selectedValues={selectedGenreItemValue ? [selectedGenreItemValue] : []}
+                  onToggle={(val) => onGenreChange(selectedGenreItemValue === val ? null : val)}
                   searchPlaceholder={t('filters.searchGenre', 'Otsi žanrit...')}
                 />
               )}
@@ -445,8 +462,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   title={t('filters.type', 'Tüüp')}
                   icon={<FileType size={12} />}
                   items={typeItems}
-                  selectedValues={effectiveSelectedType ? [effectiveSelectedType] : []}
-                  onToggle={(val) => onTypeChange(effectiveSelectedType === val ? null : val)}
+                  selectedValues={selectedTypeItemValue ? [selectedTypeItemValue] : []}
+                  onToggle={(val) => onTypeChange(selectedTypeItemValue === val ? null : val)}
                   searchPlaceholder={t('filters.searchType', 'Otsi tüüpi...')}
                 />
               )}
