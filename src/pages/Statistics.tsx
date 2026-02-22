@@ -53,7 +53,7 @@ const Statistics: React.FC = () => {
           body: JSON.stringify({
             q: '',
             limit: 0,
-            facets: ['teose_staatus', 'aasta', 'work_id'],
+            facets: ['teose_staatus', 'year', 'work_id'],
             filter: filter.length > 0 ? filter : undefined
           })
         });
@@ -80,7 +80,7 @@ const Statistics: React.FC = () => {
         setStatusData(statusArray);
 
         // Year distribution
-        const yearFacets = statusResult.facetDistribution?.aasta || {};
+        const yearFacets = statusResult.facetDistribution?.year || {};
         const yearArray: YearCount[] = Object.entries(yearFacets)
           .map(([year, count]) => ({ year: parseInt(year), count: count as number }))
           .filter(y => y.year > 1600 && y.year < 1800)
