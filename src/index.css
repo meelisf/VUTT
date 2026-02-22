@@ -127,6 +127,44 @@ hr.page-break::before {
 }
 
 
+/* Dual range slider (Statistics page) */
+.dual-range-input {
+  position: absolute;
+  width: 100%;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
+}
+.dual-range-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: all;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: #0284c7;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+}
+.dual-range-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  background: #0369a1;
+}
+.dual-range-input::-moz-range-thumb {
+  pointer-events: all;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #0284c7;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  cursor: grab;
+}
+.dual-range-input::-webkit-slider-runnable-track,
+.dual-range-input::-moz-range-track {
+  background: transparent;
+}
+
 /* 4. General Reader Typography */
 .markdown-preview p {
   margin-bottom: 1rem;

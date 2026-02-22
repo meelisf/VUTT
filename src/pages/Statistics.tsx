@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getGenreFacets } from '../services/meiliService';
 
 interface StatusCount {
   name: string;
@@ -20,77 +22,80 @@ interface YearCount {
 }
 
 const Statistics: React.FC = () => {
-  const { t } = useTranslation(['statistics', 'common']);
+  const { t, i18n } = useTranslation(['statistics', 'common']);
   const { selectedCollection, getCollectionName, collections } = useCollection();
+  const navigate = useNavigate();
+  const lang = i18n.language.split('-')[0] as 'et' | 'en';
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [totalPages, setTotalPages] = useState(0);
   const [totalWorks, setTotalWorks] = useState(0);
   const [statusData, setStatusData] = useState<StatusCount[]>([]);
-  const [yearData, setYearData] = useState<YearCount[]>([]);
 
+  // Žanrifilter
+  const [genres, setGenres] = useState<{ value: string; count: number }[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+
+  // Globaalne aasta vahemik — kogu projekt, laetakse üks kord
+  const [globalMinYear, setGlobalMinYear] = useState(0);
+  const [globalMaxYear, setGlobalMaxYear] = useState(0);
+
+  // Ajajoon — täidetud tühjade aastatega (globalMin..globalMax)
+  const [worksYearData, setWorksYearData] = useState<YearCount[]>([]);
+
+  // Slaiduri valik (tegelikud aastad)
+  const [yearFrom, setYearFrom] = useState(0);
+  const [yearTo, setYearTo] = useState(0);
+  const [yearFromInput, setYearFromInput] = useState('');
+  const [yearToInput, setYearToInput] = useState('');
+
+  const meiliHeaders = useMemo<Record<string, string>>(() => {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (MEILI_API_KEY) h['Authorization'] = `Bearer ${MEILI_API_KEY}`;
+    return h;
+  }, []);
+
+  // KPI + staatuse päring (kollektsioon + žanr)
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
       try {
-        // Fetch status facets
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json'
-        };
-        if (MEILI_API_KEY) {
-          headers['Authorization'] = `Bearer ${MEILI_API_KEY}`;
-        }
-
-        // Ehita filter - kollektsiooni filter kui valitud
         const filter: string[] = [];
-        if (selectedCollection) {
-          filter.push(`collections_hierarchy = "${selectedCollection}"`);
-        }
+        if (selectedCollection) filter.push(`collections_hierarchy = "${selectedCollection}"`);
+        if (selectedGenre) filter.push(`genre_${lang} = "${selectedGenre}"`);
 
         const statusResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
           method: 'POST',
-          headers,
+          headers: meiliHeaders,
           body: JSON.stringify({
             q: '',
             limit: 0,
-            facets: ['teose_staatus', 'year', 'work_id'],
+            facets: ['teose_staatus', 'work_id'],
             filter: filter.length > 0 ? filter : undefined
           })
         });
-
         const statusResult = await statusResponse.json();
 
-        // Status breakdown
         const statusFacets = statusResult.facetDistribution?.teose_staatus || {};
-
-        // Total pages - arvutame facetide summast (täpsem kui estimatedTotalHits)
         const totalFromFacets = Object.values(statusFacets).reduce((sum: number, val) => sum + (val as number), 0);
         setTotalPages(totalFromFacets || statusResult.estimatedTotalHits || 0);
+
         const statusColors: Record<string, string> = {
           'Valmis': '#16a34a',
           'Töös': '#ca8a04',
           'Toores': '#9ca3af'
         };
+        setStatusData(
+          Object.entries(statusFacets).map(([name, value]) => ({
+            name,
+            value: value as number,
+            color: statusColors[name] || '#6b7280'
+          }))
+        );
 
-        const statusArray: StatusCount[] = Object.entries(statusFacets).map(([name, value]) => ({
-          name,
-          value: value as number,
-          color: statusColors[name] || '#6b7280'
-        }));
-        setStatusData(statusArray);
-
-        // Year distribution
-        const yearFacets = statusResult.facetDistribution?.year || {};
-        const yearArray: YearCount[] = Object.entries(yearFacets)
-          .map(([year, count]) => ({ year: parseInt(year), count: count as number }))
-          .filter(y => y.year > 1600 && y.year < 1800)
-          .sort((a, b) => a.year - b.year);
-        setYearData(yearArray);
-
-        // Works count - unikaalsete work_id-de arv facetist
         const worksFacets = statusResult.facetDistribution?.work_id || {};
         setTotalWorks(Object.keys(worksFacets).length);
-
       } catch (error) {
         console.error('Statistics fetch error:', error);
       } finally {
@@ -99,7 +104,138 @@ const Statistics: React.FC = () => {
     };
 
     fetchStats();
-  }, [selectedCollection]);
+  }, [selectedCollection, selectedGenre, lang, meiliHeaders]);
+
+  // Žanride päring
+  useEffect(() => {
+    const fetchGenres = async () => {
+      const result = await getGenreFacets(selectedCollection || undefined, lang);
+      setGenres(result);
+      if (selectedGenre && !result.find(g => g.value === selectedGenre)) {
+        setSelectedGenre(null);
+      }
+    };
+    fetchGenres();
+  }, [selectedCollection, lang]);
+
+  // Ajajoone päring — vahemik ja andmed järjestikku (väldib race condition'it)
+  useEffect(() => {
+    const fetchTimeline = async () => {
+      setIsTimelineLoading(true);
+      try {
+        const collectionFilter = selectedCollection
+          ? `collections_hierarchy = "${selectedCollection}"`
+          : null;
+
+        // Samm 1: kollektsiooni aasta vahemik (žanrita — annab täpse min/max)
+        const rangeFilter = ['lehekylje_number = 1'];
+        if (collectionFilter) rangeFilter.push(collectionFilter);
+
+        const rangeResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
+          method: 'POST',
+          headers: meiliHeaders,
+          body: JSON.stringify({ q: '', limit: 0, facets: ['year'], filter: rangeFilter })
+        });
+        const rangeResult = await rangeResponse.json();
+        const rangeYears = Object.keys(rangeResult.facetDistribution?.year || {})
+          .map(Number).filter(y => y > 1400 && y < 1900);
+
+        if (rangeYears.length === 0) {
+          setWorksYearData([]);
+          setIsTimelineLoading(false);
+          return;
+        }
+
+        const gMin = Math.min(...rangeYears);
+        const gMax = Math.max(...rangeYears);
+        setGlobalMinYear(gMin);
+        setGlobalMaxYear(gMax);
+        setYearFrom(gMin);
+        setYearTo(gMax);
+        setYearFromInput(String(gMin));
+        setYearToInput(String(gMax));
+
+        // Samm 2: andmed sama vahemiku jaoks (nüüd ka žanrifiltriga)
+        const dataFilter = ['lehekylje_number = 1'];
+        if (collectionFilter) dataFilter.push(collectionFilter);
+        if (selectedGenre) dataFilter.push(`genre_${lang} = "${selectedGenre}"`);
+
+        const dataResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
+          method: 'POST',
+          headers: meiliHeaders,
+          body: JSON.stringify({ q: '', limit: 0, facets: ['year'], filter: dataFilter })
+        });
+        const dataResult = await dataResponse.json();
+
+        const rawData: YearCount[] = Object.entries(dataResult.facetDistribution?.year || {})
+          .map(([year, count]) => ({ year: parseInt(year), count: count as number }))
+          .filter(y => y.year > 1400 && y.year < 1900);
+
+        // Täida tühjad aastad nullidega — vahemik teada eelmisest päringust
+        const filled: YearCount[] = [];
+        for (let y = gMin; y <= gMax; y++) {
+          filled.push({ year: y, count: rawData.find(d => d.year === y)?.count || 0 });
+        }
+        setWorksYearData(filled);
+      } catch (error) {
+        console.error('Timeline fetch error:', error);
+      } finally {
+        setIsTimelineLoading(false);
+      }
+    };
+
+    fetchTimeline();
+  }, [selectedCollection, selectedGenre, lang, meiliHeaders]);
+
+  // Kuvatav alamhulk (slaiduri vahemik)
+  const displayedData = useMemo(
+    () => worksYearData.filter(d => d.year >= yearFrom && d.year <= yearTo),
+    [worksYearData, yearFrom, yearTo]
+  );
+
+  // Slaiduri protsendid teerajoonele
+  const range = Math.max(1, globalMaxYear - globalMinYear);
+  const fromPct = ((yearFrom - globalMinYear) / range) * 100;
+  const toPct = ((yearTo - globalMinYear) / range) * 100;
+
+  // Numbrivälja muutus → yearFrom/yearTo uuendus
+  const handleYearFromInput = (val: string) => {
+    setYearFromInput(val);
+    const year = parseInt(val);
+    if (!isNaN(year) && year >= globalMinYear && year < yearTo) {
+      setYearFrom(year);
+    }
+  };
+
+  const handleYearToInput = (val: string) => {
+    setYearToInput(val);
+    const year = parseInt(val);
+    if (!isNaN(year) && year <= globalMaxYear && year > yearFrom) {
+      setYearTo(year);
+    }
+  };
+
+  // Slaiduri muutus → numbriväljade uuendus
+  const handleFromSlider = (val: number) => {
+    const v = Math.min(val, yearTo - 1);
+    setYearFrom(v);
+    setYearFromInput(String(v));
+  };
+
+  const handleToSlider = (val: number) => {
+    const v = Math.max(val, yearFrom + 1);
+    setYearTo(v);
+    setYearToInput(String(v));
+  };
+
+  // Tulba klikk → Dashboard, kus vastav aasta ja žanr valitud
+  const handleBarClick = (data: YearCount) => {
+    const params = new URLSearchParams();
+    params.set('ys', String(data.year));
+    params.set('ye', String(data.year));
+    if (selectedGenre) params.set('genre', selectedGenre);
+    navigate(`/?${params.toString()}`);
+  };
 
   const completedPages = statusData.find(d => d.name === 'Valmis')?.value || 0;
   const progressPercentage = totalPages > 0 ? Math.round((completedPages / totalPages) * 100) : 0;
@@ -121,7 +257,7 @@ const Statistics: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
 
-        {/* Collection Filter Indicator */}
+        {/* Kollektsiooni filter indikaator */}
         {selectedCollection && (() => {
           const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
           return (
@@ -135,119 +271,245 @@ const Statistics: React.FC = () => {
           );
         })()}
 
-        {/* KPI Cards */}
+        {/* KPI kaardid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
-                  <BookOpen size={16} />
-                  {t('kpi.totalWorks')}
-                </h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalWorks.toLocaleString()}</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
-                  <FileText size={16} />
-                  {t('kpi.totalVolume')}
-                </h3>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-lg text-gray-400 font-normal">{t('kpi.pages')}</span></p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.readiness')}</h3>
-                <p className="text-3xl font-bold text-green-600 mt-2">{progressPercentage}%</p>
-            </div>
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.avgPages')}</h3>
-                <p className="text-3xl font-bold text-primary-600 mt-2">
-                  {totalWorks > 0 ? Math.round(totalPages / totalWorks) : 0}
-                  <span className="text-lg text-gray-400 font-normal"> {t('kpi.perWork')}</span>
-                </p>
-            </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+              <BookOpen size={16} />
+              {t('kpi.totalWorks')}
+            </h3>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{totalWorks.toLocaleString()}</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+              <FileText size={16} />
+              {t('kpi.totalVolume')}
+            </h3>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-lg text-gray-400 font-normal">{t('kpi.pages')}</span></p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.readiness')}</h3>
+            <p className="text-3xl font-bold text-green-600 mt-2">{progressPercentage}%</p>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.avgPages')}</h3>
+            <p className="text-3xl font-bold text-primary-600 mt-2">
+              {totalWorks > 0 ? Math.round(totalPages / totalWorks) : 0}
+              <span className="text-lg text-gray-400 font-normal"> {t('kpi.perWork')}</span>
+            </p>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Status Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col min-h-[400px]">
-                <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <PieChartIcon size={20} className="text-gray-400"/>
-                    {t('charts.pageStatus')}
-                </h2>
-                {statusData.length > 0 ? (
-                  <>
-                    <div className="flex-1">
-                        <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                            <Pie
-                            data={statusData as { name: string; value: number }[]}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={80}
-                            outerRadius={120}
-                            paddingAngle={5}
-                            dataKey="value"
-                            label={({ name, percent }) => `${t(`common:status.${name}`)} ${(percent * 100).toFixed(0)}%`}
-                            >
-                            {statusData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                            </Pie>
-                            <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <div className="flex justify-center gap-4 text-xs font-bold text-gray-500 mt-4 flex-wrap">
-                        {statusData.map(item => (
-                        <div key={item.name} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
-                            <span className="w-3 h-3 rounded-full" style={{backgroundColor: item.color}}></span>
-                            {t(`common:status.${item.name}`)}: {item.value.toLocaleString()}
-                        </div>
-                        ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-400">
-                    {t('common:labels.noData')}
-                  </div>
-                )}
-            </div>
-
-            {/* Year Distribution Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col min-h-[400px]">
-                <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-                    <BarChart3 size={20} className="text-gray-400"/>
-                    {t('charts.byYear')}
-                </h2>
-                {yearData.length > 0 ? (
-                  <>
-                    <div className="flex-1">
-                        <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={yearData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                            <XAxis
-                              dataKey="year"
-                              axisLine={false}
-                              tickLine={false}
-                              tick={{fontSize: 11, fill: '#6b7280'}}
-                              interval={Math.floor(yearData.length / 10)}
-                            />
-                            <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                            <Tooltip
-                              cursor={{fill: '#f0f9ff'}}
-                              contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                              formatter={(value: number) => [value.toLocaleString(), t('kpi.pages')]}
-                            />
-                            <Bar dataKey="count" fill="#0284c7" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <p className="text-center text-sm text-gray-500 mt-4">{t('charts.pagesByYear')}</p>
-                  </>
-                ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-400">
-                    {t('common:labels.noData')}
-                  </div>
-                )}
-            </div>
+        {/* Žanrifilter */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-start gap-4">
+          <div className="flex items-center gap-2 text-gray-500 shrink-0 pt-1">
+            <Tag size={16} />
+            <span className="text-sm font-medium">{t('genre.label')}:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelectedGenre(null)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                selectedGenre === null
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {t('genre.allGenres')}
+            </button>
+            {genres.map(g => (
+              <button
+                key={g.value}
+                onClick={() => setSelectedGenre(selectedGenre === g.value ? null : g.value)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  selectedGenre === g.value
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {g.value} <span className="opacity-60">({g.count})</span>
+              </button>
+            ))}
+          </div>
         </div>
+
+        {/* Teosed aastate kaupa — täislaiuslik graafik */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <BarChart3 size={20} className="text-gray-400" />
+              {t('charts.worksByYear')}
+              {selectedGenre && (
+                <span className="text-primary-600 font-normal text-base ml-1">— {selectedGenre}</span>
+              )}
+            </h2>
+            {/* Täpne aasta sisestus */}
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>{t('charts.yearFrom')}</span>
+              <input
+                type="number"
+                value={yearFromInput}
+                onChange={e => handleYearFromInput(e.target.value)}
+                onBlur={() => setYearFromInput(String(yearFrom))}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+              <span>{t('charts.yearTo')}</span>
+              <input
+                type="number"
+                value={yearToInput}
+                onChange={e => handleYearToInput(e.target.value)}
+                onBlur={() => setYearToInput(String(yearTo))}
+                className="w-20 px-2 py-1 border border-gray-300 rounded text-sm text-center focus:outline-none focus:ring-1 focus:ring-primary-500"
+              />
+            </div>
+          </div>
+
+          {isTimelineLoading ? (
+            <div className="h-64 flex items-center justify-center">
+              <Loader2 className="animate-spin text-gray-400" size={32} />
+            </div>
+          ) : displayedData.length > 0 ? (
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={displayedData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                  <XAxis
+                    dataKey="year"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#6b7280' }}
+                    interval={Math.max(0, Math.floor(displayedData.length / 12))}
+                  />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: '#9ca3af' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    cursor={{ fill: '#f0f9ff' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    formatter={(value: number) => [value.toLocaleString(), t('charts.works')]}
+                    labelFormatter={(label) => String(label)}
+                  />
+                  <Bar
+                    dataKey="count"
+                    fill="#0284c7"
+                    radius={[3, 3, 0, 0]}
+                    maxBarSize={40}
+                    cursor="pointer"
+                    onClick={(data: YearCount) => { if (data.count > 0) handleBarClick(data); }}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-400">
+              {t('common:labels.noData')}
+            </div>
+          )}
+
+          {/* Dual range slider */}
+          {globalMinYear > 0 && (
+            <div className="px-2 mt-5 mb-1">
+              {/* Teerajoon + käepidemed */}
+              <div className="relative" style={{ height: '20px' }}>
+                {/* Teerajoon taust */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 bg-gray-200 rounded-full" />
+                {/* Valitud vahemiku esiletõstus */}
+                <div
+                  className="absolute top-1/2 -translate-y-1/2 h-1.5 bg-primary-400 rounded-full"
+                  style={{ left: `${fromPct}%`, right: `${100 - toPct}%` }}
+                />
+                {/* Alguse käepide */}
+                <input
+                  type="range"
+                  className="dual-range-input"
+                  min={globalMinYear}
+                  max={globalMaxYear}
+                  value={yearFrom}
+                  onChange={e => handleFromSlider(parseInt(e.target.value))}
+                />
+                {/* Lõpu käepide */}
+                <input
+                  type="range"
+                  className="dual-range-input"
+                  min={globalMinYear}
+                  max={globalMaxYear}
+                  value={yearTo}
+                  onChange={e => handleToSlider(parseInt(e.target.value))}
+                />
+              </div>
+              {/* Siltid + lähtesta nupp */}
+              <div className="flex justify-between items-center text-xs mt-2">
+                <span className="text-gray-400">{globalMinYear}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-primary-600 font-medium">{yearFrom} – {yearTo}</span>
+                  {(yearFrom !== globalMinYear || yearTo !== globalMaxYear) && (
+                    <button
+                      onClick={() => {
+                        setYearFrom(globalMinYear);
+                        setYearTo(globalMaxYear);
+                        setYearFromInput(String(globalMinYear));
+                        setYearToInput(String(globalMaxYear));
+                      }}
+                      className="text-gray-400 hover:text-gray-600 underline transition-colors"
+                    >
+                      {t('charts.resetRange')}
+                    </button>
+                  )}
+                </div>
+                <span className="text-gray-400">{globalMaxYear}</span>
+              </div>
+            </div>
+          )}
+
+          <p className="text-center text-sm text-gray-500 mt-3">{t('charts.worksByYearSub')}</p>
+        </div>
+
+        {/* Staatuse pirdiagramm */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+          <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <PieChartIcon size={20} className="text-gray-400" />
+            {t('charts.pageStatus')}
+          </h2>
+          {statusData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={statusData as { name: string; value: number }[]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={80}
+                      outerRadius={120}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${t(`common:status.${name}`)} ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  </PieChart>
+              </ResponsiveContainer>
+              <div className="flex justify-center gap-4 text-xs font-bold text-gray-500 mt-4 flex-wrap">
+                {statusData.map(item => (
+                  <div key={item.name} className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
+                    {t(`common:status.${item.name}`)}: {item.value.toLocaleString()} {t('kpi.pages')}
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="h-48 flex items-center justify-center text-gray-400">
+              {t('common:labels.noData')}
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );

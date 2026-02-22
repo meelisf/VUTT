@@ -11,9 +11,19 @@
     "perWork": "lk/teos",
     "pages": "lk"
   },
+  "genre": {
+    "allGenres": "Kõik žanrid",
+    "label": "Žanr"
+  },
   "charts": {
-    "pageStatus": "Teoste staatus",
+    "pageStatus": "Lehekülgede staatus",
     "byYear": "Leheküljed aastate kaupa",
-    "pagesByYear": "Lehekülgede jaotus trükiaasta järgi"
+    "pagesByYear": "Lehekülgede jaotus trükiaasta järgi",
+    "worksByYear": "Teosed aastate kaupa",
+    "worksByYearSub": "Teoste jaotus trükiaasta järgi",
+    "yearFrom": "Alates",
+    "yearTo": "Kuni",
+    "works": "teost",
+    "resetRange": "lähtesta valik"
   }
 }

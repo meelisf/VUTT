@@ -11,9 +11,19 @@
     "perWork": "pg/work",
     "pages": "pages"
   },
+  "genre": {
+    "allGenres": "All genres",
+    "label": "Genre"
+  },
   "charts": {
-    "pageStatus": "Works by status",
+    "pageStatus": "Pages by status",
     "byYear": "Pages by year",
-    "pagesByYear": "Page distribution by printing year"
+    "pagesByYear": "Page distribution by printing year",
+    "worksByYear": "Works by year",
+    "worksByYearSub": "Distribution of works by printing year",
+    "yearFrom": "From",
+    "yearTo": "To",
+    "works": "works",
+    "resetRange": "reset selection"
   }
 }
