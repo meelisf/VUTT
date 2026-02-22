@@ -291,7 +291,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
   const effectiveSelectedGenre = useMemo(() => {
     if (!selectedGenre) return null;
-    if (genreItems.some(item => item.value === selectedGenre)) return selectedGenre;
+    const found = genreItems.find(item => item.value === selectedGenre);
+    if (found) return found.label;
     // Q-kood → label (Wikidata žanrid)
     if (genreIdMap?.[selectedGenre]) return genreIdMap[selectedGenre];
     // Vocabulary-põhine tõlge (vocabularies-is defineeritud žanrid)
@@ -300,7 +301,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
   const effectiveSelectedType = useMemo(() => {
     if (!selectedType) return null;
-    if (typeItems.some(item => item.value === selectedType)) return selectedType;
+    const found = typeItems.find(item => item.value === selectedType);
+    if (found) return found.label;
     // Q-kood → label (Wikidata tüübid)
     if (typeIdMap?.[selectedType]) return typeIdMap[selectedType];
     // Vocabulary-põhine fallback
