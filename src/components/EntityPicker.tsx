@@ -230,10 +230,17 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             source: 'viaf',
             labels: { et: result.label }
         };
+    } else if (result.isLocal) {
+        // Kohalik seotud valik — kasuta kohalikku labeli, ära kirjuta Wikidataga üle
+        // (kohalik register on kanooniline allikas, Wikidata võib olla aegunud)
+        entity = {
+            id: result.id,
+            label: result.label,
+            source: 'wikidata',
+            labels: { et: result.label }
+        };
     } else {
-        // Wikidata või Kohalik SEOTUD valik
-        // Igal juhul pärime Wikidatast värsked labelid, et tagada andmete kvaliteet
-        // (või kui see on kohalik ja meil pole võrguühendust, võiks fallbackida)
+        // Wikidata otsing — päri värsked labelid
         let multilingualLabels: Record<string, string> = { et: result.label };
         try {
             multilingualLabels = await getEntityLabels(result.id);
@@ -243,7 +250,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
         entity = {
             id: result.id,
-            label: result.label, // Kasutame valitud labelit (võib olla kohalik)
+            label: result.label,
             source: 'wikidata',
             labels: multilingualLabels
         };
