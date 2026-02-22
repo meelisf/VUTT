@@ -169,16 +169,19 @@ const Dashboard: React.FC = () => {
       if (!obj) continue;
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
-        if (!item?.labels) continue;
-        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        if (!item) continue;
+        const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+        if (!rawLabel) continue;
         const currentLabel = cap(rawLabel);
         // Q-kood → praeguse keele label (suurtähega, nagu facetis)
         if (item.id) map[item.id] = currentLabel;
         // Teise keele labelid → praeguse keele label (mõlemad variandid)
-        for (const labelVal of Object.values(item.labels)) {
-          if (labelVal) {
-            map[labelVal] = currentLabel;
-            map[cap(labelVal)] = currentLabel;
+        if (item.labels) {
+          for (const labelVal of Object.values(item.labels)) {
+            if (labelVal) {
+              map[labelVal as string] = currentLabel;
+              map[cap(labelVal as string)] = currentLabel;
+            }
           }
         }
         if (item.label) {
@@ -199,11 +202,13 @@ const Dashboard: React.FC = () => {
       if (!obj) continue;
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
-        if (item?.id && item?.labels) {
-          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
-          // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
-          map[rawLabel] = item.id;
-          map[cap(rawLabel)] = item.id;
+        if (item?.id) {
+          const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+          if (rawLabel) {
+            // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
+            map[rawLabel] = item.id;
+            map[cap(rawLabel)] = item.id;
+          }
         }
       }
     }
@@ -246,11 +251,13 @@ const Dashboard: React.FC = () => {
       const objs = work.tags_object;
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
-        if (item?.id && item?.labels) {
-          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
-          // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
-          map[rawLabel] = item.id;
-          map[cap(rawLabel)] = item.id;
+        if (item?.id) {
+          const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+          if (rawLabel) {
+            // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
+            map[rawLabel] = item.id;
+            map[cap(rawLabel)] = item.id;
+          }
         }
       }
     }
