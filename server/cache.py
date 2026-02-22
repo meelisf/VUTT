@@ -10,6 +10,7 @@ from datetime import datetime
 from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE
 from .people_ops import load_people_data
 from .utils import get_label, get_id, get_primary_labels, get_labels_by_lang
+from .meilisearch_ops import load_labels_store
 
 # =========================================================
 # CACHE: Collections, Vocabularies ja Suggestions
@@ -147,6 +148,8 @@ def get_cached_people_register():
 def _build_suggestions(preferred_lang):
     authors, tags, places, printers, types, genres = {}, {}, {}, {}, {}, {}
     seen_ids = {}
+    # Kanooniilised labelid — ületavad _metadata.json labeli (nt Q861911 → "Oratsioon")
+    labels_store = load_labels_store()
 
     def add_item(store, val, store_name=''):
         if not val: return
@@ -160,9 +163,14 @@ def _build_suggestions(preferred_lang):
             id_code = val.get('id')
             if id_code and (store_name, id_code) in seen_ids: return
             if id_code: seen_ids[(store_name, id_code)] = True
-            labels_dict = val.get('labels', {})
-            fallback_lang = 'en' if preferred_lang == 'et' else 'et'
-            label_text = labels_dict.get(preferred_lang) or labels_dict.get(fallback_lang) or val.get('label', '').strip()
+            # Kontrolli labels_store esmalt (kanooniline allikas)
+            if id_code and id_code in labels_store:
+                fallback_lang = 'en' if preferred_lang == 'et' else 'et'
+                label_text = labels_store[id_code].get(preferred_lang) or labels_store[id_code].get(fallback_lang, '')
+            else:
+                labels_dict = val.get('labels', {})
+                fallback_lang = 'en' if preferred_lang == 'et' else 'et'
+                label_text = labels_dict.get(preferred_lang) or labels_dict.get(fallback_lang) or val.get('label', '').strip()
             if label_text and isinstance(label_text, str):
                 label_text = label_text.strip()
                 key = label_text.lower()
