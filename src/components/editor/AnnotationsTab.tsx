@@ -361,7 +361,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
               <button
                 onClick={async () => {
                   try {
-                    const { text, title, author, year } = await getWorkFullText(work.id);
+                    const { text, title, author, year } = await getWorkFullText(work.work_id);
                     // Loome faili sisu päisega
                     const header = `${title}\n${author}${year ? `, ${year}` : ''}\n\n`;
                     const fullContent = header + text;

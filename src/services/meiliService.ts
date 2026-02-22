@@ -1096,7 +1096,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
@@ -1157,7 +1157,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collection'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
