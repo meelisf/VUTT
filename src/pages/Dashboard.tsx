@@ -797,8 +797,10 @@ const Dashboard: React.FC = () => {
                 yearEnd={parseInt(yearEnd) || undefined}
                 facets={facets}
                 genreIdMap={genreIdMap}
+                genreLabelToId={genreLabelToId}
                 tagsIdMap={tagsIdMap}
                 typeIdMap={typeIdMap}
+                typeLabelToId={typeLabelToId}
                 lang={i18n.language.split('-')[0] as 'et' | 'en'}
               />
             </div>

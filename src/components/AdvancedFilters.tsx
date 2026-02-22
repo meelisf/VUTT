@@ -42,10 +42,14 @@ interface AdvancedFiltersProps {
   facets?: FacetDistribution;
   // Q-kood → praeguse keele label kaart (Wikidata žanride jaoks)
   genreIdMap?: Record<string, string>;
+  // Label → Q-kood kaart (žanrite jaoks, Wikidatas muutunud labelite ühendamiseks)
+  genreLabelToId?: Record<string, string>;
   // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
   tagsIdMap?: Record<string, string>;
   // Q-kood → praeguse keele label kaart (Wikidata tüüpide jaoks)
   typeIdMap?: Record<string, string>;
+  // Label → Q-kood kaart (tüüpide jaoks)
+  typeLabelToId?: Record<string, string>;
   // Keel facetide jaoks
   lang?: 'et' | 'en';
 }
@@ -149,8 +153,10 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   defaultExpanded = false,
   facets,
   genreIdMap,
+  genreLabelToId,
   tagsIdMap,
   typeIdMap,
+  typeLabelToId,
   lang: propLang
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
@@ -210,23 +216,27 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     return map;
   }, [lang, vocabularies]);
 
-  // Abifunktsioon: ühenda facet-itemid, mis lahenduvad samale labelile (nt "Oratsioon" → "Oration")
-  // Meilisearchi facetis võivad esineda eestikeelsed fallback-labelid (ilma tõlketa teosed)
+  // Abifunktsioon: ühenda facet-itemid sama Q-koodi all
+  // Lahendab Wikidatas muutunud labelid: "Oratsioon" + "Kõne" → Q861911 (üks item)
   const mergeFacetItems = (
     items: FilterItem[],
-    idMap?: Record<string, string>
+    labelToId?: Record<string, string>,  // label → Q-kood
+    idToLabel?: Record<string, string>   // Q-kood → kuvatav label
   ): FilterItem[] => {
-    if (!idMap) return items;
     const merged = new Map<string, FilterItem>();
     for (const item of items) {
-      // Lahenda tegelik label (nt "Oratsioon" → "Oration" kui genreIdMap sisaldab seda)
-      const resolvedLabel = idMap[item.value] || item.label;
-      const existing = merged.get(resolvedLabel);
+      // Proovi lahendada Q-koodiks — üks kood tabab kõiki selle žanri labeli variante
+      const qCode = labelToId?.[item.value] || labelToId?.[item.value.charAt(0).toUpperCase() + item.value.slice(1).toLowerCase()];
+      // Grupeeri Q-koodi järgi (stabiilne ID), muidu labeli järgi
+      const groupKey = qCode || item.value;
+      // Kuvatav label: Q-koodi praegune label, muidu originaal
+      const displayLabel = (qCode && idToLabel?.[qCode]) || idToLabel?.[item.value] || item.value;
+      const existing = merged.get(groupKey);
       if (existing) {
-        // Liida arv, kasuta lahendatud labeli väärtust
         existing.count += item.count;
       } else {
-        merged.set(resolvedLabel, { value: resolvedLabel, label: resolvedLabel, count: item.count });
+        // value = Q-kood → filtreerimisel kasutatakse genre_ids, mitte genre_et stringi
+        merged.set(groupKey, { value: qCode || item.value, label: displayLabel, count: item.count });
       }
     }
     return Array.from(merged.values());
@@ -244,9 +254,9 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         count,
         label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
       }));
-    return mergeFacetItems(raw, genreIdMap)
+    return mergeFacetItems(raw, genreLabelToId, genreIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies, genreIdMap]);
+  }, [facets, lang, vocabularies, genreLabelToId, genreIdMap]);
 
   const tagItems = useMemo<FilterItem[]>(() => {
     const tagsKey = `tags_${lang}` as keyof FacetDistribution;
@@ -274,9 +284,9 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         count,
         label: vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
       }));
-    return mergeFacetItems(raw, typeIdMap)
+    return mergeFacetItems(raw, typeLabelToId, typeIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies, typeIdMap]);
+  }, [facets, lang, vocabularies, typeLabelToId, typeIdMap]);
 
   // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
   const effectiveSelectedGenre = useMemo(() => {

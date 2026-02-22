@@ -33,7 +33,7 @@ import time
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PEOPLE_FILE
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PEOPLE_FILE, LABELS_FILE
 from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,
@@ -83,6 +83,17 @@ def load_people_aliases():
     if os.path.exists(PEOPLE_FILE):
         try:
             with open(PEOPLE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def load_labels_store():
+    """Laeb kanooniilise Q-koodi → label registri (state/labels.json)."""
+    if os.path.exists(LABELS_FILE):
+        try:
+            with open(LABELS_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except:
             pass
@@ -326,8 +337,9 @@ def sync_work_to_meilisearch(dir_name):
         print(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
         work_id = slug  # Fallback slugile
 
-    # Lae inimeste aliased ÜKS KORD enne tsüklit (mitte iga lehe kohta!)
+    # Lae inimeste aliased ja kanooniilised labelid ÜKS KORD enne tsüklit
     people_data = load_people_aliases()
+    labels_store = load_labels_store()
 
     for i, img_name in enumerate(images):
         page_num = i + 1
@@ -401,9 +413,9 @@ def sync_work_to_meilisearch(dir_name):
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],
-            "page_tags": get_primary_labels(page_tags_data),          # Eesti label, capitalize_first (teose tags-iga ühtlane)
-            "page_tags_et": get_labels_by_lang(page_tags_data, 'et'), # Eesti label, capitalize_first
-            "page_tags_en": get_labels_by_lang(page_tags_data, 'en'), # Inglise label, capitalize_first
+            "page_tags": get_primary_labels(page_tags_data),                          # Eesti label, capitalize_first (teose tags-iga ühtlane)
+            "page_tags_et": get_labels_by_lang(page_tags_data, 'et', labels_store), # Eesti label, capitalize_first
+            "page_tags_en": get_labels_by_lang(page_tags_data, 'en', labels_store), # Inglise label, capitalize_first
             "page_tags_ids": get_all_ids(page_tags_data),              # Q-koodid (filtreeritav, nagu tags_ids)
             "page_tags_suggest_et": [
                 f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}"
@@ -418,8 +430,8 @@ def sync_work_to_meilisearch(dir_name):
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
             "tags": get_primary_labels(tags),
-            "tags_et": get_labels_by_lang(tags, 'et'),
-            "tags_en": get_labels_by_lang(tags, 'en'),
+            "tags_et": get_labels_by_lang(tags, 'et', labels_store),
+            "tags_en": get_labels_by_lang(tags, 'en', labels_store),
             "tags_object": tags,
             "tags_search": get_all_labels(tags),
             "tags_ids": get_all_ids(tags),
@@ -434,14 +446,14 @@ def sync_work_to_meilisearch(dir_name):
             "publisher_id": get_id(publisher),
             "publisher_search": get_all_labels(publisher) + publisher_aliases,
             "genre": get_label(genre),
-            "genre_et": get_labels_by_lang(genre, 'et'),
-            "genre_en": get_labels_by_lang(genre, 'en'),
+            "genre_et": get_labels_by_lang(genre, 'et', labels_store),
+            "genre_en": get_labels_by_lang(genre, 'en', labels_store),
             "genre_object": genre,
             "genre_search": get_all_labels(genre),
             "genre_ids": get_all_ids(genre),
             "type": get_label(work_type),
-            "type_et": get_labels_by_lang(work_type, 'et'),
-            "type_en": get_labels_by_lang(work_type, 'en'),
+            "type_et": get_labels_by_lang(work_type, 'et', labels_store),
+            "type_en": get_labels_by_lang(work_type, 'en', labels_store),
             "type_object": work_type,
             "type_ids": get_all_ids(work_type),
             "languages": languages,

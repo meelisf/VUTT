@@ -257,31 +257,42 @@ def get_primary_labels(value):
     return labels
 
 
-def get_labels_by_lang(value, lang):
-    """Tagastab sildid konkreetses keeles (või fallback)."""
+def get_labels_by_lang(value, lang, labels_store=None):
+    """Tagastab sildid konkreetses keeles (või fallback).
+
+    Args:
+        value: LinkedEntity objekt, string või nende massiiv
+        lang: keelekood ('et', 'en', jne)
+        labels_store: kanooniline Q-koodi → label register (state/labels.json)
+    """
     if not value:
         return []
-    
+
     values = value if isinstance(value, list) else [value]
     labels = []
-    
+
     for val in values:
         if isinstance(val, str):
             # Stringi puhul ei tea keelt, tagastame alati (eeldades et on primaarne)
             labels.append(capitalize_first(val))
         elif isinstance(val, dict):
             label = None
-            # Otsi konkreetses keeles
-            if val.get('labels') and isinstance(val['labels'], dict):
-                label = val['labels'].get(lang)
-            
-            # Fallback: primaarne label
-            if not label:
-                label = val.get('label')
-            
+            qcode = val.get('id', '')
+            # Kontrolli labels_store esmalt (kanooniline allikas — ületab _metadata.json labeli)
+            if labels_store and qcode and qcode in labels_store:
+                label = labels_store[qcode].get(lang) or labels_store[qcode].get('et')
+            else:
+                # Fallback: _metadata.json labels objekt
+                if val.get('labels') and isinstance(val['labels'], dict):
+                    label = val['labels'].get(lang)
+
+                # Fallback: primaarne label
+                if not label:
+                    label = val.get('label')
+
             if label:
                 labels.append(capitalize_first(label))
-                
+
     return labels
 
 
