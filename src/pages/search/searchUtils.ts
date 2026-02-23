@@ -9,6 +9,12 @@ export const getImageUrl = (imagePath: string): string => {
     return `${IMAGE_BASE_URL}/${encodeURI(cleanPath)}`;
 };
 
+export const getPageThumbUrl = (workId: string, imagePath: string): string => {
+    if (!workId || !imagePath) return '';
+    const filename = imagePath.split('/').pop() || '';
+    return `${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${filename}`;
+};
+
 export const getAuthorDisplay = (hit: ContentSearchHit, t: (key: string) => string): string => {
     if (hit.creators && hit.creators.length > 0) {
         // Prioriteet: praeses > auctor > esimene

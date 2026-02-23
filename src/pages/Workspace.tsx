@@ -588,6 +588,7 @@ const Workspace: React.FC = () => {
             loading={gridLoading}
             onSelectPage={handleSelectFromGrid}
             onClose={() => setIsGridView(false)}
+            work={work}
           />
         )}
 

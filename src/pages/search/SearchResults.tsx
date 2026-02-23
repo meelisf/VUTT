@@ -6,7 +6,7 @@ import { Vocabularies, getCollectionColorClasses } from '../../services/collecti
 import { searchWorkHits } from '../../services/meiliService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getLabel } from '../../utils/metadataUtils';
-import { getImageUrl, getAuthorDisplay } from './searchUtils';
+import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
@@ -175,7 +175,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                             title={t('results.openWorkspaceTitle')}
                         >
                             <img
-                                src={getImageUrl(hit.lehekylje_pilt)}
+                                src={getPageThumbUrl(hit.work_id, hit.lehekylje_pilt)}
                                 alt=""
                                 loading="lazy"
                                 className="w-full h-full object-cover"

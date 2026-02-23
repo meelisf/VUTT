@@ -162,14 +162,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, onGridView }) => {
           >
             <RotateCcw size={20} />
           </button>
-          <div className="w-px bg-white/20 mx-1"></div>
-          <button
-            onClick={handleDownload}
-            className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-            title="Lae pilt alla"
-          >
-            <Download size={20} />
-          </button>
           {onGridView && (
             <>
               <div className="w-px bg-white/20 mx-1"></div>
@@ -182,6 +174,14 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, onGridView }) => {
               </button>
             </>
           )}
+          <div className="w-px bg-white/20 mx-1"></div>
+          <button
+            onClick={handleDownload}
+            className="p-2 text-white hover:bg-white/20 rounded transition-colors"
+            title="Lae pilt alla"
+          >
+            <Download size={20} />
+          </button>
         </div>
       </div>
 

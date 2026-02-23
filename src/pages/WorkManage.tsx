@@ -366,7 +366,7 @@ const WorkManage: React.FC = () => {
                     {/* Pisipilt */}
                     <div className="w-10 h-14 bg-gray-100 rounded overflow-hidden flex-shrink-0 border border-gray-200 flex items-center justify-center">
                       <img
-                        src={`${IMAGE_BASE_URL}/${page.lehekylje_pilt}`}
+                        src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}`}
                         alt={`Lk ${page.page_num}`}
                         className="w-full h-full object-cover"
                         loading="lazy"
