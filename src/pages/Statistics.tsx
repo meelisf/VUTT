@@ -469,11 +469,16 @@ const Statistics: React.FC = () => {
 
         {/* Staatuse pirdiagramm */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-            <PieChartIcon size={20} className="text-gray-400" />
+          <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 flex-wrap">
+            <PieChartIcon size={20} className="text-gray-400 shrink-0" />
             {selectedCollection
               ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection) })
               : t('charts.pageStatus')}
+            {selectedGenre && (
+              <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 text-sm font-medium rounded-full">
+                {selectedGenre}
+              </span>
+            )}
           </h2>
           {statusData.length > 0 ? (
             <>
