@@ -72,6 +72,7 @@ const Workspace: React.FC = () => {
   const [isGridView, setIsGridView] = useState(false);
   const [gridPages, setGridPages] = useState<{ pageNum: number; imageUrl: string }[]>([]);
   const [gridLoading, setGridLoading] = useState(false);
+  const [gridCols, setGridCols] = useState(5); // min 3, max 10 (vt ThumbnailGrid)
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -590,6 +591,8 @@ const Workspace: React.FC = () => {
             onSelectPage={handleSelectFromGrid}
             onClose={() => setIsGridView(false)}
             work={work}
+            cols={gridCols}
+            onColsChange={setGridCols}
           />
         )}
 
