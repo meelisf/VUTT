@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Download } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Download, LayoutGrid } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface ImageViewerProps {
   src: string;
+  onGridView?: () => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, onGridView }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -169,6 +170,18 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src }) => {
           >
             <Download size={20} />
           </button>
+          {onGridView && (
+            <>
+              <div className="w-px bg-white/20 mx-1"></div>
+              <button
+                onClick={onGridView}
+                className="p-2 text-white hover:bg-white/20 rounded transition-colors"
+                title="Kõik leheküljed"
+              >
+                <LayoutGrid size={20} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

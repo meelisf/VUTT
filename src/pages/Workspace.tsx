@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
-import { getPage, savePage, getWorkMetadata, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/meiliService';
+import { getPage, savePage, getWorkMetadata, checkPendingEdits, savePageAsPending, getWorkPageImages, PendingEditInfo } from '../services/meiliService';
 import type { Page, Work } from '../types';
 import { PageStatus } from '../types';
 import ImageViewer from '../components/ImageViewer';
+import ThumbnailGrid from '../components/ThumbnailGrid';
 import TextEditor from '../components/TextEditor';
 import ConfirmModal from '../components/ConfirmModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -65,6 +66,11 @@ const Workspace: React.FC = () => {
   // Kasutaja menüü ja login modaali olek
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  // Thumbnail grid-vaate olek
+  const [isGridView, setIsGridView] = useState(false);
+  const [gridPages, setGridPages] = useState<{ pageNum: number; imageUrl: string }[]>([]);
+  const [gridLoading, setGridLoading] = useState(false);
 
   const currentPageNum = parseInt(pageNum || '1', 10);
 
@@ -243,6 +249,20 @@ const Workspace: React.FC = () => {
       }
     }
   };
+
+  const handleOpenGridView = useCallback(async () => {
+    if (!work) return;
+    setIsGridView(true);
+    setGridLoading(true);
+    const pages = await getWorkPageImages(work.work_id, work.page_count);
+    setGridPages(pages);
+    setGridLoading(false);
+  }, [work]);
+
+  const handleSelectFromGrid = useCallback((pageNum: number) => {
+    setIsGridView(false);
+    navigate(`/work/${workId}/${pageNum}`);
+  }, [navigate, workId]);
 
   const navigatePage = useCallback((delta: number) => {
     if (!workId) return;
@@ -552,13 +572,24 @@ const Workspace: React.FC = () => {
         <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
           {page.image_url ? (
-            <ImageViewer src={page.image_url} />
+            <ImageViewer src={page.image_url} onGridView={handleOpenGridView} />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
               Pilt puudub
             </div>
           )}
         </div>
+
+        {/* Thumbnail grid overlay */}
+        {isGridView && (
+          <ThumbnailGrid
+            pages={gridPages}
+            currentPage={currentPageNum}
+            loading={gridLoading}
+            onSelectPage={handleSelectFromGrid}
+            onClose={() => setIsGridView(false)}
+          />
+        )}
 
         {/* Right: Text Editor */}
         <div className="w-full h-1/2 md:w-1/2 md:h-full bg-white relative flex flex-col">

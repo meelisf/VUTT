@@ -42,6 +42,13 @@ const getThumbUrl = (workId: string): string => {
   return `${IMAGE_BASE_URL}/${workId}/_thumb`;
 };
 
+// Lehekülje thumbnaili URL (_thumbs/ alamkataloogist)
+const getPageThumbUrl = (workId: string, imagePath: string): string => {
+  if (!workId || !imagePath) return '';
+  const filename = imagePath.split('/').pop() || '';
+  return `${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${filename}`;
+};
+
 // Check for Mixed Content (HTTPS vs HTTP)
 const checkMixedContent = () => {
   if (window.location.protocol === 'https:' && MEILI_HOST.startsWith('http:')) {
@@ -1311,6 +1318,31 @@ export const getAllTags = async (lang: string = 'et'): Promise<{ label: string; 
     return Array.from(uniqueTags.values()).sort((a, b) => a.label.localeCompare(b.label, lang));
   } catch (e) {
     console.error("Failed to fetch tags:", e);
+    return [];
+  }
+};
+
+// Kõigi teose lehtede thumbnailide URL-id grid-vaate jaoks
+export const getWorkPageImages = async (
+  workId: string,
+  pageCount: number
+): Promise<{ pageNum: number; imageUrl: string }[]> => {
+  checkMixedContent();
+  const limit = Math.min(Math.ceil(pageCount * 1.1) + 10, 1000);
+  try {
+    const response = await index.search('', {
+      filter: [`work_id = "${workId}"`],
+      attributesToRetrieve: ['lehekylje_number', 'lehekylje_pilt'],
+      limit,
+    });
+    const hits = response.hits as any[];
+    hits.sort((a, b) => (a.lehekylje_number || 0) - (b.lehekylje_number || 0));
+    return hits.map(hit => ({
+      pageNum: hit.lehekylje_number,
+      imageUrl: getPageThumbUrl(workId, hit.lehekylje_pilt || ''),
+    }));
+  } catch (e) {
+    console.error('getWorkPageImages error:', e);
     return [];
   }
 };

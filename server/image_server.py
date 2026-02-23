@@ -102,9 +102,9 @@ def generate_thumbnail(source_path, thumb_path, width=THUMB_WIDTH):
 
 
 def get_or_create_thumbnail(work_path):
-    """Tagastab thumbnaili tee, genereerides selle vajadusel.
+    """Tagastab teose esilehe thumbnaili tee, genereerides selle vajadusel.
 
-    Valideerib, et olemasolev thumbnail vastab praegusele esimesele lehele.
+    Thumbnailid salvestatakse _thumbs/ alamkataloogi (_thumb_NIMI.jpg).
     Kui esimene leht on muutunud, kustutab vana ja genereerib uue.
 
     Args:
@@ -119,32 +119,63 @@ def get_or_create_thumbnail(work_path):
         print(f"[THUMB] Kataloogis pole pilte: {work_path}")
         return None
 
-    first_image_name = os.path.basename(first_image)  # nt "0001.jpg" või "0001.png"
-    # Thumbnaili nimi alati .jpg, kuna generate_thumbnail salvestab JPEG-na
+    first_image_name = os.path.basename(first_image)
     thumb_base = os.path.splitext(first_image_name)[0]
     expected_thumb_name = f"_thumb_{thumb_base}.jpg"
-    expected_thumb_path = os.path.join(work_path, expected_thumb_name)
 
-    # 2. Leia olemasolevad thumbnailid
-    existing_thumbs = glob.glob(os.path.join(work_path, "_thumb_*.jpg"))
+    # Thumbnailid _thumbs/ alamkataloogis
+    thumbs_dir = os.path.join(work_path, '_thumbs')
+    expected_thumb_path = os.path.join(thumbs_dir, expected_thumb_name)
 
-    # 3. Kustuta vale lähtefailiga thumbnailid
-    for thumb in existing_thumbs:
-        if thumb != expected_thumb_path:
-            try:
-                os.remove(thumb)
-                print(f"[THUMB] Kustutatud aegunud: {thumb}")
-            except OSError as e:
-                print(f"[THUMB] Viga kustutamisel {thumb}: {e}")
+    # 2. Kustuta aegunud thumbnailid _thumbs/ kataloogist
+    if os.path.exists(thumbs_dir):
+        existing_thumbs = glob.glob(os.path.join(thumbs_dir, "_thumb_*.jpg"))
+        for thumb in existing_thumbs:
+            if thumb != expected_thumb_path:
+                try:
+                    os.remove(thumb)
+                    print(f"[THUMB] Kustutatud aegunud: {thumb}")
+                except OSError as e:
+                    print(f"[THUMB] Viga kustutamisel {thumb}: {e}")
 
-    # 4. Genereeri vajadusel
+    # 3. Genereeri vajadusel
     if not os.path.exists(expected_thumb_path):
+        os.makedirs(thumbs_dir, exist_ok=True)
         success = generate_thumbnail(first_image, expected_thumb_path)
         if not success:
             # Fallback: tagasta originaalpilt
             return first_image
 
     return expected_thumb_path
+
+
+def get_or_create_page_thumbnail(work_path, thumb_filename):
+    """Tagastab ühe lehekülje thumbnaili tee, genereerides selle vajadusel.
+
+    Args:
+        work_path: Teose kataloog
+        thumb_filename: Thumbnaili failinimi (nt "_thumb_slug_pg_001.jpg")
+
+    Returns:
+        Thumbnaili failitee või None kui lähtefail puudub
+    """
+    thumbs_dir = os.path.join(work_path, '_thumbs')
+    thumb_path = os.path.join(thumbs_dir, thumb_filename)
+
+    if not os.path.exists(thumb_path):
+        # Leia lähtefail: eemalda "_thumb_" prefiks
+        source_filename = thumb_filename[len('_thumb_'):]
+        source_path = os.path.join(work_path, source_filename)
+
+        if not os.path.exists(source_path):
+            return None
+
+        os.makedirs(thumbs_dir, exist_ok=True)
+        success = generate_thumbnail(source_path, thumb_path)
+        if not success:
+            return source_path  # Fallback: originaalpilt
+
+    return thumb_path
 
 
 class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -167,10 +198,17 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = urllib.parse.unquote(parsed.path)
         parts = [p for p in path.split('/') if p]
 
-        # Kontrolli, kas see on thumbnail päring: /{work_id}/_thumb
+        # Teose esilehe thumbnail: /{work_id}/_thumb
         if len(parts) == 2 and parts[1] == '_thumb':
             work_id = parts[0]
             self.serve_thumbnail(work_id)
+            return
+
+        # Lehekülje thumbnail: /{work_id}/_thumbs/_thumb_*.jpg
+        if len(parts) == 3 and parts[1] == '_thumbs' and parts[2].startswith('_thumb_'):
+            work_id = parts[0]
+            thumb_filename = parts[2]
+            self.serve_page_thumbnail(work_id, thumb_filename)
             return
 
         # Muu puhul kasuta vaikimisi käitumist
@@ -195,6 +233,30 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             with open(thumb_path, 'rb') as f:
                 content = f.read()
 
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Content-Length', len(content))
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            print(f"[THUMB] Viga serveerimisel {thumb_path}: {e}")
+            self.send_error(500, f"Viga faili lugemisel: {e}")
+
+    def serve_page_thumbnail(self, work_id, thumb_filename):
+        """Serveerib ühe lehekülje thumbnaili, genereerides selle vajadusel."""
+        work_path = find_directory_by_id(work_id)
+        if not work_path:
+            self.send_error(404, f"Teost ei leitud: {work_id}")
+            return
+
+        thumb_path = get_or_create_page_thumbnail(work_path, thumb_filename)
+        if not thumb_path or not os.path.exists(thumb_path):
+            self.send_error(404, f"Lehekülge ei leitud: {thumb_filename}")
+            return
+
+        try:
+            with open(thumb_path, 'rb') as f:
+                content = f.read()
             self.send_response(200)
             self.send_header('Content-Type', 'image/jpeg')
             self.send_header('Content-Length', len(content))
