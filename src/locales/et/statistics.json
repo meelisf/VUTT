@@ -17,6 +17,7 @@
   },
   "charts": {
     "pageStatus": "Lehekülgede staatus",
+    "pageStatusInCollection": "Lehekülgede staatus — {{collection}}",
     "byYear": "Leheküljed aastate kaupa",
     "pagesByYear": "Lehekülgede jaotus trükiaasta järgi",
     "worksByYear": "Teosed aastate kaupa",

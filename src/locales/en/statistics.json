@@ -17,6 +17,7 @@
   },
   "charts": {
     "pageStatus": "Pages by status",
+    "pageStatusInCollection": "Pages by status — {{collection}}",
     "byYear": "Pages by year",
     "pagesByYear": "Page distribution by printing year",
     "worksByYear": "Works by year",

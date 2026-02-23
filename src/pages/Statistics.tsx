@@ -471,7 +471,9 @@ const Statistics: React.FC = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
           <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
             <PieChartIcon size={20} className="text-gray-400" />
-            {t('charts.pageStatus')}
+            {selectedCollection
+              ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection) })
+              : t('charts.pageStatus')}
           </h2>
           {statusData.length > 0 ? (
             <>
