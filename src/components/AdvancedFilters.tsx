@@ -10,7 +10,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
-import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/meiliService';
+import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
 interface FacetItem {

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { searchContent, getWorkMetadata, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/meiliService';
+import { searchContent, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../services/searchService';
+import { getWorkMetadata } from '../services/workService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
 import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag } from 'lucide-react';

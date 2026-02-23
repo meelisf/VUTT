@@ -5,7 +5,7 @@ import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageS
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
-import { getWorkFullText, getAllTags } from '../../services/meiliService';
+import { getWorkFullText, getAllTags } from '../../services/searchService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';

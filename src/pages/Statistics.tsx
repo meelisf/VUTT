@@ -8,7 +8,7 @@ import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { getGenreFacets } from '../services/meiliService';
+import { getGenreFacets } from '../services/searchService';
 
 interface StatusCount {
   name: string;

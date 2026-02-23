@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
-import { getAllTags } from '../services/meiliService';
+import { getAllTags } from '../services/searchService';
 import { useUser } from '../contexts/UserContext';
 import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2 } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';

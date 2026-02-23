@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
-import { getPage, savePage, getWorkMetadata, checkPendingEdits, savePageAsPending, getWorkPageImages, PendingEditInfo } from '../services/meiliService';
+import { getPage, savePage, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/pageService';
+import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
 import { PageStatus } from '../types';
 import ImageViewer from '../components/ImageViewer';

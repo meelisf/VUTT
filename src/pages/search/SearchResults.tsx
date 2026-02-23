@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ContentSearchHit, ContentSearchResponse } from '../../types';
 import { Vocabularies, getCollectionColorClasses } from '../../services/collectionService';
-import { searchWorkHits } from '../../services/meiliService';
+import { searchWorkHits } from '../../services/searchService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getLabel } from '../../utils/metadataUtils';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
