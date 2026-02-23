@@ -587,7 +587,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         index.search(query, {
           filter,
           limit: STATS_LIMIT,
-          attributesToRetrieve: ['id', 'work_id', 'title', 'year', 'location', 'publisher', 'creators', 'genre_object', 'type_object', 'collection', 'collections_hierarchy', 'author_names', 'respondens_names', 'tags_object'],
+          attributesToRetrieve: ['id', 'work_id', 'title', 'year', 'location', 'publisher', 'creators', 'genre_object', 'type_object', 'collection', 'collections_hierarchy', 'author_names', 'respondens_names', 'tags_object', genreFacetField, typeFacetField, tagsFacetField],
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 2: Sisu (kuvatavad teosed, distinct)

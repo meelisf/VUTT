@@ -25,7 +25,9 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   work,
 }) => {
   // cols: 1 (suur) kuni 8 (väike)
-  const [cols, setCols] = React.useState(3);
+  const [cols, setCols] = React.useState(5);
+  const MIN_COLS = 2;
+  const MAX_COLS = 10;
 
   // Teose kontekst päisesse
   const workAuthor = work?.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || null;
@@ -56,13 +58,11 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   }, [onClose]);
 
   // Slider: parem = suurem thumbnail (vähem veerge)
-  const sliderValue = 9 - cols; // cols 1..8 → slider 8..1
+  // slider max → MIN_COLS, slider min → MAX_COLS
+  const sliderValue = MAX_COLS + MIN_COLS - cols;
   const handleSlider = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCols(9 - Number(e.target.value));
+    setCols(MAX_COLS + MIN_COLS - Number(e.target.value));
   };
-
-  // auto-fill: konteiner otsustab mitu tulpa mahub antud miinimum-laiuse juures
-  const minThumbWidth = Math.round(400 / cols);
 
   return (
     <div className="absolute inset-0 z-30 bg-slate-900 flex flex-col">
@@ -95,8 +95,8 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
           <ZoomOut size={14} className="text-white/25" />
           <input
             type="range"
-            min={1}
-            max={8}
+            min={MIN_COLS}
+            max={MAX_COLS}
             step={1}
             value={sliderValue}
             onChange={handleSlider}
@@ -133,7 +133,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             className="p-3"
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(auto-fill, minmax(${minThumbWidth}px, 1fr))`,
+              gridTemplateColumns: `repeat(${cols}, 1fr)`,
               gap: '8px',
               alignItems: 'start',  // Kriitilline: ei siruta üksuseid rea kõrguseni
             }}
