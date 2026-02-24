@@ -649,6 +649,10 @@ const Workspace: React.FC = () => {
           inputPage={inputPage}
           onInputPageChange={setInputPage}
           onPageInputSubmit={handlePageInputSubmit}
+          gridPages={gridPages}
+          gridLoading={gridLoading}
+          onOpenGrid={handleOpenGridView}
+          onSelectPage={handleSelectFromGrid}
         />
       </div>
 

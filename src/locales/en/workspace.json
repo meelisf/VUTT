@@ -176,6 +176,7 @@
   },
   "mobile": {
     "imageTab": "Image",
+    "gridTab": "Grid",
     "textTab": "Text",
     "infoTab": "Info"
   },

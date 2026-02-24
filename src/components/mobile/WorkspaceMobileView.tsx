@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check } from 'lucide-react';
+import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
@@ -25,6 +25,11 @@ interface WorkspaceMobileViewProps {
   inputPage: string;
   onInputPageChange: (value: string) => void;
   onPageInputSubmit: () => void;
+  // Grid view props
+  gridPages: { pageNum: number; imageUrl: string }[];
+  gridLoading: boolean;
+  onOpenGrid: () => void;
+  onSelectPage: (pageNum: number) => void;
 }
 
 const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
@@ -37,6 +42,10 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   inputPage,
   onInputPageChange,
   onPageInputSubmit,
+  gridPages,
+  gridLoading,
+  onOpenGrid,
+  onSelectPage,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
@@ -44,6 +53,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   const lang = (i18n.language as 'et' | 'en') || 'et';
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
   const [copied, setCopied] = useState(false);
+  const [isMobileGridView, setIsMobileGridView] = useState(false);
 
   const handleCopyPermalink = () => {
     if (!workId) return;
@@ -53,8 +63,64 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleOpenGrid = () => {
+    onOpenGrid();
+    setIsMobileGridView(true);
+  };
+
+  const handleSelectPage = (pageNum: number) => {
+    onSelectPage(pageNum);
+    setIsMobileGridView(false);
+  };
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
+      {/* Grid view overlay (mobiilis üle kogu sisu) */}
+      {isMobileGridView && (
+        <div className="absolute inset-0 z-[60] bg-slate-900 flex flex-col md:hidden">
+          <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0">
+            <span className="text-white font-medium">{t('mobile.gridTab', 'Ruudustik')}</span>
+            <button 
+              onClick={() => setIsMobileGridView(false)}
+              className="p-1.5 text-white/60 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {gridLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/30"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 p-3 pb-20">
+                {gridPages.map((p) => (
+                  <button
+                    key={p.pageNum}
+                    onClick={() => handleSelectPage(p.pageNum)}
+                    className={`relative aspect-[3/4] bg-slate-800 rounded overflow-hidden border-2 transition-all ${
+                      p.pageNum === currentPageNum
+                        ? 'border-primary-500 ring-2 ring-primary-500/50'
+                        : 'border-transparent'
+                    }`}
+                  >
+                    <img
+                      src={p.imageUrl}
+                      alt={`Lk ${p.pageNum}`}
+                      loading="lazy"
+                      className="w-full h-full object-contain"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center">
+                      {p.pageNum}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Kompaktne navigatsiooniriba */}
       <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-gray-200 shrink-0">
         <div className="flex items-center gap-2">
@@ -158,7 +224,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
         {activeTab === 'image' ? (
           <div className="h-full bg-slate-900">
             {page.image_url ? (
-              <ImageViewer src={page.image_url} />
+              <ImageViewer src={page.image_url} onGridView={handleOpenGrid} />
             ) : (
               <div className="flex items-center justify-center h-full text-white/50">
                 Pilt puudub

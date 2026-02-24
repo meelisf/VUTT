@@ -176,6 +176,7 @@
   },
   "mobile": {
     "imageTab": "Pilt",
+    "gridTab": "Ruudustik",
     "textTab": "Tekst",
     "infoTab": "Info"
   },
