@@ -3,7 +3,7 @@
  * Tab-ide abil saab vaadata pilti, teksti VÕI teose infot täiskraanina
  * (desktop 50/50 jaotuse asemel, mis mobiilis ei tööta).
  */
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
@@ -54,6 +54,14 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
   const [copied, setCopied] = useState(false);
   const [isMobileGridView, setIsMobileGridView] = useState(false);
+  const currentRef = useRef<HTMLButtonElement>(null);
+
+  // Skrolli praegusele lehele kui grid avatakse
+  useEffect(() => {
+    if (isMobileGridView && !gridLoading && currentRef.current) {
+      currentRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
+  }, [isMobileGridView, gridLoading]);
 
   const handleCopyPermalink = () => {
     if (!workId) return;
@@ -94,27 +102,31 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-2 p-3 pb-20">
-                {gridPages.map((p) => (
-                  <button
-                    key={p.pageNum}
-                    onClick={() => handleSelectPage(p.pageNum)}
-                    className={`relative aspect-[3/4] bg-slate-800 rounded overflow-hidden border-2 transition-all ${
-                      p.pageNum === currentPageNum
-                        ? 'border-primary-500 ring-2 ring-primary-500/50'
-                        : 'border-transparent'
-                    }`}
-                  >
-                    <img
-                      src={p.imageUrl}
-                      alt={`Lk ${p.pageNum}`}
-                      loading="lazy"
-                      className="w-full h-full object-contain"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center">
-                      {p.pageNum}
-                    </div>
-                  </button>
-                ))}
+                {gridPages.map((p) => {
+                  const isCurrent = p.pageNum === currentPageNum;
+                  return (
+                    <button
+                      key={p.pageNum}
+                      ref={isCurrent ? currentRef : undefined}
+                      onClick={() => handleSelectPage(p.pageNum)}
+                      className={`relative aspect-[3/4] bg-slate-800 rounded overflow-hidden border-2 transition-all ${
+                        isCurrent
+                          ? 'border-primary-500 ring-2 ring-primary-500/50'
+                          : 'border-transparent'
+                      }`}
+                    >
+                      <img
+                        src={p.imageUrl}
+                        alt={`Lk ${p.pageNum}`}
+                        loading="lazy"
+                        className="w-full h-full object-contain"
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center">
+                        {p.pageNum}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
