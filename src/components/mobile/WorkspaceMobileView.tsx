@@ -85,17 +85,17 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
     <div className="flex flex-col h-full relative">
       {/* Grid view overlay (mobiilis üle kogu sisu) */}
       {isMobileGridView && (
-        <div className="absolute inset-0 z-[60] bg-slate-900 flex flex-col md:hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 shrink-0">
-            <span className="text-white font-medium">{t('mobile.gridTab', 'Ruudustik')}</span>
+        <div className="absolute inset-0 z-[100] bg-slate-900 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-slate-800 shrink-0 shadow-lg">
+            <span className="text-white font-bold tracking-wide uppercase text-xs">{t('mobile.gridTab', 'Ruudustik')}</span>
             <button 
               onClick={() => setIsMobileGridView(false)}
-              className="p-1.5 text-white/60 hover:text-white"
+              className="p-2 text-white/70 hover:text-white bg-white/10 rounded-full transition-colors active:scale-95"
             >
               <X size={20} />
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto overscroll-contain">
             {gridLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white/30"></div>
