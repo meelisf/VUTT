@@ -43,8 +43,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView }) =
       const link = document.createElement('a');
       link.href = url;
       const rawFilename = src.split('/').pop() || 'image.jpg';
-      const filename = pageNum
-        ? `lk_${String(pageNum).padStart(3, '0')}_${rawFilename}`
+      const ext = rawFilename.includes('.') ? `.${rawFilename.split('.').pop()}` : '.jpg';
+      const slug = src.split('/').at(-2) || '';
+      const filename = pageNum && slug
+        ? `${slug}_lk${String(pageNum).padStart(3, '0')}${ext}`
         : rawFilename;
       link.download = filename;
       document.body.appendChild(link);
