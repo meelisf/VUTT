@@ -131,27 +131,6 @@ def get_collection_hierarchy(collections, collection_id):
     return hierarchy
 
 
-def derive_place(year):
-    """Tuletab trükikoha aasta järgi."""
-    if not year:
-        return "Tartu"
-    if year >= 1699:
-        return "Pärnu"
-    return "Tartu"
-
-
-def derive_printer(year):
-    """Tuletab trükkali aasta järgi."""
-    if not year:
-        return "Typis Academicis"
-    if 1632 <= year <= 1635:
-        return "Jacob Becker (Pistorius)"
-    elif 1642 <= year <= 1656:
-        return "Johann Vogel (Vogelius)"
-    elif 1690 <= year <= 1710:
-        return "Johann Brendeken"
-    return "Typis Academicis"
-
 
 def capitalize_first(text):
     """Teeb esimese tähe suureks, ülejäänud jätab samaks."""
@@ -338,8 +317,8 @@ def get_work_metadata(doc_path, dir_name, collections):
                 # V1/V2 fallback: v2 esmalt, siis v1
                 result['title'] = meta.get('title') or meta.get('pealkiri', result['title'])
                 result['year'] = meta.get('year') or meta.get('aasta')
-                result['location'] = meta.get('location') or meta.get('koht') or derive_place(result['year'])
-                result['publisher'] = meta.get('publisher') or meta.get('trükkal') or derive_printer(result['year'])
+                result['location'] = meta.get('location') or meta.get('koht')
+                result['publisher'] = meta.get('publisher') or meta.get('trükkal')
 
                 # V1/V2 fallback: tags
                 result['tags'] = meta.get('tags') or meta.get('teose_tags', [])
@@ -383,10 +362,8 @@ def get_work_metadata(doc_path, dir_name, collections):
             print(f"Viga _metadata.json lugemisel {metadata_json_path}: {e}")
             return teose_id, result
 
-    # Kui _metadata.json puudub, kasuta vaikeväärtusi
+    # Kui _metadata.json puudub
     print(f"⚠️  Puudub _metadata.json: {dir_name}")
-    result['location'] = derive_place(result['year'])
-    result['publisher'] = derive_printer(result['year'])
 
     return teose_id, result
 
