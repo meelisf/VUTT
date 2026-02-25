@@ -28,7 +28,7 @@ except ImportError:
     print("Installi: pip install Pillow")
 
 # Thumbnaili seaded
-THUMB_WIDTH = 400  # Laius pikslites
+THUMB_HEIGHT = 560  # Kõrgus pikslites (portree- ja topeltlehtedel ühtlane kõrgus)
 THUMB_QUALITY = 85  # JPEG kvaliteet (0-100)
 
 # =========================================================
@@ -60,13 +60,17 @@ def get_first_image(work_path):
     return images[0]
 
 
-def generate_thumbnail(source_path, thumb_path, width=THUMB_WIDTH):
+def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
     """Genereerib thumbnaili antud pildist.
+
+    Skaleerib kõrguse järgi, et portree- ja topeltlehtedel oleks ühtlane
+    vertikaalne resolutsioon. Topeltleht saab laiema thumbi (nt 800×560)
+    selle asemel, et kokkusurutud kitsas riba (400×143).
 
     Args:
         source_path: Lähtefaili tee
         thumb_path: Sihtfaili tee (_thumb_XXXX.jpg)
-        width: Thumbnaili laius (kõrgus arvutatakse proportsionaalselt)
+        height: Thumbnaili kõrgus (laius arvutatakse proportsionaalselt)
 
     Returns:
         True kui õnnestus, False kui mitte
@@ -77,9 +81,9 @@ def generate_thumbnail(source_path, thumb_path, width=THUMB_WIDTH):
 
     try:
         with Image.open(source_path) as img:
-            # Arvuta proportsioon
-            ratio = width / img.width
-            height = int(img.height * ratio)
+            # Skaleerib kõrguse järgi — laius proportsionaalne
+            ratio = height / img.height
+            width = int(img.width * ratio)
 
             # Resize kasutades LANCZOS (parim kvaliteet)
             thumb = img.resize((width, height), Image.Resampling.LANCZOS)
