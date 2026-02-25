@@ -467,8 +467,18 @@ const WorkManage: React.FC = () => {
                       max={pages.length}
                       value={draftPositions[page.filename] ?? page.page_num}
                       onChange={(e) => {
-                        const v = Math.max(1, Math.min(pages.length, Number(e.target.value)));
-                        setDraftPositions(prev => ({ ...prev, [page.filename]: v }));
+                        const newPos = Math.max(1, Math.min(pages.length, Number(e.target.value)));
+                        const currentFile = page.filename;
+                        const currentDraft = draftPositions[currentFile] ?? page.page_num;
+                        // Vaheta kohad: leht mis oli newPos peal saab currentDraft positsiooni
+                        const conflictFile = pages.find(
+                          p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
+                        )?.filename;
+                        setDraftPositions(prev => {
+                          const next = { ...prev, [currentFile]: newPos };
+                          if (conflictFile) next[conflictFile] = currentDraft;
+                          return next;
+                        });
                       }}
                       className={`w-14 text-sm text-center border rounded px-1 py-0.5 ${
                         draftPositions[page.filename] !== page.page_num
