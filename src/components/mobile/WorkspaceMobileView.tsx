@@ -236,7 +236,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
         {activeTab === 'image' ? (
           <div className="h-full bg-slate-900">
             {page.image_url ? (
-              <ImageViewer src={page.image_url} onGridView={handleOpenGrid} />
+              <ImageViewer src={page.image_url} pageNum={page.page_number} onGridView={handleOpenGrid} />
             ) : (
               <div className="flex items-center justify-center h-full text-white/50">
                 Pilt puudub

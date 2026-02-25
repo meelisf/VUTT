@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   RotateCcw,
   FileImage,
+  ArrowUpDown,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
@@ -67,6 +68,11 @@ const WorkManage: React.FC = () => {
   const [trashError, setTrashError] = useState<string | null>(null);
   const [restoringPage, setRestoringPage] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // Lehekülgede järjekorra muutmine
+  const [draftPositions, setDraftPositions] = useState<Record<string, number>>({});
+  const [reorderSaving, setReorderSaving] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
 
   // Teose kustutamine
   const [deleteWorkConfirm, setDeleteWorkConfirm] = useState(false);
@@ -144,6 +150,51 @@ const WorkManage: React.FC = () => {
   useEffect(() => {
     if (isAdmin) loadPages();
   }, [workId, authToken, isAdmin]);
+
+  useEffect(() => {
+    const init: Record<string, number> = {};
+    pages.forEach(p => { init[p.filename] = p.page_num; });
+    setDraftPositions(init);
+  }, [pages]);
+
+  const hasReorderChanges = pages.some(p => draftPositions[p.filename] !== p.page_num);
+
+  const handleReorderSave = async () => {
+    if (!workId || !authToken) return;
+    const confirmed = window.confirm(t('manage.reorderConfirm'));
+    if (!confirmed) return;
+
+    // Sorteeri pages draftPositions järgi, võta filename järjekord
+    const sorted = [...pages].sort((a, b) => {
+      const pa = draftPositions[a.filename] ?? a.page_num;
+      const pb = draftPositions[b.filename] ?? b.page_num;
+      return pa - pb;
+    });
+    const order = sorted.map(p => p.filename);
+
+    setReorderSaving(true);
+    setReorderError(null);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/work/${workId}/reorder-pages?token=${authToken}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order }),
+          timeout: 30000,
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      await loadPages();
+    } catch (e: any) {
+      setReorderError(e.message || t('manage.reorderError'));
+    } finally {
+      setReorderSaving(false);
+    }
+  };
 
   const handleDeletePage = async (pageNum: number) => {
     if (!workId || !authToken) return;
@@ -344,7 +395,19 @@ const WorkManage: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-800">{t('manage.pages')}</h2>
-              <span className="text-sm text-gray-500">{pages.length} {t('manage.pages').toLowerCase()}</span>
+              <div className="flex items-center gap-3">
+                {hasReorderChanges && (
+                  <button
+                    onClick={handleReorderSave}
+                    disabled={reorderSaving}
+                    className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded transition-colors"
+                  >
+                    {reorderSaving ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpDown size={13} />}
+                    {t('manage.reorderSave')}
+                  </button>
+                )}
+                <span className="text-sm text-gray-500">{pages.length} {t('manage.pagesCount', { count: pages.length })}</span>
+              </div>
             </div>
 
             {loading ? (
@@ -397,6 +460,23 @@ const WorkManage: React.FC = () => {
                       <p className="text-xs text-gray-400 truncate font-mono mt-0.5">{page.filename}</p>
                     </div>
 
+                    {/* Järjekorranumber */}
+                    <input
+                      type="number"
+                      min={1}
+                      max={pages.length}
+                      value={draftPositions[page.filename] ?? page.page_num}
+                      onChange={(e) => {
+                        const v = Math.max(1, Math.min(pages.length, Number(e.target.value)));
+                        setDraftPositions(prev => ({ ...prev, [page.filename]: v }));
+                      }}
+                      className={`w-14 text-sm text-center border rounded px-1 py-0.5 ${
+                        draftPositions[page.filename] !== page.page_num
+                          ? 'border-amber-400 bg-amber-50'
+                          : 'border-gray-300'
+                      }`}
+                    />
+
                     {/* Kustuta nupp */}
                     <button
                       onClick={() => handleDeletePage(page.page_num)}
@@ -412,6 +492,12 @@ const WorkManage: React.FC = () => {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {reorderError && (
+              <div className="mx-5 mb-2 mt-3 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                {reorderError}
               </div>
             )}
 
@@ -453,12 +539,13 @@ const WorkManage: React.FC = () => {
                       onChange={(e) => setAddAfterPage(Number(e.target.value))}
                       className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
-                      <option value={-1}>{t('manage.addPageToEnd')}</option>
+                      <option value={0}>{t('manage.addPageToBeginning')}</option>
                       {pages.map((p) => (
                         <option key={p.page_num} value={p.page_num}>
                           {t('manage.addPageAfter', { num: p.page_num })}
                         </option>
                       ))}
+                      <option value={-1}>{t('manage.addPageToEnd')}</option>
                     </select>
                   </div>
 

@@ -4,10 +4,11 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface ImageViewerProps {
   src: string;
+  pageNum?: number;
   onGridView?: () => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src, onGridView }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -41,7 +42,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, onGridView }) => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const filename = src.split('/').pop() || 'image.jpg';
+      const rawFilename = src.split('/').pop() || 'image.jpg';
+      const filename = pageNum
+        ? `lk_${String(pageNum).padStart(3, '0')}_${rawFilename}`
+        : rawFilename;
       link.download = filename;
       document.body.appendChild(link);
       link.click();

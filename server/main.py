@@ -34,7 +34,7 @@ from .cache import (
     get_cached_people_register, get_cached_suggestions, invalidate_cache
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences
+from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -471,6 +471,23 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
 
     new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
+
+
+@app.post("/admin/work/{work_id}/reorder-pages")
+async def admin_reorder_pages(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Muudab lehekülgede järjekorda. Body: {"order": ["fail1.jpg", "fail2.jpg", ...]}"""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    data = await request.json()
+    new_order = data.get("order", [])
+    result = reorder_pages(path, new_order, user.get("username", "admin"))
+    if result.get("error"):
+        raise HTTPException(status_code=400, detail=result["error"])
+    folder_name = os.path.basename(path)
+    sync_work_to_meilisearch(folder_name)
+    return {"status": "success"}
+
 
 # =========================================================
 # TOIMETAMINE JA SALVESTAMINE
