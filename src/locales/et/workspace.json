@@ -82,6 +82,7 @@
     "addPageSubmit": "Lisa leht",
     "addPageError": "Lehe lisamine ebaõnnestus",
     "addPageSuccess": "Leht lisatud",
+    "reorderTo": "→",
     "reorderSave": "Salvesta järjekord",
     "reorderConfirm": "Oled kindel, et soovid lehekülgede järjekorda muuta?",
     "reorderError": "Järjekorra salvestamine ebaõnnestus",

@@ -423,85 +423,80 @@ const WorkManage: React.FC = () => {
             ) : pages.length === 0 ? (
               <p className="p-5 text-sm text-gray-400">{t('manage.noPages')}</p>
             ) : (
-              <div className="divide-y divide-gray-100">
-                {pages.map((page) => (
-                  <div key={page.page_num} className="flex items-center gap-3 px-5 py-3">
-                    {/* Pisipilt */}
-                    <div className="w-10 h-14 bg-gray-100 rounded overflow-hidden flex-shrink-0 border border-gray-200 flex items-center justify-center">
-                      <img
-                        src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}`}
-                        alt={`Lk ${page.page_num}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-300"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>';
-                          }
-                        }}
-                      />
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">
-                          {t('navigation.page')} {page.page_num}
-                        </span>
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${statusColor(page.status)}`}>
-                          {page.status}
-                        </span>
-                        {!page.has_text && (
-                          <span className="text-xs text-gray-400 italic">tühi</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 truncate font-mono mt-0.5">{page.filename}</p>
-                    </div>
-
-                    {/* Järjekorranumber */}
-                    <input
-                      type="number"
-                      min={1}
-                      max={pages.length}
-                      value={draftPositions[page.filename] ?? page.page_num}
-                      onChange={(e) => {
-                        const newPos = Math.max(1, Math.min(pages.length, Number(e.target.value)));
-                        const currentFile = page.filename;
-                        const currentDraft = draftPositions[currentFile] ?? page.page_num;
-                        // Vaheta kohad: leht mis oli newPos peal saab currentDraft positsiooni
-                        const conflictFile = pages.find(
-                          p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
-                        )?.filename;
-                        setDraftPositions(prev => {
-                          const next = { ...prev, [currentFile]: newPos };
-                          if (conflictFile) next[conflictFile] = currentDraft;
-                          return next;
-                        });
-                      }}
-                      className={`w-14 text-sm text-center border rounded px-1 py-0.5 ${
-                        draftPositions[page.filename] !== page.page_num
-                          ? 'border-amber-400 bg-amber-50'
-                          : 'border-gray-300'
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
+                {pages.map((page) => {
+                  const isChanged = draftPositions[page.filename] !== page.page_num;
+                  return (
+                    <div
+                      key={page.page_num}
+                      className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
+                        isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
                       }`}
-                    />
-
-                    {/* Kustuta nupp */}
-                    <button
-                      onClick={() => handleDeletePage(page.page_num)}
-                      disabled={deletingPage === page.page_num}
-                      className="flex-shrink-0 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                      title={t('manage.deletePage')}
                     >
-                      {deletingPage === page.page_num ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
-                  </div>
-                ))}
+                      {/* Pisipilt */}
+                      <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
+                        <img
+                          src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}`}
+                          alt={`Lk ${page.page_num}`}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = '<div class="flex items-center justify-center h-full text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>';
+                            }
+                          }}
+                        />
+                        {/* Kustuta nupp — paremas ülanurgas */}
+                        <button
+                          onClick={() => handleDeletePage(page.page_num)}
+                          disabled={deletingPage === page.page_num}
+                          className="absolute top-1 right-1 p-1 bg-white/80 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded shadow-sm transition-colors disabled:opacity-50"
+                          title={t('manage.deletePage')}
+                        >
+                          {deletingPage === page.page_num ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                        </button>
+                        {/* Staatus — vasakus ülanurgas */}
+                        <span className={`absolute top-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(page.status)}`}>
+                          {page.page_num}
+                        </span>
+                      </div>
+
+                      {/* Numbriväli */}
+                      <div className="px-1.5 py-1.5 flex items-center gap-1">
+                        <span className="text-xs text-gray-400 flex-shrink-0">{t('manage.reorderTo')}</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={pages.length}
+                          value={draftPositions[page.filename] ?? page.page_num}
+                          onChange={(e) => {
+                            const newPos = Math.max(1, Math.min(pages.length, Number(e.target.value)));
+                            const currentFile = page.filename;
+                            const currentDraft = draftPositions[currentFile] ?? page.page_num;
+                            const conflictFile = pages.find(
+                              p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
+                            )?.filename;
+                            setDraftPositions(prev => {
+                              const next = { ...prev, [currentFile]: newPos };
+                              if (conflictFile) next[conflictFile] = currentDraft;
+                              return next;
+                            });
+                          }}
+                          className={`flex-1 min-w-0 text-xs text-center border rounded px-1 py-0.5 ${
+                            isChanged ? 'border-amber-400 bg-amber-50 font-semibold' : 'border-gray-300'
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 

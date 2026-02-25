@@ -82,6 +82,7 @@
     "addPageSubmit": "Add page",
     "addPageError": "Failed to add page",
     "addPageSuccess": "Page added",
+    "reorderTo": "→",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",
     "reorderError": "Failed to save page order",
