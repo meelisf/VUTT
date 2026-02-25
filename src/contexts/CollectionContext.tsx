@@ -18,6 +18,7 @@ interface CollectionContextType {
 const CollectionContext = createContext<CollectionContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'vutt_collection';
+const DEFAULT_COLLECTION = 'universitas-dorpatensis-1';
 
 export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [selectedCollection, setSelectedCollectionState] = useState<string | null>(null);
@@ -31,10 +32,12 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
         const data = await getCollections();
         setCollections(data);
 
-        // Taasta valik localStorage'ist
+        // Taasta valik localStorage'ist; uuel kasutajal kasuta vaikimisi kollektsiooni
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored && data[stored]) {
           setSelectedCollectionState(stored);
+        } else if (!stored && data[DEFAULT_COLLECTION]) {
+          setSelectedCollectionState(DEFAULT_COLLECTION);
         }
       } catch (e) {
         console.error('Failed to load collections:', e);
