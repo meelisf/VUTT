@@ -30,6 +30,13 @@
     "Annoteeritud": "Annoteeritud",
     "Valmis": "Valmis"
   },
+  "statusHelp": {
+    "Toores": "Automaatne OCR-transkriptsioon. Tekst võib sisaldada tuvastusvigu ja pole toimetatud.",
+    "Töös": "Lehekülg on parasjagu toimetamisel. Tekst on osaliselt parandatud, kuid töö pole lõpetatud.",
+    "Parandatud": "Tekst on käsitsi parandatud.",
+    "Annoteeritud": "Tekst on parandatud ja annoteeritud.",
+    "Valmis": "Tekst on läbi vaadatud ja korras."
+  },
   "roles": {
     "admin": "Administraator",
     "editor": "Toimetaja",

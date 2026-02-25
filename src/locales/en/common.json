@@ -30,6 +30,13 @@
     "Annoteeritud": "Annotated",
     "Valmis": "Done"
   },
+  "statusHelp": {
+    "Toores": "Automatic OCR transcription. The text may contain recognition errors and has not been edited.",
+    "Töös": "This page is currently being edited. The text has been partially corrected but work is not finished.",
+    "Parandatud": "The text has been manually corrected.",
+    "Annoteeritud": "The text has been corrected and annotated.",
+    "Valmis": "The text has been reviewed and is complete."
+  },
   "roles": {
     "admin": "Administrator",
     "editor": "Editor",

@@ -55,6 +55,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
   const [copied, setCopied] = useState(false);
   const [isMobileGridView, setIsMobileGridView] = useState(false);
+  const [statusHelpOpen, setStatusHelpOpen] = useState(false);
   const currentRef = useRef<HTMLButtonElement>(null);
 
   // Skrolli praegusele lehele kui grid avatakse
@@ -186,7 +187,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               <span className="text-xs text-gray-500">/{work.page_count}</span>
             )}
           </div>
-          {/* Staatusmärk */}
+          {/* Staatusmärk — klikitav selgitusega */}
           {page.status && (() => {
             const colorClass =
               page.status === PageStatus.DONE ? 'bg-green-100 text-green-700' :
@@ -194,9 +195,12 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               page.status === PageStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700' :
               'bg-gray-100 text-gray-500';
             return (
-              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${colorClass}`}>
+              <button
+                onClick={() => setStatusHelpOpen(o => !o)}
+                className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${colorClass} active:opacity-70`}
+              >
                 {t(`common:status.${page.status}`)}
-              </span>
+              </button>
             );
           })()}
           <button
@@ -210,6 +214,14 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
 
         <LanguageSwitcher />
       </div>
+
+      {/* Staatuse selgitus (klikitav) */}
+      {statusHelpOpen && page.status && (
+        <div className="mx-3 mt-1 px-3 py-2 bg-gray-800 text-white text-xs rounded-lg flex items-start gap-2 shrink-0">
+          <span className="flex-1">{t(`common:statusHelp.${page.status}`)}</span>
+          <button onClick={() => setStatusHelpOpen(false)} className="text-gray-400 shrink-0 mt-0.5">✕</button>
+        </div>
+      )}
 
       {/* Tab-riba */}
       <div className="flex bg-gray-100 p-1 mx-3 mt-2 rounded-lg shadow-inner shrink-0">

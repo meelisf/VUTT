@@ -396,7 +396,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                         ))}
                       </select>
                     ) : (
-                      <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full border ${colorClass}`}>
+                      <span
+                        className={`text-xs font-bold uppercase px-2 py-1 rounded-full border cursor-help ${colorClass}`}
+                        title={t(`common:statusHelp.${st}`)}
+                      >
                         {t(`common:status.${st}`)}
                       </span>
                     )}
