@@ -374,27 +374,35 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 )}
               </div>
 
-              {/* Page Status Selector (Right) */}
-              {onStatusChange && (
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('status.label')}</span>
-                  <select
-                    value={currentStatus || page.status}
-                    onChange={(e) => onStatusChange(e.target.value as PageStatus)}
-                    disabled={readOnly}
-                    className={`text-xs font-bold uppercase px-2 py-1 rounded-full border outline-none transition-all cursor-pointer ${readOnly ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' :
-                        (currentStatus || page.status) === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' :
-                          (currentStatus || page.status) === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' :
-                            (currentStatus || page.status) === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100' :
-                              'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
-                      }`}
-                  >
-                    {Object.values(PageStatus).map((s) => (
-                      <option key={s} value={s}>{t(`common:status.${s}`)}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              {/* Page Status (Right) */}
+              {(() => {
+                const st = currentStatus || page.status;
+                const colorClass =
+                  st === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
+                  st === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                  st === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                  'bg-gray-50 text-gray-700 border-gray-200';
+                return (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('status.label')}</span>
+                    {onStatusChange ? (
+                      <select
+                        value={st}
+                        onChange={(e) => onStatusChange(e.target.value as PageStatus)}
+                        className={`text-xs font-bold uppercase px-2 py-1 rounded-full border outline-none transition-all cursor-pointer ${colorClass} hover:opacity-80`}
+                      >
+                        {Object.values(PageStatus).map((s) => (
+                          <option key={s} value={s}>{t(`common:status.${s}`)}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className={`text-xs font-bold uppercase px-2 py-1 rounded-full border ${colorClass}`}>
+                        {t(`common:status.${st}`)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
 
             </div>
 

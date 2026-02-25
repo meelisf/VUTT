@@ -10,6 +10,7 @@ import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
+import { PageStatus } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -185,6 +186,19 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               <span className="text-xs text-gray-500">/{work.page_count}</span>
             )}
           </div>
+          {/* Staatusmärk */}
+          {page.status && (() => {
+            const colorClass =
+              page.status === PageStatus.DONE ? 'bg-green-100 text-green-700' :
+              page.status === PageStatus.CORRECTED ? 'bg-blue-100 text-blue-700' :
+              page.status === PageStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700' :
+              'bg-gray-100 text-gray-500';
+            return (
+              <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${colorClass}`}>
+                {t(`common:status.${page.status}`)}
+              </span>
+            );
+          })()}
           <button
             onClick={() => onNavigatePage(1)}
             disabled={work?.page_count ? currentPageNum >= work.page_count : false}
