@@ -315,19 +315,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             </button>
           </div>
 
-          {/* RIGHT: Save Button */}
-          <button
-            onClick={handleSave}
-            disabled={isSaving || readOnly}
-            className={`flex items-center gap-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 ${(hasUnsavedChanges || statusDirty) && !readOnly
-              ? 'bg-amber-500 hover:bg-amber-600'
-              : 'bg-primary-600 hover:bg-primary-700'
-              }`}
-            title={readOnly ? t('editor.readOnlyHint') : ''}
-          >
-            {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-            {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
-          </button>
+          {/* RIGHT: Save Button — peidetud sisselogimata kasutajalt */}
+          {!readOnly && (
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`flex items-center gap-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 ${(hasUnsavedChanges || statusDirty)
+                ? 'bg-amber-500 hover:bg-amber-600'
+                : 'bg-primary-600 hover:bg-primary-700'
+                }`}
+            >
+              {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+              {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
+            </button>
+          )}
         </div>
       </div>
 
