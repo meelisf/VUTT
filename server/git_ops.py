@@ -487,8 +487,13 @@ def get_commit_diff(commit_hash, filepaths=None):
         return None
 
 
-def commit_new_work_to_git(dir_name):
-    """Lisab uue teose txt ja json failid Git reposse originaal-OCR commitina."""
+def commit_new_work_to_git(dir_name, username=None):
+    """Lisab uue teose txt ja json failid Git reposse originaal-OCR commitina.
+
+    Args:
+        dir_name: Kausta nimi (nt "1632-1")
+        username: Commit'i autor. Kui None, kasutatakse "Automaatne" (automaatne import).
+    """
     try:
         repo = get_or_init_repo()
         dir_path = os.path.join(BASE_DIR, dir_name)
@@ -514,7 +519,8 @@ def commit_new_work_to_git(dir_name):
         repo.index.add(files_to_add)
 
         # Tee commit
-        author = Actor("Automaatne", "auto@vutt.local")
+        author_name = username if username else "Automaatne"
+        author = Actor(author_name, f"{author_name}@vutt.local")
         repo.index.commit(
             f"Originaal OCR: {dir_name} ({txt_count} lehekülge, {json_count} json)",
             author=author,
@@ -642,6 +648,10 @@ def get_recent_commits(username=None, limit=50, skip=0):
             # See väldib kulukat sisu võrdlemist (diff)
             file_paths = list(commit.stats.files.keys())
 
+            # Impordi commit: sisaldab kõiki lehe txt-faile + _metadata.json.
+            # Näitame ainult ÜHT kirjet teose kohta (change_type="import").
+            is_import_commit = commit.message.strip().startswith("Originaal OCR:")
+
             for filepath in file_paths:
                 if not filepath:
                     continue
@@ -664,7 +674,14 @@ def get_recent_commits(username=None, limit=50, skip=0):
                 # Leia teose info _metadata.json failist
                 work_info = get_work_info_from_folder(folder_name)
 
-                if is_txt:
+                if is_import_commit:
+                    # Impordi commit: emit ainult _metadata.json kirje, txt-failid vahele
+                    if not is_metadata:
+                        continue
+                    page_num = None
+                    file_key = f"{work_info['work_id']}/_import"
+                    change_type = "import"
+                elif is_txt:
                     # Lehekülje muudatus
                     page_num = get_page_number_from_txt(folder_name, filename)
                     file_key = f"{work_info['work_id']}/{page_num}"
@@ -698,7 +715,7 @@ def get_recent_commits(username=None, limit=50, skip=0):
                     "work_author": work_info['author'],  # NB: 'author' on juba commit author
                     "lehekylje_number": page_num,
                     "filepath": filepath,
-                    "change_type": change_type  # "page" või "metadata"
+                    "change_type": change_type  # "page", "metadata" või "import"
                 })
 
                 # Kui limit täis, proovi leida veel üks tulemus has_more jaoks

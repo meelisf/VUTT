@@ -22,7 +22,8 @@
     "continue": "Jätka tööd"
   },
   "changeType": {
-    "metadata": "Metaandmed"
+    "metadata": "Metaandmed",
+    "import": "Uus teos"
   },
   "loadMore": "Laadi veel",
   "loadingMore": "Laadin...",

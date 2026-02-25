@@ -22,7 +22,8 @@
     "continue": "Continue working"
   },
   "changeType": {
-    "metadata": "Metadata"
+    "metadata": "Metadata",
+    "import": "New work"
   },
   "loadMore": "Load more",
   "loadingMore": "Loading...",

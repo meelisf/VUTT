@@ -871,7 +871,7 @@ def get_ocr_status(upload_id: str) -> dict:
     }
 
 
-def import_as_work(upload_id: str) -> dict:
+def import_as_work(upload_id: str, username: str = None) -> dict:
     """
     Impordib OCR-itud teose VUTT andmebaasi.
 
@@ -1013,7 +1013,7 @@ def import_as_work(upload_id: str) -> dict:
     # Git commit
     try:
         from .git_ops import commit_new_work_to_git
-        commit_new_work_to_git(slug)
+        commit_new_work_to_git(slug, username=username)
         logger.info(f"import {upload_id}: git commit OK ({slug})")
     except Exception as e:
         logger.warning(f"import {upload_id}: git commit ebaõnnestus: {e}")

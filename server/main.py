@@ -668,7 +668,7 @@ async def admin_upload_files(upload_id: str, request: Request, user=Depends(requ
 @app.post("/admin/upload/{upload_id}/import")
 async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
     try:
-        res = import_as_work(upload_id)
+        res = import_as_work(upload_id, username=user['username'])
         build_work_id_cache()
         return {"status": "success", **res}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))

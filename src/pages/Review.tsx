@@ -499,7 +499,11 @@ const Review: React.FC = () => {
                               {commit.title.length > 20 ? commit.title.slice(0, 20) + '…' : commit.title}
                             </span>
                           )}
-                          {commit.change_type === 'metadata' ? (
+                          {commit.change_type === 'import' ? (
+                            <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                              {t('changeType.import', 'Uus teos')}
+                            </span>
+                          ) : commit.change_type === 'metadata' ? (
                             <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0">
                               {t('changeType.metadata', 'Metaandmed')}
                             </span>
@@ -513,11 +517,11 @@ const Review: React.FC = () => {
                         {/* Link */}
                         <div className="col-span-1 flex items-center justify-end">
                           <Link
-                            to={commit.change_type === 'metadata'
+                            to={commit.change_type === 'metadata' || commit.change_type === 'import'
                               ? `/work/${commit.work_id}/1`
                               : `/work/${commit.work_id}/${commit.lehekylje_number}`}
                             className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-                            title={commit.change_type === 'metadata' ? t('actions.openWork', 'Ava teos') : t('actions.openPage')}
+                            title={commit.change_type === 'metadata' || commit.change_type === 'import' ? t('actions.openWork', 'Ava teos') : t('actions.openPage')}
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ExternalLink size={18} />
