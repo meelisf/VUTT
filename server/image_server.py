@@ -20,7 +20,7 @@ from .utils import find_directory_by_id, build_work_id_cache
 
 # Pillow thumbnail genereerimiseks
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
     PILLOW_AVAILABLE = True
 except ImportError:
     PILLOW_AVAILABLE = False
@@ -81,6 +81,9 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
 
     try:
         with Image.open(source_path) as img:
+            # Rakenda EXIF orientatsioon enne skaleerimist (muidu thumb tuleb pööratud)
+            img = ImageOps.exif_transpose(img)
+
             # Skaleerib kõrguse järgi — laius proportsionaalne
             ratio = height / img.height
             width = int(img.width * ratio)
