@@ -97,9 +97,9 @@ const Header: React.FC<HeaderProps> = ({
           })()}
 
           {pageTitle && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               {pageTitleIcon}
-              <span className="text-lg font-bold text-primary-900">{pageTitle}</span>
+              <span className="text-sm sm:text-lg font-bold text-primary-900 whitespace-nowrap">{pageTitle}</span>
             </div>
           )}
         </div>
@@ -178,7 +178,7 @@ const Header: React.FC<HeaderProps> = ({
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 font-medium text-sm transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-md hover:bg-primary-700 font-medium text-sm transition-colors"
             >
               <LogIn size={16} />
               {t('auth:login.title')}

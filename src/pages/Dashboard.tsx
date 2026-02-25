@@ -8,7 +8,7 @@ import Header from '../components/Header';
 import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
@@ -23,7 +23,8 @@ const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, isLoading: userLoading } = useUser();
-  const { selectedCollection, setSelectedCollection, collections } = useCollection();
+  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const lang = i18n.language.split('-')[0] as 'et' | 'en';
   const [showAboutModal, setShowAboutModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
@@ -65,6 +66,7 @@ const Dashboard: React.FC = () => {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
   const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
+  const [showMobileCollectionPicker, setShowMobileCollectionPicker] = useState(false);
   const [showBulkTagsPicker, setShowBulkTagsPicker] = useState(false);
   const [showBulkGenrePicker, setShowBulkGenrePicker] = useState(false);
   const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
@@ -646,10 +648,31 @@ const Dashboard: React.FC = () => {
                 />
               </div>
 
+              {/* Mobiili kollektsiooni valija */}
+              {(() => {
+                const colorClasses = selectedCollection ? getCollectionColorClasses(collections[selectedCollection]) : null;
+                return (
+                  <button
+                    className={`sm:hidden flex items-center gap-2 w-full px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                      selectedCollection && colorClasses
+                        ? `${colorClasses.bg} ${colorClasses.border} ${colorClasses.text} ${colorClasses.hoverBg}`
+                        : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setShowMobileCollectionPicker(true)}
+                  >
+                    <Library size={16} className={selectedCollection && colorClasses ? colorClasses.text : 'text-primary-600'} />
+                    <span className="flex-1 text-left truncate">
+                      {selectedCollection ? getCollectionName(selectedCollection, lang) : t('common:collections.all', 'Kõik tööd')}
+                    </span>
+                    <ChevronDown size={14} className="shrink-0 opacity-50" />
+                  </button>
+                );
+              })()}
+
               {/* Controls Row */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
+              <div className="flex flex-row flex-wrap items-center gap-2 sm:gap-4 sm:justify-between bg-white p-2 sm:p-3 rounded-lg border border-gray-200 shadow-sm">
                 {/* Year Filter */}
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-3">
                   <span className="hidden sm:inline text-xs font-bold text-gray-500 uppercase tracking-wide whitespace-nowrap">{t('search.timeRange')}</span>
                   <div className="flex items-center gap-2">
                     <input
@@ -762,7 +785,7 @@ const Dashboard: React.FC = () => {
                       setSelectedTags([]);
                       setSearchParams({});
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium"
+                    className="flex items-center justify-center sm:justify-start gap-1 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors font-medium order-last sm:order-none w-full sm:w-auto"
                     title={t('search.clearAll')}
                   >
                     <X size={14} />
@@ -773,7 +796,7 @@ const Dashboard: React.FC = () => {
                 <div className="h-6 w-px bg-gray-200 hidden sm:block"></div>
 
                 {/* Sort Control */}
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="flex items-center gap-2 ml-auto sm:ml-0">
                   <ArrowUpDown size={16} className="text-gray-400" />
                   <select
                     value={sort}
@@ -1113,6 +1136,12 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* Mobiili kollektsiooni filter picker */}
+      <CollectionPicker
+        isOpen={showMobileCollectionPicker}
+        onClose={() => setShowMobileCollectionPicker(false)}
+      />
 
       {/* Bulk Collection Picker Modal */}
       {showBulkCollectionPicker && (

@@ -193,6 +193,14 @@ const Statistics: React.FC = () => {
     [worksYearData, yearFrom, yearTo]
   );
 
+  // Mobiilituvastus — graafikute kohandamiseks
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
   // Slaiduri protsendid teerajoonele
   const range = Math.max(1, globalMaxYear - globalMinYear);
   const fromPct = ((yearFrom - globalMinYear) / range) * 100;
@@ -255,13 +263,13 @@ const Statistics: React.FC = () => {
         pageTitleIcon={<BarChart3 className="text-primary-600" size={22} />}
       />
 
-      <div className="max-w-7xl mx-auto px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 space-y-3 sm:space-y-6">
 
         {/* Kollektsiooni filter indikaator */}
         {selectedCollection && (() => {
           const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
           return (
-            <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-4 flex items-center gap-3`}>
+            <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-3 sm:p-4 flex items-center gap-3`}>
               <Library className={colorClasses.text} size={20} />
               <div>
                 <span className={`text-sm ${colorClasses.text}`}>{t('common:collections.activeFilter')}:</span>
@@ -272,36 +280,36 @@ const Statistics: React.FC = () => {
         })()}
 
         {/* KPI kaardid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
-              <BookOpen size={16} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+              <BookOpen size={14} className="shrink-0" />
               {t('kpi.totalWorks')}
             </h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{totalWorks.toLocaleString()}</p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{totalWorks.toLocaleString()}</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
-              <FileText size={16} />
+          <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+              <FileText size={14} className="shrink-0" />
               {t('kpi.totalVolume')}
             </h3>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-lg text-gray-400 font-normal">{t('kpi.pages')}</span></p>
+            <p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-2">{totalPages.toLocaleString()} <span className="text-base sm:text-lg text-gray-400 font-normal">{t('kpi.pages')}</span></p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.readiness')}</h3>
-            <p className="text-3xl font-bold text-green-600 mt-2">{progressPercentage}%</p>
+          <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.readiness')}</h3>
+            <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{progressPercentage}%</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.avgPages')}</h3>
-            <p className="text-3xl font-bold text-primary-600 mt-2">
+          <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+            <h3 className="text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wide">{t('kpi.avgPages')}</h3>
+            <p className="text-2xl sm:text-3xl font-bold text-primary-600 mt-2">
               {totalWorks > 0 ? Math.round(totalPages / totalWorks) : 0}
-              <span className="text-lg text-gray-400 font-normal"> {t('kpi.perWork')}</span>
+              <span className="text-base sm:text-lg text-gray-400 font-normal"> {t('kpi.perWork')}</span>
             </p>
           </div>
         </div>
 
         {/* Žanrifilter */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-start gap-4">
+        <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-gray-200 flex items-start gap-3 sm:gap-4">
           <div className="flex items-center gap-2 text-gray-500 shrink-0 pt-1">
             <Tag size={16} />
             <span className="text-sm font-medium">{t('genre.label')}:</span>
@@ -334,8 +342,8 @@ const Statistics: React.FC = () => {
         </div>
 
         {/* Teosed aastate kaupa — täislaiuslik graafik */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
               <BarChart3 size={20} className="text-gray-400" />
               {t('charts.worksByYear')}
@@ -369,18 +377,25 @@ const Statistics: React.FC = () => {
               <Loader2 className="animate-spin text-gray-400" size={32} />
             </div>
           ) : displayedData.length > 0 ? (
-            <div className="h-72">
+            <div className="h-52 sm:h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={displayedData} margin={{ top: 10, right: 10, left: 0, bottom: 5 }}>
+                <BarChart
+                  data={displayedData}
+                  margin={isMobile
+                    ? { top: 5, right: 5, left: -25, bottom: 0 }
+                    : { top: 10, right: 10, left: 0, bottom: 5 }
+                  }
+                >
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis
                     dataKey="year"
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#6b7280' }}
-                    interval={Math.max(0, Math.floor(displayedData.length / 12))}
+                    tick={{ fontSize: isMobile ? 10 : 11, fill: '#6b7280' }}
+                    interval={Math.max(0, Math.floor(displayedData.length / (isMobile ? 6 : 12)))}
                   />
                   <YAxis
+                    hide={isMobile}
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 12, fill: '#9ca3af' }}
@@ -388,7 +403,7 @@ const Statistics: React.FC = () => {
                   />
                   <Tooltip
                     cursor={{ fill: '#f0f9ff' }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: isMobile ? 12 : 14 }}
                     formatter={(value: number) => [value.toLocaleString(), t('charts.works')]}
                     labelFormatter={(label) => String(label)}
                   />
@@ -468,7 +483,7 @@ const Statistics: React.FC = () => {
         </div>
 
         {/* Staatuse pirdiagramm */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white p-3 sm:p-6 rounded-xl shadow-sm border border-gray-200">
           <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 flex-wrap">
             <PieChartIcon size={20} className="text-gray-400 shrink-0" />
             {selectedCollection

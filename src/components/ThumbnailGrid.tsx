@@ -88,7 +88,14 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
 
         {/* Keskel: suumi slider */}
         <div className="flex items-center gap-2 shrink-0">
-          <ZoomOut size={14} className="text-white/25" />
+          <button
+            onClick={() => onColsChange(Math.min(cols + 1, MAX_COLS))}
+            disabled={cols >= MAX_COLS}
+            className="p-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Väiksemad pisipildid"
+          >
+            <ZoomOut size={14} />
+          </button>
           <input
             type="range"
             min={MIN_COLS}
@@ -99,7 +106,14 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             className="w-24 accent-white/50 cursor-pointer"
             title="Thumbnailide suurus"
           />
-          <ZoomIn size={14} className="text-white/25" />
+          <button
+            onClick={() => onColsChange(Math.max(cols - 1, MIN_COLS))}
+            disabled={cols <= MIN_COLS}
+            className="p-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
+            title="Suuremad pisipildid"
+          >
+            <ZoomIn size={14} />
+          </button>
         </div>
 
         {/* Paremal: lehtede arv + sulge */}
@@ -109,10 +123,10 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
           </span>
           <button
             onClick={onClose}
-            className="p-1.5 text-white/40 hover:text-white hover:bg-white/10 rounded transition-colors"
+            className="p-1.5 text-white/60 hover:text-white hover:bg-white/15 rounded transition-colors"
             title="Sulge (ESC)"
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
       </div>
