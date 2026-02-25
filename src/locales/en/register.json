@@ -1,6 +1,8 @@
 {
   "title": "Join VUTT",
   "subtitle": "Request access to the Early Modern Text Workbench",
+  "description": "Browsing, searching, and reading the workbench is open to everyone. If you would like to contribute to correcting and annotating texts, you can request editor access here.",
+  "reviewNote": "Your request will be reviewed and this may take a little time.",
   "form": {
     "name": "Name",
     "namePlaceholder": "Your full name",

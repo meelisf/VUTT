@@ -120,6 +120,11 @@ const Register: React.FC = () => {
             <p className="text-gray-500 mt-1">{t('subtitle')}</p>
           </div>
 
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-100 rounded-lg space-y-2">
+            <p className="text-sm text-blue-800">{t('description')}</p>
+            <p className="text-sm text-blue-700 italic">{t('reviewNote')}</p>
+          </div>
+
           {/* Veateade */}
           {submitStatus === 'error' && errorMessage && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">

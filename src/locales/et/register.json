@@ -1,6 +1,8 @@
 {
   "title": "Liitu VUTTiga",
   "subtitle": "Taotle ligipääsu varauusaegsete tekstide töölauale",
+  "description": "Töölaua kasutamine, otsimine ja vaatamine on ligipääsetav kõigile. Kui soovid kaasa aidata tekstide parandamisele ja annoteerimisele, siis siin saab taotleda töölaua toimetusõigusi.",
+  "reviewNote": "Taotlus vaadatakse läbi ja see võib võtta natuke aega.",
   "form": {
     "name": "Nimi",
     "namePlaceholder": "Sinu täisnimi",
