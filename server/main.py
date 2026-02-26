@@ -162,7 +162,7 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     return {
         "status": "success",
         "invite_token": token_data['token'],
-        "invite_url": f"/invite/{token_data['token']}",
+        "invite_url": f"/set-password?token={token_data['token']}",
         "expires_at": token_data['expires_at'],
         "email": token_data['email'],
         "name": token_data['name'],
