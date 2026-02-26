@@ -131,7 +131,7 @@ async def register(request: Request):
 @app.get("/invite/{token}")
 async def check_invite(token: str):
     token_data, error = validate_invite_token(token)
-    if token_data: return {"status": "success", "valid": True, "email": token_data["email"], "name": token_data["name"]}
+    if token_data: return {"status": "success", "valid": True, "email": token_data["email"], "name": token_data["name"], "expires_at": token_data["expires_at"]}
     return {"status": "error", "valid": False, "message": error}
 
 @app.post("/invite/set-password")
@@ -171,7 +171,8 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
 @app.post("/admin/registrations/reject")
 async def reject_registration(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    update_registration_status(data.get('registration_id'), "rejected", user["username"])
+    reg = update_registration_status(data.get('registration_id'), "rejected", user["username"])
+    if not reg: raise HTTPException(status_code=400, detail="Vigane taotlus")
     return {"status": "success"}
 
 @app.post("/admin/users")
