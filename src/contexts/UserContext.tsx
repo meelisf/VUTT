@@ -31,7 +31,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const tokenCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tokeni verifitseerimine serverist
-  const verifyToken = async (token: string): Promise<User | null> => {
+  // Tagastab: User (kehtiv) | null (server ütles aegunud) | 'network-error' (võrguviga, ärge logige välja)
+  const verifyToken = async (token: string): Promise<User | null | 'network-error'> => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/verify-token`, {
         method: 'POST',
@@ -45,8 +46,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return null;
     } catch (e) {
-      console.error('Token verification failed:', e);
-      return null;
+      console.error('Token verification failed (network error):', e);
+      return 'network-error';
     }
   };
 
@@ -55,15 +56,21 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const initAuth = async () => {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       const storedUser = localStorage.getItem(STORAGE_KEY);
-      
+
       if (storedToken && storedUser) {
         // Kontrolli, kas token on veel kehtiv
         const verifiedUser = await verifyToken(storedToken);
-        if (verifiedUser) {
+        if (verifiedUser && verifiedUser !== 'network-error') {
           setUser(verifiedUser);
           setAuthToken(storedToken);
+        } else if (verifiedUser === 'network-error') {
+          // Võrguviga käivitusel — laadime localStorage'ist (optimistlik)
+          try {
+            setUser(JSON.parse(storedUser));
+            setAuthToken(storedToken);
+          } catch {}
         } else {
-          // Token aegunud, kustuta localStorage
+          // Server kinnitas et token on aegunud
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(STORAGE_KEY);
         }
@@ -85,9 +92,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!authToken || !user) return;
 
     tokenCheckRef.current = setInterval(async () => {
-      const valid = await verifyToken(authToken);
-      if (!valid) {
-        // Token aegunud — logi välja ja märgi sessioon aegunuks
+      const result = await verifyToken(authToken);
+      if (result === 'network-error') {
+        // Võrguviga — ära logi välja, proovi järgmisel korral uuesti
+        console.warn('Token check: võrguviga, jätkan sessiooni');
+        return;
+      }
+      if (!result) {
+        // Server kinnitas et token on aegunud — logi välja
         setUser(null);
         setAuthToken(null);
         localStorage.removeItem(TOKEN_KEY);
