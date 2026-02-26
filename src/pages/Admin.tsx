@@ -576,6 +576,24 @@ const Admin: React.FC = () => {
                     {linkCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
                     {linkCopied ? t('registrations.linkCopied') : t('registrations.copyLink')}
                   </button>
+                  <a
+                    href={(() => {
+                      const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
+                      const subject = encodeURIComponent('VUTT – konto aktiveerimise link');
+                      const body = encodeURIComponent(
+                        `Tere ${inviteResult.name},\n\n` +
+                        `Teie juurdepääsutaotlus VUTT platvormile on kinnitatud.\n\n` +
+                        `Palun seadistage oma parool alloleva lingi kaudu (link kehtib 48 tundi):\n` +
+                        `${fullUrl}\n\n` +
+                        `Lugupidamisega,\nVUTT meeskonna nimel`
+                      );
+                      return `mailto:${inviteResult.email}?subject=${subject}&body=${body}`;
+                    })()}
+                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                  >
+                    <Mail size={16} />
+                    {t('registrations.sendEmail')}
+                  </a>
                 </div>
                 <p className="text-xs text-green-600 mt-2">
                   Aegub: {formatDate(inviteResult.expires_at)}

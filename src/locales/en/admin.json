@@ -20,7 +20,8 @@
     "rejected": "Rejected",
     "inviteLinkGenerated": "Invite link generated",
     "copyLink": "Copy link",
-    "linkCopied": "Link copied!"
+    "linkCopied": "Link copied!",
+    "sendEmail": "Send email"
   },
   "users": {
     "title": "Users",

@@ -644,8 +644,19 @@ const Dashboard: React.FC = () => {
                   placeholder={t('search.placeholder')}
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-shadow text-lg"
+                  className={`w-full pl-12 py-3 rounded-lg border border-gray-300 shadow-sm focus:ring-2 focus:ring-primary-100 focus:border-primary-500 outline-none transition-shadow text-lg ${inputValue ? 'pr-10' : 'pr-4'}`}
                 />
+                {inputValue && (
+                  <button
+                    type="button"
+                    onClick={() => setInputValue('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                    aria-label="Tühjenda otsing"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
               </div>
 
               {/* Mobiili kollektsiooni valija */}

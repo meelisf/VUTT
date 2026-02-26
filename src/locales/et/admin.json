@@ -20,7 +20,8 @@
     "rejected": "Tagasi lükatud",
     "inviteLinkGenerated": "Kutse link on loodud",
     "copyLink": "Kopeeri link",
-    "linkCopied": "Link kopeeritud!"
+    "linkCopied": "Link kopeeritud!",
+    "sendEmail": "Saada e-kiri"
   },
   "users": {
     "title": "Kasutajad",
