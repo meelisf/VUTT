@@ -159,7 +159,14 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     if not reg or reg["status"] != "pending": raise HTTPException(status_code=400, detail="Vigane taotlus")
     update_registration_status(reg["id"], "approved", user["username"])
     token_data = create_invite_token(reg["email"], reg["name"], user["username"])
-    return {"status": "success", "invite_token": token_data['token']}
+    return {
+        "status": "success",
+        "invite_token": token_data['token'],
+        "invite_url": f"/invite/{token_data['token']}",
+        "expires_at": token_data['expires_at'],
+        "email": token_data['email'],
+        "name": token_data['name'],
+    }
 
 @app.post("/admin/registrations/reject")
 async def reject_registration(request: Request, user=Depends(require_role("admin"))):
