@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Home, ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
@@ -143,7 +143,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
             title={t('navigation.backToDashboard')}
           >
-            <Home size={16} />
+            <img src="/logo.png" alt="VUTT" className="h-5 w-auto" />
           </button>
           <span className="text-xs text-gray-500">ID:</span>
           <button

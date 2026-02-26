@@ -13,7 +13,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, Home, LogOut, LogIn, Settings, History, Copy, Check, Upload, Wrench } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogOut, LogIn, Settings, History, Copy, Check, Upload, Wrench } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { FILE_API_URL } from '../config';
@@ -414,7 +414,7 @@ const Workspace: React.FC = () => {
             className="p-1.5 hover:bg-gray-100 rounded-md text-gray-600 transition-colors flex items-center gap-1.5"
             title={t('navigation.backToDashboard')}
           >
-            <Home size={16} />
+            <img src="/logo.png" alt="VUTT" className="h-5 w-auto" />
             <span className="font-bold text-gray-800 tracking-tight hidden sm:inline">{t('common:app.name')}</span>
           </button>
           {/* Otsing */}
