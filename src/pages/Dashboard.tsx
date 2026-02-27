@@ -324,8 +324,8 @@ const Dashboard: React.FC = () => {
   const publisherIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const work of works) {
-      const id = (work as any).publisher_id;
-      const label = (work as any).publisher;
+      const id = work.publisher_id;
+      const label = work.publisher;
       if (id && label) map[id] = label;
     }
     return map;

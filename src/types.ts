@@ -100,6 +100,7 @@ export interface Work {
   location_object?: LinkedEntity; // Trükikoht (objekt)
   publisher: string;        // Trükkal (string facetiks)
   publisher_object?: LinkedEntity; // Trükkal (objekt)
+  publisher_id?: string;    // Trükkal (Wikidata Q-kood)
 
   // Taksonoomia
   type?: string;            // 'impressum' | 'manuscriptum'
