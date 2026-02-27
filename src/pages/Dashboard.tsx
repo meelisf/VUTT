@@ -809,7 +809,7 @@ const Dashboard: React.FC = () => {
                       setInputValue('');
                       setYearStart('1630');
                       setYearEnd('1710');
-                      setSort('recent');
+                      setSort('year_asc');
                       setSelectedTags([]);
                       setSearchParams({});
                     }}

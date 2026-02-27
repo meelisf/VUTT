@@ -86,8 +86,9 @@ export const normalizeWork = (hit: any): Work => {
     year: hit.year ?? 0,
     location: hit.location || '',
     location_object: hit.location_object,
-    publisher: hit.publisher || '',
-    publisher_object: hit.publisher_object,
+    // Toeta nii vana (publisher = LinkedEntity objekt) kui uut (publisher = string) Meili formaati
+    publisher: typeof hit.publisher === 'string' ? hit.publisher : (hit.publisher?.label || ''),
+    publisher_object: typeof hit.publisher === 'object' && hit.publisher !== null ? hit.publisher : hit.publisher_object,
     type: hit.type,
     type_object: hit.type_object,
     genre: hit.genre,

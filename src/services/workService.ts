@@ -74,8 +74,8 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       year: hit.year ?? hit.aasta ?? 0,
       location: hit.location || '',
       location_object: hit.location,
-      publisher: hit.publisher || '',
-      publisher_object: hit.publisher_object,
+      publisher: typeof hit.publisher === 'string' ? hit.publisher : (hit.publisher?.label || ''),
+      publisher_object: typeof hit.publisher === 'object' && hit.publisher !== null ? hit.publisher : hit.publisher_object,
 
       // V2 taksonoomia
       type: hit.type,
