@@ -6,6 +6,7 @@ import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getWorkFullText, getAllTags } from '../../services/searchService';
+import { isQCode } from '../../services/meiliService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
@@ -247,7 +248,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <div className="flex items-center gap-1.5 group">
                     <div className="flex items-center gap-1.5 text-gray-900 overflow-hidden">
                       <button
-                        onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
+                        onClick={() => { const pubId = (work.publisher_object as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
                         className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
                         title="Filtreeri trükkali järgi"
                       >
@@ -255,7 +256,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       </button>
                       <span
                         className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
-                        onClick={() => navigate(`/?printer=${encodeURIComponent(getLabel(work.publisher, lang))}`)}
+                        onClick={() => { const pubId = (work.publisher_object as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
                       >
                         {getLabel(work.publisher, lang)}
                       </span>

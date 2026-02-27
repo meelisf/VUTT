@@ -254,7 +254,12 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`respondens_names = "${options.respondens}"`);
     }
     if (options?.printer) {
-      filter.push(`publisher = "${options.printer}"`);
+      // Q-kood → publisher_id filter, muidu label täpne vaste
+      if (isQCode(options.printer)) {
+        filter.push(`publisher_id = "${options.printer}"`);
+      } else {
+        filter.push(`publisher = "${options.printer}"`);
+      }
     }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
@@ -299,7 +304,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       attributesToRetrieve: [
-        'id', 'work_id', 'title', 'year', 'location', 'publisher',
+        'id', 'work_id', 'title', 'year', 'location', 'publisher', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',

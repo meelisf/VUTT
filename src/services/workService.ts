@@ -50,7 +50,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'id', 'title', 'year', 'location', 'publisher',
+        'work_id', 'id', 'title', 'year', 'location', 'publisher', 'publisher_object', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -75,7 +75,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       location: hit.location || '',
       location_object: hit.location,
       publisher: hit.publisher || '',
-      publisher_object: hit.publisher,
+      publisher_object: hit.publisher_object,
 
       // V2 taksonoomia
       type: hit.type,

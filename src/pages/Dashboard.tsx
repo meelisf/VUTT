@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/searchService';
+import { isQCode } from '../services/meiliService';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
@@ -318,6 +319,17 @@ const Dashboard: React.FC = () => {
     }
     return map;
   }, [works, i18n.language]);
+
+  // Q-kood → trükkali nimi (publisher_id → publisher label)
+  const publisherIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const work of works) {
+      const id = (work as any).publisher_id;
+      const label = (work as any).publisher;
+      if (id && label) map[id] = label;
+    }
+    return map;
+  }, [works]);
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -754,7 +766,7 @@ const Dashboard: React.FC = () => {
                 {printerParam && (
                   <div className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium">
                     <span className="font-serif">¶</span>
-                    <span className="truncate max-w-32">{printerParam}</span>
+                    <span className="truncate max-w-32">{isQCode(printerParam) ? (publisherIdMap[printerParam] || printerParam) : printerParam}</span>
                     <button
                       onClick={() => {
                         const newParams = new URLSearchParams(searchParams);
