@@ -882,8 +882,8 @@ const Dashboard: React.FC = () => {
                   newParams.set('page', newPage.toString());
                 }
                 setSearchParams(newParams, { replace: true });
-                // Scroll to top
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                // Scroll to top (keritav element on scrollContainerRef, mitte window)
+                scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
               };
 
               // Generate page numbers to show
