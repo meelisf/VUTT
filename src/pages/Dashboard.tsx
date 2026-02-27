@@ -146,6 +146,7 @@ const Dashboard: React.FC = () => {
   }, []);
 
   // Sync state with URL params (e.g. back button, or navigation from WorkCard)
+  // NB: pageParam on eraldi efektis, et lehevahetuse puhul ei käivituks fetchWorks uuesti
   useEffect(() => {
     setInputValue(queryParam);
     if (yearStartParam) setYearStart(yearStartParam);
@@ -155,8 +156,12 @@ const Dashboard: React.FC = () => {
     setSelectedGenre(genreParam);
     setSelectedType(typeParam);
     setSelectedStatus(statusParam);
+  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam]);
+
+  // Sünkroniseeri lehekülje number URL parameetrist (nt tagasi-navigatsioon, otselink)
+  useEffect(() => {
     setCurrentPage(pageParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam, pageParam]);
+  }, [pageParam]);
 
   // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega, vt server/utils.py capitalize_first)
   const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
