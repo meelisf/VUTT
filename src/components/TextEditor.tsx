@@ -509,6 +509,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
             </div>
 
+            {/* Re-OCR käimasoleku bänner */}
+            {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
+              <div className="shrink-0 bg-emerald-50 border-b border-emerald-200 px-4 py-2 flex items-center gap-2 text-xs text-emerald-800">
+                <Loader2 className="animate-spin shrink-0" size={12} />
+                {t('editor.reocr.inProgress')}
+              </div>
+            )}
+
             {/* 3. EDITOR AREA */}
             <div className="flex-1 relative flex overflow-hidden bg-white">
 

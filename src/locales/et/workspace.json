@@ -222,6 +222,7 @@
       "button": "Transkriptsioon",
       "uploading": "Laadin...",
       "processing": "OCR töötleb...",
+      "inProgress": "Transkriptsioon käib — ära seda lehekülge sulge.",
       "modalTitle": "Re-OCR tulemus",
       "modalHint": "Kas soovid asendada praeguse teksti automaatse transkriptsiooniga?",
       "apply": "Asenda tekst",

@@ -222,6 +222,7 @@
       "button": "Transcription",
       "uploading": "Uploading...",
       "processing": "OCR processing...",
+      "inProgress": "Transcription in progress — don't close this page.",
       "modalTitle": "Re-OCR result",
       "modalHint": "Do you want to replace the current text with the automatic transcription?",
       "apply": "Replace text",
