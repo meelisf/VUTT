@@ -217,6 +217,16 @@
       "marginalia": "Ääremärkus",
       "footnote": "Joonealune märkus",
       "pageBreak": "Lehekülje vahetus"
+    },
+    "reocr": {
+      "button": "Transkriptsioon",
+      "uploading": "Laadin...",
+      "processing": "OCR töötleb...",
+      "modalTitle": "Re-OCR tulemus",
+      "modalHint": "Kas soovid asendada praeguse teksti automaatse transkriptsiooniga?",
+      "apply": "Asenda tekst",
+      "cancel": "Loobu",
+      "error": "Re-OCR ebaõnnestus"
     }
   }
 }

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { getAllTags } from '../services/searchService';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2 } from 'lucide-react';
+import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2, Wand2 } from 'lucide-react';
 import MarkdownPreview from './MarkdownPreview';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
@@ -56,6 +56,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [page_tags, setPageTags] = useState<(string | any)[]>(page.page_tags || []);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // Re-OCR state
+  type ReocrStatus = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
+  const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
+  const [reocrText, setReocrText] = useState<string | null>(null);
+  const [reocrError, setReocrError] = useState<string | null>(null);
+  const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Erimärkide state
   const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
@@ -248,6 +255,78 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, text, status, comments, page_tags, onSave]);
 
+  // Re-OCR: pollimise puhastus unmount'il
+  useEffect(() => {
+    return () => {
+      if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
+    };
+  }, []);
+
+  const handleReOcr = useCallback(async () => {
+    if (!page.image_url || !authToken) return;
+    const pageFilename = page.image_url.split('/').pop();
+    if (!pageFilename) return;
+
+    if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
+    setReocrStatus('uploading');
+    setReocrText(null);
+    setReocrError(null);
+
+    try {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page_filename: pageFilename, auth_token: authToken }),
+        timeout: 30000,
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.detail || 'Re-OCR alustamine ebaõnnestus');
+      }
+      const { job_id } = await res.json();
+      setReocrStatus('processing');
+
+      const poll = async () => {
+        try {
+          const pr = await fetchWithTimeout(
+            `${FILE_API_URL}/admin/reocr/${job_id}/status?token=${authToken}`,
+            { timeout: 10000 }
+          );
+          if (!pr.ok) throw new Error('Polling ebaõnnestus');
+          const pd = await pr.json();
+          if (pd.status === 'done') {
+            setReocrStatus('done');
+            setReocrText(pd.text ?? '');
+          } else if (pd.status === 'error') {
+            setReocrStatus('error');
+            setReocrError(pd.error || 'Tundmatu viga');
+          } else {
+            reocrPollRef.current = setTimeout(poll, 3000);
+          }
+        } catch {
+          reocrPollRef.current = setTimeout(poll, 4000);
+        }
+      };
+      reocrPollRef.current = setTimeout(poll, 3000);
+    } catch (e: any) {
+      setReocrStatus('error');
+      setReocrError(e.message || 'Viga');
+    }
+  }, [page.image_url, page.work_id, authToken]);
+
+  const applyReOcr = useCallback(() => {
+    if (reocrText !== null) setText(reocrText);
+    setReocrStatus('idle');
+    setReocrText(null);
+  }, [reocrText]);
+
+  const dismissReOcr = useCallback(() => {
+    if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
+    setReocrStatus('idle');
+    setReocrText(null);
+    setReocrError(null);
+  }, []);
+
   // Ctrl+S salvestamine
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -315,19 +394,39 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             </button>
           </div>
 
-          {/* RIGHT: Save Button — peidetud sisselogimata kasutajalt */}
+          {/* RIGHT: nupud — peidetud sisselogimata kasutajalt */}
           {!readOnly && (
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`flex items-center gap-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 ${(hasUnsavedChanges || statusDirty)
-                ? 'bg-amber-500 hover:bg-amber-600'
-                : 'bg-primary-600 hover:bg-primary-700'
-                }`}
-            >
-              {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-              {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Re-OCR nupp — ainult adminile */}
+              {user?.role === 'admin' && (
+                <button
+                  onClick={handleReOcr}
+                  disabled={reocrStatus !== 'idle'}
+                  title={t('editor.reocr.button')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-60 bg-emerald-600 hover:bg-emerald-700"
+                >
+                  {reocrStatus === 'uploading' || reocrStatus === 'processing'
+                    ? <Loader2 className="animate-spin" size={12} />
+                    : <Wand2 size={12} />}
+                  {reocrStatus === 'uploading'
+                    ? t('editor.reocr.uploading')
+                    : reocrStatus === 'processing'
+                      ? t('editor.reocr.processing')
+                      : t('editor.reocr.button')}
+                </button>
+              )}
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`flex items-center gap-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 ${(hasUnsavedChanges || statusDirty)
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-primary-600 hover:bg-primary-700'
+                  }`}
+              >
+                {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -412,6 +511,46 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
             {/* 3. EDITOR AREA */}
             <div className="flex-1 relative flex overflow-hidden bg-white">
+
+              {/* Re-OCR tulemus overlay */}
+              {(reocrStatus === 'done' || reocrStatus === 'error') && (
+                <div className="absolute inset-0 z-20 bg-white/95 flex flex-col">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
+                    <span className="text-sm font-semibold text-gray-800">
+                      {reocrStatus === 'error' ? t('editor.reocr.error') : t('editor.reocr.modalTitle')}
+                    </span>
+                    <button onClick={dismissReOcr} className="text-gray-400 hover:text-gray-600">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  {reocrStatus === 'error' ? (
+                    <div className="flex-1 flex items-center justify-center p-6 text-sm text-red-600">
+                      {reocrError}
+                    </div>
+                  ) : (
+                    <>
+                      <p className="px-4 pt-3 pb-1 text-xs text-gray-500 shrink-0">{t('editor.reocr.modalHint')}</p>
+                      <div className="flex-1 overflow-auto px-4 pb-2">
+                        <pre className="font-serif text-[15px] leading-[1.7] text-gray-800 whitespace-pre-wrap">{reocrText}</pre>
+                      </div>
+                      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
+                        <button
+                          onClick={dismissReOcr}
+                          className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                        >
+                          {t('editor.reocr.cancel')}
+                        </button>
+                        <button
+                          onClick={applyReOcr}
+                          className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
+                        >
+                          {t('editor.reocr.apply')}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               {/* Line Numbers Column */}
               <div
                 ref={lineNumbersRef}

@@ -1099,3 +1099,122 @@ def cancel_upload(upload_id: str) -> bool:
     except Exception as e:
         logger.error(f"cancel_upload {upload_id}: {e}")
         return False
+
+
+# =========================================================
+# RE-OCR — olemasoleva lehekülje uuesti transkribeerimine
+# =========================================================
+
+_reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
+
+
+def start_reocr_job(work_id: str, slug: str, img_path: str) -> str:
+    """
+    Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.
+    Tagastab job_id, mille abil saab staatust küsida poll_reocr_job() kaudu.
+    """
+    job_id = generate_nanoid()
+    remote_staging = f"AUTO-OCR/{job_id}"
+    remote_work = f"AUTO-OCR/{job_id}/{slug}"
+    remote_img_name = f"{slug}_pg_001.jpg"
+
+    _reocr_jobs[job_id] = {
+        "work_id": work_id,
+        "slug": slug,
+        "status": "uploading",
+        "text": None,
+        "error": None,
+        "remote_staging": remote_staging,
+        "remote_work": remote_work,
+        "remote_img": f"{remote_work}/{remote_img_name}",
+        "remote_txt": f"{remote_work}/{slug}_pg_001.txt",
+    }
+
+    def _upload():
+        try:
+            sftp = _sftp_open(job_id)
+            staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
+            work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
+            for d in (staging_abs, work_abs):
+                try:
+                    sftp.stat(d)
+                except FileNotFoundError:
+                    sftp.mkdir(d)
+            img_abs = f"{OCR_SERVER_PATH}/{_reocr_jobs[job_id]['remote_img']}"
+            sftp.put(img_path, img_abs)
+            sftp.close()
+            _reocr_jobs[job_id]["status"] = "processing"
+            logger.info(f"Re-OCR {job_id}: pilt edastatud ({slug})")
+        except Exception as e:
+            logger.error(f"Re-OCR {job_id} upload viga: {e}")
+            _reocr_jobs[job_id]["status"] = "error"
+            _reocr_jobs[job_id]["error"] = str(e)
+        finally:
+            try:
+                os.unlink(img_path)
+            except Exception:
+                pass
+
+    threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}").start()
+    return job_id
+
+
+def poll_reocr_job(job_id: str) -> dict:
+    """
+    Küsib re-OCR töö staatuse.
+    Kui olek on 'processing', proovib SFTP kaudu TXT faili alla laadida.
+    Tagastab: {status, text?, error?}
+    """
+    job = _reocr_jobs.get(job_id)
+    if not job:
+        return {"status": "not_found"}
+
+    current = job["status"]
+    if current in ("uploading", "done", "error"):
+        return {"status": current, "text": job.get("text"), "error": job.get("error")}
+
+    # status == 'processing' — proovi TXT alla laadida
+    try:
+        sftp = _sftp_open(job_id)
+        txt_abs = f"{OCR_SERVER_PATH}/{job['remote_txt']}"
+        try:
+            sftp.stat(txt_abs)
+        except FileNotFoundError:
+            sftp.close()
+            return {"status": "processing", "text": None, "error": None}
+
+        # TXT on valmis — laadi sisu alla
+        import io
+        buf = io.BytesIO()
+        sftp.getfo(txt_abs, buf)
+        text = buf.getvalue().decode("utf-8", errors="replace")
+        sftp.close()
+
+        # Puhasta OCR serveri kataloog taustal
+        try:
+            sftp2 = _sftp_open(job_id)
+            img_abs = f"{OCR_SERVER_PATH}/{job['remote_img']}"
+            work_abs = f"{OCR_SERVER_PATH}/{job['remote_work']}"
+            staging_abs = f"{OCR_SERVER_PATH}/{job['remote_staging']}"
+            for f in (txt_abs, img_abs):
+                try:
+                    sftp2.remove(f)
+                except Exception:
+                    pass
+            for d in (work_abs, staging_abs):
+                try:
+                    sftp2.rmdir(d)
+                except Exception:
+                    pass
+            sftp2.close()
+        except Exception as cleanup_err:
+            logger.warning(f"Re-OCR {job_id} cleanup viga: {cleanup_err}")
+
+        close_ssh(job_id)
+        job["status"] = "done"
+        job["text"] = text
+        logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
+    except Exception as e:
+        logger.warning(f"Re-OCR {job_id} poll viga: {e}")
+
+    return {"status": job["status"], "text": job.get("text"), "error": job.get("error")}

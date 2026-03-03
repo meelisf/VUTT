@@ -217,6 +217,16 @@
       "marginalia": "Marginalia",
       "footnote": "Footnote",
       "pageBreak": "Page break"
+    },
+    "reocr": {
+      "button": "Transcription",
+      "uploading": "Uploading...",
+      "processing": "OCR processing...",
+      "modalTitle": "Re-OCR result",
+      "modalHint": "Do you want to replace the current text with the automatic transcription?",
+      "apply": "Replace text",
+      "cancel": "Cancel",
+      "error": "Re-OCR failed"
     }
   }
 }

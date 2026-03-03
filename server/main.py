@@ -27,7 +27,7 @@ from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work
+    import_as_work, start_reocr_job, poll_reocr_job
 )
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
@@ -685,6 +685,34 @@ async def admin_upload_import(upload_id: str, user=Depends(require_role("admin")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
     if cancel_upload(upload_id): return {"status": "success"}
     raise HTTPException(status_code=500)
+
+# =========================================================
+# RE-OCR — olemasoleva lehekülje uuesti transkribeerimine
+# =========================================================
+
+@app.post("/admin/work/{work_id}/reocr-page")
+async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Alustab lehekülje pildi re-OCR tööd. Tagastab job_id pollimiseks."""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teos ei leitud")
+    slug = os.path.basename(path)
+    data = await get_json_data(request)
+    page_filename = data.get("page_filename")
+    if not page_filename:
+        raise HTTPException(status_code=400, detail="page_filename puudub")
+    img_path = os.path.join(path, page_filename)
+    if not os.path.isfile(img_path):
+        raise HTTPException(status_code=404, detail="Pilti ei leitud")
+    tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
+    shutil.copy2(img_path, tmp_path)
+    job_id = start_reocr_job(work_id, slug, tmp_path)
+    return {"status": "accepted", "job_id": job_id}
+
+@app.get("/admin/reocr/{job_id}/status")
+async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
+    """Küsib re-OCR töö staatust. Küsida korduvalt kuni done/error."""
+    return {"status": "success", **poll_reocr_job(job_id)}
 
 # =========================================================
 # AVALIKUD ANDMED JA SEO
