@@ -1106,8 +1106,28 @@ def cancel_upload(upload_id: str) -> bool:
 # =========================================================
 
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
+_reocr_jobs_lock = threading.Lock()
 
-REOCR_MAX_CONCURRENT = 5  # Max korraga aktiivseid re-OCR töid
+REOCR_MAX_CONCURRENT = 5   # Max korraga aktiivseid re-OCR töid
+REOCR_JOB_TTL = 3600       # Valmis/vigased tööd kustutatakse 1h pärast
+
+
+def _reocr_cleanup_loop():
+    """Daemon-thread: eemaldab vanad done/error re-OCR tööd mälust."""
+    import time
+    while True:
+        time.sleep(600)  # kontrolli iga 10 minuti järel
+        cutoff = datetime.now().timestamp() - REOCR_JOB_TTL
+        with _reocr_jobs_lock:
+            stale = [jid for jid, j in _reocr_jobs.items()
+                     if j["status"] in ("done", "error") and j.get("finished_at", 0) < cutoff]
+            for jid in stale:
+                del _reocr_jobs[jid]
+        if stale:
+            logger.info(f"Re-OCR cleanup: eemaldati {len(stale)} vana tööd")
+
+
+threading.Thread(target=_reocr_cleanup_loop, daemon=True, name="reocr-cleanup").start()
 
 
 def get_active_reocr_count() -> int:
@@ -1156,6 +1176,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str) -> str:
             logger.error(f"Re-OCR {job_id} upload viga: {e}")
             _reocr_jobs[job_id]["status"] = "error"
             _reocr_jobs[job_id]["error"] = str(e)
+            _reocr_jobs[job_id]["finished_at"] = datetime.now().timestamp()
         finally:
             try:
                 os.unlink(img_path)
@@ -1220,6 +1241,7 @@ def poll_reocr_job(job_id: str) -> dict:
         close_ssh(job_id)
         job["status"] = "done"
         job["text"] = text
+        job["finished_at"] = datetime.now().timestamp()
         logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
     except Exception as e:
         logger.warning(f"Re-OCR {job_id} poll viga: {e}")
