@@ -1107,6 +1107,13 @@ def cancel_upload(upload_id: str) -> bool:
 
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
 
+REOCR_MAX_CONCURRENT = 5  # Max korraga aktiivseid re-OCR töid
+
+
+def get_active_reocr_count() -> int:
+    """Tagastab parajasti aktiivsete (uploading/processing) re-OCR tööde arvu."""
+    return sum(1 for j in _reocr_jobs.values() if j["status"] in ("uploading", "processing"))
+
 
 def start_reocr_job(work_id: str, slug: str, img_path: str) -> str:
     """
