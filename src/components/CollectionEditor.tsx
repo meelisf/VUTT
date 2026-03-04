@@ -39,7 +39,13 @@ const CollectionEditor: React.FC = () => {
   // Hierarhiline puu (order järgi, peakollektsioonid ees)
   const tree = buildCollectionTree(collections);
 
-  // Lae valitud kollektsiooni andmed vormi
+  // Reset tagasiside kui kasutaja vahetab kollektsiooni
+  useEffect(() => {
+    setSaved(false);
+    setError(null);
+  }, [selectedId]);
+
+  // Lae valitud kollektsiooni andmed vormi (ka pärast refreshCollections)
   useEffect(() => {
     if (!selectedId || !collections[selectedId]) {
       setDescEt(''); setDescEn(''); setDescLongEt(''); setDescLongEn('');
@@ -50,8 +56,6 @@ const CollectionEditor: React.FC = () => {
     setDescEn(col.description?.en || '');
     setDescLongEt(col.description_long?.et || '');
     setDescLongEn(col.description_long?.en || '');
-    setSaved(false);
-    setError(null);
   }, [selectedId, collections]);
 
   const handleSave = async () => {
