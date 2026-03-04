@@ -229,7 +229,7 @@ def create_upload(meta: dict) -> dict:
     meta peab sisaldama: title, year, slug
     Valikulised: type, type_object, genre, genre_object, creators,
                  location, location_object, publisher, publisher_object,
-                 collection, languages, tags, tags_object
+                 collections, languages, tags, tags_object
     """
     upload_id = generate_nanoid()
     while os.path.isdir(_upload_dir(upload_id)):
@@ -258,7 +258,7 @@ def create_upload(meta: dict) -> dict:
             "location_object": meta.get('location_object'),
             "publisher": meta.get('publisher'),
             "publisher_object": meta.get('publisher_object'),
-            "collection": meta.get('collection'),
+            "collections": meta.get('collections', []),
             "languages": meta.get('languages', []),
             "tags": meta.get('tags', []),
             "tags_object": meta.get('tags_object', []),
@@ -901,7 +901,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     meta = state['meta']
     title = meta['title']
     slug = meta['slug']
-    collection = meta.get('collection') or None
+    work_collections = meta.get('collections') or []
     languages = meta.get('languages') or []
     try:
         year = int(str(meta.get('year', '')))
@@ -1000,7 +1000,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         "title": title,
         "creators": [],
         "tags": [],
-        "collection": collection,
+        "collections": work_collections,
         "languages": languages,
     }
     if year is not None:

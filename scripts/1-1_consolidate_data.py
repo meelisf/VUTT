@@ -112,23 +112,35 @@ def get_creator_aliases(creators, people_data):
     return aliases
 
 
-def get_collection_hierarchy(collections, collection_id):
+def get_collection_hierarchy(collections, collection_ids):
     """
-    Tagastab kollektsiooni hierarhia (vanematest lapseni).
-    Näiteks: ["universitas-dorpatensis-1", "academia-gustaviana"]
+    Tagastab kollektsioonide hierarhia (kõigi kuuluvate kollektsioonide esivanemate union).
+
+    Args:
+        collections: Kõigi kollektsioonide dict
+        collection_ids: Üks ID (str) või list ID-sid
     """
-    if not collection_id or not collections:
+    if not collection_ids or not collections:
         return []
 
-    hierarchy = []
-    current_id = collection_id
+    if isinstance(collection_ids, str):
+        ids = [collection_ids]
+    else:
+        ids = [c for c in collection_ids if c]
 
-    while current_id:
-        hierarchy.insert(0, current_id)
-        collection = collections.get(current_id)
-        current_id = collection.get('parent') if collection else None
+    seen = set()
+    result = []
 
-    return hierarchy
+    for cid in ids:
+        current = cid
+        while current:
+            if current not in seen:
+                seen.add(current)
+                result.append(current)
+            col = collections.get(current)
+            current = col.get('parent') if col else None
+
+    return result
 
 
 
@@ -278,7 +290,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'slug': sanitize_id(dir_name),
         'type': 'impressum',
         'genre': None,
-        'collection': None,
+        'collections': [],
         'collections_hierarchy': [],
         'title': 'Pealkiri puudub',
         'year': None,
@@ -306,12 +318,12 @@ def get_work_metadata(doc_path, dir_name, collections):
 
                 result['type'] = meta.get('type', 'impressum')
                 result['genre'] = meta.get('genre')
-                result['collection'] = meta.get('collection')
+                result['collections'] = meta.get('collections', [])
 
                 # Hierarhia laiendamine
-                if result['collection']:
+                if result['collections']:
                     result['collections_hierarchy'] = get_collection_hierarchy(
-                        collections, result['collection']
+                        collections, result['collections']
                     )
 
                 # V1/V2 fallback: v2 esmalt, siis v1
@@ -505,7 +517,7 @@ def create_meilisearch_data_per_page():
                 'genre_search': get_all_labels(doc_metadata.get('genre')),
                 'genre_ids': get_all_ids(doc_metadata.get('genre')),
                 
-                'collection': doc_metadata.get('collection'),
+                'collections': doc_metadata.get('collections', []),
                 'collections_hierarchy': doc_metadata.get('collections_hierarchy', []),
 
                 # Isikud

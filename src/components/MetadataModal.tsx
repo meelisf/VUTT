@@ -32,7 +32,7 @@ interface MetadataForm {
   languages: string[];
   ester_id: string;
   external_url: string;
-  collection: string | null;
+  collections: string[];
 }
 
 interface SuggestionItem {
@@ -66,7 +66,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     languages: [],
     ester_id: '',
     external_url: '',
-    collection: null
+    collections: []
   });
   const [suggestions, setSuggestions] = useState<{
     authors: SuggestionItem[];
@@ -110,7 +110,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       languages: work?.languages || page.languages || [],
       ester_id: work?.ester_id || page.ester_id || '',
       external_url: work?.external_url || page.external_url || '',
-      collection: work?.collection || page.collection || null
+      collections: work?.collections || page.collections || []
     });
 
     // Lae sõnavara
@@ -207,7 +207,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           languages: m.languages || [],
           ester_id: m.ester_id || '',
           external_url: m.external_url || '',
-          collection: m.collection || null
+          collections: Array.isArray(m.collections) ? m.collections : []
         });
       }
     } catch (e) {
@@ -264,7 +264,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           publisher: metaForm.publisher,
           ester_id: cleanEsterId || null,
           external_url: metaForm.external_url.trim() || null,
-          collection: metaForm.collection
+          collections: metaForm.collections
         }
       };
 
@@ -323,7 +323,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             publisher_object: metaForm.publisher as LinkedEntity,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
-            collection: metaForm.collection
+            collections: metaForm.collections
           } as Partial<Page>,
           {
             title: metaForm.title,
@@ -342,7 +342,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             publisher_object: metaForm.publisher as LinkedEntity,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
-            collection: metaForm.collection
+            collections: metaForm.collections
           } as Partial<Work>
         );
 
@@ -541,24 +541,30 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.genres}
                 />
               </div>
-              {/* Kollektsioon */}
+              {/* Kollektsioonid (multi-select) */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
                   <Library size={12} />
                   {t('metadata.collection')}
                 </label>
-                <select
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  value={metaForm.collection || ''}
-                  onChange={e => setMetaForm({ ...metaForm, collection: e.target.value || null })}
-                >
-                  <option value="">{t('metadata.noCollection')}</option>
+                <div className="border border-gray-300 rounded px-3 py-2 max-h-40 overflow-y-auto flex flex-col gap-1">
                   {Object.entries(collections).map(([id, col]) => (
-                    <option key={id} value={id}>
-                      {col.name[lang] || col.name.et}
-                    </option>
+                    <label key={id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                      <input
+                        type="checkbox"
+                        checked={metaForm.collections.includes(id)}
+                        onChange={e => {
+                          const next = e.target.checked
+                            ? [...metaForm.collections, id]
+                            : metaForm.collections.filter(c => c !== id);
+                          setMetaForm({ ...metaForm, collections: next });
+                        }}
+                        className="rounded"
+                      />
+                      <span>{col.name[lang] || col.name.et}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
             {/* Keeled */}

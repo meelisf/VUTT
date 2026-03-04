@@ -107,7 +107,7 @@ export interface Work {
   type_object?: LinkedEntity;
   genre?: string | null;    // 'disputatio' jne (string facetiks)
   genre_object?: LinkedEntity | LinkedEntity[] | null;
-  collection?: string | null;
+  collections?: string[];
   collections_hierarchy?: string[];
 
   // Isikud - KASUTA SEDA, mitte author/respondens!
@@ -187,7 +187,7 @@ export interface Page {
   type_object?: LinkedEntity;
   genre?: string | null;
   genre_object?: LinkedEntity | LinkedEntity[] | null;
-  collection?: string | null;
+  collections?: string[];
   collections_hierarchy?: string[];
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];
@@ -240,7 +240,7 @@ export interface ContentSearchOptions {
   teoseTags?: string[];
   genre?: string[];       // V2: žanri filter (mitu valikut OR loogikaga)
   type?: string[];        // V2: tüübi filter (mitu valikut OR loogikaga)
-  collection?: string;    // V2: kollektsiooni filter
+  collection?: string;    // V2: kollektsiooni filter (collections_hierarchy kaudu)
   lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
   author?: string;        // V2: autori filter (creators massiivist)
 }
@@ -268,7 +268,7 @@ export interface ContentSearchHit {
   genre_object?: LinkedEntity | LinkedEntity[] | null;
   type?: string | null;
   type_object?: LinkedEntity | null;
-  collection?: string | null;
+  collections?: string[];
   creators?: Creator[];
   authors_text?: string[];
   tags?: string[]; // Added support for V3

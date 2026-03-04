@@ -226,24 +226,25 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             <BookOpen size={14} />
             <span>{work.page_count} {t('common:labels.pages')}</span>
           </div>
-          {/* Kollektsiooni badge */}
-          {work.collection && collections[work.collection] && (() => {
-            const colorClasses = getCollectionColorClasses(collections[work.collection]);
+          {/* Kollektsioonide badged */}
+          {(work.collections || []).filter(cid => collections[cid]).map(cid => {
+            const colorClasses = getCollectionColorClasses(collections[cid]);
             return (
               <button
+                key={cid}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  navigate(`/?collection=${encodeURIComponent(work.collection!)}`);
+                  navigate(`/?collection=${encodeURIComponent(cid)}`);
                 }}
                 className={`flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full cursor-pointer transition-colors max-w-full ${colorClasses.bg} ${colorClasses.text} ${colorClasses.hoverBg}`}
-                title={getCollectionName(work.collection, lang as 'et' | 'en')}
+                title={getCollectionName(cid, lang as 'et' | 'en')}
               >
                 <FolderOpen size={12} className="shrink-0" />
-                <span className="truncate">{getCollectionName(work.collection, lang as 'et' | 'en')}</span>
+                <span className="truncate">{getCollectionName(cid, lang as 'et' | 'en')}</span>
               </button>
             );
-          })()}
+          })}
         </div>
 
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">

@@ -51,7 +51,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       attributesToRetrieve: [
         // V2 väljad
         'work_id', 'id', 'title', 'year', 'location', 'publisher', 'publisher_object', 'publisher_id',
-        'type', 'type_object', 'genre', 'genre_object', 'collection', 'collections_hierarchy',
+        'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         // Filtrite/sortimise väljad
@@ -82,7 +82,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       type_object: hit.type_object,
       genre: hit.genre_object || hit.genre,
       genre_object: hit.genre_object,
-      collection: hit.collection,
+      collections: hit.collections || [],
       collections_hierarchy: hit.collections_hierarchy || [],
 
       // V2 isikud

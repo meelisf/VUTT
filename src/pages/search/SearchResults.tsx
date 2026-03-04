@@ -353,16 +353,16 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                                         );
                                                     })()}
 
-                                                    {/* Kollektsioon */}
-                                                    {firstHit.collection && collections[firstHit.collection] && (() => {
-                                                        const colorClasses = getCollectionColorClasses(collections[firstHit.collection]);
+                                                    {/* Kollektsioonid */}
+                                                    {(firstHit.collections || []).filter(cid => collections[cid]).map(cid => {
+                                                        const colorClasses = getCollectionColorClasses(collections[cid]);
                                                         return (
-                                                            <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${colorClasses.bg} ${colorClasses.text}`}>
+                                                            <span key={cid} className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${colorClasses.bg} ${colorClasses.text}`}>
                                                                 <FolderOpen size={10} />
-                                                                {getCollectionName(firstHit.collection, lang as 'et' | 'en')}
+                                                                {getCollectionName(cid, lang as 'et' | 'en')}
                                                             </span>
                                                         );
-                                                    })()}
+                                                    })}
                                                 </div>
                                             </div>
                                             <div className="shrink-0 text-right">

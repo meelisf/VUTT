@@ -151,20 +151,38 @@ def load_collections():
     return {}
 
 
-def get_collection_hierarchy(collections, collection_id):
-    """Tagastab kollektsiooni hierarhia (vanematest lapseni)."""
-    if not collection_id or not collections:
+def get_collection_hierarchy(collections, collection_ids):
+    """Tagastab kollektsioonide hierarhia (kõigi kuuluvate kollektsioonide esivanemate union).
+
+    Args:
+        collections: Kõigi kollektsioonide dict (state/collections.json)
+        collection_ids: Üks kollektsiooni ID (str) või list ID-sid
+
+    Returns:
+        Kõigi kollektsioonide ja nende esivanemate ID-de list (duplikaadid eemaldatud)
+    """
+    if not collection_ids or not collections:
         return []
 
-    hierarchy = []
-    current_id = collection_id
+    # Normaliseeri listiks
+    if isinstance(collection_ids, str):
+        ids = [collection_ids]
+    else:
+        ids = [c for c in collection_ids if c]
 
-    while current_id:
-        hierarchy.insert(0, current_id)
-        collection = collections.get(current_id)
-        current_id = collection.get('parent') if collection else None
+    seen = set()
+    result = []
 
-    return hierarchy
+    for cid in ids:
+        current = cid
+        while current:
+            if current not in seen:
+                seen.add(current)
+                result.append(current)
+            col = collections.get(current)
+            current = col.get('parent') if col else None
+
+    return result
 
 
 def wait_for_task(task_uid, timeout=30):
@@ -293,10 +311,10 @@ def sync_work_to_meilisearch(dir_name):
     if isinstance(tags, list):
         tags = [normalize_genre(t) for t in tags]
 
-    # Kollektsioon
-    collection = metadata.get('collection')
+    # Kollektsioonid (uus formaat: massiiv)
+    work_collections = metadata.get('collections', [])
     collections = load_collections()
-    collections_hierarchy = get_collection_hierarchy(collections, collection)
+    collections_hierarchy = get_collection_hierarchy(collections, work_collections)
 
     ester_id = metadata.get('ester_id')
     external_url = metadata.get('external_url')
@@ -435,7 +453,7 @@ def sync_work_to_meilisearch(dir_name):
             "tags_object": tags,
             "tags_search": get_all_labels(tags),
             "tags_ids": get_all_ids(tags),
-            "collection": collection,
+            "collections": work_collections,
             "collections_hierarchy": collections_hierarchy,
             "location": get_label(location),
             "location_object": location,

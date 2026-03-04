@@ -532,8 +532,8 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
-    "title", "year", "location", "publisher", "creators", "tags", 
-    "collection", "type", "genre", "languages", "ester_id", "external_url",
+    "title", "year", "location", "publisher", "creators", "tags",
+    "collections", "type", "genre", "languages", "ester_id", "external_url",
     "location_object", "publisher_object", "type_object", "genre_object", "tags_object",
     "series", "relations"
 }
@@ -619,6 +619,39 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
     save_with_git(path, content, user['username'], message=f"Restore: {data.get('commit_hash')[:8]}")
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     return {"status": "success", "restored_content": content}
+
+@app.post("/works/bulk-collection")
+async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    """Määrab mitme teose kollektsioonid korraga.
+
+    Body: { work_ids: [...], mode: "add"|"set"|"remove", collection_id: "..." }
+    - add: lisab kollektsiooni (kui pole juba)
+    - set: asendab kõik kollektsioonid üheainsaga
+    - remove: eemaldab konkreetse kollektsiooni
+    - set + collection_id null/puudub: tühjendab kõik kollektsioonid
+    """
+    data = await get_json_data(request)
+    mode = data.get('mode', 'set')
+    collection_id = data.get('collection_id') or data.get('collection')
+
+    for work_id in data.get('work_ids', []):
+        path = find_directory_by_id(work_id)
+        if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+        with metadata_lock:
+            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
+            current = meta.get('collections', [])
+            if mode == 'add':
+                if collection_id and collection_id not in current:
+                    current = current + [collection_id]
+            elif mode == 'remove':
+                current = [c for c in current if c != collection_id]
+            else:  # set
+                current = [collection_id] if collection_id else []
+            meta['collections'] = current
+            save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk collection: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+    invalidate_cache()
+    return {"status": "success"}
 
 @app.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):

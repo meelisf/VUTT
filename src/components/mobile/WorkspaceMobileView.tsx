@@ -394,34 +394,38 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                       </div>
                     )}
 
-                    {/* Kollektsioon */}
-                    {work.collection && collections[work.collection] && (() => {
-                      const hierarchyIds = getCollectionHierarchy(collections, work.collection);
-                      return (
-                        <div className="pt-3 border-t border-gray-100">
-                          <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.collection')}</span>
-                          <div className="flex items-center gap-2">
-                            <FolderOpen size={14} className="text-gray-400 shrink-0" />
-                            <div className="flex flex-wrap items-center gap-1 text-sm">
-                              {hierarchyIds.map((colId, idx, arr) => {
-                                const col = collections[colId];
-                                const colorClasses = getCollectionColorClasses(col);
-                                const name = col?.name[lang] || col?.name.et || colId;
-                                const isLast = idx === arr.length - 1;
-                                return (
-                                  <React.Fragment key={colId}>
-                                    {idx > 0 && <span className="text-gray-300 select-none">›</span>}
-                                    <span className={isLast ? `${colorClasses.bg} ${colorClasses.text} px-1.5 py-0.5 rounded font-medium` : 'text-gray-500'}>
-                                      {name}
-                                    </span>
-                                  </React.Fragment>
-                                );
-                              })}
-                            </div>
-                          </div>
+                    {/* Kollektsioonid */}
+                    {(work.collections || []).some(cid => collections[cid]) && (
+                      <div className="pt-3 border-t border-gray-100">
+                        <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.collection')}</span>
+                        <div className="flex flex-col gap-2">
+                          {(work.collections || []).filter(cid => collections[cid]).map(rootId => {
+                            const hierarchyIds = getCollectionHierarchy(collections, rootId);
+                            return (
+                              <div key={rootId} className="flex items-center gap-2">
+                                <FolderOpen size={14} className="text-gray-400 shrink-0" />
+                                <div className="flex flex-wrap items-center gap-1 text-sm">
+                                  {hierarchyIds.map((colId, idx, arr) => {
+                                    const col = collections[colId];
+                                    const colorClasses = getCollectionColorClasses(col);
+                                    const name = col?.name[lang] || col?.name.et || colId;
+                                    const isLast = idx === arr.length - 1;
+                                    return (
+                                      <React.Fragment key={colId}>
+                                        {idx > 0 && <span className="text-gray-300 select-none">›</span>}
+                                        <span className={isLast ? `${colorClasses.bg} ${colorClasses.text} px-1.5 py-0.5 rounded font-medium` : 'text-gray-500'}>
+                                          {name}
+                                        </span>
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
-                      );
-                    })()}
+                      </div>
+                    )}
 
                     {/* ESTER link */}
                     {work.ester_id && (

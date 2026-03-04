@@ -333,7 +333,7 @@ const Upload: React.FC = () => {
           title: title.trim(),
           year: year.trim(),
           slug,
-          collection: selectedCollection || undefined,
+          collections: selectedCollection ? [selectedCollection] : [],
         }),
       });
       const d = await r.json();

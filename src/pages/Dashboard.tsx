@@ -539,7 +539,8 @@ const Dashboard: React.FC = () => {
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
-          collection: collectionId
+          mode: 'set',
+          collection_id: collectionId
         }),
         timeout: 30000
       });

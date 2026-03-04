@@ -209,7 +209,7 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
       type_object: hit.type_object,
       genre: hit.genre_object || hit.genre,
       genre_object: hit.genre_object,
-      collection: hit.collection,
+      collections: hit.collections || [],
       collections_hierarchy: hit.collections_hierarchy || [],
       creators: hit.creators || [],
       authors_text: hit.authors_text || [],
