@@ -10,6 +10,9 @@ interface CollectionContextType {
   collections: Collections;
   isLoading: boolean;
 
+  // Laadib kollektsioonid uuesti (nt pärast admin muudatusi)
+  refreshCollections: () => Promise<void>;
+
   // Abifunktsioonid
   getCollectionName: (id: string, lang?: 'et' | 'en') => string;
   getCollectionPath: (id: string, lang?: 'et' | 'en') => string[];
@@ -46,6 +49,16 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
       }
     };
     init();
+  }, []);
+
+  // Laadib kollektsioonid uuesti (nt pärast admin muudatusi)
+  const refreshCollections = useCallback(async () => {
+    try {
+      const data = await getCollections(true); // forceRefresh
+      setCollections(data);
+    } catch (e) {
+      console.error('Kollektsioonide uuendamine ebaõnnestus:', e);
+    }
   }, []);
 
   // Salvesta valik localStorage'i
@@ -88,9 +101,10 @@ export const CollectionProvider: React.FC<{ children: ReactNode }> = ({ children
     setSelectedCollection,
     collections,
     isLoading,
+    refreshCollections,
     getCollectionName,
     getCollectionPath
-  }), [selectedCollection, setSelectedCollection, collections, isLoading, getCollectionName, getCollectionPath]);
+  }), [selectedCollection, setSelectedCollection, collections, isLoading, refreshCollections, getCollectionName, getCollectionPath]);
 
   return (
     <CollectionContext.Provider value={value}>

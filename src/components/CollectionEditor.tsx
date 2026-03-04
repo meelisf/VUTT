@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2 } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { getCollections, clearCache } from '../services/collectionService';
+import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
@@ -10,9 +10,22 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
  * Admin-komponent kollektsioonide lühikirjelduste ja pikkade kirjelduste muutmiseks.
  * Salvestab PUT /admin/collections/{id} kaudu.
  */
+
+// Ehitab hierarhilise <option> massiivi puust (rekursiivne)
+function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactNode[] {
+  const prefix = depth > 0 ? '\u00a0\u00a0\u00a0\u00a0'.repeat(depth) + '↳ ' : '';
+  return nodes.flatMap(node => [
+    <option key={node.id} value={node.id}>
+      {prefix}{node.collection.name.et}
+      {node.collection.type === 'virtual_group' ? ' (grupp)' : ''}
+    </option>,
+    ...renderTreeOptions(node.children, depth + 1),
+  ]);
+}
+
 const CollectionEditor: React.FC = () => {
   const { t } = useTranslation('admin');
-  const { collections } = useCollection();
+  const { collections, refreshCollections } = useCollection();
 
   const [selectedId, setSelectedId] = useState<string>('');
   const [descEt, setDescEt] = useState('');
@@ -23,12 +36,8 @@ const CollectionEditor: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sorteeritud kollektsioonide nimekiri (kõik, sh virtual_group)
-  const collectionList = Object.entries(collections).sort((a, b) => {
-    const orderA = a[1].order ?? 999;
-    const orderB = b[1].order ?? 999;
-    return orderA !== orderB ? orderA - orderB : a[0].localeCompare(b[0]);
-  });
+  // Hierarhiline puu (order järgi, peakollektsioonid ees)
+  const tree = buildCollectionTree(collections);
 
   // Lae valitud kollektsiooni andmed vormi
   useEffect(() => {
@@ -67,8 +76,8 @@ const CollectionEditor: React.FC = () => {
       );
       const data = await res.json();
       if (data.status === 'success') {
-        // Tühjenda frontend cache → CollectionContext uueneb järgmisel korral
-        clearCache();
+        // Laadib kollektsioonid uuesti → CollectionInfoBanner näeb uusi kirjeldusi kohe
+        await refreshCollections();
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
@@ -85,7 +94,7 @@ const CollectionEditor: React.FC = () => {
     <div className="space-y-6">
       <h2 className="text-lg font-semibold text-gray-800">{t('collections.title')}</h2>
 
-      {/* Kollektsiooni valik */}
+      {/* Kollektsiooni valik — hierarhiline */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {t('collections.selectCollection')}
@@ -96,12 +105,7 @@ const CollectionEditor: React.FC = () => {
           className="w-full max-w-md border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
         >
           <option value="">{t('collections.selectCollection')}</option>
-          {collectionList.map(([id, col]) => (
-            <option key={id} value={id}>
-              {col.parent ? `\u00a0\u00a0\u00a0\u00a0 ${col.name.et}` : col.name.et}
-              {col.type === 'virtual_group' ? ' (grupp)' : ''}
-            </option>
-          ))}
+          {renderTreeOptions(tree)}
         </select>
       </div>
 
