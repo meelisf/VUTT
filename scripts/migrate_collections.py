@@ -84,11 +84,13 @@ def main():
             print(f"  {folder}: {err}")
 
     if not DRY_RUN and updated:
-        print(f"\nLuun git commit ({len(updated)} faili)...")
+        # data/ on eraldi git repo (VUTT repo gitignore'd selle)
+        data_git_dir = base
+        print(f"\nLuun git commit ({len(updated)} faili) data/ repos...")
         try:
             result = subprocess.run(
-                ['git', 'add', '-A', 'data/'],
-                cwd=os.path.join(BASE_DIR, '..'),
+                ['git', 'add', '-A'],
+                cwd=data_git_dir,
                 capture_output=True, text=True
             )
             if result.returncode != 0:
@@ -97,7 +99,7 @@ def main():
 
             result = subprocess.run(
                 ['git', 'commit', '-m', f'migrate: collection → collections[] ({len(updated)} teost)'],
-                cwd=os.path.join(BASE_DIR, '..'),
+                cwd=data_git_dir,
                 capture_output=True, text=True
             )
             if result.returncode == 0:
