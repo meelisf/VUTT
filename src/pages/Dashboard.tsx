@@ -11,12 +11,14 @@ import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
+import CollectionInfoBanner from '../components/CollectionInfoBanner';
 import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -75,6 +77,9 @@ const Dashboard: React.FC = () => {
 
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
+
+  // Sünkroonib selectedCollection → URL ?collection= param (Context → URL suund)
+  useCollectionUrlSync(selectedCollection, setSearchParams);
 
   // Laadime "Projektist" HTML faili alles modaali avamisel (lazy load)
   useEffect(() => {
@@ -863,6 +868,9 @@ const Dashboard: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Kollektsiooni infobänner */}
+          <CollectionInfoBanner />
 
           {/* Results Grid */}
           <div className="max-w-7xl mx-auto">

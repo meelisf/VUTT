@@ -60,6 +60,19 @@
     "refreshDone": "Valmis: {{updated}}/{{total}} uuendatud, {{errors}} viga",
     "refreshError": "Uuendamine ebaõnnestus"
   },
+  "collections": {
+    "tab": "Kollektsioonid",
+    "title": "Kollektsiooni kirjeldused",
+    "selectCollection": "Vali kollektsioon...",
+    "description": "Lühikirjeldus",
+    "descriptionLong": "Pikk kirjeldus",
+    "descriptionHint": "1–2 lauset. Kuvatakse Dashboardil kollektsiooni valides.",
+    "descriptionLongHint": "Pikem tutvustus. Kuvatakse \"Loe lähemalt\" all.",
+    "save": "Salvesta",
+    "saving": "Salvestan...",
+    "saveSuccess": "Kirjeldus salvestatud",
+    "saveError": "Salvestamine ebaõnnestus"
+  },
   "trash": {
     "tab": "Prügikast",
     "title": "Kustutatud teosed",

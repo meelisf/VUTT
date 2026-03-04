@@ -84,6 +84,12 @@
     "genreSuccess": "Žanr määratud {{count}} teosele",
     "genreError": "Žanri määramine ebaõnnestus"
   },
+  "collection": {
+    "copyLink": "Kopeeri link",
+    "linkCopied": "Link kopeeritud!",
+    "readMore": "Loe lähemalt",
+    "readLess": "Sulge"
+  },
   "filters": {
     "advanced": "Täpsemad valikud",
     "status": "Staatus",

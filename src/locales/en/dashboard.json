@@ -84,6 +84,12 @@
     "genreSuccess": "Genre assigned to {{count}} works",
     "genreError": "Failed to assign genre"
   },
+  "collection": {
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied!",
+    "readMore": "Read more",
+    "readLess": "Close"
+  },
   "filters": {
     "advanced": "Advanced options",
     "status": "Status",

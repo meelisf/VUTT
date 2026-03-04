@@ -724,6 +724,50 @@ async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
 @app.get("/collections")
 async def collections(): return {"status": "success", "collections": get_cached_collections()}
 
+@app.put("/admin/collections/{collection_id}")
+async def admin_update_collection(collection_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Uuendab kollektsiooni description ja description_long välju."""
+    body = await request.json()
+    description = body.get("description")      # { et, en }
+    description_long = body.get("description_long")  # { et, en }
+
+    # Loe olemaolev fail
+    if not os.path.exists(COLLECTIONS_FILE):
+        return {"status": "error", "message": "collections.json ei leitud"}
+    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if collection_id not in data:
+        return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
+
+    # Uuenda ainult description väljad (mitte nimi, värv, hierarhia)
+    if description is not None:
+        if description.get("et") or description.get("en"):
+            data[collection_id]["description"] = {
+                "et": description.get("et", ""),
+                "en": description.get("en", ""),
+            }
+        elif "description" in data[collection_id]:
+            del data[collection_id]["description"]
+
+    if description_long is not None:
+        if description_long.get("et") or description_long.get("en"):
+            data[collection_id]["description_long"] = {
+                "et": description_long.get("et", ""),
+                "en": description_long.get("en", ""),
+            }
+        elif "description_long" in data[collection_id]:
+            del data[collection_id]["description_long"]
+
+    # Kirjuta tagasi
+    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    # Invalideerib cache → järgmine /collections päring laeb uued andmed
+    invalidate_cache()
+
+    return {"status": "success"}
+
 @app.get("/vocabularies")
 async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}
 

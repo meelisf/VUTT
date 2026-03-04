@@ -60,6 +60,19 @@
     "refreshDone": "Done: {{updated}}/{{total}} updated, {{errors}} errors",
     "refreshError": "Refresh failed"
   },
+  "collections": {
+    "tab": "Collections",
+    "title": "Collection descriptions",
+    "selectCollection": "Select collection...",
+    "description": "Short description",
+    "descriptionLong": "Long description",
+    "descriptionHint": "1–2 sentences. Shown in Dashboard when collection is selected.",
+    "descriptionLongHint": "Longer introduction. Shown under \"Read more\".",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Description saved",
+    "saveError": "Failed to save"
+  },
   "trash": {
     "tab": "Trash",
     "title": "Deleted works",
