@@ -15,6 +15,7 @@ import CollectionInfoBanner from '../components/CollectionInfoBanner';
 import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
+import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -64,6 +65,9 @@ const Dashboard: React.FC = () => {
   const [selectedGenre, setSelectedGenre] = useState<string | null>(genreParam);
   const [selectedType, setSelectedType] = useState<string | null>(typeParam);
   const [selectedStatus, setSelectedStatus] = useState<WorkStatus | null>(statusParam);
+
+  // Wikidata rikastatud labelid — Q-koodid millel puudub praeguse keele label
+  const [enrichedLabels, setEnrichedLabels] = useState<Record<string, Record<string, string>>>({});
 
   // Multi-select režiim (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
@@ -183,7 +187,7 @@ const Dashboard: React.FC = () => {
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
         if (!item) continue;
-        const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
         if (!rawLabel) continue;
         const currentLabel = cap(rawLabel);
         // Q-kood → praeguse keele label (suurtähega, nagu facetis)
@@ -204,7 +208,7 @@ const Dashboard: React.FC = () => {
       }
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works, i18n.language, enrichedLabels]);
 
   // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
   const genreLabelToId = useMemo(() => {
@@ -216,7 +220,7 @@ const Dashboard: React.FC = () => {
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
         if (item?.id) {
-          const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+          const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
           if (rawLabel) {
             // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
             map[rawLabel] = item.id;
@@ -226,7 +230,7 @@ const Dashboard: React.FC = () => {
       }
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works, i18n.language, enrichedLabels]);
 
   // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
   const tagsIdMap = useMemo(() => {
@@ -237,7 +241,7 @@ const Dashboard: React.FC = () => {
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
         if (!item?.labels) continue;
-        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label;
         const currentLabel = cap(rawLabel);
         // Q-kood → praeguse keele label (suurtähega, nagu facetis)
         if (item.id) map[item.id] = currentLabel;
@@ -254,7 +258,7 @@ const Dashboard: React.FC = () => {
       }
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works, i18n.language, enrichedLabels]);
 
   // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
   const tagsLabelToId = useMemo(() => {
@@ -265,7 +269,7 @@ const Dashboard: React.FC = () => {
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
         if (item?.id) {
-          const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+          const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
           if (rawLabel) {
             // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
             map[rawLabel] = item.id;
@@ -288,7 +292,7 @@ const Dashboard: React.FC = () => {
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
         if (!item?.labels) continue;
-        const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
+        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label;
         const currentLabel = cap(rawLabel);
         if (item.id) map[item.id] = currentLabel;
         for (const labelVal of Object.values(item.labels)) {
@@ -304,7 +308,7 @@ const Dashboard: React.FC = () => {
       }
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works, i18n.language, enrichedLabels]);
 
   // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks, tüüp)
   const typeLabelToId = useMemo(() => {
@@ -324,6 +328,13 @@ const Dashboard: React.FC = () => {
     }
     return map;
   }, [works, i18n.language]);
+
+  // Lae entity labels cache serverist (üks kord sessiooni jooksul)
+  useEffect(() => {
+    getEntityLabelsCache().then(labels => {
+      if (Object.keys(labels).length > 0) setEnrichedLabels(labels);
+    });
+  }, []);
 
   // Q-kood → trükkali nimi (publisher_id → publisher label)
   const publisherIdMap = useMemo(() => {

@@ -15,6 +15,7 @@ from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, gen
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, get_refresh_status, refresh_all_people_safe
+from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
 from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
@@ -566,6 +567,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
 
         save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
     if meta.get('creators'): background_tasks.add_task(process_creators_metadata, meta['creators'])
+    background_tasks.add_task(enrich_entity_labels_async, meta)
     sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))
     invalidate_cache()
     return {"status": "success"}
@@ -976,6 +978,9 @@ async def people_aliases(): return {"status": "success", "aliases": get_cached_p
 
 @app.get("/people-register")
 async def people_register(): return {"status": "success", "people": get_cached_people_register()}
+
+@app.get("/entity-labels")
+async def entity_labels(): return load_entity_labels()
 
 @app.get("/user-chars")
 async def get_user_chars(request: Request, user=Depends(get_user)):

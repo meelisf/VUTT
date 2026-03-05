@@ -86,7 +86,7 @@ export async function getEntityLabels(id: string): Promise<Record<string, string
 
 /**
  * Helper to determine Wikidata search context (e.g., restricted to cities, humans, etc.)
- * Note: wbsearchentities doesn't support complex SPARQL filtering easily, 
+ * Note: wbsearchentities doesn't support complex SPARQL filtering easily,
  * but we can filter results in the UI or use specific properties if needed.
  */
 export const WIKIDATA_TYPES = {

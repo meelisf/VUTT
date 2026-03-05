@@ -28,6 +28,7 @@ interface EntityPickerProps {
   lang?: string;
   localSuggestions?: SuggestionItem[];
   peopleRegister?: PeopleRegisterEntry[];
+  alreadySelected?: LinkedEntity[];
 }
 
 type Suggestion = WikidataSearchResult & {
@@ -35,6 +36,7 @@ type Suggestion = WikidataSearchResult & {
   isViaf?: boolean;
   isGnd?: boolean;
   isRegister?: boolean;
+  isAlreadyAdded?: boolean;
 };
 
 // Tagastab tulemuse välise lingi (Wikidata, GND, VIAF)
@@ -55,7 +57,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   className = '',
   lang = 'et',
   localSuggestions = [],
-  peopleRegister = []
+  peopleRegister = [],
+  alreadySelected = []
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -72,6 +75,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   localSuggestionsRef.current = localSuggestions;
   const peopleRegisterRef = useRef(peopleRegister);
   peopleRegisterRef.current = peopleRegister;
+  const alreadySelectedRef = useRef(alreadySelected);
+  alreadySelectedRef.current = alreadySelected;
   // Race condition vältimiseks: iga otsingutsükkel saab unikaalse ID
   const searchIdRef = useRef(0);
 
@@ -122,9 +127,32 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       const linkedText = lang === 'en' ? 'linked' : 'seotud';
       const unlinkedText = lang === 'en' ? 'unlinked' : 'sidumata';
 
+      // 0. Juba lisatud kirjed — otsib kõigist keeltest
+      const alreadyAddedMatches: Suggestion[] = alreadySelectedRef.current
+        .filter(s => {
+          if (s.label.toLowerCase().includes(normalizedInput)) return true;
+          if (s.labels && typeof s.labels === 'object') {
+            return Object.values(s.labels).some(
+              l => typeof l === 'string' && l.toLowerCase().includes(normalizedInput)
+            );
+          }
+          return false;
+        })
+        .map(s => ({
+          id: s.id || ('local-' + s.label),
+          label: s.label,
+          description: lang === 'en' ? 'Already added' : 'Juba lisatud',
+          url: '',
+          isLocal: true,
+          isAlreadyAdded: true
+        }));
+
+      const alreadyAddedIds = new Set(alreadyAddedMatches.filter(m => m.id && !m.id.startsWith('local-')).map(m => m.id));
+
       // 1. Kohalikud soovitused — sõnaalguse match esikohal, piiratud 3-le
       const localMatches: Suggestion[] = localSuggestionsRef.current
         .filter(s => s.label.toLowerCase().includes(normalizedInput))
+        .filter(s => !alreadyAddedIds.has(s.id || ''))
         .sort((a, b) => {
           // Sõnaalgusega match enne kui lihtsalt sisaldab
           const aStarts = a.label.toLowerCase().startsWith(normalizedInput) ? 0 : 1;
@@ -177,7 +205,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         registerMatches = registerMatches.slice(0, 3);
       }
 
-      const allLocalIds = new Set([...localIds, ...registerMatches.map(m => m.id)]);
+      const allLocalIds = new Set([...alreadyAddedIds, ...localIds, ...registerMatches.map(m => m.id)]);
 
       // 3. Välised päringud paralleelselt
       const externalPromises: Promise<any>[] = [searchWikidata(inputValue)];
@@ -212,7 +240,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           : [];
       }
 
-      setSuggestions([...localMatches, ...registerMatches, ...gndMatches, ...viafMatches, ...wikidataMatches]);
+      setSuggestions([...alreadyAddedMatches, ...localMatches, ...registerMatches, ...gndMatches, ...viafMatches, ...wikidataMatches]);
       setIsLoading(false);
       setSelectedIndex(0);
     }, 300);
@@ -255,11 +283,13 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     if (!inputValue.trim()) { onChange(null); return; }
     const existingId = value && typeof value !== 'string' ? value.id : null;
     const existingSource = value && typeof value !== 'string' ? value.source : null;
+    const existingLabels = value && typeof value !== 'string' ? (value.labels || {}) : {};
+    const baseLang = lang.split('-')[0];
     onChange({
       id: existingId,
       label: inputValue.trim(),
       source: existingId ? (existingSource || 'manual') : 'manual',
-      labels: { et: inputValue.trim() }
+      labels: { ...existingLabels, [baseLang]: inputValue.trim() }
     });
     if (value === null) setInputValue('');
     setShowSuggestions(false);
@@ -362,11 +392,14 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               const isViaf = result.isViaf || result.id.startsWith('VIAF:');
               const rowUrl = getResultUrl(result);
 
+              const isAlreadyAdded = result.isAlreadyAdded;
+
               return (
                 <div
                   key={result.id}
                   className={`w-full px-3 py-2 border-b border-gray-50 flex items-start gap-2 group cursor-pointer ${
                     idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
+                    isAlreadyAdded ? 'bg-blue-50/60 hover:bg-blue-100/60' :
                     isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
                     isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
                     'hover:bg-gray-50'
@@ -376,8 +409,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 >
                   {/* Allika ikoon */}
                   <span className="mt-0.5 shrink-0">
-                    {isRegister && <Users size={12} className="text-teal-600" />}
-                    {isLocal && !isRegister && <Database size={12} className="text-amber-600" />}
+                    {isAlreadyAdded && <Tag size={12} className="text-blue-500" />}
+                    {!isAlreadyAdded && isRegister && <Users size={12} className="text-teal-600" />}
+                    {!isAlreadyAdded && isLocal && !isRegister && <Database size={12} className="text-amber-600" />}
                     {isGnd && <BookMarked size={12} className="text-orange-600" />}
                     {isViaf && <Library size={12} className="text-purple-600" />}
                     {!isLocal && !isGnd && !isViaf && <Globe size={12} className="text-blue-400" />}
@@ -388,6 +422,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                     <span className="font-medium text-gray-900 text-sm block truncate">{result.label}</span>
                     {result.description && (
                       <span className={`text-xs block truncate ${
+                        isAlreadyAdded ? 'text-blue-600/80 italic' :
                         isRegister ? 'text-teal-600/80 italic' :
                         isLocal ? 'text-amber-600/80 italic' :
                         isGnd ? 'text-orange-500/80' :

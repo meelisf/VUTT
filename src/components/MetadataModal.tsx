@@ -654,7 +654,23 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <EntityPicker
                 type="genre"
                 value={null}
-                onChange={val => { if (val) setMetaForm({ ...metaForm, genre: [...metaForm.genre, val] }); }}
+                alreadySelected={metaForm.genre.filter(g => typeof g !== 'string') as LinkedEntity[]}
+                onChange={val => {
+                  if (!val) return;
+                  if (val.id) {
+                    const idx = metaForm.genre.findIndex(
+                      g => typeof g !== 'string' && (g as LinkedEntity).id === val.id
+                    );
+                    if (idx !== -1) {
+                      const newGenre = [...metaForm.genre];
+                      const existing = newGenre[idx] as LinkedEntity;
+                      newGenre[idx] = { ...existing, labels: { ...existing.labels, ...val.labels } };
+                      setMetaForm({ ...metaForm, genre: newGenre });
+                      return;
+                    }
+                  }
+                  setMetaForm({ ...metaForm, genre: [...metaForm.genre, val] });
+                }}
                 placeholder={t('metadata.genrePlaceholder', 'Lisa žanr...')}
                 lang={lang}
                 localSuggestions={suggestions.genres}
@@ -719,10 +735,22 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <EntityPicker
                 type="topic"
                 value={null}
+                alreadySelected={metaForm.tags.filter(t => typeof t !== 'string') as LinkedEntity[]}
                 onChange={val => {
-                  if (val) {
-                    setMetaForm({ ...metaForm, tags: [...metaForm.tags, val] });
+                  if (!val) return;
+                  if (val.id) {
+                    const idx = metaForm.tags.findIndex(
+                      t => typeof t !== 'string' && (t as LinkedEntity).id === val.id
+                    );
+                    if (idx !== -1) {
+                      const newTags = [...metaForm.tags];
+                      const existing = newTags[idx] as LinkedEntity;
+                      newTags[idx] = { ...existing, labels: { ...existing.labels, ...val.labels } };
+                      setMetaForm({ ...metaForm, tags: newTags });
+                      return;
+                    }
                   }
+                  setMetaForm({ ...metaForm, tags: [...metaForm.tags, val] });
                 }}
                 placeholder={t('metadata.tagsPlaceholder', 'Lisa märksõna...')}
                 lang={lang}

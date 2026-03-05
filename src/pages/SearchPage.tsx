@@ -6,6 +6,7 @@ import { getWorkMetadata } from '../services/workService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
 import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag } from 'lucide-react';
+import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
@@ -58,6 +59,9 @@ const SearchPage: React.FC = () => {
     const [aliasMap, setAliasMap] = useState<Record<string, string>>({});
     const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+
+    // Wikidata rikastatud labelid — Q-koodid millel puudub praeguse keele label
+    const [enrichedLabels, setEnrichedLabels] = useState<Record<string, Record<string, string>>>({});
 
     // Otsingututemused
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
@@ -124,7 +128,7 @@ const SearchPage: React.FC = () => {
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
                 if (!item?.labels) continue;
-                const currentLabel = cap(item.labels[lang] || item.labels['et'] || item.label);
+                const currentLabel = cap((item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label);
                 if (item.id) map[item.id] = currentLabel;
                 for (const labelVal of Object.values(item.labels)) {
                     if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
@@ -133,7 +137,7 @@ const SearchPage: React.FC = () => {
             }
         }
         return map;
-    }, [results, i18n.language]);
+    }, [results, i18n.language, enrichedLabels]);
 
     // Label → Q-kood (URL-i jaoks, žanrid)
     const genreLabelToId = useMemo(() => {
@@ -202,7 +206,7 @@ const SearchPage: React.FC = () => {
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
                 if (!item?.labels) continue;
-                const currentLabel = cap(item.labels[lang] || item.labels['et'] || item.label);
+                const currentLabel = cap((item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label);
                 if (item.id) map[item.id] = currentLabel;
                 for (const labelVal of Object.values(item.labels)) {
                     if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
@@ -211,7 +215,7 @@ const SearchPage: React.FC = () => {
             }
         }
         return map;
-    }, [results, i18n.language]);
+    }, [results, i18n.language, enrichedLabels]);
 
     // Label → Q-kood (URL-i jaoks, tüüp)
     const typeLabelToId = useMemo(() => {
@@ -231,6 +235,13 @@ const SearchPage: React.FC = () => {
         }
         return map;
     }, [results, i18n.language]);
+
+    // Lae entity labels cache serverist (üks kord sessiooni jooksul)
+    useEffect(() => {
+        getEntityLabelsCache().then(labels => {
+            if (Object.keys(labels).length > 0) setEnrichedLabels(labels);
+        });
+    }, []);
 
     // Lahenda Q-koodid labeliteks (tüüp) — sama loogika kui žanride puhul
     useEffect(() => {
