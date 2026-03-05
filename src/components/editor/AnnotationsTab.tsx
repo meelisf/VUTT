@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark } from 'lucide-react';
+import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
@@ -43,6 +44,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
   const { collections, getCollectionName, getCollectionPath } = useCollection();
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [newComment, setNewComment] = useState('');
   
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
@@ -136,31 +138,22 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   return (
     <div className="h-full flex flex-col bg-gray-50 p-6 overflow-y-auto">
 
+      {work && <DownloadModal isOpen={showDownloadModal} workId={work.work_id} onClose={() => setShowDownloadModal(false)} />}
+
       {/* Work Info */}
       {work && (
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
           <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
             <BookOpen size={18} className="text-primary-600" />
             <h4 className="font-bold">{t('info.workInfo')}</h4>
-            {/* Allalaadimine — paremal */}
-            <div className="ml-auto flex items-center gap-1">
-              {[
-                { key: 'both', label: t('info.downloadBoth', 'TXT+JPG'), title: t('info.downloadBothTitle', 'Lae alla tekst ja pildid') },
-                { key: 'text', label: 'TXT', title: t('info.downloadText', 'Lae alla tekstifailid') },
-                { key: 'images', label: 'JPG', title: t('info.downloadImages', 'Lae alla pildifailid') },
-              ].map(({ key, label, title }) => (
-                <a
-                  key={key}
-                  href={`${FILE_API_URL}/download/${work.work_id}?content=${key}`}
-                  download
-                  title={title}
-                  className="flex items-center gap-1 text-xs px-2 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
-                >
-                  <Download size={11} />
-                  {label}
-                </a>
-              ))}
-            </div>
+            <button
+              onClick={() => setShowDownloadModal(true)}
+              className="ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
+              title={t('download.button')}
+            >
+              <Download size={12} />
+              {t('download.button')}
+            </button>
           </div>
           <div className="space-y-3 text-sm">
             <div>

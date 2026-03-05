@@ -149,12 +149,18 @@
     "genre": "Žanr",
     "languages": "Keeled"
   },
+  "download": {
+    "title": "Lae alla",
+    "button": "Lae alla",
+    "optionText": "Kogu tekst (.txt)",
+    "optionTextDesc": "Kõik leheküljed ühes failis järjekorras",
+    "optionImages": "Pildid (.zip)",
+    "optionImagesDesc": "Kõik skaneeringud ZIP-arhiivis",
+    "optionBoth": "Tekst ja pildid (.zip)",
+    "optionBothDesc": "Tekstifail + skaneeringud ZIP-arhiivis"
+  },
   "info": {
     "workInfo": "Teose info",
-    "downloadBoth": "TXT+JPG",
-    "downloadBothTitle": "Lae alla tekst ja pildid (ZIP)",
-    "downloadText": "Lae alla kogu teose tekst (.txt)",
-    "downloadImages": "Lae alla pildifailid (ZIP)",
     "pages": "Lehekülgi",
     "status": "Staatus",
     "viewInEster": "Vaata ESTERis",

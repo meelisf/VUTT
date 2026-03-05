@@ -149,12 +149,18 @@
     "genre": "Genre",
     "languages": "Languages"
   },
+  "download": {
+    "title": "Download",
+    "button": "Download",
+    "optionText": "Full text (.txt)",
+    "optionTextDesc": "All pages in one file, in order",
+    "optionImages": "Images (.zip)",
+    "optionImagesDesc": "All scans in a ZIP archive",
+    "optionBoth": "Text and images (.zip)",
+    "optionBothDesc": "Text file + scans in a ZIP archive"
+  },
   "info": {
     "workInfo": "Work info",
-    "downloadBoth": "TXT+JPG",
-    "downloadBothTitle": "Download text and images (ZIP)",
-    "downloadText": "Download full text (.txt)",
-    "downloadImages": "Download image files (ZIP)",
     "pages": "Pages",
     "status": "Status",
     "viewInEster": "View in ESTER",
