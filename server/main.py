@@ -809,8 +809,8 @@ async def admin_create_collection(request: Request, user=Depends(require_role("a
     collection_id = body.get("id", "").strip()
     name_et = body.get("name_et", "").strip()
     name_en = body.get("name_en", "").strip()
-    parent = body.get("parent", "").strip() or None
-    color = body.get("color", "").strip() or None
+    parent = (body.get("parent") or "").strip() or None
+    color = (body.get("color") or "").strip() or None
     is_virtual = bool(body.get("is_virtual", False))
 
     if not collection_id or not re.match(r'^[a-z0-9-]+$', collection_id):
