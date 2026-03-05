@@ -294,22 +294,23 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const closeTag = `</${tag}>`;
     const docText = view.state.doc.toString();
 
-    // Toggle off: kui valik on juba täpselt selle tagi sees, eemalda tägid.
-    // CM6 peidab tägid, seega kasutaja valib SISU — from on kohe avatägi järel,
-    // to kohe sulgtägi ees.
-    const beforeFrom = from >= openTag.length ? docText.slice(from - openTag.length, from) : '';
-    const afterTo = docText.slice(to, to + closeTag.length);
-
-    if (beforeFrom === openTag && afterTo === closeTag) {
-      view.dispatch({
-        changes: [
-          { from: from - openTag.length, to: from, insert: '' },
-          { from: to, to: to + closeTag.length, insert: '' },
-        ],
-        selection: EditorSelection.range(from - openTag.length, to - openTag.length),
-      });
-      view.focus();
-      return;
+    // Toggle off: kui from asub selle tagi sees, eemalda tägid.
+    // Kasutame lastIndexOf et leida viimane avatäg enne from-i — nii töötab ka
+    // siis kui valik sisaldab lisaks tühiku/punkti tagi piirist väljaspool.
+    const lastOpen = docText.lastIndexOf(openTag, from);
+    if (lastOpen !== -1) {
+      const firstClose = docText.indexOf(closeTag, lastOpen + openTag.length);
+      if (firstClose !== -1 && from >= lastOpen + openTag.length && from <= firstClose) {
+        view.dispatch({
+          changes: [
+            { from: lastOpen, to: lastOpen + openTag.length, insert: '' },
+            { from: firstClose, to: firstClose + closeTag.length, insert: '' },
+          ],
+          selection: EditorSelection.range(lastOpen, firstClose - openTag.length),
+        });
+        view.focus();
+        return;
+      }
     }
 
     if (from === to) {
