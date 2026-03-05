@@ -699,8 +699,11 @@ const SearchPage: React.FC = () => {
                     vocabularies={vocabularies}
                     aliasMap={aliasMap}
                     genreIdMap={genreIdMap}
+                    genreLabelToId={genreLabelToId}
                     typeIdMap={typeIdMap}
+                    typeLabelToId={typeLabelToId}
                     tagsIdMap={tagsIdMap}
+                    tagsLabelToId={tagsLabelToId}
                     loading={loading}
                     onScopeChange={setSelectedScope}
                     onYearStartChange={setYearStart}
