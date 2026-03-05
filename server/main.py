@@ -672,6 +672,38 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
     invalidate_cache()
     return {"status": "success"}
 
+@app.post("/works/bulk-genre")
+async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    """Määrab žanri mitmele teosele korraga.
+
+    Body: { work_ids: [...], genre: LinkedEntity|null, mode: "add"|"set"|"remove" }
+    - add: lisab žanri olemasolevate hulka (vaikimisi)
+    - set: asendab kõik žanrid [genre]-ga (genre=null → tühjendab)
+    - remove: eemaldab konkreetse žanri
+    """
+    data = await get_json_data(request)
+    genre = data.get('genre')
+    mode = data.get('mode', 'add')
+
+    for work_id in data.get('work_ids', []):
+        path = find_directory_by_id(work_id)
+        if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+        with metadata_lock:
+            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
+            current = meta.get('genre', [])
+            if not isinstance(current, list): current = [current] if current else []
+            if mode == 'add':
+                if genre and genre not in current: current.append(genre)
+            elif mode == 'remove':
+                current = [g for g in current if g != genre]
+            else:  # set
+                current = [genre] if genre else []
+            meta['genre'] = current
+            save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk genre: {work_id}")
+            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+    invalidate_cache()
+    return {"status": "success"}
+
 # =========================================================
 # UPLOAD JA OCR (GET status, POST files/import, DELETE cancel)
 # =========================================================

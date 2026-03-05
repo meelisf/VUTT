@@ -180,9 +180,11 @@ def find_directory_by_id(target_id):
 
 
 def get_label(value, lang='et'):
-    """Tagastab sildi LinkedEntity objektist või stringist eelistatud keeles."""
+    """Tagastab sildi LinkedEntity objektist, stringist või massiivist (esimene element) eelistatud keeles."""
     if not value:
         return ""
+    if isinstance(value, list):
+        return get_label(value[0], lang) if value else ""
     if isinstance(value, str):
         return capitalize_first(value)
     if isinstance(value, dict):

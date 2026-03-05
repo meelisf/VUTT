@@ -24,7 +24,7 @@ interface MetadataForm {
   title: string;
   year: number;
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
-  genre: string | LinkedEntity | null;  // EntityPicker toetab ainult üksikut väärtust
+  genre: (string | LinkedEntity)[];  // Mitu žanrit
   tags: (string | LinkedEntity)[];
   location: string | LinkedEntity;
   publisher: string | LinkedEntity;
@@ -191,7 +191,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       title: work?.title || page.title || '',
       year: work?.year || page.year || page.aasta || 0,
       type: work?.type || page.type || null,
-      genre: work?.genre || page.genre || null,
+      genre: (() => { const g = (work as any)?.genre_object ?? (page as any)?.genre_object ?? work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
       tags: work?.tags || page.tags || [],
       location: work?.location || page.location || '',
       publisher: work?.publisher || page.publisher || '',
@@ -288,7 +288,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           title: title,
           year: year ? parseInt(year) : 0,
           type: m.type || null,
-          genre: m.genre || null,
+          genre: (() => { const g = m.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
           tags: Array.isArray(tags) ? tags : [],
           location: location || '',
           publisher: publisher || '',
@@ -345,7 +345,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           title: metaForm.title,
           year: metaForm.year,
           type: metaForm.type || null,
-          genre: metaForm.genre || null,
+          genre: metaForm.genre.length > 0 ? metaForm.genre : null,
           creators: cleanCreators,
           tags: tagsArray,
           languages: metaForm.languages.length > 0 ? metaForm.languages : null,
@@ -388,8 +388,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           if (typeof t === 'string') return t;
           return t.label;
         };
-        const getGenreLabel = (g: typeof metaForm.genre): string | undefined => {
-          if (!g) return undefined;
+        const getGenreLabel = (genres: typeof metaForm.genre): string | undefined => {
+          if (!genres || genres.length === 0) return undefined;
+          const g = genres[0];
           if (typeof g === 'string') return g;
           return g.label;
         };
@@ -401,7 +402,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             type: getTypeLabel(metaForm.type),
             type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
-            genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
+            genre_object: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : undefined,
             creators: cleanCreators,
             tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
             tags_object: tagsArray as LinkedEntity[],
@@ -420,7 +421,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             type: getTypeLabel(metaForm.type),
             type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
-            genre_object: metaForm.genre as LinkedEntity | LinkedEntity[] | undefined,
+            genre_object: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : undefined,
             creators: cleanCreators,
             tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
             tags_object: tagsArray as LinkedEntity[],
@@ -618,14 +619,28 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.types}
                 />
               </div>
-              {/* Žanr */}
+              {/* Žanrid (multi-select) */}
               <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.genre', 'Žanr')}</label>
+                {metaForm.genre.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    {metaForm.genre.map((g, i) => (
+                      <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
+                        typeof g !== 'string' && (g as any).id ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                      }`}>
+                        {getLabel(g, lang)}
+                        <button onClick={() => setMetaForm({ ...metaForm, genre: metaForm.genre.filter((_, j) => j !== i) })} className="hover:text-red-500">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <EntityPicker
-                  label={t('metadata.genre', 'Žanr')}
                   type="genre"
-                  value={metaForm.genre}
-                  onChange={val => setMetaForm({ ...metaForm, genre: val })}
-                  placeholder="nt: disputatsioon, oratsioon"
+                  value={null}
+                  onChange={val => { if (val) setMetaForm({ ...metaForm, genre: [...metaForm.genre, val] }); }}
+                  placeholder="Lisa žanr..."
                   lang={lang}
                   localSuggestions={suggestions.genres}
                 />

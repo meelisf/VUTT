@@ -277,37 +277,47 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
               )}
             </div>
 
-            {/* Žanr - eraldi sektsioon bookmark ikooniga */}
-            {work.genre && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.genre')}</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={() => navigate(`/?genre=${encodeURIComponent(getLabel(work.genre_object || work.genre, lang))}`)}
-                    className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-                    title={t('dashboard:workCard.filterByGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
-                  >
-                    <Bookmark size={12} className="fill-primary-200" />
-                    {getLabel(work.genre_object || work.genre, lang)}
-                  </button>
-                  {(() => {
-                    const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
-                    const url = getEntityUrl(genreObj?.id, genreObj?.source);
-                    return url && (
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title={genreObj?.id || ''}
-                      >
-                        <ExternalLink size={12} />
-                      </a>
-                    );
-                  })()}
+            {/* Žanrid - eraldi sektsioon */}
+            {(() => {
+              const raw = work.genre_object;
+              const genres: any[] = Array.isArray(raw) ? raw : (raw ? [raw] : (work.genre ? [work.genre] : []));
+              if (genres.length === 0) return null;
+              return (
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.genre')}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {genres.map((g, i) => {
+                      const label = getLabel(g, lang);
+                      const genreObj = typeof g === 'object' ? g : null;
+                      const url = genreObj ? getEntityUrl(genreObj.id, genreObj.source) : null;
+                      return (
+                        <div key={i} className="flex items-center gap-1">
+                          <button
+                            onClick={() => navigate(`/?genre=${encodeURIComponent(label)}`)}
+                            className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                            title={t('dashboard:workCard.filterByGenre', { genre: label })}
+                          >
+                            <Bookmark size={12} className="fill-primary-200" />
+                            {label}
+                          </button>
+                          {url && (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
+                              title={genreObj?.id || ''}
+                            >
+                              <ExternalLink size={12} />
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Kollektsioonid */}
             {(work.collections || []).some(cid => collections[cid]) && (
