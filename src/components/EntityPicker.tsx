@@ -67,6 +67,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const justSelectedRef = useRef(false);
   const localSuggestionsRef = useRef(localSuggestions);
+  // Jälgib milliseid Q-koode on juba enrichitud — väldib lõputut silmust
+  const enrichedIdsRef = useRef<Set<string>>(new Set());
   localSuggestionsRef.current = localSuggestions;
   const peopleRegisterRef = useRef(peopleRegister);
   peopleRegisterRef.current = peopleRegister;
@@ -76,8 +78,21 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   useEffect(() => {
     if (!value) {
       setInputValue('');
-    } else {
-      setInputValue(getLabel(value, lang));
+      return;
+    }
+    setInputValue(getLabel(value, lang));
+
+    // Kui Q-koodiga LinkedEntity-l puudub praeguse keele label, fetch Wikidatast
+    if (typeof value !== 'string' && !Array.isArray(value) && value.id && /^Q\d+$/.test(value.id)) {
+      const baseLang = lang.split('-')[0];
+      if (!value.labels?.[baseLang] && !enrichedIdsRef.current.has(value.id)) {
+        enrichedIdsRef.current.add(value.id);
+        getEntityLabels(value.id).then(multilingualLabels => {
+          if (Object.keys(multilingualLabels).length > 0) {
+            onChange({ ...value, labels: { ...(value.labels || {}), ...multilingualLabels } });
+          }
+        }).catch(() => {});
+      }
     }
   }, [value, lang]);
 
@@ -216,9 +231,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       entity = { id: result.id, label: result.label, source: 'gnd', labels: { et: result.label } };
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
       entity = { id: result.id, label: result.label, source: 'viaf', labels: { et: result.label } };
-    } else if (result.isLocal) {
-      entity = { id: result.id, label: result.label, source: 'wikidata', labels: { et: result.label } };
+    } else if (result.isLocal && !/^Q\d+$/.test(result.id)) {
+      // Lokaalne kirje ilma Wikidata Q-koodita — manuaalne, ainult eesti label
+      entity = { id: result.id.startsWith('local-') ? null : result.id, label: result.label, source: 'manual', labels: { et: result.label } };
     } else {
+      // Wikidata Q-kood (kas otse Wikidatast või kohalikust andmebaasist) — fetch kõik keeled
       let multilingualLabels: Record<string, string> = { et: result.label };
       try {
         multilingualLabels = await getEntityLabels(result.id);
