@@ -147,7 +147,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     title: '',
     year: 0,
     type: null,
-    genre: null,
+    genre: [],
     tags: [],
     location: '',
     publisher: '',
