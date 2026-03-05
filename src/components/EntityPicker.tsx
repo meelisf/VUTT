@@ -346,16 +346,16 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               const rowUrl = getResultUrl(result);
 
               return (
-                <button
+                <div
                   key={result.id}
-                  onMouseDown={() => { justSelectedRef.current = true; }}
-                  onClick={() => handleSelect(result)}
-                  className={`w-full text-left px-3 py-2 border-b border-gray-50 flex items-start gap-2 group ${
+                  className={`w-full px-3 py-2 border-b border-gray-50 flex items-start gap-2 group cursor-pointer ${
                     idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
                     isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
                     isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
                     'hover:bg-gray-50'
                   }`}
+                  onMouseDown={() => { justSelectedRef.current = true; }}
+                  onClick={() => handleSelect(result)}
                 >
                   {/* Allika ikoon */}
                   <span className="mt-0.5 shrink-0">
@@ -380,7 +380,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                     )}
                   </span>
 
-                  {/* Väline link — alati nähtav kui URL olemas */}
+                  {/* Väline link */}
                   {rowUrl && (
                     <a
                       href={rowUrl}
@@ -394,7 +394,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                       <ExternalLink size={12} />
                     </a>
                   )}
-                </button>
+                </div>
               );
             })}
 
