@@ -114,6 +114,8 @@
     "author": "Author",
     "respondens": "Respondens",
     "year": "Year",
+    "yearDisplay": "Display year",
+    "yearDisplayPlaceholder": "e.g. ca. 1680 or 1670–1690",
     "place": "Place",
     "printer": "Printer",
     "tags": "Work keywords",

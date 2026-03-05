@@ -95,7 +95,8 @@ export interface Work {
 
   // Teose põhiandmed
   title: string;            // Pealkiri
-  year: number | null;      // Ilmumisaasta
+  year: number | null;      // Ilmumisaasta (number filtri/sortimise jaoks)
+  year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
   location: string;         // Trükikoht (string facetiks)
   location_object?: LinkedEntity; // Trükikoht (objekt)
   publisher: string;        // Trükkal (string facetiks)
@@ -179,6 +180,7 @@ export interface Page {
   // =========================================================
   title?: string;
   year?: number | null;
+  year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
   location?: string;
   location_object?: LinkedEntity;
   publisher?: string;

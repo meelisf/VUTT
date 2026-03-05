@@ -210,7 +210,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
-                <p className="text-gray-900">{work.year}</p>
+                <p className="text-gray-900">{work.year_display || work.year}</p>
               </div>
               
               {/* Tüüp */}

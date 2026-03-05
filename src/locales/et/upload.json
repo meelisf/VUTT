@@ -17,6 +17,7 @@
     "titlePlaceholder": "nt Disputatio philosophica de...",
     "yearLabel": "Aasta",
     "yearPlaceholder": "nt 1695",
+    "yearHint": "Kui täpne aasta pole teada, sisesta ligikaudne aasta. Kuvatava vahemiku (nt \"ca. 1680\") saab hiljem metaandmetes seadistada.",
     "slugLabel": "Kaustanimi (slug)",
     "slugHint": "Kaust luuakse: data/{{slug}}/",
     "slugConflict": "Kaust data/{{slug}}/ on juba olemas — muuda slug-i",

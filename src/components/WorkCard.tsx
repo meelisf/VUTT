@@ -225,7 +225,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             title={t('workCard.filterByYear')}
           >
             <Calendar size={14} />
-            <span>{work.year}</span>
+            <span>{work.year_display || work.year}</span>
           </button>
           <div className="flex items-center gap-2">
             <BookOpen size={14} />

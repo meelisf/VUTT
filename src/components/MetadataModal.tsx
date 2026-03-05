@@ -23,6 +23,7 @@ interface MetadataModalProps {
 interface MetadataForm {
   title: string;
   year: number;
+  year_display: string;                // Kuvatav aasta (nt "ca. 1680"), tühi = kasuta year numbrit
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
   genre: (string | LinkedEntity)[];  // Mitu žanrit
   tags: (string | LinkedEntity)[];
@@ -146,6 +147,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [metaForm, setMetaForm] = useState<MetadataForm>({
     title: '',
     year: 0,
+    year_display: '',
     type: null,
     genre: [],
     tags: [],
@@ -190,6 +192,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     setMetaForm({
       title: work?.title || page.title || '',
       year: work?.year || page.year || page.aasta || 0,
+      year_display: work?.year_display || page.year_display || '',
       type: work?.type || page.type || null,
       genre: (() => { const g = (work as any)?.genre_object ?? (page as any)?.genre_object ?? work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
       tags: work?.tags || page.tags || [],
@@ -287,6 +290,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         setMetaForm({
           title: title,
           year: year ? parseInt(year) : 0,
+          year_display: m.year_display || '',
           type: m.type || null,
           genre: (() => { const g = m.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
           tags: Array.isArray(tags) ? tags : [],
@@ -344,6 +348,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         metadata: {
           title: metaForm.title,
           year: metaForm.year,
+          year_display: metaForm.year_display.trim() || null,
           type: metaForm.type || null,
           genre: metaForm.genre.length > 0 ? metaForm.genre : null,
           creators: cleanCreators,
@@ -399,6 +404,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {
             title: metaForm.title,
             year: metaForm.year,
+            year_display: metaForm.year_display.trim() || null,
             type: getTypeLabel(metaForm.type),
             type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
@@ -413,11 +419,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             publisher_object: metaForm.publisher as LinkedEntity,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
-            collections: metaForm.collections
+            collections: metaForm.collections,
+            year_display: metaForm.year_display.trim() || null,
           } as Partial<Page>,
           {
             title: metaForm.title,
             year: metaForm.year,
+            year_display: metaForm.year_display.trim() || null,
             type: getTypeLabel(metaForm.type),
             type_object: metaForm.type as LinkedEntity | undefined,
             genre: getGenreLabel(metaForm.genre),
@@ -432,7 +440,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             publisher_object: metaForm.publisher as LinkedEntity,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
-            collections: metaForm.collections
+            collections: metaForm.collections,
+            year_display: metaForm.year_display.trim() || null,
           } as Partial<Work>
         );
 
@@ -569,7 +578,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {/* Grupp 2: Bibliograafilised andmed */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
             <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.bibliographic', 'Bibliograafilised andmed')}</h4>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.year')}</label>
                 <input
@@ -577,6 +586,16 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
                   value={metaForm.year || ''}
                   onChange={e => setMetaForm({ ...metaForm, year: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.yearDisplay')}</label>
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                  placeholder={t('metadata.yearDisplayPlaceholder', 'nt ca. 1680')}
+                  value={metaForm.year_display}
+                  onChange={e => setMetaForm({ ...metaForm, year_display: e.target.value })}
                 />
               </div>
               <div>

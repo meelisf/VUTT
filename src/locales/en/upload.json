@@ -17,6 +17,7 @@
     "titlePlaceholder": "e.g. Disputatio philosophica de...",
     "yearLabel": "Year",
     "yearPlaceholder": "e.g. 1695",
+    "yearHint": "If the exact year is unknown, enter an approximate year. A display range (e.g. \"ca. 1680\") can be configured later in metadata.",
     "slugLabel": "Folder name (slug)",
     "slugHint": "Folder will be created: data/{{slug}}/",
     "slugConflict": "Folder data/{{slug}}/ already exists — change the slug",

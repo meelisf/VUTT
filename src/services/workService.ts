@@ -50,7 +50,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       filter: [`work_id = "${workId}"`],
       attributesToRetrieve: [
         // V2 väljad
-        'work_id', 'id', 'title', 'year', 'location', 'publisher', 'publisher_object', 'publisher_id',
+        'work_id', 'id', 'title', 'year', 'year_display', 'location', 'publisher', 'publisher_object', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
@@ -72,6 +72,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       // Teose andmed
       title: hit.title || '',
       year: hit.year ?? hit.aasta ?? 0,
+      year_display: hit.year_display || null,
       location: hit.location || '',
       location_object: hit.location,
       publisher: typeof hit.publisher === 'string' ? hit.publisher : (hit.publisher?.label || ''),

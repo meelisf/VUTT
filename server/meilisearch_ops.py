@@ -285,6 +285,7 @@ def sync_work_to_meilisearch(dir_name):
     slug = metadata.get('slug', sanitize_id(dir_name))
     title = metadata.get('title', 'Pealkiri puudub')
     year = metadata.get('year', 0)
+    year_display = metadata.get('year_display') or None
 
     # Autor ja respondens creators massiivist
     creators = metadata.get('creators', [])
@@ -424,6 +425,7 @@ def sync_work_to_meilisearch(dir_name):
             "respondens": respondens,  # Filtreerimiseks (jääb)
             "aasta": year,       # Filtreerimiseks ja sortimiseks (jääb)
             "year": year,
+            "year_display": year_display,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
             "lehekylje_tekst": clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)

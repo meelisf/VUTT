@@ -84,6 +84,7 @@ export const normalizeWork = (hit: any): Work => {
     work_id: workId,
     title: hit.title || 'Pealkiri puudub',
     year: hit.year ?? 0,
+    year_display: hit.year_display || null,
     location: hit.location || '',
     location_object: hit.location_object,
     // Toeta nii vana (publisher = LinkedEntity objekt) kui uut (publisher = string) Meili formaati
@@ -136,6 +137,7 @@ export const normalizePage = (hit: any): Page => {
     // Denormaliseeritud teose andmed
     title: hit.title,
     year: hit.year,
+    year_display: hit.year_display || null,
     location: hit.location,
     location_object: hit.location_object,
     publisher: hit.publisher,

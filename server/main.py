@@ -532,7 +532,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
-    "title", "year", "location", "publisher", "creators", "tags",
+    "title", "year", "year_display", "location", "publisher", "creators", "tags",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
     "location_object", "publisher_object", "type_object", "genre_object", "tags_object",
     "series", "relations"
