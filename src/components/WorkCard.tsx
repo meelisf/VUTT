@@ -40,18 +40,23 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     navigate(`/work/${work.work_id}/1`);
   };
 
-  // Staatuse badge stiilid
-  const getStatusStyle = (status?: WorkStatus) => {
+  // Staatuse täpp stiilid
+  const getStatusDotStyle = (status?: WorkStatus) => {
     switch (status) {
-      case 'Valmis':
-        return 'text-green-600 bg-green-50';
-      case 'Töös':
-        return 'text-amber-600 bg-amber-50';
-      case 'Toores':
-      default:
-        return 'text-gray-500 bg-gray-50';
+      case 'Valmis': return 'bg-green-500';
+      case 'Töös': return 'bg-amber-400';
+      case 'Toores': default: return 'bg-gray-300';
     }
   };
+
+  // Žanrid massiivist (toetab nii massiivi kui üksikut väärtust)
+  const genres: any[] = (() => {
+    const raw = work.genre_object;
+    if (Array.isArray(raw) && raw.length > 0) return raw;
+    if (raw) return [raw];
+    if (work.genre) return [work.genre];
+    return [];
+  })();
 
   // Eelistame tags_object (LinkedEntity[]) mitmekeelsuse jaoks
   const displayTags = work.tags_object && work.tags_object.length > 0 
@@ -247,37 +252,34 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           })}
         </div>
 
-        <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
-          {/* Žanr vasakul - bookmark ikooniga */}
-          {work.genre ? (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                // Kasuta Q-koodi kui olemas (keelest sõltumatu), muidu labeli
-                const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
-                const genreUrlValue = genreObj?.id || getLabel(work.genre_object || work.genre, lang);
-                navigate(`/?genre=${encodeURIComponent(genreUrlValue)}`);
-              }}
-              className="flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-              title={t('workCard.filterByGenre', { genre: getLabel(work.genre_object || work.genre, lang) })}
-            >
-              <Bookmark size={11} className="fill-primary-200" />
-              {getLabel(work.genre_object || work.genre, lang)}
-            </button>
-          ) : (
-            <span />
+        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-1 min-w-0">
+          {/* Žanrid vasakul — kuni 2, siis +N */}
+          {genres.slice(0, 2).map((g, i) => {
+            const label = getLabel(g, lang);
+            const genreUrlValue = (typeof g !== 'string' && g.id) ? g.id : label;
+            return (
+              <button
+                key={i}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/?genre=${encodeURIComponent(genreUrlValue)}`); }}
+                className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors shrink-0"
+                title={t('workCard.filterByGenre', { genre: label })}
+              >
+                <Bookmark size={10} className="fill-primary-200 shrink-0" />
+                <span className="truncate max-w-[80px]">{label}</span>
+              </button>
+            );
+          })}
+          {genres.length > 2 && (
+            <span className="text-[10px] text-gray-400 shrink-0">+{genres.length - 2}</span>
           )}
-          {/* Staatus paremal */}
+          <span className="flex-1" />
+          {/* Staatus — värviline täpp */}
           <button
-            onClick={(e) => {
-              e.preventDefault();
-              navigate(`/?status=${encodeURIComponent(workStatus)}`);
-            }}
-            className={`text-xs font-medium px-2 py-1 rounded-full cursor-pointer hover:ring-2 hover:ring-offset-1 transition-all ${getStatusStyle(workStatus)}`}
+            onClick={(e) => { e.preventDefault(); navigate(`/?status=${encodeURIComponent(workStatus)}`); }}
+            className="p-1 rounded-full hover:bg-gray-100 transition-colors shrink-0"
             title={t('workCard.filterByStatus', { status: t(`common:status.${workStatus}`) })}
           >
-            {t(`common:status.${workStatus}`)}
+            <span className={`block w-2.5 h-2.5 rounded-full ${getStatusDotStyle(workStatus)}`} />
           </button>
         </div>
       </div >
