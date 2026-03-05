@@ -5,7 +5,7 @@ import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageS
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
-import { getWorkFullText, getAllTags } from '../../services/searchService';
+import { getAllTags } from '../../services/searchService';
 import { isQCode } from '../../services/meiliService';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
@@ -142,6 +142,25 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
             <BookOpen size={18} className="text-primary-600" />
             <h4 className="font-bold">{t('info.workInfo')}</h4>
+            {/* Allalaadimine — paremal */}
+            <div className="ml-auto flex items-center gap-1">
+              {[
+                { key: 'both', label: t('info.downloadBoth', 'TXT+JPG'), title: t('info.downloadBothTitle', 'Lae alla tekst ja pildid') },
+                { key: 'text', label: 'TXT', title: t('info.downloadText', 'Lae alla tekstifailid') },
+                { key: 'images', label: 'JPG', title: t('info.downloadImages', 'Lae alla pildifailid') },
+              ].map(({ key, label, title }) => (
+                <a
+                  key={key}
+                  href={`${FILE_API_URL}/download/${work.work_id}?content=${key}`}
+                  download
+                  title={title}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
+                >
+                  <Download size={11} />
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
           <div className="space-y-3 text-sm">
             <div>
@@ -372,36 +391,6 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </a>
               )}
 
-              <button
-                onClick={async () => {
-                  try {
-                    const { text, title, author, year } = await getWorkFullText(work.work_id);
-                    // Loome faili sisu päisega
-                    const header = `${title}\n${author}${year ? `, ${year}` : ''}\n\n`;
-                    const fullContent = header + text;
-                    // Genereerime faili ja pakume allalaadimiseks
-                    const blob = new Blob([fullContent], { type: 'text/plain;charset=utf-8' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    // Failinimeks: aasta-autor-pealkiri_esimesed_sõnad-id.txt
-                    const slugify = (s: string) => s.replace(/[^a-zA-ZäöüõÄÖÜÕ0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 40);
-                    const nameParts = [year, slugify(author), slugify(title)].filter(Boolean);
-                    a.download = `${nameParts.join('-')}-${work.id}.txt`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                  } catch (err) {
-                    console.error('Download error:', err);
-                    alert('Viga teksti allalaadimisel');
-                  }
-                }}
-                className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
-              >
-                <Download size={16} />
-                {t('metadata.downloadFullText')}
-              </button>
 
               {onOpenMetaModal && (
                 <button

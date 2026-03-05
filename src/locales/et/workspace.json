@@ -151,6 +151,10 @@
   },
   "info": {
     "workInfo": "Teose info",
+    "downloadBoth": "TXT+JPG",
+    "downloadBothTitle": "Lae alla tekst ja pildid (ZIP)",
+    "downloadText": "Lae alla kogu teose tekst (.txt)",
+    "downloadImages": "Lae alla pildifailid (ZIP)",
     "pages": "Lehekülgi",
     "status": "Staatus",
     "viewInEster": "Vaata ESTERis",

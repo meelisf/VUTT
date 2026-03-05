@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Depends, status, BackgroundTasks, UploadFile
 from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid
@@ -995,6 +995,111 @@ async def save_user_chars(request: Request, user=Depends(get_user)):
         return {"status": "success", "reset": True}
     with open(path, 'w', encoding='utf-8') as f: json.dump({"characters": data.get('characters', [])}, f, ensure_ascii=False, indent=2)
     return {"status": "success"}
+
+@app.get("/download/{work_id}")
+async def download_work(request: Request, work_id: str, content: str = "both"):
+    """Laeb alla teose failid.
+    content:
+      'text'   → üks kokku liidetud .txt fail (sequence järjekorras)
+      'images' → ZIP kõigi piltidega
+      'both'   → ZIP piltide + kokku liidetud tekstifailiga
+    """
+    import zipfile
+    import io
+
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/download')
+    if not allowed:
+        raise HTTPException(status_code=429, detail=f"Liiga palju päringuid. Proovi uuesti {retry_after}s pärast.")
+
+    folder = find_directory_by_id(work_id)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Teos ei leitud")
+
+    slug = os.path.basename(folder)
+
+    # Loe metaandmed failinime jaoks
+    meta_path = os.path.join(folder, '_metadata.json')
+    title_slug = slug
+    title = slug
+    author = ''
+    year = ''
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+        title = meta.get('title', slug)
+        year = str(meta.get('year', ''))
+        creators = meta.get('creators', [])
+        if creators:
+            author = creators[0].get('name', '') if isinstance(creators[0], dict) else str(creators[0])
+        raw_title = title
+        safe = unicodedata.normalize('NFKD', raw_title).encode('ascii', 'ignore').decode()
+        safe = ''.join(c if c.isalnum() or c in '-_ ' else '' for c in safe).strip().replace(' ', '_')
+        if safe:
+            title_slug = safe[:60]
+    except Exception:
+        pass
+
+    # Sequence järgi sorteeritud pildid (ilma laiendita → sama nimi txt-ile)
+    sorted_images = get_sorted_images(folder)
+
+    if content == 'text':
+        # Üks kokku liidetud tekstifail
+        parts = []
+        header = title
+        if author:
+            header += f'\n{author}'
+        if year:
+            header += f', {year}'
+        parts.append(header + '\n\n')
+
+        for img_fname in sorted_images:
+            base = os.path.splitext(img_fname)[0]
+            txt_path = os.path.join(folder, base + '.txt')
+            if os.path.exists(txt_path):
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    parts.append(f.read())
+                parts.append('\n')
+
+        combined = ''.join(parts)
+        buf = combined.encode('utf-8')
+        return StreamingResponse(
+            iter([buf]),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="{title_slug}.txt"'}
+        )
+
+    # ZIP (images või both)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        if os.path.exists(meta_path):
+            zf.write(meta_path, f"{slug}/_metadata.json")
+
+        if content == 'both':
+            # Kokku liidetud tekst ZIP-is
+            parts = []
+            for img_fname in sorted_images:
+                base = os.path.splitext(img_fname)[0]
+                txt_path = os.path.join(folder, base + '.txt')
+                if os.path.exists(txt_path):
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        parts.append(f.read())
+                    parts.append('\n')
+            if parts:
+                zf.writestr(f"{slug}/{title_slug}.txt", ''.join(parts))
+
+        # Pildid sequence järjekorras
+        for img_fname in sorted_images:
+            img_path = os.path.join(folder, img_fname)
+            if os.path.isfile(img_path):
+                zf.write(img_path, f"{slug}/{img_fname}")
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{title_slug}.zip"'}
+    )
 
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str):
