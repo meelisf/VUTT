@@ -844,9 +844,33 @@ async def admin_create_collection(request: Request, user=Depends(require_role("a
     invalidate_cache()
     return {"status": "success"}
 
+def _find_works_with_collection(collection_id: str):
+    """Leiab kõik teoste _metadata.json failid mis sisaldavad antud kollektsiooni ID-d."""
+    results = []
+    if not os.path.isdir(BASE_DIR):
+        return results
+    for folder in os.listdir(BASE_DIR):
+        meta_path = os.path.join(BASE_DIR, folder, '_metadata.json')
+        if not os.path.exists(meta_path):
+            continue
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            if collection_id in meta.get('collections', []):
+                results.append((meta_path, meta))
+        except Exception:
+            continue
+    return results
+
+@app.get("/admin/collections/{collection_id}/works-count")
+async def admin_collection_works_count(collection_id: str, user=Depends(require_role("admin"))):
+    """Tagastab mitu teost on antud kollektsioonis."""
+    count = len(_find_works_with_collection(collection_id))
+    return {"status": "success", "count": count}
+
 @app.delete("/admin/collections/{collection_id}")
-async def admin_delete_collection(collection_id: str, user=Depends(require_role("admin"))):
-    """Kustutab kollektsiooni. Keeldub kui on alamkollektsioone."""
+async def admin_delete_collection(collection_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    """Kustutab kollektsiooni ja eemaldab selle ID kõigi teoste metaandmetest. Keeldub kui on alamkollektsioone."""
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
     with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
@@ -859,13 +883,51 @@ async def admin_delete_collection(collection_id: str, user=Depends(require_role(
     if children:
         return {"status": "error", "message": f"Kollektsioonil on alamkollektsioonid ({', '.join(children)}). Kustuta need esmalt."}
 
-    del data[collection_id]
+    # Leia ja uuenda kõik mõjutatud teosed
+    affected = _find_works_with_collection(collection_id)
+    affected_work_ids = []
 
+    if affected:
+        repo = get_or_init_repo()
+        files_to_add = []
+
+        with metadata_lock:
+            for meta_path, meta in affected:
+                meta['collections'] = [c for c in meta.get('collections', []) if c != collection_id]
+                new_content = json.dumps(meta, ensure_ascii=False, indent=2)
+                with open(meta_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                os.chmod(meta_path, 0o644)
+                files_to_add.append(os.path.relpath(meta_path, BASE_DIR))
+                if meta.get('id'):
+                    affected_work_ids.append(meta['id'])
+
+        # Üks git commit kõigi muudatuste kohta
+        try:
+            col_name = data[collection_id].get('name', {}).get('et', collection_id)
+            author = Actor(user['username'], f"{user['username']}@vutt.local")
+            repo.index.add(files_to_add)
+            repo.index.commit(
+                f"Kustuta kollektsioon '{col_name}': eemaldatud {len(affected)} teosest",
+                author=author,
+                committer=author
+            )
+        except Exception as e:
+            logger.error(f"Git commit ebaõnnestus kollektsiooni kustutamisel: {e}")
+
+        # Async Meilisearch sync mõjutatud teostele
+        for work_id in affected_work_ids:
+            path = find_directory_by_id(work_id)
+            if path:
+                background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+
+    # Kustuta kollektsioonist
+    del data[collection_id]
     with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     invalidate_cache()
-    return {"status": "success"}
+    return {"status": "success", "affected_works": len(affected)}
 
 @app.get("/vocabularies")
 async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}

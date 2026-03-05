@@ -43,6 +43,8 @@ const CollectionEditor: React.FC = () => {
 
   // --- Kustutamine ---
   const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleteWorksCount, setDeleteWorksCount] = useState<number | null>(null);
+  const [deleteInput, setDeleteInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -65,6 +67,8 @@ const CollectionEditor: React.FC = () => {
     setSaved(false);
     setSaveError(null);
     setDeleteConfirming(false);
+    setDeleteWorksCount(null);
+    setDeleteInput('');
     setDeleteError(null);
   }, [selectedId]);
 
@@ -116,6 +120,24 @@ const CollectionEditor: React.FC = () => {
     }
   };
 
+  const handleStartDelete = async () => {
+    if (!selectedId) return;
+    setDeleteConfirming(true);
+    setDeleteWorksCount(null);
+    setDeleteInput('');
+    setDeleteError(null);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/collections/${selectedId}/works-count?token=${encodeURIComponent(token || '')}`,
+        { timeout: 10000 }
+      );
+      const data = await res.json();
+      if (data.status === 'success') setDeleteWorksCount(data.count);
+    } catch {
+      // count jääb null — näitame confirm ilma arvuta
+    }
+  };
+
   const handleDelete = async () => {
     if (!selectedId) return;
     setDeleting(true);
@@ -123,13 +145,14 @@ const CollectionEditor: React.FC = () => {
     try {
       const res = await fetchWithTimeout(
         `${FILE_API_URL}/admin/collections/${selectedId}?token=${encodeURIComponent(token || '')}`,
-        { method: 'DELETE', timeout: 10000 }
+        { method: 'DELETE', timeout: 30000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
         await refreshCollections();
         setSelectedId('');
         setDeleteConfirming(false);
+        setDeleteInput('');
       } else {
         setDeleteError(data.message || t('collections.deleteError'));
         setDeleteConfirming(false);
@@ -278,40 +301,59 @@ const CollectionEditor: React.FC = () => {
             </button>
             {saveError && <p className="text-sm text-red-600">{saveError}</p>}
 
-            {/* Kustuta */}
-            <div className="ml-auto flex items-center gap-2">
-              {deleteConfirming ? (
-                <>
-                  <span className="text-sm text-gray-700">
-                    {t('collections.deleteConfirm', { name: selectedName })}
-                  </span>
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {deleting ? <Loader2 size={14} className="animate-spin" /> : null}
-                    {deleting ? t('collections.deleting') : t('collections.delete')}
-                  </button>
-                  <button
-                    onClick={() => { setDeleteConfirming(false); setDeleteError(null); }}
-                    className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
-                  >
-                    Tühista
-                  </button>
-                </>
-              ) : (
+            {!deleteConfirming && (
+              <div className="ml-auto">
                 <button
-                  onClick={() => setDeleteConfirming(true)}
+                  onClick={handleStartDelete}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   <Trash2 size={14} />
                   {t('collections.delete')}
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
+
+          {deleteConfirming && (
+            <div className="border border-red-200 rounded-lg p-4 bg-red-50 space-y-3">
+              <p className="text-sm text-red-800 font-medium">
+                {t('collections.deleteConfirm', { name: selectedName })}
+              </p>
+              {deleteWorksCount !== null && (
+                <p className="text-sm text-red-700">
+                  {t('collections.deleteWorksWarning', { count: deleteWorksCount })}
+                </p>
+              )}
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={e => setDeleteInput(e.target.value)}
+                placeholder={t('collections.deleteInputPlaceholder', { word: t('collections.deleteConfirmWord') })}
+                className="w-full px-3 py-2 text-sm border border-red-200 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                autoFocus
+              />
+              {deleteError && <p className="text-sm text-red-600 font-medium">{deleteError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting || deleteInput !== t('collections.deleteConfirmWord')}
+                  className="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  {deleting ? <Loader2 size={14} className="animate-spin inline mr-1" /> : null}
+                  {deleting ? t('collections.deleting') : t('collections.deleteConfirmBtn')}
+                </button>
+                <button
+                  onClick={() => { setDeleteConfirming(false); setDeleteInput(''); setDeleteError(null); }}
+                  className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Tühista
+                </button>
+              </div>
+            </div>
+          )
+
+          }
+          {!deleteConfirming && deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
         </div>
       )}
 
