@@ -107,6 +107,17 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
         return Array.from(merged.values());
     };
 
+    // Laiendab valiku massiivi et sisaldaks nii Q-koodi kui labeli variante —
+    // vältib vilkumist kui selectedValues ja item.value pole veel sünkroonis
+    const resolveSelected = (selected: string[], labelToId?: Record<string, string>, idToLabel?: Record<string, string>) => {
+        const set = new Set<string>(selected);
+        for (const v of selected) {
+            if (labelToId?.[v]) set.add(labelToId[v]);
+            if (idToLabel?.[v]) set.add(idToLabel[v]);
+        }
+        return Array.from(set);
+    };
+
     const hasActiveFilters = (yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ||
         selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
         selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
@@ -206,7 +217,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 genreLabelToId,
                                 genreIdMap
                             ).sort((a, b) => b.count - a.count)}
-                            selectedValues={selectedGenres}
+                            selectedValues={resolveSelected(selectedGenres, genreLabelToId, genreIdMap)}
                             onToggle={onGenreToggle}
                             placeholder={t('filters.searchGenre', 'Otsi žanrit...')}
                         />
@@ -231,7 +242,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 tagsLabelToId,
                                 tagsIdMap
                             ).sort((a, b) => b.count - a.count)}
-                            selectedValues={selectedTeoseTags}
+                            selectedValues={resolveSelected(selectedTeoseTags, tagsLabelToId, tagsIdMap)}
                             onToggle={onTagToggle}
                             placeholder={t('filters.searchTag', 'Otsi märksõna...')}
                         />
@@ -256,7 +267,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 typeLabelToId,
                                 typeIdMap
                             ).sort((a, b) => b.count - a.count)}
-                            selectedValues={selectedTypes}
+                            selectedValues={resolveSelected(selectedTypes, typeLabelToId, typeIdMap)}
                             onToggle={onTypeToggle}
                             placeholder={t('filters.searchType', 'Otsi tüüpi...')}
                         />

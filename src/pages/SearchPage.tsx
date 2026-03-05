@@ -159,41 +159,24 @@ const SearchPage: React.FC = () => {
         return map;
     }, [results, i18n.language]);
 
-    // Lahenda Q-koodid labeliteks (žanrid)
-    // Viga: Q-kood lisatakse availableGenres-i fallback-ina → availableValues.has('Q...') === true → lahendus möödub
-    // Parandus: Q-koodid läbivad genreIdMap lahenduse ENNE availableValues kontrolli
+    // Normaliseeri žanrid Q-koodideks — label URL-ist → Q-kood, Q-kood jääb
     useEffect(() => {
         if (selectedGenres.length === 0) return;
         const isQ = (s: string) => /^Q\d+$/.test(s);
-        const labelValues = new Set(availableGenres.filter(g => !isQ(g.value)).map(g => g.value));
         let changed = false;
         const resolved = selectedGenres.map(g => {
-            if (isQ(g)) {
-                // Q-kood: proovi lahendada genreIdMap kaudu (tulemuste genre_object-ist)
-                if (genreIdMap[g]) { changed = true; return genreIdMap[g]; }
-                return g; // Ei saa veel lahendada (tulemused puuduvad)
-            }
-            if (labelValues.has(g)) return g;
-            if (genreIdMap[g] && genreIdMap[g] !== g) { changed = true; return genreIdMap[g]; }
-            if (vocabularies?.genres) {
-                const lang = i18n.language.split('-')[0];
-                const altLang = lang === 'et' ? 'en' : 'et';
-                for (const [, labels] of Object.entries(vocabularies.genres)) {
-                    if (labels[altLang] === g) {
-                        const curLabel = labels[lang] || labels['et'];
-                        if (curLabel) { changed = true; return curLabel; }
-                    }
-                }
-            }
+            if (isQ(g)) return g;
+            const qCode = genreLabelToId[g] || genreLabelToId[cap(g)];
+            if (qCode) { changed = true; return qCode; }
             return g;
         });
         if (changed) {
             setSelectedGenres(resolved);
             const newParams = new URLSearchParams(searchParams);
-            newParams.set('genre', resolved.map(g => genreLabelToId[g] || g).join(','));
+            newParams.set('genre', resolved.join(','));
             setSearchParams(newParams, { replace: true });
         }
-    }, [selectedGenres, availableGenres, genreIdMap, vocabularies, i18n.language]);
+    }, [selectedGenres, genreLabelToId]);
 
     // Q-kood → praeguse keele label (tüüp)
     const typeIdMap = useMemo(() => {
@@ -243,38 +226,24 @@ const SearchPage: React.FC = () => {
         });
     }, []);
 
-    // Lahenda Q-koodid labeliteks (tüüp) — sama loogika kui žanride puhul
+    // Normaliseeri tüübid Q-koodideks — label URL-ist → Q-kood, Q-kood jääb
     useEffect(() => {
         if (selectedTypes.length === 0) return;
         const isQ = (s: string) => /^Q\d+$/.test(s);
-        const labelValues = new Set(availableTypes.filter(t => !isQ(t.value)).map(t => t.value));
         let changed = false;
         const resolved = selectedTypes.map(t => {
-            if (isQ(t)) {
-                if (typeIdMap[t]) { changed = true; return typeIdMap[t]; }
-                return t;
-            }
-            if (labelValues.has(t)) return t;
-            if (typeIdMap[t] && typeIdMap[t] !== t) { changed = true; return typeIdMap[t]; }
-            if (vocabularies?.types) {
-                const lang = i18n.language.split('-')[0];
-                const altLang = lang === 'et' ? 'en' : 'et';
-                for (const [, labels] of Object.entries(vocabularies.types)) {
-                    if (labels[altLang] === t) {
-                        const curLabel = labels[lang] || labels['et'];
-                        if (curLabel) { changed = true; return curLabel; }
-                    }
-                }
-            }
+            if (isQ(t)) return t;
+            const qCode = typeLabelToId[t] || typeLabelToId[cap(t)];
+            if (qCode) { changed = true; return qCode; }
             return t;
         });
         if (changed) {
             setSelectedTypes(resolved);
             const newParams = new URLSearchParams(searchParams);
-            newParams.set('type', resolved.map(t => typeLabelToId[t] || t).join(','));
+            newParams.set('type', resolved.join(','));
             setSearchParams(newParams, { replace: true });
         }
-    }, [selectedTypes, availableTypes, typeIdMap, vocabularies, i18n.language]);
+    }, [selectedTypes, typeLabelToId]);
 
     // Q-kood → praeguse keele label (märksõnad)
     const tagsIdMap = useMemo(() => {
@@ -339,31 +308,24 @@ const SearchPage: React.FC = () => {
         return map;
     }, [results, i18n.language]);
 
-    // Lahenda Q-koodid labeliteks + normaliseeri URL Q-koodideks (märksõnad)
+    // Normaliseeri märksõnad Q-koodideks — label URL-ist → Q-kood, Q-kood jääb
     useEffect(() => {
         if (selectedTeoseTags.length === 0) return;
         const isQ = (s: string) => /^Q\d+$/.test(s);
-        const labelValues = new Set(availableTeoseTags.filter(t => !isQ(t.tag)).map(t => t.tag));
         let changed = false;
         const resolved = selectedTeoseTags.map(tag => {
-            if (isQ(tag)) {
-                if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
-                return tag;
-            }
-            if (labelValues.has(tag)) return tag;
-            if (tagsIdMap[tag] && tagsIdMap[tag] !== tag) { changed = true; return tagsIdMap[tag]; }
+            if (isQ(tag)) return tag;
+            const qCode = tagsLabelToId[tag] || tagsLabelToId[cap(tag)];
+            if (qCode) { changed = true; return qCode; }
             return tag;
         });
-        // URL normaliseerimine: konverdi labelid Q-koodideks kui tagsLabelToId on teada
-        const urlNormalized = resolved.map(t => tagsLabelToId[t] || t);
-        const urlNeedsUpdate = urlNormalized.join(',') !== teoseTagsParam.join(',');
-        if (changed) setSelectedTeoseTags(resolved);
-        if (changed || urlNeedsUpdate) {
+        if (changed) {
+            setSelectedTeoseTags(resolved);
             const newParams = new URLSearchParams(searchParams);
-            newParams.set('teoseTags', urlNormalized.join(','));
+            newParams.set('teoseTags', resolved.join(','));
             setSearchParams(newParams, { replace: true });
         }
-    }, [selectedTeoseTags, availableTeoseTags, tagsIdMap, tagsLabelToId, i18n.language]);
+    }, [selectedTeoseTags, tagsLabelToId]);
 
     // Laadi teose info kui tullakse work-filter-iga (nt Workspace'ist)
     useEffect(() => {
@@ -708,9 +670,19 @@ const SearchPage: React.FC = () => {
                     onScopeChange={setSelectedScope}
                     onYearStartChange={setYearStart}
                     onYearEndChange={setYearEnd}
-                    onGenreToggle={(v) => setSelectedGenres(prev => prev.includes(v) ? prev.filter(g => g !== v) : [...prev, v])}
-                    onTypeToggle={(v) => setSelectedTypes(prev => prev.includes(v) ? prev.filter(t => t !== v) : [...prev, v])}
-                    onTagToggle={(v) => setSelectedTeoseTags(prev => prev.includes(v) ? prev.filter(t => t !== v) : [...prev, v])}
+                    onGenreToggle={(v) => {
+                        // Normaliseri Q-koodiks kohe — hoiab ära Q-kood+label topelt lisamise
+                        const key = /^Q\d+$/.test(v) ? v : (genreLabelToId[v] || genreLabelToId[v[0]?.toUpperCase() + v.slice(1)] || v);
+                        setSelectedGenres(prev => prev.includes(key) ? prev.filter(g => g !== key) : [...prev, key]);
+                    }}
+                    onTypeToggle={(v) => {
+                        const key = /^Q\d+$/.test(v) ? v : (typeLabelToId[v] || typeLabelToId[v[0]?.toUpperCase() + v.slice(1)] || v);
+                        setSelectedTypes(prev => prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]);
+                    }}
+                    onTagToggle={(v) => {
+                        const key = /^Q\d+$/.test(v) ? v : (tagsLabelToId[v] || tagsLabelToId[v[0]?.toUpperCase() + v.slice(1)] || v);
+                        setSelectedTeoseTags(prev => prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]);
+                    }}
                     onAuthorInputChange={setAuthorInput}
                     onShowAuthorSuggestions={setShowAuthorSuggestions}
                     onAuthorSelect={handleAuthorSelect}
