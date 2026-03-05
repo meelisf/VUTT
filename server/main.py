@@ -1034,6 +1034,9 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
     except Exception:
         pass
 
+    # Failinimeks: slug eesliitega aastaarv kui see seal juba pole
+    file_slug = slug if (not year or slug.startswith(year)) else f"{year}-{slug}"
+
     # Sequence järgi sorteeritud pildid
     sorted_images = get_sorted_images(folder)
 
@@ -1059,29 +1062,29 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
         return StreamingResponse(
             iter([buf]),
             media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{slug}.txt"'}
+            headers={"Content-Disposition": f'attachment; filename="{file_slug}.txt"'}
         )
 
-    # ZIP (images või both) — pildid nimetatud {slug}_pg_NNN.jpg sequence järjekorras
+    # ZIP (images või both) — pildid nimetatud {file_slug}_pg_NNN.jpg sequence järjekorras
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         if os.path.exists(meta_path):
-            zf.write(meta_path, f"{slug}/_metadata.json")
+            zf.write(meta_path, f"{file_slug}/_metadata.json")
 
         if content == 'both':
-            zf.writestr(f"{slug}/{slug}.txt", _build_text())
+            zf.writestr(f"{file_slug}/{file_slug}.txt", _build_text())
 
         for i, img_fname in enumerate(sorted_images, start=1):
             img_path = os.path.join(folder, img_fname)
             if os.path.isfile(img_path):
                 ext = img_fname.rsplit('.', 1)[-1].lower()
-                zf.write(img_path, f"{slug}/{slug}_pg_{i:03d}.{ext}")
+                zf.write(img_path, f"{file_slug}/{file_slug}_pg_{i:03d}.{ext}")
 
     buf.seek(0)
     return StreamingResponse(
         buf,
         media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{title_slug}.zip"'}
+        headers={"Content-Disposition": f'attachment; filename="{file_slug}.zip"'}
     )
 
 @app.get("/meta/work/{work_id}")
