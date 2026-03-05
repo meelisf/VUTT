@@ -801,6 +801,72 @@ async def admin_update_collection(collection_id: str, request: Request, user=Dep
 
     return {"status": "success"}
 
+@app.post("/admin/collections")
+async def admin_create_collection(request: Request, user=Depends(require_role("admin"))):
+    """Loob uue kollektsiooni. Body: {id, name_et, name_en, parent?, color?, is_virtual?}"""
+    import re
+    body = await request.json()
+    collection_id = body.get("id", "").strip()
+    name_et = body.get("name_et", "").strip()
+    name_en = body.get("name_en", "").strip()
+    parent = body.get("parent", "").strip() or None
+    color = body.get("color", "").strip() or None
+    is_virtual = bool(body.get("is_virtual", False))
+
+    if not collection_id or not re.match(r'^[a-z0-9-]+$', collection_id):
+        return {"status": "error", "message": "ID peab koosnema ainult väiketähtedest, numbritest ja sidekriipsudest"}
+    if not name_et:
+        return {"status": "error", "message": "Eestikeelne nimi on kohustuslik"}
+
+    if not os.path.exists(COLLECTIONS_FILE):
+        return {"status": "error", "message": "collections.json ei leitud"}
+    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if collection_id in data:
+        return {"status": "error", "message": f"ID '{collection_id}' on juba kasutusel"}
+    if parent and parent not in data:
+        return {"status": "error", "message": f"Vanemkollektsioon '{parent}' ei leitud"}
+
+    new_col: dict = {"name": {"et": name_et, "en": name_en or name_et}}
+    if parent:
+        new_col["parent"] = parent
+    if color:
+        new_col["color"] = color
+    if is_virtual:
+        new_col["type"] = "virtual_group"
+
+    data[collection_id] = new_col
+
+    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    invalidate_cache()
+    return {"status": "success"}
+
+@app.delete("/admin/collections/{collection_id}")
+async def admin_delete_collection(collection_id: str, user=Depends(require_role("admin"))):
+    """Kustutab kollektsiooni. Keeldub kui on alamkollektsioone."""
+    if not os.path.exists(COLLECTIONS_FILE):
+        return {"status": "error", "message": "collections.json ei leitud"}
+    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if collection_id not in data:
+        return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
+
+    children = [k for k, v in data.items() if v.get("parent") == collection_id]
+    if children:
+        return {"status": "error", "message": f"Kollektsioonil on alamkollektsioonid ({', '.join(children)}). Kustuta need esmalt."}
+
+    del data[collection_id]
+
+    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    invalidate_cache()
+    return {"status": "success"}
+
 @app.get("/vocabularies")
 async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}
 

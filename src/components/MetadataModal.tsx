@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Edit3, X, Save, Plus, Trash2, Library } from 'lucide-react';
-import { getVocabularies, Vocabularies, Collections } from '../services/collectionService';
+import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown } from 'lucide-react';
+import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { Creator, CreatorRole, Page, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
@@ -39,6 +39,95 @@ interface SuggestionItem {
   label: string;
   id: string | null;
 }
+
+// Hierarhiline kollektsiooni multi-select dropdown MetadataModal jaoks
+interface CollectionDropdownProps {
+  collections: Collections;
+  selected: string[];
+  lang: 'et' | 'en';
+  onChange: (next: string[]) => void;
+  label: string;
+}
+
+function CollectionDropdownTreeNode({
+  node, selected, onChange, lang, depth
+}: {
+  node: CollectionTreeNode; selected: string[]; onChange: (next: string[]) => void; lang: 'et' | 'en'; depth: number;
+}) {
+  const col = node.collection;
+  const isVirtual = col.type === 'virtual_group';
+  return (
+    <>
+      <label
+        className={`flex items-center gap-2 text-sm rounded px-2 py-1 ${isVirtual ? 'text-gray-400 cursor-default' : 'cursor-pointer hover:bg-gray-50'}`}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
+      >
+        <input
+          type="checkbox"
+          disabled={isVirtual}
+          checked={selected.includes(node.id)}
+          onChange={e => {
+            const next = e.target.checked
+              ? [...selected, node.id]
+              : selected.filter(c => c !== node.id);
+            onChange(next);
+          }}
+          className="rounded border-gray-300"
+        />
+        <span className={isVirtual ? 'italic' : ''}>{col.name[lang] || col.name.et}</span>
+      </label>
+      {node.children.map(child => (
+        <CollectionDropdownTreeNode key={child.id} node={child} selected={selected} onChange={onChange} lang={lang} depth={depth + 1} />
+      ))}
+    </>
+  );
+}
+
+const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collections, selected, lang, onChange, label }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const tree = buildCollectionTree(collections);
+
+  // Sulge väljaspool klikkides
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const selectedLabels = selected
+    .map(id => collections[id]?.name[lang] || collections[id]?.name.et || id)
+    .join(', ');
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+        <Library size={12} />
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between border border-gray-300 rounded px-3 py-2 text-sm bg-white hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-400 text-left"
+      >
+        <span className={selected.length === 0 ? 'text-gray-400' : 'text-gray-800'}>
+          {selected.length === 0 ? '—' : selectedLabels}
+        </span>
+        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto py-1">
+          {tree.map(node => (
+            <CollectionDropdownTreeNode key={node.id} node={node} selected={selected} onChange={onChange} lang={lang} depth={0} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const MetadataModal: React.FC<MetadataModalProps> = ({
   isOpen,
@@ -541,31 +630,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.genres}
                 />
               </div>
-              {/* Kollektsioonid (multi-select) */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
-                  <Library size={12} />
-                  {t('metadata.collection')}
-                </label>
-                <div className="border border-gray-300 rounded px-3 py-2 max-h-40 overflow-y-auto flex flex-col gap-1">
-                  {Object.entries(collections).map(([id, col]) => (
-                    <label key={id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
-                      <input
-                        type="checkbox"
-                        checked={metaForm.collections.includes(id)}
-                        onChange={e => {
-                          const next = e.target.checked
-                            ? [...metaForm.collections, id]
-                            : metaForm.collections.filter(c => c !== id);
-                          setMetaForm({ ...metaForm, collections: next });
-                        }}
-                        className="rounded"
-                      />
-                      <span>{col.name[lang] || col.name.et}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              {/* Kollektsioonid (multi-select dropdown) */}
+              <CollectionDropdown
+                collections={collections}
+                selected={metaForm.collections}
+                lang={lang}
+                onChange={next => setMetaForm({ ...metaForm, collections: next })}
+                label={t('metadata.collection')}
+              />
             </div>
             {/* Keeled */}
             <div>

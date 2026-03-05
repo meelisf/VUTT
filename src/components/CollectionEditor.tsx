@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
+import { buildCollectionTree, CollectionTreeNode, COLLECTION_COLOR_CLASSES } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 /**
- * Admin-komponent kollektsioonide lühikirjelduste ja pikkade kirjelduste muutmiseks.
- * Salvestab PUT /admin/collections/{id} kaudu.
+ * Admin-komponent kollektsioonide haldamiseks:
+ * - kirjelduste muutmine (PUT /admin/collections/{id})
+ * - uue kollektsiooni lisamine (POST /admin/collections)
+ * - kollektsiooni kustutamine (DELETE /admin/collections/{id})
  */
 
 // Ehitab hierarhilise <option> massiivi puust (rekursiivne)
@@ -23,10 +25,13 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
   ]);
 }
 
+const AVAILABLE_COLORS = Object.keys(COLLECTION_COLOR_CLASSES);
+
 const CollectionEditor: React.FC = () => {
   const { t } = useTranslation('admin');
   const { collections, refreshCollections } = useCollection();
 
+  // --- Kirjelduse muutmine ---
   const [selectedId, setSelectedId] = useState<string>('');
   const [descEt, setDescEt] = useState('');
   const [descEn, setDescEn] = useState('');
@@ -34,18 +39,36 @@ const CollectionEditor: React.FC = () => {
   const [descLongEn, setDescLongEn] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Hierarhiline puu (order järgi, peakollektsioonid ees)
+  // --- Kustutamine ---
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  // --- Uue loomine ---
+  const [showCreate, setShowCreate] = useState(false);
+  const [newId, setNewId] = useState('');
+  const [newNameEt, setNewNameEt] = useState('');
+  const [newNameEn, setNewNameEn] = useState('');
+  const [newParent, setNewParent] = useState('');
+  const [newColor, setNewColor] = useState('indigo');
+  const [newIsVirtual, setNewIsVirtual] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createSuccess, setCreateSuccess] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const tree = buildCollectionTree(collections);
 
   // Reset tagasiside kui kasutaja vahetab kollektsiooni
   useEffect(() => {
     setSaved(false);
-    setError(null);
+    setSaveError(null);
+    setDeleteConfirming(false);
+    setDeleteError(null);
   }, [selectedId]);
 
-  // Lae valitud kollektsiooni andmed vormi (ka pärast refreshCollections)
+  // Lae valitud kollektsiooni andmed vormi
   useEffect(() => {
     if (!selectedId || !collections[selectedId]) {
       setDescEt(''); setDescEn(''); setDescLongEt(''); setDescLongEn('');
@@ -58,14 +81,14 @@ const CollectionEditor: React.FC = () => {
     setDescLongEn(col.description_long?.en || '');
   }, [selectedId, collections]);
 
+  const token = localStorage.getItem('vutt_token');
+
   const handleSave = async () => {
     if (!selectedId) return;
     setSaving(true);
-    setError(null);
+    setSaveError(null);
     setSaved(false);
-
     try {
-      const token = localStorage.getItem('vutt_token');
       const res = await fetchWithTimeout(
         `${FILE_API_URL}/admin/collections/${selectedId}?token=${encodeURIComponent(token || '')}`,
         {
@@ -80,25 +103,92 @@ const CollectionEditor: React.FC = () => {
       );
       const data = await res.json();
       if (data.status === 'success') {
-        // Laadib kollektsioonid uuesti → CollectionInfoBanner näeb uusi kirjeldusi kohe
         await refreshCollections();
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       } else {
-        setError(data.message || t('collections.saveError'));
+        setSaveError(data.message || t('collections.saveError'));
       }
     } catch {
-      setError(t('collections.saveError'));
+      setSaveError(t('collections.saveError'));
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = async () => {
+    if (!selectedId) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/collections/${selectedId}?token=${encodeURIComponent(token || '')}`,
+        { method: 'DELETE', timeout: 10000 }
+      );
+      const data = await res.json();
+      if (data.status === 'success') {
+        await refreshCollections();
+        setSelectedId('');
+        setDeleteConfirming(false);
+      } else {
+        setDeleteError(data.message || t('collections.deleteError'));
+        setDeleteConfirming(false);
+      }
+    } catch {
+      setDeleteError(t('collections.deleteError'));
+      setDeleteConfirming(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    setCreateError(null);
+    setCreateSuccess(false);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/collections?token=${encodeURIComponent(token || '')}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: newId.trim(),
+            name_et: newNameEt.trim(),
+            name_en: newNameEn.trim(),
+            parent: newParent || null,
+            color: newColor || null,
+            is_virtual: newIsVirtual,
+          }),
+          timeout: 10000,
+        }
+      );
+      const data = await res.json();
+      if (data.status === 'success') {
+        await refreshCollections();
+        setCreateSuccess(true);
+        setNewId(''); setNewNameEt(''); setNewNameEn('');
+        setNewParent(''); setNewColor('indigo'); setNewIsVirtual(false);
+        setTimeout(() => setCreateSuccess(false), 3000);
+      } else {
+        setCreateError(data.message || t('collections.createError'));
+      }
+    } catch {
+      setCreateError(t('collections.createError'));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const selectedName = selectedId && collections[selectedId]
+    ? (collections[selectedId].name.et)
+    : '';
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <h2 className="text-lg font-semibold text-gray-800">{t('collections.title')}</h2>
 
-      {/* Kollektsiooni valik — hierarhiline */}
+      {/* Kollektsiooni valik */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
           {t('collections.selectCollection')}
@@ -171,8 +261,8 @@ const CollectionEditor: React.FC = () => {
             <p className="text-xs text-gray-400 mt-1">{t('collections.descriptionLongHint')}</p>
           </div>
 
-          {/* Salvesta nupp */}
-          <div className="flex items-center gap-3">
+          {/* Salvesta + Kustuta */}
+          <div className="flex items-center gap-3 flex-wrap">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -186,10 +276,154 @@ const CollectionEditor: React.FC = () => {
                 t('collections.save')
               )}
             </button>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+
+            {/* Kustuta */}
+            <div className="ml-auto flex items-center gap-2">
+              {deleteConfirming ? (
+                <>
+                  <span className="text-sm text-gray-700">
+                    {t('collections.deleteConfirm', { name: selectedName })}
+                  </span>
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {deleting ? t('collections.deleting') : t('collections.delete')}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteConfirming(false); setDeleteError(null); }}
+                    className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Tühista
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirming(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={14} />
+                  {t('collections.delete')}
+                </button>
+              )}
+            </div>
           </div>
+          {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
         </div>
       )}
+
+      {/* Lisa uus kollektsioon */}
+      <div className="border-t border-gray-200 pt-6">
+        <button
+          onClick={() => setShowCreate(v => !v)}
+          className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 hover:text-primary-700"
+        >
+          {showCreate ? <ChevronUp size={16} /> : <Plus size={16} />}
+          {t('collections.createTitle')}
+        </button>
+
+        {showCreate && (
+          <div className="mt-4 space-y-4 max-w-lg">
+            {/* ID */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('collections.createId')}
+              </label>
+              <input
+                type="text"
+                value={newId}
+                onChange={e => setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                placeholder="academia-gustaviana-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">{t('collections.createIdHint')}</p>
+            </div>
+
+            {/* Nimed */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.createNameEt')}</label>
+                <input
+                  type="text"
+                  value={newNameEt}
+                  onChange={e => setNewNameEt(e.target.value)}
+                  placeholder="Nimi eesti keeles"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.createNameEn')}</label>
+                <input
+                  type="text"
+                  value={newNameEn}
+                  onChange={e => setNewNameEn(e.target.value)}
+                  placeholder="Name in English"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                />
+              </div>
+            </div>
+
+            {/* Vanem */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('collections.createParent')}</label>
+              <select
+                value={newParent}
+                onChange={e => setNewParent(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+              >
+                <option value="">{t('collections.createParentNone')}</option>
+                {renderTreeOptions(tree)}
+              </select>
+            </div>
+
+            {/* Värv + virtuaalne */}
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('collections.createColor')}</label>
+                <select
+                  value={newColor}
+                  onChange={e => setNewColor(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+                >
+                  {AVAILABLE_COLORS.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-gray-700 pb-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={newIsVirtual}
+                  onChange={e => setNewIsVirtual(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                {t('collections.createIsVirtual')}
+              </label>
+            </div>
+
+            {/* Lisa nupp */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCreate}
+                disabled={creating || !newId || !newNameEt}
+                className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {creating ? (
+                  <><Loader2 size={15} className="animate-spin" /> {t('collections.creating')}</>
+                ) : createSuccess ? (
+                  <><Check size={15} /> {t('collections.createSuccess')}</>
+                ) : (
+                  <><Plus size={15} /> {t('collections.create')}</>
+                )}
+              </button>
+              {createError && <p className="text-sm text-red-600">{createError}</p>}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
