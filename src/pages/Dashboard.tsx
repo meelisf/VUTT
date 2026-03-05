@@ -210,7 +210,8 @@ const Dashboard: React.FC = () => {
     return map;
   }, [works, i18n.language, enrichedLabels]);
 
-  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
+  // Pöördkaart: kõik labelite variandid → Q-kood (URL + facet merging)
+  // Kaardistab KÕIK keelevariantid et mergeFacetItems ühendaks nt "Kõne"+"Oration" → Q861911
   const genreLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
     const lang = i18n.language.split('-')[0];
@@ -219,14 +220,17 @@ const Dashboard: React.FC = () => {
       if (!obj) continue;
       const items = Array.isArray(obj) ? obj : [obj];
       for (const item of items) {
-        if (item?.id) {
-          const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
-          if (rawLabel) {
-            // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
-            map[rawLabel] = item.id;
-            map[cap(rawLabel)] = item.id;
+        if (!item?.id) continue;
+        // Eelistatud label (praegune keel + enriched)
+        const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
+        if (rawLabel) { map[rawLabel] = item.id; map[cap(rawLabel)] = item.id; }
+        // Kõik keelevariantid → sama Q-kood (Meilisearchi vanad labelid ühendamiseks)
+        if (item.labels) {
+          for (const lv of Object.values(item.labels)) {
+            if (lv) { map[lv as string] = item.id; map[cap(lv as string)] = item.id; }
           }
         }
+        if (item.label) { map[item.label] = item.id; map[cap(item.label)] = item.id; }
       }
     }
     return map;
@@ -260,7 +264,7 @@ const Dashboard: React.FC = () => {
     return map;
   }, [works, i18n.language, enrichedLabels]);
 
-  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks)
+  // Pöördkaart: kõik labelite variandid → Q-kood (facet merging + URL)
   const tagsLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
     const lang = i18n.language.split('-')[0];
@@ -268,18 +272,19 @@ const Dashboard: React.FC = () => {
       const objs = work.tags_object;
       if (!objs || !Array.isArray(objs)) continue;
       for (const item of objs) {
-        if (item?.id) {
-          const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
-          if (rawLabel) {
-            // Mõlemad variandid: väiketäht ja suurtäht (facetid kasutavad capitalize_first)
-            map[rawLabel] = item.id;
-            map[cap(rawLabel)] = item.id;
+        if (!item?.id) continue;
+        const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
+        if (rawLabel) { map[rawLabel] = item.id; map[cap(rawLabel)] = item.id; }
+        if (item.labels) {
+          for (const lv of Object.values(item.labels)) {
+            if (lv) { map[lv as string] = item.id; map[cap(lv as string)] = item.id; }
           }
         }
+        if (item.label) { map[item.label] = item.id; map[cap(item.label)] = item.id; }
       }
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works, i18n.language, enrichedLabels]);
 
   // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (tüüp)
   const typeIdMap = useMemo(() => {
@@ -876,6 +881,7 @@ const Dashboard: React.FC = () => {
                 genreIdMap={genreIdMap}
                 genreLabelToId={genreLabelToId}
                 tagsIdMap={tagsIdMap}
+                tagsLabelToId={tagsLabelToId}
                 typeIdMap={typeIdMap}
                 typeLabelToId={typeLabelToId}
                 lang={i18n.language.split('-')[0] as 'et' | 'en'}

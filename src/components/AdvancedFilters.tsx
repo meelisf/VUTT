@@ -46,6 +46,8 @@ interface AdvancedFiltersProps {
   genreLabelToId?: Record<string, string>;
   // Q-kood → praeguse keele label kaart (Wikidata märksõnade jaoks)
   tagsIdMap?: Record<string, string>;
+  // Label → Q-kood kaart (märksõnade jaoks, facet merging)
+  tagsLabelToId?: Record<string, string>;
   // Q-kood → praeguse keele label kaart (Wikidata tüüpide jaoks)
   typeIdMap?: Record<string, string>;
   // Label → Q-kood kaart (tüüpide jaoks)
@@ -155,6 +157,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   genreIdMap,
   genreLabelToId,
   tagsIdMap,
+  tagsLabelToId,
   typeIdMap,
   typeLabelToId,
   lang: propLang
@@ -269,9 +272,10 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
         label: tag,
         count
       }));
-    return mergeFacetItems(raw, tagsIdMap)
+    // tagsLabelToId: label→Q-kood (grupeering), tagsIdMap: Q-kood→praeguse keele label (kuvamine)
+    return mergeFacetItems(raw, tagsLabelToId, tagsIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, tagsIdMap]);
+  }, [facets, lang, tagsIdMap, tagsLabelToId]);
 
   const typeItems = useMemo<FilterItem[]>(() => {
     const typeKey = `type_${lang}` as keyof FacetDistribution;
