@@ -292,6 +292,25 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const { from, to } = view.state.selection.main;
     const openTag = `<${tag}>`;
     const closeTag = `</${tag}>`;
+    const docText = view.state.doc.toString();
+
+    // Toggle off: kui valik on juba täpselt selle tagi sees, eemalda tägid.
+    // CM6 peidab tägid, seega kasutaja valib SISU — from on kohe avatägi järel,
+    // to kohe sulgtägi ees.
+    const beforeFrom = from >= openTag.length ? docText.slice(from - openTag.length, from) : '';
+    const afterTo = docText.slice(to, to + closeTag.length);
+
+    if (beforeFrom === openTag && afterTo === closeTag) {
+      view.dispatch({
+        changes: [
+          { from: from - openTag.length, to: from, insert: '' },
+          { from: to, to: to + closeTag.length, insert: '' },
+        ],
+        selection: EditorSelection.range(from - openTag.length, to - openTag.length),
+      });
+      view.focus();
+      return;
+    }
 
     if (from === to) {
       // Valik puudub: sisesta <tag></tag>, pane kursor tägide vahele
