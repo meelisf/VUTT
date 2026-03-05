@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
-import { getAllTags } from '../services/searchService';
 import { useUser } from '../contexts/UserContext';
 import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2, Wand2 } from 'lucide-react';
-import MarkdownPreview from './MarkdownPreview';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
+import { vuttMarkupExtension } from './editor/VuttMarkupExtension';
+import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { FILE_API_URL } from '../config';
+
+// CM6 impordid
+import { EditorView, lineNumbers, keymap } from '@codemirror/view';
+import { EditorState, EditorSelection, Compartment } from '@codemirror/state';
+import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 
 // Erimärgi tüüp
 interface SpecialCharacter {
@@ -39,6 +44,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { user, authToken } = useUser();
   const lang = i18n.language || 'et';
   const [activeTab, setActiveTab] = useState<TabType>('edit');
+
   // Salvesta viewMode localStorage'sse, et see säiliks lehekülgede vahel liikudes
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (readOnly) return 'read';
@@ -50,11 +56,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     localStorage.setItem('vutt_viewMode', mode);
   }, []);
 
-  const [text, setText] = useState(page.text_content);
+  // Redaktori sisu muudatuste jälgimine (asendab vana `text` state'i)
+  const [isDirty, setIsDirty] = useState(false);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
   const [page_tags, setPageTags] = useState<(string | any)[]>(page.page_tags || []);
-
   const [isSaving, setIsSaving] = useState(false);
 
   // Re-OCR state
@@ -72,37 +78,118 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
 
-  // Salvestamata muudatuste jälgimine
+  // Salvestamata muudatuste jälgimine (teksti osa: isDirty; muu: savedState)
   const [savedState, setSavedState] = useState({
-    text: page.text_content,
     status: page.status,
     comments: page.comments,
-    page_tags: page.page_tags
+    page_tags: page.page_tags,
   });
 
-  // Refs for sync scrolling
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lineNumbersRef = useRef<HTMLDivElement>(null);
+  // CM6 refs
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const editableCompartmentRef = useRef(new Compartment());
+  const handleSaveRef = useRef<() => void>(() => {});
+  const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
+  const isSavingRef = useRef(false);
 
   // Arvutame kas on salvestamata muudatusi
   const hasUnsavedChanges =
-    text !== savedState.text ||
+    isDirty ||
     status !== savedState.status ||
     JSON.stringify(comments) !== JSON.stringify(savedState.comments) ||
     JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags);
 
+  // --- CM6 editori loomine (üks kord mount'il) ---
   useEffect(() => {
-    setText(page.text_content);
+    if (!editorContainerRef.current) return;
+
+    const copyHandler = (event: ClipboardEvent, view: EditorView) => {
+      // Nutikas kopeerimine: liidab read tühikuga, jätab poolitused, eemaldab XML tägid
+      const { from, to } = view.state.selection.main;
+      if (from === to) return false;
+      const selected = view.state.doc.sliceString(from, to);
+      const lines = selected.split('\n');
+      let result = '';
+      for (let i = 0; i < lines.length; i++) {
+        if (i === 0) {
+          result = lines[i];
+        } else if (result.endsWith('-') || result.endsWith('⸗')) {
+          result += lines[i]; // poolitus — liida otse
+        } else if (result.endsWith(' ') || lines[i].startsWith(' ')) {
+          result += lines[i]; // tühik juba olemas
+        } else {
+          result += ' ' + lines[i];
+        }
+      }
+      // Eemaldame XML tägid kopeeritud tekstist
+      const clean = result.replace(/<\/?[a-z]+[^>]*>/g, '').trim();
+      event.clipboardData?.setData('text/plain', clean);
+      event.preventDefault();
+      return true;
+    };
+
+    const view = new EditorView({
+      state: EditorState.create({
+        doc: page.text_content,
+        extensions: [
+          lineNumbers(),
+          history(),
+          keymap.of([
+            ...defaultKeymap,
+            ...historyKeymap,
+            { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
+            { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
+            { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
+          ]),
+          editableCompartmentRef.current.of(
+            EditorView.editable.of(!readOnly)
+          ),
+          vuttMarkupExtension,
+          vuttTheme,
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) setIsDirty(true);
+          }),
+          EditorView.domEventHandlers({ copy: copyHandler }),
+        ],
+      }),
+      parent: editorContainerRef.current,
+    });
+
+    viewRef.current = view;
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Ainult mount'il — page.text_content on algväärtus
+
+  // Uuendame editeeritavust viewMode ja readOnly muutmisel
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: editableCompartmentRef.current.reconfigure(
+        EditorView.editable.of(viewMode === 'edit' && !readOnly)
+      ),
+    });
+  }, [viewMode, readOnly]);
+
+  // Uuendame editori sisu lehe vahetusel
+  useEffect(() => {
     setStatus(page.status);
     setComments(page.comments);
-    setPageTags(page.page_tags);
-    // Uuendame ka salvestatud olekut uue lehe laadimisel
-    setSavedState({
-      text: page.text_content,
-      status: page.status,
-      comments: page.comments,
-      page_tags: page.page_tags
-    });
+    setPageTags(page.page_tags || []);
+    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags });
+    setIsDirty(false);
+
+    const view = viewRef.current;
+    if (view) {
+      const currentText = view.state.doc.toString();
+      if (currentText !== page.text_content) {
+        view.dispatch({
+          changes: { from: 0, to: currentText.length, insert: page.text_content },
+        });
+      }
+    }
   }, [page]);
 
   // Hoiatus brauseri sulgemise/refreshi korral
@@ -114,12 +201,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         return '';
       }
     };
-
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // Teavitame parent komponenti muudatuste olekust (ainult lokaalsed muudatused)
+  // Teavitame parent komponenti muudatuste olekust
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
@@ -133,15 +219,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           if (response.ok) {
             const data = await response.json();
             if (data.is_custom) {
-              // Kasutajal on isiklik komplekt — kasuta seda
               setSpecialCharacters(data.characters || []);
               setIsCustomChars(true);
               return;
             }
-            // is_custom: false — lae globaalne (ei return, langeb läbi)
           }
         }
-        // Fallback: globaalne vaikimisi (sisselogimata kasutaja või pole isiklikku komplekti)
         const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });
         if (response.ok) {
           const data = await response.json();
@@ -176,84 +259,69 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     loadTranscriptionGuide();
   }, [lang]);
 
-  // Erimärgi sisestamine või teksti ümbritsemine
-  const insertCharacter = useCallback((char: string, e?: React.MouseEvent) => {
-    if (e) e.preventDefault();
-    if (!textareaRef.current || readOnly) return;
-
-    const textarea = textareaRef.current;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const isSelection = start !== end;
-    const selectedText = text.substring(start, end);
-
-    let insertValue = char;
-    let newCursorPos = start + char.length;
-
-    // Logic for specific markers
-    if (char === '**') {
-      insertValue = isSelection ? `**${selectedText}**` : `****`;
-      newCursorPos = isSelection ? end + 4 : start + 2;
-    } else if (char === '*') {
-      insertValue = isSelection ? `*${selectedText}*` : `**`;
-      newCursorPos = isSelection ? end + 2 : start + 1;
-    } else if (char === '~') {
-      insertValue = isSelection ? `~${selectedText}~` : `~~`;
-      newCursorPos = isSelection ? end + 2 : start + 1;
-    } else if (char === '[[m: ') {
-      insertValue = isSelection ? `[[m: ${selectedText}]]` : `[[m: ]]`;
-      newCursorPos = isSelection ? end + 6 : start + 5;
-    } else if (char === '[^1]') {
-      // Kui tekst on valitud, lisa märgis selle lõppu (nt "sõna[^1]")
-      // Kui valikut pole, lihtsalt sisesta märgis
-      insertValue = isSelection ? `${selectedText}[^1]` : `[^1]`
-      newCursorPos = isSelection ? end + 4 : start + 4;
-    }
-
-    // Use document.execCommand to keep undo/redo stack intact
-    textarea.focus();
-    const success = document.execCommand('insertText', false, insertValue);
-
-    // Fallback if execCommand fails (though it works in all modern browsers for textarea)
-    if (!success) {
-      const newText = text.substring(0, start) + insertValue + text.substring(end);
-      setText(newText);
-    }
-
-    // Set cursor position after the update
-    // setTimeout is needed because React/DOM might still be processing the insertText
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.selectionStart = textareaRef.current.selectionEnd = newCursorPos;
-      }
-    }, 0);
-  }, [text, readOnly]);
-
+  // --- Salvestamine ---
   const handleSave = useCallback(async () => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
     setIsSaving(true);
-    const updatedPage: Page = {
-      ...page,
-      text_content: text,
-      status: status,
-      comments: comments,
-      page_tags: page_tags,
-    };
+
+    const text = viewRef.current?.state.doc.toString() ?? '';
+    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags };
 
     try {
       await onSave(updatedPage);
-      setSavedState({
-        text: text,
-        status: status,
-        comments: comments,
-        page_tags: page_tags
-      });
+      setSavedState({ status, comments, page_tags });
+      setIsDirty(false);
     } catch (e: any) {
-      console.error("Save error:", e);
-      alert(`Viga salvestamisel: ${e.message || "Tundmatu viga"}`);
+      console.error('Save error:', e);
+      alert(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
     } finally {
+      isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [page, text, status, comments, page_tags, onSave]);
+  }, [page, status, comments, page_tags, onSave]);
+
+  // Uuendame refid, et keymap saaks alati uusima versiooni
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+
+  // --- Toolbar toimingud ---
+  const wrapWithTag = useCallback((tag: string) => {
+    const view = viewRef.current;
+    if (!view || readOnly) return;
+    const { from, to } = view.state.selection.main;
+    const openTag = `<${tag}>`;
+    const closeTag = `</${tag}>`;
+
+    if (from === to) {
+      // Valik puudub: sisesta <tag></tag>, pane kursor tägide vahele
+      view.dispatch({
+        changes: { from, insert: openTag + closeTag },
+        selection: EditorSelection.cursor(from + openTag.length),
+      });
+    } else {
+      // Mähkime valiku tägidega
+      view.dispatch({
+        changes: [{ from, insert: openTag }, { from: to, insert: closeTag }],
+        selection: EditorSelection.range(from + openTag.length, to + openTag.length),
+      });
+    }
+    view.focus();
+  }, [readOnly]);
+
+  useEffect(() => { wrapWithTagRef.current = wrapWithTag; }, [wrapWithTag]);
+
+  const insertAtCursor = useCallback((text: string) => {
+    const view = viewRef.current;
+    if (!view || readOnly) return;
+    view.dispatch(view.state.replaceSelection(text));
+    view.focus();
+  }, [readOnly]);
+
+  // Erimärgi sisestamine (toolbar footer)
+  const insertSpecialChar = useCallback((char: string, e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    insertAtCursor(char);
+  }, [insertAtCursor]);
 
   // Re-OCR: pollimise puhastus unmount'il
   useEffect(() => {
@@ -315,7 +383,15 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   }, [page.image_url, page.work_id, authToken]);
 
   const applyReOcr = useCallback(() => {
-    if (reocrText !== null) setText(reocrText);
+    if (reocrText !== null) {
+      const view = viewRef.current;
+      if (view) {
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: reocrText },
+        });
+        setIsDirty(true);
+      }
+    }
     setReocrStatus('idle');
     setReocrText(null);
   }, [reocrText]);
@@ -327,37 +403,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setReocrError(null);
   }, []);
 
-  // Ctrl+S salvestamine
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (!isSaving && !readOnly) {
-          handleSave();
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSaving, readOnly, handleSave]);
-
-  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
-    if (lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = e.currentTarget.scrollTop;
-    }
-  };
-
-  // Generate line numbers based on text content
-  const lineCount = text.split('\n').length;
-  const lineNumbers = Array.from({ length: Math.max(1, lineCount) }, (_, i) => i + 1);
-
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
   return (
     <div className="flex flex-col h-full bg-paper font-sans">
 
-      {/* 1. GLOBAL HEADER - Two rows to prevent overlap */}
+      {/* 1. GLOBAL HEADER */}
       <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
         {/* Row 1: Work Metadata */}
         {work && (
@@ -437,12 +488,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         {/* TEXT TAB CONTENT */}
         {activeTab === 'edit' && (
           <>
-            {/* 2. SECONDARY TOOLBAR - Editor Controls & Status */}
+            {/* 2. SECONDARY TOOLBAR */}
             <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-1.5 shrink-0 gap-4">
 
               {/* Editor Tools (Left) */}
               <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-                {/* View Mode Toggle - ICONS */}
+                {/* View Mode Toggle */}
                 <div className="flex bg-gray-100 p-0.5 rounded-md border border-gray-200">
                   <button
                     onClick={() => handleViewModeChange('edit')}
@@ -459,17 +510,17 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   </button>
                 </div>
 
-                {/* Formatting Toolbar */}
+                {/* Formatting Toolbar — ainult edit mode'is */}
                 {viewMode === 'edit' && (
                   <div className="flex items-center gap-1">
                     <div className="w-px h-5 bg-gray-200 mx-2"></div>
-                    <button type="button" onClick={() => insertCharacter('**')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={t('editor.tooltips.bold')}>B</button>
-                    <button type="button" onClick={() => insertCharacter('*')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.italic')}>I</button>
-                    <button type="button" onClick={() => insertCharacter('~')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.fractur')}>𝔉</button>
+                    <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={t('editor.tooltips.bold')}>B</button>
+                    <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.italic')}>I</button>
+                    <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.fractur')}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={() => insertCharacter('[[m: ')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
-                    <button type="button" onClick={() => insertCharacter('[^1]')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.footnote')}>[^1]</button>
-                    <button type="button" onClick={() => insertCharacter('--lk--\n')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-400 border border-transparent hover:border-gray-200 font-mono" title={t('editor.tooltips.pageBreak')}>--lk--</button>
+                    <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
+                    <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.footnote')}>&lt;fn&gt;</button>
+                    <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-400 border border-transparent hover:border-gray-200 font-mono" title={t('editor.tooltips.pageBreak')}>&lt;pb/&gt;</button>
                   </div>
                 )}
               </div>
@@ -506,7 +557,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   </div>
                 );
               })()}
-
             </div>
 
             {/* Re-OCR käimasoleku bänner */}
@@ -517,7 +567,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               </div>
             )}
 
-            {/* 3. EDITOR AREA */}
+            {/* 3. EDITOR AREA — CM6 EditorView */}
             <div className="flex-1 relative flex overflow-hidden bg-white">
 
               {/* Re-OCR tulemus overlay */}
@@ -559,39 +609,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   )}
                 </div>
               )}
-              {/* Line Numbers Column */}
-              <div
-                ref={lineNumbersRef}
-                className="w-12 bg-gray-50 border-r border-gray-200 text-gray-400 font-serif text-[18px] leading-[1.7] text-right py-6 pr-2 select-none overflow-hidden"
-              >
-                {lineNumbers.map((num) => (
-                  <div key={num} className="whitespace-no-wrap">{num}</div>
-                ))}
-              </div>
 
-              {/* Text Area OR Markdown Preview */}
-              {viewMode === 'edit' ? (
-                <textarea
-                  ref={textareaRef}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  onScroll={handleScroll}
-                  readOnly={readOnly}
-                  className={`flex-1 w-full p-6 bg-white outline-none font-serif text-[18px] leading-[1.7] text-gray-800 resize-none whitespace-pre overflow-auto ${readOnly ? 'cursor-default' : ''}`}
-                  placeholder={t('editor.placeholder')}
-                  spellCheck={false}
-                />
-              ) : (
-                <div
-                  className="flex-1 w-full bg-white overflow-auto"
-                  onScroll={handleScroll}
-                >
-                  <MarkdownPreview content={text} />
-                </div>
-              )}
+              {/* CM6 konteiner — täidab kogu ala */}
+              <div ref={editorContainerRef} className="flex-1 overflow-hidden" />
             </div>
 
-            {/* 4. COLLAPSIBLE FOOTER (Very Compact) */}
+            {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) */}
             {viewMode === 'edit' && (
               <div className="border-t border-gray-200 bg-white shrink-0">
                 <details className="group" open={showCharPanel}>
@@ -619,13 +642,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   </summary>
 
                   <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
-                    {/* Special Characters - Even smaller buttons */}
                     <div className="flex flex-wrap gap-1">
                       {specialCharacters.map((char, idx) => (
                         <button
                           key={idx}
                           type="button"
-                          onClick={(e) => insertCharacter(char.character, e)}
+                          onClick={(e) => insertSpecialChar(char.character, e)}
                           disabled={readOnly}
                           title={char.name || char.character}
                           className="w-[22px] h-[22px] flex items-center justify-center text-xs font-serif bg-white border border-gray-200 rounded hover:bg-primary-50 hover:border-primary-300 transition-colors shadow-sm"
@@ -635,7 +657,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       ))}
                     </div>
 
-                    {/* Guide Link (Very Compact) */}
                     <button
                       onClick={() => setShowTranscriptionGuide(true)}
                       className="text-[11px] text-primary-600 hover:text-primary-800 hover:underline py-1 transition-colors"
@@ -662,25 +683,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             )}
 
             {/* Guide Modal */}
-            {
-              showTranscriptionGuide && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
-                  <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                      <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
-                      <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
-                        <X size={20} />
-                      </button>
-                    </div>
-                    <div
-                      className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-                      dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
-                    />
+            {showTranscriptionGuide && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
+                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+                  <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                    <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
+                    <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
+                      <X size={20} />
+                    </button>
                   </div>
+                  <div
+                    className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
+                    dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
+                  />
                 </div>
-              )
-            }
-
+              </div>
+            )}
           </>
         )}
 
@@ -709,15 +727,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             user={user}
             authToken={authToken}
             onRestore={(content) => {
-              setText(content);
+              const view = viewRef.current;
+              if (view) {
+                view.dispatch({
+                  changes: { from: 0, to: view.state.doc.length, insert: content },
+                });
+                setIsDirty(true);
+              }
               setActiveTab('edit');
             }}
             readOnly={readOnly || false}
           />
         )}
-
-      </div >
-    </div >
+      </div>
+    </div>
   );
 };
 

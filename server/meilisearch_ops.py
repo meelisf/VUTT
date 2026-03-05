@@ -47,35 +47,34 @@ from .git_ops import commit_new_work_to_git
 import re
 
 def clean_text_for_search(text):
-    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused."""
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
+
+    Toetab mõlemat märgendusformaati:
+    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <fn>n</fn>, <pb/>
+    - Vana pseudo-markdown: *italic*, **bold**, ~cs~, [[m:text]], --lk--, [^n]
+    """
     if not text:
         return ""
-    
-    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner", "spen⸗\ner" või "spen¬ \ner" -> "spener")
-    # Toetab standardset kriipsu (-), topeltkriipsu (⸗) ja poolitusmärki (¬)
+
+    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner" -> "spener")
     text = re.sub(r'[-⸗¬]\s*\n\s*', '', text)
-    
-    # Asenda erimärgid tühikuga, et vältida sõnade kokkukleepumist ja müra
-    
-    # 1. Bold/Italic (*) - asenda kõik tärnid tühikuga
-    text = text.replace('*', ' ')
-    
-    # 2. Koodivahetus (~)
-    text = text.replace('~', ' ')
-    
-    # 3. Ääremärkuse markerid [[m: ja ]]
-    text = text.replace('[[m:', ' ').replace(']]', ' ')
-    
-    # 4. Leheküljevahetus --lk--
-    text = text.replace('--lk--', ' ')
-    
-    # 5. Joonealused viited [^...] - eemaldame viite markeri
-    # Nt [^1] -> " "
-    text = re.sub(r'\[\^\d+\]', ' ', text)
-    
-    # 6. Eemalda üleliigsed tühikud (pole kriitiline Meilisearchile, aga viisakas)
+
+    # 1. Uus XML märgendus — eemalda kõik VUTT tägid
+    # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
+    text = re.sub(r'<fn>\d+</fn>', ' ', text)  # joonealuse viite marker
+    text = re.sub(r'<pb/>', ' ', text)           # leheküljevahetus
+    text = re.sub(r'</?[a-z]+>', '', text)       # avamis/sulgemistägid (<i>, </i>, <b>, <cs> jne)
+
+    # 2. Vana pseudo-markdown (legacy, kui faile pole veel migreeritud)
+    text = text.replace('*', ' ')               # bold/italic tärnid
+    text = text.replace('~', ' ')               # koodivahetus
+    text = text.replace('[[m:', ' ').replace(']]', ' ')  # ääremärkus
+    text = text.replace('--lk--', ' ')          # leheküljevahetus
+    text = re.sub(r'\[\^\d+\]', ' ', text)      # joonealuse viite marker
+
+    # 3. Eemalda üleliigsed tühikud
     text = re.sub(r'\s+', ' ', text).strip()
-    
+
     return text
 
 def load_people_aliases():
