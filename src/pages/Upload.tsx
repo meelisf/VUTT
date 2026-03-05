@@ -283,35 +283,36 @@ const Upload: React.FC = () => {
     }
   }, []);
 
+  const fetchStatus = useCallback(
+    async (id: string) => {
+      if (!authToken) return;
+      try {
+        const r = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/upload/${id}/status?token=${authToken}`
+        );
+        if (!r.ok) return;
+        const d: PollResult = await r.json();
+        setPollResult(d);
+        if (['processing', 'reviewing', 'done'].includes(d.status)) {
+          setStep(3);
+          if (ocrStartedAt === null) setOcrStartedAt(Date.now());
+        }
+        if (['done', 'error', 'imported'].includes(d.status)) {
+          stopPolling();
+        }
+      } catch {
+        // Ignoreerime ajutisi võrgu vigu
+      }
+    },
+    [authToken, stopPolling, ocrStartedAt]
+  );
+
   const startPolling = useCallback(
     (id: string, intervalMs = POLL_SLOW_MS) => {
       stopPolling();
-      pollTimerRef.current = setInterval(async () => {
-        if (!authToken) return;
-        try {
-          const r = await fetchWithTimeout(
-            `${FILE_API_URL}/admin/upload/${id}/status?token=${authToken}`
-          );
-          if (!r.ok) return;
-          const d: PollResult = await r.json();
-          setPollResult(d);
-
-          // Liigu samm 3-sse kui OCR hakkab tööle (collecting_images jääb sammu 2-sse)
-          if (['processing', 'reviewing', 'done'].includes(d.status)) {
-            setStep(3);
-            if (ocrStartedAt === null) setOcrStartedAt(Date.now());
-          }
-
-          // Peata polling kui valmis
-          if (['done', 'error', 'imported'].includes(d.status)) {
-            stopPolling();
-          }
-        } catch {
-          // Ignoreerime ajutisi võrgu vigu
-        }
-      }, intervalMs);
+      pollTimerRef.current = setInterval(() => fetchStatus(id), intervalMs);
     },
-    [authToken, stopPolling, ocrStartedAt]
+    [stopPolling, fetchStatus]
   );
 
   useEffect(() => () => stopPolling(), [stopPolling]);
@@ -611,10 +612,12 @@ const Upload: React.FC = () => {
       setStep(3);
       setFileUploading(true);
       setOcrStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
+      fetchStatus(saved.id); // Vahetu päring — ära kuva vananenud cached andmeid
       startPolling(saved.id, POLL_SLOW_MS);
     } else if (saved.status === 'uploading') {
       setStep(2);
       setFileUploading(true);
+      fetchStatus(saved.id); // Vahetu päring
       startPolling(saved.id, POLL_FAST_MS);
     } else if (saved.status === 'collecting_images') {
       setStep(2); // Piltide üleslaadimine katkes — kasutaja peab failid uuesti valima
