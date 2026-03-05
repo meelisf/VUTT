@@ -369,8 +369,8 @@ const Workspace: React.FC = () => {
     const title = work?.title || page.title || '';
 
     // Leia autor ja respondens creators massiivist
-    let author = work?.author || page.autor || '';
-    let respondens = work?.respondens || page.respondens || '';
+    let author = page.autor || '';
+    let respondens = page.respondens || '';
 
     if (work?.creators && work.creators.length > 0) {
       const authorCreator = work.creators.find(c => c.role === 'praeses' || c.role === 'auctor');

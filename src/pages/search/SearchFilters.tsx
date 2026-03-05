@@ -46,8 +46,11 @@ export interface SearchFiltersProps {
     aliasMap: Record<string, string>;
     // Q-kood → praeguse keele label (tulemuste genre/type/tags_object-ist)
     genreIdMap?: Record<string, string>;
+    genreLabelToId?: Record<string, string>;
     typeIdMap?: Record<string, string>;
+    typeLabelToId?: Record<string, string>;
     tagsIdMap?: Record<string, string>;
+    tagsLabelToId?: Record<string, string>;
     loading: boolean;
 
     // Callback-id
@@ -73,7 +76,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     selectedAuthor, authorInput, showAuthorSuggestions,
     selectedWork, selectedWorkInfo, showFiltersMobile,
     availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks,
-    vocabularies, aliasMap, genreIdMap, typeIdMap, tagsIdMap, loading,
+    vocabularies, aliasMap, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, loading,
     onScopeChange, onYearStartChange, onYearEndChange,
     onGenreToggle, onTypeToggle, onTagToggle,
     onAuthorInputChange, onShowAuthorSuggestions, onAuthorSelect, onAuthorClear,
@@ -82,6 +85,27 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     const { t, i18n } = useTranslation(['search', 'common']);
     const authorInputRef = useRef<HTMLInputElement>(null);
     const lang = i18n.language.split('-')[0] as 'et' | 'en';
+
+    // Ühendab erineva keele labelid ja Q-koodid üheks kirjeks (nagu AdvancedFilters)
+    const mergeFacetItems = (
+        items: { value: string; count: number; label: string }[],
+        labelToId?: Record<string, string>,
+        idToLabel?: Record<string, string>
+    ) => {
+        const merged = new Map<string, { value: string; count: number; label: string }>();
+        for (const item of items) {
+            const qCode = labelToId?.[item.value] || labelToId?.[item.value.charAt(0).toUpperCase() + item.value.slice(1).toLowerCase()];
+            const groupKey = qCode || item.value;
+            const displayLabel = (qCode && idToLabel?.[qCode]) || idToLabel?.[item.value] || item.label;
+            const existing = merged.get(groupKey);
+            if (existing) {
+                existing.count += item.count;
+            } else {
+                merged.set(groupKey, { value: qCode || item.value, label: displayLabel, count: item.count });
+            }
+        }
+        return Array.from(merged.values());
+    };
 
     const hasActiveFilters = (yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ||
         selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
@@ -173,13 +197,15 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                         badge={selectedGenres.length || undefined}
                     >
                         <SearchableFilterList
-                            items={availableGenres.map(({ value, count }) => ({
-                                value,
-                                count,
-                                // Q-kood: lahenda genreIdMap kaudu (tulemuste genre_object-ist)
-                                // Label: otsi sõnavarast (vocabularies on keyed by Latin ID, mitte label/Q-kood — seega enamasti fallback)
-                                label: genreIdMap?.[value] || vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
-                            }))}
+                            items={mergeFacetItems(
+                                availableGenres.map(({ value, count }) => ({
+                                    value,
+                                    count,
+                                    label: genreIdMap?.[value] || vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
+                                })),
+                                genreLabelToId,
+                                genreIdMap
+                            ).sort((a, b) => b.count - a.count)}
                             selectedValues={selectedGenres}
                             onToggle={onGenreToggle}
                             placeholder={t('filters.searchGenre', 'Otsi žanrit...')}
@@ -196,12 +222,15 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                         badge={selectedTeoseTags.length || undefined}
                     >
                         <SearchableFilterList
-                            items={availableTeoseTags.map(({ tag, count }) => ({
-                                value: tag,
-                                // Q-kood: lahenda tagsIdMap kaudu; label: kuva nii nagu on
-                                label: tagsIdMap?.[tag] || tag,
-                                count
-                            }))}
+                            items={mergeFacetItems(
+                                availableTeoseTags.map(({ tag, count }) => ({
+                                    value: tag,
+                                    label: tagsIdMap?.[tag] || tag,
+                                    count
+                                })),
+                                tagsLabelToId,
+                                tagsIdMap
+                            ).sort((a, b) => b.count - a.count)}
                             selectedValues={selectedTeoseTags}
                             onToggle={onTagToggle}
                             placeholder={t('filters.searchTag', 'Otsi märksõna...')}
@@ -218,11 +247,15 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                         badge={selectedTypes.length || undefined}
                     >
                         <SearchableFilterList
-                            items={availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => ({
-                                value,
-                                count,
-                                label: typeIdMap?.[value] || vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
-                            }))}
+                            items={mergeFacetItems(
+                                availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => ({
+                                    value,
+                                    count,
+                                    label: typeIdMap?.[value] || vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
+                                })),
+                                typeLabelToId,
+                                typeIdMap
+                            ).sort((a, b) => b.count - a.count)}
                             selectedValues={selectedTypes}
                             onToggle={onTypeToggle}
                             placeholder={t('filters.searchType', 'Otsi tüüpi...')}

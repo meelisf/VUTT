@@ -181,11 +181,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const loadData = async () => {
     // Ehita creators massiiv olemasolevatest andmetest
     const initialCreators: Creator[] = [];
-    if (work?.author || page.autor) {
-      initialCreators.push({ name: work?.author || page.autor || '', role: 'auctor' });
+    if (page.autor) {
+      initialCreators.push({ name: page.autor, role: 'auctor' });
     }
-    if (work?.respondens || page.respondens) {
-      initialCreators.push({ name: work?.respondens || page.respondens || '', role: 'respondens' });
+    if (page.respondens) {
+      initialCreators.push({ name: page.respondens, role: 'respondens' });
     }
 
     // Algväärtused page/work objektidest

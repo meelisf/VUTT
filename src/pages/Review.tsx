@@ -45,7 +45,7 @@ interface RecentCommit {
   work_author: string | null;  // NB: 'author' on commit author
   lehekylje_number: number | null;
   filepath: string;
-  change_type?: 'page' | 'metadata';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus
+  change_type?: 'page' | 'metadata' | 'import';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus, 'import' = uus teos
 }
 
 interface DiffData {

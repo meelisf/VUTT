@@ -413,7 +413,7 @@ const Statistics: React.FC = () => {
                     radius={[3, 3, 0, 0]}
                     maxBarSize={40}
                     cursor="pointer"
-                    onClick={(data: YearCount) => { if (data.count > 0) handleBarClick(data); }}
+                    onClick={(data) => { const d = data as unknown as YearCount; if (d.count > 0) handleBarClick(d); }}
                   />
                 </BarChart>
               </ResponsiveContainer>

@@ -362,7 +362,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         {/* Row 1: Work Metadata */}
         {work && (
           <div className="px-4 py-1.5 border-b border-gray-50 flex items-center gap-2 text-[11px] text-gray-500 bg-gray-50/50">
-            <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.author}</span>
+            <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
             <span className="text-gray-300">•</span>
             <span className="text-gray-400">{work.year_display || work.year}</span>
             <span className="text-gray-300">•</span>
