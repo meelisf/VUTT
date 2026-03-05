@@ -573,10 +573,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             )}
           </div>
 
-          {/* Grupp 2: Bibliograafilised andmed */}
+          {/* Grupp 2: Kolofoon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
-            <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.bibliographic', 'Bibliograafilised andmed')}</h4>
-            <div className="grid grid-cols-5 gap-3">
+            <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.colophon', 'Kolofoon')}</h4>
+            {/* Rida 1: Aasta */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.year')}</label>
                 <input
@@ -596,6 +597,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   onChange={e => setMetaForm({ ...metaForm, year_display: e.target.value })}
                 />
               </div>
+            </div>
+            {/* Rida 2: Koht ja trükkal */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <EntityPicker
                   label={t('metadata.place')}
@@ -606,7 +610,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.places}
                 />
               </div>
-              <div className="col-span-2">
+              <div>
                 <EntityPicker
                   label={t('metadata.printer')}
                   type="printer"
