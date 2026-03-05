@@ -420,7 +420,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collections: metaForm.collections,
-            year_display: metaForm.year_display.trim() || null,
           } as Partial<Page>,
           {
             title: metaForm.title,
@@ -441,7 +440,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collections: metaForm.collections,
-            year_display: metaForm.year_display.trim() || null,
           } as Partial<Work>
         );
 
