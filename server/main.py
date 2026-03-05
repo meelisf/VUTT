@@ -759,10 +759,11 @@ async def collections(): return {"status": "success", "collections": get_cached_
 
 @app.put("/admin/collections/{collection_id}")
 async def admin_update_collection(collection_id: str, request: Request, user=Depends(require_role("admin"))):
-    """Uuendab kollektsiooni description ja description_long välju."""
+    """Uuendab kollektsiooni description, description_long ja color välju."""
     body = await request.json()
     description = body.get("description")      # { et, en }
     description_long = body.get("description_long")  # { et, en }
+    color = body.get("color")  # string või None
 
     # Loe olemaolev fail
     if not os.path.exists(COLLECTIONS_FILE):
@@ -773,7 +774,7 @@ async def admin_update_collection(collection_id: str, request: Request, user=Dep
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
 
-    # Uuenda ainult description väljad (mitte nimi, värv, hierarhia)
+    # Uuenda description, description_long ja color väljad (mitte nimi, hierarhia)
     if description is not None:
         if description.get("et") or description.get("en"):
             data[collection_id]["description"] = {
@@ -791,6 +792,12 @@ async def admin_update_collection(collection_id: str, request: Request, user=Dep
             }
         elif "description_long" in data[collection_id]:
             del data[collection_id]["description_long"]
+
+    if color is not None:
+        if color.strip():
+            data[collection_id]["color"] = color.strip()
+        elif "color" in data[collection_id]:
+            del data[collection_id]["color"]
 
     # Kirjuta tagasi
     with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:

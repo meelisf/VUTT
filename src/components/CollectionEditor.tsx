@@ -37,6 +37,7 @@ const CollectionEditor: React.FC = () => {
   const [descEn, setDescEn] = useState('');
   const [descLongEt, setDescLongEt] = useState('');
   const [descLongEn, setDescLongEn] = useState('');
+  const [editColor, setEditColor] = useState('indigo');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -83,6 +84,7 @@ const CollectionEditor: React.FC = () => {
     setDescEn(col.description?.en || '');
     setDescLongEt(col.description_long?.et || '');
     setDescLongEn(col.description_long?.en || '');
+    setEditColor(col.color || 'indigo');
   }, [selectedId, collections]);
 
   const token = localStorage.getItem('vutt_token');
@@ -101,6 +103,7 @@ const CollectionEditor: React.FC = () => {
           body: JSON.stringify({
             description: { et: descEt.trim(), en: descEn.trim() },
             description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
+            color: editColor,
           }),
           timeout: 10000,
         }
@@ -228,6 +231,20 @@ const CollectionEditor: React.FC = () => {
 
       {selectedId && (
         <div className="space-y-6">
+          {/* Värv */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('collections.createColor')}</label>
+            <select
+              value={editColor}
+              onChange={e => setEditColor(e.target.value)}
+              className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+            >
+              {AVAILABLE_COLORS.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Lühikirjeldus */}
           <div>
             <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.description')}</p>
