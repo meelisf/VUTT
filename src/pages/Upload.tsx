@@ -454,7 +454,7 @@ const Upload: React.FC = () => {
     // Mitu faili — ainult pildid lubatud
     const images = files.filter((f) => {
       const n = f.name.toLowerCase();
-      return n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.png');
+      return n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.png') || n.endsWith('.tif') || n.endsWith('.tiff');
     });
 
     if (images.length !== files.length) {
@@ -1012,7 +1012,7 @@ const Upload: React.FC = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  accept=".pdf,.jpg,.jpeg,.png,.tif,.tiff,application/pdf,image/jpeg,image/png,image/tiff"
                   multiple
                   className="hidden"
                   onChange={(e) => {

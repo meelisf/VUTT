@@ -340,7 +340,7 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
 
 
 def _detect_file_type(path: str) -> str:
-    """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png' või 'unknown'."""
+    """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png', 'tiff' või 'unknown'."""
     with open(path, 'rb') as f:
         header = f.read(8)
     if header[:4] == b'%PDF':
@@ -349,6 +349,8 @@ def _detect_file_type(path: str) -> str:
         return 'jpeg'
     if header[:8] == b'\x89PNG\r\n\x1a\n':
         return 'png'
+    if header[:4] in (b'II\x2a\x00', b'MM\x00\x2a'):  # little-endian ja big-endian TIFF
+        return 'tiff'
     return 'unknown'
 
 
@@ -375,7 +377,7 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
     # --- Tuvasta faili tüüp ---
     file_type = _detect_file_type(tmp_path)
 
-    if file_type in ('jpeg', 'png'):
+    if file_type in ('jpeg', 'png', 'tiff'):
         # Pildi puhul: laadi otse remote work kausta, OCR server teeb ise üles
         pages = 1
         file_size = os.path.getsize(tmp_path)
@@ -409,8 +411,8 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
                     upload_progress[upload_id]['bytes_sent'] = transferred
                     upload_progress[upload_id]['bytes_total'] = total
 
-                # Konverteeri JPEG-iks kui PNG
-                if file_type == 'png':
+                # Konverteeri JPEG-iks kui PNG või TIFF
+                if file_type in ('png', 'tiff'):
                     from PIL import Image
                     conv_path = tmp_path + '.conv.jpg'
                     with Image.open(tmp_path) as img:
@@ -459,7 +461,7 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
         except Exception:
             pass
         raise ValueError(
-            "Toetamata failivorming. Palun laadi üles PDF, JPG või PNG fail."
+            "Toetamata failivorming. Palun laadi üles PDF, JPG, PNG või TIFF fail."
         )
 
     # file_type == 'pdf' → tavapärane PDF flow allpool
@@ -477,7 +479,7 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
                 pass
             raise ValueError(
                 "Vigane PDF — fail ei ole korrektne PDF-dokument. "
-                "Kontrolli, et laadid üles õige faili (PDF, JPG või PNG)."
+                "Kontrolli, et laadid üles õige faili (PDF, JPG, PNG või TIFF)."
             )
 
         pages = None
@@ -802,7 +804,7 @@ def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages:
         remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
         remote_dst = f"{remote_work_abs}/{remote_img_name}"
 
-        if file_type == 'png':
+        if file_type in ('png', 'tiff'):
             from PIL import Image
             conv_path = tmp_path + '.conv.jpg'
             with Image.open(tmp_path) as img:
