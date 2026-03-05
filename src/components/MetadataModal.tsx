@@ -606,47 +606,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {/* Grupp 3: Klassifikatsioon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
             <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.classification', 'Klassifikatsioon')}</h4>
-            <div className="grid grid-cols-3 gap-3">
-              {/* Tüüp */}
-              <div>
-                <EntityPicker
-                  label={t('metadata.type', 'Tüüp')}
-                  type="topic"
-                  value={metaForm.type}
-                  onChange={val => setMetaForm({ ...metaForm, type: val })}
-                  placeholder="nt: trükis, käsikiri"
-                  lang={lang}
-                  localSuggestions={suggestions.types}
-                />
-              </div>
-              {/* Žanrid (multi-select, col-span-2) */}
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.genre', 'Žanr')}</label>
-                {metaForm.genre.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-1.5">
-                    {metaForm.genre.map((g, i) => (
-                      <span key={i} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
-                        typeof g !== 'string' && (g as any).id ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-gray-100 border-gray-200 text-gray-700'
-                      }`}>
-                        {getLabel(g, lang)}
-                        <button onClick={() => setMetaForm({ ...metaForm, genre: metaForm.genre.filter((_, j) => j !== i) })} className="hover:text-red-500">
-                          <X size={11} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <EntityPicker
-                  type="genre"
-                  value={null}
-                  onChange={val => { if (val) setMetaForm({ ...metaForm, genre: [...metaForm.genre, val] }); }}
-                  placeholder="Lisa žanr..."
-                  lang={lang}
-                  localSuggestions={suggestions.genres}
-                />
-              </div>
-            </div>
-            {/* Kollektsioonid eraldi real */}
+            {/* Kollektsioon */}
             <CollectionDropdown
               collections={collections}
               selected={metaForm.collections}
@@ -654,6 +614,43 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               onChange={next => setMetaForm({ ...metaForm, collections: next })}
               label={t('metadata.collection')}
             />
+            {/* Žanrid — nagu märksõnad: pillid + picker */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-2">{t('metadata.genre', 'Žanr')}</label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {metaForm.genre.length === 0 && <span className="text-xs text-gray-400 italic">{t('metadata.noGenres', 'Žanrid puuduvad')}</span>}
+                {metaForm.genre.map((g, i) => (
+                  <span key={i} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border ${
+                    typeof g !== 'string' && (g as any).id ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                  }`}>
+                    {getLabel(g, lang)}
+                    <button onClick={() => setMetaForm({ ...metaForm, genre: metaForm.genre.filter((_, j) => j !== i) })} className="hover:text-red-500">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <EntityPicker
+                type="genre"
+                value={null}
+                onChange={val => { if (val) setMetaForm({ ...metaForm, genre: [...metaForm.genre, val] }); }}
+                placeholder={t('metadata.genrePlaceholder', 'Lisa žanr...')}
+                lang={lang}
+                localSuggestions={suggestions.genres}
+              />
+            </div>
+            {/* Tüüp */}
+            <div className="w-1/3">
+              <EntityPicker
+                label={t('metadata.type', 'Tüüp')}
+                type="topic"
+                value={metaForm.type}
+                onChange={val => setMetaForm({ ...metaForm, type: val })}
+                placeholder="nt: trükis, käsikiri"
+                lang={lang}
+                localSuggestions={suggestions.types}
+              />
+            </div>
             {/* Keeled */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.languages', 'Keeled')}</label>
