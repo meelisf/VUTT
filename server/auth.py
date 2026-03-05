@@ -226,6 +226,10 @@ def update_user_role(username, new_role, admin_user):
     if username == admin_user["username"]:
         return False, "Ei saa muuta enda rolli"
 
+    # Superadmini rolli ei saa muuta
+    if username == "meelis":
+        return False, "Selle kasutaja rolli ei saa muuta"
+
     users = load_users()
 
     if username not in users:
@@ -253,6 +257,10 @@ def delete_user(username, admin_user):
     # Admin ei saa ennast kustutada
     if username == admin_user["username"]:
         return False, "Ei saa kustutada ennast"
+
+    # Superadmini ei saa kustutada
+    if username == "meelis":
+        return False, "Seda kasutajat ei saa kustutada"
 
     users = load_users()
 
