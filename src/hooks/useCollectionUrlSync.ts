@@ -32,6 +32,7 @@ export function useCollectionUrlSync(
       } else {
         next.delete('collection');
       }
+      next.delete('page'); // Kollektsiooni vahetamisel lähtesta leht 1-le
       return next;
     }, { replace: true });
   }, [selectedCollection]);
