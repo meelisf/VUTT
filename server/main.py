@@ -1018,9 +1018,8 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
 
     slug = os.path.basename(folder)
 
-    # Loe metaandmed failinime jaoks
+    # Loe metaandmed päise jaoks (tekst) ja failinimeks kasutame slug-i otse
     meta_path = os.path.join(folder, '_metadata.json')
-    title_slug = slug
     title = slug
     author = ''
     year = ''
@@ -1032,27 +1031,20 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
         creators = meta.get('creators', [])
         if creators:
             author = creators[0].get('name', '') if isinstance(creators[0], dict) else str(creators[0])
-        raw_title = title
-        safe = unicodedata.normalize('NFKD', raw_title).encode('ascii', 'ignore').decode()
-        safe = ''.join(c if c.isalnum() or c in '-_ ' else '' for c in safe).strip().replace(' ', '_')
-        if safe:
-            title_slug = safe[:60]
     except Exception:
         pass
 
-    # Sequence järgi sorteeritud pildid (ilma laiendita → sama nimi txt-ile)
+    # Sequence järgi sorteeritud pildid
     sorted_images = get_sorted_images(folder)
 
-    if content == 'text':
-        # Üks kokku liidetud tekstifail
-        parts = []
-        header = title
+    def _build_text() -> str:
+        """Koostab kokku liidetud tekstifaili sisu."""
+        parts = [title]
         if author:
-            header += f'\n{author}'
+            parts.append(f'\n{author}')
         if year:
-            header += f', {year}'
-        parts.append(header + '\n\n')
-
+            parts.append(f', {year}')
+        parts.append('\n\n')
         for img_fname in sorted_images:
             base = os.path.splitext(img_fname)[0]
             txt_path = os.path.join(folder, base + '.txt')
@@ -1060,39 +1052,30 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     parts.append(f.read())
                 parts.append('\n')
+        return ''.join(parts)
 
-        combined = ''.join(parts)
-        buf = combined.encode('utf-8')
+    if content == 'text':
+        buf = _build_text().encode('utf-8')
         return StreamingResponse(
             iter([buf]),
             media_type="text/plain; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="{title_slug}.txt"'}
+            headers={"Content-Disposition": f'attachment; filename="{slug}.txt"'}
         )
 
-    # ZIP (images või both)
+    # ZIP (images või both) — pildid nimetatud {slug}_pg_NNN.jpg sequence järjekorras
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         if os.path.exists(meta_path):
             zf.write(meta_path, f"{slug}/_metadata.json")
 
         if content == 'both':
-            # Kokku liidetud tekst ZIP-is
-            parts = []
-            for img_fname in sorted_images:
-                base = os.path.splitext(img_fname)[0]
-                txt_path = os.path.join(folder, base + '.txt')
-                if os.path.exists(txt_path):
-                    with open(txt_path, 'r', encoding='utf-8') as f:
-                        parts.append(f.read())
-                    parts.append('\n')
-            if parts:
-                zf.writestr(f"{slug}/{title_slug}.txt", ''.join(parts))
+            zf.writestr(f"{slug}/{slug}.txt", _build_text())
 
-        # Pildid sequence järjekorras
-        for img_fname in sorted_images:
+        for i, img_fname in enumerate(sorted_images, start=1):
             img_path = os.path.join(folder, img_fname)
             if os.path.isfile(img_path):
-                zf.write(img_path, f"{slug}/{img_fname}")
+                ext = img_fname.rsplit('.', 1)[-1].lower()
+                zf.write(img_path, f"{slug}/{slug}_pg_{i:03d}.{ext}")
 
     buf.seek(0)
     return StreamingResponse(
