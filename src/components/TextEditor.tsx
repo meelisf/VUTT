@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2, Wand2 } from 'lucide-react';
+import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2, Wand2, Superscript, SeparatorHorizontal } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
@@ -141,6 +141,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
             { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
             { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
+            { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
           ]),
           editableCompartmentRef.current.of(
             EditorView.editable.of(!readOnly)
@@ -514,13 +515,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 {viewMode === 'edit' && (
                   <div className="flex items-center gap-1">
                     <div className="w-px h-5 bg-gray-200 mx-2"></div>
-                    <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={t('editor.tooltips.bold')}>B</button>
-                    <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.italic')}>I</button>
-                    <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={t('editor.tooltips.fractur')}>𝔉</button>
+                    <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={`${t('editor.tooltips.bold')} (Ctrl+B)`}>B</button>
+                    <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
+                    <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
-                    <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.footnote')}>&lt;fn&gt;</button>
-                    <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-400 border border-transparent hover:border-gray-200 font-mono" title={t('editor.tooltips.pageBreak')}>&lt;pb/&gt;</button>
+                    <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
+                    <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                   </div>
                 )}
               </div>
