@@ -619,8 +619,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.types}
                 />
               </div>
-              {/* Žanrid (multi-select) */}
-              <div>
+              {/* Žanrid (multi-select, col-span-2) */}
+              <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.genre', 'Žanr')}</label>
                 {metaForm.genre.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-1.5">
@@ -645,15 +645,15 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.genres}
                 />
               </div>
-              {/* Kollektsioonid (multi-select dropdown) */}
-              <CollectionDropdown
-                collections={collections}
-                selected={metaForm.collections}
-                lang={lang}
-                onChange={next => setMetaForm({ ...metaForm, collections: next })}
-                label={t('metadata.collection')}
-              />
             </div>
+            {/* Kollektsioonid eraldi real */}
+            <CollectionDropdown
+              collections={collections}
+              selected={metaForm.collections}
+              lang={lang}
+              onChange={next => setMetaForm({ ...metaForm, collections: next })}
+              label={t('metadata.collection')}
+            />
             {/* Keeled */}
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.languages', 'Keeled')}</label>
