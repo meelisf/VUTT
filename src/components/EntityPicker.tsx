@@ -25,9 +25,25 @@ interface EntityPickerProps {
   value: string | LinkedEntity | undefined | null;
   onChange: (value: LinkedEntity | null) => void;
   className?: string;
-  lang?: string; // Current UI language
-  localSuggestions?: SuggestionItem[]; // List of existing values from database
-  peopleRegister?: PeopleRegisterEntry[]; // Kohalik isikute register aliaste otsinguks
+  lang?: string;
+  localSuggestions?: SuggestionItem[];
+  peopleRegister?: PeopleRegisterEntry[];
+}
+
+type Suggestion = WikidataSearchResult & {
+  isLocal?: boolean;
+  isViaf?: boolean;
+  isGnd?: boolean;
+  isRegister?: boolean;
+};
+
+// Tagastab tulemuse välise lingi (Wikidata, GND, VIAF)
+function getResultUrl(result: Suggestion): string | null {
+  if (result.url) return result.url;
+  if (result.id && !result.id.startsWith('local-') && !result.isLocal) {
+    return `https://www.wikidata.org/wiki/${result.id}`;
+  }
+  return null;
 }
 
 const EntityPicker: React.FC<EntityPickerProps> = ({
@@ -42,20 +58,21 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   peopleRegister = []
 }) => {
   const [inputValue, setInputValue] = useState('');
-  const [suggestions, setSuggestions] = useState<(WikidataSearchResult & { isLocal?: boolean; isViaf?: boolean; isGnd?: boolean; isRegister?: boolean })[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const justSelectedRef = useRef(false); // Jälgib, kas soovitus just valiti
+  const justSelectedRef = useRef(false);
   const localSuggestionsRef = useRef(localSuggestions);
   localSuggestionsRef.current = localSuggestions;
   const peopleRegisterRef = useRef(peopleRegister);
   peopleRegisterRef.current = peopleRegister;
+  // Race condition vältimiseks: iga otsingutsükkel saab unikaalse ID
+  const searchIdRef = useRef(0);
 
-  // Sync internal input with external value
   useEffect(() => {
     if (!value) {
       setInputValue('');
@@ -64,7 +81,6 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     }
   }, [value, lang]);
 
-  // Handle outside clicks
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -75,234 +91,174 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Debounced search
+  // Debounced search — paralleelsed päringud + race condition kaitse
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (inputValue && showSuggestions && (!value || (typeof value === 'string' ? value : value.label) !== inputValue)) {
-        setIsLoading(true);
-        
-        // 1. Otsi kohalikest soovitustest
-        const normalizedInput = inputValue.toLowerCase();
-        const localDbText = lang === 'en' ? 'Local database' : 'Kohalik andmebaas';
-        const linkedText = lang === 'en' ? 'linked' : 'seotud';
-        const unlinkedText = lang === 'en' ? 'unlinked' : 'sidumata';
-        const localMatches: (WikidataSearchResult & { isLocal: boolean })[] = localSuggestionsRef.current
-          .filter(s => s.label.toLowerCase().includes(normalizedInput))
-          .slice(0, 5) // Piira kohalike arvu
-          .map(s => ({
-            id: s.id || ('local-' + s.label), // Kasuta päris ID-d kui on, muidu local-
-            label: s.label,
-            description: s.id ? `${localDbText} (${linkedText}: ${s.id})` : `${localDbText} (${unlinkedText})`,
-            url: '',
-            isLocal: true
-          }));
-
-        // Ehita localIds kohe pärast localMatches'i, et kasutada registri filtreerimises
-        const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
-
-        // 2. Otsi kohalikust isikute registrist (aliased)
-        let registerMatches: (WikidataSearchResult & { isLocal: boolean; isRegister: boolean })[] = [];
-        if ((type === 'person' || type === 'printer') && peopleRegisterRef.current.length > 0) {
-          const registerText = lang === 'en' ? 'People register' : 'Isikute register';
-          const aliasText = lang === 'en' ? 'alias' : 'alias';
-          const seenRegisterIds = new Set<string>();
-
-          for (const person of peopleRegisterRef.current) {
-            // Otsi nii primary_name kui aliaste hulgast
-            const nameMatch = person.primary_name.toLowerCase().includes(normalizedInput);
-            const matchingAlias = person.aliases.find(a => a.toLowerCase().includes(normalizedInput));
-
-            if (nameMatch || matchingAlias) {
-              // ID eelistus: wikidata > gnd > viaf
-              const bestId = person.ids.wikidata ? `Q${person.ids.wikidata.replace(/^Q/, '')}` :
-                             person.ids.gnd ? `GND:${person.ids.gnd}` :
-                             person.ids.viaf ? `VIAF:${person.ids.viaf}` : null;
-              if (!bestId || seenRegisterIds.has(bestId)) continue;
-              seenRegisterIds.add(bestId);
-
-              // Ära lisa kui sama ID juba kohalikes soovitustes
-              if (localIds.has(bestId)) continue;
-
-              const desc = matchingAlias && !nameMatch
-                ? `${registerText} (${aliasText}: ${matchingAlias})`
-                : `${registerText}`;
-
-              registerMatches.push({
-                id: bestId,
-                label: person.primary_name,
-                description: desc,
-                url: '',
-                isLocal: true,
-                isRegister: true
-              });
-            }
-          }
-          registerMatches = registerMatches.slice(0, 5);
-        }
-
-        // 3. Otsi Wikidatast
-        let wikidataMatches: WikidataSearchResult[] = [];
-        try {
-           wikidataMatches = await searchWikidata(inputValue);
-        } catch (e) {
-           console.error("Wikidata search error", e);
-        }
-
-        // 4. Otsi GND-st ja VIAF-ist (ainult isikute puhul)
-        let gndMatches: (WikidataSearchResult & { isGnd: boolean })[] = [];
-        let viafMatches: (WikidataSearchResult & { isViaf: boolean })[] = [];
-
-        if (type === 'person' || type === 'printer') {
-          // GND on stabiilsem kui VIAF, otsime sealt eelistatult
-          try {
-            const gndResults = await searchGnd(inputValue);
-            gndMatches = gndResults.map(g => ({
-              id: g.id,
-              label: g.label,
-              description: g.description,
-              url: g.url,
-              isGnd: true
-            }));
-          } catch (e) {
-            console.error("GND search error", e);
-          }
-
-          // VIAF kui varuvariant
-          try {
-            const viafResults = await searchViaf(inputValue);
-            viafMatches = viafResults.map(v => ({
-              id: v.id,
-              label: v.label,
-              description: v.description,
-              url: v.url,
-              isViaf: true
-            }));
-          } catch (e) {
-            console.error("VIAF search error", e);
-          }
-        }
-
-        // Eemalda duplikaadid: kui kohalikul/registril on SAMA ID mis kaugel, jäta kohalik
-        const registerIds = new Set(registerMatches.map(m => m.id));
-        const allLocalIds = new Set([...localIds, ...registerIds]);
-        const filteredWikidata = wikidataMatches.filter(m => !allLocalIds.has(m.id));
-        const filteredGnd = gndMatches.filter(m => !allLocalIds.has(m.id));
-        const filteredViaf = viafMatches.filter(m => !allLocalIds.has(m.id));
-
-        // Järjekord: kohalik -> register -> GND -> VIAF -> Wikidata
-        setSuggestions([...localMatches, ...registerMatches, ...filteredGnd, ...filteredViaf, ...filteredWikidata]);
-        setIsLoading(false);
-        setSelectedIndex(0);
-      } else {
+      if (!inputValue || !showSuggestions || (value && (typeof value === 'string' ? value : value.label) === inputValue)) {
         setSuggestions([]);
+        return;
       }
+
+      const currentSearchId = ++searchIdRef.current;
+      setIsLoading(true);
+
+      const normalizedInput = inputValue.toLowerCase();
+      const localDbText = lang === 'en' ? 'Local database' : 'Kohalik andmebaas';
+      const linkedText = lang === 'en' ? 'linked' : 'seotud';
+      const unlinkedText = lang === 'en' ? 'unlinked' : 'sidumata';
+
+      // 1. Kohalikud soovitused — sõnaalguse match esikohal, piiratud 3-le
+      const localMatches: Suggestion[] = localSuggestionsRef.current
+        .filter(s => s.label.toLowerCase().includes(normalizedInput))
+        .sort((a, b) => {
+          // Sõnaalgusega match enne kui lihtsalt sisaldab
+          const aStarts = a.label.toLowerCase().startsWith(normalizedInput) ? 0 : 1;
+          const bStarts = b.label.toLowerCase().startsWith(normalizedInput) ? 0 : 1;
+          return aStarts - bStarts;
+        })
+        .slice(0, 3)
+        .map(s => ({
+          id: s.id || ('local-' + s.label),
+          label: s.label,
+          description: s.id ? `${localDbText} (${linkedText}: ${s.id})` : `${localDbText} (${unlinkedText})`,
+          url: '',
+          isLocal: true
+        }));
+
+      const localIds = new Set(localMatches.filter(m => !m.id.startsWith('local-')).map(m => m.id));
+
+      // 2. Isikute register
+      let registerMatches: Suggestion[] = [];
+      if ((type === 'person' || type === 'printer') && peopleRegisterRef.current.length > 0) {
+        const registerText = lang === 'en' ? 'People register' : 'Isikute register';
+        const seenRegisterIds = new Set<string>();
+
+        for (const person of peopleRegisterRef.current) {
+          const nameMatch = person.primary_name.toLowerCase().includes(normalizedInput);
+          const matchingAlias = person.aliases.find(a => a.toLowerCase().includes(normalizedInput));
+
+          if (nameMatch || matchingAlias) {
+            const bestId = person.ids.wikidata ? `Q${person.ids.wikidata.replace(/^Q/, '')}` :
+                           person.ids.gnd ? `GND:${person.ids.gnd}` :
+                           person.ids.viaf ? `VIAF:${person.ids.viaf}` : null;
+            if (!bestId || seenRegisterIds.has(bestId)) continue;
+            seenRegisterIds.add(bestId);
+            if (localIds.has(bestId)) continue;
+
+            const desc = matchingAlias && !nameMatch
+              ? `${registerText} (alias: ${matchingAlias})`
+              : registerText;
+
+            registerMatches.push({
+              id: bestId,
+              label: person.primary_name,
+              description: desc,
+              url: '',
+              isLocal: true,
+              isRegister: true
+            });
+          }
+        }
+        registerMatches = registerMatches.slice(0, 3);
+      }
+
+      const allLocalIds = new Set([...localIds, ...registerMatches.map(m => m.id)]);
+
+      // 3. Välised päringud paralleelselt
+      const externalPromises: Promise<any>[] = [searchWikidata(inputValue)];
+      if (type === 'person' || type === 'printer') {
+        externalPromises.push(searchGnd(inputValue));
+        externalPromises.push(searchViaf(inputValue));
+      }
+
+      const results = await Promise.allSettled(externalPromises);
+
+      // Kontrolli race condition — kas see otsing on ikka aktuaalne
+      if (searchIdRef.current !== currentSearchId) return;
+
+      const wikidataMatches: Suggestion[] = results[0].status === 'fulfilled'
+        ? (results[0].value as WikidataSearchResult[]).filter(m => !allLocalIds.has(m.id))
+        : [];
+
+      let gndMatches: Suggestion[] = [];
+      let viafMatches: Suggestion[] = [];
+
+      if (type === 'person' || type === 'printer') {
+        gndMatches = results[1]?.status === 'fulfilled'
+          ? (results[1].value as GndSearchResult[])
+              .filter(m => !allLocalIds.has(m.id))
+              .map(g => ({ id: g.id, label: g.label, description: g.description, url: g.url, isGnd: true }))
+          : [];
+
+        viafMatches = results[2]?.status === 'fulfilled'
+          ? (results[2].value as ViafSearchResult[])
+              .filter(m => !allLocalIds.has(m.id))
+              .map(v => ({ id: v.id, label: v.label, description: v.description, url: v.url, isViaf: true }))
+          : [];
+      }
+
+      setSuggestions([...localMatches, ...registerMatches, ...gndMatches, ...viafMatches, ...wikidataMatches]);
+      setIsLoading(false);
+      setSelectedIndex(0);
     }, 300);
     return () => clearTimeout(timer);
   }, [inputValue, showSuggestions, value]);
 
-  const handleSelect = async (result: WikidataSearchResult & { isViaf?: boolean; isGnd?: boolean }) => {
-    justSelectedRef.current = true; // Märgi, et valiti soovitus
+  const handleSelect = async (result: Suggestion) => {
+    justSelectedRef.current = true;
     setIsLoading(true);
 
     let entity: LinkedEntity;
 
     if (result.id.startsWith('local-')) {
-        // Kohalik SIDUMATA valik (tekstipõhine)
-        entity = {
-            id: null,
-            label: result.label,
-            source: 'manual',
-            labels: { et: result.label }
-        };
+      entity = { id: null, label: result.label, source: 'manual', labels: { et: result.label } };
     } else if (result.isGnd || result.id.startsWith('GND:')) {
-        // GND valik
-        entity = {
-            id: result.id,
-            label: result.label,
-            source: 'gnd',
-            labels: { et: result.label }
-        };
+      entity = { id: result.id, label: result.label, source: 'gnd', labels: { et: result.label } };
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
-        // VIAF valik
-        entity = {
-            id: result.id,
-            label: result.label,
-            source: 'viaf',
-            labels: { et: result.label }
-        };
+      entity = { id: result.id, label: result.label, source: 'viaf', labels: { et: result.label } };
     } else if (result.isLocal) {
-        // Kohalik seotud valik — kasuta kohalikku labeli, ära kirjuta Wikidataga üle
-        // (kohalik register on kanooniline allikas, Wikidata võib olla aegunud)
-        entity = {
-            id: result.id,
-            label: result.label,
-            source: 'wikidata',
-            labels: { et: result.label }
-        };
+      entity = { id: result.id, label: result.label, source: 'wikidata', labels: { et: result.label } };
     } else {
-        // Wikidata otsing — päri värsked labelid
-        let multilingualLabels: Record<string, string> = { et: result.label };
-        try {
-            multilingualLabels = await getEntityLabels(result.id);
-        } catch (e) {
-            console.warn("Ei saanud silte Wikidatast", e);
-        }
-
-        entity = {
-            id: result.id,
-            label: result.label,
-            source: 'wikidata',
-            labels: multilingualLabels
-        };
+      let multilingualLabels: Record<string, string> = { et: result.label };
+      try {
+        multilingualLabels = await getEntityLabels(result.id);
+      } catch (e) {
+        console.warn("Ei saanud silte Wikidatast", e);
+      }
+      entity = { id: result.id, label: result.label, source: 'wikidata', labels: multilingualLabels };
     }
 
     onChange(entity);
-    // Kui value on null (nt märksõnade lisamisel), tühjenda lahter
-    // Kui value on olemas (nt üksiku välja muutmisel), näita valitud teksti
     setInputValue(value === null ? '' : result.label);
     setShowSuggestions(false);
     setIsLoading(false);
   };
 
   const handleManualEntry = () => {
-    if (!inputValue.trim()) {
-      onChange(null);
-      return;
-    }
-
-    // Kui on olemasolev lingitud entiteet (ID olemas), säilita link ja muuda ainult nime
+    if (!inputValue.trim()) { onChange(null); return; }
     const existingId = value && typeof value !== 'string' ? value.id : null;
     const existingSource = value && typeof value !== 'string' ? value.source : null;
-
-    const entity: LinkedEntity = {
+    onChange({
       id: existingId,
       label: inputValue.trim(),
       source: existingId ? (existingSource || 'manual') : 'manual',
       labels: { et: inputValue.trim() }
-    };
-
-    onChange(entity);
-    // Kui value on null (nt märksõnade lisamisel), tühjenda lahter
-    if (value === null) {
-      setInputValue('');
-    }
+    });
+    if (value === null) setInputValue('');
     setShowSuggestions(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setSelectedIndex(prev => Math.min(prev + 1, suggestions.length)); // +1 for manual entry option
+      setSelectedIndex(prev => Math.min(prev + 1, suggestions.length));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setSelectedIndex(prev => Math.max(prev - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (selectedIndex < suggestions.length) {
-        handleSelect(suggestions[selectedIndex]);
-      } else {
-        handleManualEntry();
-      }
+      if (selectedIndex < suggestions.length) handleSelect(suggestions[selectedIndex]);
+      else handleManualEntry();
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
@@ -330,49 +286,39 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           {label}
         </label>
       )}
-      
+
       <div className="relative">
         <div className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLinked ? 'text-green-500' : 'text-gray-400'}`}>
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : getIcon()}
         </div>
-        
+
         <input
           ref={inputRef}
           type="text"
           value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            setShowSuggestions(true);
-          }}
+          onChange={(e) => { setInputValue(e.target.value); setShowSuggestions(true); }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => {
-            // Kui kasutaja lahkub väljalt ja väärtus on muutunud, rakenda muudatus
-            // Kui just valiti soovitus, ära tee midagi (justSelectedRef)
-            if (justSelectedRef.current) {
-              justSelectedRef.current = false;
-              return;
-            }
+            if (justSelectedRef.current) { justSelectedRef.current = false; return; }
             const currentLabel = value ? (typeof value === 'string' ? value : value.label) : '';
-            if (inputValue.trim() !== currentLabel) {
-              handleManualEntry();
-            }
+            if (inputValue.trim() !== currentLabel) handleManualEntry();
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || `Otsi ${label?.toLowerCase() || 'väärtust'}...`}
           className={`w-full pl-10 ${entityUrl ? 'pr-16' : 'pr-10'} py-2 text-sm border rounded-md outline-none transition-all ${
-            isLinked 
-              ? 'border-green-200 bg-green-50/30 focus:border-green-400 focus:ring-2 focus:ring-green-100' 
+            isLinked
+              ? 'border-green-200 bg-green-50/30 focus:border-green-400 focus:ring-2 focus:ring-green-100'
               : 'border-gray-300 focus:border-primary-500 focus:ring-2 focus:ring-primary-100'
           }`}
         />
-        
+
         {entityUrl && (
           <a
             href={entityUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="absolute right-9 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-            title="Vaata Wikidatas"
+            title="Vaata andmebaasis"
             onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink size={14} />
@@ -381,11 +327,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
         {inputValue && (
           <button
-            onClick={() => {
-              setInputValue('');
-              onChange(null);
-              inputRef.current?.focus();
-            }}
+            onClick={() => { setInputValue(''); onChange(null); inputRef.current?.focus(); }}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-100"
           >
             <X size={14} />
@@ -394,41 +336,69 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       </div>
 
       {showSuggestions && (inputValue.length >= 2 || suggestions.length > 0) && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-72 flex flex-col">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden max-h-80 flex flex-col">
           <div className="overflow-y-auto flex-1">
             {suggestions.map((result, idx) => {
               const isLocal = result.isLocal;
               const isRegister = result.isRegister;
               const isGnd = result.isGnd || result.id.startsWith('GND:');
               const isViaf = result.isViaf || result.id.startsWith('VIAF:');
+              const rowUrl = getResultUrl(result);
+
               return (
-              <button
-                key={result.id}
-                onMouseDown={() => { justSelectedRef.current = true; }}
-                onClick={() => handleSelect(result)}
-                className={`w-full text-left px-4 py-2 border-b border-gray-50 flex flex-col ${
-                  idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
-                  isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
-                  isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
-                  'hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    {isRegister && <Users size={12} className="text-teal-600" aria-label={lang === 'en' ? 'People register' : 'Isikute register'} />}
-                    {isLocal && !isRegister && <Database size={12} className="text-amber-600" aria-label={lang === 'en' ? 'Local database' : 'Kohalik andmebaas'} />}
-                    {isGnd && <BookMarked size={12} className="text-orange-600" aria-label="GND" />}
-                    {isViaf && <Library size={12} className="text-purple-600" aria-label="VIAF" />}
-                    <span className="font-medium text-gray-900 text-sm">{result.label}</span>
-                  </div>
-                  {!isLocal && <span className={`text-[10px] font-mono px-1 rounded ${isGnd ? 'text-orange-500 bg-orange-50' : isViaf ? 'text-purple-500 bg-purple-50' : 'text-gray-400 bg-gray-100'}`}>{result.id}</span>}
-                </div>
-                {result.description && (
-                  <span className={`text-xs line-clamp-1 ${isRegister ? 'text-teal-600/80 italic' : isLocal ? 'text-amber-600/80 italic' : isGnd ? 'text-orange-500/80' : isViaf ? 'text-purple-500/80' : 'text-gray-500'}`}>{result.description}</span>
-                )}
-              </button>
-            )})}
-            
+                <button
+                  key={result.id}
+                  onMouseDown={() => { justSelectedRef.current = true; }}
+                  onClick={() => handleSelect(result)}
+                  className={`w-full text-left px-3 py-2 border-b border-gray-50 flex items-start gap-2 group ${
+                    idx === selectedIndex ? 'bg-primary-50 ring-1 ring-inset ring-primary-200' :
+                    isRegister ? 'bg-teal-50/60 hover:bg-teal-100/60' :
+                    isLocal ? 'bg-amber-50/60 hover:bg-amber-100/60' :
+                    'hover:bg-gray-50'
+                  }`}
+                >
+                  {/* Allika ikoon */}
+                  <span className="mt-0.5 shrink-0">
+                    {isRegister && <Users size={12} className="text-teal-600" />}
+                    {isLocal && !isRegister && <Database size={12} className="text-amber-600" />}
+                    {isGnd && <BookMarked size={12} className="text-orange-600" />}
+                    {isViaf && <Library size={12} className="text-purple-600" />}
+                    {!isLocal && !isGnd && !isViaf && <Globe size={12} className="text-blue-400" />}
+                  </span>
+
+                  {/* Nimi + kirjeldus */}
+                  <span className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-900 text-sm block truncate">{result.label}</span>
+                    {result.description && (
+                      <span className={`text-xs block truncate ${
+                        isRegister ? 'text-teal-600/80 italic' :
+                        isLocal ? 'text-amber-600/80 italic' :
+                        isGnd ? 'text-orange-500/80' :
+                        isViaf ? 'text-purple-500/80' :
+                        'text-gray-500'
+                      }`}>{result.description}</span>
+                    )}
+                  </span>
+
+                  {/* Väline link — alati nähtav kui URL olemas */}
+                  {rowUrl && (
+                    <a
+                      href={rowUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={lang === 'en' ? 'View in database' : 'Vaata andmebaasis'}
+                      onClick={e => e.stopPropagation()}
+                      onMouseDown={e => e.stopPropagation()}
+                      className="shrink-0 mt-0.5 p-1 rounded text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Käsitsi sisestus */}
             <button
               onMouseDown={() => { justSelectedRef.current = true; }}
               onClick={handleManualEntry}
@@ -444,7 +414,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               </span>
             </button>
           </div>
-          
+
           <div className="bg-gray-50 px-3 py-1.5 border-t border-gray-100 flex justify-between items-center shrink-0">
             <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider flex items-center gap-2">
               <span className="flex items-center gap-1"><Globe size={10} /> Wikidata</span>
@@ -453,17 +423,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 <span className="flex items-center gap-1"><Library size={10} className="text-purple-500" /> VIAF</span>
               </>}
             </span>
-            {selectedIndex < suggestions.length && suggestions[selectedIndex] && suggestions[selectedIndex].url && (
-              <a
-                href={suggestions[selectedIndex].url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-primary-600 hover:underline flex items-center gap-1"
-                onClick={e => e.stopPropagation()}
-              >
-                {lang === 'en' ? 'View' : 'Vaata'} <ExternalLink size={10} />
-              </a>
-            )}
+            {isLoading && <Loader2 size={10} className="animate-spin text-gray-400" />}
           </div>
         </div>
       )}
