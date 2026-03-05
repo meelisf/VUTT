@@ -388,7 +388,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                       rel="noopener noreferrer"
                       title={lang === 'en' ? 'View in database' : 'Vaata andmebaasis'}
                       onClick={e => e.stopPropagation()}
-                      onMouseDown={e => e.stopPropagation()}
+                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
                       className="shrink-0 mt-0.5 p-1 rounded text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <ExternalLink size={12} />
