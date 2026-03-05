@@ -539,7 +539,8 @@ const Dashboard: React.FC = () => {
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
-          mode: 'set',
+          // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
+          mode: collectionId === null ? 'set' : 'add',
           collection_id: collectionId
         }),
         timeout: 30000
