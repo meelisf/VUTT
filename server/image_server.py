@@ -5,6 +5,7 @@ Toetab NanoID püsiviiteid ja thumbnail genereerimist.
 """
 import glob
 import http.server
+import json
 import os
 import socketserver
 import sys
@@ -55,8 +56,19 @@ def get_first_image(work_path):
     if not images:
         return None
 
-    # Sorteeri failinime järgi
-    images.sort(key=lambda x: os.path.basename(x).lower())
+    # Sorteeri sequence välja järgi (kui olemas), muidu failinime järgi
+    def sort_key(img_path):
+        json_path = os.path.splitext(img_path)[0] + '.json'
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                seq = json.load(f).get('sequence')
+            if seq is not None:
+                return (0, int(seq), os.path.basename(img_path).lower())
+        except Exception:
+            pass
+        return (1, 0, os.path.basename(img_path).lower())
+
+    images.sort(key=sort_key)
     return images[0]
 
 
