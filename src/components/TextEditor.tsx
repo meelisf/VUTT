@@ -16,6 +16,47 @@ import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState, EditorSelection, Compartment } from '@codemirror/state';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 
+// --- wrapWithTag abifunktsioonid ---
+
+interface TagPair {
+  open: number; openEnd: number; close: number; closeEnd: number;
+}
+
+function findContainer(tag: string, pos: number, docText: string): TagPair | null {
+  const openTag = `<${tag}>`;
+  const closeTag = `</${tag}>`;
+  const lastOpen = docText.lastIndexOf(openTag, pos);
+  if (lastOpen === -1) return null;
+  const firstClose = docText.indexOf(closeTag, lastOpen + openTag.length);
+  if (firstClose === -1) return null;
+  const closeEnd = firstClose + closeTag.length;
+  // pos >= lastOpen: käsitleb CM6 Decoration.replace käitumist kus kursor
+  // võib maanduda avatägi ALGUSESSE (mitte sisu algusesse)
+  if (pos >= lastOpen && pos <= closeEnd) {
+    return { open: lastOpen, openEnd: lastOpen + openTag.length, close: firstClose, closeEnd };
+  }
+  return null;
+}
+
+function findInnerPairs(tag: string, from: number, to: number, docText: string): TagPair[] {
+  const openTag = `<${tag}>`;
+  const closeTag = `</${tag}>`;
+  const pairs: TagPair[] = [];
+  let searchFrom = from;
+  while (searchFrom < to) {
+    const openIdx = docText.indexOf(openTag, searchFrom);
+    if (openIdx === -1 || openIdx >= to) break;
+    const closeIdx = docText.indexOf(closeTag, openIdx + openTag.length);
+    if (closeIdx === -1) break;
+    const closeEnd = closeIdx + closeTag.length;
+    if (openIdx >= from && closeEnd <= to) {
+      pairs.push({ open: openIdx, openEnd: openIdx + openTag.length, close: closeIdx, closeEnd });
+    }
+    searchFrom = closeEnd;
+  }
+  return pairs;
+}
+
 // Erimärgi tüüp
 interface SpecialCharacter {
   row?: number;
@@ -294,36 +335,105 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const closeTag = `</${tag}>`;
     const docText = view.state.doc.toString();
 
-    // Toggle off: kui from asub selle tagi sees, eemalda tägid.
-    // Kasutame lastIndexOf et leida viimane avatäg enne from-i — nii töötab ka
-    // siis kui valik sisaldab lisaks tühiku/punkti tagi piirist väljaspool.
-    const lastOpen = docText.lastIndexOf(openTag, from);
-    if (lastOpen !== -1) {
-      const firstClose = docText.indexOf(closeTag, lastOpen + openTag.length);
-      if (firstClose !== -1 && from >= lastOpen + openTag.length && from <= firstClose) {
+    if (from === to) {
+      // Valik puudub: toggle off kui kursor on tägi sees, muidu sisesta <tag></tag>
+      const container = findContainer(tag, from, docText);
+      if (container) {
+        const changes = [
+          { from: container.open, to: container.openEnd, insert: '' },
+          { from: container.close, to: container.closeEnd, insert: '' },
+        ];
+        const mapped = view.state.changes(changes);
         view.dispatch({
-          changes: [
-            { from: lastOpen, to: lastOpen + openTag.length, insert: '' },
-            { from: firstClose, to: firstClose + closeTag.length, insert: '' },
-          ],
-          selection: EditorSelection.range(lastOpen, firstClose - openTag.length),
+          changes,
+          selection: EditorSelection.range(
+            mapped.mapPos(container.openEnd, -1),
+            mapped.mapPos(container.close, 1),
+          ),
         });
-        view.focus();
-        return;
+      } else {
+        view.dispatch({
+          changes: { from, insert: openTag + closeTag },
+          selection: EditorSelection.cursor(from + openTag.length),
+        });
       }
+      view.focus();
+      return;
     }
 
-    if (from === to) {
-      // Valik puudub: sisesta <tag></tag>, pane kursor tägide vahele
+    // Valik olemas
+    const containerFrom = findContainer(tag, from, docText);
+    const containerTo = findContainer(tag, to, docText);
+
+    if (
+      containerFrom && containerTo &&
+      containerFrom.open === containerTo.open &&
+      to < containerFrom.closeEnd
+    ) {
+      // Case A — Toggle off: valik on täielikult sama tägipaari sees
+      const changes = [
+        { from: containerFrom.open, to: containerFrom.openEnd, insert: '' },
+        { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
+      ];
+      const mapped = view.state.changes(changes);
       view.dispatch({
-        changes: { from, insert: openTag + closeTag },
-        selection: EditorSelection.cursor(from + openTag.length),
+        changes,
+        selection: EditorSelection.range(
+          mapped.mapPos(from, 1),
+          mapped.mapPos(to, -1),
+        ),
+      });
+    } else if (containerFrom && !containerTo) {
+      // Case B — Extend close: valik algab tägi sees, lõpeb väljaspool
+      // Nihuta </tag> from-i konteinerist to-le
+      const changes = [
+        { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
+        { from: to, to, insert: closeTag },
+      ];
+      const mapped = view.state.changes(changes);
+      view.dispatch({
+        changes,
+        selection: EditorSelection.range(
+          mapped.mapPos(containerFrom.open, 1),
+          mapped.mapPos(to, -1),
+        ),
+      });
+    } else if (!containerFrom && containerTo) {
+      // Case C — Extend open: valik algab väljaspool, lõpeb tägi sees
+      // Nihuta <tag> containerTo-st from-ile
+      const changes = [
+        { from, to: from, insert: openTag },
+        { from: containerTo.open, to: containerTo.openEnd, insert: '' },
+      ];
+      const mapped = view.state.changes(changes);
+      view.dispatch({
+        changes,
+        selection: EditorSelection.range(
+          mapped.mapPos(from, 1),
+          mapped.mapPos(containerTo.closeEnd, -1),
+        ),
       });
     } else {
-      // Mähkime valiku tägidega
+      // Case D — Wrap + remove inner: mähki valik, eemalda sisemised sama tüübi tägipaarid
+      const innerPairs = findInnerPairs(tag, from, to, docText);
+      // Ehita muuduste massiiv kasvavalt (CM6 nõue)
+      const changes: { from: number; to: number; insert: string }[] = [
+        { from, to: from, insert: openTag },
+      ];
+      for (const p of innerPairs) {
+        changes.push({ from: p.open, to: p.openEnd, insert: '' });
+        changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+      }
+      changes.push({ from: to, to, insert: closeTag });
+      // Sorteeri kasvavalt (innerPairs võivad olla from ja to vahel)
+      changes.sort((a, b) => a.from - b.from);
+      const mapped = view.state.changes(changes);
       view.dispatch({
-        changes: [{ from, insert: openTag }, { from: to, insert: closeTag }],
-        selection: EditorSelection.range(from + openTag.length, to + openTag.length),
+        changes,
+        selection: EditorSelection.range(
+          mapped.mapPos(from, 1),
+          mapped.mapPos(to, -1),
+        ),
       });
     }
     view.focus();
