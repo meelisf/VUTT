@@ -1146,6 +1146,7 @@ def list_reocr_jobs() -> list:
                 "work_id": j["work_id"],
                 "slug": j["slug"],
                 "page_filename": j.get("page_filename", ""),
+                "page_number": j.get("page_number"),
                 "username": j.get("username", ""),
                 "status": j["status"],
                 "error": j.get("error"),
@@ -1156,7 +1157,7 @@ def list_reocr_jobs() -> list:
         ]
 
 
-def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", username: str = "") -> str:
+def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "") -> str:
     """
     Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.
     Tagastab job_id, mille abil saab staatust küsida poll_reocr_job() kaudu.
@@ -1170,6 +1171,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
         "work_id": work_id,
         "slug": slug,
         "page_filename": page_filename,
+        "page_number": page_number,
         "username": username,
         "status": "uploading",
         "text": None,

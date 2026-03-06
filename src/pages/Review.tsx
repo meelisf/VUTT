@@ -56,6 +56,7 @@ interface ReocrJob {
   work_id: string;
   slug: string;
   page_filename: string;
+  page_number: number | null;
   username: string;
   status: 'uploading' | 'processing' | 'done' | 'error';
   error: string | null;
@@ -498,7 +499,6 @@ const Review: React.FC = () => {
                 <div className="space-y-2">
                   {[...reocrJobs].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0)).map(job => {
                     const isActive = job.status === 'uploading' || job.status === 'processing';
-                    const pageNum = job.page_filename.match(/_pg_(\d+)\./)?.[1];
                     return (
                       <div
                         key={job.job_id}
@@ -523,12 +523,12 @@ const Review: React.FC = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-gray-800 text-sm">{job.slug}</span>
-                            {pageNum && (
-                              <span className="text-xs text-gray-500">lk {parseInt(pageNum, 10)}</span>
+                            {job.page_number && (
+                              <span className="text-xs text-gray-500">lk {job.page_number}</span>
                             )}
-                            {job.work_id && (
+                            {job.work_id && job.page_number && (
                               <a
-                                href={`/work/${job.work_id}/${pageNum ? parseInt(pageNum, 10) : 1}`}
+                                href={`/work/${job.work_id}/${job.page_number}`}
                                 className="text-xs text-primary-600 hover:underline flex items-center gap-0.5"
                                 target="_blank"
                                 rel="noreferrer"

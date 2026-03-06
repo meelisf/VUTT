@@ -575,7 +575,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page_filename: pageFilename, auth_token: authToken }),
+        body: JSON.stringify({ page_filename: pageFilename, page_number: page.page_number, auth_token: authToken }),
         timeout: 30000,
       });
       if (!res.ok) {
