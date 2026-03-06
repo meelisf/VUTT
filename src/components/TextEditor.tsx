@@ -22,20 +22,33 @@ interface TagPair {
   open: number; openEnd: number; close: number; closeEnd: number;
 }
 
-function findContainer(tag: string, pos: number, docText: string): TagPair | null {
+/**
+ * Leiab, kas antud positsioon asub konkreetse tägi vahel.
+ * Otsing on piiratud searchFrom ja searchTo vahemikuga (tavaliselt üks rida).
+ */
+function findContainer(tag: string, pos: number, docText: string, searchFrom = 0, searchTo = docText.length): TagPair | null {
   const openTag = `<${tag}>`;
   const closeTag = `</${tag}>`;
+  
+  // Leiame viimase avava tägi ENNE positsiooni, aga vahemiku piires
   const lastOpen = docText.lastIndexOf(openTag, pos);
-  if (lastOpen === -1) return null;
+  if (lastOpen === -1 || lastOpen < searchFrom) return null;
+  
+  // Leiame esimese sulgeva tägi PÄRAST seda avavat tägi
   const firstClose = docText.indexOf(closeTag, lastOpen + openTag.length);
-  if (firstClose === -1) return null;
+  if (firstClose === -1 || firstClose > searchTo) return null;
+  
   const closeEnd = firstClose + closeTag.length;
+  // Kontrollime, kas kursor/valik on tõesti selle paari vahel
   if (pos >= lastOpen && pos <= closeEnd) {
     return { open: lastOpen, openEnd: lastOpen + openTag.length, close: firstClose, closeEnd };
   }
   return null;
 }
 
+/**
+ * Leiab kõik antud tägi paarid vahemikus [from, to].
+ */
 function findInnerPairs(tag: string, from: number, to: number, docText: string): TagPair[] {
   const openTag = `<${tag}>`;
   const closeTag = `</${tag}>`;
@@ -45,7 +58,7 @@ function findInnerPairs(tag: string, from: number, to: number, docText: string):
     const openIdx = docText.indexOf(openTag, searchFrom);
     if (openIdx === -1 || openIdx >= to) break;
     const closeIdx = docText.indexOf(closeTag, openIdx + openTag.length);
-    if (closeIdx === -1) break;
+    if (closeIdx === -1 || closeIdx > to) break; // Sulgev tägi peab ka jääma vahemikku
     const closeEnd = closeIdx + closeTag.length;
     if (openIdx >= from && closeEnd <= to) {
       pairs.push({ open: openIdx, openEnd: openIdx + openTag.length, close: closeIdx, closeEnd });
@@ -313,27 +326,28 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const wrapWithTag = useCallback((tag: string) => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    let { from, to } = view.state.selection.main;
+
+    const { from, to } = view.state.selection.main;
+    const docText = view.state.doc.toString();
     const openTag = `<${tag}>`;
     const closeTag = `</${tag}>`;
-    const docText = view.state.doc.toString();
 
+    // 1. KÄSITLUS ILMA VALIKUTA (kursor)
     if (from === to) {
-      const container = findContainer(tag, from, docText);
+      const line = view.state.doc.lineAt(from);
+      const container = findContainer(tag, from, docText, line.from, line.to);
       if (container) {
+        // Kui kursor on tägi sees, eemaldame tägi
         const changes = [
           { from: container.open, to: container.openEnd, insert: '' },
           { from: container.close, to: container.closeEnd, insert: '' },
         ];
-        const mapped = view.state.changes(changes);
         view.dispatch({
           changes,
-          selection: EditorSelection.range(
-            mapped.mapPos(container.openEnd, -1),
-            mapped.mapPos(container.close, 1),
-          ),
+          selection: EditorSelection.cursor(view.state.changes(changes).mapPos(from))
         });
       } else {
+        // Muul juhul lisame tühjad tägid ja viime kursori vahele
         view.dispatch({
           changes: { from, insert: openTag + closeTag },
           selection: EditorSelection.cursor(from + openTag.length),
@@ -343,82 +357,76 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
-    // Valik olemas: puhastame valiku servad tühikutest/reavahetustest
-    while (to > from && /\s/.test(docText[to - 1])) {
-      to--;
-    }
-    while (from < to && /\s/.test(docText[from])) {
-      from++;
-    }
+    // 2. KÄSITLUS VALIKUGA (võib olla mitu rida)
+    const lineFrom = view.state.doc.lineAt(from);
+    const lineTo = view.state.doc.lineAt(to);
+    const changes: { from: number; to: number; insert: string }[] = [];
 
-    const containerFrom = findContainer(tag, from, docText);
-    const containerTo = findContainer(tag, to, docText);
-
-    if (
-      containerFrom && containerTo &&
-      containerFrom.open === containerTo.open &&
-      to <= containerFrom.closeEnd
-    ) {
-      const changes = [
-        { from: containerFrom.open, to: containerFrom.openEnd, insert: '' },
-        { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
-      ];
-      const mapped = view.state.changes(changes);
-      view.dispatch({
-        changes,
-        selection: EditorSelection.range(
-          mapped.mapPos(from, 1),
-          mapped.mapPos(to, -1),
-        ),
-      });
-    } else if (containerFrom && !containerTo) {
-      const changes = [
-        { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
-        { from: to, to, insert: closeTag },
-      ];
-      const mapped = view.state.changes(changes);
-      view.dispatch({
-        changes,
-        selection: EditorSelection.range(
-          mapped.mapPos(containerFrom.open, 1),
-          mapped.mapPos(to, -1),
-        ),
-      });
-    } else if (!containerFrom && containerTo) {
-      const changes = [
-        { from, to: from, insert: openTag },
-        { from: containerTo.open, to: containerTo.openEnd, insert: '' },
-      ];
-      const mapped = view.state.changes(changes);
-      view.dispatch({
-        changes,
-        selection: EditorSelection.range(
-          mapped.mapPos(from, 1),
-          mapped.mapPos(containerTo.closeEnd, -1),
-        ),
-      });
-    } else {
-      const innerPairs = findInnerPairs(tag, from, to, docText);
-      const changes: { from: number; to: number; insert: string }[] = [
-        { from, to: from, insert: openTag },
-      ];
-      for (const p of innerPairs) {
-        changes.push({ from: p.open, to: p.openEnd, insert: '' });
-        changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+    // OTSUSTAMINE: Kas me pakime lahti (unwrap) või paneme tägi ümber (wrap)?
+    // Reegel: Kui esimese valitud rea sisu on juba tägi sees, siis me pakime LAHTI kõik valitud read.
+    let mode: 'wrap' | 'unwrap' = 'wrap';
+    for (let i = lineFrom.number; i <= lineTo.number; i++) {
+      const line = view.state.doc.line(i);
+      let sFrom = Math.max(from, line.from);
+      let sTo = Math.min(to, line.to);
+      
+      // Puhastame servadest tühikud otsuse tegemiseks
+      while (sTo > sFrom && /\s/.test(docText[sTo - 1])) sTo--;
+      while (sFrom < sTo && /\s/.test(docText[sFrom])) sFrom++;
+      
+      if (sFrom < sTo) {
+        const container = findContainer(tag, sFrom, docText, line.from, line.to);
+        if (container && sTo <= container.closeEnd) {
+          mode = 'unwrap';
+        }
+        break; // Võtame esimese sisulise rea järgi otsuse vastu
       }
-      changes.push({ from: to, to, insert: closeTag });
+    }
+
+    // TEGEVUS: Käime read läbi ja rakendame muudatused
+    for (let i = lineFrom.number; i <= lineTo.number; i++) {
+      const line = view.state.doc.line(i);
+      let sFrom = Math.max(from, line.from);
+      let sTo = Math.min(to, line.to);
+
+      // Puhastame valiku servadest tühikud/reavahetused
+      while (sTo > sFrom && /\s/.test(docText[sTo - 1])) sTo--;
+      while (sFrom < sTo && /\s/.test(docText[sFrom])) sFrom++;
+
+      if (sFrom >= sTo) continue; // Tühi rida jääb vahele
+
+      if (mode === 'unwrap') {
+        const container = findContainer(tag, sFrom, docText, line.from, line.to);
+        if (container && sTo <= container.closeEnd) {
+          changes.push({ from: container.open, to: container.openEnd, insert: '' });
+          changes.push({ from: container.close, to: container.closeEnd, insert: '' });
+        }
+      } else {
+        // WRAP: Eemaldame enne sisemised sama tüüpi tägid, et vältida dubleerimist
+        const innerPairs = findInnerPairs(tag, sFrom, sTo, docText);
+        changes.push({ from: sFrom, to: sFrom, insert: openTag });
+        for (const p of innerPairs) {
+          changes.push({ from: p.open, to: p.openEnd, insert: '' });
+          changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+        }
+        changes.push({ from: sTo, to: sTo, insert: closeTag });
+      }
+    }
+
+    if (changes.length > 0) {
       changes.sort((a, b) => a.from - b.from);
       const mapped = view.state.changes(changes);
       view.dispatch({
         changes,
         selection: EditorSelection.range(
           mapped.mapPos(from, 1),
-          mapped.mapPos(to, -1),
+          mapped.mapPos(to, -1)
         ),
       });
     }
     view.focus();
   }, [readOnly]);
+
 
   useEffect(() => { wrapWithTagRef.current = wrapWithTag; }, [wrapWithTag]);
 
