@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, Edit3, ChevronRight, Eye, X, Settings2, Wand2, Superscript, SeparatorHorizontal } from 'lucide-react';
+import { Save, Loader2, ChevronRight, X, Settings2, Wand2, Superscript, SeparatorHorizontal } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
@@ -30,8 +30,6 @@ function findContainer(tag: string, pos: number, docText: string): TagPair | nul
   const firstClose = docText.indexOf(closeTag, lastOpen + openTag.length);
   if (firstClose === -1) return null;
   const closeEnd = firstClose + closeTag.length;
-  // pos >= lastOpen: käsitleb CM6 Decoration.replace käitumist kus kursor
-  // võib maanduda avatägi ALGUSESSE (mitte sisu algusesse)
   if (pos >= lastOpen && pos <= closeEnd) {
     return { open: lastOpen, openEnd: lastOpen + openTag.length, close: firstClose, closeEnd };
   }
@@ -78,7 +76,6 @@ interface TextEditorProps {
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
-type ViewMode = 'edit' | 'read';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
@@ -86,18 +83,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const lang = i18n.language || 'et';
   const [activeTab, setActiveTab] = useState<TabType>('edit');
 
-  // Salvesta viewMode localStorage'sse, et see säiliks lehekülgede vahel liikudes
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (readOnly) return 'read';
-    const saved = localStorage.getItem('vutt_viewMode');
-    return saved === 'read' ? 'read' : 'edit';
-  });
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    localStorage.setItem('vutt_viewMode', mode);
-  }, []);
-
-  // Redaktori sisu muudatuste jälgimine (asendab vana `text` state'i)
+  // Redaktori sisu muudatuste jälgimine
   const [isDirty, setIsDirty] = useState(false);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
@@ -119,7 +105,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
 
-  // Salvestamata muudatuste jälgimine (teksti osa: isDirty; muu: savedState)
+  // Salvestamata muudatuste jälgimine
   const [savedState, setSavedState] = useState({
     status: page.status,
     comments: page.comments,
@@ -146,7 +132,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     if (!editorContainerRef.current) return;
 
     const copyHandler = (event: ClipboardEvent, view: EditorView) => {
-      // Nutikas kopeerimine: liidab read tühikuga, jätab poolitused, eemaldab XML tägid
       const { from, to } = view.state.selection.main;
       if (from === to) return false;
       const selected = view.state.doc.sliceString(from, to);
@@ -156,14 +141,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         if (i === 0) {
           result = lines[i];
         } else if (result.endsWith('-') || result.endsWith('⸗')) {
-          result += lines[i]; // poolitus — liida otse
+          result += lines[i];
         } else if (result.endsWith(' ') || lines[i].startsWith(' ')) {
-          result += lines[i]; // tühik juba olemas
+          result += lines[i];
         } else {
           result += ' ' + lines[i];
         }
       }
-      // Eemaldame XML tägid kopeeritud tekstist
       const clean = result.replace(/<\/?[a-z]+[^>]*>/g, '').trim();
       event.clipboardData?.setData('text/plain', clean);
       event.preventDefault();
@@ -204,16 +188,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Ainult mount'il — page.text_content on algväärtus
+  }, []);
 
-  // Uuendame editeeritavust viewMode ja readOnly muutmisel
+  // Uuendame editeeritavust readOnly muutmisel
   useEffect(() => {
     viewRef.current?.dispatch({
       effects: editableCompartmentRef.current.reconfigure(
-        EditorView.editable.of(viewMode === 'edit' && !readOnly)
+        EditorView.editable.of(!readOnly)
       ),
     });
-  }, [viewMode, readOnly]);
+  }, [readOnly]);
 
   // Uuendame editori sisu lehe vahetusel
   useEffect(() => {
@@ -252,7 +236,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
 
-  // Laadime erimärgid: sisselogitud kasutajal isiklik komplekt, muidu globaalne
+  // Laadime erimärgid
   useEffect(() => {
     const loadSpecialCharacters = async () => {
       try {
@@ -280,7 +264,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     loadSpecialCharacters();
   }, [authToken]);
 
-  // Laadime transkribeerimise juhendi HTML failist
+  // Laadime transkribeerimise juhendi
   useEffect(() => {
     const loadTranscriptionGuide = async () => {
       try {
@@ -323,7 +307,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, status, comments, page_tags, onSave]);
 
-  // Uuendame refid, et keymap saaks alati uusima versiooni
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
 
   // --- Toolbar toimingud ---
@@ -336,7 +319,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const docText = view.state.doc.toString();
 
     if (from === to) {
-      // Valik puudub: toggle off kui kursor on tägi sees, muidu sisesta <tag></tag>
       const container = findContainer(tag, from, docText);
       if (container) {
         const changes = [
@@ -361,7 +343,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return;
     }
 
-    // Valik olemas
     const containerFrom = findContainer(tag, from, docText);
     const containerTo = findContainer(tag, to, docText);
 
@@ -370,7 +351,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       containerFrom.open === containerTo.open &&
       to <= containerFrom.closeEnd
     ) {
-      // Case A — Toggle off: valik on täielikult sama tägipaari sees
       const changes = [
         { from: containerFrom.open, to: containerFrom.openEnd, insert: '' },
         { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
@@ -384,8 +364,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         ),
       });
     } else if (containerFrom && !containerTo) {
-      // Case B — Extend close: valik algab tägi sees, lõpeb väljaspool
-      // Nihuta </tag> from-i konteinerist to-le
       const changes = [
         { from: containerFrom.close, to: containerFrom.closeEnd, insert: '' },
         { from: to, to, insert: closeTag },
@@ -399,8 +377,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         ),
       });
     } else if (!containerFrom && containerTo) {
-      // Case C — Extend open: valik algab väljaspool, lõpeb tägi sees
-      // Nihuta <tag> containerTo-st from-ile
       const changes = [
         { from, to: from, insert: openTag },
         { from: containerTo.open, to: containerTo.openEnd, insert: '' },
@@ -414,9 +390,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         ),
       });
     } else {
-      // Case D — Wrap + remove inner: mähki valik, eemalda sisemised sama tüübi tägipaarid
       const innerPairs = findInnerPairs(tag, from, to, docText);
-      // Ehita muuduste massiiv kasvavalt (CM6 nõue)
       const changes: { from: number; to: number; insert: string }[] = [
         { from, to: from, insert: openTag },
       ];
@@ -425,7 +399,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         changes.push({ from: p.close, to: p.closeEnd, insert: '' });
       }
       changes.push({ from: to, to, insert: closeTag });
-      // Sorteeri kasvavalt (innerPairs võivad olla from ja to vahel)
       changes.sort((a, b) => a.from - b.from);
       const mapped = view.state.changes(changes);
       view.dispatch({
@@ -448,13 +421,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     view.focus();
   }, [readOnly]);
 
-  // Erimärgi sisestamine (toolbar footer)
   const insertSpecialChar = useCallback((char: string, e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     insertAtCursor(char);
   }, [insertAtCursor]);
 
-  // Re-OCR: pollimise puhastus unmount'il
   useEffect(() => {
     return () => {
       if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
@@ -541,7 +512,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       {/* 1. GLOBAL HEADER */}
       <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
-        {/* Row 1: Work Metadata */}
         {work && (
           <div className="px-4 py-1.5 border-b border-gray-50 flex items-center gap-2 text-[11px] text-gray-500 bg-gray-50/50">
             <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
@@ -552,15 +522,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           </div>
         )}
 
-        {/* Row 2: Tabs and Save button */}
         <div className="px-4 py-2 flex items-center justify-between gap-4">
-          {/* LEFT: Main Tabs */}
           <div className="flex bg-gray-100 p-0.5 rounded-lg shadow-inner">
             <button
               onClick={() => setActiveTab('edit')}
               className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'edit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
-              {t('tabs.edit').toUpperCase()}
+              {(readOnly ? t('tabs.view') : t('tabs.edit')).toUpperCase()}
             </button>
             <button
               onClick={() => setActiveTab('annotate')}
@@ -576,10 +544,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             </button>
           </div>
 
-          {/* RIGHT: nupud — peidetud sisselogimata kasutajalt */}
           {!readOnly && (
             <div className="flex items-center gap-2">
-              {/* Re-OCR nupp — ainult adminile */}
               {user?.role === 'admin' && (
                 <button
                   onClick={handleReOcr}
@@ -613,10 +579,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
-        {/* TEXT TAB CONTENT */}
         {activeTab === 'edit' && (
           <>
             {/* 2. SECONDARY TOOLBAR */}
@@ -624,27 +588,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
               {/* Editor Tools (Left) */}
               <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-                {/* View Mode Toggle */}
-                <div className="flex bg-gray-100 p-0.5 rounded-md border border-gray-200">
-                  <button
-                    onClick={() => handleViewModeChange('edit')}
-                    disabled={readOnly}
-                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'edit' ? 'bg-amber-50 text-amber-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleViewModeChange('read')}
-                    className={`p-1.5 rounded transition-all flex items-center justify-center ${viewMode === 'read' ? 'bg-blue-50 text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    <Eye size={16} />
-                  </button>
-                </div>
-
-                {/* Formatting Toolbar — ainult edit mode'is */}
-                {viewMode === 'edit' && (
+                {/* Formatting Toolbar — ainult sisselogitud kasutajale */}
+                {!readOnly && (
                   <div className="flex items-center gap-1">
-                    <div className="w-px h-5 bg-gray-200 mx-2"></div>
                     <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={`${t('editor.tooltips.bold')} (Ctrl+B)`}>B</button>
                     <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
                     <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
@@ -667,7 +613,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 return (
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('status.label')}</span>
-                    {onStatusChange ? (
+                    {onStatusChange && !readOnly ? (
                       <select
                         value={st}
                         onChange={(e) => onStatusChange(e.target.value as PageStatus)}
@@ -690,7 +636,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               })()}
             </div>
 
-            {/* Re-OCR käimasoleku bänner */}
             {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
               <div className="shrink-0 bg-emerald-50 border-b border-emerald-200 px-4 py-2 flex items-center gap-2 text-xs text-emerald-800">
                 <Loader2 className="animate-spin shrink-0" size={12} />
@@ -698,10 +643,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               </div>
             )}
 
-            {/* 3. EDITOR AREA — CM6 EditorView */}
+            {/* 3. EDITOR AREA */}
             <div className="flex-1 relative flex overflow-hidden bg-white">
-
-              {/* Re-OCR tulemus overlay */}
               {(reocrStatus === 'done' || reocrStatus === 'error') && (
                 <div className="absolute inset-0 z-20 bg-white/95 flex flex-col">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
@@ -740,13 +683,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   )}
                 </div>
               )}
-
-              {/* CM6 konteiner — täidab kogu ala */}
               <div ref={editorContainerRef} className="flex-1 overflow-hidden" />
             </div>
 
-            {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) */}
-            {viewMode === 'edit' && (
+            {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) — ainult sisselogitud kasutajale */}
+            {!readOnly && (
               <div className="border-t border-gray-200 bg-white shrink-0">
                 <details className="group" open={showCharPanel}>
                   <summary
@@ -799,7 +740,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               </div>
             )}
 
-            {/* CharSet Editor Modal */}
             {showCharEditor && authToken && (
               <CharSetEditor
                 characters={specialCharacters}
@@ -813,7 +753,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               />
             )}
 
-            {/* Guide Modal */}
             {showTranscriptionGuide && (
               <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
                 <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -833,7 +772,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           </>
         )}
 
-        {/* ANNOTATIONS TAB */}
         {activeTab === 'annotate' && (
           <AnnotationsTab
             work={work}
@@ -850,7 +788,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           />
         )}
 
-        {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <HistoryTab
             page={page}
