@@ -368,7 +368,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     if (
       containerFrom && containerTo &&
       containerFrom.open === containerTo.open &&
-      to < containerFrom.closeEnd
+      to <= containerFrom.closeEnd
     ) {
       // Case A — Toggle off: valik on täielikult sama tägipaari sees
       const changes = [
