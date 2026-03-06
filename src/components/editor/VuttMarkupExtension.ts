@@ -5,6 +5,19 @@ import { ViewPlugin, Decoration, DecorationSet, EditorView, WidgetType } from '@
 import { RangeSetBuilder } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 
+// Nähtamatu widget tagi karakterite asendamiseks — teeb ala atoomiliseks
+// (kursor hüppab üle, mitte ei roomab tähthaaval peidetud tagi sees)
+class HiddenTagWidget extends WidgetType {
+  toDOM() {
+    const span = document.createElement('span');
+    span.className = 'vutt-tag-hidden';
+    span.setAttribute('aria-hidden', 'true');
+    return span;
+  }
+  ignoreEvent() { return true; }
+  get estimatedHeight() { return -1; }
+}
+
 // Widget <pb/> (leheküljevahetus) kuvamiseks
 class PageBreakWidget extends WidgetType {
   toDOM() {
@@ -103,14 +116,14 @@ function buildDecorations(view: EditorView): DecorationSet {
         const contentEnd = closeIdx;
         const closeEnd = closeIdx + closeTag.length;
 
-        // Peidame avatägi
-        ranges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({}) });
+        // Peidame avatägi — widget teeb ala atoomiliseks (kursor hüppab üle)
+        ranges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
         // Stailime sisu
         if (contentStart < contentEnd) {
           ranges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls! }) });
         }
-        // Peidame sulgtägi
-        ranges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({}) });
+        // Peidame sulgtägi — sama
+        ranges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
 
         searchFrom = closeEnd;
       }

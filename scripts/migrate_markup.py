@@ -21,11 +21,13 @@ from pathlib import Path
 DATA_DIR = Path(__file__).parent.parent / 'data'
 
 # Asendused rakendatakse järjestuses (** enne *, et vältida topelt asendust)
+# Italic/bold tingimuseks: * peab olema vahetult teksti kõrval (ilma tühikuta),
+# et mitte matšida joonealuste viidete sümboleid (nt "tekst.* Vrd" jne).
 REPLACEMENTS = [
-    # Bold enne italic
-    (r'\*\*(.*?)\*\*', r'<b>\1</b>'),
-    # Italic (multiline toetuse nimel: re.DOTALL)
-    (r'\*(.*?)\*', r'<i>\1</i>'),
+    # Bold enne italic; (?!\s) = ei tohi järgneda tühik; (?<!\s) = ei tohi eelneda tühik
+    (r'\*\*(?!\s)(.*?)(?<!\s)\*\*', r'<b>\1</b>'),
+    # Italic — sama tingimus
+    (r'\*(?!\s)(.*?)(?<!\s)\*', r'<i>\1</i>'),
     # Koodivahetus
     (r'~(.*?)~', r'<cs>\1</cs>'),
     # Ääremärkus

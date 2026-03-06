@@ -15,6 +15,7 @@ import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
+import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 
 interface WorkspaceMobileViewProps {
   page: Page;
@@ -271,9 +272,16 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
           </div>
         ) : activeTab === 'text' ? (
           <div className="h-full overflow-y-auto bg-white px-4 pt-3 pb-16">
-            <div className="whitespace-pre-wrap font-serif text-gray-800 leading-relaxed text-base">
-              {page.text_content || t('editor.placeholder')}
-            </div>
+            {page.text_content ? (
+              <div
+                className="whitespace-pre-wrap font-serif text-gray-800 leading-relaxed text-base"
+                dangerouslySetInnerHTML={{ __html: renderVuttMarkup(page.text_content) }}
+              />
+            ) : (
+              <div className="whitespace-pre-wrap font-serif text-gray-400 leading-relaxed text-base">
+                {t('editor.placeholder')}
+              </div>
+            )}
           </div>
         ) : (
           /* Info tab - teose metaandmed (read-only) */
