@@ -8,6 +8,7 @@
     "copyPermalink": "Copy link to work"
   },
   "tabs": {
+    "view": "View",
     "edit": "Edit",
     "annotations": "Annotations",
     "info": "Info & Annotations",

@@ -8,6 +8,7 @@
     "copyPermalink": "Kopeeri teose püsiviide"
   },
   "tabs": {
+    "view": "Vaade",
     "edit": "Muuda",
     "annotations": "Annotatsioonid",
     "info": "Info ja annotatsioonid",

@@ -154,30 +154,32 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return true;
     };
 
+    const extensions = [
+      lineNumbers(),
+      history(),
+      keymap.of([
+        ...defaultKeymap,
+        ...historyKeymap,
+        { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
+        { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
+        { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
+        { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
+      ]),
+      editableCompartmentRef.current.of(
+        EditorView.editable.of(!readOnly)
+      ),
+      vuttMarkupExtension,
+      vuttTheme,
+      EditorView.updateListener.of((update) => {
+        if (update.docChanged) setIsDirty(true);
+      }),
+      EditorView.domEventHandlers({ copy: copyHandler }),
+    ];
+
     const view = new EditorView({
       state: EditorState.create({
-        doc: page.text_content,
-        extensions: [
-          lineNumbers(),
-          history(),
-          keymap.of([
-            ...defaultKeymap,
-            ...historyKeymap,
-            { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
-            { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
-            { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
-            { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
-          ]),
-          editableCompartmentRef.current.of(
-            EditorView.editable.of(!readOnly)
-          ),
-          vuttMarkupExtension,
-          vuttTheme,
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) setIsDirty(true);
-          }),
-          EditorView.domEventHandlers({ copy: copyHandler }),
-        ],
+        doc: page.text_content || '',
+        extensions
       }),
       parent: editorContainerRef.current,
     });
@@ -188,15 +190,17 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       viewRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Ainult mount'il, et vältida liigset re-mountimist
 
   // Uuendame editeeritavust readOnly muutmisel
   useEffect(() => {
-    viewRef.current?.dispatch({
-      effects: editableCompartmentRef.current.reconfigure(
-        EditorView.editable.of(!readOnly)
-      ),
-    });
+    if (viewRef.current) {
+      viewRef.current.dispatch({
+        effects: editableCompartmentRef.current.reconfigure(
+          EditorView.editable.of(!readOnly)
+        ),
+      });
+    }
   }, [readOnly]);
 
   // Uuendame editori sisu lehe vahetusel
@@ -212,7 +216,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const currentText = view.state.doc.toString();
       if (currentText !== page.text_content) {
         view.dispatch({
-          changes: { from: 0, to: currentText.length, insert: page.text_content },
+          changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
         });
       }
     }
@@ -516,7 +520,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
   return (
-    <div className="flex flex-col h-full bg-paper font-sans">
+    <div className="flex flex-col h-full bg-paper font-sans overflow-hidden">
 
       {/* 1. GLOBAL HEADER */}
       <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
@@ -590,7 +594,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
         {activeTab === 'edit' && (
-          <>
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* 2. SECONDARY TOOLBAR */}
             <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-1.5 shrink-0 gap-4">
 
@@ -691,7 +695,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   )}
                 </div>
               )}
-              <div ref={editorContainerRef} className="flex-1 overflow-hidden" />
+              <div ref={editorContainerRef} className="flex-1 overflow-hidden" style={{ minHeight: '200px' }} />
             </div>
 
             {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) — ainult sisselogitud kasutajale */}
@@ -747,37 +751,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 </details>
               </div>
             )}
-
-            {showCharEditor && authToken && (
-              <CharSetEditor
-                characters={specialCharacters}
-                isCustom={isCustomChars}
-                authToken={authToken}
-                onClose={() => setShowCharEditor(false)}
-                onSaved={(chars, custom) => {
-                  setSpecialCharacters(chars);
-                  setIsCustomChars(custom);
-                }}
-              />
-            )}
-
-            {showTranscriptionGuide && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
-                    <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <div
-                    className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-                    dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
-                  />
-                </div>
-              </div>
-            )}
-          </>
+          </div>
         )}
 
         {activeTab === 'annotate' && (
@@ -816,6 +790,36 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           />
         )}
       </div>
+
+      {showCharEditor && authToken && (
+        <CharSetEditor
+          characters={specialCharacters}
+          isCustom={isCustomChars}
+          authToken={authToken}
+          onClose={() => setShowCharEditor(false)}
+          onSaved={(chars, custom) => {
+            setSpecialCharacters(chars);
+            setIsCustomChars(custom);
+          }}
+        />
+      )}
+
+      {showTranscriptionGuide && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
+              <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+            <div
+              className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
+              dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
