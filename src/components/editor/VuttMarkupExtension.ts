@@ -59,7 +59,7 @@ function buildMarkup(text: string): MarkupSets {
 
   for (const tagDef of VUTT_TAGS) {
     if (tagDef.selfClose) {
-      const re = /<pb\/>/g;
+      const re = new RegExp(`<${tagDef.tag}\\/>`, 'g');
       let m;
       while ((m = re.exec(text)) !== null) {
         const from = m.index;
@@ -96,7 +96,7 @@ function buildMarkup(text: string): MarkupSets {
         decoRanges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({}) });
         atomicRanges.push({ from: openIdx, to: contentStart, deco: atomicReplace });
         
-        // Sisu (ainult visuaalne stiil, EI OLE aatomiline!)
+        // Sisu
         if (contentStart < contentEnd && tagDef.cls) {
           decoRanges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls }) });
         }
@@ -110,16 +110,33 @@ function buildMarkup(text: string): MarkupSets {
     }
   }
 
-  // RangeSetBuilder reegel: sort from ASC, siis to DESC (pikemad eespool)
-  const sortFn = (a: any, b: any) => a.from !== b.from ? a.from - b.from : b.to - a.to;
+  // Sorteerimine from ASC, to DESC
+  const sortFn = (a: any, b: any) => {
+    if (a.from !== b.from) return a.from - b.from;
+    return b.to - a.to;
+  };
+
   decoRanges.sort(sortFn);
   atomicRanges.sort(sortFn);
 
   const decoBuilder = new RangeSetBuilder<Decoration>();
-  for (const r of decoRanges) decoBuilder.add(r.from, r.to, r.deco);
+  let lastReplaceEnd = -1;
+  for (const r of decoRanges) {
+    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || (r.from < r.to && !r.deco.spec.class));
+    if (isReplace) {
+      if (r.from < lastReplaceEnd) continue; // Ära lisa kattuvaid asendusi
+      lastReplaceEnd = r.to;
+    }
+    decoBuilder.add(r.from, r.to, r.deco);
+  }
 
   const atomicBuilder = new RangeSetBuilder<Decoration>();
-  for (const r of atomicRanges) atomicBuilder.add(r.from, r.to, r.deco);
+  let lastAtomicEnd = -1;
+  for (const r of atomicRanges) {
+    if (r.from < lastAtomicEnd) continue;
+    lastAtomicEnd = r.to;
+    atomicBuilder.add(r.from, r.to, r.deco);
+  }
 
   return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish() };
 }

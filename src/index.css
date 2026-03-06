@@ -73,15 +73,11 @@ body:has(.workspace-container) {
 .vutt-cs {
   color: inherit;
   background-color: #f1f5f9; /* slate-100 */
-  padding: 0 2px;
-  border-radius: 2px;
 }
 
 /* <m>tekst</m> — ääremärkus */
 .vutt-marginalia {
   background-color: #fef9c3; /* yellow-100 */
-  padding: 0 2px;
-  border-radius: 2px;
 }
 
 /* <hi>tekst</hi> — esiletõst */
