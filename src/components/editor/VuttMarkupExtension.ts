@@ -122,12 +122,18 @@ function buildMarkup(text: string): MarkupSets {
   const decoBuilder = new RangeSetBuilder<Decoration>();
   let lastReplaceEnd = -1;
   for (const r of decoRanges) {
-    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || (r.from < r.to && !r.deco.spec.class));
+    if (r.from < lastReplaceEnd) continue; // Ära lisa dekoratsioone, mis algavad asenduse seest
+
+    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || !r.deco.spec.class);
     if (isReplace) {
-      if (r.from < lastReplaceEnd) continue; // Ära lisa kattuvaid asendusi
       lastReplaceEnd = r.to;
     }
-    decoBuilder.add(r.from, r.to, r.deco);
+
+    try {
+      decoBuilder.add(r.from, r.to, r.deco);
+    } catch (e) {
+      console.warn('VuttMarkupExtension: decoBuilder.add error:', e, r);
+    }
   }
 
   const atomicBuilder = new RangeSetBuilder<Decoration>();
@@ -135,11 +141,16 @@ function buildMarkup(text: string): MarkupSets {
   for (const r of atomicRanges) {
     if (r.from < lastAtomicEnd) continue;
     lastAtomicEnd = r.to;
-    atomicBuilder.add(r.from, r.to, r.deco);
+    try {
+      atomicBuilder.add(r.from, r.to, r.deco);
+    } catch (e) {
+      console.warn('VuttMarkupExtension: atomicBuilder.add error:', e, r);
+    }
   }
 
   return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish() };
-}
+  }
+
 
 export const vuttMarkupField = StateField.define<MarkupSets>({
   create(state) {
