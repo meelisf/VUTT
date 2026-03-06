@@ -28,7 +28,7 @@ from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work, start_reocr_job, poll_reocr_job,
+    import_as_work, start_reocr_job, poll_reocr_job, list_reocr_jobs,
     get_active_reocr_count, REOCR_MAX_CONCURRENT
 )
 from .cache import (
@@ -776,13 +776,18 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
         raise HTTPException(status_code=404, detail="Pilti ei leitud")
     tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
     shutil.copy2(img_path, tmp_path)
-    job_id = start_reocr_job(work_id, slug, tmp_path)
+    job_id = start_reocr_job(work_id, slug, tmp_path, page_filename=page_filename, username=user['username'])
     return {"status": "accepted", "job_id": job_id}
 
 @app.get("/admin/reocr/{job_id}/status")
 async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
     """Küsib re-OCR töö staatust. Küsida korduvalt kuni done/error."""
     return {"status": "success", **poll_reocr_job(job_id)}
+
+@app.get("/admin/reocr/jobs")
+async def admin_reocr_jobs(user=Depends(require_role("admin"))):
+    """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
+    return {"status": "success", "jobs": list_reocr_jobs()}
 
 # =========================================================
 # AVALIKUD ANDMED JA SEO

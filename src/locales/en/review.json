@@ -1,5 +1,19 @@
 {
   "title": "Recent Changes",
+  "tabs": {
+    "history": "Changes",
+    "reocr": "OCR jobs"
+  },
+  "reocr": {
+    "loading": "Loading OCR jobs...",
+    "empty": "No active or recent OCR jobs",
+    "status": {
+      "uploading": "Uploading",
+      "processing": "Processing",
+      "done": "Done",
+      "error": "Error"
+    }
+  },
   "subtitle": "Your recent work",
   "subtitleAdmin": "All users' changes",
   "empty": "No changes made yet",

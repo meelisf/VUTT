@@ -1,5 +1,19 @@
 {
   "title": "Viimased muudatused",
+  "tabs": {
+    "history": "Muudatused",
+    "reocr": "OCR tööd"
+  },
+  "reocr": {
+    "loading": "Laadin OCR töid...",
+    "empty": "Aktiivseid ega hiljutisi OCR töid pole",
+    "status": {
+      "uploading": "Laadin",
+      "processing": "Töötleb",
+      "done": "Valmis",
+      "error": "Viga"
+    }
+  },
   "subtitle": "Sinu viimased töökohad",
   "subtitleAdmin": "Kõigi kasutajate muudatused",
   "empty": "Muudatusi pole veel tehtud",

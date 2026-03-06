@@ -1137,7 +1137,26 @@ def get_active_reocr_count() -> int:
     return sum(1 for j in _reocr_jobs.values() if j["status"] in ("uploading", "processing"))
 
 
-def start_reocr_job(work_id: str, slug: str, img_path: str) -> str:
+def list_reocr_jobs() -> list:
+    """Tagastab kõigi re-OCR tööde loendi (admin ülevaate jaoks)."""
+    with _reocr_jobs_lock:
+        return [
+            {
+                "job_id": jid,
+                "work_id": j["work_id"],
+                "slug": j["slug"],
+                "page_filename": j.get("page_filename", ""),
+                "username": j.get("username", ""),
+                "status": j["status"],
+                "error": j.get("error"),
+                "started_at": j.get("started_at"),
+                "finished_at": j.get("finished_at"),
+            }
+            for jid, j in _reocr_jobs.items()
+        ]
+
+
+def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", username: str = "") -> str:
     """
     Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.
     Tagastab job_id, mille abil saab staatust küsida poll_reocr_job() kaudu.
@@ -1150,9 +1169,12 @@ def start_reocr_job(work_id: str, slug: str, img_path: str) -> str:
     _reocr_jobs[job_id] = {
         "work_id": work_id,
         "slug": slug,
+        "page_filename": page_filename,
+        "username": username,
         "status": "uploading",
         "text": None,
         "error": None,
+        "started_at": datetime.now().timestamp(),
         "remote_staging": remote_staging,
         "remote_work": remote_work,
         "remote_img": f"{remote_work}/{remote_img_name}",

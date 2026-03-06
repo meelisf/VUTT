@@ -10,7 +10,7 @@
  * kuna tekitab liiga suure halduskoormuse. Praegu on see leht lihtsalt
  * Git ajaloo vaatamiseks.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -25,7 +25,10 @@ import {
   Filter,
   History,
   Plus,
-  Minus
+  Minus,
+  Wand2,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -46,6 +49,18 @@ interface RecentCommit {
   lehekylje_number: number | null;
   filepath: string;
   change_type?: 'page' | 'metadata' | 'import';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus, 'import' = uus teos
+}
+
+interface ReocrJob {
+  job_id: string;
+  work_id: string;
+  slug: string;
+  page_filename: string;
+  username: string;
+  status: 'uploading' | 'processing' | 'done' | 'error';
+  error: string | null;
+  started_at: number | null;
+  finished_at: number | null;
 }
 
 interface DiffData {
@@ -74,6 +89,10 @@ const Review: React.FC = () => {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [allUsers, setAllUsers] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'history' | 'reocr'>('history');
+  const [reocrJobs, setReocrJobs] = useState<ReocrJob[]>([]);
+  const [reocrLoading, setReocrLoading] = useState(false);
+  const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Kontrolli ligipääsu (oota kuni kasutaja andmed on laetud)
   useEffect(() => {
@@ -112,6 +131,36 @@ const Review: React.FC = () => {
         // Fallback: kasutame getUniqueAuthors() — allUsers jääb tühjaks
       });
   }, [user, token]);
+
+  const loadReocrJobs = async (showLoader = false) => {
+    if (!token || !isAdmin) return;
+    if (showLoader) setReocrLoading(true);
+    try {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/jobs?token=${token}`, { timeout: 10000 });
+      const data = await res.json();
+      if (data.status === 'success') setReocrJobs(data.jobs);
+    } catch {
+      // eiramine
+    } finally {
+      if (showLoader) setReocrLoading(false);
+    }
+  };
+
+  // Pollimine: laadi OCR tööd iga 4s kui tab on aktiivne või on aktiivseid töid
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const hasActive = reocrJobs.some(j => j.status === 'uploading' || j.status === 'processing');
+    if (activeTab !== 'reocr' && !hasActive) return;
+
+    reocrPollRef.current = setTimeout(() => loadReocrJobs(), 4000);
+    return () => { if (reocrPollRef.current) clearTimeout(reocrPollRef.current); };
+  }, [reocrJobs, activeTab, isAdmin]);
+
+  // Lae OCR tööd kui tab avatakse
+  useEffect(() => {
+    if (activeTab === 'reocr' && isAdmin) loadReocrJobs(true);
+  }, [activeTab, isAdmin]);
 
   const loadRecentEdits = async (fromOffset: number, append: boolean) => {
     if (!token) return;
@@ -347,8 +396,8 @@ const Review: React.FC = () => {
                 </p>
               </div>
 
-              {/* Filter (ainult admin) */}
-              {isAdmin && (
+              {/* Filter (ainult admin, ainult history tabis) */}
+              {isAdmin && activeTab === 'history' && (
                 <div className="relative">
                   <button
                     onClick={() => setShowUserFilter(!showUserFilter)}
@@ -398,9 +447,129 @@ const Review: React.FC = () => {
             </div>
           </div>
 
+          {/* Tab bar (ainult adminile) */}
+          {isAdmin && (
+            <div className="flex border-b border-gray-200 px-6">
+              <button
+                onClick={() => setActiveTab('history')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'history'
+                    ? 'border-primary-600 text-primary-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <History size={15} />
+                {t('tabs.history')}
+              </button>
+              <button
+                onClick={() => setActiveTab('reocr')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === 'reocr'
+                    ? 'border-primary-600 text-primary-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Wand2 size={15} />
+                {t('tabs.reocr')}
+                {reocrJobs.filter(j => j.status === 'uploading' || j.status === 'processing').length > 0 && (
+                  <span className="ml-1 bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {reocrJobs.filter(j => j.status === 'uploading' || j.status === 'processing').length}
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Content */}
           <div className="p-6">
-            {loading ? (
+            {activeTab === 'reocr' ? (
+              /* OCR tööde tab */
+              reocrLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="animate-spin text-primary-600" size={32} />
+                  <span className="ml-3 text-gray-600">{t('reocr.loading')}</span>
+                </div>
+              ) : reocrJobs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Wand2 className="mx-auto text-gray-300" size={48} />
+                  <p className="mt-4 text-gray-500">{t('reocr.empty')}</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {[...reocrJobs].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0)).map(job => {
+                    const isActive = job.status === 'uploading' || job.status === 'processing';
+                    const pageNum = job.page_filename.match(/_pg_(\d+)\./)?.[1];
+                    return (
+                      <div
+                        key={job.job_id}
+                        className={`flex items-center gap-4 px-4 py-3 rounded-lg border ${
+                          isActive ? 'border-amber-200 bg-amber-50' :
+                          job.status === 'done' ? 'border-green-200 bg-green-50' :
+                          job.status === 'error' ? 'border-red-200 bg-red-50' :
+                          'border-gray-200'
+                        }`}
+                      >
+                        {/* Staatus ikoon */}
+                        <div className="shrink-0">
+                          {isActive
+                            ? <Loader2 size={18} className="animate-spin text-amber-600" />
+                            : job.status === 'done'
+                              ? <CheckCircle size={18} className="text-green-600" />
+                              : <XCircle size={18} className="text-red-500" />
+                          }
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-gray-800 text-sm">{job.slug}</span>
+                            {pageNum && (
+                              <span className="text-xs text-gray-500">lk {parseInt(pageNum, 10)}</span>
+                            )}
+                            {job.work_id && (
+                              <a
+                                href={`/work/${job.work_id}/${pageNum ? parseInt(pageNum, 10) : 1}`}
+                                className="text-xs text-primary-600 hover:underline flex items-center gap-0.5"
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <ExternalLink size={11} />
+                              </a>
+                            )}
+                          </div>
+                          {job.error && (
+                            <p className="text-xs text-red-600 mt-0.5">{job.error}</p>
+                          )}
+                        </div>
+
+                        {/* Kasutaja + aeg */}
+                        <div className="text-xs text-gray-500 text-right shrink-0">
+                          <div className="flex items-center gap-1 justify-end">
+                            <User size={11} />
+                            {job.username}
+                          </div>
+                          {job.started_at && (
+                            <div className="flex items-center gap-1 mt-0.5 justify-end">
+                              <Clock size={11} />
+                              {new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Staatus badge */}
+                        <div className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
+                          isActive ? 'bg-amber-100 text-amber-700' :
+                          job.status === 'done' ? 'bg-green-100 text-green-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {t(`reocr.status.${job.status}`)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="animate-spin text-primary-600" size={32} />
                 <span className="ml-3 text-gray-600">{t('loading')}</span>
