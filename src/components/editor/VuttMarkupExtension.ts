@@ -5,19 +5,6 @@ import { ViewPlugin, Decoration, DecorationSet, EditorView, WidgetType } from '@
 import { RangeSetBuilder, RangeSet } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 
-// Nähtamatu widget tagi karakterite asendamiseks — teeb ala atoomiliseks
-// (kursor hüppab üle, mitte ei roomab tähthaaval peidetud tagi sees)
-class HiddenTagWidget extends WidgetType {
-  toDOM() {
-    const span = document.createElement('span');
-    span.className = 'vutt-tag-hidden';
-    span.setAttribute('aria-hidden', 'true');
-    return span;
-  }
-  ignoreEvent() { return true; }
-  get estimatedHeight() { return -1; }
-}
-
 // Widget <pb/> (leheküljevahetus) kuvamiseks
 class PageBreakWidget extends WidgetType {
   toDOM() {
@@ -118,14 +105,14 @@ function buildAll(view: EditorView): BuildResult {
         const contentEnd = closeIdx;
         const closeEnd = closeIdx + closeTag.length;
 
-        decoRanges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
+        decoRanges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({}) });
         atomicList.push({ from: openIdx, to: contentStart });
 
         if (contentStart < contentEnd) {
           decoRanges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls! }) });
         }
 
-        decoRanges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
+        decoRanges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({}) });
         atomicList.push({ from: contentEnd, to: closeEnd });
 
         searchFrom = closeEnd;
