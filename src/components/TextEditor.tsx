@@ -395,6 +395,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       if (sFrom >= sTo) continue; // Tühi rida jääb vahele
 
+      // NUTIKAS PESASTAMINE: Kui mähime stiili-tägiga (i, b, cs), siis 
+      // kontrollime, kas rida on juba struktuuri-tägi (m, hi, fn) sees.
+      // Kui jah, siis liigume stiili-tägiga struktuuri-tägi SISSE.
+      if (mode === 'wrap' && ['i', 'b', 'cs'].includes(tag)) {
+        let adjusted = true;
+        while (adjusted) {
+          adjusted = false;
+          // Kontrollime kõiki struktuuri-tage
+          for (const sTag of ['m', 'hi', 'fn']) {
+            const container = findContainer(sTag, sFrom + 1, docText, line.from, line.to);
+            // Kui valiku piirid ühtivad täpselt struktuuri-tägi piiridega, siis nihutame sissepoole
+            if (container && container.open === sFrom && container.closeEnd === sTo) {
+              sFrom = container.openEnd;
+              sTo = container.close;
+              adjusted = true;
+              break;
+            }
+          }
+        }
+      }
+
       if (mode === 'unwrap') {
         const container = findContainer(tag, sFrom, docText, line.from, line.to);
         if (container && sTo <= container.closeEnd) {
