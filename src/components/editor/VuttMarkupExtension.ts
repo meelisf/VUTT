@@ -2,7 +2,7 @@
 // XML tägid peidetakse alati (mitte cursor-reveals), sisestamine ainult toolbar kaudu.
 
 import { ViewPlugin, Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
-import { RangeSetBuilder } from '@codemirror/state';
+import { RangeSetBuilder, RangeSet } from '@codemirror/state';
 import type { ViewUpdate } from '@codemirror/view';
 
 // Nähtamatu widget tagi karakterite asendamiseks — teeb ala atoomiliseks
@@ -68,11 +68,20 @@ interface DecoRange {
   deco: Decoration;
 }
 
-// Ehitab dekoraatorikogu kogu dokumendi teksti põhjal.
-// Märgendite nestimist toetab CM6 loomulikult (replace sees mark on OK).
-function buildDecorations(view: EditorView): DecorationSet {
+// Aatomiline märgend — väärtus ei loe, ainult positsioon (EditorView.atomicRanges jaoks)
+const atomicMark = Decoration.mark({});
+
+interface BuildResult {
+  decorations: DecorationSet;
+  atomicRanges: RangeSet<Decoration>;
+}
+
+// Ehitab dekoraatorikogu + aatomilistede tägialade kogumi kogu dokumendi põhjal.
+// atomicRanges tagab et kursor hüppab peidetud tägimärkide üle ühel sammul (mõlemas suunas).
+function buildAll(view: EditorView): BuildResult {
   const text = view.state.doc.toString();
-  const ranges: DecoRange[] = [];
+  const decoRanges: DecoRange[] = [];
+  const atomicList: { from: number; to: number }[] = [];
 
   for (const tagDef of VUTT_TAGS) {
     if (tagDef.selfClose) {
@@ -80,11 +89,8 @@ function buildDecorations(view: EditorView): DecorationSet {
       const re = /<pb\/>/g;
       let m;
       while ((m = re.exec(text)) !== null) {
-        ranges.push({
-          from: m.index,
-          to: m.index + m[0].length,
-          deco: Decoration.replace({ widget: new PageBreakWidget() }),
-        });
+        decoRanges.push({ from: m.index, to: m.index + m[0].length, deco: Decoration.replace({ widget: new PageBreakWidget() }) });
+        atomicList.push({ from: m.index, to: m.index + m[0].length });
       }
 
     } else if (tagDef.useWidget) {
@@ -92,16 +98,12 @@ function buildDecorations(view: EditorView): DecorationSet {
       const re = new RegExp(`<${tagDef.tag}>(\\d+)<\\/${tagDef.tag}>`, 'g');
       let m;
       while ((m = re.exec(text)) !== null) {
-        ranges.push({
-          from: m.index,
-          to: m.index + m[0].length,
-          deco: Decoration.replace({ widget: new FootnoteWidget(m[1]) }),
-        });
+        decoRanges.push({ from: m.index, to: m.index + m[0].length, deco: Decoration.replace({ widget: new FootnoteWidget(m[1]) }) });
+        atomicList.push({ from: m.index, to: m.index + m[0].length });
       }
 
     } else {
       // <i>...</i>, <b>...</b> jne — peidame tägid, stailime sisu
-      // Toetab mitmerearilisi spanne: from..to võib ületada realõppe
       const openTag = `<${tagDef.tag}>`;
       const closeTag = `</${tagDef.tag}>`;
       let searchFrom = 0;
@@ -116,44 +118,62 @@ function buildDecorations(view: EditorView): DecorationSet {
         const contentEnd = closeIdx;
         const closeEnd = closeIdx + closeTag.length;
 
-        // Peidame avatägi — widget teeb ala atoomiliseks (kursor hüppab üle)
-        ranges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
-        // Stailime sisu
+        decoRanges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
+        atomicList.push({ from: openIdx, to: contentStart });
+
         if (contentStart < contentEnd) {
-          ranges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls! }) });
+          decoRanges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls! }) });
         }
-        // Peidame sulgtägi — sama
-        ranges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
+
+        decoRanges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({ widget: new HiddenTagWidget() }) });
+        atomicList.push({ from: contentEnd, to: closeEnd });
 
         searchFrom = closeEnd;
       }
     }
   }
 
-  // Sorteerime from järgi (RangeSetBuilder nõue); sama from korral väiksem to ees
-  ranges.sort((a, b) => a.from !== b.from ? a.from - b.from : a.to - b.to);
-
-  const builder = new RangeSetBuilder<Decoration>();
-  for (const { from, to, deco } of ranges) {
-    builder.add(from, to, deco);
+  decoRanges.sort((a, b) => a.from !== b.from ? a.from - b.from : a.to - b.to);
+  const decoBuilder = new RangeSetBuilder<Decoration>();
+  for (const { from, to, deco } of decoRanges) {
+    decoBuilder.add(from, to, deco);
   }
-  return builder.finish();
+
+  atomicList.sort((a, b) => a.from - b.from);
+  const atomicBuilder = new RangeSetBuilder<Decoration>();
+  for (const { from, to } of atomicList) {
+    atomicBuilder.add(from, to, atomicMark);
+  }
+
+  return { decorations: decoBuilder.finish(), atomicRanges: atomicBuilder.finish() };
 }
 
-// CM6 ViewPlugin — dekoraatoriextension, mis peidab XML tägid ja stailib sisu
+// CM6 ViewPlugin — dekoraatoriextension + atomicRanges (kursor hüppab tägide üle)
 export const vuttMarkupExtension = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
+    atomicRanges: RangeSet<Decoration>;
 
     constructor(view: EditorView) {
-      this.decorations = buildDecorations(view);
+      const r = buildAll(view);
+      this.decorations = r.decorations;
+      this.atomicRanges = r.atomicRanges;
     }
 
     update(update: ViewUpdate) {
       if (update.docChanged || update.viewportChanged) {
-        this.decorations = buildDecorations(update.view);
+        const r = buildAll(update.view);
+        this.decorations = r.decorations;
+        this.atomicRanges = r.atomicRanges;
       }
     }
   },
-  { decorations: v => v.decorations }
+  {
+    decorations: v => v.decorations,
+    // provide: EditorView.atomicRanges.of tagab et CM6 cursorCharRight/Left
+    // hüppab peidetud tägimärkide (nt <i>, </cs>) üle ühel sammul, mitte char-haaval
+    provide: plugin => EditorView.atomicRanges.of(view =>
+      view.plugin(plugin)?.atomicRanges ?? RangeSet.empty
+    ),
+  }
 );
