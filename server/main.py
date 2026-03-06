@@ -1045,45 +1045,49 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
     # Sequence järgi sorteeritud pildid
     sorted_images = get_sorted_images(folder)
 
-    def _build_text() -> str:
-        """Koostab kokku liidetud tekstifaili sisu."""
-        parts = [title]
-        if author:
-            parts.append(f'\n{author}')
-        if year:
-            parts.append(f', {year}')
-        parts.append('\n\n')
-        for img_fname in sorted_images:
-            base = os.path.splitext(img_fname)[0]
-            txt_path = os.path.join(folder, base + '.txt')
-            if os.path.exists(txt_path):
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    parts.append(f.read())
-                parts.append('\n')
-        return ''.join(parts)
-
     if content == 'text':
-        buf = _build_text().encode('utf-8')
+        def _build_full_text() -> str:
+            """Koostab kokku liidetud tekstifaili sisu."""
+            parts = [title]
+            if author: parts.append(f'\n{author}')
+            if year: parts.append(f', {year}')
+            parts.append('\n\n')
+            for img_fname in sorted_images:
+                base = os.path.splitext(img_fname)[0]
+                txt_path = os.path.join(folder, base + '.txt')
+                if os.path.exists(txt_path):
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        parts.append(f.read())
+                    parts.append('\n')
+            return ''.join(parts)
+            
+        buf = _build_full_text().encode('utf-8')
         return StreamingResponse(
             iter([buf]),
             media_type="text/plain; charset=utf-8",
             headers={"Content-Disposition": f'attachment; filename="{file_slug}.txt"'}
         )
 
-    # ZIP (images või both) — pildid nimetatud {file_slug}_pg_NNN.jpg sequence järjekorras
+    # ZIP (images või both) — failid nimetatud {file_slug}_pg_NNN.ext sequence järjekorras
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
         if os.path.exists(meta_path):
             zf.write(meta_path, f"{file_slug}/_metadata.json")
 
-        if content == 'both':
-            zf.writestr(f"{file_slug}/{file_slug}.txt", _build_text())
-
         for i, img_fname in enumerate(sorted_images, start=1):
+            base = os.path.splitext(img_fname)[0]
+            ext = img_fname.rsplit('.', 1)[-1].lower()
+            
+            # Lisa pilt
             img_path = os.path.join(folder, img_fname)
             if os.path.isfile(img_path):
-                ext = img_fname.rsplit('.', 1)[-1].lower()
                 zf.write(img_path, f"{file_slug}/{file_slug}_pg_{i:03d}.{ext}")
+            
+            # Lisa tekst eraldi failina (ainult 'both' puhul)
+            if content == 'both':
+                txt_path = os.path.join(folder, base + '.txt')
+                if os.path.exists(txt_path):
+                    zf.write(txt_path, f"{file_slug}/{file_slug}_pg_{i:03d}.txt")
 
     buf.seek(0)
     return StreamingResponse(
