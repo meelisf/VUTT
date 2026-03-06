@@ -88,8 +88,8 @@ function buildMarkup(text: string): MarkupSets {
         const open = stack[openIdx];
         stack.splice(openIdx, 1);
 
-        // Peidame sulgeva tägi klassiga
-        decoRanges.push({ from, to, deco: Decoration.mark({ class: 'vutt-tag-hidden' }) });
+        // Peidame sulgeva tägi (replace tähendab, et see ei võta ruumi)
+        decoRanges.push({ from, to, deco: Decoration.replace({}) });
         atomicRanges.push({ from, to, deco: atomicReplace });
 
         // Rakendame sisu stiili (nt kursiiv või marginalia taust)
@@ -112,8 +112,8 @@ function buildMarkup(text: string): MarkupSets {
           tagRegex.lastIndex = totalTo; // Hüppame üle sulgeva tägi
         }
       } else {
-        // Tavaline avav täg: peidame klassiga ja paneme pinu otsa
-        decoRanges.push({ from, to, deco: Decoration.mark({ class: 'vutt-tag-hidden' }) });
+        // Tavaline avav täg: peidame (replace) ja paneme pinu otsa
+        decoRanges.push({ from, to, deco: Decoration.replace({}) });
         atomicRanges.push({ from, to, deco: atomicReplace });
         stack.push({ tag: cleanTagName, from, openEnd: to });
       }
@@ -132,12 +132,12 @@ function buildMarkup(text: string): MarkupSets {
   const decoBuilder = new RangeSetBuilder<Decoration>();
   let lastReplaceEnd = -1;
   for (const r of decoRanges) {
-    // Ära lisa dekoratsioone, mis algavad asenduse (mis asendab teksti vidinaga) seest.
-    // Lihtne replace({}) (tägi peitmine) ei tohiks teisi blokeerida.
-    const isRealReplacement = !!r.deco.spec.widget;
+    // CodeMirroris ei tohi 'replace' dekoratsioonid (mis peidavad teksti) omavahel kattuda.
+    // Kuna me sorteerisime nad (from ASC, to DESC), siis saame lihtsalt kontrollida piire.
+    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || !r.deco.spec.class);
 
     if (r.from < lastReplaceEnd) continue;
-    if (isRealReplacement) lastReplaceEnd = r.to;
+    if (isReplace) lastReplaceEnd = r.to;
 
     try {
       decoBuilder.add(r.from, r.to, r.deco);
@@ -145,7 +145,6 @@ function buildMarkup(text: string): MarkupSets {
       // Ignoreeri vead, mis tekivad ebakorrektse XML-i puhul
     }
   }
-
   const atomicBuilder = new RangeSetBuilder<Decoration>();
   let lastAtomicEnd = -1;
   for (const r of atomicRanges) {

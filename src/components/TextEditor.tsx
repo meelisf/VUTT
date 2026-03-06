@@ -13,7 +13,7 @@ import { FILE_API_URL } from '../config';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
-import { EditorState, EditorSelection, Compartment } from '@codemirror/state';
+import { EditorState, EditorSelection, Compartment, Transaction } from '@codemirror/state';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 
 // --- wrapWithTag abifunktsioonid ---
@@ -401,19 +401,25 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         let adjusted = true;
         while (adjusted) {
           adjusted = false;
-          // 1. Kontrollime algust: kas sFrom juures algab mõni struktuuri-tägi?
-          // Kasutame regex-i, et tabada ka <fn>1</fn> tüüpi täge
-          const startMatch = docText.slice(sFrom, sFrom + 20).match(/^<(m|hi|fn\d*)>/);
-          if (startMatch) {
-            sFrom += startMatch[0].length;
-            adjusted = true;
+          // 1. Kontrollime algust: kas sFrom juures algab suvaline täg?
+          const startTagMatch = docText.slice(sFrom, sFrom + 20).match(/^<[^>]+>/);
+          if (startTagMatch) {
+            const tagName = startTagMatch[0].match(/[a-z]+/)?.[0];
+            // Kui on struktuuri-täg, hüppame sisse
+            if (tagName && ['m', 'hi', 'fn'].includes(tagName)) {
+              sFrom += startTagMatch[0].length;
+              adjusted = true;
+            }
           }
 
-          // 2. Kontrollime lõppu: kas sTo juures lõpeb mõni struktuuri-tägi?
-          const endMatch = docText.slice(Math.max(0, sTo - 10), sTo).match(/<\/(m|hi|fn)>$/);
-          if (endMatch) {
-            sTo -= endMatch[0].length;
-            adjusted = true;
+          // 2. Kontrollime lõppu: kas sTo juures lõpeb suvaline täg?
+          const endTagMatch = docText.slice(Math.max(0, sTo - 15), sTo).match(/<\/[^>]+>$/);
+          if (endTagMatch) {
+            const tagName = endTagMatch[0].match(/[a-z]+/)?.[0];
+            if (tagName && ['m', 'hi', 'fn'].includes(tagName)) {
+              sTo -= endTagMatch[0].length;
+              adjusted = true;
+            }
           }
           
           if (sFrom >= sTo) break;
@@ -445,7 +451,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           view.state.changes(changes).mapPos(from, 1),
           view.state.changes(changes).mapPos(to, -1)
         ),
-        scrollIntoView: false // Ära keri automaatselt, see väldib hüppamist
+        scrollIntoView: false,
+        annotations: Transaction.userEvent.of('input.format')
       });
       view.dispatch(tr);
     }
