@@ -1269,6 +1269,18 @@ def poll_reocr_job(job_id: str) -> dict:
         job["text"] = text
         job["finished_at"] = datetime.now().timestamp()
         logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
+
+        # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
+        page_fn = job.get("page_filename", "")
+        if page_fn:
+            stem = os.path.splitext(page_fn)[0]
+            ocr_path = os.path.join(BASE_DIR, job["slug"], stem + ".ocr")
+            try:
+                with open(ocr_path, "w", encoding="utf-8") as f:
+                    f.write(text)
+                logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
+            except Exception as write_err:
+                logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
     except Exception as e:
         logger.warning(f"Re-OCR {job_id} poll viga: {e}")
 

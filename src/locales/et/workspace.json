@@ -242,7 +242,7 @@
       "apply": "Asenda tekst",
       "cancel": "Loobu",
       "error": "Re-OCR ebaõnnestus",
-      "ttlHint": "Tulemus on saadaval 1 tund."
+      "deleteFile": "Kustuta OCR fail"
     }
   }
 }

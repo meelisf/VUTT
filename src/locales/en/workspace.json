@@ -242,7 +242,7 @@
       "apply": "Replace text",
       "cancel": "Cancel",
       "error": "Re-OCR failed",
-      "ttlHint": "Result is available for 1 hour."
+      "deleteFile": "Delete OCR file"
     }
   }
 }

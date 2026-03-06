@@ -790,6 +790,32 @@ async def admin_reocr_jobs(user=Depends(require_role("admin"))):
     """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
     return {"status": "success", "jobs": list_reocr_jobs()}
 
+@app.get("/admin/work/{work_id}/page-ocr")
+async def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
+    """Tagastab lehekülje .ocr faili sisu, kui see eksisteerib."""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teos ei leitud")
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    ocr_path = os.path.join(path, stem + ".ocr")
+    if not os.path.isfile(ocr_path):
+        raise HTTPException(status_code=404, detail=".ocr fail puudub")
+    with open(ocr_path, "r", encoding="utf-8") as f:
+        text = f.read()
+    return {"status": "success", "text": text}
+
+@app.delete("/admin/work/{work_id}/page-ocr")
+async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
+    """Kustutab lehekülje .ocr faili (tulemus rakendatud või tagasi lükatud)."""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teos ei leitud")
+    stem = os.path.splitext(os.path.basename(filename))[0]
+    ocr_path = os.path.join(path, stem + ".ocr")
+    if os.path.isfile(ocr_path):
+        os.remove(ocr_path)
+    return {"status": "success"}
+
 # =========================================================
 # AVALIKUD ANDMED JA SEO
 # =========================================================

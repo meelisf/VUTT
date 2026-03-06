@@ -109,9 +109,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [reocrText, setReocrText] = useState<string | null>(null);
   const [reocrError, setReocrError] = useState<string | null>(null);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // localStorage võti selle lehekülje re-OCR töö säilitamiseks (töö on backendis 1h alles)
-  const reocrStorageKey = page.work_id && page.image_url
-    ? `reocr_job_${page.work_id}_${page.image_url.split('/').pop()}`
+  // Lehekülje failinimi (piltide URL-ist) — kasutatakse .ocr faili ja localStorage võtme jaoks
+  const pageFilename = page.image_url ? (page.image_url.split('/').pop() ?? null) : null;
+  // localStorage võti poolelioleva re-OCR töö job_id säilitamiseks
+  const reocrStorageKey = page.work_id && pageFilename
+    ? `reocr_job_${page.work_id}_${pageFilename}`
     : null;
   const didCheckStoredJobRef = useRef(false);
 
@@ -502,13 +504,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     };
   }, []);
 
-  // Mountimisel kontrolli, kas eelmine re-OCR töö on backendis alles (TTL 1h)
+  // Mountimisel: kontrolli esmalt .ocr faili (püsiv), siis localStorage (pooleliolev töö)
   useEffect(() => {
-    if (didCheckStoredJobRef.current || !authToken || !reocrStorageKey) return;
+    if (didCheckStoredJobRef.current || !authToken || !page.work_id || !pageFilename) return;
     didCheckStoredJobRef.current = true;
-
-    const savedJobId = localStorage.getItem(reocrStorageKey);
-    if (!savedJobId) return;
 
     const startPollingFromSaved = (jobId: string) => {
       setReocrStatus('processing');
@@ -526,11 +525,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           } else if (pd.status === 'error') {
             setReocrStatus('error');
             setReocrError(pd.error || 'Tundmatu viga');
-            localStorage.removeItem(reocrStorageKey);
+            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
           } else if (pd.status === 'not_found') {
-            // Töö aegus — puhastame localStorage
             setReocrStatus('idle');
-            localStorage.removeItem(reocrStorageKey);
+            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
           } else {
             reocrPollRef.current = setTimeout(poll, 3000);
           }
@@ -541,30 +539,53 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       reocrPollRef.current = setTimeout(poll, 1000);
     };
 
-    // Kontrollime esmalt staatust — võib olla juba valmis
-    fetchWithTimeout(
-      `${FILE_API_URL}/admin/reocr/${savedJobId}/status?token=${authToken}`,
-      { timeout: 10000 }
-    ).then(res => res.json()).then(pd => {
-      if (pd.status === 'done') {
-        setReocrStatus('done');
-        setReocrText(pd.text ?? '');
-      } else if (pd.status === 'uploading' || pd.status === 'processing') {
-        startPollingFromSaved(savedJobId);
-      } else {
-        // not_found või error — töö aegus või ebaõnnestus
-        localStorage.removeItem(reocrStorageKey);
+    const checkAll = async () => {
+      // 1. Kontrolli .ocr faili (elab serverirestate üle)
+      try {
+        const res = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
+          { timeout: 5000 }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setReocrStatus('done');
+          setReocrText(data.text ?? '');
+          if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+          return;
+        }
+      } catch {
+        // Ühenduse viga — proovime localStorage
       }
-    }).catch(() => {
-      // Ühenduse viga — eiramine (ei puhasta localStorage, proovime järgmine kord)
-    });
+
+      // 2. .ocr puudub — kontrolli localStorage (pooleliolev töö)
+      const savedJobId = reocrStorageKey ? localStorage.getItem(reocrStorageKey) : null;
+      if (!savedJobId) return;
+
+      try {
+        const pr = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/reocr/${savedJobId}/status?token=${authToken}`,
+          { timeout: 10000 }
+        );
+        const pd = await pr.json();
+        if (pd.status === 'done') {
+          setReocrStatus('done');
+          setReocrText(pd.text ?? '');
+        } else if (pd.status === 'uploading' || pd.status === 'processing') {
+          startPollingFromSaved(savedJobId);
+        } else {
+          if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+        }
+      } catch {
+        // Eiramine
+      }
+    };
+
+    checkAll();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authToken]);
 
   const handleReOcr = useCallback(async () => {
-    if (!page.image_url || !authToken) return;
-    const pageFilename = page.image_url.split('/').pop();
-    if (!pageFilename) return;
+    if (!pageFilename || !authToken) return;
 
     if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
     setReocrStatus('uploading');
@@ -613,7 +634,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setReocrStatus('error');
       setReocrError(e.message || 'Viga');
     }
-  }, [page.image_url, page.work_id, authToken]);
+  }, [pageFilename, page.work_id, page.page_number, authToken, reocrStorageKey]);
 
   const applyReOcr = useCallback(() => {
     if (reocrText !== null) {
@@ -625,10 +646,28 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         setIsDirty(true);
       }
     }
+    // Kustuta .ocr fail — tulemus on rakendatud
+    if (pageFilename && authToken && page.work_id) {
+      fetchWithTimeout(
+        `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
+        { method: 'DELETE', timeout: 5000 }
+      ).catch(() => {});
+    }
     if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
     setReocrStatus('idle');
     setReocrText(null);
-  }, [reocrText, reocrStorageKey]);
+  }, [reocrText, reocrStorageKey, pageFilename, authToken, page.work_id]);
+
+  const deleteOcrFile = useCallback(async () => {
+    if (!pageFilename || !authToken || !page.work_id) return;
+    await fetchWithTimeout(
+      `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
+      { method: 'DELETE', timeout: 5000 }
+    ).catch(() => {});
+    if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+    setReocrStatus('idle');
+    setReocrText(null);
+  }, [pageFilename, authToken, page.work_id, reocrStorageKey]);
 
   const dismissReOcr = useCallback(() => {
     if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
@@ -796,24 +835,32 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     </div>
                   ) : (
                     <>
-                      <p className="px-4 pt-3 pb-1 text-xs text-gray-500 shrink-0">{t('editor.reocr.modalHint')}</p>
-                      <p className="px-4 pb-2 text-xs text-amber-600 shrink-0">{t('editor.reocr.ttlHint')}</p>
+                      <p className="px-4 pt-3 pb-2 text-xs text-gray-500 shrink-0">{t('editor.reocr.modalHint')}</p>
                       <div className="flex-1 overflow-auto px-4 pb-2">
                         <pre className="font-serif text-[15px] leading-[1.7] text-gray-800 whitespace-pre-wrap">{reocrText}</pre>
                       </div>
-                      <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-gray-200 shrink-0">
+                      <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 shrink-0">
                         <button
-                          onClick={dismissReOcr}
-                          className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                          onClick={deleteOcrFile}
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title={t('editor.reocr.deleteFile')}
                         >
-                          {t('editor.reocr.cancel')}
+                          {t('editor.reocr.deleteFile')}
                         </button>
-                        <button
-                          onClick={applyReOcr}
-                          className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
-                        >
-                          {t('editor.reocr.apply')}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={dismissReOcr}
+                            className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
+                          >
+                            {t('editor.reocr.cancel')}
+                          </button>
+                          <button
+                            onClick={applyReOcr}
+                            className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
+                          >
+                            {t('editor.reocr.apply')}
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}
