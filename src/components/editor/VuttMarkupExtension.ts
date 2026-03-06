@@ -57,60 +57,70 @@ function buildMarkup(text: string): MarkupSets {
   const decoRanges: { from: number; to: number; deco: Decoration }[] = [];
   const atomicRanges: { from: number; to: number; deco: Decoration }[] = [];
 
-  for (const tagDef of VUTT_TAGS) {
-    if (tagDef.selfClose) {
-      const re = new RegExp(`<${tagDef.tag}\\/>`, 'g');
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        const from = m.index;
-        const to = m.index + m[0].length;
-        const deco = Decoration.replace({ widget: new PageBreakWidget() });
-        decoRanges.push({ from, to, deco });
+  // Regulaaravaldis kõigi toetatud tägide leidmiseks
+  const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
+  let m;
+  const stack: { tag: string; from: number; openEnd: number }[] = [];
+
+  while ((m = tagRegex.exec(text)) !== null) {
+    const fullTag = m[0];
+    const tagName = m[1];
+    const isClosing = tagName.startsWith('/');
+    const cleanTagName = isClosing ? tagName.slice(1) : tagName;
+    const isSelfClosing = m[3] === '/' || fullTag === '<pb/>';
+
+    const tagDef = VUTT_TAGS.find(t => t.tag === cleanTagName);
+    if (!tagDef) continue;
+
+    const from = m.index;
+    const to = from + fullTag.length;
+
+    if (isSelfClosing || tagDef.selfClose) {
+      // Leheküljevahetus või muu isesulguv täg
+      const widget = cleanTagName === 'pb' ? new PageBreakWidget() : null;
+      const deco = Decoration.replace({ widget: widget || undefined });
+      decoRanges.push({ from, to, deco });
+      atomicRanges.push({ from, to, deco: atomicReplace });
+    } else if (isClosing) {
+      // Sulgev täg: leiame vastava avava tägi pinust
+      const openIdx = stack.map(s => s.tag).lastIndexOf(cleanTagName);
+      if (openIdx !== -1) {
+        const open = stack[openIdx];
+        stack.splice(openIdx, 1);
+
+        // Peidame sulgeva tägi
+        decoRanges.push({ from, to, deco: Decoration.replace({}) });
         atomicRanges.push({ from, to, deco: atomicReplace });
-      }
-    } else if (tagDef.useWidget) {
-      const re = new RegExp(`<${tagDef.tag}>(\\d+)<\\/${tagDef.tag}>`, 'g');
-      let m;
-      while ((m = re.exec(text)) !== null) {
-        const from = m.index;
-        const to = m.index + m[0].length;
-        const deco = Decoration.replace({ widget: new FootnoteWidget(m[1]) });
-        decoRanges.push({ from, to, deco });
-        atomicRanges.push({ from, to, deco: atomicReplace });
+
+        // Rakendame sisu stiili (nt kursiiv või marginalia taust)
+        if (tagDef.cls && open.openEnd < from) {
+          decoRanges.push({ from: open.openEnd, to: from, deco: Decoration.mark({ class: tagDef.cls }) });
+        }
       }
     } else {
-      const openTag = `<${tagDef.tag}>`;
-      const closeTag = `</${tagDef.tag}>`;
-      let searchFrom = 0;
-      while (searchFrom < text.length) {
-        const openIdx = text.indexOf(openTag, searchFrom);
-        if (openIdx === -1) break;
-        const closeIdx = text.indexOf(closeTag, openIdx + openTag.length);
-        if (closeIdx === -1) break;
-
-        const contentStart = openIdx + openTag.length;
-        const contentEnd = closeIdx;
-        const closeEnd = closeIdx + closeTag.length;
-
-        // Avatägi
-        decoRanges.push({ from: openIdx, to: contentStart, deco: Decoration.replace({}) });
-        atomicRanges.push({ from: openIdx, to: contentStart, deco: atomicReplace });
-        
-        // Sisu
-        if (contentStart < contentEnd && tagDef.cls) {
-          decoRanges.push({ from: contentStart, to: contentEnd, deco: Decoration.mark({ class: tagDef.cls }) });
+      // Avav täg
+      if (tagDef.useWidget) {
+        // Erijuht: <fn>1</fn> - asendame kogu bloki vidinaga
+        const closeTag = `</${cleanTagName}>`;
+        const closeIdx = text.indexOf(closeTag, to);
+        if (closeIdx !== -1) {
+          const num = text.slice(to, closeIdx);
+          const deco = Decoration.replace({ widget: new FootnoteWidget(num) });
+          const totalTo = closeIdx + closeTag.length;
+          decoRanges.push({ from, to: totalTo, deco });
+          atomicRanges.push({ from, to: totalTo, deco: atomicReplace });
+          tagRegex.lastIndex = totalTo; // Hüppame üle sulgeva tägi
         }
-        
-        // Sulgtägi
-        decoRanges.push({ from: contentEnd, to: closeEnd, deco: Decoration.replace({}) });
-        atomicRanges.push({ from: contentEnd, to: closeEnd, deco: atomicReplace });
-
-        searchFrom = closeEnd;
+      } else {
+        // Tavaline avav täg: peidame ja paneme pinu otsa
+        decoRanges.push({ from, to, deco: Decoration.replace({}) });
+        atomicRanges.push({ from, to, deco: atomicReplace });
+        stack.push({ tag: cleanTagName, from, openEnd: to });
       }
     }
   }
 
-  // Sorteerimine from ASC, to DESC
+  // Sorteerimine CodeMirrori reeglite järgi: from ASC, to DESC
   const sortFn = (a: any, b: any) => {
     if (a.from !== b.from) return a.from - b.from;
     return b.to - a.to;
@@ -122,17 +132,17 @@ function buildMarkup(text: string): MarkupSets {
   const decoBuilder = new RangeSetBuilder<Decoration>();
   let lastReplaceEnd = -1;
   for (const r of decoRanges) {
-    if (r.from < lastReplaceEnd) continue; // Ära lisa dekoratsioone, mis algavad asenduse seest
+    // Ära lisa dekoratsioone, mis algavad asenduse (mis asendab teksti vidinaga) seest.
+    // Lihtne replace({}) (tägi peitmine) ei tohiks teisi blokeerida.
+    const isRealReplacement = !!r.deco.spec.widget;
 
-    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || !r.deco.spec.class);
-    if (isReplace) {
-      lastReplaceEnd = r.to;
-    }
+    if (r.from < lastReplaceEnd) continue;
+    if (isRealReplacement) lastReplaceEnd = r.to;
 
     try {
       decoBuilder.add(r.from, r.to, r.deco);
     } catch (e) {
-      console.warn('VuttMarkupExtension: decoBuilder.add error:', e, r);
+      // Ignoreeri vead, mis tekivad ebakorrektse XML-i puhul
     }
   }
 
@@ -143,14 +153,11 @@ function buildMarkup(text: string): MarkupSets {
     lastAtomicEnd = r.to;
     try {
       atomicBuilder.add(r.from, r.to, r.deco);
-    } catch (e) {
-      console.warn('VuttMarkupExtension: atomicBuilder.add error:', e, r);
-    }
+    } catch (e) {}
   }
 
   return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish() };
-  }
-
+}
 
 export const vuttMarkupField = StateField.define<MarkupSets>({
   create(state) {
