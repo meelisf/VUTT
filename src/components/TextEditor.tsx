@@ -313,7 +313,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const wrapWithTag = useCallback((tag: string) => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
     const openTag = `<${tag}>`;
     const closeTag = `</${tag}>`;
     const docText = view.state.doc.toString();
