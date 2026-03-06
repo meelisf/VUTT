@@ -236,12 +236,13 @@
       "button": "Transcription",
       "uploading": "Uploading...",
       "processing": "OCR processing...",
-      "inProgress": "Transcription in progress — don't close this page.",
+      "inProgress": "Transcription in progress — the result can be applied later too.",
       "modalTitle": "Re-OCR result",
       "modalHint": "Do you want to replace the current text with the automatic transcription?",
       "apply": "Replace text",
       "cancel": "Cancel",
-      "error": "Re-OCR failed"
+      "error": "Re-OCR failed",
+      "ttlHint": "Result is available for 1 hour."
     }
   }
 }

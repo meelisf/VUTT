@@ -236,12 +236,13 @@
       "button": "Transkriptsioon",
       "uploading": "Laadin...",
       "processing": "OCR töötleb...",
-      "inProgress": "Transkriptsioon käib — ära seda lehekülge sulge.",
+      "inProgress": "Transkriptsioon käib — tulemuse saab ka hiljem rakendada.",
       "modalTitle": "Re-OCR tulemus",
       "modalHint": "Kas soovid asendada praeguse teksti automaatse transkriptsiooniga?",
       "apply": "Asenda tekst",
       "cancel": "Loobu",
-      "error": "Re-OCR ebaõnnestus"
+      "error": "Re-OCR ebaõnnestus",
+      "ttlHint": "Tulemus on saadaval 1 tund."
     }
   }
 }

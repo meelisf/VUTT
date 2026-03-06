@@ -109,6 +109,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [reocrText, setReocrText] = useState<string | null>(null);
   const [reocrError, setReocrError] = useState<string | null>(null);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // localStorage võti selle lehekülje re-OCR töö säilitamiseks (töö on backendis 1h alles)
+  const reocrStorageKey = page.work_id && page.image_url
+    ? `reocr_job_${page.work_id}_${page.image_url.split('/').pop()}`
+    : null;
+  const didCheckStoredJobRef = useRef(false);
 
   // Erimärkide state
   const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
@@ -497,6 +502,65 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     };
   }, []);
 
+  // Mountimisel kontrolli, kas eelmine re-OCR töö on backendis alles (TTL 1h)
+  useEffect(() => {
+    if (didCheckStoredJobRef.current || !authToken || !reocrStorageKey) return;
+    didCheckStoredJobRef.current = true;
+
+    const savedJobId = localStorage.getItem(reocrStorageKey);
+    if (!savedJobId) return;
+
+    const startPollingFromSaved = (jobId: string) => {
+      setReocrStatus('processing');
+      const poll = async () => {
+        try {
+          const pr = await fetchWithTimeout(
+            `${FILE_API_URL}/admin/reocr/${jobId}/status?token=${authToken}`,
+            { timeout: 10000 }
+          );
+          if (!pr.ok) throw new Error('Polling ebaõnnestus');
+          const pd = await pr.json();
+          if (pd.status === 'done') {
+            setReocrStatus('done');
+            setReocrText(pd.text ?? '');
+          } else if (pd.status === 'error') {
+            setReocrStatus('error');
+            setReocrError(pd.error || 'Tundmatu viga');
+            localStorage.removeItem(reocrStorageKey);
+          } else if (pd.status === 'not_found') {
+            // Töö aegus — puhastame localStorage
+            setReocrStatus('idle');
+            localStorage.removeItem(reocrStorageKey);
+          } else {
+            reocrPollRef.current = setTimeout(poll, 3000);
+          }
+        } catch {
+          reocrPollRef.current = setTimeout(poll, 4000);
+        }
+      };
+      reocrPollRef.current = setTimeout(poll, 1000);
+    };
+
+    // Kontrollime esmalt staatust — võib olla juba valmis
+    fetchWithTimeout(
+      `${FILE_API_URL}/admin/reocr/${savedJobId}/status?token=${authToken}`,
+      { timeout: 10000 }
+    ).then(res => res.json()).then(pd => {
+      if (pd.status === 'done') {
+        setReocrStatus('done');
+        setReocrText(pd.text ?? '');
+      } else if (pd.status === 'uploading' || pd.status === 'processing') {
+        startPollingFromSaved(savedJobId);
+      } else {
+        // not_found või error — töö aegus või ebaõnnestus
+        localStorage.removeItem(reocrStorageKey);
+      }
+    }).catch(() => {
+      // Ühenduse viga — eiramine (ei puhasta localStorage, proovime järgmine kord)
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authToken]);
+
   const handleReOcr = useCallback(async () => {
     if (!page.image_url || !authToken) return;
     const pageFilename = page.image_url.split('/').pop();
@@ -519,6 +583,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         throw new Error(d.detail || 'Re-OCR alustamine ebaõnnestus');
       }
       const { job_id } = await res.json();
+      if (reocrStorageKey) localStorage.setItem(reocrStorageKey, job_id);
       setReocrStatus('processing');
 
       const poll = async () => {
@@ -535,6 +600,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           } else if (pd.status === 'error') {
             setReocrStatus('error');
             setReocrError(pd.error || 'Tundmatu viga');
+            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
           } else {
             reocrPollRef.current = setTimeout(poll, 3000);
           }
@@ -559,16 +625,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         setIsDirty(true);
       }
     }
+    if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
     setReocrStatus('idle');
     setReocrText(null);
-  }, [reocrText]);
+  }, [reocrText, reocrStorageKey]);
 
   const dismissReOcr = useCallback(() => {
     if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
+    if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
     setReocrStatus('idle');
     setReocrText(null);
     setReocrError(null);
-  }, []);
+  }, [reocrStorageKey]);
 
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
@@ -729,6 +797,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                   ) : (
                     <>
                       <p className="px-4 pt-3 pb-1 text-xs text-gray-500 shrink-0">{t('editor.reocr.modalHint')}</p>
+                      <p className="px-4 pb-2 text-xs text-amber-600 shrink-0">{t('editor.reocr.ttlHint')}</p>
                       <div className="flex-1 overflow-auto px-4 pb-2">
                         <pre className="font-serif text-[15px] leading-[1.7] text-gray-800 whitespace-pre-wrap">{reocrText}</pre>
                       </div>
