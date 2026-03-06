@@ -396,22 +396,28 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       if (sFrom >= sTo) continue; // Tühi rida jääb vahele
 
       // NUTIKAS PESASTAMINE: Kui mähime stiili-tägiga (i, b, cs), siis 
-      // kontrollime, kas rida on juba struktuuri-tägi (m, hi, fn) sees.
+      // kontrollime, kas valiku piir on struktuuri-tägi (m, hi, fn) servas.
       // Kui jah, siis liigume stiili-tägiga struktuuri-tägi SISSE.
       if (mode === 'wrap' && ['i', 'b', 'cs'].includes(tag)) {
         let adjusted = true;
         while (adjusted) {
           adjusted = false;
-          // Kontrollime kõiki struktuuri-tage
           for (const sTag of ['m', 'hi', 'fn']) {
-            const container = findContainer(sTag, sFrom + 1, docText, line.from, line.to);
-            // Kui valiku piirid ühtivad täpselt struktuuri-tägi piiridega, siis nihutame sissepoole
-            if (container && container.open === sFrom && container.closeEnd === sTo) {
-              sFrom = container.openEnd;
-              sTo = container.close;
+            // Kontrollime nii sFrom kui sTo juurest, kas seal on struktuuri-tägi
+            const containerFrom = findContainer(sTag, sFrom + 1, docText, line.from, line.to);
+            const containerTo = findContainer(sTag, sTo - 1, docText, line.from, line.to);
+
+            // Kui valik algab struktuuri-tägiga, liigume sissepoole
+            if (containerFrom && containerFrom.open === sFrom) {
+              sFrom = containerFrom.openEnd;
               adjusted = true;
-              break;
             }
+            // Kui valik lõpeb struktuuri-tägiga, liigume sissepoole
+            if (containerTo && containerTo.closeEnd === sTo) {
+              sTo = containerTo.close;
+              adjusted = true;
+            }
+            if (adjusted) break;
           }
         }
       }
@@ -462,6 +468,23 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     if (e) e.preventDefault();
     insertAtCursor(char);
   }, [insertAtCursor]);
+
+  const cleanMarkup = useCallback(() => {
+    const view = viewRef.current;
+    if (!view || readOnly) return;
+    const { from, to } = view.state.selection.main;
+    if (from === to) return;
+
+    const selected = view.state.doc.sliceString(from, to);
+    // Eemaldab kõik XML tägid: <tag>, </tag>, <tag/>
+    const cleaned = selected.replace(/<\/?[a-z]+[^>]*>/g, '');
+
+    view.dispatch({
+      changes: { from, to, insert: cleaned },
+      selection: EditorSelection.range(from, from + cleaned.length)
+    });
+    view.focus();
+  }, [readOnly]);
 
   useEffect(() => {
     return () => {
@@ -633,6 +656,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
+                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                    <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title="Puhasta valik märgendusest">Puhasta</button>
+                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                   </div>
