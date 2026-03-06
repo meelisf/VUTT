@@ -56,9 +56,6 @@ def clean_text_for_search(text):
     if not text:
         return ""
 
-    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner" -> "spener")
-    text = re.sub(r'[-⸗¬]\s*\n\s*', '', text)
-
     # 1. Uus XML märgendus — eemalda kõik VUTT tägid
     # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
     text = re.sub(r'<fn>\d+</fn>', ' ', text)  # joonealuse viite marker
@@ -72,7 +69,11 @@ def clean_text_for_search(text):
     text = text.replace('--lk--', ' ')          # leheküljevahetus
     text = re.sub(r'\[\^\d+\]', ' ', text)      # joonealuse viite marker
 
-    # 3. Eemalda üleliigsed tühikud
+    # 3. Käitle reavahetuse poolituskriipse PÄRAST tägide eemaldamist
+    # (nt "<i>Sueco¬</i>\n<i>rum" -> pärast tägide eemaldust "Sueco¬\nrum" -> "Suecorum")
+    text = re.sub(r'[-⸗¬]\s*\n\s*', '', text)
+
+    # 4. Eemalda üleliigsed tühikud
     text = re.sub(r'\s+', ' ', text).strip()
 
     return text
