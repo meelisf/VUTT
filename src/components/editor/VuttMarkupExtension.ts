@@ -88,8 +88,8 @@ function buildMarkup(text: string): MarkupSets {
         const open = stack[openIdx];
         stack.splice(openIdx, 1);
 
-        // Peidame sulgeva tägi
-        decoRanges.push({ from, to, deco: Decoration.replace({}) });
+        // Peidame sulgeva tägi klassiga
+        decoRanges.push({ from, to, deco: Decoration.mark({ class: 'vutt-tag-hidden' }) });
         atomicRanges.push({ from, to, deco: atomicReplace });
 
         // Rakendame sisu stiili (nt kursiiv või marginalia taust)
@@ -112,8 +112,8 @@ function buildMarkup(text: string): MarkupSets {
           tagRegex.lastIndex = totalTo; // Hüppame üle sulgeva tägi
         }
       } else {
-        // Tavaline avav täg: peidame ja paneme pinu otsa
-        decoRanges.push({ from, to, deco: Decoration.replace({}) });
+        // Tavaline avav täg: peidame klassiga ja paneme pinu otsa
+        decoRanges.push({ from, to, deco: Decoration.mark({ class: 'vutt-tag-hidden' }) });
         atomicRanges.push({ from, to, deco: atomicReplace });
         stack.push({ tag: cleanTagName, from, openEnd: to });
       }

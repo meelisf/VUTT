@@ -59,6 +59,11 @@ body:has(.workspace-container) {
 
 /* --- VUTT XML märgenduse stailid (CM6 dekoraatoriextension) --- */
 
+/* Tägi peitmine (<i>, <b> jne) */
+.vutt-tag-hidden {
+  display: none;
+}
+
 /* <i>tekst</i> — kursiiv */
 .vutt-italic {
   font-style: italic;
