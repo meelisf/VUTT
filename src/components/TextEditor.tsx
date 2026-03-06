@@ -313,7 +313,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const wrapWithTag = useCallback((tag: string) => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
     const openTag = `<${tag}>`;
     const closeTag = `</${tag}>`;
     const docText = view.state.doc.toString();
@@ -341,6 +341,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
       view.focus();
       return;
+    }
+
+    // Valik olemas: puhastame valiku servad tühikutest/reavahetustest
+    while (to > from && /\s/.test(docText[to - 1])) {
+      to--;
+    }
+    while (from < to && /\s/.test(docText[from])) {
+      from++;
     }
 
     const containerFrom = findContainer(tag, from, docText);
@@ -398,7 +406,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         changes.push({ from: p.open, to: p.openEnd, insert: '' });
         changes.push({ from: p.close, to: p.closeEnd, insert: '' });
       }
-      changes.push({ from: to, to, insert: closeTag });
+      changes.push({ from: to, to: to, insert: closeTag });
       changes.sort((a, b) => a.from - b.from);
       const mapped = view.state.changes(changes);
       view.dispatch({
