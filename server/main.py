@@ -1078,8 +1078,13 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
     sorted_images = get_sorted_images(folder)
 
     if content == 'text':
+        import re
+        def _strip_tags(text: str) -> str:
+            """Eemaldab XML/HTML tagid tekstist."""
+            return re.sub(r'<[^>]+>', '', text)
+
         def _build_full_text() -> str:
-            """Koostab kokku liidetud tekstifaili sisu."""
+            """Koostab kokku liidetud tekstifaili sisu (tagideta)."""
             parts = [title]
             if author: parts.append(f'\n{author}')
             if year: parts.append(f', {year}')
@@ -1090,7 +1095,7 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
                 if os.path.exists(txt_path):
                     parts.append(f'---- lk {i} ----\n')
                     with open(txt_path, 'r', encoding='utf-8') as f:
-                        parts.append(f.read())
+                        parts.append(_strip_tags(f.read()))
                     parts.append('\n')
             return ''.join(parts)
             
