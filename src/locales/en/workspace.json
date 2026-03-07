@@ -101,7 +101,7 @@
       "restoring": "Restoring...",
       "restoreSuccess": "Page {{name}} restored",
       "restoreError": "Restore failed"
-    },
+    }
   },
   "metadata": {
     "title": "Metadata",

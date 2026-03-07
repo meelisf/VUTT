@@ -101,7 +101,7 @@
       "restoring": "Taastan...",
       "restoreSuccess": "Leht {{name}} taastatud",
       "restoreError": "Taastamine ebaõnnestus"
-    },
+    }
   },
   "metadata": {
     "title": "Metaandmed",
