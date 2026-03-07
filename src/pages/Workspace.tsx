@@ -97,10 +97,14 @@ const Workspace: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
+  // skipBlockerRef: tõese väärtuse korral ignoreerib blocker hasUnsavedChanges kontrolli
+  // (kasutatakse "Salvesta ja lahku" ajal — navigeerimiseks pärast salvestamist)
+  const skipBlockerRef = useRef(false);
+
   // React Router level blocker (internal navigation, back button)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
-      hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
+      !skipBlockerRef.current && hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
   );
 
   // Kontrolli kas blocker on aktiivne (kasutatakse modaali kuvamiseks)
@@ -354,29 +358,24 @@ const Workspace: React.FC = () => {
   };
 
   const handleSaveAndLeave = async () => {
-    // Salvesta navigatsiooni sihtpunkt enne blokkeri/modaali sulgemist
     const blockedLocation = blocker.state === 'blocked' ? blocker.location : null;
     const navCallback = pendingNavigation;
 
-    // Sulge modaal kohe (reset blocker, eemalda pendingNavigation)
     if (blocker.state === 'blocked') blocker.reset();
     setPendingNavigation(null);
 
-    // Salvesta
     if (editorSaveRef.current) {
-      try {
-        await editorSaveRef.current();
-      } catch {
-        // Salvestamine ebaõnnestus — alert on juba näidatud TextEditoris
-      }
+      try { await editorSaveRef.current(); } catch { /* alert on juba TextEditoris */ }
     }
 
-    // Navigeeri sihtpunkti
+    // Blocker bypass: navigeerimisel ei pea hasUnsavedChanges kontrollima
+    skipBlockerRef.current = true;
     if (blockedLocation) {
       navigate(blockedLocation.pathname + blockedLocation.search + blockedLocation.hash);
     } else if (navCallback) {
       navCallback();
     }
+    requestAnimationFrame(() => { skipBlockerRef.current = false; });
   };
 
   const handleCancelLeave = () => {
@@ -704,11 +703,9 @@ const Workspace: React.FC = () => {
         title={t('editor.unsavedChanges')}
         message={t('confirm.unsavedChangesPrompt')}
         confirmText={t('confirm.saveAndLeave')}
-        extraText={t('confirm.leaveWithoutSaving')}
-        cancelText={t('confirm.stayOnPage')}
+        cancelText={t('confirm.leaveWithoutSaving')}
         onConfirm={handleSaveAndLeave}
-        onExtra={handleConfirmLeave}
-        onCancel={handleCancelLeave}
+        onCancel={handleConfirmLeave}
         variant="warning"
       />
 

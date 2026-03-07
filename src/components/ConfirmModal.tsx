@@ -56,32 +56,30 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className={`px-6 py-4 bg-gray-50 flex gap-3 ${onExtra ? 'justify-between' : 'justify-end'}`}>
+        <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors whitespace-nowrap"
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
           >
             {resolvedCancelText}
           </button>
-          <div className="flex gap-3">
-            {onExtra && extraText && (
-              <button
-                type="button"
-                onClick={onExtra}
-                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors whitespace-nowrap"
-              >
-                {extraText}
-              </button>
-            )}
+          {onExtra && extraText && (
             <button
               type="button"
-              onClick={onConfirm}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${confirmButtonClass}`}
+              onClick={onExtra}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
             >
-              {resolvedConfirmText}
+              {extraText}
             </button>
-          </div>
+          )}
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${confirmButtonClass}`}
+          >
+            {resolvedConfirmText}
+          </button>
         </div>
       </div>
     </div>

@@ -193,10 +193,9 @@
   },
   "confirm": {
     "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
-    "unsavedChangesPrompt": "You have unsaved changes. Do you want to save before leaving?",
-    "saveAndLeave": "Save and leave",
-    "leaveWithoutSaving": "Leave without saving",
-    "stayOnPage": "Stay on page"
+    "unsavedChangesPrompt": "You have unsaved changes. Do you want to save?",
+    "saveAndLeave": "Yes, save",
+    "leaveWithoutSaving": "No, leave"
   },
   "pendingEdit": {
     "hasPending": "You have a pending edit for this page under review.",

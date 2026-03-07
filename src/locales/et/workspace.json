@@ -193,10 +193,9 @@
   },
   "confirm": {
     "unsavedChanges": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
-    "unsavedChangesPrompt": "Sul on salvestamata muudatusi. Kas soovid enne lahkumist salvestada?",
-    "saveAndLeave": "Salvesta ja lahku",
-    "leaveWithoutSaving": "Lahku ilma salvestamata",
-    "stayOnPage": "Jää lehele"
+    "unsavedChangesPrompt": "Sul on salvestamata muudatusi. Kas soovid salvestada?",
+    "saveAndLeave": "Jah, salvesta",
+    "leaveWithoutSaving": "Ei, lahku"
   },
   "pendingEdit": {
     "hasPending": "Sul on selle lehe kohta muudatus ülevaatusel.",
