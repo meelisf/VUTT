@@ -102,11 +102,6 @@
       "restoreSuccess": "Page {{name}} restored",
       "restoreError": "Restore failed"
     },
-    "pageStatus": {
-      "Valmis": "Done",
-      "Toores": "Raw",
-      "Kontrollitud": "Checked"
-    }
   },
   "metadata": {
     "title": "Metadata",

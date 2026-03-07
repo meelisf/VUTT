@@ -102,11 +102,6 @@
       "restoreSuccess": "Leht {{name}} taastatud",
       "restoreError": "Taastamine ebaõnnestus"
     },
-    "pageStatus": {
-      "Valmis": "Valmis",
-      "Toores": "Toores",
-      "Kontrollitud": "Kontrollitud"
-    }
   },
   "metadata": {
     "title": "Metaandmed",
