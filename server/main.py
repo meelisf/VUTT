@@ -1084,10 +1084,11 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
             if author: parts.append(f'\n{author}')
             if year: parts.append(f', {year}')
             parts.append('\n\n')
-            for img_fname in sorted_images:
+            for i, img_fname in enumerate(sorted_images, start=1):
                 base = os.path.splitext(img_fname)[0]
                 txt_path = os.path.join(folder, base + '.txt')
                 if os.path.exists(txt_path):
+                    parts.append(f'---- lk {i} ----\n')
                     with open(txt_path, 'r', encoding='utf-8') as f:
                         parts.append(f.read())
                     parts.append('\n')
