@@ -86,11 +86,12 @@ interface TextEditorProps {
   statusDirty?: boolean;
   currentStatus?: PageStatus | null;
   onStatusChange?: (status: PageStatus) => void;
+  triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const lang = i18n.language || 'et';
@@ -347,7 +348,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, status, page_tags, onSave]);
 
-  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+    if (triggerSave) triggerSave.current = handleSave;
+  }, [handleSave, triggerSave]);
 
   // --- Toolbar toimingud ---
   const wrapWithTag = useCallback((tag: string) => {

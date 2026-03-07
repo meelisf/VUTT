@@ -192,7 +192,11 @@
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
   },
   "confirm": {
-    "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?"
+    "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
+    "unsavedChangesPrompt": "You have unsaved changes. Do you want to save before leaving?",
+    "saveAndLeave": "Save and leave",
+    "leaveWithoutSaving": "Leave without saving",
+    "stayOnPage": "Stay on page"
   },
   "pendingEdit": {
     "hasPending": "You have a pending edit for this page under review.",

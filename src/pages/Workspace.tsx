@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
 import { getPage, savePage, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/pageService';
@@ -63,6 +63,7 @@ const Workspace: React.FC = () => {
 
   // Salvestamata muudatuste kinnitusdialoogi olek
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
+  const editorSaveRef = useRef<(() => Promise<void>) | null>(null);
 
   // Kasutaja menüü ja login modaali olek
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -352,6 +353,13 @@ const Workspace: React.FC = () => {
     }
   };
 
+  const handleSaveAndLeave = async () => {
+    if (editorSaveRef.current) {
+      await editorSaveRef.current();
+    }
+    handleConfirmLeave();
+  };
+
   const handleCancelLeave = () => {
     if (isBlockerActive) {
       blocker.reset();
@@ -632,6 +640,7 @@ const Workspace: React.FC = () => {
             statusDirty={statusDirty}
             currentStatus={currentStatus}
             onStatusChange={user && !isContributor ? setCurrentStatus : undefined}
+            triggerSave={editorSaveRef}
           />
           </div>
         </div>
@@ -674,8 +683,12 @@ const Workspace: React.FC = () => {
       <ConfirmModal
         isOpen={showLeaveConfirm}
         title={t('editor.unsavedChanges')}
-        message={t('confirm.unsavedChanges')}
-        onConfirm={handleConfirmLeave}
+        message={t('confirm.unsavedChangesPrompt')}
+        confirmText={t('confirm.saveAndLeave')}
+        extraText={t('confirm.leaveWithoutSaving')}
+        cancelText={t('confirm.stayOnPage')}
+        onConfirm={handleSaveAndLeave}
+        onExtra={handleConfirmLeave}
         onCancel={handleCancelLeave}
         variant="warning"
       />

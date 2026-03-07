@@ -8,8 +8,10 @@ interface ConfirmModalProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
+  extraText?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  onExtra?: () => void;
   variant?: 'warning' | 'danger';
 }
 
@@ -19,8 +21,10 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   message,
   confirmText,
   cancelText,
+  extraText,
   onConfirm,
   onCancel,
+  onExtra,
   variant = 'warning'
 }) => {
   const { t } = useTranslation('common');
@@ -60,6 +64,15 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           >
             {resolvedCancelText}
           </button>
+          {onExtra && extraText && (
+            <button
+              type="button"
+              onClick={onExtra}
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
+            >
+              {extraText}
+            </button>
+          )}
           <button
             type="button"
             onClick={onConfirm}
