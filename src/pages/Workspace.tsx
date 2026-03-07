@@ -354,22 +354,28 @@ const Workspace: React.FC = () => {
   };
 
   const handleSaveAndLeave = async () => {
-    // Salvesta viited enne salvestamist — pärast save'i muutub hasUnsavedChanges false
-    // ja blocker võib ennast automaatselt resettida
-    const wasBlockerActive = isBlockerActive;
-    const savedPendingNav = pendingNavigation;
+    // Salvesta navigatsiooni sihtpunkt enne blokkeri/modaali sulgemist
+    const blockedLocation = blocker.state === 'blocked' ? blocker.location : null;
+    const navCallback = pendingNavigation;
+
+    // Sulge modaal kohe (reset blocker, eemalda pendingNavigation)
+    if (blocker.state === 'blocked') blocker.reset();
+    setPendingNavigation(null);
+
+    // Salvesta
     if (editorSaveRef.current) {
       try {
         await editorSaveRef.current();
       } catch {
-        return; // Salvestamine ebaõnnestus — ära lahku
+        // Salvestamine ebaõnnestus — alert on juba näidatud TextEditoris
       }
     }
-    if (wasBlockerActive) {
-      blocker.proceed();
-    } else if (savedPendingNav) {
-      savedPendingNav();
-      setPendingNavigation(null);
+
+    // Navigeeri sihtpunkti
+    if (blockedLocation) {
+      navigate(blockedLocation.pathname + blockedLocation.search + blockedLocation.hash);
+    } else if (navCallback) {
+      navCallback();
     }
   };
 
