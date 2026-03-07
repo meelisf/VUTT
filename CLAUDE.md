@@ -250,6 +250,15 @@ SESSION_CLEANUP_INTERVAL = 300   # Sessioonide puhastuse intervall
 RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
 ```
 
+## Töövoog
+
+Suuremad muudatused ja featuurid planeeritakse ja jälgitakse **GitHub Issues** kaudu:
+```bash
+gh issue list                    # Vaata avatud issueid
+gh issue create --title "..."    # Loo uus issue
+gh issue view 1                  # Vaata issue detaile
+```
+
 ## TODO
 
 | Task | Priority |
