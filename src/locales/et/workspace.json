@@ -161,7 +161,7 @@
     "optionImages": "Pildid (.zip)",
     "optionImagesDesc": "Kõik skaneeringud ZIP-arhiivis",
     "optionBoth": "Tekst ja pildid (.zip)",
-    "optionBothDesc": "Tekstifail + skaneeringud ZIP-arhiivis"
+    "optionBothDesc": "Eraldi tekstifailid + skaneeringud ZIP-arhiivis"
   },
   "info": {
     "workInfo": "Teose info",

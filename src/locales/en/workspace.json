@@ -161,7 +161,7 @@
     "optionImages": "Images (.zip)",
     "optionImagesDesc": "All scans in a ZIP archive",
     "optionBoth": "Text and images (.zip)",
-    "optionBothDesc": "Text file + scans in a ZIP archive"
+    "optionBothDesc": "Individual text files + scans in a ZIP archive"
   },
   "info": {
     "workInfo": "Work info",
