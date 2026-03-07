@@ -157,7 +157,7 @@
     "title": "Lae alla",
     "button": "Lae alla",
     "optionText": "Kogu tekst (.txt)",
-    "optionTextDesc": "Kõik leheküljed ühes failis järjekorras",
+    "optionTextDesc": "Kõik leheküljed ühes failis järjekorras, ilma märgenduseta",
     "optionImages": "Pildid (.zip)",
     "optionImagesDesc": "Kõik skaneeringud ZIP-arhiivis",
     "optionBoth": "Tekst ja pildid (.zip)",

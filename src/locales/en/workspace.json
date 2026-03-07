@@ -157,7 +157,7 @@
     "title": "Download",
     "button": "Download",
     "optionText": "Full text (.txt)",
-    "optionTextDesc": "All pages in one file, in order",
+    "optionTextDesc": "All pages in one file, in order, without markup",
     "optionImages": "Images (.zip)",
     "optionImagesDesc": "All scans in a ZIP archive",
     "optionBoth": "Text and images (.zip)",
