@@ -4,18 +4,31 @@ Estonian early modern text transcription workbench (React/TypeScript SPA). UI: E
 
 ## Commands
 
+**NB: arendus toimub LOKAALSELT. Server on eraldi masin (`ssh vutt`). Ära eelda, et käsud töötavad serveris — vaata Deploy sektsiooni.**
+
 ```bash
+# Lokaalne arendus
 npm install && npm run dev    # Frontend dev (localhost:5173)
 npm run build                 # Production build to dist/
-./start_services.sh           # Start all backend services
+```
 
-# Individual services
-docker compose up meilisearch       # Port 7700
-python3 server/file_server.py       # Port 8002
-python3 server/image_server.py      # Port 8001
+### Deploy serverisse
 
-# Data sync
-python3 scripts/sync_meilisearch.py --apply  # Sync filesystem with Meilisearch
+```bash
+ssh vutt
+cd ~/VUTT
+
+./scripts/server_update.sh       # git pull + docker rebuild + restart (Python kood)
+./scripts/server_seed_data.sh    # Meilisearch indeksi uuendamine (kui andmed muutusid)
+
+# Manuaalselt backend logid vaatamiseks:
+docker logs vutt-backend
+docker compose ps
+```
+
+Frontend deploy (pärast `npm run build` lokaalses masinas):
+```bash
+rsync -avz dist/ vutt:~/VUTT/dist/
 ```
 
 ## Architecture
@@ -56,11 +69,13 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 | `src/services/collectionService.ts` | Collection helpers, color classes |
 | `src/contexts/CollectionContext.tsx` | Collection state (React Context) |
 | `src/components/EntityPicker.tsx` | Wikidata linked data picker |
-| `server/file_server.py` | Main HTTP server, all endpoints |
+| `server/main.py` | FastAPI backend, kõik endpointid |
+| `server/auth.py` | Autentimine, rollid, sessioonid |
 | `server/git_ops.py` | Git version control |
-| `server/meilisearch_ops.py` | Meilisearch sync, watcher |
+| `server/meilisearch_ops.py` | Meilisearch sync, ThreadPoolExecutor |
+| `server/cache.py` | Collections/people/suggestions cache (TTL 5 min) |
+| `server/upload_ops.py` | Upload wizard, OCR server integratsioon |
 | `state/` | users.json, collections.json, vocabularies.json |
-| `scripts/reconcile_authors.py` | WIP: Author → Wikidata/VIAF linking |
 
 ## Linked Data (Wikidata)
 
@@ -119,7 +134,10 @@ To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius
 
 ## Authentication
 
-- Roles: `editor` < `admin`
+- Roles: `contributor` < `editor` < `admin`
+  - `contributor`: muudatused lähevad ülevaatusele (pending edits)
+  - `editor`: saab otse salvestada, staatust muuta
+  - `admin`: täielik ligipääs, versiooni taastamine, kasutajate haldus
 - Token-based (UUID, 24h expiry)
 - localStorage: `vutt_user`, `vutt_token`
 
@@ -203,15 +221,15 @@ Files: `src/locales/{et,en}/*.json`
 
 Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
 
-**Async Meilisearch sync** (`file_server.py`)
-- `/save` ei blokeeru enam Meilisearch indekseerimist oodates
+**Async Meilisearch sync** (`meilisearch_ops.py`)
+- `/save` ei blokeeru Meilisearch indekseerimist oodates
 - `ThreadPoolExecutor` (max 10 töötajat) piirab samaagseid päringuid
 - Kasutaja saab vastuse kohe pärast Git commit'i (~100-500ms vs varem kuni 30s)
 
-**Cache'imine**
+**Cache'imine** (`server/cache.py`)
 - `users.json` - laetakse stardil, uuendatakse ainult muudatuste korral (`auth.py`)
-- `collections.json`, `vocabularies.json` - cache TTL 5 min (`file_server.py`)
-- `people.json` - loetakse üks kord sync'i alguses, mitte iga lehe kohta (`meilisearch_ops.py`)
+- `collections.json`, `vocabularies.json`, `people.json` - cache TTL 5 min
+- Suggestions cache TTL 5 min
 
 **Automaatne puhastus (daemon threads)**
 - Aegunud sessioonid - iga 5 min (`auth.py`)
@@ -219,8 +237,10 @@ Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
 
 **Konfigureeritavad konstandid:**
 ```python
-# file_server.py
+# meilisearch_ops.py
 MEILISEARCH_POOL_SIZE = 10      # Max samaagseid Meilisearch päringuid
+
+# server/cache.py
 CACHE_TTL_SECONDS = 300          # Collections/vocabularies cache TTL
 
 # auth.py
@@ -242,7 +262,7 @@ RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
 
 | Task | Millal vaja |
 |------|-------------|
-| Vaheta `http.server` → FastAPI/Flask + gunicorn | Kui Python GIL hakkab piirama (>500 kasutajat) |
+| FastAPI + gunicorn (praegu uvicorn single-worker) | Kui Python GIL hakkab piirama (>500 kasutajat) |
 | Lisa Redis sessioonide ja cache jaoks | Kui vaja mitut serveri instantsi (horisontaalne skaleerimine) |
 | Lisa metrics endpoint (Prometheus) | Kui vaja jälgida mälukasutust ja jõudlust tootmises |
 
@@ -281,6 +301,7 @@ Admin saab lisada uue teose PDF-i või pildina (`/upload`). Kolmeastmeline viisa
 - JSON files in git (txt + json same commit, _metadata.json tracked)
 - Metadata changes in Review page (yellow badge)
 - Search filters: type multi-select, facets preserve all options
-- File permissions fix (chmod 644 after writes)
 - Server performance optimizations (async Meilisearch, caching, cleanup threads)
 - Upload wizard: PDF + JPG/PNG, OCR server integration, pooleliolevate haldus
+- Backend migreeritud http.server → FastAPI (server/main.py), Docker deploy
+- CodeMirror 6 editor: XML tag hiding, atomicRanges, tag protection filter
