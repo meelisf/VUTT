@@ -327,6 +327,26 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, status, comments, page_tags, onSave]);
 
+  // Annotatsioonide kohene salvestus (möödub state async viivitusest)
+  const handleSaveAnnotations = useCallback(async (updatedComments: Annotation[]) => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
+    const text = viewRef.current?.state.doc.toString() ?? '';
+    const updatedPage: Page = { ...page, text_content: text, status, comments: updatedComments, page_tags };
+    try {
+      await onSave(updatedPage);
+      setSavedState({ status, comments: updatedComments, page_tags });
+      setIsDirty(false);
+    } catch (e: any) {
+      console.error('Save error:', e);
+      alert(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [page, status, page_tags, onSave]);
+
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
 
   // --- Toolbar toimingud ---
@@ -962,6 +982,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             setPageTags={setPageTags}
             comments={comments}
             setComments={setComments}
+            onSaveAnnotations={handleSaveAnnotations}
             readOnly={readOnly || false}
             user={user}
             authToken={authToken}

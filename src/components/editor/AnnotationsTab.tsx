@@ -21,6 +21,7 @@ interface AnnotationsTabProps {
   setPageTags: (tags: (string | any)[]) => void;
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
+  onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
   readOnly: boolean;
   user: any;
   authToken: string | null;
@@ -35,6 +36,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   setPageTags,
   comments,
   setComments,
+  onSaveAnnotations,
   readOnly,
   user,
   authToken,
@@ -145,11 +147,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     setEditingText(comment.text);
   };
 
-  const saveEditComment = (commentId: string) => {
+  const saveEditComment = async (commentId: string) => {
     if (!editingText.trim()) return;
-    setComments(comments.map(c => c.id === commentId ? { ...c, text: editingText } : c));
+    const updated = comments.map(c => c.id === commentId ? { ...c, text: editingText } : c);
+    setComments(updated);
     setEditingCommentId(null);
     setEditingText('');
+    if (onSaveAnnotations) await onSaveAnnotations(updated);
   };
 
   return (
@@ -548,8 +552,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <textarea
                     value={editingText}
                     onChange={(e) => setEditingText(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none"
-                    rows={4}
+                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
+                    rows={6}
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === 'Escape') { setEditingCommentId(null); setEditingText(''); }
