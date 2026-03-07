@@ -354,10 +354,23 @@ const Workspace: React.FC = () => {
   };
 
   const handleSaveAndLeave = async () => {
+    // Salvesta viited enne salvestamist — pärast save'i muutub hasUnsavedChanges false
+    // ja blocker võib ennast automaatselt resettida
+    const wasBlockerActive = isBlockerActive;
+    const savedPendingNav = pendingNavigation;
     if (editorSaveRef.current) {
-      await editorSaveRef.current();
+      try {
+        await editorSaveRef.current();
+      } catch {
+        return; // Salvestamine ebaõnnestus — ära lahku
+      }
     }
-    handleConfirmLeave();
+    if (wasBlockerActive) {
+      blocker.proceed();
+    } else if (savedPendingNav) {
+      savedPendingNav();
+      setPendingNavigation(null);
+    }
   };
 
   const handleCancelLeave = () => {

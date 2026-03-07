@@ -41,7 +41,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3">
           <div className="p-2 bg-amber-100 rounded-full">
@@ -56,11 +56,11 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+        <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3 flex-wrap">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
+            className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors whitespace-nowrap"
           >
             {resolvedCancelText}
           </button>
@@ -68,7 +68,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <button
               type="button"
               onClick={onExtra}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors"
+              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium transition-colors whitespace-nowrap"
             >
               {extraText}
             </button>
@@ -76,7 +76,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${confirmButtonClass}`}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${confirmButtonClass}`}
           >
             {resolvedConfirmText}
           </button>
