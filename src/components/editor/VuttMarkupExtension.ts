@@ -1,7 +1,7 @@
 // VuttMarkupExtension.ts — CM6 dekoraatoriextension VUTT XML märgenduse jaoks
 
 import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
-import { RangeSetBuilder, StateField } from '@codemirror/state';
+import { ChangeSet, EditorState, RangeSetBuilder, StateField, Transaction } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 
 // Widget <pb/> (leheküljevahetus) kuvamiseks
@@ -45,9 +45,15 @@ const VUTT_TAGS: TagDef[] = [
   { tag: 'pb', selfClose: true },
 ];
 
+interface TagRange {
+  from: number;
+  to: number;
+}
+
 interface MarkupSets {
   deco: DecorationSet;
   atomic: DecorationSet;
+  tagRanges: TagRange[]; // tägi positsioonid protection filteri jaoks
 }
 
 const atomicReplace = Decoration.replace({});
@@ -56,6 +62,7 @@ const atomicReplace = Decoration.replace({});
 function buildMarkup(text: string): MarkupSets {
   const decoRanges: { from: number; to: number; deco: Decoration }[] = [];
   const atomicRanges: { from: number; to: number; deco: Decoration }[] = [];
+  const tagRanges: TagRange[] = [];
 
   // Regulaaravaldis kõigi toetatud tägide leidmiseks
   const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
@@ -81,6 +88,7 @@ function buildMarkup(text: string): MarkupSets {
       const deco = Decoration.replace({ widget: widget || undefined });
       decoRanges.push({ from, to, deco });
       atomicRanges.push({ from, to, deco: atomicReplace });
+      tagRanges.push({ from, to });
     } else if (isClosing) {
       // Sulgev täg: leiame vastava avava tägi pinust
       const openIdx = stack.map(s => s.tag).lastIndexOf(cleanTagName);
@@ -91,6 +99,7 @@ function buildMarkup(text: string): MarkupSets {
         // Peidame sulgeva tägi (replace tähendab, et see ei võta ruumi)
         decoRanges.push({ from, to, deco: Decoration.replace({}) });
         atomicRanges.push({ from, to, deco: atomicReplace });
+        tagRanges.push({ from, to });
 
         // Rakendame sisu stiili (nt kursiiv või marginalia taust)
         if (tagDef.cls && open.openEnd < from) {
@@ -109,12 +118,14 @@ function buildMarkup(text: string): MarkupSets {
           const totalTo = closeIdx + closeTag.length;
           decoRanges.push({ from, to: totalTo, deco });
           atomicRanges.push({ from, to: totalTo, deco: atomicReplace });
+          tagRanges.push({ from, to: totalTo });
           tagRegex.lastIndex = totalTo; // Hüppame üle sulgeva tägi
         }
       } else {
         // Tavaline avav täg: peidame (replace) ja paneme pinu otsa
         decoRanges.push({ from, to, deco: Decoration.replace({}) });
         atomicRanges.push({ from, to, deco: atomicReplace });
+        tagRanges.push({ from, to });
         stack.push({ tag: cleanTagName, from, openEnd: to });
       }
     }
@@ -156,7 +167,7 @@ function buildMarkup(text: string): MarkupSets {
     } catch (e) {}
   }
 
-  return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish() };
+  return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish(), tagRanges };
 }
 
 export const vuttMarkupField = StateField.define<MarkupSets>({
@@ -173,6 +184,90 @@ export const vuttMarkupField = StateField.define<MarkupSets>({
   ]
 });
 
+// Transaction filter: kaitseb tägi positsioone kasutaja muudatuste eest.
+// Kui kustutamine või asendus kattub tägi positsiooniga, lõigatakse täg muudatusest välja.
+// Täid ei ole võimalik kogemata kustutada — ainult tägi sisestamiseks mõeldud toolbar-nupud toimivad.
+const vuttTagProtectionFilter = EditorState.transactionFilter.of(tr => {
+  // Ainult kasutaja käivitatud muudatused — programmaatilised (laadimine jms) jäetakse puutumata
+  if (!tr.docChanged || !tr.annotation(Transaction.userEvent)) return tr;
+
+  const { tagRanges } = tr.startState.field(vuttMarkupField);
+  if (tagRanges.length === 0) return tr;
+
+  // Kontrolli, kas mõni kustutamine kattub tägi positsiooniga
+  let needsAdjust = false;
+  tr.changes.iterChanges((fromA, toA) => {
+    if (needsAdjust || fromA >= toA) return;
+    for (const r of tagRanges) {
+      if (r.from < toA && r.to > fromA) { needsAdjust = true; break; }
+    }
+  });
+  if (!needsAdjust) return tr;
+
+  // Rekonstrueeri muudatused, hoides tägi positsioonid puutumata
+  const newSpecs: { from: number; to: number; insert: string }[] = [];
+
+  tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
+    const ins = inserted.toString();
+
+    if (fromA === toA) {
+      // Puhas sisestus — ära luba sisestada tägi sisse (kursorilt ei peaks see juhtuma,
+      // aga kaitseme igaks juhuks)
+      const insideTag = tagRanges.some(r => fromA > r.from && fromA < r.to);
+      if (!insideTag) newSpecs.push({ from: fromA, to: fromA, insert: ins });
+      return;
+    }
+
+    // Kustutamine (võimalik koos sisestusega) — leia kattuvad tägid
+    const overlapping = tagRanges
+      .filter(r => r.from < toA && r.to > fromA)
+      .sort((a, b) => a.from - b.from);
+
+    if (overlapping.length === 0) {
+      newSpecs.push({ from: fromA, to: toA, insert: ins });
+      return;
+    }
+
+    // Kogu nähtavad lõigud (tägide vahel ja ümber) mida on lubatud kustutada
+    const segments: { from: number; to: number }[] = [];
+    let pos = fromA;
+    for (const tag of overlapping) {
+      const segEnd = Math.min(tag.from, toA);
+      if (pos < segEnd) segments.push({ from: pos, to: segEnd });
+      pos = Math.max(pos, tag.to);
+    }
+    if (pos < toA) segments.push({ from: pos, to: toA });
+
+    if (segments.length === 0) {
+      // Kogu selekteeritud ala on tägid — ainult sisestus (tippimise asendus), kui on
+      if (ins) newSpecs.push({ from: fromA, to: fromA, insert: ins });
+    } else {
+      // Esimene nähtav lõik saab sisestuse (tippimise asenduse korral), ülejäänud kustutatakse
+      newSpecs.push({ from: segments[0].from, to: segments[0].to, insert: ins });
+      for (let i = 1; i < segments.length; i++) {
+        newSpecs.push({ from: segments[i].from, to: segments[i].to, insert: '' });
+      }
+    }
+  });
+
+  try {
+    const docLen = tr.startState.doc.length;
+    const newChanges = newSpecs.length > 0
+      ? ChangeSet.of(newSpecs, docLen)
+      : ChangeSet.empty(docLen);
+    const userEvent = tr.annotation(Transaction.userEvent);
+    return {
+      changes: newChanges,
+      ...(userEvent !== undefined && { annotations: Transaction.userEvent.of(userEvent) }),
+      scrollIntoView: tr.scrollIntoView,
+    };
+  } catch {
+    // Viga muudatuste rekonstrueerimisel — lase originaal läbi
+    return tr;
+  }
+});
+
 export const vuttMarkupExtension: Extension = [
-  vuttMarkupField
+  vuttMarkupField,
+  vuttTagProtectionFilter,
 ];
