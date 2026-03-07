@@ -130,6 +130,46 @@ To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius
 - First commit = original OCR (always restorable)
 - Admin can restore via "Ajalugu" tab in Workspace
 
+## CodeMirror Editor (VuttMarkupExtension)
+
+**File:** `src/components/editor/VuttMarkupExtension.ts`
+
+XML-tägide peitmise ja kaitse süsteem CodeMirror 6-s. Kaks komponenti:
+
+### 1. `vuttMarkupField` (StateField)
+
+Parsib dokumendi igal muutusel ja loob kolm andmestruktuuri:
+- **`deco`** — visuaalsed dekoratsioonid: tägid `Decoration.replace({})` (peidetud, ei võta ruumi), sisu `Decoration.mark({ class })` (kursiiv, marginalia jms)
+- **`atomic`** — `EditorView.atomicRanges`: kursor ei saa tägide sisse sattuda, hüppab üle tervikuna
+- **`tagRanges`** — tägide raw positsioonid `{from, to}[]`, kasutatakse protection filtris
+
+**Kriitilised reeglid `RangeSetBuilder` jaoks:**
+- `add()` nõuab rangeid **kasvavalt**: `from ASC`, sama `from` korral `to ASC` (mitte DESC!)
+- Kattuvad `replace` dekoratsioonid ei ole lubatud — filter: `if (isReplace && r.from < lastReplaceEnd) continue`
+- `mark` dekoratsioonid **võivad** `replace`-idega kattuda — ära blokeeri neid `lastReplaceEnd`-iga
+
+**Tägide tüübid:**
+```
+<i>, <b>, <cs>, <m>, <hi>  → replace (peida täg) + mark (sisu stiil)
+<pb/>                        → replace + PageBreakWidget
+<fn>1</fn>                   → kogu blokk ühe replace + FootnoteWidget
+```
+
+**Ristuvad tägid** (nt `<cs><i>tekst</cs></i>`) on toetatud — stack-põhine parser, `lastIndexOf` leiab lähima avava tägi.
+
+### 2. `vuttTagProtectionFilter` (transactionFilter)
+
+Kaitseb tägi positsioone kasutaja juhuslike kustutamiste eest.
+
+**Loogika:** kui kasutaja kustutamine (shift+del, ctrl+k jms) kattub tägi positsiooniga, lõigatakse täg muudatusest välja — kustutamine kehtib ainult nähtava teksti kohta.
+
+**Filtreeritakse:** ainult `Transaction.userEvent` annotatsiooniga tehingud (kasutaja input/delete). Programmaatilised muudatused (laadimine, toolbar-nupud) jäetakse puutumata.
+
+**EI TOHI muuta:**
+- `sortFn`: peab olema `to ASC` sama `from` korral (mitte `to DESC`)
+- `isReplace && r.from < lastReplaceEnd`: ainult replace'id blokeeritakse, mitte markid
+- Protection filter peab jääma `vuttMarkupExtension` listi viimaseks (pärast `vuttMarkupField`)
+
 ## i18n
 
 ```tsx
