@@ -18,12 +18,13 @@ import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { FILE_API_URL } from '../config';
 import { getLabel } from '../utils/metadataUtils';
+import { getLangCode } from '../utils/getLangCode';
 
 const Workspace: React.FC = () => {
   const { t, i18n } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
   const { collections } = useCollection();
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);

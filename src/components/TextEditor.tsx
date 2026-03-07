@@ -9,6 +9,7 @@ import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension } from './editor/VuttMarkupExtension';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getLangCode } from '../utils/getLangCode';
 import { FILE_API_URL } from '../config';
 
 // CM6 impordid
@@ -94,7 +95,7 @@ type TabType = 'edit' | 'annotate' | 'history';
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
-  const lang = i18n.language || 'et';
+  const lang = getLangCode(i18n.language);
   const [activeTab, setActiveTab] = useState<TabType>('edit');
 
   // Redaktori sisu muudatuste jälgimine

@@ -19,6 +19,7 @@ import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getLangCode } from '../utils/getLangCode';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const ITEMS_PER_PAGE = 12;
@@ -28,7 +29,7 @@ const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user, isLoading: userLoading } = useUser();
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
-  const lang = i18n.language.split('-')[0] as 'et' | 'en';
+  const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
@@ -90,7 +91,7 @@ const Dashboard: React.FC = () => {
     if (!showAboutModal || aboutHtml) return;
     const loadAbout = async () => {
       try {
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         const fileSuffix = lang === 'en' ? '_en' : '';
         const response = await fetchWithTimeout(`/about${fileSuffix}.html`, { timeout: 5000 });
         if (response.ok) {
@@ -180,7 +181,7 @@ const Dashboard: React.FC = () => {
   // Kasutatakse AdvancedFilters-is, et lahendada URL-i väärtus kuvamiseks
   const genreIdMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const obj = work.genre_object;
       if (!obj) continue;
@@ -214,7 +215,7 @@ const Dashboard: React.FC = () => {
   // Kaardistab KÕIK keelevariantid et mergeFacetItems ühendaks nt "Kõne"+"Oration" → Q861911
   const genreLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const obj = work.genre_object;
       if (!obj) continue;
@@ -239,7 +240,7 @@ const Dashboard: React.FC = () => {
   // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
   const tagsIdMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const objs = work.tags_object;
       if (!objs || !Array.isArray(objs)) continue;
@@ -267,7 +268,7 @@ const Dashboard: React.FC = () => {
   // Pöördkaart: kõik labelite variandid → Q-kood (facet merging + URL)
   const tagsLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const objs = work.tags_object;
       if (!objs || !Array.isArray(objs)) continue;
@@ -289,7 +290,7 @@ const Dashboard: React.FC = () => {
   // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (tüüp)
   const typeIdMap = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const obj = (work as any).type_object;
       if (!obj) continue;
@@ -318,7 +319,7 @@ const Dashboard: React.FC = () => {
   // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks, tüüp)
   const typeLabelToId = useMemo(() => {
     const map: Record<string, string> = {};
-    const lang = i18n.language.split('-')[0];
+    const lang = getLangCode(i18n.language);
     for (const work of works) {
       const obj = (work as any).type_object;
       if (!obj) continue;
@@ -485,7 +486,7 @@ const Dashboard: React.FC = () => {
           type: selectedType ? [selectedType] : undefined,
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
-          lang: i18n.language.split('-')[0]  // et-EE -> et
+          lang: getLangCode(i18n.language)
         });
         setWorks(result.works);
         setFacets(result.facets);
@@ -884,7 +885,7 @@ const Dashboard: React.FC = () => {
                 tagsLabelToId={tagsLabelToId}
                 typeIdMap={typeIdMap}
                 typeLabelToId={typeLabelToId}
-                lang={i18n.language.split('-')[0] as 'et' | 'en'}
+                lang={getLangCode(i18n.language)}
               />
             </div>
           </div>

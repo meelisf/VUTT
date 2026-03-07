@@ -25,6 +25,7 @@ import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getLangCode } from '../utils/getLangCode';
 
 // ---------------------------------------------------------------------------
 // Tüübid
@@ -201,7 +202,7 @@ const Upload: React.FC = () => {
   const { user, authToken, isLoading: authLoading } = useUser();
   const { collections } = useCollection();
   const navigate = useNavigate();
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
 
   // --- Samm ja upload olek ---
   const [step, setStep] = useState<1 | 2 | 3>(1);

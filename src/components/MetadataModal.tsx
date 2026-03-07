@@ -8,6 +8,7 @@ import { getLabel } from '../utils/metadataUtils';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getLangCode } from '../utils/getLangCode';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -141,7 +142,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   onSaveSuccess
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
 
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
   const [metaForm, setMetaForm] = useState<MetadataForm>({

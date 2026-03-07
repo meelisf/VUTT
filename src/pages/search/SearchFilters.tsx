@@ -4,6 +4,7 @@ import { Vocabularies } from '../../services/collectionService';
 import CollapsibleSection from '../../components/CollapsibleSection';
 import SearchableFilterList from './SearchableFilterList';
 import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText } from 'lucide-react';
+import { getLangCode } from '../../utils/getLangCode';
 
 interface WorkInfo {
     title: string;
@@ -84,7 +85,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 }) => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const authorInputRef = useRef<HTMLInputElement>(null);
-    const lang = i18n.language.split('-')[0] as 'et' | 'en';
+    const lang = getLangCode(i18n.language);
 
     // Ühendab erineva keele labelid ja Q-koodid üheks kirjeks (nagu AdvancedFilters)
     const mergeFacetItems = (

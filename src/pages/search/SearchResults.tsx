@@ -6,6 +6,7 @@ import { Vocabularies, getCollectionColorClasses } from '../../services/collecti
 import { searchWorkHits } from '../../services/searchService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getLabel } from '../../utils/metadataUtils';
+import { getLangCode } from '../../utils/getLangCode';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
@@ -115,7 +116,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
         const snippet = hit._formatted?.lehekylje_tekst || hit.lehekylje_tekst;
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         const tagsField = `page_tags_${lang}`;
         const formattedTags = (hit._formatted as any)?.[tagsField] || hit._formatted?.page_tags;
         const hasHighlightedTags = formattedTags?.some((tag: string) => tag.includes('<em'));
@@ -298,7 +299,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                 const isExpanded = expandedGroups.has(workId);
                                 const isLoadingHits = loadingWorkHits.has(workId);
                                 const loadedHits = workHits.get(workId);
-                                const lang = i18n.language.split('-')[0];
+                                const lang = getLangCode(i18n.language);
 
                                 return (
                                     <article key={workId} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">

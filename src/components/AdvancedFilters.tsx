@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
+import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 
@@ -163,7 +164,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   lang: propLang
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
-  const lang = propLang || (i18n.language.split('-')[0] as 'et' | 'en') || 'et';
+  const lang = propLang || getLangCode(i18n.language);
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   // Sõnavara state (tõlked)

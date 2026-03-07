@@ -8,6 +8,7 @@ import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets } from '../services/searchService';
 
 interface StatusCount {
@@ -25,7 +26,7 @@ const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
   const { selectedCollection, getCollectionName, collections } = useCollection();
   const navigate = useNavigate();
-  const lang = i18n.language.split('-')[0] as 'et' | 'en';
+  const lang = getLangCode(i18n.language);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link2, ChevronDown, ChevronUp, Check } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../services/collectionService';
+import { getLangCode } from '../utils/getLangCode';
 
 /**
  * DSpace-stiilis kollektsiooni infobänner Dashboardi kohal.
@@ -20,7 +21,7 @@ const CollectionInfoBanner: React.FC = () => {
   const collection = collections[selectedCollection];
   if (!collection) return null;
 
-  const lang = i18n.language.split('-')[0] as 'et' | 'en';
+  const lang = getLangCode(i18n.language);
   const colorClasses = getCollectionColorClasses(collection);
 
   // Hierarhia ID-de massiivina (nt ["universitas-dorpatensis-1", "academia-gustaviana"])

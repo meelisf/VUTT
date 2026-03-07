@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { Collection, buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
+import { getLangCode } from '../utils/getLangCode';
 
 interface CollectionPickerProps {
   // Variant 1: Headeris kasutatav (globaalne kontekst)
@@ -96,7 +97,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
 }) => {
   const { t, i18n } = useTranslation(['common']);
   const { selectedCollection, setSelectedCollection, collections } = useCollection();
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
 
   // Laiendatud sõlmed
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {

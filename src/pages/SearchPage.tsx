@@ -13,6 +13,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import SearchFilters from './search/SearchFilters';
 import SearchResults from './search/SearchResults';
 import { mergeFacetsWithExisting, mergeTagsWithExisting, mergeSelectedIntoFacets, mergeSelectedIntoTags } from './search/searchUtils';
+import { getLangCode } from '../utils/getLangCode';
 
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
@@ -83,7 +84,7 @@ const SearchPage: React.FC = () => {
                     teoseTagsParam.length > 0 || genreParam.length > 0 || typeParam.length > 0;
                 if (hasActiveContentFilters) return;
 
-                const facetLang = i18n.language.split('-')[0];
+                const facetLang = getLangCode(i18n.language);
                 const [tags, genres, types, authors] = await Promise.all([
                     getTeoseTagsFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
                     getGenreFacets(selectedCollection || undefined, facetLang, yearStartParam, yearEndParam),
@@ -120,7 +121,7 @@ const SearchPage: React.FC = () => {
     // Q-kood → praeguse keele label (žanrid)
     const genreIdMap = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const obj = (hit as any).genre_object;
@@ -142,7 +143,7 @@ const SearchPage: React.FC = () => {
     // Label → Q-kood (URL-i jaoks, žanrid)
     const genreLabelToId = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const obj = (hit as any).genre_object;
@@ -181,7 +182,7 @@ const SearchPage: React.FC = () => {
     // Q-kood → praeguse keele label (tüüp)
     const typeIdMap = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const obj = (hit as any).type_object;
@@ -203,7 +204,7 @@ const SearchPage: React.FC = () => {
     // Label → Q-kood (URL-i jaoks, tüüp)
     const typeLabelToId = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const obj = (hit as any).type_object;
@@ -248,7 +249,7 @@ const SearchPage: React.FC = () => {
     // Q-kood → praeguse keele label (märksõnad)
     const tagsIdMap = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const objs = (hit as any).tags_object;
@@ -269,7 +270,7 @@ const SearchPage: React.FC = () => {
     // Q-kood → praeguse keele label (lehekülje märksõnad, page_tags_object põhjal)
     const pageTagsIdMap = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const objs = (hit as any).page_tags_object;
@@ -293,7 +294,7 @@ const SearchPage: React.FC = () => {
     // Label → Q-kood (URL-i jaoks, märksõnad)
     const tagsLabelToId = useMemo(() => {
         const map: Record<string, string> = {};
-        const lang = i18n.language.split('-')[0];
+        const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
             const objs = (hit as any).tags_object;
@@ -360,7 +361,7 @@ const SearchPage: React.FC = () => {
                 type: typeParam.length > 0 ? typeParam : undefined,
                 author: authorParam || undefined,
                 collection: selectedCollection || undefined,
-                lang: i18n.language.split('-')[0]
+                lang: getLangCode(i18n.language)
             };
             performSearch(queryParam, pageParam, options);
         } else {

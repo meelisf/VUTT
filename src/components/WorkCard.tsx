@@ -7,6 +7,7 @@ import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
+import { getLangCode } from '../utils/getLangCode';
 
 interface WorkCardProps {
   work: Work;
@@ -63,7 +64,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
     ? work.tags_object 
     : (work.tags || []);
 
-  const lang = i18n.language || 'et';
+  const lang = getLangCode(i18n.language);
 
   // Autorite kuvamise loogika
   const renderAuthors = () => {

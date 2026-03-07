@@ -7,6 +7,7 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
+import { getLangCode } from '../utils/getLangCode';
 
 interface SuggestionItem {
   label: string;
@@ -27,7 +28,7 @@ const BulkGenrePicker: React.FC<BulkGenrePickerProps> = ({
   selectedCount
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
-  const lang = (i18n.language.split('-')[0] as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
 
   const [selectedGenre, setSelectedGenre] = useState<LinkedEntity | null>(null);
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);

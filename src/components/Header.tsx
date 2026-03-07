@@ -18,6 +18,7 @@ import CollectionPicker from './CollectionPicker';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
+import { getLangCode } from '../utils/getLangCode';
 
 interface HeaderProps {
   /** Kuva täistekstotsingu nupp (vaikimisi true) */
@@ -42,7 +43,7 @@ const Header: React.FC<HeaderProps> = ({
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
 
   return (
     <>

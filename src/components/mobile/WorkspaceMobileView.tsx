@@ -16,6 +16,7 @@ import { getEntityUrl } from '../../utils/entityUrl';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
+import { getLangCode } from '../../utils/getLangCode';
 
 interface WorkspaceMobileViewProps {
   page: Page;
@@ -52,7 +53,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   const { t, i18n } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
   const { collections, getCollectionPath } = useCollection();
-  const lang = (i18n.language as 'et' | 'en') || 'et';
+  const lang = getLangCode(i18n.language);
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
   const [copied, setCopied] = useState(false);
   const [isMobileGridView, setIsMobileGridView] = useState(false);
