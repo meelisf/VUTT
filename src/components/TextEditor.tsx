@@ -466,14 +466,30 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           changes.push({ from: container.close, to: container.closeEnd, insert: '' });
         }
       } else {
+        // Kui sFrom/sTo asub olemasoleva sama tägi sees, laienda piir tägi alguse/lõpuni
+        const startContainer = findContainer(tag, sFrom, docText, line.from, line.to);
+        if (startContainer && sFrom > startContainer.open) sFrom = startContainer.open;
+        const endContainer = findContainer(tag, sTo, docText, line.from, line.to);
+        if (endContainer && sTo < endContainer.closeEnd) sTo = endContainer.closeEnd;
+
         // WRAP: Eemaldame enne sisemised sama tüüpi tägid, et vältida dubleerimist
         const innerPairs = findInnerPairs(tag, sFrom, sTo, docText);
-        changes.push({ from: sFrom, to: sFrom, insert: openTag });
+        // Kui selektsioon algab/lõpeb täpselt olemasoleva tägi piiril, kasuta seda tägina
+        // (ära loo uut tägi samale positsioonile — tekitaks konflikti ja pesastuse)
+        const leadingPair = innerPairs.length > 0 && innerPairs[0].open === sFrom ? innerPairs[0] : null;
+        const trailingPair = innerPairs.length > 0 && innerPairs[innerPairs.length - 1].closeEnd === sTo ? innerPairs[innerPairs.length - 1] : null;
+        if (!leadingPair) changes.push({ from: sFrom, to: sFrom, insert: openTag });
         for (const p of innerPairs) {
-          changes.push({ from: p.open, to: p.openEnd, insert: '' });
-          changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+          if (p === leadingPair) {
+            changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+          } else if (p === trailingPair) {
+            changes.push({ from: p.open, to: p.openEnd, insert: '' });
+          } else {
+            changes.push({ from: p.open, to: p.openEnd, insert: '' });
+            changes.push({ from: p.close, to: p.closeEnd, insert: '' });
+          }
         }
-        changes.push({ from: sTo, to: sTo, insert: closeTag });
+        if (!trailingPair) changes.push({ from: sTo, to: sTo, insert: closeTag });
       }
     }
 
