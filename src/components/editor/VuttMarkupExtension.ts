@@ -120,10 +120,11 @@ function buildMarkup(text: string): MarkupSets {
     }
   }
 
-  // Sorteerimine CodeMirrori reeglite järgi: from ASC, to DESC
+  // Sorteerimine CodeMirrori reeglite järgi: from ASC, to ASC
+  // RangeSetBuilder nõuab, et sama from korral oleks to kasvav (mitte kahanev)
   const sortFn = (a: any, b: any) => {
     if (a.from !== b.from) return a.from - b.from;
-    return b.to - a.to;
+    return a.to - b.to;
   };
 
   decoRanges.sort(sortFn);
@@ -132,11 +133,11 @@ function buildMarkup(text: string): MarkupSets {
   const decoBuilder = new RangeSetBuilder<Decoration>();
   let lastReplaceEnd = -1;
   for (const r of decoRanges) {
-    // CodeMirroris ei tohi 'replace' dekoratsioonid (mis peidavad teksti) omavahel kattuda.
-    // Kuna me sorteerisime nad (from ASC, to DESC), siis saame lihtsalt kontrollida piire.
+    // CodeMirroris ei tohi 'replace' dekoratsioonid omavahel kattuda.
+    // 'mark' dekoratsioonid võivad replace'idega kattuda — CM6 näitab neid ainult nähtavas tekstis.
     const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || !r.deco.spec.class);
 
-    if (r.from < lastReplaceEnd) continue;
+    if (isReplace && r.from < lastReplaceEnd) continue;
     if (isReplace) lastReplaceEnd = r.to;
 
     try {
