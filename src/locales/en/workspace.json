@@ -181,7 +181,12 @@
     "addComment": "Add comment",
     "annotationPlaceholder": "Write a note here...",
     "commentPlaceholder": "Write here...",
-    "loginToComment": "Log in to add comments"
+    "loginToComment": "Log in to add comments",
+    "deleteCommentConfirm": "Are you sure you want to delete this note?",
+    "deleteComment": "Delete note",
+    "editComment": "Edit note",
+    "saveEdit": "Save",
+    "cancelEdit": "Cancel"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"

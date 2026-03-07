@@ -181,7 +181,12 @@
     "addComment": "Lisa kommentaar",
     "annotationPlaceholder": "Kirjuta märge siia...",
     "commentPlaceholder": "Kirjuta siia...",
-    "loginToComment": "Kommentaaride lisamiseks logi sisse"
+    "loginToComment": "Kommentaaride lisamiseks logi sisse",
+    "deleteCommentConfirm": "Kas oled kindel, et soovid selle märkme kustutada?",
+    "deleteComment": "Kustuta märge",
+    "editComment": "Muuda märget",
+    "saveEdit": "Salvesta",
+    "cancelEdit": "Tühista"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"

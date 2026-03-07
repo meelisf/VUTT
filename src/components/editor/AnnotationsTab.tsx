@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { getLabel } from '../../utils/metadataUtils';
@@ -46,6 +46,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const { collections, getCollectionName, getCollectionPath } = useCollection();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [newComment, setNewComment] = useState('');
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState('');
+
+  const isAdmin = user?.role === 'admin';
   
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
   const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
@@ -132,7 +136,20 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   };
 
   const removeComment = (commentId: string) => {
+    if (!window.confirm(t('info.deleteCommentConfirm'))) return;
     setComments(comments.filter(c => c.id !== commentId));
+  };
+
+  const startEditComment = (comment: Annotation) => {
+    setEditingCommentId(comment.id);
+    setEditingText(comment.text);
+  };
+
+  const saveEditComment = (commentId: string) => {
+    if (!editingText.trim()) return;
+    setComments(comments.map(c => c.id === commentId ? { ...c, text: editingText } : c));
+    setEditingCommentId(null);
+    setEditingText('');
   };
 
   return (
@@ -526,19 +543,64 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           )}
           {comments.map(comment => (
             <div key={comment.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative group">
-              <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5">{comment.text}</p>
-              <div className="flex justify-between items-center text-xs text-gray-500">
-                <span className="font-semibold text-primary-700">{comment.author}</span>
-                <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
-              </div>
-              {!readOnly && (
-                <button
-                  onClick={() => removeComment(comment.id)}
-                  className="absolute top-2 right-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white"
-                  title="Kustuta kommentaar"
-                >
-                  <Trash2 size={14} />
-                </button>
+              {editingCommentId === comment.id ? (
+                <div className="space-y-2">
+                  <textarea
+                    value={editingText}
+                    onChange={(e) => setEditingText(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none"
+                    rows={4}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') { setEditingCommentId(null); setEditingText(''); }
+                    }}
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setEditingCommentId(null); setEditingText(''); }}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                    >
+                      <X size={12} />
+                      {t('info.cancelEdit')}
+                    </button>
+                    <button
+                      onClick={() => saveEditComment(comment.id)}
+                      disabled={!editingText.trim()}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Check size={12} />
+                      {t('info.saveEdit')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 whitespace-pre-wrap">{comment.text}</p>
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                    <span className="font-semibold text-primary-700">{comment.author}</span>
+                    <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
+                  </div>
+                  {!readOnly && (
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {isAdmin && (
+                        <button
+                          onClick={() => startEditComment(comment)}
+                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                          title={t('info.editComment')}
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => removeComment(comment.id)}
+                        className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
+                        title={t('info.deleteComment')}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ))}
