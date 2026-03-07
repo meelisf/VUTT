@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
+import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
 import { Save, Loader2, ChevronRight, X, Settings2, Wand2, Superscript, SeparatorHorizontal } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
@@ -102,7 +103,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [isDirty, setIsDirty] = useState(false);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
-  const [page_tags, setPageTags] = useState<(string | any)[]>(page.page_tags || []);
+  const [page_tags, setPageTags] = useState<(string | LinkedEntity)[]>(page.page_tags || []);
   const [isSaving, setIsSaving] = useState(false);
 
   // Re-OCR state

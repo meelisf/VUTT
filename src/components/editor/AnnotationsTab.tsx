@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
+import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getAllTags } from '../../services/searchService';
@@ -17,8 +18,8 @@ import { getCollectionColorClasses, getCollectionHierarchy } from '../../service
 interface AnnotationsTabProps {
   work?: Work;
   page: Page;
-  page_tags: (string | any)[];
-  setPageTags: (tags: (string | any)[]) => void;
+  page_tags: (string | LinkedEntity)[];
+  setPageTags: (tags: (string | LinkedEntity)[]) => void;
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
   onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
@@ -54,7 +55,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const isAdmin = user?.role === 'admin';
   
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
-  const [tagSuggestions, setTagSuggestions] = useState<any[]>([]);
+  const [tagSuggestions, setTagSuggestions] = useState<{ label: string; id: string | null }[]>([]);
   // Meilisearchi märksõnad (kõik olemasolevad, koos ID-dega)
   const [allAvailableTags, setAllAvailableTags] = useState<{ label: string; id: string | null }[]>([]);
 
