@@ -1,7 +1,9 @@
 // VuttMarkupExtension.ts — CM6 dekoraatoriextension VUTT XML märgenduse jaoks
+// Tägid alati peidetud (Decoration.replace + atomicRanges).
+// Orv tägid eemaldatakse automaatselt pärast kasutaja muudatust (vuttAutoSanitizer).
 
-import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
-import { ChangeSet, EditorState, RangeSetBuilder, StateField, Transaction } from '@codemirror/state';
+import { Decoration, DecorationSet, EditorView, WidgetType, keymap } from '@codemirror/view';
+import { Annotation, RangeSetBuilder, StateField, Transaction } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 
 // Widget <pb/> (leheküljevahetus) kuvamiseks
@@ -45,7 +47,7 @@ const VUTT_TAGS: TagDef[] = [
   { tag: 'pb', selfClose: true },
 ];
 
-interface TagRange {
+export interface TagRange {
   from: number;
   to: number;
 }
@@ -53,18 +55,58 @@ interface TagRange {
 interface MarkupSets {
   deco: DecorationSet;
   atomic: DecorationSet;
-  tagRanges: TagRange[]; // tägi positsioonid protection filteri jaoks
+  tagRanges: TagRange[]; // kõik tägi positsioonid (cleanMarkup valiku laiendamiseks)
 }
 
-const atomicReplace = Decoration.replace({});
+const atomicMark = Decoration.mark({});
 
-// Arvutab korraga nii visuaalsed dekoratsioonid kui ka aatomilised vahemikud
+// Leiab orvud (paarita) tägid dokumendis. Teksti ennast ei muuda.
+export function findOrphanTags(text: string): TagRange[] {
+  const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
+  const allTags: { from: number; to: number; tagName: string; isClose: boolean; isSelf: boolean }[] = [];
+  let m;
+
+  while ((m = tagRegex.exec(text)) !== null) {
+    const rawName = m[1];
+    const isClose = rawName.startsWith('/');
+    const cleanName = isClose ? rawName.slice(1) : rawName;
+    const isSelf = m[3] === '/' || cleanName === 'pb';
+    if (!VUTT_TAGS.find(t => t.tag === cleanName)) continue;
+    allTags.push({ from: m.index, to: m.index + m[0].length, tagName: cleanName, isClose, isSelf });
+  }
+
+  const orphans: TagRange[] = [];
+  const tagNames = [...new Set(allTags.filter(t => !t.isSelf).map(t => t.tagName))];
+
+  for (const name of tagNames) {
+    const tags = allTags.filter(t => t.tagName === name);
+    const stack: typeof allTags = [];
+    const unmatched: typeof allTags = [];
+
+    for (const t of tags) {
+      if (!t.isClose) {
+        stack.push(t);
+      } else {
+        if (stack.length > 0) {
+          stack.pop(); // sobiv paar leitud
+        } else {
+          unmatched.push(t); // orv sulge täg
+        }
+      }
+    }
+    for (const t of stack) unmatched.push(t); // orv avav täg
+    for (const t of unmatched) orphans.push({ from: t.from, to: t.to });
+  }
+
+  return orphans;
+}
+
+// Arvutab dekoratsioonid, atomicRanges ja tagRanges.
 function buildMarkup(text: string): MarkupSets {
-  const decoRanges: { from: number; to: number; deco: Decoration }[] = [];
-  const atomicRanges: { from: number; to: number; deco: Decoration }[] = [];
+  const decoRanges: { from: number; to: number; deco: Decoration; isReplace: boolean }[] = [];
+  const atomicRanges: { from: number; to: number }[] = [];
   const tagRanges: TagRange[] = [];
 
-  // Regulaaravaldis kõigi toetatud tägide leidmiseks
   const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
   let m;
   const stack: { tag: string; from: number; openEnd: number }[] = [];
@@ -83,48 +125,49 @@ function buildMarkup(text: string): MarkupSets {
     const to = from + fullTag.length;
 
     if (isSelfClosing || tagDef.selfClose) {
-      // Leheküljevahetus või muu isesulguv täg
       const widget = cleanTagName === 'pb' ? new PageBreakWidget() : null;
-      const deco = Decoration.replace({ widget: widget || undefined });
-      decoRanges.push({ from, to, deco });
-      atomicRanges.push({ from, to, deco: atomicReplace });
+      const deco = Decoration.replace({ widget: widget || undefined, atomic: true });
+      decoRanges.push({ from, to, deco, isReplace: true });
+      atomicRanges.push({ from, to });
       tagRanges.push({ from, to });
     } else if (isClosing) {
-      // Sulgev täg: leiame vastava avava tägi pinust
       const openIdx = stack.map(s => s.tag).lastIndexOf(cleanTagName);
       if (openIdx !== -1) {
         const open = stack[openIdx];
         stack.splice(openIdx, 1);
 
-        // Peidame sulgeva tägi (replace tähendab, et see ei võta ruumi)
-        decoRanges.push({ from, to, deco: Decoration.replace({}) });
-        atomicRanges.push({ from, to, deco: atomicReplace });
+        decoRanges.push({ from, to, deco: Decoration.replace({ atomic: true }), isReplace: true });
+        atomicRanges.push({ from, to });
         tagRanges.push({ from, to });
 
-        // Rakendame sisu stiili (nt kursiiv või marginalia taust)
+        // Sisu stiilmark (vutt-italic jne) — võib replace-idega kattuda
         if (tagDef.cls && open.openEnd < from) {
-          decoRanges.push({ from: open.openEnd, to: from, deco: Decoration.mark({ class: tagDef.cls }) });
+          decoRanges.push({
+            from: open.openEnd,
+            to: from,
+            deco: Decoration.mark({ class: tagDef.cls }),
+            isReplace: false,
+          });
         }
       }
     } else {
       // Avav täg
       if (tagDef.useWidget) {
-        // Erijuht: <fn>1</fn> - asendame kogu bloki vidinaga
+        // <fn>n</fn>: kogu blokk ühe replace + FootnoteWidget
         const closeTag = `</${cleanTagName}>`;
         const closeIdx = text.indexOf(closeTag, to);
         if (closeIdx !== -1) {
-          const num = text.slice(to, closeIdx);
-          const deco = Decoration.replace({ widget: new FootnoteWidget(num) });
           const totalTo = closeIdx + closeTag.length;
-          decoRanges.push({ from, to: totalTo, deco });
-          atomicRanges.push({ from, to: totalTo, deco: atomicReplace });
+          const num = text.slice(to, closeIdx);
+          const deco = Decoration.replace({ widget: new FootnoteWidget(num), atomic: true });
+          decoRanges.push({ from, to: totalTo, deco, isReplace: true });
+          atomicRanges.push({ from, to: totalTo });
           tagRanges.push({ from, to: totalTo });
-          tagRegex.lastIndex = totalTo; // Hüppame üle sulgeva tägi
+          tagRegex.lastIndex = totalTo;
         }
       } else {
-        // Tavaline avav täg: peidame (replace) ja paneme pinu otsa
-        decoRanges.push({ from, to, deco: Decoration.replace({}) });
-        atomicRanges.push({ from, to, deco: atomicReplace });
+        decoRanges.push({ from, to, deco: Decoration.replace({ atomic: true }), isReplace: true });
+        atomicRanges.push({ from, to });
         tagRanges.push({ from, to });
         stack.push({ tag: cleanTagName, from, openEnd: to });
       }
@@ -132,39 +175,36 @@ function buildMarkup(text: string): MarkupSets {
   }
 
   // Sorteerimine CodeMirrori reeglite järgi: from ASC, to ASC
-  // RangeSetBuilder nõuab, et sama from korral oleks to kasvav (mitte kahanev)
-  const sortFn = (a: any, b: any) => {
+  const sortFn = (a: { from: number; to: number }, b: { from: number; to: number }) => {
     if (a.from !== b.from) return a.from - b.from;
     return a.to - b.to;
   };
-
   decoRanges.sort(sortFn);
   atomicRanges.sort(sortFn);
 
+  // Replace-dekoratsioonid ei tohi kattuda. Mark-dekoratsioonid (sisu stiilid) võivad.
   const decoBuilder = new RangeSetBuilder<Decoration>();
   let lastReplaceEnd = -1;
   for (const r of decoRanges) {
-    // CodeMirroris ei tohi 'replace' dekoratsioonid omavahel kattuda.
-    // 'mark' dekoratsioonid võivad replace'idega kattuda — CM6 näitab neid ainult nähtavas tekstis.
-    const isReplace = !!(r.deco.spec.widget || r.deco.spec.replaceWith || !r.deco.spec.class);
+    if (r.isReplace && r.from < lastReplaceEnd) continue;
+    if (r.isReplace) lastReplaceEnd = r.to;
+    decoBuilder.add(r.from, r.to, r.deco);
+  }
 
-    if (isReplace && r.from < lastReplaceEnd) continue;
-    if (isReplace) lastReplaceEnd = r.to;
-
-    try {
-      decoBuilder.add(r.from, r.to, r.deco);
-    } catch (e) {
-      // Ignoreeri vead, mis tekivad ebakorrektse XML-i puhul
+  // Ühendame külgnevad atomilised vahemikud: <i><b> → üks hüpe, mitte kaks
+  const mergedAtomic: { from: number; to: number }[] = [];
+  for (const r of atomicRanges) {
+    const last = mergedAtomic[mergedAtomic.length - 1];
+    if (last && r.from <= last.to) {
+      last.to = Math.max(last.to, r.to);
+    } else {
+      mergedAtomic.push({ from: r.from, to: r.to });
     }
   }
+
   const atomicBuilder = new RangeSetBuilder<Decoration>();
-  let lastAtomicEnd = -1;
-  for (const r of atomicRanges) {
-    if (r.from < lastAtomicEnd) continue;
-    lastAtomicEnd = r.to;
-    try {
-      atomicBuilder.add(r.from, r.to, r.deco);
-    } catch (e) {}
+  for (const r of mergedAtomic) {
+    atomicBuilder.add(r.from, r.to, atomicMark);
   }
 
   return { deco: decoBuilder.finish(), atomic: atomicBuilder.finish(), tagRanges };
@@ -176,98 +216,88 @@ export const vuttMarkupField = StateField.define<MarkupSets>({
   },
   update(value, tr) {
     if (!tr.docChanged) return value;
-    return buildMarkup(tr.newDoc.toString());
+    return buildMarkup(tr.state.doc.toString());
   },
   provide: f => [
     EditorView.decorations.from(f, val => val.deco),
-    EditorView.atomicRanges.from(f, val => () => val.atomic)
-  ]
+    EditorView.atomicRanges.from(f, val => val.atomic),
+  ],
 });
 
-// Transaction filter: kaitseb tägi positsioone kasutaja muudatuste eest.
-// Kui kustutamine või asendus kattub tägi positsiooniga, lõigatakse täg muudatusest välja.
-// Täid ei ole võimalik kogemata kustutada — ainult tägi sisestamiseks mõeldud toolbar-nupud toimivad.
-const vuttTagProtectionFilter = EditorState.transactionFilter.of(tr => {
-  // Ainult kasutaja käivitatud muudatused — programmaatilised (laadimine jms) jäetakse puutumata
-  if (!tr.docChanged || !tr.annotation(Transaction.userEvent)) return tr;
+// Märgendus, mis tähistab sanitiseerimis-tehingut — väldib rekursiooni
+const SANITIZE = Annotation.define<true>();
 
-  const { tagRanges } = tr.startState.field(vuttMarkupField);
-  if (tagRanges.length === 0) return tr;
+// Peale iga kasutaja muudatuse: leia orvud tägid ja eemalda need automaatselt.
+// Teksti ennast ei muudeta kunagi — eemaldatakse ainult paarita tägid.
+const vuttAutoSanitizer = EditorView.updateListener.of(update => {
+  if (!update.docChanged) return;
+  const hasUserEvent = update.transactions.some(tr => tr.annotation(Transaction.userEvent) !== undefined);
+  if (!hasUserEvent) return;
+  const alreadySanitized = update.transactions.some(tr => tr.annotation(SANITIZE));
+  if (alreadySanitized) return;
 
-  // Kontrolli, kas mõni kustutamine kattub tägi positsiooniga
-  let needsAdjust = false;
-  tr.changes.iterChanges((fromA, toA) => {
-    if (needsAdjust || fromA >= toA) return;
-    for (const r of tagRanges) {
-      if (r.from < toA && r.to > fromA) { needsAdjust = true; break; }
-    }
+  const text = update.state.doc.toString();
+  const orphans = findOrphanTags(text);
+  if (orphans.length === 0) return;
+
+  const changes = orphans
+    .sort((a, b) => b.from - a.from) // tagantpoolt, et positsioonid ei nihkuks
+    .map(o => ({ from: o.from, to: o.to, insert: '' }));
+
+  update.view.dispatch({
+    changes,
+    annotations: [SANITIZE.of(true), Transaction.userEvent.of('input.format')],
   });
-  if (!needsAdjust) return tr;
+});
 
-  // Rekonstrueeri muudatused, hoides tägi positsioonid puutumata
-  const newSpecs: { from: number; to: number; insert: string }[] = [];
-
-  tr.changes.iterChanges((fromA, toA, _fromB, _toB, inserted) => {
-    const ins = inserted.toString();
-
-    if (fromA === toA) {
-      // Puhas sisestus — ära luba sisestada tägi sisse (kursorilt ei peaks see juhtuma,
-      // aga kaitseme igaks juhuks)
-      const insideTag = tagRanges.some(r => fromA > r.from && fromA < r.to);
-      if (!insideTag) newSpecs.push({ from: fromA, to: fromA, insert: ins });
-      return;
-    }
-
-    // Kustutamine (võimalik koos sisestusega) — leia kattuvad tägid
-    const overlapping = tagRanges
-      .filter(r => r.from < toA && r.to > fromA)
-      .sort((a, b) => a.from - b.from);
-
-    if (overlapping.length === 0) {
-      newSpecs.push({ from: fromA, to: toA, insert: ins });
-      return;
-    }
-
-    // Kogu nähtavad lõigud (tägide vahel ja ümber) mida on lubatud kustutada
-    const segments: { from: number; to: number }[] = [];
-    let pos = fromA;
-    for (const tag of overlapping) {
-      const segEnd = Math.min(tag.from, toA);
-      if (pos < segEnd) segments.push({ from: pos, to: segEnd });
-      pos = Math.max(pos, tag.to);
-    }
-    if (pos < toA) segments.push({ from: pos, to: toA });
-
-    if (segments.length === 0) {
-      // Kogu selekteeritud ala on tägid — ainult sisestus (tippimise asendus), kui on
-      if (ins) newSpecs.push({ from: fromA, to: fromA, insert: ins });
-    } else {
-      // Esimene nähtav lõik saab sisestuse (tippimise asenduse korral), ülejäänud kustutatakse
-      newSpecs.push({ from: segments[0].from, to: segments[0].to, insert: ins });
-      for (let i = 1; i < segments.length; i++) {
-        newSpecs.push({ from: segments[i].from, to: segments[i].to, insert: '' });
+// Nooleklahvide keymap: hüppab üle kõigi järjestikuste tägide ühe vajutusega.
+// Lahendab CM6 atomicRanges piirangu — kursor võib peatuda range alguspiiril.
+const vuttArrowKeymap = keymap.of([
+  {
+    key: 'ArrowRight',
+    run: (view) => {
+      const { main } = view.state.selection;
+      if (!main.empty) return false;
+      const { tagRanges } = view.state.field(vuttMarkupField);
+      let pos = main.head;
+      let moved = false;
+      // Korda kuni enam tägipiiril ei ole (lahendab <m><i> → üks hüpe)
+      let found = true;
+      while (found) {
+        found = false;
+        for (const r of tagRanges) {
+          if (r.from === pos) { pos = r.to; moved = true; found = true; break; }
+        }
       }
-    }
-  });
-
-  try {
-    const docLen = tr.startState.doc.length;
-    const newChanges = newSpecs.length > 0
-      ? ChangeSet.of(newSpecs, docLen)
-      : ChangeSet.empty(docLen);
-    const userEvent = tr.annotation(Transaction.userEvent);
-    return {
-      changes: newChanges,
-      ...(userEvent !== undefined && { annotations: Transaction.userEvent.of(userEvent) }),
-      scrollIntoView: tr.scrollIntoView,
-    };
-  } catch {
-    // Viga muudatuste rekonstrueerimisel — lase originaal läbi
-    return tr;
-  }
-});
+      if (!moved) return false;
+      view.dispatch({ selection: { anchor: pos, head: pos }, scrollIntoView: true });
+      return true;
+    },
+  },
+  {
+    key: 'ArrowLeft',
+    run: (view) => {
+      const { main } = view.state.selection;
+      if (!main.empty) return false;
+      const { tagRanges } = view.state.field(vuttMarkupField);
+      let pos = main.head;
+      let moved = false;
+      let found = true;
+      while (found) {
+        found = false;
+        for (const r of tagRanges) {
+          if (r.to === pos) { pos = r.from; moved = true; found = true; break; }
+        }
+      }
+      if (!moved) return false;
+      view.dispatch({ selection: { anchor: pos, head: pos }, scrollIntoView: true });
+      return true;
+    },
+  },
+]);
 
 export const vuttMarkupExtension: Extension = [
   vuttMarkupField,
-  vuttTagProtectionFilter,
+  vuttAutoSanitizer,
+  vuttArrowKeymap,
 ];

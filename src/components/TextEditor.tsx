@@ -7,7 +7,7 @@ import { Save, Loader2, ChevronRight, X, Settings2, Wand2, Superscript, Separato
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
-import { vuttMarkupExtension } from './editor/VuttMarkupExtension';
+import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -526,16 +526,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const cleanMarkup = useCallback(() => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    const { from, to } = view.state.selection.main;
+    let { from, to } = view.state.selection.main;
     if (from === to) return;
 
+    // Laienda valikut, et hõlmata kõik osaliselt kattuvad tägid
+    // (mouse-valik võib lõppeda tägi sees → ilma laienduseta jääb poolik täg alles)
+    const { tagRanges } = view.state.field(vuttMarkupField);
+    for (const r of tagRanges) {
+      if (r.from < to && r.to > from) {
+        from = Math.min(from, r.from);
+        to = Math.max(to, r.to);
+      }
+    }
+
     const selected = view.state.doc.sliceString(from, to);
-    // Eemaldab kõik XML tägid: <tag>, </tag>, <tag/>
-    const cleaned = selected.replace(/<\/?[a-z]+[^>]*>/g, '');
+    // Eemalda kõik VUTT tägid täpse nimeloendi järgi
+    const cleaned = selected.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
 
     view.dispatch({
       changes: { from, to, insert: cleaned },
-      selection: EditorSelection.range(from, from + cleaned.length)
+      selection: EditorSelection.range(from, from + cleaned.length),
+      annotations: Transaction.userEvent.of('input.format'),
     });
     view.focus();
   }, [readOnly]);
