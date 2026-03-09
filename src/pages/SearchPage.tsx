@@ -37,8 +37,8 @@ const SearchPage: React.FC = () => {
 
     // Filter state — lokaalkoopiad URL parameetritest (muutuvad enne "Otsi" vajutust)
     const [inputValue, setInputValue] = useState(queryParam);
-    const [yearStart, setYearStart] = useState<string>(yearStartParam?.toString() || '1630');
-    const [yearEnd, setYearEnd] = useState<string>(yearEndParam?.toString() || '1710');
+    const [yearStart, setYearStart] = useState<string>(yearStartParam?.toString() || '');
+    const [yearEnd, setYearEnd] = useState<string>(yearEndParam?.toString() || '');
     const [selectedScope, setSelectedScope] = useState<'all' | 'original' | 'annotation'>(scopeParam);
     const [selectedWork, setSelectedWork] = useState<string>(workIdParam);
     const [selectedWorkInfo, setSelectedWorkInfo] = useState<{ title: string; year?: string | number; author?: string } | null>(null);
@@ -417,7 +417,7 @@ const SearchPage: React.FC = () => {
 
     const handleSearch = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
-        const hasFilters = (yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ||
+        const hasFilters = yearStart || yearEnd ||
             selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
             selectedPageTags.length > 0 || selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
 
@@ -443,7 +443,7 @@ const SearchPage: React.FC = () => {
     };
 
     const handleClearFilters = () => {
-        setYearStart('1630'); setYearEnd('1710'); setSelectedScope('all');
+        setYearStart(''); setYearEnd(''); setSelectedScope('all');
         setSelectedWork(''); setSelectedWorkInfo(null);
         setSelectedTeoseTags([]); setSelectedPageTags([]); setSelectedGenres([]); setSelectedTypes([]);
         setSelectedAuthor(''); setAuthorInput('');
@@ -560,11 +560,11 @@ const SearchPage: React.FC = () => {
                                 {(yearStartParam !== undefined || yearEndParam !== undefined) && (
                                     <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium border border-slate-200">
                                         <Calendar size={11} />
-                                        <span>{yearStartParam ?? 1630}–{yearEndParam ?? 1710}</span>
+                                        <span>{yearStartParam ?? ''}–{yearEndParam ?? ''}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setYearStart('1630'); setYearEnd('1710');
+                                                setYearStart(''); setYearEnd('');
                                                 setSearchParams(prev => { prev.delete('ys'); prev.delete('ye'); prev.set('p', '1'); return prev; });
                                             }}
                                             className="ml-0.5 hover:bg-slate-200 rounded-full p-0.5"

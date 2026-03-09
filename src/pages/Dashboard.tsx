@@ -57,8 +57,8 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Year filter state
-  const [yearStart, setYearStart] = useState<string>(yearStartParam || '1630');
-  const [yearEnd, setYearEnd] = useState<string>(yearEndParam || '1710');
+  const [yearStart, setYearStart] = useState<string>(yearStartParam || '');
+  const [yearEnd, setYearEnd] = useState<string>(yearEndParam || '');
   const [sort, setSort] = useState<string>(sortParam);
 
   // Täpsemad filtrid (AdvancedFilters komponent)
@@ -374,26 +374,15 @@ const Dashboard: React.FC = () => {
         resetPage = true; // Otsingu muutmisel lähtesta leht
       }
 
-      // Only sync year if it's different from default OR if it was already in params
-      // This prevents cluttering URL with defaults on initial load unless user explicitly set them
-      const defaultStart = '1630';
-      const defaultEnd = '1710';
-
-      if (yearStart !== (yearStartParam || defaultStart)) {
-        newParams.set('ys', yearStart);
+      // Aastafiltrit rakendatakse ainult kui kasutaja on midagi sisestanud
+      const prevYearStart = yearStartParam || '';
+      const prevYearEnd = yearEndParam || '';
+      if (yearStart !== prevYearStart || yearEnd !== prevYearEnd) {
         changed = true;
-        resetPage = true; // Aasta muutmisel lähtesta leht
-      } else if (yearStart !== defaultStart || yearStartParam) {
-        newParams.set('ys', yearStart);
+        resetPage = true;
       }
-
-      if (yearEnd !== (yearEndParam || defaultEnd)) {
-        newParams.set('ye', yearEnd);
-        changed = true;
-        resetPage = true; // Aasta muutmisel lähtesta leht
-      } else if (yearEnd !== defaultEnd || yearEndParam) {
-        newParams.set('ye', yearEnd);
-      }
+      if (yearStart) newParams.set('ys', yearStart); else newParams.delete('ys');
+      if (yearEnd) newParams.set('ye', yearEnd); else newParams.delete('ye');
 
       if (sort !== sortParam) {
         newParams.set('sort', sort);
@@ -828,12 +817,12 @@ const Dashboard: React.FC = () => {
                 )}
 
                 {/* Reset Filters Button */}
-                {(inputValue || yearStart !== '1630' || yearEnd !== '1710' || authorParam || respondensParam || printerParam || statusParam || selectedTags.length > 0) && (
+                {(inputValue || yearStart || yearEnd || authorParam || respondensParam || printerParam || statusParam || selectedTags.length > 0) && (
                   <button
                     onClick={() => {
                       setInputValue('');
-                      setYearStart('1630');
-                      setYearEnd('1710');
+                      setYearStart('');
+                      setYearEnd('');
                       setSort('year_asc');
                       setSelectedTags([]);
                       setSearchParams({});
@@ -1060,8 +1049,8 @@ const Dashboard: React.FC = () => {
                       <button
                         onClick={() => {
                           setInputValue('');
-                          setYearStart('1630');
-                          setYearEnd('1710');
+                          setYearStart('');
+                          setYearEnd('');
                           setSort('recent');
                           setSearchParams({});
                         }}

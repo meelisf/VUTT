@@ -130,7 +130,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
         return Array.from(set);
     };
 
-    const hasActiveFilters = (yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ||
+    const hasActiveFilters = yearStart || yearEnd ||
         selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
         selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
 
@@ -187,7 +187,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     title={t('filters.timeRange')}
                     icon={<Calendar size={14} />}
                     defaultOpen={true}
-                    badge={(yearStart && yearStart !== '1630') || (yearEnd && yearEnd !== '1710') ? 1 : undefined}
+                    badge={yearStart || yearEnd ? 1 : undefined}
                 >
                     <div className="grid grid-cols-2 gap-2">
                         <div>
