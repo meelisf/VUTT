@@ -5,7 +5,7 @@ import { searchContent, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAu
 import { getWorkMetadata } from '../services/workService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
-import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag } from 'lucide-react';
+import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag, BookOpen, LayoutList, Calendar } from 'lucide-react';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
@@ -543,12 +543,32 @@ const SearchPage: React.FC = () => {
                         </form>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(selectedAuthor || selectedWork || selectedCollection || scopeParam !== 'all' || pageTagsParam.length > 0) && (
-                            <div className="flex flex-wrap items-center gap-2 mt-3">
-                                {/* Scope chip — nähtav hoiatus kui otsitakse ainult osa dokumendist */}
+                        {(selectedAuthor || selectedWork || selectedCollection || scopeParam !== 'all' ||
+                            pageTagsParam.length > 0 || genreParam.length > 0 || typeParam.length > 0 ||
+                            teoseTagsParam.length > 0 || yearStartParam !== undefined || yearEndParam !== undefined) && (
+                            <div className="flex flex-wrap items-center gap-1.5 mt-3">
+                                {/* Ajavahemik */}
+                                {(yearStartParam !== undefined || yearEndParam !== undefined) && (
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs font-medium border border-slate-200">
+                                        <Calendar size={11} />
+                                        <span>{yearStartParam ?? 1630}–{yearEndParam ?? 1710}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setYearStart('1630'); setYearEnd('1710');
+                                                setSearchParams(prev => { prev.delete('ys'); prev.delete('ye'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-0.5 hover:bg-slate-200 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                )}
+                                {/* Scope chip */}
                                 {scopeParam !== 'all' && (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full text-sm font-medium border border-orange-200">
-                                        <Layers size={14} />
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full text-xs font-medium border border-orange-200">
+                                        <Layers size={11} />
                                         <span>{t(`filters.scope${scopeParam.charAt(0).toUpperCase() + scopeParam.slice(1)}`)}</span>
                                         <button
                                             type="button"
@@ -556,16 +576,74 @@ const SearchPage: React.FC = () => {
                                                 setSelectedScope('all');
                                                 setSearchParams(prev => { prev.delete('scope'); prev.set('p', '1'); return prev; });
                                             }}
-                                            className="ml-1 hover:bg-orange-100 rounded-full p-0.5"
+                                            className="ml-0.5 hover:bg-orange-100 rounded-full p-0.5"
                                             title={t('filters.removeFilter')}
                                         >
-                                            <X size={14} />
+                                            <X size={11} />
                                         </button>
                                     </div>
                                 )}
+                                {/* Žanrid */}
+                                {genreParam.map(g => (
+                                    <div key={g} className="flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium border border-violet-200">
+                                        <BookOpen size={11} />
+                                        <span>{genreIdMap[g] || g}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = genreParam.filter(x => x !== g);
+                                                setSelectedGenres(next);
+                                                setSearchParams(prev => { if (next.length > 0) prev.set('genre', next.join(',')); else prev.delete('genre'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-0.5 hover:bg-violet-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* Tüübid */}
+                                {typeParam.map(tp => (
+                                    <div key={tp} className="flex items-center gap-1 px-2 py-0.5 bg-sky-50 text-sky-700 rounded-full text-xs font-medium border border-sky-200">
+                                        <LayoutList size={11} />
+                                        <span>{typeIdMap[tp] || tp}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = typeParam.filter(x => x !== tp);
+                                                setSelectedTypes(next);
+                                                setSearchParams(prev => { if (next.length > 0) prev.set('type', next.join(',')); else prev.delete('type'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-0.5 hover:bg-sky-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* Teose märksõnad */}
+                                {teoseTagsParam.map(tag => (
+                                    <div key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
+                                        <Tag size={11} />
+                                        <span>{tagsIdMap[tag] || tag}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = teoseTagsParam.filter(t => t !== tag);
+                                                setSelectedTeoseTags(next);
+                                                setSearchParams(prev => { if (next.length > 0) prev.set('teoseTags', next.join(',')); else prev.delete('teoseTags'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-0.5 hover:bg-emerald-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* Lehekülje märksõnad */}
                                 {pageTagsParam.map(tag => (
-                                    <div key={tag} className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 rounded-full text-sm font-medium border border-teal-200">
-                                        <Tag size={14} />
+                                    <div key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-xs font-medium border border-teal-200">
+                                        <Tag size={11} />
                                         <span>{knownPageTagsLabels[tag] || pageTagsIdMap[tag] || tag}</span>
                                         <button
                                             type="button"
@@ -579,16 +657,17 @@ const SearchPage: React.FC = () => {
                                                     return prev;
                                                 });
                                             }}
-                                            className="ml-1 hover:bg-teal-100 rounded-full p-0.5"
+                                            className="ml-0.5 hover:bg-teal-100 rounded-full p-0.5"
                                             title={t('filters.removeFilter')}
                                         >
-                                            <X size={14} />
+                                            <X size={11} />
                                         </button>
                                     </div>
                                 ))}
+                                {/* Teos */}
                                 {selectedWork && (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium border border-amber-200">
-                                        <FileText size={14} />
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
+                                        <FileText size={11} />
                                         <span className="truncate max-w-xs">{selectedWorkInfo?.title || selectedWork}</span>
                                         <button
                                             type="button"
@@ -596,40 +675,42 @@ const SearchPage: React.FC = () => {
                                                 setSelectedWork(''); setSelectedWorkInfo(null);
                                                 setSearchParams(prev => { prev.delete('work'); prev.set('p', '1'); return prev; });
                                             }}
-                                            className="ml-1 hover:bg-amber-100 rounded-full p-0.5"
+                                            className="ml-0.5 hover:bg-amber-100 rounded-full p-0.5"
                                             title={t('filters.removeFilter')}
                                         >
-                                            <X size={14} />
+                                            <X size={11} />
                                         </button>
                                     </div>
                                 )}
+                                {/* Autor */}
                                 {selectedAuthor && (
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 rounded-full text-sm font-medium border border-primary-200">
-                                        <User size={14} />
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-200">
+                                        <User size={11} />
                                         <span className="truncate max-w-xs">{selectedAuthor}</span>
                                         <button
                                             type="button"
                                             onClick={handleAuthorClear}
-                                            className="ml-1 hover:bg-primary-100 rounded-full p-0.5"
+                                            className="ml-0.5 hover:bg-primary-100 rounded-full p-0.5"
                                             title={t('filters.removeAuthorFilter')}
                                         >
-                                            <X size={14} />
+                                            <X size={11} />
                                         </button>
                                     </div>
                                 )}
+                                {/* Kollektsioon */}
                                 {selectedCollection && (() => {
                                     const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
                                     return (
-                                        <div className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 ${colorClasses.bg} ${colorClasses.text} rounded-full text-sm font-medium border ${colorClasses.border}`}>
-                                            <Library size={14} />
+                                        <div className={`ml-auto flex items-center gap-1 px-2 py-0.5 ${colorClasses.bg} ${colorClasses.text} rounded-full text-xs font-medium border ${colorClasses.border}`}>
+                                            <Library size={11} />
                                             <span className="truncate max-w-xs">{getCollectionName(selectedCollection)}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => setSelectedCollection(null)}
-                                                className="ml-1 hover:opacity-70 rounded-full p-0.5"
+                                                className="ml-0.5 hover:opacity-70 rounded-full p-0.5"
                                                 title={t('filters.removeFilter')}
                                             >
-                                                <X size={14} />
+                                                <X size={11} />
                                             </button>
                                         </div>
                                     );

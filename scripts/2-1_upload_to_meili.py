@@ -67,6 +67,7 @@ def main():
             'publisher',
             'genre_ids',
             'tags_ids',
+            'type_ids',
             'creator_ids',
             'creators',
             'type',
