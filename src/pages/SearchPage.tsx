@@ -118,6 +118,15 @@ const SearchPage: React.FC = () => {
     // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega)
     const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
 
+    // Q-kood → label pillide jaoks: enrichedLabels (labels.json) on primaarne allikas
+    const resolveLabel = (qCode: string, fallbackMap?: Record<string, string>) => {
+        const lang = getLangCode(i18n.language);
+        if (enrichedLabels[qCode]) {
+            return cap(enrichedLabels[qCode][lang] || enrichedLabels[qCode]['et'] || qCode);
+        }
+        return fallbackMap?.[qCode] || qCode;
+    };
+
     // Q-kood → praeguse keele label (žanrid)
     const genreIdMap = useMemo(() => {
         const map: Record<string, string> = {};
@@ -587,7 +596,7 @@ const SearchPage: React.FC = () => {
                                 {genreParam.map(g => (
                                     <div key={g} className="flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium border border-violet-200">
                                         <BookOpen size={11} />
-                                        <span>{genreIdMap[g] || g}</span>
+                                        <span>{resolveLabel(g, genreIdMap)}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -606,7 +615,7 @@ const SearchPage: React.FC = () => {
                                 {typeParam.map(tp => (
                                     <div key={tp} className="flex items-center gap-1 px-2 py-0.5 bg-sky-50 text-sky-700 rounded-full text-xs font-medium border border-sky-200">
                                         <LayoutList size={11} />
-                                        <span>{typeIdMap[tp] || tp}</span>
+                                        <span>{resolveLabel(tp, typeIdMap)}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
@@ -625,7 +634,7 @@ const SearchPage: React.FC = () => {
                                 {teoseTagsParam.map(tag => (
                                     <div key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium border border-emerald-200">
                                         <Tag size={11} />
-                                        <span>{tagsIdMap[tag] || tag}</span>
+                                        <span>{resolveLabel(tag, tagsIdMap)}</span>
                                         <button
                                             type="button"
                                             onClick={() => {
