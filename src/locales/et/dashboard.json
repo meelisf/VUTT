@@ -15,6 +15,7 @@
     "clearAll": "Tühista kõik filtrid"
   },
   "sort": {
+    "label": "Sortimine",
     "relevance": "Relevantsus",
     "yearAsc": "Aasta (kasvav)",
     "yearDesc": "Aasta (kahanev)",

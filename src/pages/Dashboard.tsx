@@ -31,7 +31,7 @@ const Dashboard: React.FC = () => {
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
@@ -647,7 +647,7 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col h-full bg-gray-50 font-sans">
       <Header />
 
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+      <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         <div className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
 
           {/* Error Banner */}
@@ -843,6 +843,7 @@ const Dashboard: React.FC = () => {
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value)}
+                    aria-label={t('sort.label')}
                     className="p-1.5 border border-gray-300 rounded text-sm focus:border-primary-500 outline-none bg-transparent cursor-pointer hover:bg-gray-50"
                   >
                     {queryParam && <option value="relevance">{t('sort.relevance')}</option>}
@@ -982,13 +983,14 @@ const Dashboard: React.FC = () => {
                   ) : works.length > 0 ? (
                     <>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {currentWorks.map(work => (
+                        {currentWorks.map((work, index) => (
                             <WorkCard
                               key={work.work_id}
                               work={work}
                               selectMode={selectMode}
                               isSelected={selectedWorkIds.has(work.work_id)}
                               onToggleSelect={() => toggleWorkSelection(work.work_id)}
+                              isPriority={index === 0}
                             />
                           ))}
                       </div>
@@ -999,6 +1001,7 @@ const Dashboard: React.FC = () => {
                           <button
                             onClick={() => handlePageChange(currentPage - 1)}
                             disabled={currentPage === 1}
+                            aria-label={t('common:buttons.previous')}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             <ChevronLeft size={18} />
@@ -1030,6 +1033,7 @@ const Dashboard: React.FC = () => {
                           <button
                             onClick={() => handlePageChange(currentPage + 1)}
                             disabled={currentPage === totalPages}
+                            aria-label={t('common:buttons.next')}
                             className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                           >
                             <span className="hidden sm:inline">{t('common:buttons.next')}</span>
@@ -1065,7 +1069,7 @@ const Dashboard: React.FC = () => {
             })()}
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-gray-50 py-4 px-4 sm:px-8 shrink-0">

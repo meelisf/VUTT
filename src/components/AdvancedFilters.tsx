@@ -491,7 +491,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     )}
                     {effectiveSelectedTags.map(tag => (
                       <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
-                        {tag}
+                        {tagsIdMap?.[tag] || tag}
                         <button onClick={() => toggleTag(tag)} className="hover:text-primary-900"><X size={12} /></button>
                       </span>
                     ))}

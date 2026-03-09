@@ -119,7 +119,7 @@ const Workspace: React.FC = () => {
     // Kontrollime, et number oleks valiidne ja piires (kui lehekülgede arv on teada)
     if (!isNaN(newPage) && newPage >= 1 && (totalPages === 0 || newPage <= totalPages)) {
       if (newPage !== currentPageNum) {
-        navigate(`/work/${workId}/${newPage}`);
+        navigate(`/work/${workId}/${newPage}`, { replace: true });
       }
     } else {
       // Taasta praegune number, kui sisestus oli vigane
@@ -269,7 +269,7 @@ const Workspace: React.FC = () => {
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
-    navigate(`/work/${workId}/${pageNum}`);
+    navigate(`/work/${workId}/${pageNum}`, { replace: true });
   }, [navigate, workId]);
 
   const navigatePage = useCallback((delta: number) => {
@@ -283,11 +283,11 @@ const Workspace: React.FC = () => {
 
     // Hoiatus salvestamata muudatuste korral
     if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`));
+      setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`, { replace: true }));
       return;
     }
 
-    navigate(`/work/${workId}/${newPage}`);
+    navigate(`/work/${workId}/${newPage}`, { replace: true });
   }, [workId, currentPageNum, work?.page_count, hasUnsavedChanges, navigate]);
 
   if (loading) {
@@ -313,7 +313,7 @@ const Workspace: React.FC = () => {
           </div>
           <div className="flex gap-3 justify-center">
             <button
-              onClick={() => navigate(`/work/${workId}/1`)}
+              onClick={() => navigate(`/work/${workId}/1`, { replace: true })}
               className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
             >
               {t('workspace:navigation.toFirstPage', 'Mine teose algusesse')}
@@ -330,13 +330,13 @@ const Workspace: React.FC = () => {
     );
   }
 
-  // Navigeerimine tagasi dashboardile
+  // Navigeerimine tagasi (dashboardile või täistekstiotsingusse, olenevalt kust tuldi)
   const handleNavigateBack = () => {
     if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate('/'));
+      setPendingNavigation(() => () => navigate(-1));
       return;
     }
-    navigate('/');
+    navigate(-1);
   };
 
   // Navigeerimine otsingusse (selle teose piires)

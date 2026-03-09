@@ -12,14 +12,20 @@ import { getLangCode } from '../utils/getLangCode';
  */
 const CollectionInfoBanner: React.FC = () => {
   const { t, i18n } = useTranslation('dashboard');
-  const { selectedCollection, collections, setSelectedCollection } = useCollection();
+  const { selectedCollection, collections, isLoading, setSelectedCollection } = useCollection();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
   if (!selectedCollection) return null;
 
   const collection = collections[selectedCollection];
-  if (!collection) return null;
+  // Kollektsioonid laadivad — reserveeri ruum, et vältida CLS-i
+  if (!collection) {
+    if (isLoading) {
+      return <div className="mb-6 h-10 rounded-lg bg-gray-100 animate-pulse" />;
+    }
+    return null;
+  }
 
   const lang = getLangCode(i18n.language);
   const colorClasses = getCollectionColorClasses(collection);

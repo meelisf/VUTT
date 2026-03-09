@@ -15,6 +15,7 @@
     "clearAll": "Clear all filters"
   },
   "sort": {
+    "label": "Sort by",
     "relevance": "Relevance",
     "yearAsc": "Year (ascending)",
     "yearDesc": "Year (descending)",

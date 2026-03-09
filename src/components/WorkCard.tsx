@@ -15,9 +15,10 @@ interface WorkCardProps {
   selectMode?: boolean;
   isSelected?: boolean;
   onToggleSelect?: () => void;
+  isPriority?: boolean;
 }
 
-const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect }) => {
+const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect, isPriority = false }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
   const navigate = useNavigate();
   const location = useLocation();
@@ -146,7 +147,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
         <img
           src={work.thumbnail_url}
           alt={work.title}
-          loading="lazy"
+          loading={isPriority ? 'eager' : 'lazy'}
+          fetchPriority={isPriority ? 'high' : 'auto'}
           onClick={!selectMode ? handleOpenWorkspace : undefined}
           className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity ${!selectMode ? 'cursor-pointer' : ''}`}
         />
