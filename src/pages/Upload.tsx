@@ -60,7 +60,7 @@ interface SavedUpload {
 const POLL_SLOW_MS = 5000;
 const POLL_FAST_MS = 2000;
 const OCR_TIMEOUT_MS_FALLBACK = 2 * 60 * 60 * 1000; // 2 tundi (kui lehekülgede arv teadmata)
-const OCR_MS_PER_PAGE = 2 * 60 * 1000; // ~2 min/lk (OCR ~1 lk/min + varu)
+const OCR_MS_PER_PAGE = 60 * 1000; // ~60 sek/lk (OCR ~30 sek/lk + varu)
 
 // ---------------------------------------------------------------------------
 // Slug utiliit (peegeldab serveri sanitize_slug)
@@ -647,7 +647,7 @@ const Upload: React.FC = () => {
       : 0;
   const status = pollResult?.status ?? '';
   const ocrTimeoutMs = pollResult?.expected_pages
-    ? Math.max(10 * 60 * 1000, pollResult.expected_pages * OCR_MS_PER_PAGE)
+    ? Math.max(5 * 60 * 1000, pollResult.expected_pages * OCR_MS_PER_PAGE)
     : OCR_TIMEOUT_MS_FALLBACK;
   const ocrTimedOut =
     ocrStartedAt !== null &&
@@ -804,36 +804,16 @@ const Upload: React.FC = () => {
               <p className="text-xs text-gray-400 mt-1">{t('step1.yearHint')}</p>
             </div>
 
-            {/* Slug */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('step1.slugLabel')}
-              </label>
-              <input
-                type="text"
-                value={slug}
-                onChange={(e) => {
-                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-                  if (!val) {
-                    // Tühi väärtus → lähtesta automaatgenereerimisele
-                    setSlugManual(false);
-                  } else {
-                    setSlugManual(true);
-                    setSlug(val);
-                  }
-                }}
-                className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
-                  slugConflict ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                }`}
-              />
-              <p
-                className={`text-xs mt-1 ${slugConflict ? 'text-red-600 font-medium' : 'text-gray-400'}`}
-              >
-                {slugConflict
-                  ? step1Error
-                  : t('step1.slugHint').replace('{{slug}}', slug || '…')}
+            {/* Slug — automaatne, nähtav ainult vihjena */}
+            {slugConflict ? (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {step1Error}
+              </div>
+            ) : slug ? (
+              <p className="text-xs text-gray-400 mb-4 font-mono">
+                data/{slug}/
               </p>
-            </div>
+            ) : null}
 
             {/* Kollektsioon */}
             <div className="mb-4">
