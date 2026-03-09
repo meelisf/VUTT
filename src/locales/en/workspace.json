@@ -89,6 +89,7 @@
     "reorderError": "Failed to save page order",
     "dangerZone": "Danger zone",
     "managePageLink": "Manage work",
+    "managePageHint": "Page order, adding and deletion.",
     "tabPages": "Pages",
     "tabTrash": "Trash",
     "trash": {
@@ -236,7 +237,8 @@
       "pageBreak": "Page break"
     },
     "reocr": {
-      "button": "Transcription",
+      "button": "Re-transcribe page",
+      "hint": "Send the page image to the OCR server and replace the text with a new automatic transcription.",
       "uploading": "Uploading...",
       "processing": "OCR processing...",
       "inProgress": "Transcription in progress — the result can be applied later too.",

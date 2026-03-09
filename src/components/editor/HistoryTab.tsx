@@ -12,7 +12,10 @@ import {
   Plus,
   Minus,
   Clock,
-  Wrench
+  Wrench,
+  Wand2,
+  Copy,
+  Check
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
@@ -45,6 +48,8 @@ interface HistoryTabProps {
   authToken: string | null;
   onRestore: (content: string) => void;
   readOnly: boolean;
+  handleReOcr?: () => void;
+  reocrStatus?: string;
 }
 
 const HistoryTab: React.FC<HistoryTabProps> = ({
@@ -53,7 +58,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   user,
   authToken,
   onRestore,
-  readOnly
+  readOnly,
+  handleReOcr,
+  reocrStatus
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const navigate = useNavigate();
@@ -339,20 +346,31 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const isAdmin = user?.role === 'admin';
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
+  const [slugCopied, setSlugCopied] = useState(false);
+  const slug = page.original_path?.replace(/^data\//, '').split('/')[0];
+
+  const copySlug = () => {
+    if (!slug) return;
+    navigator.clipboard.writeText(slug).then(() => {
+      setSlugCopied(true);
+      setTimeout(() => setSlugCopied(false), 2000);
+    });
+  };
+
   return (
     <div className="h-full bg-gray-50 p-6 overflow-y-auto">
       {/* Git versiooniajalugu - nähtav kõigile sisselogitud kasutajatele */}
       {user ? (
-        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-2">
-            <div className="flex items-center gap-2 text-gray-800">
-              <History size={18} className="text-primary-600" />
-              <h4 className="font-bold">{t('history.gitHistory')}</h4>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <History size={15} className="text-gray-400" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t('history.gitHistory')}</span>
             </div>
             <button
               onClick={loadGitHistory}
               disabled={isLoadingHistory || !canLoad}
-              className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 disabled:text-gray-400 rounded text-gray-700 transition-colors"
+              className="text-xs px-3 py-1.5 font-medium text-gray-600 border border-gray-200 bg-gray-50 hover:bg-gray-100 disabled:opacity-50 rounded transition-colors"
               title={!canLoad ? t('history.rateLimitHint') : undefined}
             >
               {isLoadingHistory ? t('common:labels.loading') : t('history.refresh')}
@@ -360,11 +378,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
           </div>
 
           {gitHistory.length === 0 && !isLoadingHistory && (
-            <p className="text-sm text-gray-400 text-center py-4">{t('history.emptyHistory')}</p>
+            <p className="text-sm text-gray-400 text-center px-5 py-6">{t('history.emptyHistory')}</p>
           )}
 
           {gitHistory.length > 0 && (
-            <div className="space-y-1">
+            <div className="divide-y divide-gray-100">
               {gitHistory.map((entry) => {
                 const isExpanded = expandedCommit === entry.full_hash;
                 const diffData = diffCache[entry.full_hash];
@@ -373,15 +391,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                 return (
                   <div
                     key={entry.full_hash}
-                    className={`border rounded-lg overflow-hidden ${
-                      entry.is_original
-                        ? 'border-green-200 bg-green-50/50'
-                        : 'border-gray-200'
-                    }`}
+                    className={entry.is_original ? 'bg-green-50/40' : ''}
                   >
                     {/* Peamine rida */}
                     <div
-                      className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 ${
+                      className={`flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${
                         isExpanded ? 'bg-gray-50' : ''
                       }`}
                       onClick={() => toggleDiff(entry)}
@@ -467,7 +481,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
                     {/* Avatav diff paneel */}
                     {isExpanded && (
-                      <div className="border-t border-gray-200 bg-gray-50 px-3 py-2">
+                      <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
                         {isLoadingThis ? (
                           <div className="flex items-center gap-2 text-gray-500 py-2">
                             <Loader2 size={14} className="animate-spin" />
@@ -512,21 +526,78 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
           )}
         </div>
       ) : (
-        <div className="bg-gray-100 p-4 rounded-lg text-center text-sm text-gray-500">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-5 py-6 text-center text-sm text-gray-400">
           {t('history.loginToView')}
         </div>
       )}
 
-      {/* Teose haldus — ainult adminile */}
-      {isAdmin && work && (
-        <div className="mt-6">
-          <button
-            onClick={() => navigate(`/work/${work.work_id}/manage`)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm hover:bg-amber-100 text-amber-600 border border-amber-200 bg-amber-50 rounded transition-colors"
-          >
-            <Wrench size={14} />
-            {t('manage.manageWork')}
-          </button>
+      {/* Admin — transkriptsioon ja teose haldus */}
+      {isAdmin && (
+        <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
+            <Shield size={15} className="text-gray-400" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Admin</span>
+          </div>
+
+          {handleReOcr && (
+            <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-gray-100 last:border-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800 mb-0.5">
+                  <Wand2 size={13} className="text-emerald-600 shrink-0" />
+                  {t('editor.reocr.button')}
+                </div>
+                <p className="text-xs text-gray-400 leading-snug">{t('editor.reocr.hint')}</p>
+              </div>
+              <button
+                onClick={handleReOcr}
+                disabled={reocrStatus !== 'idle'}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-700 border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors disabled:opacity-50"
+              >
+                {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
+                  <Loader2 className="animate-spin" size={12} />
+                )}
+                {reocrStatus === 'uploading'
+                  ? t('editor.reocr.uploading')
+                  : reocrStatus === 'processing'
+                    ? t('editor.reocr.processing')
+                    : t('editor.reocr.button')}
+              </button>
+            </div>
+          )}
+
+          {slug && (
+            <div className="px-5 py-4 flex items-center justify-between gap-4 border-b border-gray-100">
+              <div className="min-w-0">
+                <p className="text-xs text-gray-400 mb-1">Kataloog</p>
+                <code className="text-xs font-mono text-gray-700 truncate block">data/{slug}/</code>
+              </div>
+              <button
+                onClick={copySlug}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 bg-gray-50 hover:bg-gray-100 rounded transition-colors"
+              >
+                {slugCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                {slugCopied ? 'Kopeeritud' : 'Kopeeri'}
+              </button>
+            </div>
+          )}
+
+          {work && (
+            <div className="px-5 py-4 flex items-start justify-between gap-4 last:border-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-gray-800 mb-0.5">
+                  <Wrench size={13} className="text-amber-500 shrink-0" />
+                  {t('manage.manageWork')}
+                </div>
+                <p className="text-xs text-gray-400 leading-snug">{t('manage.managePageHint')}</p>
+              </div>
+              <button
+                onClick={() => navigate(`/work/${work.work_id}/manage`)}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-700 border border-amber-200 bg-amber-50 hover:bg-amber-100 rounded transition-colors"
+              >
+                {t('manage.manageWork')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

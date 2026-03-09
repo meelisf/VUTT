@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, ChevronRight, X, Settings2, Wand2, Superscript, SeparatorHorizontal } from 'lucide-react';
+import { Save, Loader2, ChevronRight, X, Settings2, Superscript, SeparatorHorizontal } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
@@ -771,23 +771,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
           {!readOnly && (
             <div className="flex items-center gap-2">
-              {user?.role === 'admin' && (
-                <button
-                  onClick={handleReOcr}
-                  disabled={reocrStatus !== 'idle'}
-                  title={t('editor.reocr.button')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-60 bg-emerald-600 hover:bg-emerald-700"
-                >
-                  {reocrStatus === 'uploading' || reocrStatus === 'processing'
-                    ? <Loader2 className="animate-spin" size={12} />
-                    : <Wand2 size={12} />}
-                  {reocrStatus === 'uploading'
-                    ? t('editor.reocr.uploading')
-                    : reocrStatus === 'processing'
-                      ? t('editor.reocr.processing')
-                      : t('editor.reocr.button')}
-                </button>
-              )}
               <button
                 onClick={handleSave}
                 disabled={isSaving}
@@ -1030,6 +1013,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             work={work}
             user={user}
             authToken={authToken}
+            handleReOcr={handleReOcr}
+            reocrStatus={reocrStatus}
             onRestore={(content) => {
               const view = viewRef.current;
               if (view) {

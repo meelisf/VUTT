@@ -89,6 +89,7 @@
     "reorderError": "Järjekorra salvestamine ebaõnnestus",
     "dangerZone": "Ohutsoon",
     "managePageLink": "Halda teost",
+    "managePageHint": "Lehekülgede järjestus, lisamine ja kustutamine.",
     "tabPages": "Leheküljed",
     "tabTrash": "Prügikast",
     "trash": {
@@ -236,7 +237,8 @@
       "pageBreak": "Lehekülje vahetus"
     },
     "reocr": {
-      "button": "Transkriptsioon",
+      "button": "Tee uus transkriptsioon",
+      "hint": "Saada lehekülje pilt OCR serverisse ja asenda tekst uue automaatse transkriptsiooniga.",
       "uploading": "Laadin...",
       "processing": "OCR töötleb...",
       "inProgress": "Transkriptsioon käib — tulemuse saab ka hiljem rakendada.",

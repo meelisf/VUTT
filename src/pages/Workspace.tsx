@@ -13,7 +13,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogOut, LogIn, Settings, History, Copy, Check, Upload, Wrench } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogOut, LogIn, Settings, History, Copy, Check, Upload } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { FILE_API_URL } from '../config';
@@ -469,19 +469,6 @@ const Workspace: React.FC = () => {
               )}
             </button>
           </div>
-          {user?.role === 'admin' && workId && (
-            <>
-              <div className="h-6 w-px bg-gray-300"></div>
-              <button
-                onClick={() => navigate(`/work/${workId}/manage`)}
-                className="p-1.5 hover:bg-amber-50 rounded-md text-amber-600 transition-colors flex items-center gap-1.5 text-sm"
-                title={t('manage.manageWork')}
-              >
-                <Wrench size={15} />
-                <span className="hidden sm:inline text-xs">{t('manage.manageWork')}</span>
-              </button>
-            </>
-          )}
         </div>
 
         {/* Pagination Controls */}
