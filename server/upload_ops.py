@@ -194,13 +194,15 @@ def _extract_page_num(base: str) -> int:
 # SLUG UTILIIDID
 # =========================================================
 
+SLUG_MAX_LEN = 80
+
 def sanitize_slug(text: str) -> str:
-    """Puhastab teksti, et see sobiks slug-iks (ainult a-z, 0-9, sidekriips)."""
+    """Puhastab teksti, et see sobiks slug-iks (ainult a-z, 0-9, sidekriips, max 80 tähemärki)."""
     normalized = unicodedata.normalize('NFD', text)
     ascii_text = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
     slug = ascii_text.lower()
     slug = re.sub(r'[^a-z0-9]+', '-', slug)
-    slug = slug.strip('-')
+    slug = slug[:SLUG_MAX_LEN].rstrip('-')
     return slug or 'teos'
 
 

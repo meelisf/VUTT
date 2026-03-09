@@ -59,11 +59,14 @@ interface SavedUpload {
 
 const POLL_SLOW_MS = 5000;
 const POLL_FAST_MS = 2000;
-const OCR_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 tundi
+const OCR_TIMEOUT_MS_FALLBACK = 2 * 60 * 60 * 1000; // 2 tundi (kui lehekülgede arv teadmata)
+const OCR_MS_PER_PAGE = 2 * 60 * 1000; // ~2 min/lk (OCR ~1 lk/min + varu)
 
 // ---------------------------------------------------------------------------
 // Slug utiliit (peegeldab serveri sanitize_slug)
 // ---------------------------------------------------------------------------
+const SLUG_MAX_LEN = 80;
+
 function sanitizeSlug(text: string): string {
   return (
     text
@@ -71,7 +74,8 @@ function sanitizeSlug(text: string): string {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'teos'
+      .slice(0, SLUG_MAX_LEN)
+      .replace(/-+$/g, '') || 'teos'
   );
 }
 
@@ -642,9 +646,12 @@ const Upload: React.FC = () => {
       ? Math.round((progress.bytes_sent / progress.bytes_total) * 100)
       : 0;
   const status = pollResult?.status ?? '';
+  const ocrTimeoutMs = pollResult?.expected_pages
+    ? Math.max(10 * 60 * 1000, pollResult.expected_pages * OCR_MS_PER_PAGE)
+    : OCR_TIMEOUT_MS_FALLBACK;
   const ocrTimedOut =
     ocrStartedAt !== null &&
-    Date.now() - ocrStartedAt > OCR_TIMEOUT_MS &&
+    Date.now() - ocrStartedAt > ocrTimeoutMs &&
     status !== 'done';
   const canImport = readyCount > 0 && !importLoading;
 
