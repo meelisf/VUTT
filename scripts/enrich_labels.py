@@ -17,9 +17,11 @@ import argparse
 BASE_DIR = os.getenv("VUTT_DATA_DIR", "data")
 LABELS_FILE = os.path.join("state", "labels.json")
 
-# Metaandmete väljade nimed mis sisaldavad LinkedEntity objekte
-SINGLE_ENTITY_FIELDS = ["genre", "type", "location", "publisher"]
-ARRAY_ENTITY_FIELDS = ["creators", "tags"]
+# Metaandmete väljade nimed mis sisaldavad LinkedEntity objekte.
+# Isikute (creators) ja trükkalite (publisher) nimesid ei rikastata —
+# need on samad kõigis keeltes.
+SINGLE_ENTITY_FIELDS = ["genre", "type", "location"]
+ARRAY_ENTITY_FIELDS = ["tags"]
 
 
 def enrich_entity(entity, labels_cache):
