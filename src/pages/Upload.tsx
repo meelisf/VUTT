@@ -274,7 +274,6 @@ const Upload: React.FC = () => {
   }, [title, year, slugManual]);
 
   useEffect(() => {
-    setSlugConflict(false);
     setStep1Error('');
   }, [slug, year]);
 
@@ -329,7 +328,6 @@ const Upload: React.FC = () => {
     if (!title.trim() || !year.trim() || !authToken) return;
     setStep1Loading(true);
     setStep1Error('');
-    setSlugConflict(false);
 
     // Proovi slug-iga, konflikt → lisa juhuslik 4-tähtne sufiks, korda max 3×
     const randSuffix = () => Math.random().toString(36).slice(2, 6);
