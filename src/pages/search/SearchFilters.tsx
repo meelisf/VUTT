@@ -45,6 +45,8 @@ export interface SearchFiltersProps {
     // Sõnavara ja aliased
     vocabularies: Vocabularies | null;
     aliasMap: Record<string, string>;
+    // labels.json cache — primaarne Q-kood → {lang: label} allikas
+    enrichedLabels?: Record<string, Record<string, string>>;
     // Q-kood → praeguse keele label (tulemuste genre/type/tags_object-ist)
     genreIdMap?: Record<string, string>;
     genreLabelToId?: Record<string, string>;
@@ -77,7 +79,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     selectedAuthor, authorInput, showAuthorSuggestions,
     selectedWork, selectedWorkInfo, showFiltersMobile,
     availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks,
-    vocabularies, aliasMap, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, loading,
+    vocabularies, aliasMap, enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, loading,
     onScopeChange, onYearStartChange, onYearEndChange,
     onGenreToggle, onTypeToggle, onTagToggle,
     onAuthorInputChange, onShowAuthorSuggestions, onAuthorSelect, onAuthorClear,
@@ -86,6 +88,15 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     const { t, i18n } = useTranslation(['search', 'common']);
     const authorInputRef = useRef<HTMLInputElement>(null);
     const lang = getLangCode(i18n.language);
+
+    // Q-kood → label: enrichedLabels (labels.json) primaarne, seejärel idToLabel map
+    const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) => {
+        const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
+        if (enrichedLabels?.[qCode]) {
+            return cap(enrichedLabels[qCode][lang] || enrichedLabels[qCode]['et'] || qCode);
+        }
+        return idToLabel?.[qCode] || qCode;
+    };
 
     // Ühendab erineva keele labelid ja Q-koodid üheks kirjeks (nagu AdvancedFilters)
     const mergeFacetItems = (
@@ -213,7 +224,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 availableGenres.map(({ value, count }) => ({
                                     value,
                                     count,
-                                    label: genreIdMap?.[value] || vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
+                                    label: enrichedLabels?.[value] ? resolveLabel(value) : (genreIdMap?.[value] || vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value)
                                 })),
                                 genreLabelToId,
                                 genreIdMap
@@ -237,7 +248,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                             items={mergeFacetItems(
                                 availableTeoseTags.map(({ tag, count }) => ({
                                     value: tag,
-                                    label: tagsIdMap?.[tag] || tag,
+                                    label: enrichedLabels?.[tag] ? resolveLabel(tag) : (tagsIdMap?.[tag] || tag),
                                     count
                                 })),
                                 tagsLabelToId,
@@ -263,7 +274,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 availableTypes.filter(({ value }) => value && value.trim()).map(({ value, count }) => ({
                                     value,
                                     count,
-                                    label: typeIdMap?.[value] || vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
+                                    label: enrichedLabels?.[value] ? resolveLabel(value) : (typeIdMap?.[value] || vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value)
                                 })),
                                 typeLabelToId,
                                 typeIdMap

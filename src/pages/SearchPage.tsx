@@ -5,7 +5,7 @@ import { searchContent, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAu
 import { getWorkMetadata } from '../services/workService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
-import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag, BookOpen, LayoutList, Calendar } from 'lucide-react';
+import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag, BookOpen, FileType, Calendar } from 'lucide-react';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
@@ -614,7 +614,7 @@ const SearchPage: React.FC = () => {
                                 {/* Tüübid */}
                                 {typeParam.map(tp => (
                                     <div key={tp} className="flex items-center gap-1 px-2 py-0.5 bg-sky-50 text-sky-700 rounded-full text-xs font-medium border border-sky-200">
-                                        <LayoutList size={11} />
+                                        <FileType size={11} />
                                         <span>{resolveLabel(tp, typeIdMap)}</span>
                                         <button
                                             type="button"
@@ -751,6 +751,7 @@ const SearchPage: React.FC = () => {
                     availableWorks={availableWorks}
                     vocabularies={vocabularies}
                     aliasMap={aliasMap}
+                    enrichedLabels={enrichedLabels}
                     genreIdMap={genreIdMap}
                     genreLabelToId={genreLabelToId}
                     typeIdMap={typeIdMap}
