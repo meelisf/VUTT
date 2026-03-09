@@ -806,8 +806,14 @@ const Upload: React.FC = () => {
                 type="text"
                 value={slug}
                 onChange={(e) => {
-                  setSlugManual(true);
-                  setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'));
+                  const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+                  if (!val) {
+                    // Tühi väärtus → lähtesta automaatgenereerimisele
+                    setSlugManual(false);
+                  } else {
+                    setSlugManual(true);
+                    setSlug(val);
+                  }
                 }}
                 className={`w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
                   slugConflict ? 'border-red-400 bg-red-50' : 'border-gray-300'
@@ -852,7 +858,7 @@ const Upload: React.FC = () => {
 
             <button
               onClick={handleStep1Submit}
-              disabled={!title.trim() || !year.trim() || step1Loading || slugConflict}
+              disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading || slugConflict}
               className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
             >
               {step1Loading ? (
