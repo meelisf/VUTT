@@ -62,7 +62,7 @@ export const getTeoseTagsFacets = async (
   try {
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
+      filter.push(`(collections_hierarchy = "${collection}" OR collections = "${collection}")`);
     }
     if (yearStart) {
       filter.push(`year >= ${yearStart}`);
@@ -108,7 +108,7 @@ export const getGenreFacets = async (
   try {
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
+      filter.push(`(collections_hierarchy = "${collection}" OR collections = "${collection}")`);
     }
     if (yearStart) {
       filter.push(`year >= ${yearStart}`);
@@ -154,7 +154,7 @@ export const getTypeFacets = async (
   try {
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
+      filter.push(`(collections_hierarchy = "${collection}" OR collections = "${collection}")`);
     }
     if (yearStart) {
       filter.push(`year >= ${yearStart}`);
@@ -195,7 +195,7 @@ export const getAuthorFacets = async (
   try {
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) {
-      filter.push(`collections_hierarchy = "${collection}"`);
+      filter.push(`(collections_hierarchy = "${collection}" OR collections = "${collection}")`);
     }
     if (yearStart) {
       filter.push(`year >= ${yearStart}`);
@@ -277,7 +277,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     }
     // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
     if (options?.collection) {
-      filter.push(`collections_hierarchy = "${options.collection}"`);
+      filter.push(`(collections_hierarchy = "${options.collection}" OR collections = "${options.collection}")`);
     }
     // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
     if (options?.genre && options.genre.length > 0) {
@@ -451,7 +451,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   }
   // V2: Kollektsiooni filter
   if (options.collection) {
-    filter.push(`collections_hierarchy = "${options.collection}"`);
+    filter.push(`(collections_hierarchy = "${options.collection}" OR collections = "${options.collection}")`);
   }
   // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
   if (options.genre && options.genre.length > 0) {
