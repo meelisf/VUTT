@@ -222,7 +222,7 @@ const Upload: React.FC = () => {
   const [year, setYear] = useState('');
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
-  const [slugConflict, setSlugConflict] = useState(false);
+
   const [selectedCollection, setSelectedCollection] = useState('');
   const [step1Loading, setStep1Loading] = useState(false);
   const [step1Error, setStep1Error] = useState('');
@@ -330,32 +330,42 @@ const Upload: React.FC = () => {
     setStep1Loading(true);
     setStep1Error('');
     setSlugConflict(false);
+
+    // Proovi slug-iga, konflikt → lisa juhuslik 4-tähtne sufiks, korda max 3×
+    const randSuffix = () => Math.random().toString(36).slice(2, 6);
+    let candidateSlug = slug;
+    let attempts = 0;
+
     try {
-      const r = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          auth_token: authToken,
-          title: title.trim(),
-          year: year.trim(),
-          slug,
-          collections: selectedCollection ? [selectedCollection] : [],
-        }),
-      });
-      const d = await r.json();
-      if (!r.ok) {
+      while (attempts < 3) {
+        const r = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            auth_token: authToken,
+            title: title.trim(),
+            year: year.trim(),
+            slug: candidateSlug,
+            collections: selectedCollection ? [selectedCollection] : [],
+          }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          if (candidateSlug !== slug) setSlug(candidateSlug); // uuenda nähtavat vihjet
+          setUploadId(d.upload.id);
+          setStep(2);
+          return;
+        }
         if (d.conflict) {
-          setSlugConflict(true);
-          setStep1Error(
-            t('step1.slugConflict').replace('{{slug}}', slug)
-          );
+          candidateSlug = `${slug}-${randSuffix()}`;
+          attempts++;
         } else {
           setStep1Error(d.message || t('errors.createFailed'));
+          return;
         }
-        return;
       }
-      setUploadId(d.upload.id);
-      setStep(2);
+      // 3 katset ebaõnnestus (väga ebatõenäoline)
+      setStep1Error(t('errors.createFailed'));
     } catch {
       setStep1Error(t('errors.networkError'));
     } finally {
@@ -805,11 +815,7 @@ const Upload: React.FC = () => {
             </div>
 
             {/* Slug — automaatne, nähtav ainult vihjena */}
-            {slugConflict ? (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {step1Error}
-              </div>
-            ) : slug ? (
+            {slug ? (
               <p className="text-xs text-gray-400 mb-4 font-mono">
                 data/{slug}/
               </p>
@@ -836,8 +842,8 @@ const Upload: React.FC = () => {
               </select>
             </div>
 
-            {/* Vea teade (muu viga peale slug konflikti) */}
-            {step1Error && !slugConflict && (
+            {/* Vea teade */}
+            {step1Error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                 {step1Error}
               </div>
@@ -845,7 +851,7 @@ const Upload: React.FC = () => {
 
             <button
               onClick={handleStep1Submit}
-              disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading || slugConflict}
+              disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading}
               className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
             >
               {step1Loading ? (
