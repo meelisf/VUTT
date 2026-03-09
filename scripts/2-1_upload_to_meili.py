@@ -75,6 +75,7 @@ def main():
             'genre',
             'genre_et', 'genre_en',
             'collection',
+            'collections',
             'collections_hierarchy',
             'authors_text',
             'author_names',

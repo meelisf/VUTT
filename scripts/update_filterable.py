@@ -29,6 +29,7 @@ FILTERABLE_ATTRS = [
     'author_names',
     'authors_text',
     'collection',
+    'collections',
     'collections_hierarchy',
     'creator_ids',
     'creators',
