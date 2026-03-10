@@ -65,7 +65,7 @@ logger = get_logger(__name__)
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
 _reocr_jobs_lock = threading.Lock()
 
-REOCR_MAX_CONCURRENT = 5    # Max korraga aktiivseid re-OCR töid
+REOCR_MAX_CONCURRENT = 20   # Max korraga aktiivseid re-OCR töid
 REOCR_JOB_TTL = 86400       # Valmis/vigased tööd kustutatakse 24h pärast
 REOCR_PROCESSING_TIMEOUT = 1800  # 30 minutit — pärast seda märgitakse error
 
