@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
@@ -24,8 +25,18 @@ interface YearCount {
 
 const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
-  const { selectedCollection, getCollectionName, collections } = useCollection();
+  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Sünkroonib kollektsiooni URL ?collection= parameetriga (mõlemas suunas)
+  useCollectionUrlSync(selectedCollection, setSearchParams);
+  useEffect(() => {
+    const collectionParam = searchParams.get('collection');
+    if (collectionParam && collections[collectionParam] && collectionParam !== selectedCollection) {
+      setSelectedCollection(collectionParam);
+    }
+  }, [searchParams.get('collection'), collections]);
   const lang = getLangCode(i18n.language);
 
   const [isLoading, setIsLoading] = useState(true);
