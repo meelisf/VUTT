@@ -114,7 +114,14 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   // Debounced search — paralleelsed päringud + race condition kaitse
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (!inputValue || !showSuggestions || (value && (typeof value === 'string' ? value : value.label) === inputValue)) {
+      // Ära otsi kui lingitud entity on juba valitud ja tekst pole muutunud.
+      // Aga kui source === 'manual' (blur salvestas teksti ilma valikuta), luba otsing — kasutaja võib
+      // olla avab välise lingi kontrollimaeks ja tuleb tagasi vaste valima.
+      const isLinkedAndUnchanged = value &&
+        typeof value !== 'string' &&
+        value.source !== 'manual' &&
+        value.label === inputValue;
+      if (!inputValue || !showSuggestions || isLinkedAndUnchanged) {
         setSuggestions([]);
         return;
       }
