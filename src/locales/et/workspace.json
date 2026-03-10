@@ -245,9 +245,9 @@
       "modalTitle": "Re-OCR tulemus",
       "modalHint": "Kas soovid asendada praeguse teksti automaatse transkriptsiooniga?",
       "apply": "Asenda tekst",
-      "cancel": "Loobu",
       "error": "Re-OCR ebaõnnestus",
-      "deleteFile": "Kustuta OCR fail"
+      "deleteFile": "Kustuta OCR tulemus",
+      "deleteConfirm": "Kas oled kindel? OCR tulemus kustutatakse jäädavalt."
     }
   }
 }

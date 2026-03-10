@@ -722,13 +722,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setReocrText(null);
   }, [pageFilename, authToken, page.work_id, reocrStorageKey]);
 
-  const dismissReOcr = useCallback(() => {
-    if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
-    if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
-    setReocrStatus('idle');
-    setReocrText(null);
-    setReocrError(null);
-  }, [reocrStorageKey]);
 
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
@@ -857,17 +850,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             <div className="flex-1 relative flex overflow-hidden bg-white">
               {(reocrStatus === 'done' || reocrStatus === 'error') && (
                 <div className="absolute inset-0 z-20 bg-white/95 flex flex-col">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
+                  <div className="px-4 py-3 border-b border-gray-200 shrink-0">
                     <span className="text-sm font-semibold text-gray-800">
                       {reocrStatus === 'error' ? t('editor.reocr.error') : t('editor.reocr.modalTitle')}
                     </span>
-                    <button onClick={dismissReOcr} className="text-gray-400 hover:text-gray-600">
-                      <X size={16} />
-                    </button>
                   </div>
                   {reocrStatus === 'error' ? (
-                    <div className="flex-1 flex items-center justify-center p-6 text-sm text-red-600">
-                      {reocrError}
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4">
+                      <div className="text-sm text-red-600">{reocrError}</div>
+                      <button
+                        onClick={deleteOcrFile}
+                        className="px-4 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
+                      >
+                        {t('editor.reocr.deleteFile')}
+                      </button>
                     </div>
                   ) : (
                     <>
@@ -877,26 +873,19 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       </div>
                       <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 shrink-0">
                         <button
-                          onClick={deleteOcrFile}
-                          className="px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 rounded transition-colors"
-                          title={t('editor.reocr.deleteFile')}
+                          onClick={() => {
+                            if (window.confirm(t('editor.reocr.deleteConfirm'))) deleteOcrFile();
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors"
                         >
                           {t('editor.reocr.deleteFile')}
                         </button>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={dismissReOcr}
-                            className="px-4 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors"
-                          >
-                            {t('editor.reocr.cancel')}
-                          </button>
-                          <button
-                            onClick={applyReOcr}
-                            className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
-                          >
-                            {t('editor.reocr.apply')}
-                          </button>
-                        </div>
+                        <button
+                          onClick={applyReOcr}
+                          className="px-4 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-sm transition-colors"
+                        >
+                          {t('editor.reocr.apply')}
+                        </button>
                       </div>
                     </>
                   )}

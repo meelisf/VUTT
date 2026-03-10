@@ -11,6 +11,8 @@ import {
   RotateCcw,
   FileImage,
   ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
@@ -489,10 +491,50 @@ const WorkManage: React.FC = () => {
                               return next;
                             });
                           }}
-                          className={`flex-1 min-w-0 text-xs text-center border rounded px-1 py-0.5 ${
+                          className={`flex-1 min-w-0 text-xs text-center border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                             isChanged ? 'border-amber-400 bg-amber-50 font-semibold' : 'border-gray-300'
                           }`}
                         />
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => {
+                              const currentFile = page.filename;
+                              const currentPos = draftPositions[currentFile] ?? page.page_num;
+                              const newPos = Math.max(1, currentPos - 1);
+                              const conflictFile = pages.find(
+                                p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
+                              )?.filename;
+                              setDraftPositions(prev => {
+                                const next = { ...prev, [currentFile]: newPos };
+                                if (conflictFile) next[conflictFile] = currentPos;
+                                return next;
+                              });
+                            }}
+                            disabled={(draftPositions[page.filename] ?? page.page_num) <= 1}
+                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              const currentFile = page.filename;
+                              const currentPos = draftPositions[currentFile] ?? page.page_num;
+                              const newPos = Math.min(pages.length, currentPos + 1);
+                              const conflictFile = pages.find(
+                                p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
+                              )?.filename;
+                              setDraftPositions(prev => {
+                                const next = { ...prev, [currentFile]: newPos };
+                                if (conflictFile) next[conflictFile] = currentPos;
+                                return next;
+                              });
+                            }}
+                            disabled={(draftPositions[page.filename] ?? page.page_num) >= pages.length}
+                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
