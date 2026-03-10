@@ -1113,7 +1113,7 @@ _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_
 _reocr_jobs_lock = threading.Lock()
 
 REOCR_MAX_CONCURRENT = 5   # Max korraga aktiivseid re-OCR töid
-REOCR_JOB_TTL = 3600       # Valmis/vigased tööd kustutatakse 1h pärast
+REOCR_JOB_TTL = 86400      # Valmis/vigased tööd kustutatakse 24h pärast
 
 
 def _reocr_cleanup_loop():
