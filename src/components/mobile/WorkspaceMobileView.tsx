@@ -167,9 +167,9 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
           <button
             onClick={() => onNavigatePage(-1)}
             disabled={currentPageNum <= 1}
-            className="p-1 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 transition-all"
+            className="p-2.5 hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 disabled:opacity-30 transition-all"
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={24} />
           </button>
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-500">{t('navigation.page')}</span>
@@ -189,29 +189,31 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               <span className="text-xs text-gray-500">/{work.page_count}</span>
             )}
           </div>
-          {/* Staatusmärk — klikitav selgitusega */}
-          {page.status && (() => {
-            const colorClass =
-              page.status === PageStatus.DONE ? 'bg-green-100 text-green-700' :
-              page.status === PageStatus.CORRECTED ? 'bg-blue-100 text-blue-700' :
-              page.status === PageStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700' :
-              'bg-gray-100 text-gray-500';
-            return (
-              <button
-                onClick={() => setStatusHelpOpen(o => !o)}
-                className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full ${colorClass} active:opacity-70`}
-              >
-                {t(`common:status.${page.status}`)}
-              </button>
-            );
-          })()}
           <button
             onClick={() => onNavigatePage(1)}
             disabled={work?.page_count ? currentPageNum >= work.page_count : false}
-            className="p-1 hover:bg-gray-100 rounded text-gray-600 disabled:opacity-30 transition-all"
+            className="p-2.5 hover:bg-gray-100 active:bg-gray-200 rounded-lg text-gray-600 disabled:opacity-30 transition-all"
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={24} />
           </button>
+          {/* Staatuse täpp — klikitav selgitusega */}
+          {page.status && (() => {
+            const dotClass =
+              page.status === PageStatus.DONE ? 'bg-green-500' :
+              page.status === PageStatus.CORRECTED ? 'bg-blue-500' :
+              page.status === PageStatus.IN_PROGRESS ? 'bg-amber-400' :
+              page.status === PageStatus.ANNOTATED ? 'bg-purple-500' :
+              'bg-gray-300';
+            return (
+              <button
+                onClick={() => setStatusHelpOpen(o => !o)}
+                className="p-1.5 active:opacity-70"
+                title={t(`common:status.${page.status}`)}
+              >
+                <span className={`block w-2.5 h-2.5 rounded-full ${dotClass}`} />
+              </button>
+            );
+          })()}
         </div>
 
         <LanguageSwitcher />
