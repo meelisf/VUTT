@@ -1134,6 +1134,38 @@ def _reocr_cleanup_loop():
 threading.Thread(target=_reocr_cleanup_loop, daemon=True, name="reocr-cleanup").start()
 
 
+REOCR_PROCESSING_TIMEOUT = 1800  # 30 minutit — pärast seda märgitakse error
+
+
+def _reocr_poll_loop():
+    """Daemon-thread: kontrollib proaktiivselt 'processing' töid iga 10s tagant.
+    Nii ei pea kasutaja olema Workspace lehel, et tulemus kätte saada.
+    Tööd mis on olnud processing-s üle 30 min märgitakse error-iks."""
+    import time
+    while True:
+        time.sleep(10)
+        now = datetime.now().timestamp()
+        with _reocr_jobs_lock:
+            processing = [(jid, j) for jid, j in _reocr_jobs.items() if j["status"] == "processing"]
+        for jid, job in processing:
+            # Timeout: liiga kaua processing-s olnud töö märgitakse veaks
+            if now - job.get("started_at", now) > REOCR_PROCESSING_TIMEOUT:
+                with _reocr_jobs_lock:
+                    if _reocr_jobs.get(jid, {}).get("status") == "processing":
+                        _reocr_jobs[jid]["status"] = "error"
+                        _reocr_jobs[jid]["error"] = "Aegumine: OCR server ei vastanud 30 minuti jooksul."
+                        _reocr_jobs[jid]["finished_at"] = now
+                        logger.warning(f"Re-OCR {jid}: timeout, märgitud error-iks")
+                continue
+            try:
+                poll_reocr_job(jid)
+            except Exception as e:
+                logger.warning(f"Re-OCR background poll viga ({jid}): {e}")
+
+
+threading.Thread(target=_reocr_poll_loop, daemon=True, name="reocr-poll").start()
+
+
 def get_active_reocr_count() -> int:
     """Tagastab parajasti aktiivsete (uploading/processing) re-OCR tööde arvu."""
     return sum(1 for j in _reocr_jobs.values() if j["status"] in ("uploading", "processing"))
