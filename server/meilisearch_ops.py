@@ -100,16 +100,27 @@ def load_labels_store():
     return {}
 
 
+def _invert_name(name: str) -> str | None:
+    """Teisendab 'Perenimi, Eesnimi' → 'Eesnimi Perenimi'. Tagastab None kui komat pole."""
+    if ',' in name:
+        parts = name.split(',', 1)
+        return f"{parts[1].strip()} {parts[0].strip()}"
+    return None
+
+
 def get_creator_aliases(creators, people_data):
-    """Leiab isikutele aliased (nimevariandid)."""
+    """Leiab isikutele aliased (nimevariandid).
+    Lisab igale 'Perenimi, Eesnimi' aliasele ka inverteeritud 'Eesnimi Perenimi' versiooni."""
     aliases = []
     for creator in creators:
         creator_id = creator.get('id')
-        # Otsi ID järgi (nt Q123)
         if creator_id and people_data.get(creator_id):
             person = people_data[creator_id]
-            if person.get('aliases'):
-                aliases.extend(person['aliases'])
+            for alias in person.get('aliases', []):
+                aliases.append(alias)
+                inverted = _invert_name(alias)
+                if inverted:
+                    aliases.append(inverted)
     return aliases
 
 
@@ -415,7 +426,11 @@ def sync_work_to_meilisearch(dir_name):
         publisher_aliases = []
         pub_id = get_id(publisher)
         if pub_id and people_data.get(pub_id):
-            publisher_aliases = people_data[pub_id].get('aliases', [])
+            for alias in people_data[pub_id].get('aliases', []):
+                publisher_aliases.append(alias)
+                inverted = _invert_name(alias)
+                if inverted:
+                    publisher_aliases.append(inverted)
 
         doc = {
             "id": page_id,
