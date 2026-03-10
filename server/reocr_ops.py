@@ -2,13 +2,63 @@
 Re-OCR operatsioonid — olemasoleva lehekülje uuesti transkribeerimine OCR serveri kaudu.
 """
 import io
+import json
 import os
 import threading
 from datetime import datetime
 
-from .config import BASE_DIR, OCR_SERVER_PATH, get_logger
+from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, get_logger
 from .utils import generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
+
+REOCR_LOG_MAX = 500   # Maksimaalne kirjete arv logifailis
+_log_lock = threading.Lock()
+
+
+def _append_to_log(job: dict, job_id: str):
+    """Lisab lõppenud (done/error) töö püsivasse logifaili."""
+    entry = {
+        "job_id": job_id,
+        "work_id": job.get("work_id"),
+        "slug": job.get("slug"),
+        "page_filename": job.get("page_filename"),
+        "page_number": job.get("page_number"),
+        "username": job.get("username"),
+        "status": job.get("status"),
+        "error": job.get("error"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
+    }
+    with _log_lock:
+        try:
+            if os.path.exists(REOCR_LOG_FILE):
+                with open(REOCR_LOG_FILE, "r", encoding="utf-8") as f:
+                    log = json.load(f)
+            else:
+                log = []
+            log.append(entry)
+            if len(log) > REOCR_LOG_MAX:
+                log = log[-REOCR_LOG_MAX:]
+            with open(REOCR_LOG_FILE, "w", encoding="utf-8") as f:
+                json.dump(log, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            logger.warning(f"Re-OCR logi kirjutamine ebaõnnestus: {e}")
+
+
+def get_reocr_log(offset: int = 0, limit: int = 50) -> dict:
+    """Tagastab re-OCR logi kirjed (uuemad ees)."""
+    with _log_lock:
+        try:
+            if not os.path.exists(REOCR_LOG_FILE):
+                return {"entries": [], "has_more": False, "total": 0}
+            with open(REOCR_LOG_FILE, "r", encoding="utf-8") as f:
+                log = json.load(f)
+        except Exception:
+            return {"entries": [], "has_more": False, "total": 0}
+    entries = list(reversed(log))  # uuemad ees
+    total = len(entries)
+    page = entries[offset: offset + limit]
+    return {"entries": page, "has_more": offset + limit < total, "total": total}
 
 logger = get_logger(__name__)
 
@@ -57,6 +107,7 @@ def _reocr_poll_loop():
                         _reocr_jobs[jid]["error"] = "Aegumine: OCR server ei vastanud 30 minuti jooksul."
                         _reocr_jobs[jid]["finished_at"] = now
                         logger.warning(f"Re-OCR {jid}: timeout, märgitud error-iks")
+                        _append_to_log(_reocr_jobs[jid], jid)
                 continue
             try:
                 poll_reocr_job(jid)
@@ -138,6 +189,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             _reocr_jobs[job_id]["status"] = "error"
             _reocr_jobs[job_id]["error"] = str(e)
             _reocr_jobs[job_id]["finished_at"] = datetime.now().timestamp()
+            _append_to_log(_reocr_jobs[job_id], job_id)
         finally:
             try:
                 os.unlink(img_path)
@@ -203,6 +255,7 @@ def poll_reocr_job(job_id: str) -> dict:
         job["text"] = text
         job["finished_at"] = datetime.now().timestamp()
         logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
+        _append_to_log(job, job_id)
 
         # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
         page_fn = job.get("page_filename", "")

@@ -88,5 +88,5 @@ from .upload_ops import (
 # Re-OCR operatsioonid (olemasoleva lehekülje uuesti transkribeerimine)
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
-    get_active_reocr_count, REOCR_MAX_CONCURRENT,
+    get_active_reocr_count, REOCR_MAX_CONCURRENT, get_reocr_log,
 )

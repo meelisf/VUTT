@@ -94,6 +94,10 @@ const Review: React.FC = () => {
   const [reocrJobs, setReocrJobs] = useState<ReocrJob[]>([]);
   const [reocrLoading, setReocrLoading] = useState(false);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reocrLog, setReocrLog] = useState<ReocrJob[]>([]);
+  const [reocrLogOffset, setReocrLogOffset] = useState(0);
+  const [reocrLogHasMore, setReocrLogHasMore] = useState(false);
+  const [reocrLogLoading, setReocrLogLoading] = useState(false);
 
   // Kontrolli ligipääsu (oota kuni kasutaja andmed on laetud)
   useEffect(() => {
@@ -160,8 +164,32 @@ const Review: React.FC = () => {
 
   // Lae OCR tööd kui tab avatakse
   useEffect(() => {
-    if (activeTab === 'reocr' && isAdmin) loadReocrJobs(true);
+    if (activeTab === 'reocr' && isAdmin) {
+      loadReocrJobs(true);
+      loadReocrLog(0, true);
+    }
   }, [activeTab, isAdmin]);
+
+  const loadReocrLog = async (fromOffset: number, reset = false) => {
+    if (!token || !isAdmin) return;
+    setReocrLogLoading(true);
+    try {
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/reocr/log?offset=${fromOffset}&limit=50&token=${token}`,
+        { timeout: 10000 }
+      );
+      const data = await res.json();
+      if (data.status === 'success') {
+        setReocrLog(prev => reset ? data.entries : [...prev, ...data.entries]);
+        setReocrLogOffset(fromOffset + data.entries.length);
+        setReocrLogHasMore(data.has_more);
+      }
+    } catch {
+      // eiramine
+    } finally {
+      setReocrLogLoading(false);
+    }
+  };
 
   const loadRecentEdits = async (fromOffset: number, append: boolean) => {
     if (!token) return;
@@ -568,7 +596,70 @@ const Review: React.FC = () => {
                     );
                   })}
                 </div>
-              )
+              )}
+
+              {/* Ajalugu */}
+              {isAdmin && (
+                <div className="mt-8">
+                  <h3 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                    <History size={14} />
+                    {t('reocr.logTitle')}
+                  </h3>
+                  {reocrLog.length === 0 && !reocrLogLoading ? (
+                    <p className="text-sm text-gray-400">{t('reocr.logEmpty')}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {reocrLog.map(entry => (
+                        <div
+                          key={entry.job_id}
+                          className={`flex items-center gap-4 px-4 py-2.5 rounded-lg border text-sm ${
+                            entry.status === 'done' ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'
+                          }`}
+                        >
+                          <div className="shrink-0">
+                            {entry.status === 'done'
+                              ? <CheckCircle size={15} className="text-green-500" />
+                              : <XCircle size={15} className="text-red-400" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-gray-700">{entry.slug}</span>
+                              {entry.page_number && <span className="text-xs text-gray-400">lk {entry.page_number}</span>}
+                              {entry.work_id && entry.page_number && (
+                                <a href={`/work/${entry.work_id}/${entry.page_number}`} target="_blank" rel="noreferrer"
+                                  className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
+                                  <ExternalLink size={11} />
+                                </a>
+                              )}
+                            </div>
+                            {entry.error && <p className="text-xs text-red-500 mt-0.5">{entry.error}</p>}
+                          </div>
+                          <div className="text-xs text-gray-400 text-right shrink-0">
+                            <div className="flex items-center gap-1 justify-end">
+                              <User size={11} />{entry.username}
+                            </div>
+                            {entry.finished_at && (
+                              <div className="flex items-center gap-1 mt-0.5 justify-end">
+                                <Clock size={11} />
+                                {new Date(entry.finished_at * 1000).toLocaleString('et-EE', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {reocrLogHasMore && (
+                    <button
+                      onClick={() => loadReocrLog(reocrLogOffset)}
+                      disabled={reocrLogLoading}
+                      className="mt-4 w-full py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      {reocrLogLoading ? <Loader2 size={14} className="animate-spin mx-auto" /> : t('reocr.logLoadMore')}
+                    </button>
+                  )}
+                </div>
+              )}
             ) : loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="animate-spin text-primary-600" size={32} />

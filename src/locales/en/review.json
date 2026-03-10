@@ -7,6 +7,9 @@
   "reocr": {
     "loading": "Loading OCR jobs...",
     "empty": "No active or recent OCR jobs",
+    "logTitle": "History",
+    "logEmpty": "No history yet",
+    "logLoadMore": "Load more",
     "status": {
       "uploading": "Uploading",
       "processing": "Processing",

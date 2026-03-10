@@ -7,6 +7,9 @@
   "reocr": {
     "loading": "Laadin OCR töid...",
     "empty": "Aktiivseid ega hiljutisi OCR töid pole",
+    "logTitle": "Ajalugu",
+    "logEmpty": "Ajalugu on tühi",
+    "logLoadMore": "Laadi veel",
     "status": {
       "uploading": "Laadin",
       "processing": "Töötleb",

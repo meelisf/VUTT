@@ -32,7 +32,7 @@ from .upload_ops import (
 )
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
-    get_active_reocr_count, REOCR_MAX_CONCURRENT,
+    get_active_reocr_count, REOCR_MAX_CONCURRENT, get_reocr_log,
 )
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
@@ -792,6 +792,11 @@ async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
 async def admin_reocr_jobs(user=Depends(require_role("admin"))):
     """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
     return {"status": "success", "jobs": list_reocr_jobs()}
+
+@app.get("/admin/reocr/log")
+async def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require_role("admin"))):
+    """Tagastab re-OCR ajalogi (püsiv, uuemad ees)."""
+    return {"status": "success", **get_reocr_log(offset, limit)}
 
 @app.get("/admin/work/{work_id}/page-ocr")
 async def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
