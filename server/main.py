@@ -28,8 +28,11 @@ from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work, start_reocr_job, poll_reocr_job, list_reocr_jobs,
-    get_active_reocr_count, REOCR_MAX_CONCURRENT
+    import_as_work,
+)
+from .reocr_ops import (
+    start_reocr_job, poll_reocr_job, list_reocr_jobs,
+    get_active_reocr_count, REOCR_MAX_CONCURRENT,
 )
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,

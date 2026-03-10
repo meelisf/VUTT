@@ -84,3 +84,9 @@ from .upload_ops import (
     # Etapp 4: import VUTT-i
     import_as_work,
 )
+
+# Re-OCR operatsioonid (olemasoleva lehekülje uuesti transkribeerimine)
+from .reocr_ops import (
+    start_reocr_job, poll_reocr_job, list_reocr_jobs,
+    get_active_reocr_count, REOCR_MAX_CONCURRENT,
+)
