@@ -88,6 +88,13 @@ def fetch_wikidata_aliases(wikidata_id):
         print(f"Wikidata fetch error ({wikidata_id}): {e}")
         return None
 
+def invert_gnd_name(name):
+    """Teisendab GND 'Perenimi, Eesnimi' -> 'Eesnimi Perenimi'."""
+    if ', ' in name:
+        parts = name.split(', ', 1)
+        return f"{parts[1]} {parts[0]}"
+    return name
+
 def fetch_gnd_aliases(gnd_id):
     """Küsub nimevariante GND-st (lobid.org API)."""
     # Eemalda "GND:" prefiks kui olemas (frontend salvestab kujul "GND:123456789")
@@ -106,7 +113,7 @@ def fetch_gnd_aliases(gnd_id):
             elif isinstance(variants, str):
                 aliases.append(variants)
                 
-            primary_name = data.get('preferredName', gnd_id)
+            primary_name = invert_gnd_name(data.get('preferredName', gnd_id))
             
             # Teised ID-d
             ids = {'gnd': clean_id}

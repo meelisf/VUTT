@@ -12,6 +12,15 @@ interface SuggestionItem {
   id: string | null;
 }
 
+// Normaliseerib "Perenimi, Eesnimi" → "Eesnimi Perenimi" (GND/VIAF formaat)
+function normalizePersonName(name: string): string {
+  if (!name.includes(',')) return name;
+  const commaIdx = name.indexOf(',');
+  const surname = name.substring(0, commaIdx).trim();
+  const rest = name.substring(commaIdx + 1).trim();
+  return rest ? `${rest} ${surname}` : name;
+}
+
 export interface PeopleRegisterEntry {
   primary_name: string;
   aliases: string[];
@@ -201,7 +210,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
             registerMatches.push({
               id: bestId,
-              label: person.primary_name,
+              label: normalizePersonName(person.primary_name),
               description: desc,
               url: '',
               isLocal: true,
@@ -263,9 +272,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     if (result.id.startsWith('local-')) {
       entity = { id: null, label: result.label, source: 'manual', labels: { et: result.label } };
     } else if (result.isGnd || result.id.startsWith('GND:')) {
-      entity = { id: result.id, label: result.label, source: 'gnd', labels: { et: result.label } };
+      const label = normalizePersonName(result.label);
+      entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
     } else if (result.isViaf || result.id.startsWith('VIAF:')) {
-      entity = { id: result.id, label: result.label, source: 'viaf', labels: { et: result.label } };
+      const label = normalizePersonName(result.label);
+      entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
     } else if (result.isLocal && !/^Q\d+$/.test(result.id)) {
       // Lokaalne kirje ilma Wikidata Q-koodita — manuaalne, ainult eesti label
       entity = { id: result.id.startsWith('local-') ? null : result.id, label: result.label, source: 'manual', labels: { et: result.label } };
@@ -277,11 +288,15 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       } catch (e) {
         console.warn("Ei saanud silte Wikidatast", e);
       }
-      entity = { id: result.id, label: result.label, source: 'wikidata', labels: multilingualLabels };
+      // Kasuta Wikidata canonical labeli (nt "Paul Oderborn"), mitte isikuregistri labeli
+      // (mis võib olla GND-formaadis "Oderborn, Paul")
+      const baseLang = lang.split('-')[0];
+      const bestLabel = multilingualLabels[baseLang] || multilingualLabels.en || result.label;
+      entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };
     }
 
     onChange(entity);
-    setInputValue(value === null ? '' : result.label);
+    setInputValue(value === null ? '' : entity.label);
     setShowSuggestions(false);
     setIsLoading(false);
   };
@@ -351,7 +366,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           type="text"
           value={inputValue}
           onChange={(e) => { setInputValue(e.target.value); setShowSuggestions(true); }}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={() => { justSelectedRef.current = false; setShowSuggestions(true); }}
           onBlur={() => {
             if (justSelectedRef.current) { justSelectedRef.current = false; return; }
             const currentLabel = value ? (typeof value === 'string' ? value : value.label) : '';
@@ -445,9 +460,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                       href={rowUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      tabIndex={-1}
                       title={lang === 'en' ? 'View in database' : 'Vaata andmebaasis'}
                       onClick={e => e.stopPropagation()}
-                      onMouseDown={e => { e.preventDefault(); e.stopPropagation(); }}
+                      onMouseDown={e => { justSelectedRef.current = true; e.preventDefault(); e.stopPropagation(); }}
                       className="shrink-0 mt-0.5 p-1 rounded text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition-colors opacity-0 group-hover:opacity-100"
                     >
                       <ExternalLink size={12} />
