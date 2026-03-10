@@ -513,7 +513,8 @@ const Review: React.FC = () => {
           <div className="p-6">
             {activeTab === 'reocr' ? (
               /* OCR tööde tab */
-              reocrLoading ? (
+              <>
+              {reocrLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="animate-spin text-primary-600" size={32} />
                   <span className="ml-3 text-gray-600">{t('reocr.loading')}</span>
@@ -599,6 +600,7 @@ const Review: React.FC = () => {
               )}
 
               {/* Ajalugu */}
+
               {isAdmin && (
                 <div className="mt-8">
                   <h3 className="text-sm font-semibold text-gray-600 mb-3 flex items-center gap-2">
@@ -660,6 +662,7 @@ const Review: React.FC = () => {
                   )}
                 </div>
               )}
+              </>
             ) : loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="animate-spin text-primary-600" size={32} />
