@@ -100,7 +100,7 @@ def load_labels_store():
     return {}
 
 
-def _invert_name(name: str) -> str | None:
+def _invert_name(name: str):
     """Teisendab 'Perenimi, Eesnimi' → 'Eesnimi Perenimi'. Tagastab None kui komat pole."""
     if ',' in name:
         parts = name.split(',', 1)
