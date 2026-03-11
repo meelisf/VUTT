@@ -39,13 +39,16 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
     ? 'bg-red-600 hover:bg-red-700 text-white'
     : 'bg-primary-600 hover:bg-primary-700 text-white';
 
+  const iconBgClass = variant === 'danger' ? 'bg-red-100' : 'bg-amber-100';
+  const iconClass = variant === 'danger' ? 'text-red-600' : 'text-amber-600';
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3">
-          <div className="p-2 bg-amber-100 rounded-full">
-            <AlertTriangle className="text-amber-600" size={24} />
+          <div className={`p-2 ${iconBgClass} rounded-full`}>
+            <AlertTriangle className={iconClass} size={24} />
           </div>
           <h2 className="text-lg font-semibold text-gray-900">{resolvedTitle}</h2>
         </div>
