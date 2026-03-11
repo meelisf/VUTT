@@ -60,7 +60,15 @@ interface SavedUpload {
 const POLL_SLOW_MS = 5000;
 const POLL_FAST_MS = 2000;
 const OCR_TIMEOUT_MS_FALLBACK = 2 * 60 * 60 * 1000; // 2 tundi (kui lehekülgede arv teadmata)
-const OCR_MS_PER_PAGE = 60 * 1000; // ~60 sek/lk (OCR ~30 sek/lk + varu)
+const OCR_MS_PER_PAGE = 60 * 1000; // ~60 sek/lk (konservatiivne, timeout'i jaoks)
+const OCR_PAGES_PER_MIN = 2.5; // Reaalne OCR kiirus lehekülgi minutis (ajahinnangu kuvamiseks)
+
+/** Arvutab OCR ajahinnangu lehekülgede arvu põhjal. */
+function ocrEstimate(pages: number | null | undefined): string {
+  if (!pages) return '~10 min';
+  const mins = Math.ceil(pages / OCR_PAGES_PER_MIN);
+  return `~${mins} min`;
+}
 
 // ---------------------------------------------------------------------------
 // Slug utiliit (peegeldab serveri sanitize_slug)
@@ -662,6 +670,7 @@ const Upload: React.FC = () => {
     Date.now() - ocrStartedAt > ocrTimeoutMs &&
     status !== 'done';
   const canImport = readyCount > 0 && !importLoading;
+  const estimatedTime = ocrEstimate(pollResult?.expected_pages);
 
   // Kollektsioonide loend (sortimine nime järgi)
   const collectionList = Object.entries(collections).sort(([, a], [, b]) => {
@@ -763,12 +772,12 @@ const Upload: React.FC = () => {
         {/* Sammuindikaator */}
         <StepIndicator step={step} labels={stepLabels} />
 
-        {/* Püsiv teade: samm 2 ja 3 ajal */}
-        {step >= 2 && (
+        {/* Eelteade: ainult samm 2-s enne faili valimist (samm 3-s on oma inline teade) */}
+        {step === 2 && !fileUploading && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-xl text-sm text-blue-900 flex items-start gap-3 shadow-sm">
             <Info size={18} className="shrink-0 mt-0.5 text-blue-600" />
             <div>
-              <p className="font-semibold mb-0.5">{t('notice.title')}</p>
+              <p className="font-semibold mb-0.5">{t('notice.title', { time: estimatedTime })}</p>
               <p className="text-blue-800">{t('notice.body')}</p>
             </div>
           </div>
@@ -904,7 +913,7 @@ const Upload: React.FC = () => {
                 ) : (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
                     <Info size={16} className="shrink-0 mt-0.5" />
-                    <span>{t('step2.canLeaveNote')}</span>
+                    <span>{t('step2.canLeaveNote', { time: estimatedTime })}</span>
                   </div>
                 )}
 
@@ -1076,7 +1085,7 @@ const Upload: React.FC = () => {
             {fileUploading && !ocrTimedOut && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
                 <Info size={16} className="shrink-0 mt-0.5" />
-                <span>{t('step3.canLeaveNote')}</span>
+                <span>{t('step3.canLeaveNote', { time: estimatedTime })}</span>
               </div>
             )}
 

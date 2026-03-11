@@ -26,7 +26,7 @@
     "languagesLabel": "Languages (optional)",
     "continue": "Continue to upload",
     "required": "Required field",
-    "timeEstimate": "Upload and OCR processing takes about 10 minutes."
+    "timeEstimate": "Upload and OCR processing duration depends on page count (approx. 2–3 pages/min)."
   },
   "step2": {
     "title": "Upload PDF or images",
@@ -37,7 +37,7 @@
     "uploadingMulti": "Transferring file {{current}}/{{total}} to OCR server...",
     "processing": "OCR server is processing...",
     "waitNote": "This may take a few minutes.",
-    "canLeaveNote": "Upload and OCR processing runs in the background — this takes about 10 minutes. You can safely leave this page and return later, your progress is saved.",
+    "canLeaveNote": "Upload and OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved.",
     "progressLabel": "Transfer: {{pct}}%",
     "multipleImagesNote": "Multiple images are uploaded sequentially — do not close this page.",
     "collectingImages": "Images not fully uploaded — please select all files again.",
@@ -55,7 +55,7 @@
     "expectedPages": "Expected: {{n}} pages",
     "done": "OCR complete",
     "processing": "OCR running...",
-    "canLeaveNote": "OCR processing runs in the background — this takes about 10 minutes. You can safely leave this page and return later, your progress is saved.",
+    "canLeaveNote": "OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "importBtn": "Import to VUTT",
     "importDisabled": "Need at least 1 ready page",
     "timeoutWarning": "OCR processing is taking a long time. You can import the available pages.",
@@ -64,7 +64,7 @@
     "importError": "Import failed"
   },
   "notice": {
-    "title": "Upload and processing takes about 10 minutes",
+    "title": "Upload and processing takes {{time}}",
     "body": "After adding the PDF, OCR processing runs in the background. You can leave this page and return later — your progress is saved automatically."
   },
   "closeAndMonitor": "Close — I'll check progress later",

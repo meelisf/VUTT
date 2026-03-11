@@ -26,7 +26,7 @@
     "languagesLabel": "Keeled (valikuline)",
     "continue": "Jätka üleslaadimisele",
     "required": "Kohustuslik väli",
-    "timeEstimate": "Üleslaadimine ja OCR töötlemine võtab umbes 10 minutit."
+    "timeEstimate": "Üleslaadimine ja OCR töötlemine kestab vastavalt lk arvule (u 2–3 lk/min)."
   },
   "step2": {
     "title": "Laadi üles PDF või pildid",
@@ -37,7 +37,7 @@
     "uploadingMulti": "Edastatakse faili {{current}}/{{total}} OCR serverisse...",
     "processing": "OCR server töötleb...",
     "waitNote": "See võib võtta mõne minuti.",
-    "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab umbes 10 minutit. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
+    "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
     "progressLabel": "Edastus: {{pct}}%",
     "multipleImagesNote": "Mitu pilti laetakse üles järjestikuselt — ärge sulgege lehte.",
     "collectingImages": "Pildid üles laadimata — vali kõik failid uuesti.",
@@ -55,7 +55,7 @@
     "expectedPages": "Oodatud: {{n}} lk",
     "done": "OCR lõpetatud",
     "processing": "OCR käib...",
-    "canLeaveNote": "OCR töötlemine käib taustal — see võtab umbes 10 minutit. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
+    "canLeaveNote": "OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
     "importBtn": "Impordi VUTT-i",
     "importDisabled": "Vaja vähemalt 1 valmis lehekülge",
     "timeoutWarning": "OCR töötlemine võtab kaua aega. Saad importida olemasolevad lehed.",
@@ -64,7 +64,7 @@
     "importError": "Importimine ebaõnnestus"
   },
   "notice": {
-    "title": "Üleslaadimine ja töötlemine võtab umbes 10 minutit",
+    "title": "Üleslaadimine ja töötlemine võtab {{time}}",
     "body": "Pärast PDF-i lisamist käivitub OCR töötlemine taustal. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse automaatselt."
   },
   "closeAndMonitor": "Sulge — vaatan progressi hiljem",
