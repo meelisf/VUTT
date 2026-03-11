@@ -1093,8 +1093,8 @@ const Upload: React.FC = () => {
               )}
             </div>
 
-            {/* Metaandmete muutmine OCR ootamise ajal */}
-            {status !== 'done' && uploadId && authToken && (
+            {/* Metaandmete muutmine OCR ootamise ajal ja pärast */}
+            {uploadId && authToken && (
               <UploadMetaForm
                 uploadId={uploadId}
                 authToken={authToken}
