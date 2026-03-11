@@ -112,6 +112,19 @@ def get_creator_aliases(creators, people_data):
     return aliases
 
 
+def get_entity_aliases(entity_or_list, people_data):
+    """Leiab LinkedEntity(te) aliased people.json-ist (trükkal, märksõnad vms)."""
+    aliases = []
+    items = entity_or_list if isinstance(entity_or_list, list) else ([entity_or_list] if entity_or_list else [])
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item_id = item.get('id')
+        if item_id and people_data.get(item_id):
+            aliases.extend(people_data[item_id].get('aliases', []))
+    return aliases
+
+
 def get_collection_hierarchy(collections, collection_ids):
     """
     Tagastab kollektsioonide hierarhia (kõigi kuuluvate kollektsioonide esivanemate union).
@@ -534,7 +547,7 @@ def create_meilisearch_data_per_page():
                 'tags_et': get_labels_by_lang(doc_metadata.get('tags', []), 'et'),
                 'tags_en': get_labels_by_lang(doc_metadata.get('tags', []), 'en'),
                 'tags_object': doc_metadata.get('tags', []),
-                'tags_search': get_all_labels(doc_metadata.get('tags')),
+                'tags_search': get_all_labels(doc_metadata.get('tags')) + get_entity_aliases(doc_metadata.get('tags', []), people_data),
                 'tags_ids': get_all_ids(doc_metadata.get('tags')),
                 'languages': doc_metadata.get('languages', ['lat']),
 
@@ -581,7 +594,7 @@ def create_meilisearch_data_per_page():
             meili_doc['location'] = doc_metadata.get('location')
             meili_doc['publisher'] = doc_metadata.get('publisher')
             meili_doc['location_search'] = get_all_labels(doc_metadata.get('location'))
-            meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher'))
+            meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher')) + get_entity_aliases(doc_metadata.get('publisher_object'), people_data)
 
             pages.append(meili_doc)
 

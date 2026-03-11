@@ -432,6 +432,17 @@ def sync_work_to_meilisearch(dir_name):
                 if inverted:
                     publisher_aliases.append(inverted)
 
+        # Märksõna aliased (isiku märksõnade nimevariandid, nt Ludenius → Luden)
+        tag_aliases = []
+        for tag in tags if isinstance(tags, list) else []:
+            tag_id = get_id(tag) if isinstance(tag, dict) else None
+            if tag_id and people_data.get(tag_id):
+                for alias in people_data[tag_id].get('aliases', []):
+                    tag_aliases.append(alias)
+                    inverted = _invert_name(alias)
+                    if inverted:
+                        tag_aliases.append(inverted)
+
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
@@ -468,7 +479,7 @@ def sync_work_to_meilisearch(dir_name):
             "tags_et": get_labels_by_lang(tags, 'et', labels_store),
             "tags_en": get_labels_by_lang(tags, 'en', labels_store),
             "tags_object": tags,
-            "tags_search": get_all_labels(tags),
+            "tags_search": get_all_labels(tags) + tag_aliases,
             "tags_ids": get_all_ids(tags),
             "collections": work_collections,
             "collections_hierarchy": collections_hierarchy,

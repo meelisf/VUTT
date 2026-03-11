@@ -181,6 +181,36 @@ def process_creators_metadata(creators):
             update_person_async(c_id, c_source)
 
 
+def process_linked_entity(entity):
+    """Töötleb ühe LinkedEntity objekti (trükkal, märksõna vms) — lisab people.json-i kui on ID."""
+    if not entity or not isinstance(entity, dict):
+        return
+    e_id = entity.get('id')
+    e_source = entity.get('source')
+    if e_id:
+        update_person_async(e_id, e_source)
+
+
+def process_person_fields_metadata(meta):
+    """Töötleb kõik metaandmete väljad kus võib esineda isik (creator, publisher, tags).
+
+    Kutsutakse salvestamisel taustal — lisab uued isikud people.json-i.
+    """
+    # Creators (algselt juba toetatud, aga koondame siia)
+    for creator in meta.get('creators') or []:
+        c_id = creator.get('id')
+        c_source = creator.get('source')
+        if c_id:
+            update_person_async(c_id, c_source)
+
+    # Trükkal / kirjastaja
+    process_linked_entity(meta.get('publisher_object'))
+
+    # Märksõnad (tags) — kõik mis omavad ID-d (Wikidata Q-kood või GND)
+    for tag in meta.get('tags_object') or []:
+        process_linked_entity(tag)
+
+
 def refresh_all_people():
     """Uuendab kõigi isikute aliased Wikidatast/GND-st.
 
