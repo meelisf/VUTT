@@ -20,6 +20,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
+import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const ITEMS_PER_PAGE = 12;
@@ -174,166 +175,23 @@ const Dashboard: React.FC = () => {
     setCurrentPage(pageParam);
   }, [pageParam]);
 
-  // Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega, vt server/utils.py capitalize_first)
-  const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
-
-  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (žanrid)
-  // Kasutatakse AdvancedFilters-is, et lahendada URL-i väärtus kuvamiseks
-  const genreIdMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const obj = work.genre_object;
-      if (!obj) continue;
-      const items = Array.isArray(obj) ? obj : [obj];
-      for (const item of items) {
-        if (!item) continue;
-        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
-        if (!rawLabel) continue;
-        const currentLabel = cap(rawLabel);
-        // Q-kood → praeguse keele label (suurtähega, nagu facetis)
-        if (item.id) map[item.id] = currentLabel;
-        // Teise keele labelid → praeguse keele label (mõlemad variandid)
-        if (item.labels) {
-          for (const labelVal of Object.values(item.labels)) {
-            if (labelVal) {
-              map[labelVal as string] = currentLabel;
-              map[cap(labelVal as string)] = currentLabel;
-            }
-          }
-        }
-        if (item.label) {
-          map[item.label] = currentLabel;
-          map[cap(item.label)] = currentLabel;
-        }
-      }
-    }
-    return map;
+  // Genre kaardid: Q-kood/label → praeguse keele label + label → Q-kood
+  const { idToLabel: genreIdMap, labelToId: genreLabelToId } = useMemo(() => {
+    const items = collectLinkedEntities(works, w => w.genre_object);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
-  // Pöördkaart: kõik labelite variandid → Q-kood (URL + facet merging)
-  // Kaardistab KÕIK keelevariantid et mergeFacetItems ühendaks nt "Kõne"+"Oration" → Q861911
-  const genreLabelToId = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const obj = work.genre_object;
-      if (!obj) continue;
-      const items = Array.isArray(obj) ? obj : [obj];
-      for (const item of items) {
-        if (!item?.id) continue;
-        // Eelistatud label (praegune keel + enriched)
-        const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
-        if (rawLabel) { map[rawLabel] = item.id; map[cap(rawLabel)] = item.id; }
-        // Kõik keelevariantid → sama Q-kood (Meilisearchi vanad labelid ühendamiseks)
-        if (item.labels) {
-          for (const lv of Object.values(item.labels)) {
-            if (lv) { map[lv as string] = item.id; map[cap(lv as string)] = item.id; }
-          }
-        }
-        if (item.label) { map[item.label] = item.id; map[cap(item.label)] = item.id; }
-      }
-    }
-    return map;
+  // Tags kaardid: Q-kood/label → praeguse keele label + label → Q-kood
+  const { idToLabel: tagsIdMap, labelToId: tagsLabelToId } = useMemo(() => {
+    const items = collectLinkedEntities(works, w => w.tags_object);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
-  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (märksõnad)
-  const tagsIdMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const objs = work.tags_object;
-      if (!objs || !Array.isArray(objs)) continue;
-      for (const item of objs) {
-        if (!item?.labels) continue;
-        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label;
-        const currentLabel = cap(rawLabel);
-        // Q-kood → praeguse keele label (suurtähega, nagu facetis)
-        if (item.id) map[item.id] = currentLabel;
-        for (const labelVal of Object.values(item.labels)) {
-          if (labelVal) {
-            map[labelVal] = currentLabel;
-            map[cap(labelVal)] = currentLabel;
-          }
-        }
-        if (item.label) {
-          map[item.label] = currentLabel;
-          map[cap(item.label)] = currentLabel;
-        }
-      }
-    }
-    return map;
+  // Type kaardid: Q-kood/label → praeguse keele label + label → Q-kood
+  const { idToLabel: typeIdMap, labelToId: typeLabelToId } = useMemo(() => {
+    const items = collectLinkedEntities(works, w => (w as any).type_object);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
-
-  // Pöördkaart: kõik labelite variandid → Q-kood (facet merging + URL)
-  const tagsLabelToId = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const objs = work.tags_object;
-      if (!objs || !Array.isArray(objs)) continue;
-      for (const item of objs) {
-        if (!item?.id) continue;
-        const rawLabel = (enrichedLabels[item.id]?.[lang]) || item.labels?.[lang] || item.labels?.['et'] || item.label;
-        if (rawLabel) { map[rawLabel] = item.id; map[cap(rawLabel)] = item.id; }
-        if (item.labels) {
-          for (const lv of Object.values(item.labels)) {
-            if (lv) { map[lv as string] = item.id; map[cap(lv as string)] = item.id; }
-          }
-        }
-        if (item.label) { map[item.label] = item.id; map[cap(item.label)] = item.id; }
-      }
-    }
-    return map;
-  }, [works, i18n.language, enrichedLabels]);
-
-  // Lahenduskaart: Q-kood VÕI teise keele label → praeguse keele label (tüüp)
-  const typeIdMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const obj = (work as any).type_object;
-      if (!obj) continue;
-      // type_object on üksik objekt (mitte massiiv)
-      const items = Array.isArray(obj) ? obj : [obj];
-      for (const item of items) {
-        if (!item?.labels) continue;
-        const rawLabel = (item.id && enrichedLabels[item.id]?.[lang]) || item.labels[lang] || item.labels['et'] || item.label;
-        const currentLabel = cap(rawLabel);
-        if (item.id) map[item.id] = currentLabel;
-        for (const labelVal of Object.values(item.labels)) {
-          if (labelVal) {
-            map[labelVal as string] = currentLabel;
-            map[cap(labelVal as string)] = currentLabel;
-          }
-        }
-        if (item.label) {
-          map[item.label] = currentLabel;
-          map[cap(item.label)] = currentLabel;
-        }
-      }
-    }
-    return map;
-  }, [works, i18n.language, enrichedLabels]);
-
-  // Pöördkaart: praeguse keele label → Q-kood (URL-i jaoks, tüüp)
-  const typeLabelToId = useMemo(() => {
-    const map: Record<string, string> = {};
-    const lang = getLangCode(i18n.language);
-    for (const work of works) {
-      const obj = (work as any).type_object;
-      if (!obj) continue;
-      const items = Array.isArray(obj) ? obj : [obj];
-      for (const item of items) {
-        if (item?.id && item?.labels) {
-          const rawLabel = item.labels[lang] || item.labels['et'] || item.label;
-          map[rawLabel] = item.id;
-          map[cap(rawLabel)] = item.id;
-        }
-      }
-    }
-    return map;
-  }, [works, i18n.language]);
 
   // Lae entity labels cache serverist (üks kord sessiooni jooksul)
   useEffect(() => {
