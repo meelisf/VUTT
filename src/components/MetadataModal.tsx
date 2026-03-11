@@ -196,9 +196,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       year_display: work?.year_display || page.year_display || '',
       type: work?.type || page.type || null,
       genre: (() => { const g = (work as any)?.genre_object ?? (page as any)?.genre_object ?? work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
-      tags: work?.tags || page.tags || [],
-      location: work?.location || page.location || '',
-      publisher: work?.publisher || page.publisher || '',
+      tags: work?.tags_object || work?.tags || page.tags_object || page.tags || [],
+      location: work?.location_object || work?.location || page.location_object || page.location || '',
+      publisher: work?.publisher_object || work?.publisher || page.publisher_object || page.publisher || '',
       creators: work?.creators || page.creators || initialCreators,
       languages: work?.languages || page.languages || [],
       ester_id: work?.ester_id || page.ester_id || '',
@@ -275,9 +275,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         // V2 formaat (v1 fallback turvavõrguna)
         const title = m.title ?? m.pealkiri ?? '';
         const year = m.year ?? m.aasta ?? 0;
-        const location = m.location ?? m.koht ?? '';
-        const publisher = m.publisher ?? m.trükkal ?? '';
-        const tags = m.tags ?? m.teose_tags ?? [];
+        const location = m.location_object ?? m.location ?? m.koht ?? '';
+        const publisher = m.publisher_object ?? m.publisher ?? m.trükkal ?? '';
+        const tags = m.tags_object ?? m.tags ?? m.teose_tags ?? [];
 
         // Creators: v2 esmalt, v1 fallback
         let creators: Creator[] = [];
