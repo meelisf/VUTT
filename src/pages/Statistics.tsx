@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
-import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag } from 'lucide-react';
+import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag, Link2, Check } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
@@ -38,6 +38,7 @@ const Statistics: React.FC = () => {
     }
   }, [searchParams.get('collection'), collections]);
   const lang = getLangCode(i18n.language);
+  const [collectionLinkCopied, setCollectionLinkCopied] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
@@ -281,12 +282,31 @@ const Statistics: React.FC = () => {
         {selectedCollection && (() => {
           const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
           return (
-            <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-3 sm:p-4 flex items-center gap-3`}>
-              <Library className={colorClasses.text} size={20} />
-              <div>
-                <span className={`text-sm ${colorClasses.text}`}>{t('common:collections.activeFilter')}:</span>
-                <span className={`ml-2 font-bold ${colorClasses.text}`}>{getCollectionName(selectedCollection)}</span>
+            <div className={`${colorClasses.bg} border ${colorClasses.border} rounded-lg p-3 sm:p-4 flex items-center justify-between gap-3`}>
+              <div className="flex items-center gap-3">
+                <Library className={colorClasses.text} size={20} />
+                <div>
+                  <span className={`text-sm ${colorClasses.text}`}>{t('common:collections.activeFilter')}:</span>
+                  <span className={`ml-2 font-bold ${colorClasses.text}`}>{getCollectionName(selectedCollection)}</span>
+                </div>
               </div>
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}/stats?collection=${encodeURIComponent(selectedCollection)}`;
+                  try { await navigator.clipboard.writeText(url); } catch {
+                    const el = document.createElement('textarea');
+                    el.value = url; document.body.appendChild(el); el.select();
+                    document.execCommand('copy'); document.body.removeChild(el);
+                  }
+                  setCollectionLinkCopied(true);
+                  setTimeout(() => setCollectionLinkCopied(false), 2000);
+                }}
+                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded border ${colorClasses.border} ${colorClasses.hoverBg} ${colorClasses.text} transition-colors shrink-0`}
+                title={t('common:collections.copyLink', 'Kopeeri link')}
+              >
+                {collectionLinkCopied ? <Check size={13} /> : <Link2 size={13} />}
+                <span className="hidden sm:inline">{collectionLinkCopied ? t('common:collections.linkCopied', 'Kopeeritud!') : t('common:collections.copyLink', 'Kopeeri link')}</span>
+              </button>
             </div>
           );
         })()}
