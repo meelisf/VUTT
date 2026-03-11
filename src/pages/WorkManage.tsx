@@ -60,6 +60,8 @@ const WorkManage: React.FC = () => {
   // Pildi asendamine
   const [replacingPage, setReplacingPage] = useState<number | null>(null);
   const [replaceError, setReplaceError] = useState<string | null>(null);
+  const [replaceSuccess, setReplaceSuccess] = useState<string | null>(null);
+  const [thumbCacheBust, setThumbCacheBust] = useState<number>(Date.now());
   const replaceInputRef = useRef<HTMLInputElement>(null);
   const replaceTargetPage = useRef<number | null>(null);
 
@@ -250,7 +252,10 @@ const WorkManage: React.FC = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.status === 'success') {
-        // Uuenda lehekülgede nimekirja (thumbnail on uuenenud)
+        // Cache bust + success teade
+        setThumbCacheBust(Date.now());
+        setReplaceSuccess(t('manage.replaceSuccess', { num: pageNum }));
+        setTimeout(() => setReplaceSuccess(null), 4000);
         await loadPages();
       } else {
         setReplaceError(t('manage.replaceError'));
@@ -491,7 +496,7 @@ const WorkManage: React.FC = () => {
                       {/* Pisipilt */}
                       <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
                         <img
-                          src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}`}
+                          src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}?v=${thumbCacheBust}`}
                           alt={`Lk ${page.page_num}`}
                           className="w-full h-full object-cover"
                           loading="lazy"
@@ -630,6 +635,12 @@ const WorkManage: React.FC = () => {
             {deletePageError && (
               <div className="mx-5 mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
                 {deletePageError}
+              </div>
+            )}
+
+            {replaceSuccess && (
+              <div className="mx-5 mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+                {replaceSuccess}
               </div>
             )}
 

@@ -86,6 +86,7 @@
     "downloadImage": "Download image",
     "replaceImage": "Replace image",
     "replaceError": "Failed to replace image",
+    "replaceSuccess": "Page {{num}} image replaced",
     "reorderTo": "→",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",

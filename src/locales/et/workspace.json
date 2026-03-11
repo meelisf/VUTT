@@ -86,6 +86,7 @@
     "downloadImage": "Lae pilt alla",
     "replaceImage": "Asenda pilt",
     "replaceError": "Pildi asendamine ebaõnnestus",
+    "replaceSuccess": "Leht {{num}} pilt asendatud",
     "reorderTo": "→",
     "reorderSave": "Salvesta järjekord",
     "reorderConfirm": "Oled kindel, et soovid lehekülgede järjekorda muuta?",
