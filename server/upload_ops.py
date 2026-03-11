@@ -280,6 +280,28 @@ def create_upload(meta: dict) -> dict:
     return state
 
 
+def update_upload_meta(upload_id: str, updates: dict) -> bool:
+    """Uuendab staging uploadi metaandmeid. Slug ei muutu."""
+    if not _valid_upload_id(upload_id):
+        return False
+    allowed = {
+        'title', 'year', 'collections', 'languages',
+        'type', 'type_object', 'genre', 'genre_object',
+        'creators', 'location', 'location_object',
+        'publisher', 'publisher_object', 'tags', 'tags_object',
+    }
+    lock = _get_upload_lock(upload_id)
+    with lock:
+        state = _read_state(upload_id)
+        if not state:
+            return False
+        for key, val in updates.items():
+            if key in allowed:
+                state['meta'][key] = val
+        _write_state(upload_id, state)
+    return True
+
+
 def list_uploads() -> list:
     """Tagastab kõik aktiivsed (mitte-imporditud) üleslaadimised, uuemad ees."""
     if not os.path.isdir(UPLOADS_DIR):

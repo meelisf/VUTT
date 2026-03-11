@@ -21,6 +21,7 @@ import {
   ListTodo,
 } from 'lucide-react';
 import Header from '../components/Header';
+import UploadMetaForm from '../components/UploadMetaForm';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
@@ -669,7 +670,7 @@ const Upload: React.FC = () => {
     ocrStartedAt !== null &&
     Date.now() - ocrStartedAt > ocrTimeoutMs &&
     status !== 'done';
-  const canImport = readyCount > 0 && !importLoading;
+  const canImport = (status === 'done' || ocrTimedOut) && readyCount > 0 && !importLoading;
   const estimatedTime = ocrEstimate(pollResult?.expected_pages);
 
   // Kollektsioonide loend (sortimine nime järgi)
@@ -1081,6 +1082,18 @@ const Upload: React.FC = () => {
               )}
             </div>
 
+            {/* Metaandmete muutmine OCR ootamise ajal */}
+            {status !== 'done' && uploadId && authToken && (
+              <UploadMetaForm
+                uploadId={uploadId}
+                authToken={authToken}
+                collections={collections}
+                initialTitle={title}
+                initialYear={year}
+                initialCollections={selectedCollection ? [selectedCollection] : []}
+              />
+            )}
+
             {/* Info: OCR käib taustal, saab lahkuda */}
             {fileUploading && !ocrTimedOut && (
               <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
@@ -1131,7 +1144,7 @@ const Upload: React.FC = () => {
             <button
               onClick={handleImport}
               disabled={!canImport}
-              title={canImport ? '' : t('step3.importDisabled')}
+              title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
               className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
             >
               {importLoading ? (

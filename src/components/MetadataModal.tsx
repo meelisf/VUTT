@@ -85,7 +85,7 @@ function CollectionDropdownTreeNode({
   );
 }
 
-const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collections, selected, lang, onChange, label }) => {
+export const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collections, selected, lang, onChange, label }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const tree = buildCollectionTree(collections);

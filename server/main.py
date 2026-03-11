@@ -25,7 +25,7 @@ from .registration import (
     create_user_from_invite
 )
 from .upload_ops import (
-    sanitize_slug, check_slug_conflict, create_upload,
+    sanitize_slug, check_slug_conflict, create_upload, update_upload_meta,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
     import_as_work,
@@ -751,6 +751,20 @@ async def admin_upload_import(upload_id: str, user=Depends(require_role("admin")
         build_work_id_cache()
         return {"status": "success", **res}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/admin/upload/{upload_id}/meta")
+async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin"))):
+    state = get_upload(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Upload ei leitud")
+    return {"status": "success", "meta": state.get("meta", {})}
+
+@app.patch("/admin/upload/{upload_id}/meta")
+async def admin_upload_update_meta(upload_id: str, request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    if not update_upload_meta(upload_id, data):
+        raise HTTPException(status_code=404, detail="Upload ei leitud")
+    return {"status": "success"}
 
 @app.delete("/admin/upload/{upload_id}")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
