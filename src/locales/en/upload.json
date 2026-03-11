@@ -81,6 +81,7 @@
   "errors": {
     "createFailed": "Failed to create staging",
     "uploadFailed": "File upload failed",
+    "fileTooLarge": "File is too large (max 500 MB). For very large files, upload as individual images.",
     "networkError": "Network error — please try again",
     "invalidPdf": "Invalid PDF — file cannot be read"
   },

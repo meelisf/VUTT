@@ -366,8 +366,8 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
 def _detect_file_type(path: str) -> str:
     """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png', 'tiff' või 'unknown'."""
     with open(path, 'rb') as f:
-        header = f.read(8)
-    if header[:4] == b'%PDF':
+        header = f.read(1024)
+    if b'%PDF' in header[:1024]:
         return 'pdf'
     if header[:2] == b'\xff\xd8':
         return 'jpeg'
@@ -497,13 +497,14 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
             capture_output=True, text=True, timeout=30
         )
         if result.returncode != 0:
+            logger.error(f"pdfinfo viga: {result.stderr}")
             try:
                 os.unlink(tmp_path)
             except Exception:
                 pass
             raise ValueError(
-                "Vigane PDF — fail ei ole korrektne PDF-dokument. "
-                "Kontrolli, et laadid üles õige faili (PDF, JPG, PNG või TIFF)."
+                f"Vigane PDF — fail ei ole korrektne PDF-dokument (pdfinfo viga). "
+                f"Kontrolli, et laadid üles õige faili."
             )
 
         pages = None
@@ -512,6 +513,7 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
                 pages = int(line.split(':', 1)[1].strip())
                 break
         if pages is None:
+            logger.error(f"pdfinfo väljundis puudus 'Pages:': {result.stdout}")
             raise ValueError("PDF lehekülgede arvu ei õnnestunud tuvastada")
 
     except FileNotFoundError:

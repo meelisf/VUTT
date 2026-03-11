@@ -408,9 +408,15 @@ const Upload: React.FC = () => {
           timeout: 300_000, // 5 min suurtele failidele
         }
       );
+      if (r.status === 413) {
+        setUploadError(t('errors.fileTooLarge'));
+        setFileUploading(false);
+        stopPolling();
+        return;
+      }
       const d = await r.json();
       if (!r.ok) {
-        setUploadError(d.message || t('errors.uploadFailed'));
+        setUploadError(d.detail || d.message || t('errors.uploadFailed'));
         setFileUploading(false);
         stopPolling();
       }
@@ -447,9 +453,14 @@ const Upload: React.FC = () => {
             timeout: 300_000,
           }
         );
+        if (r.status === 413) {
+          setUploadError(t('errors.fileTooLarge'));
+          setFileUploading(false);
+          return;
+        }
         const d = await r.json();
         if (!r.ok) {
-          setUploadError(d.message || t('errors.uploadFailed'));
+          setUploadError(d.detail || d.message || t('errors.uploadFailed'));
           setFileUploading(false);
           return;
         }

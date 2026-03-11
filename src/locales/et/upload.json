@@ -81,6 +81,7 @@
   "errors": {
     "createFailed": "Staging loomine ebaõnnestus",
     "uploadFailed": "Faili üleslaadimine ebaõnnestus",
+    "fileTooLarge": "Fail on liiga suur (max 500 MB). Väga suurte failide korral lae üles üksikute piltidena.",
     "networkError": "Võrgu viga — proovi uuesti",
     "invalidPdf": "Vigane PDF — faili ei saa lugeda"
   },

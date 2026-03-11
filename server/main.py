@@ -10,8 +10,10 @@ from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, get_logger
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid
+
+logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
@@ -739,10 +741,21 @@ async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require
 async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
     x_pg, x_total = int(request.headers.get('X-Page-Number', '0')), int(request.headers.get('X-Total-Pages', '0'))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
-    with open(tmp_path, 'wb') as f:
-        async for chunk in request.stream(): f.write(chunk)
-    pages = add_image_page(upload_id, tmp_path, x_pg, x_total) if x_pg > 0 else save_and_transfer_to_ocr(upload_id, tmp_path)
-    return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
+    try:
+        with open(tmp_path, 'wb') as f:
+            async for chunk in request.stream():
+                f.write(chunk)
+        pages = add_image_page(upload_id, tmp_path, x_pg, x_total) if x_pg > 0 else save_and_transfer_to_ocr(upload_id, tmp_path)
+        return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
+    except ValueError as e:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        logger.error(f"Üleslaadimise viga ({upload_id}): {e}")
+        raise HTTPException(status_code=500, detail="Serveri viga faili töötlemisel")
 
 @app.post("/admin/upload/{upload_id}/import")
 async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
