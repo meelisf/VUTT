@@ -46,6 +46,7 @@ type Suggestion = WikidataSearchResult & {
   isGnd?: boolean;
   isRegister?: boolean;
   isAlreadyAdded?: boolean;
+  displayLabel?: string; // Kuvatav nimi dropdownis (võib erineda salvestatavast label-ist)
 };
 
 // Tagastab tulemuse välise lingi (Wikidata, GND, VIAF)
@@ -204,14 +205,16 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             seenRegisterIds.add(bestId);
             if (localIds.has(bestId)) continue;
 
-            const desc = matchingAlias && !nameMatch
-              ? `${registerText} (alias: ${matchingAlias})`
-              : registerText;
+            const primaryLabel = normalizePersonName(person.primary_name);
+            const displayLabel = matchingAlias && !nameMatch
+              ? `${matchingAlias} → ${primaryLabel}`
+              : undefined;
 
             registerMatches.push({
               id: bestId,
-              label: normalizePersonName(person.primary_name),
-              description: desc,
+              label: primaryLabel,
+              displayLabel,
+              description: registerText,
               url: '',
               isLocal: true,
               isRegister: true
@@ -441,7 +444,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
                   {/* Nimi + kirjeldus */}
                   <span className="flex-1 min-w-0">
-                    <span className="font-medium text-gray-900 text-sm block truncate">{result.label}</span>
+                    <span className="font-medium text-gray-900 text-sm block truncate">{result.displayLabel || result.label}</span>
                     {result.description && (
                       <span className={`text-xs block truncate ${
                         isAlreadyAdded ? 'text-blue-600/80 italic' :
