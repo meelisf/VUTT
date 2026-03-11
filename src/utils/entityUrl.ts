@@ -18,7 +18,7 @@ export function getEntityUrl(id: string | null | undefined, source?: string): st
   // GND koodid (GND:1202439284)
   if (source === 'gnd' || id.toUpperCase().startsWith('GND:')) {
     const gndId = id.replace(/^gnd:/i, '');
-    return `https://d-nb.info/gnd/${gndId}`;
+    return `https://explore.gnd.network/gnd/${gndId}`;
   }
 
   // VIAF koodid (VIAF:12345 või viaf:12345)

@@ -85,7 +85,7 @@ export async function searchGnd(query: string): Promise<GndSearchResult[]> {
         gndId,
         label,
         description,
-        url: `https://d-nb.info/gnd/${gndId}`,
+        url: `https://explore.gnd.network/gnd/${gndId}`,
         wikidataId
       });
     }
