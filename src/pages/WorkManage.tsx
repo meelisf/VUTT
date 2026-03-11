@@ -13,6 +13,8 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
+  Download,
+  Upload,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
@@ -54,6 +56,12 @@ const WorkManage: React.FC = () => {
   // Lehekülje kustutamine
   const [deletingPage, setDeletingPage] = useState<number | null>(null);
   const [deletePageError, setDeletePageError] = useState<string | null>(null);
+
+  // Pildi asendamine
+  const [replacingPage, setReplacingPage] = useState<number | null>(null);
+  const [replaceError, setReplaceError] = useState<string | null>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetPage = useRef<number | null>(null);
 
   // Lehekülje lisamine
   const [showAddForm, setShowAddForm] = useState(false);
@@ -226,6 +234,34 @@ const WorkManage: React.FC = () => {
     }
   };
 
+  const handleReplaceImage = async (file: File, pageNum: number) => {
+    if (!workId || !authToken) return;
+    setReplacingPage(pageNum);
+    setReplaceError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image?token=${authToken}`,
+        { method: 'POST', body: formData, timeout: 30000 }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.status === 'success') {
+        // Uuenda lehekülgede nimekirja (thumbnail on uuenenud)
+        await loadPages();
+      } else {
+        setReplaceError(t('manage.replaceError'));
+      }
+    } catch {
+      setReplaceError(t('manage.replaceError'));
+    } finally {
+      setReplacingPage(null);
+    }
+  };
+
   const handleAddPage = async () => {
     if (!workId || !authToken || !addFile) return;
     setAddingPage(true);
@@ -329,6 +365,23 @@ const WorkManage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
+
+      {/* Peidetud file input pildi asendamiseks */}
+      <input
+        ref={replaceInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file && replaceTargetPage.current !== null) {
+            handleReplaceImage(file, replaceTargetPage.current);
+          }
+          // Reset input
+          if (replaceInputRef.current) replaceInputRef.current.value = '';
+        }}
+      />
+
       <div className="max-w-4xl mx-auto px-4 py-8">
 
         {/* Navigatsioon tagasi */}
@@ -468,6 +521,32 @@ const WorkManage: React.FC = () => {
                         <span className={`absolute top-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(page.status)}`}>
                           {page.page_num}
                         </span>
+                        {/* Lae alla / Asenda nupud — alumises servas */}
+                        <div className="absolute bottom-1 left-1 right-1 flex justify-between">
+                          <a
+                            href={`${IMAGE_BASE_URL}/${workId}/${page.lehekylje_pilt.split('/').pop()}`}
+                            download
+                            className="p-1 bg-white/80 hover:bg-primary-50 text-gray-400 hover:text-primary-600 rounded shadow-sm transition-colors"
+                            title={t('manage.downloadImage')}
+                          >
+                            <Download size={12} />
+                          </a>
+                          <button
+                            onClick={() => {
+                              replaceTargetPage.current = page.page_num;
+                              replaceInputRef.current?.click();
+                            }}
+                            disabled={replacingPage === page.page_num}
+                            className="p-1 bg-white/80 hover:bg-primary-50 text-gray-400 hover:text-primary-600 rounded shadow-sm transition-colors disabled:opacity-50"
+                            title={t('manage.replaceImage')}
+                          >
+                            {replacingPage === page.page_num ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Upload size={12} />
+                            )}
+                          </button>
+                        </div>
                       </div>
 
                       {/* Numbriväli */}
@@ -551,6 +630,12 @@ const WorkManage: React.FC = () => {
             {deletePageError && (
               <div className="mx-5 mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
                 {deletePageError}
+              </div>
+            )}
+
+            {replaceError && (
+              <div className="mx-5 mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                {replaceError}
               </div>
             )}
 

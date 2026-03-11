@@ -42,6 +42,7 @@ from .cache import (
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
+from .image_server import generate_thumbnail
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -346,6 +347,81 @@ async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_ro
 
     new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count}
+
+
+@app.post("/admin/work/{work_id}/page/{page_num}/replace-image")
+async def admin_replace_page_image(work_id: str, page_num: int, request: Request, user=Depends(require_role("admin"))):
+    """
+    Asendab lehekülje pildi uuega. Vana pilt säilitatakse prügikastis 90 päeva.
+    Body: multipart — file (JPG/PNG)
+    """
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    folder_name = os.path.basename(path)
+
+    images = get_sorted_images(path)
+    if page_num < 1 or page_num > len(images):
+        raise HTTPException(status_code=404, detail=f"Lehekülge {page_num} ei leitud")
+
+    img_name = images[page_num - 1]
+    img_path = os.path.join(path, img_name)
+    base = os.path.splitext(img_name)[0]
+
+    # Parse multipart
+    try:
+        form: FormData = await request.form()
+        file: UploadFile = form.get('file')
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
+
+    if not file:
+        raise HTTPException(status_code=400, detail="Fail puudub")
+
+    # Kontrolli failitüüpi ja konverteeri PNG → JPG
+    content = await file.read()
+    if content[:4] == b'\xff\xd8\xff\xe0' or content[:4] == b'\xff\xd8\xff\xe1':
+        pass  # JPG on OK
+    elif content[:8] == b'\x89PNG\r\n\x1a\n':
+        # Teisenda PNG → JPG
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(content))
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=95)
+            content = buf.getvalue()
+        except ImportError:
+            raise HTTPException(status_code=500, detail="Pillow pole saadaval PNG teisendamiseks")
+    else:
+        raise HTTPException(status_code=400, detail="Toetatud formaadid: JPG, PNG")
+
+    # Salvesta vana pilt prügikasti (._trash/{work_id}/replaced_images/)
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_images')
+    os.makedirs(trash_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    trash_filename = f"{base}_{timestamp}{os.path.splitext(img_name)[1]}"
+    if os.path.exists(img_path):
+        shutil.copy2(img_path, os.path.join(trash_dir, trash_filename))
+        logger.info(f"REPLACE-IMG: Vana pilt salvestatud: {trash_filename}")
+
+    # Kirjuta uus pilt üle
+    with open(img_path, 'wb') as f:
+        f.write(content)
+    os.chmod(img_path, 0o644)
+
+    # Regenereeri thumbnail
+    thumbs_dir = os.path.join(path, '_thumbs')
+    os.makedirs(thumbs_dir, exist_ok=True)
+    thumb_path = os.path.join(thumbs_dir, f"_thumb_{img_name}")
+    if os.path.exists(thumb_path):
+        os.remove(thumb_path)
+    generate_thumbnail(img_path, thumb_path)
+
+    logger.info(f"REPLACE-IMG: {folder_name}/{img_name} asendatud ({user['username']})")
+    return {"status": "success", "filename": img_name}
 
 
 @app.post("/admin/work/{work_id}/add-page")

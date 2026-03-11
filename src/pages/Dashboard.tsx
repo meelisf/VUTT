@@ -734,6 +734,7 @@ const Dashboard: React.FC = () => {
                 typeIdMap={typeIdMap}
                 typeLabelToId={typeLabelToId}
                 lang={getLangCode(i18n.language)}
+                enrichedLabels={enrichedLabels}
               />
             </div>
           </div>

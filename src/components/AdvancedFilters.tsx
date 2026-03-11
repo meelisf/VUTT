@@ -55,6 +55,8 @@ interface AdvancedFiltersProps {
   typeLabelToId?: Record<string, string>;
   // Keel facetide jaoks
   lang?: 'et' | 'en';
+  // Enriched labels cache fallback-ina Q-koodide lahendamiseks
+  enrichedLabels?: Record<string, Record<string, string>>;
 }
 
 interface FilterItem {
@@ -161,7 +163,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   tagsLabelToId,
   typeIdMap,
   typeLabelToId,
-  lang: propLang
+  lang: propLang,
+  enrichedLabels
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
   const lang = propLang || getLangCode(i18n.language);
@@ -478,27 +481,36 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <div className="pt-2 border-t border-gray-100 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {selectedStatus && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                        <CircleDot size={11} />
                         {t(`common:status.${selectedStatus}`)}
-                        <button onClick={() => onStatusChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                        <button onClick={() => onStatusChange(null)} className="hover:bg-slate-200 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
                     {effectiveSelectedGenre && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
+                        <Bookmark size={11} />
                         {effectiveSelectedGenre}
-                        <button onClick={() => onGenreChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                        <button onClick={() => onGenreChange(null)} className="hover:bg-violet-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
-                    {effectiveSelectedTags.map(tag => (
-                      <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
-                        {tagsIdMap?.[tag] || tag}
-                        <button onClick={() => toggleTag(tag)} className="hover:text-primary-900"><X size={12} /></button>
-                      </span>
-                    ))}
+                    {effectiveSelectedTags.map(tag => {
+                      // Lahenda Q-kood labeliks: tagsIdMap > enrichedLabels > fallback
+                      const tagLabel = tagsIdMap?.[tag] || enrichedLabels?.[tag]?.[lang] || tag;
+                      const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
+                      return (
+                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <Tag size={11} />
+                          {cap(tagLabel)}
+                          <button onClick={() => toggleTag(tag)} className="hover:bg-emerald-100 rounded-full p-0.5"><X size={11} /></button>
+                        </span>
+                      );
+                    })}
                     {effectiveSelectedType && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
+                        <FileType size={11} />
                         {effectiveSelectedType}
-                        <button onClick={() => onTypeChange(null)} className="hover:text-primary-900"><X size={12} /></button>
+                        <button onClick={() => onTypeChange(null)} className="hover:bg-sky-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
                   </div>
