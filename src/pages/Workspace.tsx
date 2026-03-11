@@ -330,13 +330,15 @@ const Workspace: React.FC = () => {
     );
   }
 
-  // Navigeerimine tagasi (dashboardile või täistekstiotsingusse, olenevalt kust tuldi)
+  // Navigeerimine tagasi dashboardile või otsingusse (salvestatud URL-i järgi)
+  const getReturnUrl = () => sessionStorage.getItem('vutt_return_url') || '/';
   const handleNavigateBack = () => {
+    const returnUrl = getReturnUrl();
     if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(-1));
+      setPendingNavigation(() => () => navigate(returnUrl));
       return;
     }
-    navigate(-1);
+    navigate(returnUrl);
   };
 
   // Navigeerimine otsingusse (selle teose piires)

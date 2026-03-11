@@ -15,12 +15,20 @@ import SearchResults from './search/SearchResults';
 import { mergeFacetsWithExisting, mergeTagsWithExisting, mergeSelectedIntoFacets, mergeSelectedIntoTags } from './search/searchUtils';
 import { getLangCode } from '../utils/getLangCode';
 
+const RETURN_URL_KEY = 'vutt_return_url';
+
 const SearchPage: React.FC = () => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+
+    // Salvesta otsingu URL sessionStorage'isse, et logo saaks siia tagasi tuua
+    useEffect(() => {
+        const url = '/search' + (searchParams.toString() ? '?' + searchParams.toString() : '');
+        sessionStorage.setItem(RETURN_URL_KEY, url);
+    }, [searchParams]);
 
     // URL parameetrid — need on tõe allikas
     const queryParam = searchParams.get('q') || '';
