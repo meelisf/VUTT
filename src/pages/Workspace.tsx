@@ -588,7 +588,17 @@ const Workspace: React.FC = () => {
         <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
           {page.image_url ? (
-            <ImageViewer src={page.image_url} pageNum={page.page_number} onGridView={handleOpenGridView} />
+            <ImageViewer src={(() => {
+              // Kontrolli, kas see pilt on hiljuti asendatud (cache bust)
+              try {
+                const replaced = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
+                const key = `${workId}/${page.page_number}`;
+                if (replaced[key]) {
+                  return `${page.image_url}?v=${replaced[key]}`;
+                }
+              } catch { /* ignore */ }
+              return page.image_url;
+            })()} pageNum={page.page_number} onGridView={handleOpenGridView} />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
               Pilt puudub

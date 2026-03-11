@@ -256,6 +256,15 @@ const WorkManage: React.FC = () => {
         setThumbCacheBust(Date.now());
         setReplaceSuccess(t('manage.replaceSuccess', { num: pageNum }));
         setTimeout(() => setReplaceSuccess(null), 4000);
+        
+        // Salvesta sessionStorage'isse, et Workspace teaks cache'i tühistada
+        try {
+          const key = `${workId}/${pageNum}`;
+          const existing = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
+          existing[key] = Date.now();
+          sessionStorage.setItem('vutt_replaced_images', JSON.stringify(existing));
+        } catch { /* ignore storage errors */ }
+        
         await loadPages();
       } else {
         setReplaceError(t('manage.replaceError'));
