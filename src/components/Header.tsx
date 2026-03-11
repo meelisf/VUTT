@@ -46,11 +46,11 @@ const Header: React.FC<HeaderProps> = ({
   const lang = getLangCode(i18n.language);
   const headerNavigate = useNavigate();
 
-  // Navigeeri salvestatud dashboardi/otsingu URL-ile (filtritega)
+  // Navigeeri alati dashboardile (koos salvestatud filtritega)
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    const returnUrl = sessionStorage.getItem('vutt_return_url') || '/';
-    headerNavigate(returnUrl);
+    const dashboardUrl = sessionStorage.getItem('vutt_dashboard_url') || '/';
+    headerNavigate(dashboardUrl);
   };
 
   return (

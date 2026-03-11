@@ -26,6 +26,7 @@ import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const RETURN_URL_KEY = 'vutt_return_url';
+const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
@@ -92,6 +93,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const url = '/' + (searchParams.toString() ? '?' + searchParams.toString() : '');
     sessionStorage.setItem(RETURN_URL_KEY, url);
+    sessionStorage.setItem(DASHBOARD_URL_KEY, url);
   }, [searchParams]);
 
   // Laadime "Projektist" HTML faili alles modaali avamisel (lazy load)
