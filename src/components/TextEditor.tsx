@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
@@ -143,12 +143,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
   const isSavingRef = useRef(false);
 
-  // Arvutame kas on salvestamata muudatusi
-  const hasUnsavedChanges =
-    isDirty ||
-    status !== savedState.status ||
-    JSON.stringify(comments) !== JSON.stringify(savedState.comments) ||
-    JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags);
+  // Arvutame kas on salvestamata muudatusi (shallow compare, mitte JSON.stringify)
+  const hasUnsavedChanges = useMemo(() => {
+    if (isDirty) return true;
+    if (status !== savedState.status) return true;
+    // page_tags: string[] shallow compare
+    if (page_tags.length !== savedState.page_tags.length) return true;
+    if (page_tags.some((t, i) => t !== savedState.page_tags[i])) return true;
+    // comments: Annotation[] shallow compare (id + text)
+    if (comments.length !== savedState.comments.length) return true;
+    if (comments.some((c, i) => c.id !== savedState.comments[i]?.id || c.text !== savedState.comments[i]?.text)) return true;
+    return false;
+  }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments]);
 
   // --- CM6 editori loomine (üks kord mount'il) ---
   useEffect(() => {
