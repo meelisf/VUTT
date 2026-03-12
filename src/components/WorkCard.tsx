@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, Printer, Info } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -19,7 +19,7 @@ interface WorkCardProps {
 }
 
 const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect, isPriority = false }) => {
-  const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const { t, i18n } = useTranslation(['dashboard', 'common', 'workspace']);
   const navigate = useNavigate();
   const location = useLocation();
   const { collections, getCollectionName } = useCollection();
@@ -118,7 +118,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
   return (
     <div
-      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden ${
+      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden group/card ${
         selectMode ? 'cursor-pointer' : ''
       } ${
         isSelected
@@ -127,7 +127,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       }`}
       onClick={handleCardClick}
     >
-      <div className="h-40 bg-gray-100 relative overflow-hidden group">
+      <div className="h-40 bg-gray-100 relative overflow-hidden">
         {/* Checkbox select mode'is */}
         {selectMode && (
           <div
@@ -150,7 +150,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           loading={isPriority ? 'eager' : 'lazy'}
           fetchPriority={isPriority ? 'high' : 'auto'}
           onClick={!selectMode ? handleOpenWorkspace : undefined}
-          className={`w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity ${!selectMode ? 'cursor-pointer' : ''}`}
+          className={`w-full h-full object-cover opacity-90 group-hover/card:opacity-100 transition-opacity ${!selectMode ? 'cursor-pointer' : ''}`}
         />
         {/* Žanrid pildi peal (max 3, kompaktne) */}
         {displayTags.length > 0 && (
@@ -160,7 +160,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                 const label = getLabel(tag, lang);
                 // Kontrolli, kas on Wikidata ID
                 const tagId = typeof tag !== 'string' ? tag.id : null;
-                
+
                 return (
                   <div key={idx} className="flex items-center bg-slate-800/60 hover:bg-primary-600/80 rounded backdrop-blur-sm transition-colors overflow-hidden">
                     <button
@@ -202,9 +202,63 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             </div>
           </div>
         )}
+
+        {/* Info-ikoon + metaandmete overlay pildi peal */}
+        {!selectMode && (
+          <>
+            {/* Nupp — peer, peab olema ENNE paneelit DOMis */}
+            <button
+              className="peer/info absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
+              onClick={(e) => e.stopPropagation()}
+              tabIndex={-1}
+              aria-label={t('workCard.showMetadata', 'Näita metaandmeid')}
+            >
+              <Info size={11} className="text-white/90" />
+            </button>
+
+            {/* Metaandmete panel — katab pildi, sisuala jääb puutumata */}
+            <div className="absolute inset-0 z-10 pointer-events-none opacity-0 peer-hover/info:opacity-100 transition-opacity duration-200 delay-150 bg-black/70 backdrop-blur-sm p-3 flex flex-col gap-2 overflow-hidden">
+              {/* Pealkiri */}
+              <p className="font-semibold text-[11px] text-white leading-[1.2]">{work.title}</p>
+
+              {/* Isikud */}
+              {work.creators && work.creators.length > 0 && (
+                <div className="space-y-1">
+                  {work.creators.map((c, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-300 shrink-0 pt-0.5 min-w-[52px] leading-snug">
+                        {t(`workspace:metadata.roles.${c.role}`, c.role)}
+                      </span>
+                      <span className="text-xs text-gray-200 leading-snug">{c.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Trükkal ja trükikoht */}
+              {((work.publisher || work.publisher_object) || (work.location || work.location_object)) && (
+                <div className="border-t border-white/10 pt-1.5 mt-auto space-y-1">
+                  {(work.publisher || work.publisher_object) && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <Printer size={10} className="text-gray-500 shrink-0" />
+                      <span className="truncate">{getLabel(work.publisher_object ?? (work.publisher as any), lang)}</span>
+                    </div>
+                  )}
+                  {(work.location || work.location_object) && (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                      <MapPin size={10} className="text-gray-500 shrink-0" />
+                      <span>{getLabel(work.location_object ?? (work.location as any), lang)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="p-4 flex-1 flex flex-col">
+
         <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight line-clamp-2">
           <a
             href={`/work/${work.work_id}/1`}
