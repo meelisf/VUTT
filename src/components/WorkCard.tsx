@@ -118,7 +118,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
   return (
     <div
-      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden group/card ${
+      className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden relative group/card ${
         selectMode ? 'cursor-pointer' : ''
       } ${
         isSelected
@@ -203,58 +203,6 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           </div>
         )}
 
-        {/* Info-ikoon + metaandmete overlay pildi peal */}
-        {!selectMode && (
-          <>
-            {/* Nupp — peer, peab olema ENNE paneelit DOMis */}
-            <button
-              className="peer/info absolute top-2 right-2 z-20 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
-              onClick={(e) => e.stopPropagation()}
-              tabIndex={-1}
-              aria-label={t('workCard.showMetadata', 'Näita metaandmeid')}
-            >
-              <Info size={11} className="text-white/90" />
-            </button>
-
-            {/* Metaandmete panel — katab pildi, sisuala jääb puutumata */}
-            <div className="absolute inset-0 z-10 pointer-events-none opacity-0 peer-hover/info:opacity-100 transition-opacity duration-200 delay-150 bg-black/70 backdrop-blur-sm p-3 flex flex-col gap-2 overflow-hidden">
-              {/* Pealkiri */}
-              <p className="font-semibold text-[11px] text-white leading-[1.2]">{work.title}</p>
-
-              {/* Isikud */}
-              {work.creators && work.creators.length > 0 && (
-                <div className="space-y-1">
-                  {work.creators.map((c, i) => (
-                    <div key={i} className="flex gap-2">
-                      <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-300 shrink-0 pt-0.5 min-w-[52px] leading-snug">
-                        {t(`workspace:metadata.roles.${c.role}`, c.role)}
-                      </span>
-                      <span className="text-xs text-gray-200 leading-snug">{c.name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Trükkal ja trükikoht */}
-              {((work.publisher || work.publisher_object) || (work.location || work.location_object)) && (
-                <div className="border-t border-white/10 pt-1.5 mt-auto space-y-1">
-                  {(work.publisher || work.publisher_object) && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <Printer size={10} className="text-gray-500 shrink-0" />
-                      <span className="truncate">{getLabel(work.publisher_object ?? (work.publisher as any), lang)}</span>
-                    </div>
-                  )}
-                  {(work.location || work.location_object) && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                      <MapPin size={10} className="text-gray-500 shrink-0" />
-                      <span>{getLabel(work.location_object ?? (work.location as any), lang)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       <div className="p-4 flex-1 flex flex-col">
@@ -318,7 +266,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               <button
                 key={i}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/?genre=${encodeURIComponent(genreUrlValue)}`); }}
-                className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors shrink-0"
+                className="flex items-center gap-0.5 text-[13px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors shrink-0"
                 title={t('workCard.filterByGenre', { genre: label })}
               >
                 <Bookmark size={10} className="fill-violet-200 shrink-0" />
@@ -340,6 +288,59 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           </button>
         </div>
       </div >
+
+      {/* Info-ikoon + täiskaardi metaandmete overlay */}
+      {!selectMode && (
+        <>
+          {/* Nupp — peer, peab olema ENNE paneelit DOMis */}
+          <button
+            className="peer/info absolute top-2 right-2 z-30 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            aria-label={t('workCard.showMetadata', 'Näita metaandmeid')}
+          >
+            <Info size={11} className="text-white/90" />
+          </button>
+
+          {/* Overlay — katab kogu kaardi, triggerdub ainult info-ikoonilt */}
+          <div className="absolute inset-0 z-20 pointer-events-none opacity-0 peer-hover/info:opacity-100 transition-opacity duration-200 delay-150 bg-black/70 backdrop-blur-sm rounded-lg p-4 flex flex-col gap-2">
+            {/* Pealkiri */}
+            <p className="font-semibold text-[13px] text-white leading-[1.2]">{work.title}</p>
+
+            {/* Isikud */}
+            {work.creators && work.creators.length > 0 && (
+              <div className="space-y-1">
+                {work.creators.map((c, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="text-[9px] uppercase tracking-widest font-semibold text-indigo-300 shrink-0 pt-0.5 min-w-[52px] leading-snug">
+                      {t(`workspace:metadata.roles.${c.role}`, c.role)}
+                    </span>
+                    <span className="text-[13px] text-gray-200 leading-snug">{c.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Trükkal ja trükikoht */}
+            {((work.publisher || work.publisher_object) || (work.location || work.location_object)) && (
+              <div className="border-t border-white/10 pt-2 mt-auto space-y-1">
+                {(work.publisher || work.publisher_object) && (
+                  <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
+                    <Printer size={10} className="text-gray-500 shrink-0" />
+                    <span className="truncate">{getLabel(work.publisher_object ?? (work.publisher as any), lang)}</span>
+                  </div>
+                )}
+                {(work.location || work.location_object) && (
+                  <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
+                    <MapPin size={10} className="text-gray-500 shrink-0" />
+                    <span>{getLabel(work.location_object ?? (work.location as any), lang)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div >
   );
 };
