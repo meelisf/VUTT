@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown } from 'lucide-react';
+import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown, ExternalLink } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { Creator, CreatorRole, Page, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
+import { getEntityUrl } from '../utils/entityUrl';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -641,16 +642,25 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <label className="block text-xs font-medium text-gray-500 mb-2">{t('metadata.genre', 'Žanr')}</label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {metaForm.genre.length === 0 && <span className="text-xs text-gray-400 italic">{t('metadata.noGenres', 'Žanrid puuduvad')}</span>}
-                {metaForm.genre.map((g, i) => (
-                  <span key={i} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border ${
-                    typeof g !== 'string' && (g as any).id ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-100 border-gray-200 text-gray-700'
-                  }`}>
-                    {getLabel(g, lang)}
-                    <button onClick={() => setMetaForm({ ...metaForm, genre: metaForm.genre.filter((_, j) => j !== i) })} className="hover:text-red-500">
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
+                {metaForm.genre.map((g, i) => {
+                  const genreObj = typeof g !== 'string' ? g as any : null;
+                  const url = genreObj ? getEntityUrl(genreObj.id, genreObj.source) : null;
+                  return (
+                    <span key={i} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border ${
+                      genreObj?.id ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                    }`}>
+                      {getLabel(g, lang)}
+                      {url && (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title={genreObj?.id || ''} onClick={e => e.stopPropagation()}>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                      <button onClick={() => setMetaForm({ ...metaForm, genre: metaForm.genre.filter((_, j) => j !== i) })} className="hover:text-red-500">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
               <EntityPicker
                 type="genre"
@@ -718,19 +728,28 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               
               <div className="flex flex-wrap gap-2 mb-3">
                 {metaForm.tags.length === 0 && <span className="text-xs text-gray-400 italic">Märksõnad puuduvad</span>}
-                {metaForm.tags.map((tag, idx) => (
-                  <span key={idx} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs border ${
-                    typeof tag !== 'string' && tag.id ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-100 border-gray-200 text-gray-700'
-                  }`}>
-                    {getLabel(tag, lang)}
-                    <button 
-                      onClick={() => setMetaForm({ ...metaForm, tags: metaForm.tags.filter((_, i) => i !== idx) })}
-                      className="hover:text-red-500"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
+                {metaForm.tags.map((tag, idx) => {
+                  const tagObj = typeof tag !== 'string' ? tag as any : null;
+                  const url = tagObj ? getEntityUrl(tagObj.id, tagObj.source) : null;
+                  return (
+                    <span key={idx} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border ${
+                      tagObj?.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                    }`}>
+                      {getLabel(tag, lang)}
+                      {url && (
+                        <a href={url} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title={tagObj?.id || ''} onClick={e => e.stopPropagation()}>
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
+                      <button
+                        onClick={() => setMetaForm({ ...metaForm, tags: metaForm.tags.filter((_, i) => i !== idx) })}
+                        className="hover:text-red-500"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  );
+                })}
               </div>
 
               <EntityPicker
