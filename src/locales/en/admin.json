@@ -93,7 +93,8 @@
     "create": "Add collection",
     "creating": "Adding...",
     "createSuccess": "Collection added",
-    "createError": "Failed to add"
+    "createError": "Failed to add",
+    "createErrorDuplicateId": "ID \"{{id}}\" already exists"
   },
   "trash": {
     "tab": "Trash",

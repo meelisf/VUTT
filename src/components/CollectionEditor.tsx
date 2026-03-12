@@ -2,9 +2,38 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { buildCollectionTree, CollectionTreeNode, COLLECTION_COLOR_CLASSES } from '../services/collectionService';
+import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+
+// Tailwind 400-taseme värvid värviplaaatide jaoks (inline style — ei sõltu Tailwind JIT kompileerimisest)
+const COLOR_SWATCHES: Record<string, string> = {
+  red: '#f87171', orange: '#fb923c', amber: '#fbbf24', yellow: '#facc15',
+  lime: '#a3e635', green: '#4ade80', emerald: '#34d399', teal: '#2dd4bf',
+  cyan: '#22d3ee', sky: '#38bdf8', blue: '#60a5fa', indigo: '#818cf8',
+  violet: '#a78bfa', purple: '#c084fc', fuchsia: '#e879f9', pink: '#f472b6',
+  rose: '#fb7185',
+};
+
+// Visuaalne värvivalija — ruudustik värviliste plaatidega
+const ColorPicker: React.FC<{ value: string; onChange: (c: string) => void }> = ({ value, onChange }) => (
+  <div className="flex flex-wrap gap-1.5">
+    {Object.entries(COLOR_SWATCHES).map(([name, hex]) => (
+      <button
+        key={name}
+        type="button"
+        title={name}
+        onClick={() => onChange(name)}
+        style={{ backgroundColor: hex }}
+        className={`w-6 h-6 rounded-full transition-all focus:outline-none ${
+          value === name
+            ? 'ring-2 ring-offset-1 ring-gray-600 scale-110'
+            : 'hover:scale-110 hover:ring-1 hover:ring-offset-1 hover:ring-gray-400'
+        }`}
+      />
+    ))}
+  </div>
+);
 
 /**
  * Admin-komponent kollektsioonide haldamiseks:
@@ -25,7 +54,6 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
   ]);
 }
 
-const AVAILABLE_COLORS = Object.keys(COLLECTION_COLOR_CLASSES);
 
 const CollectionEditor: React.FC = () => {
   const { t } = useTranslation('admin');
@@ -169,9 +197,15 @@ const CollectionEditor: React.FC = () => {
   };
 
   const handleCreate = async () => {
-    setCreating(true);
     setCreateError(null);
     setCreateSuccess(false);
+    // Kliendipoolne valideerimine enne päringut
+    if (!newId.trim() || !newNameEt.trim() || !newNameEn.trim()) return;
+    if (collections[newId.trim()]) {
+      setCreateError(t('collections.createErrorDuplicateId', { id: newId.trim() }));
+      return;
+    }
+    setCreating(true);
     try {
       const res = await fetchWithTimeout(
         `${FILE_API_URL}/admin/collections?token=${encodeURIComponent(token || '')}`,
@@ -233,16 +267,9 @@ const CollectionEditor: React.FC = () => {
         <div className="space-y-6">
           {/* Värv */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{t('collections.createColor')}</label>
-            <select
-              value={editColor}
-              onChange={e => setEditColor(e.target.value)}
-              className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
-            >
-              {AVAILABLE_COLORS.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-2">{t('collections.createColor')}</label>
+            <ColorPicker value={editColor} onChange={setEditColor} />
+            <p className="text-xs text-gray-400 mt-1">{editColor}</p>
           </div>
 
           {/* Lühikirjeldus */}
@@ -394,11 +421,19 @@ const CollectionEditor: React.FC = () => {
               <input
                 type="text"
                 value={newId}
-                onChange={e => setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                onChange={e => { setNewId(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')); setCreateError(null); }}
                 placeholder="academia-gustaviana-2"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  newId && collections[newId]
+                    ? 'border-red-400 focus:ring-red-400'
+                    : 'border-gray-300 focus:ring-primary-400'
+                }`}
               />
-              <p className="text-xs text-gray-400 mt-0.5">{t('collections.createIdHint')}</p>
+              {newId && collections[newId] ? (
+                <p className="text-xs text-red-600 mt-0.5">{t('collections.createErrorDuplicateId', { id: newId })}</p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-0.5">{t('collections.createIdHint')}</p>
+              )}
             </div>
 
             {/* Nimed */}
@@ -439,20 +474,13 @@ const CollectionEditor: React.FC = () => {
             </div>
 
             {/* Värv + virtuaalne */}
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('collections.createColor')}</label>
-                <select
-                  value={newColor}
-                  onChange={e => setNewColor(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
-                >
-                  {AVAILABLE_COLORS.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('collections.createColor')}</label>
+                <ColorPicker value={newColor} onChange={setNewColor} />
+                <p className="text-xs text-gray-400 mt-1">{newColor}</p>
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-700 pb-2 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={newIsVirtual}
@@ -467,7 +495,7 @@ const CollectionEditor: React.FC = () => {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleCreate}
-                disabled={creating || !newId || !newNameEt}
+                disabled={creating || !newId.trim() || !newNameEt.trim() || !newNameEn.trim()}
                 className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {creating ? (

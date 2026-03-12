@@ -93,7 +93,8 @@
     "create": "Lisa kollektsioon",
     "creating": "Lisan...",
     "createSuccess": "Kollektsioon lisatud",
-    "createError": "Lisamine ebaõnnestus"
+    "createError": "Lisamine ebaõnnestus",
+    "createErrorDuplicateId": "ID \"{{id}}\" on juba olemas"
   },
   "trash": {
     "tab": "Prügikast",
