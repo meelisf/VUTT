@@ -420,7 +420,14 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
         os.remove(thumb_path)
     generate_thumbnail(img_path, thumb_path)
 
+    # Kirjuta püsiv logi
+    log_path = os.path.join(BASE_DIR, 'replace_image.log')
+    log_entry = f"{datetime.now().isoformat()} | {work_id} | {folder_name}/{img_name} | leht {page_num} | {user['username']}\n"
+    with open(log_path, 'a', encoding='utf-8') as lf:
+        lf.write(log_entry)
+
     logger.info(f"REPLACE-IMG: {folder_name}/{img_name} asendatud ({user['username']})")
+    sync_work_to_meilisearch(folder_name)
     return {"status": "success", "filename": img_name}
 
 
