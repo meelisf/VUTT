@@ -83,6 +83,7 @@ const WorkManage: React.FC = () => {
 
   // Lehekülgede järjekorra muutmine
   const [draftPositions, setDraftPositions] = useState<Record<string, number>>({});
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [reorderSaving, setReorderSaving] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
 
@@ -167,9 +168,23 @@ const WorkManage: React.FC = () => {
     const init: Record<string, number> = {};
     pages.forEach(p => { init[p.filename] = p.page_num; });
     setDraftPositions(init);
+    setInputValues({});
   }, [pages]);
 
   const hasReorderChanges = pages.some(p => draftPositions[p.filename] !== p.page_num);
+
+  // Swap-loogika: liigutab currentFile uuele positsioonile ja vahetab seal oleva lehega
+  const applySwap = (currentFile: string, newPos: number) => {
+    const currentDraft = draftPositions[currentFile] ?? pages.find(p => p.filename === currentFile)?.page_num ?? newPos;
+    const conflictFile = pages.find(
+      p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
+    )?.filename;
+    setDraftPositions(prev => {
+      const next = { ...prev, [currentFile]: newPos };
+      if (conflictFile) next[conflictFile] = currentDraft;
+      return next;
+    });
+  };
 
   const handleReorderSave = async () => {
     if (!workId || !authToken) return;
@@ -497,7 +512,7 @@ const WorkManage: React.FC = () => {
                   const isChanged = draftPositions[page.filename] !== page.page_num;
                   return (
                     <div
-                      key={page.page_num}
+                      key={page.filename}
                       className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
                         isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
                       }`}
@@ -570,19 +585,25 @@ const WorkManage: React.FC = () => {
                           type="number"
                           min={1}
                           max={pages.length}
-                          value={draftPositions[page.filename] ?? page.page_num}
+                          value={inputValues[page.filename] ?? (draftPositions[page.filename] ?? page.page_num)}
                           onChange={(e) => {
-                            const newPos = Math.max(1, Math.min(pages.length, Number(e.target.value)));
-                            const currentFile = page.filename;
-                            const currentDraft = draftPositions[currentFile] ?? page.page_num;
-                            const conflictFile = pages.find(
-                              p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
-                            )?.filename;
-                            setDraftPositions(prev => {
-                              const next = { ...prev, [currentFile]: newPos };
-                              if (conflictFile) next[conflictFile] = currentDraft;
-                              return next;
-                            });
+                            // Salvesta trükitav väärtus ilma swap'ita — swap toimub alles blur/Enter peale
+                            setInputValues(prev => ({ ...prev, [page.filename]: e.target.value }));
+                          }}
+                          onBlur={() => {
+                            const raw = inputValues[page.filename];
+                            if (raw === undefined) return;
+                            const parsed = parseInt(raw, 10);
+                            const newPos = isNaN(parsed) ? (draftPositions[page.filename] ?? page.page_num)
+                              : Math.max(1, Math.min(pages.length, parsed));
+                            applySwap(page.filename, newPos);
+                            setInputValues(prev => { const next = { ...prev }; delete next[page.filename]; return next; });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            if (e.key === 'Escape') {
+                              setInputValues(prev => { const next = { ...prev }; delete next[page.filename]; return next; });
+                            }
                           }}
                           className={`flex-1 min-w-0 text-xs text-center border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                             isChanged ? 'border-amber-400 bg-amber-50 font-semibold' : 'border-gray-300'
@@ -591,17 +612,8 @@ const WorkManage: React.FC = () => {
                         <div className="flex flex-col">
                           <button
                             onClick={() => {
-                              const currentFile = page.filename;
-                              const currentPos = draftPositions[currentFile] ?? page.page_num;
-                              const newPos = Math.max(1, currentPos - 1);
-                              const conflictFile = pages.find(
-                                p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
-                              )?.filename;
-                              setDraftPositions(prev => {
-                                const next = { ...prev, [currentFile]: newPos };
-                                if (conflictFile) next[conflictFile] = currentPos;
-                                return next;
-                              });
+                              const currentPos = draftPositions[page.filename] ?? page.page_num;
+                              applySwap(page.filename, Math.max(1, currentPos - 1));
                             }}
                             disabled={(draftPositions[page.filename] ?? page.page_num) <= 1}
                             className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
@@ -610,17 +622,8 @@ const WorkManage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => {
-                              const currentFile = page.filename;
-                              const currentPos = draftPositions[currentFile] ?? page.page_num;
-                              const newPos = Math.min(pages.length, currentPos + 1);
-                              const conflictFile = pages.find(
-                                p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
-                              )?.filename;
-                              setDraftPositions(prev => {
-                                const next = { ...prev, [currentFile]: newPos };
-                                if (conflictFile) next[conflictFile] = currentPos;
-                                return next;
-                              });
+                              const currentPos = draftPositions[page.filename] ?? page.page_num;
+                              applySwap(page.filename, Math.min(pages.length, currentPos + 1));
                             }}
                             disabled={(draftPositions[page.filename] ?? page.page_num) >= pages.length}
                             className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"

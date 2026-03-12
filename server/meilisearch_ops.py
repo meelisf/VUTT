@@ -523,9 +523,12 @@ def sync_work_to_meilisearch(dir_name):
     for doc in documents:
         doc['teose_staatus'] = teose_staatus
 
-    # 4. Saada Meilisearchi
-    if documents:
+    # 4. Kustuta vanad dokumendid ja saada uued Meilisearchi
+    # NB: POST (add/replace) ei kustuta dokumente mida uues nimekirjas pole (nt kustutatud lehed).
+    # Seepärast kustutame kõigepealt kõik teose dokumendid, siis lisame uued.
+    if documents and work_id:
         print(f"AUTOMAATNE SÜNK: Teos {slug} ({len(documents)} lk), staatus: {teose_staatus}")
+        delete_work_from_meilisearch(work_id)
         return send_to_meilisearch(documents)
     return False
 
