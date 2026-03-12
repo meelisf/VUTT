@@ -600,7 +600,7 @@ const Workspace: React.FC = () => {
                 }
               } catch { /* ignore */ }
               return page.image_url;
-            })()} pageNum={page.page_number} onGridView={handleOpenGridView} />
+            })()} pageNum={page.page_number} onGridView={handleOpenGridView} onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)} />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
               Pilt puudub

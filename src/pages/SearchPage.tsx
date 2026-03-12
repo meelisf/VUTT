@@ -5,7 +5,7 @@ import { searchContent, getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAu
 import { getWorkMetadata } from '../services/workService';
 import { getVocabularies, Vocabularies, getCollectionColorClasses } from '../services/collectionService';
 import { ContentSearchResponse, ContentSearchOptions } from '../types';
-import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag, BookOpen, FileType, Calendar } from 'lucide-react';
+import { Search, Loader2, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar } from 'lucide-react';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { FILE_API_URL } from '../config';
 import Header from '../components/Header';
@@ -603,7 +603,7 @@ const SearchPage: React.FC = () => {
                                 {/* Žanrid */}
                                 {genreParam.map(g => (
                                     <div key={g} className="flex items-center gap-1 px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-xs font-medium border border-violet-200">
-                                        <BookOpen size={11} />
+                                        <Bookmark size={11} />
                                         <span>{resolveLabel(g, genreIdMap)}</span>
                                         <button
                                             type="button"

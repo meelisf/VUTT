@@ -328,10 +328,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                         <div key={i} className="flex items-center gap-1">
                           <button
                             onClick={() => navigate(`/?genre=${encodeURIComponent(label)}`)}
-                            className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                            className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors"
                             title={t('dashboard:workCard.filterByGenre', { genre: label })}
                           >
-                            <Bookmark size={12} className="fill-primary-200" />
+                            <Bookmark size={12} className="fill-violet-200" />
                             {label}
                           </button>
                           {url && (

@@ -388,8 +388,8 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                       <div className="pt-3 border-t border-gray-100">
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5">{t('metadata.genre')}</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-primary-50 text-primary-700">
-                            <Bookmark size={12} className="fill-primary-200" />
+                          <span className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-violet-50 text-violet-700">
+                            <Bookmark size={12} className="fill-violet-200" />
                             {getLabel(work.genre_object || work.genre, lang)}
                           </span>
                           {(() => {

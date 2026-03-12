@@ -523,14 +523,58 @@ def sync_work_to_meilisearch(dir_name):
     for doc in documents:
         doc['teose_staatus'] = teose_staatus
 
-    # 4. Kustuta vanad dokumendid ja saada uued Meilisearchi
-    # NB: POST (add/replace) ei kustuta dokumente mida uues nimekirjas pole (nt kustutatud lehed).
-    # Seepärast kustutame kõigepealt kõik teose dokumendid, siis lisame uued.
+    # 4. Saada uued dokumendid Meilisearchi (upsert — uuendab olemasolevad, lisab uued)
+    # Kustutame PÄRAST lisamist ainult need dokumendid mis jäid üle (leheküljed kustutati).
+    # NB: Ära kustuta enne lisamist — sellel ajal oleks teos otsinguks kättesaamatu (race condition).
     if documents and work_id:
-        print(f"AUTOMAATNE SÜNK: Teos {slug} ({len(documents)} lk), staatus: {teose_staatus}")
-        delete_work_from_meilisearch(work_id)
-        return send_to_meilisearch(documents)
-    return False
+        new_count = len(documents)
+        print(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
+        result = send_to_meilisearch(documents)
+        _delete_extra_pages(work_id, new_count)
+        return result
+
+
+def _delete_extra_pages(work_id, new_count):
+    """Kustutab leheküljed mille lehekylje_number > new_count (kui neid eksisteerib).
+
+    Kasutatakse pärast upsert-sünkroonimist, et eemaldada kustutatud lehekülgede
+    jäänused Meilisearchist. Ei loo downtime-akent.
+    """
+    if not MEILI_KEY:
+        return
+    check_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/search"
+    check_body = json.dumps({
+        "filter": [f'work_id = "{work_id}"', f'lehekylje_number > {new_count}'],
+        "limit": 1,
+        "attributesToRetrieve": ["id"]
+    }).encode('utf-8')
+    req = urllib.request.Request(check_url, data=check_body, method='POST')
+    req.add_header('Content-Type', 'application/json')
+    req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    try:
+        with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if data.get('estimatedTotalHits', 0) == 0:
+                return
+    except Exception:
+        return
+
+    del_url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents/delete"
+    del_body = json.dumps({
+        "filter": [f'work_id = "{work_id}"', f'lehekylje_number > {new_count}']
+    }).encode('utf-8')
+    del_req = urllib.request.Request(del_url, data=del_body, method='POST')
+    del_req.add_header('Content-Type', 'application/json')
+    del_req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    try:
+        with urllib.request.urlopen(del_req, timeout=MEILI_TIMEOUT) as resp:
+            res_data = json.loads(resp.read().decode('utf-8'))
+            task_uid = res_data.get('taskUid')
+            if task_uid:
+                wait_for_task(task_uid)
+                print(f"Kustutatud üleliigsed leheküljed (work_id={work_id}, new_count={new_count})")
+    except Exception as e:
+        print(f"Viga üleliigsete lehekülgede kustutamisel: {e}")
 
 
 def delete_work_from_meilisearch(work_id):

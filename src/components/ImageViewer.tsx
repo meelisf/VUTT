@@ -6,14 +6,16 @@ interface ImageViewerProps {
   src: string;
   pageNum?: number;
   onGridView?: () => void;
+  onNavigate?: (direction: 'prev' | 'next') => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onNavigate }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const isHoveredRef = useRef(false);
 
   // Puuteekraani pinch-to-zoom ja drag tugi
   const touchStateRef = useRef<{
@@ -23,6 +25,17 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView }) =
     lastPos: { x: number; y: number };
     isTouching: boolean;
   }>({ lastDist: 0, lastScale: 1, lastCenter: { x: 0, y: 0 }, lastPos: { x: 0, y: 0 }, isTouching: false });
+
+  useEffect(() => {
+    if (!onNavigate) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isHoveredRef.current) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); onNavigate('prev'); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); onNavigate('next'); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onNavigate]);
 
   const handleZoom = (delta: number) => {
     setScale(prev => Math.max(0.5, Math.min(5, prev + delta)));
@@ -143,7 +156,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView }) =
   }
 
   return (
-    <div className="h-full w-full bg-slate-900 relative overflow-hidden flex flex-col select-none">
+    <div
+      className="h-full w-full bg-slate-900 relative overflow-hidden flex flex-col select-none"
+      onMouseEnter={() => { isHoveredRef.current = true; }}
+      onMouseLeave={() => { isHoveredRef.current = false; }}
+    >
       {/* Controls */}
       <div className="absolute top-4 left-4 z-10 flex gap-2">
         <div className="bg-black/50 backdrop-blur-md rounded-lg p-1 flex gap-1 shadow-lg border border-white/10">

@@ -481,10 +481,10 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 <div className="pt-2 border-t border-gray-100 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
                     {selectedStatus && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
                         <CircleDot size={11} />
                         {t(`common:status.${selectedStatus}`)}
-                        <button onClick={() => onStatusChange(null)} className="hover:bg-slate-200 rounded-full p-0.5"><X size={11} /></button>
+                        <button onClick={() => onStatusChange(null)} className="hover:bg-amber-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
                     {effectiveSelectedGenre && (

@@ -264,10 +264,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               <button
                 key={i}
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/?genre=${encodeURIComponent(genreUrlValue)}`); }}
-                className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors shrink-0"
+                className="flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors shrink-0"
                 title={t('workCard.filterByGenre', { genre: label })}
               >
-                <Bookmark size={10} className="fill-primary-200 shrink-0" />
+                <Bookmark size={10} className="fill-violet-200 shrink-0" />
                 <span className="truncate max-w-[80px]">{label}</span>
               </button>
             );
