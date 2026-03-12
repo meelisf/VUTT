@@ -301,16 +301,3 @@ Admin saab lisada uue teose PDF-i või pildina (`/upload`). Kolmeastmeline viisa
 
 **Key file:** `server/upload_ops.py` — `create_upload`, `save_and_transfer_to_ocr`, `poll_and_sync_thumbs`, `import_as_work`, `cancel_upload`
 
-## Implemented ✅
-
-- Wikidata integration (all fields including creators)
-- VIAF links
-- Collections (hierarchical, with colors)
-- Collection display in WorkCard, AnnotationsTab, SearchPage
-- JSON files in git (txt + json same commit, _metadata.json tracked)
-- Metadata changes in Review page (yellow badge)
-- Search filters: type multi-select, facets preserve all options
-- Server performance optimizations (async Meilisearch, caching, cleanup threads)
-- Upload wizard: PDF + JPG/PNG, OCR server integration, pooleliolevate haldus
-- Backend migreeritud http.server → FastAPI (server/main.py), Docker deploy
-- CodeMirror 6 editor: XML tag hiding, atomicRanges, tag protection filter
