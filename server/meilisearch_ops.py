@@ -505,8 +505,16 @@ def sync_work_to_meilisearch(dir_name):
             "languages": languages,
             "creators": creators,
             "authors_text": authors_text,
-            "author_names": [normalize_creator(c, people_data)[0] for c in creators if c.get('name') and c.get('role') != 'respondens'],
-            "respondens_names": [normalize_creator(c, people_data)[0] for c in creators if c.get('name') and c.get('role') == 'respondens'],
+            "author_names": list(dict.fromkeys(
+                name for c in creators
+                if c.get('name') and c.get('role') != 'respondens'
+                for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
+            )),
+            "respondens_names": list(dict.fromkeys(
+                name for c in creators
+                if c.get('name') and c.get('role') == 'respondens'
+                for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
+            )),
             "creator_ids": [normalize_creator(c, people_data)[1] for c in creators if c.get('id')]
             # NB: pealkiri, koht, trükkal eemaldatud - kasuta title, location, publisher
         }
