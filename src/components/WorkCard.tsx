@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, Printer, Info } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -35,6 +35,10 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       onToggleSelect();
     }
   };
+
+  // Info-overlay nähtavus (desktop: hover + 150ms delay, mobiil: touch-hold)
+  const [infoVisible, setInfoVisible] = useState(false);
+  const infoDelayRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
@@ -292,18 +296,24 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       {/* Info-ikoon + täiskaardi metaandmete overlay */}
       {!selectMode && (
         <>
-          {/* Nupp — peer, peab olema ENNE paneelit DOMis */}
+          {/* Info-nupp — desktop hover + mobiil touch-hold */}
           <button
-            className="peer/info absolute top-2 right-2 z-30 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
+            className="absolute top-2 right-2 z-30 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
             onClick={(e) => e.stopPropagation()}
+            onMouseEnter={() => { infoDelayRef.current = setTimeout(() => setInfoVisible(true), 200); }}
+            onMouseLeave={() => { if (infoDelayRef.current) clearTimeout(infoDelayRef.current); setInfoVisible(false); }}
+            onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); setInfoVisible(v => !v); }}
             tabIndex={-1}
             aria-label={t('workCard.showMetadata', 'Näita metaandmeid')}
           >
             <Info size={11} className="text-white/90" />
           </button>
 
-          {/* Overlay — katab kogu kaardi, triggerdub ainult info-ikoonilt */}
-          <div className="absolute inset-0 z-20 pointer-events-none opacity-0 peer-hover/info:opacity-100 transition-opacity duration-200 delay-150 bg-black/70 backdrop-blur-sm rounded-lg p-4 flex flex-col gap-2">
+          {/* Overlay — katab kogu kaardi; mobiilil toks suleb */}
+          <div
+            className={`absolute inset-0 z-20 transition-opacity duration-200 bg-black/70 backdrop-blur-sm rounded-lg p-4 flex flex-col gap-2 ${infoVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+            onTouchStart={(e) => { e.stopPropagation(); setInfoVisible(false); }}
+          >
             {/* Pealkiri */}
             <p className="font-semibold text-[13px] text-white leading-[1.2]">{work.title}</p>
 
@@ -326,7 +336,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               <div className="border-t border-white/10 pt-2 mt-auto space-y-1">
                 {(work.publisher || work.publisher_object) && (
                   <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
-                    <Printer size={10} className="text-gray-500 shrink-0" />
+                    <BookDown size={10} className="text-gray-500 shrink-0" />
                     <span className="truncate">{getLabel(work.publisher_object ?? (work.publisher as any), lang)}</span>
                   </div>
                 )}
