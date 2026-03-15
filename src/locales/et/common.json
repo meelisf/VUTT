@@ -78,7 +78,29 @@
   "nav": {
     "review": "Muudatused",
     "admin": "Admin",
-    "upload": "Laadi üles"
+    "upload": "Laadi üles",
+    "persons": "Isikud"
+  },
+  "prosopography": {
+    "pageTitle": "Isikud",
+    "searchPlaceholder": "Otsi nime järgi…",
+    "addPerson": "Lisa isik",
+    "totalCount": "{{count}} isikut",
+    "filteredCount": "{{filtered}} / {{total}} isikut",
+    "noResults": "Otsingule vastavaid isikuid ei leitud.",
+    "empty": "Prosopograafia andmebaas on tühi.",
+    "loadError": "Isikute laadimine ebaõnnestus.",
+    "unknownYears": "eluaastad teadm.",
+    "works": "teost",
+    "filterGenderAll": "Sugu",
+    "filterMale": "Meessoost",
+    "filterFemale": "Naissoost",
+    "filterSourceAll": "Allikas",
+    "filterLevelAll": "Olek",
+    "levelDraft": "Mustand",
+    "levelReviewed": "Üle vaadatud",
+    "levelVerified": "Kontrollitud",
+    "clearFilters": "Tühista filtrid"
   },
   "collections": {
     "title": "Vali kollektsioon",

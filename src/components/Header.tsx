@@ -11,7 +11,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, LogOut, LogIn, History, Settings, ChevronDown, Library, Upload } from 'lucide-react';
+import { Search, LogOut, LogIn, History, Settings, ChevronDown, Library, Upload, Users } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import LoginModal from './LoginModal';
 import CollectionPicker from './CollectionPicker';
@@ -140,6 +140,15 @@ const Header: React.FC<HeaderProps> = ({
                       <p className="font-medium text-gray-900 text-sm">{user.name}</p>
                       <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
                     </div>
+
+                    <Link
+                      to="/persons"
+                      onClick={() => setShowUserMenu(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <Users size={16} />
+                      {t('common:nav.persons', 'Isikud')}
+                    </Link>
 
                     <Link
                       to="/review"

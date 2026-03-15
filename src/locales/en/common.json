@@ -78,7 +78,29 @@
   "nav": {
     "review": "Changes",
     "admin": "Admin",
-    "upload": "Upload"
+    "upload": "Upload",
+    "persons": "Persons"
+  },
+  "prosopography": {
+    "pageTitle": "Persons",
+    "searchPlaceholder": "Search by name…",
+    "addPerson": "Add person",
+    "totalCount": "{{count}} persons",
+    "filteredCount": "{{filtered}} / {{total}} persons",
+    "noResults": "No persons found matching the search.",
+    "empty": "The prosopography database is empty.",
+    "loadError": "Failed to load persons.",
+    "unknownYears": "years unknown",
+    "works": "works",
+    "filterGenderAll": "Gender",
+    "filterMale": "Male",
+    "filterFemale": "Female",
+    "filterSourceAll": "Source",
+    "filterLevelAll": "Status",
+    "levelDraft": "Draft",
+    "levelReviewed": "Reviewed",
+    "levelVerified": "Verified",
+    "clearFilters": "Clear filters"
   },
   "collections": {
     "title": "Select Collection",
