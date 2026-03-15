@@ -33,7 +33,7 @@ import time
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PEOPLE_FILE, LABELS_FILE
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE
 from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,

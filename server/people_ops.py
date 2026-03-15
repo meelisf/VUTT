@@ -4,7 +4,7 @@ import time
 import threading
 import urllib.request
 import urllib.parse
-from .config import BASE_DIR, PEOPLE_FILE
+from .config import BASE_DIR, PERSON_ALIASES_FILE as PEOPLE_FILE
 from .utils import atomic_write_json
 
 PEOPLE_LOCK = threading.Lock()

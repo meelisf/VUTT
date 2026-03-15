@@ -43,6 +43,7 @@ from .cache import (
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 from .image_server import generate_thumbnail
+from .prosopography.router import router as prosopography_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI):
     print("VUTT FastAPI sulgemine.")
 
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
+app.include_router(prosopography_router, prefix="/prosopography")
 
 app.add_middleware(
     CORSMiddleware,
