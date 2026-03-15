@@ -44,6 +44,7 @@ from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pa
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
+from .prosopography.ops import update_person_to_works
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -658,6 +659,13 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
     background_tasks.add_task(process_person_fields_metadata, meta)
     background_tasks.add_task(enrich_entity_labels_async, meta)
+    background_tasks.add_task(
+        update_person_to_works,
+        meta.get("id"),
+        meta.get("creators", []),
+        meta.get("tags_object", []),
+        meta.get("publisher_object"),
+    )
     sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))
     invalidate_cache()
     return {"status": "success"}
