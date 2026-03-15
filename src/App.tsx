@@ -31,6 +31,7 @@ const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
 const NotFound = lazyRetry(() => import('./pages/NotFound'));
 const PersonsPage = lazyRetry(() => import('./prosopography/pages/PersonsPage'));
 const PersonDetailPage = lazyRetry(() => import('./prosopography/pages/PersonDetailPage'));
+const PersonEditPage = lazyRetry(() => import('./prosopography/pages/PersonEditPage'));
 
 // Suspense fallback laadimise ajaks
 const PageLoader = () => (
@@ -103,8 +104,18 @@ const router = createBrowserRouter([
     errorElement: <RouteErrorBoundary />,
   },
   {
+    path: "/persons/new",
+    element: <Lazy><PersonEditPage /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
     path: "/persons/:id",
     element: <Lazy><PersonDetailPage /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/persons/:id/edit",
+    element: <Lazy><PersonEditPage /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   // 404 - catch-all marsruut (peab olema viimane)
