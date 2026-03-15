@@ -18,6 +18,10 @@ interface DateDraft {
   place: string;
 }
 
+interface OccupationDraft { label: string }
+interface EducationDraft { institution: string; year: string }
+interface RelationDraft  { name: string; type: string }
+
 interface FormDraft {
   name_label: string;
   name_family: string;
@@ -27,10 +31,15 @@ interface FormDraft {
   gender: '' | 'M' | 'F';
   birth: DateDraft;
   death: DateDraft;
+  origin_city: string;
+  origin_region: string;
   status_label: string;
   status_id: string;
   confession_label: string;
   confession_id: string;
+  occupations: OccupationDraft[];
+  education: EducationDraft[];
+  relations: RelationDraft[];
   biography: string;
   notes: string;
   wikidata_id: string;
@@ -48,10 +57,15 @@ const emptyDraft = (): FormDraft => ({
   gender: '',
   birth: { year: '', circa: false, bound: '', place: '' },
   death: { year: '', circa: false, bound: '', place: '' },
+  origin_city: '',
+  origin_region: '',
   status_label: '',
   status_id: '',
   confession_label: '',
   confession_id: '',
+  occupations: [],
+  education: [],
+  relations: [],
   biography: '',
   notes: '',
   wikidata_id: '',
@@ -82,10 +96,15 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
       bound: p.death?.bound ?? '',
       place: p.death?.place?.label ?? '',
     },
+    origin_city: p.origin?.city ?? '',
+    origin_region: p.origin?.region ?? '',
     status_label: p.status?.label ?? '',
     status_id: p.status?.id ?? '',
     confession_label: p.confession?.label ?? '',
     confession_id: p.confession?.id ?? '',
+    occupations: (p.occupations ?? []).map((o: any) => ({ label: o.label ?? String(o) })),
+    education: (p.education ?? []).map((e: any) => ({ institution: e.institution ?? e.label ?? String(e), year: e.year ? String(e.year) : '' })),
+    relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? r.target_id ?? '', type: r.type ?? '' })),
     biography: p.biography ?? '',
     notes: p.notes ?? '',
     wikidata_id: ident('wikidata'),
@@ -150,6 +169,21 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
     confession: draft.confession_label.trim()
       ? { id: draft.confession_id.trim() || draft.confession_label.trim(), label: draft.confession_label.trim() }
       : null,
+    origin: {
+      city: draft.origin_city.trim() || null,
+      region: draft.origin_region.trim() || null,
+      geonames_id: original?.origin?.geonames_id ?? null,
+      coordinates: original?.origin?.coordinates ?? null,
+    },
+    occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({ label: o.label.trim() })),
+    education: draft.education.filter(e => e.institution.trim()).map(e => ({
+      institution: e.institution.trim(),
+      ...(e.year.trim() ? { year: parseInt(e.year) } : {}),
+    })),
+    relations: draft.relations.filter(r => r.name.trim()).map(r => ({
+      name: r.name.trim(),
+      ...(r.type.trim() ? { type: r.type.trim() } : {}),
+    })),
     biography: draft.biography.trim() || null,
     notes: draft.notes.trim() || null,
     identifiers,
@@ -266,6 +300,76 @@ const AliasesList: React.FC<{
 };
 
 // =========================================================
+// CollapsibleSection — ühtne klapitav kaart
+// =========================================================
+const CollapsibleSection: React.FC<{
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}> = ({ title, open, onToggle, children }) => (
+  <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-5">
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-5 py-4 text-gray-700 hover:text-primary-700 transition-colors"
+    >
+      <span className="font-bold text-sm capitalize-first">{title}</span>
+      <span className="ml-auto text-gray-400">
+        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+      </span>
+    </button>
+    {open && (
+      <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-5">
+        {children}
+      </div>
+    )}
+  </div>
+);
+
+// =========================================================
+// DynamicList — üldine dünaamiline massiiv
+// =========================================================
+function DynamicList<T>({
+  label, items, renderItem, onAdd, onChange,
+}: {
+  label: string;
+  items: T[];
+  renderItem: (item: T, onChange: (v: T) => void, onRemove: () => void) => React.ReactNode;
+  onAdd: () => void;
+  onChange: (items: T[]) => void;
+}): React.ReactElement {
+  const updateItem = (i: number, v: T) => {
+    const next = [...items];
+    next[i] = v;
+    onChange(next);
+  };
+  const removeItem = (i: number) => onChange(items.filter((_, j) => j !== i));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-xs text-gray-500 uppercase tracking-wide">{label}</label>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <Plus size={11} /> Lisa
+        </button>
+      </div>
+      {items.length === 0 && (
+        <p className="text-xs text-gray-400 italic">Kirjeid pole. Klõpsa "Lisa" lisamiseks.</p>
+      )}
+      <div className="space-y-2">
+        {items.map((item, i) => (
+          <div key={i}>{renderItem(item, v => updateItem(i, v), () => removeItem(i))}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================
 // PersonEditPage
 // =========================================================
 const PersonEditPage: React.FC = () => {
@@ -282,7 +386,9 @@ const PersonEditPage: React.FC = () => {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [extraOpen, setExtraOpen] = useState(false);
+  const [namesOpen, setNamesOpen] = useState(false);
+  const [occupOpen, setOccupOpen] = useState(false);
+  const [relOpen, setRelOpen] = useState(false);
 
   // Ligipääsukontroll
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -518,6 +624,34 @@ const PersonEditPage: React.FC = () => {
               />
             </div>
           </div>
+
+          {/* Päritolu */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+                {t('prosopography.origin', 'Päritolu')} — linn
+              </label>
+              <input
+                type="text"
+                value={draft.origin_city}
+                onChange={e => set({ origin_city: e.target.value })}
+                placeholder="Tallinn, Riia…"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+                {t('prosopography.origin', 'Päritolu')} — piirkond
+              </label>
+              <input
+                type="text"
+                value={draft.origin_region}
+                onChange={e => set({ origin_region: e.target.value })}
+                placeholder="Liivimaa, Saksimaa…"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              />
+            </div>
+          </div>
         </div>
 
         {/* ── Elulugu ── */}
@@ -534,66 +668,147 @@ const PersonEditPage: React.FC = () => {
           />
         </div>
 
-        {/* ── Lisaandmed (klapitav) ── */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-5">
-          <button
-            onClick={() => setExtraOpen(v => !v)}
-            className="w-full flex items-center gap-2 px-5 py-4 text-gray-700 hover:text-primary-700 transition-colors"
-          >
-            <span className="font-bold text-sm">Nimevariandid, identifikaatorid ja märkmed</span>
-            <span className="ml-auto text-gray-400">
-              {extraOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </span>
-          </button>
-
-          {extraOpen && (
-            <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-5">
-
-              <AliasesList
-                aliases={draft.name_aliases}
-                onChange={v => set({ name_aliases: v })}
-              />
-
-              {/* Identifikaatorid */}
-              <div>
-                <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Identifikaatorid</label>
-                <div className="space-y-2">
-                  {[
-                    { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345' },
-                    { key: 'gnd_id', label: 'GND', placeholder: '123456789' },
-                    { key: 'viaf_id', label: 'VIAF', placeholder: '12345678' },
-                    { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA-123' },
-                  ].map(({ key, label, placeholder }) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
-                      <input
-                        type="text"
-                        value={draft[key as keyof FormDraft] as string}
-                        onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
-                        placeholder={placeholder}
-                        className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
-                      />
-                    </div>
-                  ))}
+        {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
+        <CollapsibleSection
+          title="Nimevariandid ja identifikaatorid"
+          open={namesOpen}
+          onToggle={() => setNamesOpen(v => !v)}
+        >
+          <AliasesList
+            aliases={draft.name_aliases}
+            onChange={v => set({ name_aliases: v })}
+          />
+          <div>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Identifikaatorid</label>
+            <div className="space-y-2">
+              {[
+                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345' },
+                { key: 'gnd_id', label: 'GND', placeholder: '123456789' },
+                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678' },
+                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA-123' },
+              ].map(({ key, label, placeholder }) => (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
+                  <input
+                    type="text"
+                    value={draft[key as keyof FormDraft] as string}
+                    onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
+                    placeholder={placeholder}
+                    className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                  />
                 </div>
-              </div>
-
-              {/* Märkmed */}
-              <div>
-                <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-                  {t('prosopography.notes', 'Märkmed')}
-                </label>
-                <textarea
-                  value={draft.notes}
-                  onChange={e => set({ notes: e.target.value })}
-                  rows={3}
-                  placeholder="Sisemised märkmed (ei kuvata avalikult)…"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"
-                />
-              </div>
+              ))}
             </div>
-          )}
-        </div>
+          </div>
+        </CollapsibleSection>
+
+        {/* ── Ametid ja haridus (klapitav) ── */}
+        <CollapsibleSection
+          title={`${t('prosopography.occupations', 'Ametid')} ja ${t('prosopography.education', 'haridus').toLowerCase()}`}
+          open={occupOpen}
+          onToggle={() => setOccupOpen(v => !v)}
+        >
+          {/* Ametid */}
+          <DynamicList
+            label={t('prosopography.occupations', 'Ametid')}
+            items={draft.occupations}
+            renderItem={(item, onChange, onRemove) => (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={item.label}
+                  onChange={e => onChange({ label: e.target.value })}
+                  placeholder="pastor, jurist, professor…"
+                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            onAdd={() => set({ occupations: [...draft.occupations, { label: '' }] })}
+            onChange={items => set({ occupations: items })}
+          />
+
+          {/* Haridus */}
+          <DynamicList
+            label={t('prosopography.education', 'Haridus')}
+            items={draft.education}
+            renderItem={(item, onChange, onRemove) => (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={item.institution}
+                  onChange={e => onChange({ ...item, institution: e.target.value })}
+                  placeholder="Academia Gustaviana, Wittenberg…"
+                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
+                <input
+                  type="number"
+                  value={item.year}
+                  onChange={e => onChange({ ...item, year: e.target.value })}
+                  placeholder="aasta"
+                  className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            onAdd={() => set({ education: [...draft.education, { institution: '', year: '' }] })}
+            onChange={items => set({ education: items })}
+          />
+        </CollapsibleSection>
+
+        {/* ── Seosed ja märkmed (klapitav) ── */}
+        <CollapsibleSection
+          title={`${t('prosopography.relations', 'Seosed')} ja ${t('prosopography.notes', 'märkmed').toLowerCase()}`}
+          open={relOpen}
+          onToggle={() => setRelOpen(v => !v)}
+        >
+          {/* Seosed */}
+          <DynamicList
+            label={t('prosopography.relations', 'Seosed')}
+            items={draft.relations}
+            renderItem={(item, onChange, onRemove) => (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={item.name}
+                  onChange={e => onChange({ ...item, name: e.target.value })}
+                  placeholder="Isiku nimi"
+                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
+                <input
+                  type="text"
+                  value={item.type}
+                  onChange={e => onChange({ ...item, type: e.target.value })}
+                  placeholder="suhe (abikaasa, isa…)"
+                  className="w-40 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                />
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            onAdd={() => set({ relations: [...draft.relations, { name: '', type: '' }] })}
+            onChange={items => set({ relations: items })}
+          />
+
+          {/* Märkmed */}
+          <div>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+              {t('prosopography.notes', 'Märkmed')}
+            </label>
+            <textarea
+              value={draft.notes}
+              onChange={e => set({ notes: e.target.value })}
+              rows={3}
+              placeholder="Sisemised märkmed (ei kuvata avalikult)…"
+              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"
+            />
+          </div>
+        </CollapsibleSection>
 
         {/* Alumine salvesta nupp */}
         <div className="flex justify-end">
