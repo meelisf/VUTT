@@ -17,6 +17,7 @@ export interface ProsopoIndexEntry {
   verification_level: 'draft' | 'reviewed' | 'verified';
   work_count: number;
   biography_snippet: string;
+  image_url: string | null;
 }
 
 export interface HistoricalDate {
@@ -68,6 +69,7 @@ export interface ProsopoRecord {
   sources: any[];
   biography: string | null;
   notes: string | null;
+  image_url: string | null;
   source_data: Record<string, any>;
   // lisatakse GET /prosopography/{id} vastuses
   works?: { work_id: string; role: string }[];

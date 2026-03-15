@@ -1,33 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Search, UserPlus, Users, ChevronDown, X } from 'lucide-react';
+import { Search, UserPlus, Users } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
+import PersonAdvancedFilters, { type GenderFilter, type SourceFilter, type LevelFilter } from '../components/PersonAdvancedFilters';
 import { listPersons } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoIndexEntry } from '../types';
 
-type GenderFilter = '' | 'M' | 'F';
-type SourceFilter = '' | 'wikidata' | 'gnd' | 'aa';
-type LevelFilter = '' | 'draft' | 'reviewed' | 'verified';
-
 const PersonsPage: React.FC = () => {
   const { t } = useTranslation(['common']);
-  const { user } = useUser();
+  const { user, authToken } = useUser();
 
   const [allPersons, setAllPersons] = useState<ProsopoIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filtrid (kliendipoolsed)
   const [query, setQuery] = useState('');
   const [gender, setGender] = useState<GenderFilter>('');
   const [source, setSource] = useState<SourceFilter>('');
   const [level, setLevel] = useState<LevelFilter>('');
 
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
-  const token = user?.token ?? '';
+  const token = authToken ?? '';
 
   useEffect(() => {
     setLoading(true);
@@ -54,9 +50,7 @@ const PersonsPage: React.FC = () => {
     });
   }, [allPersons, query, gender, source, level]);
 
-  const hasActiveFilters = gender || source || level;
-
-  const clearFilters = () => { setGender(''); setSource(''); setLevel(''); };
+  const hasActiveFilters = !!(gender || source || level);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -68,73 +62,40 @@ const PersonsPage: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
 
         {/* Tööriistariba */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          {/* Otsing */}
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            <input
-              type="search"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder={t('prosopography.searchPlaceholder', 'Otsi nime järgi…')}
-              className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
-            />
-          </div>
-
-          {/* Filtrid */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <FilterSelect
-              value={gender}
-              onChange={v => setGender(v as GenderFilter)}
-              options={[
-                { value: '', label: t('prosopography.filterGenderAll', 'Sugu') },
-                { value: 'M', label: t('prosopography.filterMale', 'Meessoost') },
-                { value: 'F', label: t('prosopography.filterFemale', 'Naissoost') },
-              ]}
-              active={!!gender}
-            />
-            <FilterSelect
-              value={source}
-              onChange={v => setSource(v as SourceFilter)}
-              options={[
-                { value: '',         label: t('prosopography.filterSourceAll', 'Allikas') },
-                { value: 'wikidata', label: 'Wikidata' },
-                { value: 'gnd',      label: 'GND' },
-                { value: 'aa',       label: 'Album Acad.' },
-              ]}
-              active={!!source}
-            />
-            <FilterSelect
-              value={level}
-              onChange={v => setLevel(v as LevelFilter)}
-              options={[
-                { value: '',         label: t('prosopography.filterLevelAll', 'Olek') },
-                { value: 'draft',    label: t('prosopography.levelDraft',    'Mustand') },
-                { value: 'reviewed', label: t('prosopography.levelReviewed', 'Üle vaadatud') },
-                { value: 'verified', label: t('prosopography.levelVerified', 'Kontrollitud') },
-              ]}
-              active={!!level}
-            />
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5 rounded border border-gray-200 bg-white hover:bg-gray-50 transition-colors"
-              >
-                <X size={12} />
-                {t('prosopography.clearFilters', 'Tühista')}
-              </button>
-            )}
+        <div className="flex flex-col gap-3 mb-6">
+          <div className="flex gap-3">
+            {/* Otsing */}
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder={t('prosopography.searchPlaceholder', 'Otsi nime järgi…')}
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+              />
+            </div>
 
             {canEdit && (
               <Link
                 to="/persons/new"
-                className="ml-auto sm:ml-2 flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
+                className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
                 <UserPlus size={15} />
                 {t('prosopography.addPerson', 'Lisa isik')}
               </Link>
             )}
           </div>
+
+          {/* Täpsemad filtrid */}
+          <PersonAdvancedFilters
+            gender={gender}
+            source={source}
+            level={level}
+            onGenderChange={setGender}
+            onSourceChange={setSource}
+            onLevelChange={setLevel}
+          />
         </div>
 
         {/* Arv */}
@@ -150,7 +111,7 @@ const PersonsPage: React.FC = () => {
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-44 bg-white border border-stone-200 rounded-lg animate-pulse" />
+              <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
             ))}
           </div>
         )}
@@ -178,35 +139,5 @@ const PersonsPage: React.FC = () => {
     </div>
   );
 };
-
-// =========================================================
-// Abikomponen: filter-dropdown
-// =========================================================
-interface FilterOption { value: string; label: string; }
-interface FilterSelectProps {
-  value: string;
-  onChange: (v: string) => void;
-  options: FilterOption[];
-  active?: boolean;
-}
-
-const FilterSelect: React.FC<FilterSelectProps> = ({ value, onChange, options, active }) => (
-  <div className="relative">
-    <select
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      className={`appearance-none text-sm pl-3 pr-7 py-2 rounded-lg border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-300 ${
-        active
-          ? 'border-primary-400 bg-primary-50 text-primary-700 font-medium'
-          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-      }`}
-    >
-      {options.map(o => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-    <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-  </div>
-);
 
 export default PersonsPage;

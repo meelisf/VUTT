@@ -125,6 +125,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "verification_level": person.get("verification_level", "draft"),
         "work_count": work_count,
         "biography_snippet": _make_snippet(person),
+        "image_url": person.get("image_url"),
     }
 
 
@@ -237,6 +238,7 @@ def create_person(data: dict, username: str) -> dict:
         "sources": [],
         "biography": None,
         "notes": data.get("notes"),
+        "image_url": None,
         "source_data": {},
     }
 
