@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { LinkedEntity } from '../../types/LinkedEntity';
@@ -286,7 +286,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                         className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
                         title="Filtreeri trükkali järgi"
                       >
-                        <User size={14} />
+                        <BookDown size={14} />
                       </button>
                       <span
                         className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
