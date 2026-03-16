@@ -15,8 +15,11 @@ import type { LinkedEntity } from '../../types/LinkedEntity';
 
 interface DateDraft {
   year: string;       // '1650' vm tühi
+  month: string;      // '1'–'12' vm tühi
+  day: string;        // '1'–'31' vm tühi
   circa: boolean;
   bound: '' | 'before' | 'after';
+  calendar: '' | 'julian' | 'gregorian';
   place: string;
 }
 
@@ -64,8 +67,8 @@ const emptyDraft = (): FormDraft => ({
   name_qualifier: '',
   name_aliases: [],
   gender: '',
-  birth: { year: '', circa: false, bound: '', place: '' },
-  death: { year: '', circa: false, bound: '', place: '' },
+  birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
+  death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
   origin_city: '',
   origin_region: '',
   status: null,
@@ -94,14 +97,20 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
     gender: p.gender ?? '',
     birth: {
       year: p.birth?.date ? p.birth.date.slice(0, 4) : '',
+      month: p.birth?.date && p.birth.precision !== 'year' ? String(parseInt(p.birth.date.slice(5, 7))) : '',
+      day: p.birth?.date && p.birth.precision === 'day' ? String(parseInt(p.birth.date.slice(8, 10))) : '',
       circa: p.birth?.is_circa ?? false,
       bound: p.birth?.bound ?? '',
+      calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
       place: p.birth?.place?.label ?? '',
     },
     death: {
       year: p.death?.date ? p.death.date.slice(0, 4) : '',
+      month: p.death?.date && p.death.precision !== 'year' ? String(parseInt(p.death.date.slice(5, 7))) : '',
+      day: p.death?.date && p.death.precision === 'day' ? String(parseInt(p.death.date.slice(8, 10))) : '',
       circa: p.death?.is_circa ?? false,
       bound: p.death?.bound ?? '',
+      calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
       place: p.death?.place?.label ?? '',
     },
     origin_city: p.origin?.city ?? '',
@@ -133,13 +142,17 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
 
 function buildDatePayload(d: DateDraft): any {
   if (!d.year) return null;
+  const y = d.year.padStart(4, '0');
+  const m = d.month ? d.month.padStart(2, '0') : '01';
+  const day = d.day ? d.day.padStart(2, '0') : '01';
+  const precision = d.day && d.month ? 'day' : d.month ? 'month' : 'year';
   return {
     original_text: null,
-    date: `${d.year.padStart(4, '0')}-01-01`,
+    date: `${y}-${m}-${day}`,
     date_to: null,
     bound: d.bound || null,
-    precision: 'year',
-    calendar: null,
+    precision,
+    calendar: d.calendar || null,
     is_circa: d.circa,
     place: d.place ? { id: null, label: d.place } : null,
     notes: null,
@@ -240,13 +253,25 @@ const DateField: React.FC<{
       <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</label>
       <div className="flex flex-wrap items-center gap-2">
         <input
-          type="number"
-          min={1000}
-          max={1900}
+          type="number" min={1000} max={1900}
           placeholder="aasta"
           value={value.year}
           onChange={e => set({ year: e.target.value })}
-          className="w-24 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+          className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+        />
+        <input
+          type="number" min={1} max={12}
+          placeholder="kuu"
+          value={value.month}
+          onChange={e => set({ month: e.target.value })}
+          className="w-14 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+        />
+        <input
+          type="number" min={1} max={31}
+          placeholder="päev"
+          value={value.day}
+          onChange={e => set({ day: e.target.value })}
+          className="w-14 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
         <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
           <input
@@ -266,12 +291,21 @@ const DateField: React.FC<{
           <option value="before">enne</option>
           <option value="after">pärast</option>
         </select>
+        <select
+          value={value.calendar}
+          onChange={e => set({ calendar: e.target.value as DateDraft['calendar'] })}
+          className="text-sm border border-gray-300 rounded px-1.5 py-1.5 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white text-gray-700"
+        >
+          <option value="">kalender?</option>
+          <option value="julian">Juliuse</option>
+          <option value="gregorian">Gregoriuse</option>
+        </select>
         <input
           type="text"
           placeholder="koht"
           value={value.place}
           onChange={e => set({ place: e.target.value })}
-          className="w-32 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+          className="w-28 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
       </div>
     </div>
