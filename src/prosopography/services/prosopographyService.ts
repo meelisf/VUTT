@@ -40,6 +40,7 @@ export async function createPerson(data: {
   birth_year?: number | null;
   death_year?: number | null;
   notes?: string;
+  identifiers?: { scheme: string; id: string }[];
 }, token: string): Promise<ProsopoRecord> {
   const resp = await fetchWithTimeout(BASE, {
     method: 'POST',

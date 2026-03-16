@@ -534,6 +534,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                         lang={lang}
                         localSuggestions={suggestions.authors}
                         peopleRegister={peopleRegister}
+                        showPersonToggle
+                        defaultPersonSearch
+                        token={authToken}
                       />
                     </div>
                     <select
@@ -621,6 +624,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   lang={lang}
                   localSuggestions={suggestions.printers}
                   peopleRegister={peopleRegister}
+                  showPersonToggle
+                  token={authToken}
                 />
               </div>
             </div>
@@ -775,6 +780,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 placeholder={t('metadata.tagsPlaceholder', 'Lisa märksõna...')}
                 lang={lang}
                 localSuggestions={suggestions.tags}
+                showPersonToggle
+                token={authToken}
               />
               <p className="text-[10px] text-gray-400 mt-1 italic">
                 {t('metadata.tagsHint')}

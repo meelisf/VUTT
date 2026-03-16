@@ -3,9 +3,10 @@
  * Used for fields like location, publisher, genre, and keywords.
  */
 export interface LinkedEntity {
-  id: string | null;       // Wikidata ID (e.g., "Q13972"), VIAF, AA:123, GND, or null for manual entries
+  id: string | null;       // Wikidata ID (e.g., "Q13972"), VIAF, AA:123, GND, vutt:Pxxx, or null for manual entries
   label: string;           // Primary label for display (e.g., "Tartu")
-  source: 'wikidata' | 'viaf' | 'album_academicum' | 'gnd' | 'manual';
+  source: 'wikidata' | 'viaf' | 'album_academicum' | 'gnd' | 'manual' | 'local';
+  entity_type?: 'person' | 'topic' | 'place' | 'organization';
   labels?: {               // Multilingual support
     et?: string;
     en?: string;
