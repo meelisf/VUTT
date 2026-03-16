@@ -35,7 +35,9 @@ function describeAutoFilled(af: Record<string, any>): string[] {
   if (af['death.date']) fields.push('surmakuupäev');
   if (af['birth.place']) fields.push('sünnikoht');
   if (af['death.place']) fields.push('surmakoht');
-  if (af['_occupation_label']) fields.push('amet');
+  if (af['_occupations']?.length || af['_occupation_label']) fields.push('ametid');
+  if (af['confession']) fields.push('konfessioon');
+  if (af['status']) fields.push('seisus');
   if (af['name.aliases']?.length) fields.push('nimevariandid');
   return fields;
 }

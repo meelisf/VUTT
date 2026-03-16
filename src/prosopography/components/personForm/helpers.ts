@@ -19,32 +19,54 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   if (autoFilled['birth.date']) {
     const d: string = autoFilled['birth.date'];
     const precision = autoFilled['birth.precision'] ?? 'day';
-    const place = autoFilled['birth.place'];
     patch.birth = {
       ...draft.birth,
       year: d.slice(0, 4),
       month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
       day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
-      place: place?.label ?? draft.birth.place,
     };
+  }
+  // Sünnikoht — rakenda sõltumata sellest kas kuupäev on olemas
+  if (autoFilled['birth.place']?.label && !draft.birth.place) {
+    patch.birth = { ...(patch.birth ?? draft.birth), place: autoFilled['birth.place'].label };
   }
 
   // Surmaaeg
   if (autoFilled['death.date']) {
     const d: string = autoFilled['death.date'];
     const precision = autoFilled['death.precision'] ?? 'day';
-    const place = autoFilled['death.place'];
     patch.death = {
       ...draft.death,
       year: d.slice(0, 4),
       month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
       day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
-      place: place?.label ?? draft.death.place,
     };
   }
+  // Surmakoht — rakenda sõltumata sellest kas kuupäev on olemas
+  if (autoFilled['death.place']?.label && !draft.death.place) {
+    patch.death = { ...(patch.death ?? draft.death), place: autoFilled['death.place'].label };
+  }
 
-  // Amet (ainult esimene — kasutaja saab täiendada)
-  if (autoFilled['_occupation_label'] && draft.occupations.length === 0) {
+  // Konfessioon
+  if (autoFilled['confession'] && !draft.confession) {
+    const c = autoFilled['confession'];
+    patch.confession = { label: c.label, id: c.id ?? null, labels: null, source: 'wikidata' };
+  }
+
+  // Seisus
+  if (autoFilled['status'] && !draft.status) {
+    const s = autoFilled['status'];
+    patch.status = { label: s.label, id: s.id ?? null, labels: null, source: 'wikidata' };
+  }
+
+  // Ametid — uus vorming (_occupations massiiv), GND tagasiühilduvus (_occupation_label)
+  if (autoFilled['_occupations']?.length && draft.occupations.length === 0) {
+    patch.occupations = autoFilled['_occupations'].map((o: any) => ({
+      label: o.label,
+      id: o.id ?? null,
+      labels: undefined,
+    }));
+  } else if (autoFilled['_occupation_label'] && draft.occupations.length === 0) {
     patch.occupations = [{ label: autoFilled['_occupation_label'] }];
   }
 
