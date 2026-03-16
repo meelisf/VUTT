@@ -95,6 +95,24 @@ async def prosopography_create(
     return person
 
 
+# ── Rikastuse eelvaade (ilma kirjet loomata) ──────────────────────────────
+
+@router.get("/enrich/preview")
+async def enrichment_preview(
+    request: Request,
+    scheme: str,
+    id: str,
+    user=Depends(_require_role("editor")),
+):
+    """
+    Tagastab välisallika rikastuse eelvaate ilma kirjet loomata.
+    Kutsutakse /persons/new vormi täitmisel.
+    """
+    from .enrichment import fetch_and_diff
+    diff = fetch_and_diff(scheme, id, {})
+    return diff
+
+
 # ── Spetsiifilised /{person_id}/X ruutid enne generaalset /{person_id} ──
 
 @router.post("/{person_id:path}/identifiers")
