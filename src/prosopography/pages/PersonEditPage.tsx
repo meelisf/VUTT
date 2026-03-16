@@ -3,9 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2, ImagePlus, Trash2 } from 'lucide-react';
 import Header from '../../components/Header';
+import EntityPicker from '../../components/EntityPicker';
 import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
+import type { LinkedEntity } from '../../types/LinkedEntity';
 
 // =========================================================
 // Vorm tüübid
@@ -18,8 +20,8 @@ interface DateDraft {
   place: string;
 }
 
-interface OccupationDraft { label: string }
-interface EducationDraft { institution: string; year: string }
+interface OccupationDraft { label: string; id?: string | null; labels?: Record<string, string> }
+interface EducationDraft { institution: string; institution_id?: string | null; institution_labels?: Record<string, string>; year: string }
 interface RelationDraft  { name: string; type: string }
 
 interface FormDraft {
@@ -33,10 +35,8 @@ interface FormDraft {
   death: DateDraft;
   origin_city: string;
   origin_region: string;
-  status_label: string;
-  status_id: string;
-  confession_label: string;
-  confession_id: string;
+  status: LinkedEntity | null;
+  confession: LinkedEntity | null;
   occupations: OccupationDraft[];
   education: EducationDraft[];
   relations: RelationDraft[];
@@ -59,10 +59,8 @@ const emptyDraft = (): FormDraft => ({
   death: { year: '', circa: false, bound: '', place: '' },
   origin_city: '',
   origin_region: '',
-  status_label: '',
-  status_id: '',
-  confession_label: '',
-  confession_id: '',
+  status: null,
+  confession: null,
   occupations: [],
   education: [],
   relations: [],
@@ -98,12 +96,10 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
     },
     origin_city: p.origin?.city ?? '',
     origin_region: p.origin?.region ?? '',
-    status_label: p.status?.label ?? '',
-    status_id: p.status?.id ?? '',
-    confession_label: p.confession?.label ?? '',
-    confession_id: p.confession?.id ?? '',
-    occupations: (p.occupations ?? []).map((o: any) => ({ label: o.label ?? String(o) })),
-    education: (p.education ?? []).map((e: any) => ({ institution: e.institution ?? e.label ?? String(e), year: e.year ? String(e.year) : '' })),
+    status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
+    confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
+    occupations: (p.occupations ?? []).map((o: any) => ({ label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined })),
+    education: (p.education ?? []).map((e: any) => ({ institution: e.institution ?? e.label ?? String(e), institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined, year: e.year ? String(e.year) : '' })),
     relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? r.target_id ?? '', type: r.type ?? '' })),
     biography: p.biography ?? '',
     notes: p.notes ?? '',
@@ -163,11 +159,11 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
     gender: (draft.gender || null) as 'M' | 'F' | null,
     birth: buildDatePayload(draft.birth) ?? (original?.birth ?? null as any),
     death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
-    status: draft.status_label.trim()
-      ? { id: draft.status_id.trim() || draft.status_label.trim(), label: draft.status_label.trim() }
+    status: draft.status
+      ? { id: draft.status.id || draft.status.label, label: draft.status.label, ...(draft.status.labels ? { labels: draft.status.labels } : {}) }
       : null,
-    confession: draft.confession_label.trim()
-      ? { id: draft.confession_id.trim() || draft.confession_label.trim(), label: draft.confession_label.trim() }
+    confession: draft.confession
+      ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,
     origin: {
       city: draft.origin_city.trim() || null,
@@ -175,9 +171,15 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
       geonames_id: original?.origin?.geonames_id ?? null,
       coordinates: original?.origin?.coordinates ?? null,
     },
-    occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({ label: o.label.trim() })),
+    occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({
+      label: o.label.trim(),
+      ...(o.id ? { id: o.id } : {}),
+      ...(o.labels ? { labels: o.labels } : {}),
+    })),
     education: draft.education.filter(e => e.institution.trim()).map(e => ({
       institution: e.institution.trim(),
+      ...(e.institution_id ? { institution_id: e.institution_id } : {}),
+      ...(e.institution_labels ? { institution_labels: e.institution_labels } : {}),
       ...(e.year.trim() ? { year: parseInt(e.year) } : {}),
     })),
     relations: draft.relations.filter(r => r.name.trim()).map(r => ({
@@ -718,30 +720,22 @@ const PersonEditPage: React.FC = () => {
 
           {/* Seisus + konfessioon */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-                {t('prosopography.status', 'Seisus')}
-              </label>
-              <input
-                type="text"
-                value={draft.status_label}
-                onChange={e => set({ status_label: e.target.value })}
-                placeholder="aadlik, vaimulik…"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-                {t('prosopography.confession', 'Konfessioon')}
-              </label>
-              <input
-                type="text"
-                value={draft.confession_label}
-                onChange={e => set({ confession_label: e.target.value })}
-                placeholder="luterlik, katoliiklik…"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-              />
-            </div>
+            <EntityPicker
+              label={t('prosopography.status', 'Seisus')}
+              placeholder="aadlik, vaimulik…"
+              type="topic"
+              value={draft.status}
+              onChange={v => set({ status: v })}
+              lang="et"
+            />
+            <EntityPicker
+              label={t('prosopography.confession', 'Konfessioon')}
+              placeholder="luterlik, katoliiklik…"
+              type="topic"
+              value={draft.confession}
+              onChange={v => set({ confession: v })}
+              lang="et"
+            />
           </div>
 
           {/* Päritolu */}
@@ -833,14 +827,16 @@ const PersonEditPage: React.FC = () => {
             items={draft.occupations}
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item.label}
-                  onChange={e => onChange({ label: e.target.value })}
-                  placeholder="pastor, jurist, professor…"
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                <div className="flex-1">
+                  <EntityPicker
+                    placeholder="pastor, jurist, professor…"
+                    type="topic"
+                    value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
+                    onChange={v => onChange(v ? { label: v.label, id: v.id ?? null, labels: v.labels ?? undefined } : { label: '' })}
+                    lang="et"
+                  />
+                </div>
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
                   <X size={14} />
                 </button>
               </div>
@@ -855,13 +851,15 @@ const PersonEditPage: React.FC = () => {
             items={draft.education}
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item.institution}
-                  onChange={e => onChange({ ...item, institution: e.target.value })}
-                  placeholder="Academia Gustaviana, Wittenberg…"
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
+                <div className="flex-1">
+                  <EntityPicker
+                    placeholder="Academia Gustaviana, Wittenberg…"
+                    type="topic"
+                    value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
+                    onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                    lang="et"
+                  />
+                </div>
                 <input
                   type="number"
                   value={item.year}
@@ -869,7 +867,7 @@ const PersonEditPage: React.FC = () => {
                   placeholder="aasta"
                   className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
                 />
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
                   <X size={14} />
                 </button>
               </div>
