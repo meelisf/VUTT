@@ -83,6 +83,20 @@ export async function uploadPersonImage(personId: string, file: File, token: str
   return resp.json();
 }
 
+export async function fetchEnrichmentPreview(scheme: string, id: string, token: string): Promise<{
+  auto_filled: Record<string, any>;
+  conflicts: { field: string; local: any; remote: any }[];
+  error?: string;
+}> {
+  const url = new URL(`${BASE}/enrich/preview`, window.location.origin);
+  url.searchParams.set('scheme', scheme);
+  url.searchParams.set('id', id);
+  url.searchParams.set('token', token);
+  const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
+  if (!resp.ok) throw new Error(`fetchEnrichmentPreview: ${resp.status}`);
+  return resp.json();
+}
+
 export async function deletePersonImage(personId: string, token: string): Promise<void> {
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {

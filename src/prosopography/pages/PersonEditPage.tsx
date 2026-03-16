@@ -15,6 +15,7 @@ import AliasesList from '../components/personForm/AliasesList';
 import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
+import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +31,7 @@ const PersonEditPage: React.FC = () => {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [enrichedWith, setEnrichedWith] = useState<{ scheme: string; id: string; label: string; fields: string[] } | null>(null);
   const [namesOpen, setNamesOpen] = useState(false);
   const [occupOpen, setOccupOpen] = useState(false);
   const [relOpen, setRelOpen] = useState(false);
@@ -188,6 +190,39 @@ const PersonEditPage: React.FC = () => {
         {error && (
           <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
             {error}
+          </div>
+        )}
+
+        {/* ── Rikastamine välisallikatest (ainult uus isik) ── */}
+        {isNew && !enrichedWith && (
+          <EnrichmentSearch
+            draft={draft}
+            token={token}
+            onEnrich={(newDraft, info) => {
+              setDraft(newDraft);
+              setEnrichedWith(info);
+              setNamesOpen(true); // ava identifikaatorid
+            }}
+          />
+        )}
+
+        {enrichedWith && (
+          <div className="mb-5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 flex items-start gap-2">
+            <span className="shrink-0 mt-0.5">✓</span>
+            <span className="flex-1">
+              <strong>Rikastatud {enrichedWith.scheme === 'wikidata' ? 'Wikidatast' : enrichedWith.scheme === 'gnd' ? 'GND-st' : 'VIAF-ist'}</strong>
+              {' '}({enrichedWith.id})
+              {enrichedWith.fields.length > 0 && (
+                <span className="text-green-700"> — täideti: {enrichedWith.fields.join(', ')}</span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => setEnrichedWith(null)}
+              className="text-green-400 hover:text-green-700 shrink-0"
+            >
+              <X size={14} />
+            </button>
           </div>
         )}
 

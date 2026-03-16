@@ -1,6 +1,56 @@
 import type { ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft } from './types';
 
+// Rakendab fetch_and_diff auto_filled väljad olemasolevale draftile
+export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: FormDraft): FormDraft {
+  const patch: Partial<FormDraft> = {};
+
+  if (autoFilled['gender']) patch.gender = autoFilled['gender'];
+
+  // Nimi (ainult GND annab — ärge kirjuta üle kasutaja sisestust)
+  if (autoFilled['name.label'] && !draft.name_label.trim()) {
+    patch.name_label = autoFilled['name.label'];
+  }
+  if (autoFilled['name.aliases']?.length) {
+    patch.name_aliases = autoFilled['name.aliases'];
+  }
+
+  // Sünniaeg
+  if (autoFilled['birth.date']) {
+    const d: string = autoFilled['birth.date'];
+    const precision = autoFilled['birth.precision'] ?? 'day';
+    const place = autoFilled['birth.place'];
+    patch.birth = {
+      ...draft.birth,
+      year: d.slice(0, 4),
+      month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
+      day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
+      place: place?.label ?? draft.birth.place,
+    };
+  }
+
+  // Surmaaeg
+  if (autoFilled['death.date']) {
+    const d: string = autoFilled['death.date'];
+    const precision = autoFilled['death.precision'] ?? 'day';
+    const place = autoFilled['death.place'];
+    patch.death = {
+      ...draft.death,
+      year: d.slice(0, 4),
+      month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
+      day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
+      place: place?.label ?? draft.death.place,
+    };
+  }
+
+  // Amet (ainult esimene — kasutaja saab täiendada)
+  if (autoFilled['_occupation_label'] && draft.occupations.length === 0) {
+    patch.occupations = [{ label: autoFilled['_occupation_label'] }];
+  }
+
+  return { ...draft, ...patch };
+}
+
 export function recordToDraft(p: ProsopoRecord): FormDraft {
   const ident = (scheme: string) =>
     p.identifiers?.find(i => i.scheme === scheme)?.id ?? '';
