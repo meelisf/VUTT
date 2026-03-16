@@ -657,7 +657,7 @@ const PersonEditPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
           {[100, 80, 90, 70].map((w, i) => (
             <div key={i} className="h-10 bg-white rounded-lg border border-gray-200 animate-pulse" style={{ width: `${w}%` }} />
           ))}
@@ -671,7 +671,7 @@ const PersonEditPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-gray-600 text-sm mb-4">Muutmiseks pead olema sisse logitud toimetajana.</p>
           <button onClick={() => navigate('/persons')} className="text-primary-600 hover:underline text-sm">
             ← Tagasi isikute nimekirja
@@ -689,7 +689,7 @@ const PersonEditPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
 
         {/* Tagasi */}
         <button

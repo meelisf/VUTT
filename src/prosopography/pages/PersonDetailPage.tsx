@@ -172,7 +172,7 @@ const PersonDetailPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
           <div className="h-5 w-40 bg-gray-200 rounded animate-pulse" />
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm space-y-3">
             <div className="h-5 w-32 bg-gray-200 rounded animate-pulse" />
@@ -200,7 +200,7 @@ const PersonDetailPage: React.FC = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-red-600 text-sm mb-4">{error ?? t('prosopography.notFound', 'Isikut ei leitud.')}</p>
           <button onClick={() => navigate('/persons')} className="text-primary-600 hover:underline text-sm">
             ← {t('prosopography.backToList', 'Tagasi isikute nimekirja')}
@@ -220,7 +220,7 @@ const PersonDetailPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6">
 
         {/* Tagasi */}
         <button
