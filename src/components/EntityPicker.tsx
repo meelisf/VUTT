@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { searchViaf, ViafSearchResult } from '../services/viafService';
@@ -517,7 +518,16 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           }`}
         />
 
-        {entityUrl && (
+        {entityId?.startsWith('vutt:P') ? (
+          <Link
+            to={`/persons/${entityId}`}
+            className="absolute right-9 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
+            title="Vaata isiku profiili"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <User size={14} />
+          </Link>
+        ) : entityUrl ? (
           <a
             href={entityUrl}
             target="_blank"
@@ -528,7 +538,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           >
             <ExternalLink size={14} />
           </a>
-        )}
+        ) : null}
 
         {inputValue && (
           <button
@@ -656,8 +666,8 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 )}
 
                 {/* Loo uus isik */}
-                <a
-                  href="/persons/new"
+                <Link
+                  to={inputValue.trim() ? `/persons/new?name=${encodeURIComponent(inputValue.trim())}` : '/persons/new'}
                   target="_blank"
                   rel="noopener noreferrer"
                   onMouseDown={() => { justSelectedRef.current = true; }}
@@ -665,7 +675,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 >
                   <UserPlus size={12} className="text-green-500 shrink-0" />
                   <span>{lang === 'en' ? 'Create new person ↗' : 'Loo uus isik ↗'}</span>
-                </a>
+                </Link>
 
                 {/* Käsitsi sisestus */}
                 <button

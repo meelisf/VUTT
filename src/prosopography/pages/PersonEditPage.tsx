@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
@@ -23,14 +23,21 @@ import EnrichExistingSection from '../components/personForm/EnrichExistingSectio
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation(['common']);
   const { user, authToken } = useUser();
 
   const isNew = !id || id === 'new';
   const token = authToken ?? '';
 
+  const prefillName = isNew ? (searchParams.get('name') ?? '') : '';
+
   const [original, setOriginal] = useState<ProsopoRecord | null>(null);
-  const [draft, setDraft] = useState<FormDraft>(emptyDraft());
+  const [draft, setDraft] = useState<FormDraft>(() => {
+    const d = emptyDraft();
+    if (prefillName) d.name_label = prefillName;
+    return d;
+  });
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

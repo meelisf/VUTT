@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
@@ -209,7 +209,15 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             {creator.name}
                           </span>
                         </div>
-                        {getEntityUrl(creator.id, creator.source) && (
+                        {creator.id?.startsWith('vutt:P') ? (
+                          <Link
+                            to={`/persons/${creator.id}`}
+                            className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
+                            title={creator.id}
+                          >
+                            <User size={12} />
+                          </Link>
+                        ) : getEntityUrl(creator.id, creator.source) ? (
                           <a
                             href={getEntityUrl(creator.id, creator.source)!}
                             target="_blank"
@@ -219,7 +227,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                           >
                             <ExternalLink size={12} />
                           </a>
-                        )}
+                        ) : null}
                         <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
                       </div>
                     );

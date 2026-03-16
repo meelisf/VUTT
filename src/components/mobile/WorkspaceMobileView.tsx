@@ -5,7 +5,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
@@ -317,7 +317,15 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                                   <User size={13} className="text-gray-400 shrink-0" />
                                   <span className="font-medium">{creator.name}</span>
                                 </div>
-                                {getEntityUrl(creator.id, creator.source) && (
+                                {creator.id?.startsWith('vutt:P') ? (
+                                  <Link
+                                    to={`/persons/${creator.id}`}
+                                    className="text-gray-400 hover:text-primary-600 p-0.5"
+                                    title={creator.id}
+                                  >
+                                    <User size={11} />
+                                  </Link>
+                                ) : getEntityUrl(creator.id, creator.source) ? (
                                   <a
                                     href={getEntityUrl(creator.id, creator.source)!}
                                     target="_blank"
@@ -327,7 +335,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                                   >
                                     <ExternalLink size={11} />
                                   </a>
-                                )}
+                                ) : null}
                                 <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
                               </div>
                             );

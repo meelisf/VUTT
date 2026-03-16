@@ -96,7 +96,16 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                 >
                   {creator.name}
                 </Link>
-                {getEntityUrl(creator.id, creator.source) && (
+                {creator.id?.startsWith('vutt:P') ? (
+                  <Link
+                    to={`/persons/${creator.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
+                    title={creator.id}
+                  >
+                    <User size={10} />
+                  </Link>
+                ) : getEntityUrl(creator.id, creator.source) ? (
                   <a
                     href={getEntityUrl(creator.id, creator.source)!}
                     target="_blank"
@@ -107,7 +116,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                   >
                     <ExternalLink size={10} />
                   </a>
-                )}
+                ) : null}
                 {idx < displayCreators.length - 1 && <span className="text-gray-400">/</span>}
               </span>
             );
