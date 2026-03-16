@@ -20,8 +20,16 @@ interface DateDraft {
   place: string;
 }
 
-interface OccupationDraft { label: string; id?: string | null; labels?: Record<string, string> }
-interface EducationDraft { institution: string; institution_id?: string | null; institution_labels?: Record<string, string>; year: string }
+interface OccupationDraft {
+  label: string; id?: string | null; labels?: Record<string, string>;
+  institution?: string; institution_id?: string | null; institution_labels?: Record<string, string>;
+  year_from?: string; year_to?: string;
+}
+interface EducationDraft {
+  institution: string; institution_id?: string | null; institution_labels?: Record<string, string>;
+  year_from?: string; year_to?: string;
+}
+interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }
 interface RelationDraft  { name: string; type: string }
 
 interface FormDraft {
@@ -39,6 +47,7 @@ interface FormDraft {
   confession: LinkedEntity | null;
   occupations: OccupationDraft[];
   education: EducationDraft[];
+  tags: TagDraft[];
   relations: RelationDraft[];
   biography: string;
   notes: string;
@@ -63,6 +72,7 @@ const emptyDraft = (): FormDraft => ({
   confession: null,
   occupations: [],
   education: [],
+  tags: [],
   relations: [],
   biography: '',
   notes: '',
@@ -98,8 +108,19 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
     origin_region: p.origin?.region ?? '',
     status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
     confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
-    occupations: (p.occupations ?? []).map((o: any) => ({ label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined })),
-    education: (p.education ?? []).map((e: any) => ({ institution: e.institution ?? e.label ?? String(e), institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined, year: e.year ? String(e.year) : '' })),
+    occupations: (p.occupations ?? []).map((o: any) => ({
+      label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
+      institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
+      year_from: o.year_from ? String(o.year_from) : (o.year ? String(o.year) : ''),
+      year_to: o.year_to ? String(o.year_to) : '',
+    })),
+    education: (p.education ?? []).map((e: any) => ({
+      institution: e.institution ?? e.label ?? String(e),
+      institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined,
+      year_from: e.year_from ? String(e.year_from) : (e.year ? String(e.year) : ''),
+      year_to: e.year_to ? String(e.year_to) : '',
+    })),
+    tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
     relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? r.target_id ?? '', type: r.type ?? '' })),
     biography: p.biography ?? '',
     notes: p.notes ?? '',
@@ -175,13 +196,24 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
       label: o.label.trim(),
       ...(o.id ? { id: o.id } : {}),
       ...(o.labels ? { labels: o.labels } : {}),
+      ...(o.institution?.trim() ? { institution: o.institution.trim() } : {}),
+      ...(o.institution_id ? { institution_id: o.institution_id } : {}),
+      ...(o.institution_labels ? { institution_labels: o.institution_labels } : {}),
+      ...(o.year_from?.trim() ? { year_from: parseInt(o.year_from) } : {}),
+      ...(o.year_to?.trim() ? { year_to: parseInt(o.year_to) } : {}),
     })),
     education: draft.education.filter(e => e.institution.trim()).map(e => ({
       institution: e.institution.trim(),
       ...(e.institution_id ? { institution_id: e.institution_id } : {}),
       ...(e.institution_labels ? { institution_labels: e.institution_labels } : {}),
-      ...(e.year.trim() ? { year: parseInt(e.year) } : {}),
+      ...(e.year_from?.trim() ? { year_from: parseInt(e.year_from) } : {}),
+      ...(e.year_to?.trim() ? { year_to: parseInt(e.year_to) } : {}),
     })),
+    tags: draft.tags.filter(t => t.label.trim()).map(t => ({
+      label: t.label.trim(),
+      ...(t.id ? { id: t.id } : {}),
+      ...(t.labels ? { labels: t.labels } : {}),
+    })) as any,
     relations: draft.relations.filter(r => r.name.trim()).map(r => ({
       name: r.name.trim(),
       ...(r.type.trim() ? { type: r.type.trim() } : {}),
@@ -297,6 +329,52 @@ const AliasesList: React.FC<{
           <Plus size={12} /> Lisa
         </button>
       </div>
+    </div>
+  );
+};
+
+// =========================================================
+// TagsList — LinkedEntity märksõnade loend
+// =========================================================
+const TagsList: React.FC<{
+  tags: TagDraft[];
+  onChange: (v: TagDraft[]) => void;
+}> = ({ tags, onChange }) => {
+  const [pickerValue, setPickerValue] = useState<any>(null);
+
+  const add = (v: any) => {
+    if (!v?.label?.trim()) return;
+    const tag: TagDraft = { label: v.label, id: v.id ?? null, labels: v.labels ?? undefined };
+    onChange([...tags, tag]);
+    setPickerValue(null);
+  };
+
+  const remove = (i: number) => onChange(tags.filter((_, j) => j !== i));
+
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Märksõnad</label>
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tags.map((tag, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-primary-50 text-primary-700 border border-primary-200 rounded"
+          >
+            {tag.label}
+            {tag.id && <span className="text-primary-400 font-mono">{tag.id}</span>}
+            <button onClick={() => remove(i)} className="text-primary-400 hover:text-primary-700 transition-colors ml-0.5">
+              <X size={10} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <EntityPicker
+        placeholder="kreeka keele professor, jesuiit…"
+        type="topic"
+        value={pickerValue}
+        onChange={v => { if (v) add(v); else setPickerValue(null); }}
+        lang="et"
+      />
     </div>
   );
 };
@@ -826,19 +904,50 @@ const PersonEditPage: React.FC = () => {
             label={t('prosopography.occupations', 'Ametid')}
             items={draft.occupations}
             renderItem={(item, onChange, onRemove) => (
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <EntityPicker
-                    placeholder="pastor, jurist, professor…"
-                    type="topic"
-                    value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
-                    onChange={v => onChange(v ? { label: v.label, id: v.id ?? null, labels: v.labels ?? undefined } : { label: '' })}
-                    lang="et"
+              <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs text-gray-400 mb-0.5">Amet</label>
+                    <EntityPicker
+                      placeholder="pastor, jurist, professor…"
+                      type="topic"
+                      value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
+                      onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined })}
+                      lang="et"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs text-gray-400 mb-0.5">Asutus / töökoht</label>
+                    <EntityPicker
+                      placeholder="Academia Gustaviana…"
+                      type="topic"
+                      value={item.institution_id ? { label: item.institution ?? '', id: item.institution_id, labels: item.institution_labels, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      lang="et"
+                    />
+                  </div>
+                  <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-xs text-gray-400 shrink-0">Periood</span>
+                  <input
+                    type="number" min={1000} max={1900}
+                    value={item.year_from ?? ''}
+                    onChange={e => onChange({ ...item, year_from: e.target.value })}
+                    placeholder="alates"
+                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  />
+                  <span className="text-gray-400">–</span>
+                  <input
+                    type="number" min={1000} max={1900}
+                    value={item.year_to ?? ''}
+                    onChange={e => onChange({ ...item, year_to: e.target.value })}
+                    placeholder="kuni"
+                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   />
                 </div>
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
-                  <X size={14} />
-                </button>
               </div>
             )}
             onAdd={() => set({ occupations: [...draft.occupations, { label: '' }] })}
@@ -850,30 +959,50 @@ const PersonEditPage: React.FC = () => {
             label={t('prosopography.education', 'Haridus')}
             items={draft.education}
             renderItem={(item, onChange, onRemove) => (
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <EntityPicker
-                    placeholder="Academia Gustaviana, Wittenberg…"
-                    type="topic"
-                    value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
-                    onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
-                    lang="et"
+              <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1 min-w-0">
+                    <label className="block text-xs text-gray-400 mb-0.5">Asutus</label>
+                    <EntityPicker
+                      placeholder="Academia Gustaviana, Wittenberg…"
+                      type="topic"
+                      value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
+                      onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
+                      lang="et"
+                    />
+                  </div>
+                  <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 shrink-0">Periood</span>
+                  <input
+                    type="number" min={1000} max={1900}
+                    value={item.year_from ?? ''}
+                    onChange={e => onChange({ ...item, year_from: e.target.value })}
+                    placeholder="alates"
+                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  />
+                  <span className="text-gray-400">–</span>
+                  <input
+                    type="number" min={1000} max={1900}
+                    value={item.year_to ?? ''}
+                    onChange={e => onChange({ ...item, year_to: e.target.value })}
+                    placeholder="kuni"
+                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
                   />
                 </div>
-                <input
-                  type="number"
-                  value={item.year}
-                  onChange={e => onChange({ ...item, year: e.target.value })}
-                  placeholder="aasta"
-                  className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                />
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
-                  <X size={14} />
-                </button>
               </div>
             )}
-            onAdd={() => set({ education: [...draft.education, { institution: '', year: '' }] })}
+            onAdd={() => set({ education: [...draft.education, { institution: '' }] })}
             onChange={items => set({ education: items })}
+          />
+
+          {/* Märksõnad */}
+          <TagsList
+            tags={draft.tags}
+            onChange={v => set({ tags: v })}
           />
         </CollapsibleSection>
 
