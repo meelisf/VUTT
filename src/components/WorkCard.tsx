@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info } from 'lucide-react';
+import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, IdCard } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -103,7 +103,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                     className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
                     title={creator.id}
                   >
-                    <User size={10} />
+                    <IdCard size={10} />
                   </Link>
                 ) : getEntityUrl(creator.id, creator.source) ? (
                   <a

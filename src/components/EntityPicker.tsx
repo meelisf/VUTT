@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users } from 'lucide-react';
+import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users, IdCard } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
 import { searchViaf, ViafSearchResult } from '../services/viafService';
 import { searchGnd, GndSearchResult } from '../services/gndService';
@@ -525,7 +525,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             title="Vaata isiku profiili"
             onClick={(e) => e.stopPropagation()}
           >
-            <User size={14} />
+            <IdCard size={14} />
           </Link>
         ) : entityUrl ? (
           <a

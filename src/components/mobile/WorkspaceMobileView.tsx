@@ -6,7 +6,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X, IdCard } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
@@ -323,7 +323,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                                     className="text-gray-400 hover:text-primary-600 p-0.5"
                                     title={creator.id}
                                   >
-                                    <User size={11} />
+                                    <IdCard size={11} />
                                   </Link>
                                 ) : getEntityUrl(creator.id, creator.source) ? (
                                   <a

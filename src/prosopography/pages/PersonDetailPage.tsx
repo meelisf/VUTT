@@ -9,6 +9,7 @@ import {
 import Header from '../../components/Header';
 import { getPerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
+import { index } from '../../services/meiliService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
 
 // =========================================================
@@ -154,6 +155,7 @@ const PersonDetailPage: React.FC = () => {
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null }>>({});
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -162,7 +164,27 @@ const PersonDetailPage: React.FC = () => {
     if (!id) return;
     setLoading(true);
     getPerson(id, token)
-      .then(data => { setPerson(data); setError(null); })
+      .then(data => {
+        setPerson(data);
+        setError(null);
+        const workIds = (data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean);
+        if (workIds.length > 0) {
+          const ids = workIds.map((wid: string) => `"${wid}"`).join(', ');
+          index.search('', {
+            filter: `work_id IN [${ids}]`,
+            attributesToRetrieve: ['work_id', 'pealkiri', 'aasta'],
+            limit: workIds.length,
+          }).then(res => {
+            const map: Record<string, { title: string; year: number | null }> = {};
+            for (const hit of res.hits) {
+              if (hit.work_id && !map[hit.work_id]) {
+                map[hit.work_id] = { title: hit.pealkiri ?? hit.work_id, year: hit.aasta ?? null };
+              }
+            }
+            setWorkTitles(map);
+          }).catch(() => {});
+        }
+      })
       .catch(() => setError(t('prosopography.loadError', 'Isiku laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
   }, [id, token]);
@@ -361,6 +383,9 @@ const PersonDetailPage: React.FC = () => {
             <div className="space-y-1">
               {works.map(({ work_id, role }) => {
                 const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
+                const meta = workTitles[work_id];
+                const title = meta?.title ?? work_id;
+                const year = meta?.year;
                 return (
                   <Link
                     key={work_id}
@@ -370,8 +395,9 @@ const PersonDetailPage: React.FC = () => {
                     <div className="flex items-center gap-2 min-w-0">
                       <BookOpen size={13} className="text-gray-300 shrink-0" />
                       <span className="text-sm text-gray-700 group-hover:text-primary-700 transition-colors truncate">
-                        {work_id}
+                        {title}
                       </span>
+                      {year && <span className="text-xs text-gray-400 shrink-0">{year}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
                       <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">

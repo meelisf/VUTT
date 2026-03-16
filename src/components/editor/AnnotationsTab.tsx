@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, Creator } from '../../types';
 import { LinkedEntity } from '../../types/LinkedEntity';
@@ -215,7 +215,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
                             title={creator.id}
                           >
-                            <User size={12} />
+                            <IdCard size={12} />
                           </Link>
                         ) : getEntityUrl(creator.id, creator.source) ? (
                           <a
