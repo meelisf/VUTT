@@ -96,14 +96,18 @@ def _fetch_wikidata(qid: str) -> Optional[dict]:
     if not qid.startswith("Q"):
         return None
 
-    # ── Päring 1: ühe väärtusega omadused ────────────────────────────────────
+    # ── Päring 1: ühe väärtusega omadused (sh kuupäeva täpsus) ───────────────
     sparql1 = f"""
-SELECT ?gender ?birthDate ?deathDate
+SELECT ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
        ?birthPlaceLabel ?birthPlaceQ ?deathPlaceLabel ?deathPlaceQ
 WHERE {{
   OPTIONAL {{ wd:{qid} wdt:P21 ?gender. }}
-  OPTIONAL {{ wd:{qid} wdt:P569 ?birthDate. }}
-  OPTIONAL {{ wd:{qid} wdt:P570 ?deathDate. }}
+  OPTIONAL {{ wd:{qid} p:P569/psv:P569 ?birthNode.
+              ?birthNode wikibase:timeValue ?birthDate.
+              ?birthNode wikibase:timePrecision ?birthPrec. }}
+  OPTIONAL {{ wd:{qid} p:P570/psv:P570 ?deathNode.
+              ?deathNode wikibase:timeValue ?deathDate.
+              ?deathNode wikibase:timePrecision ?deathPrec. }}
   OPTIONAL {{ wd:{qid} wdt:P19 ?birthPlace. BIND(?birthPlace AS ?birthPlaceQ) }}
   OPTIONAL {{ wd:{qid} wdt:P20 ?deathPlace. BIND(?deathPlace AS ?deathPlaceQ) }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "et,en". }}
@@ -144,16 +148,18 @@ LIMIT 10
     try:
         birth_date = (b1.get("birthDate") or {}).get("value")
         if birth_date:
+            prec_num = int((b1.get("birthPrec") or {}).get("value", "11"))
             result["birth.date"] = birth_date[:10]
-            result["birth.precision"] = "day" if len(birth_date) >= 10 else "year"
+            result["birth.precision"] = "year" if prec_num <= 9 else ("month" if prec_num == 10 else "day")
     except Exception:
         pass
 
     try:
         death_date = (b1.get("deathDate") or {}).get("value")
         if death_date:
+            prec_num = int((b1.get("deathPrec") or {}).get("value", "11"))
             result["death.date"] = death_date[:10]
-            result["death.precision"] = "day" if len(death_date) >= 10 else "year"
+            result["death.precision"] = "year" if prec_num <= 9 else ("month" if prec_num == 10 else "day")
     except Exception:
         pass
 
@@ -249,14 +255,18 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
     try:
         birth = data.get("dateOfBirth") or []
         if birth:
-            result["birth.date"] = str(birth[0])[:10]
+            date_str = str(birth[0]).strip()
+            result["birth.date"] = date_str[:10]
+            result["birth.precision"] = "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
     except Exception:
         pass
 
     try:
         death = data.get("dateOfDeath") or []
         if death:
-            result["death.date"] = str(death[0])[:10]
+            date_str = str(death[0]).strip()
+            result["death.date"] = date_str[:10]
+            result["death.precision"] = "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
     except Exception:
         pass
 

@@ -18,12 +18,14 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   // Sünniaeg
   if (autoFilled['birth.date']) {
     const d: string = autoFilled['birth.date'];
-    const precision = autoFilled['birth.precision'] ?? 'day';
+    const precision: string = autoFilled['birth.precision'] ?? 'day';
+    const mRaw = parseInt(d.slice(5, 7));
+    const dayRaw = parseInt(d.slice(8, 10));
     patch.birth = {
       ...draft.birth,
       year: d.slice(0, 4),
-      month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
-      day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
+      month: precision !== 'year' && !isNaN(mRaw) ? String(mRaw) : '',
+      day: precision === 'day' && !isNaN(dayRaw) ? String(dayRaw) : '',
     };
   }
   // Sünnikoht — rakenda sõltumata sellest kas kuupäev on olemas
@@ -34,12 +36,14 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   // Surmaaeg
   if (autoFilled['death.date']) {
     const d: string = autoFilled['death.date'];
-    const precision = autoFilled['death.precision'] ?? 'day';
+    const precision: string = autoFilled['death.precision'] ?? 'day';
+    const mRaw = parseInt(d.slice(5, 7));
+    const dayRaw = parseInt(d.slice(8, 10));
     patch.death = {
       ...draft.death,
       year: d.slice(0, 4),
-      month: precision !== 'year' ? String(parseInt(d.slice(5, 7))) : '',
-      day: precision === 'day' ? String(parseInt(d.slice(8, 10))) : '',
+      month: precision !== 'year' && !isNaN(mRaw) ? String(mRaw) : '',
+      day: precision === 'day' && !isNaN(dayRaw) ? String(dayRaw) : '',
     };
   }
   // Surmakoht — rakenda sõltumata sellest kas kuupäev on olemas
