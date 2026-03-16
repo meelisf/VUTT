@@ -545,7 +545,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
           {/* Person-toggle */}
           {showPersonToggle && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+            <div
+              className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border-b border-gray-100"
+              onMouseDown={(e) => { e.preventDefault(); justSelectedRef.current = true; }}
+            >
               <label className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
                   type="checkbox"
