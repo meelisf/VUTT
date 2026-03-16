@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
 import EntityPicker from '../../components/EntityPicker';
+import { FILE_API_URL } from '../../config';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
@@ -37,6 +39,10 @@ const PersonEditPage: React.FC = () => {
   const [relOpen, setRelOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
+  // labels.json kohalikud soovitused topic-tüüpi EntityPickeritele
+  const [entityLabels, setEntityLabels] = useState<{ label: string; id: string }[]>([]);
+  const lang = 'et';
+
   // Profiilipilt
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
@@ -45,6 +51,18 @@ const PersonEditPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
+
+  useEffect(() => {
+    fetchWithTimeout(`${FILE_API_URL}/entity-labels`)
+      .then(r => r.json())
+      .then((data: Record<string, { et?: string; en?: string }>) => {
+        const items = Object.entries(data)
+          .filter(([, v]) => v.et || v.en)
+          .map(([id, v]) => ({ id, label: v.et || v.en! }));
+        setEntityLabels(items);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (isNew) return;
@@ -384,7 +402,8 @@ const PersonEditPage: React.FC = () => {
               type="topic"
               value={draft.status}
               onChange={v => set({ status: v })}
-              lang="et"
+              lang={lang}
+              localSuggestions={entityLabels}
             />
             <EntityPicker
               label={t('prosopography.confession', 'Konfessioon')}
@@ -392,7 +411,8 @@ const PersonEditPage: React.FC = () => {
               type="topic"
               value={draft.confession}
               onChange={v => set({ confession: v })}
-              lang="et"
+              lang={lang}
+              localSuggestions={entityLabels}
             />
           </div>
 
@@ -469,22 +489,35 @@ const PersonEditPage: React.FC = () => {
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Identifikaatorid</label>
             <div className="space-y-2">
               {[
-                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345' },
-                { key: 'gnd_id', label: 'GND', placeholder: '123456789' },
-                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678' },
-                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA-123' },
-              ].map(({ key, label, placeholder }) => (
-                <div key={key} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
-                  <input
-                    type="text"
-                    value={draft[key as keyof FormDraft] as string}
-                    onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
-                    placeholder={placeholder}
-                    className={`flex-1 ${inputCls} font-mono`}
-                  />
-                </div>
-              ))}
+                { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${v}` },
+                { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${v}` },
+                { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${v}` },
+                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA-123', url: null },
+              ].map(({ key, label, placeholder, url }) => {
+                const val = draft[key as keyof FormDraft] as string;
+                const href = url && val.trim() ? url(val.trim()) : null;
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 w-36 shrink-0">{label}</span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
+                      placeholder={placeholder}
+                      className={`flex-1 ${inputCls} font-mono`}
+                    />
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer"
+                        className="text-gray-400 hover:text-blue-600 transition-colors shrink-0"
+                        title={`Ava ${label}-s`}>
+                        <ExternalLink size={14} />
+                      </a>
+                    ) : (
+                      <span className="w-[14px] shrink-0" />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </CollapsibleSection>
@@ -508,7 +541,8 @@ const PersonEditPage: React.FC = () => {
                       type="topic"
                       value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined })}
-                      lang="et"
+                      lang={lang}
+                      localSuggestions={entityLabels}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -518,7 +552,8 @@ const PersonEditPage: React.FC = () => {
                       type="topic"
                       value={item.institution_id ? { label: item.institution ?? '', id: item.institution_id, labels: item.institution_labels, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
-                      lang="et"
+                      lang={lang}
+                      localSuggestions={entityLabels}
                     />
                   </div>
                   <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
@@ -550,7 +585,8 @@ const PersonEditPage: React.FC = () => {
                       type="topic"
                       value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
-                      lang="et"
+                      lang={lang}
+                      localSuggestions={entityLabels}
                     />
                   </div>
                   <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-5">
