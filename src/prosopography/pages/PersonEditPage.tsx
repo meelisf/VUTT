@@ -1,663 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2, ImagePlus, Trash2, Link2 } from 'lucide-react';
+import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2 } from 'lucide-react';
 import Header from '../../components/Header';
 import EntityPicker from '../../components/EntityPicker';
-import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage, listPersons } from '../services/prosopographyService';
+import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
-import type { ProsopoRecord, ProsopoIndexEntry } from '../types';
-import type { LinkedEntity } from '../../types/LinkedEntity';
+import type { ProsopoRecord } from '../types';
 
-// =========================================================
-// Vorm tüübid
-// =========================================================
+import { type FormDraft, type DateDraft, type OccupationDraft, type EducationDraft, emptyDraft } from '../components/personForm/types';
+import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
+import DateField from '../components/personForm/DateField';
+import AliasesList from '../components/personForm/AliasesList';
+import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
+import TagsList from '../components/personForm/TagsList';
+import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
 
-interface DateDraft {
-  year: string;       // '1650' vm tühi
-  month: string;      // '1'–'12' vm tühi
-  day: string;        // '1'–'31' vm tühi
-  circa: boolean;
-  bound: '' | 'before' | 'after';
-  calendar: '' | 'julian' | 'gregorian';
-  place: string;
-}
-
-interface OccupationDraft {
-  label: string; id?: string | null; labels?: Record<string, string>;
-  institution?: string; institution_id?: string | null; institution_labels?: Record<string, string>;
-  year_from?: string; year_to?: string;
-}
-interface EducationDraft {
-  institution: string; institution_id?: string | null; institution_labels?: Record<string, string>;
-  year_from?: string; year_to?: string;
-}
-interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }
-interface RelationDraft  { name: string; type: string; target_id?: string | null }
-interface SourceDraft   { text: string; note: string }
-
-interface FormDraft {
-  name_label: string;
-  name_family: string;
-  name_first: string;
-  name_qualifier: string;
-  name_aliases: string[];
-  gender: '' | 'M' | 'F';
-  birth: DateDraft;
-  death: DateDraft;
-  origin_city: LinkedEntity | null;
-  origin_region: LinkedEntity | null;
-  floruit_from: string;
-  floruit_to: string;
-  status: LinkedEntity | null;
-  confession: LinkedEntity | null;
-  occupations: OccupationDraft[];
-  education: EducationDraft[];
-  tags: TagDraft[];
-  relations: RelationDraft[];
-  sources: SourceDraft[];
-  biography: string;
-  notes: string;
-  wikidata_id: string;
-  gnd_id: string;
-  viaf_id: string;
-  aa_id: string;
-}
-
-const emptyDraft = (): FormDraft => ({
-  name_label: '',
-  name_family: '',
-  name_first: '',
-  name_qualifier: '',
-  name_aliases: [],
-  gender: '',
-  birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
-  death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
-  origin_city: null,
-  origin_region: null,
-  floruit_from: '',
-  floruit_to: '',
-  status: null,
-  confession: null,
-  occupations: [],
-  education: [],
-  tags: [],
-  relations: [],
-  sources: [],
-  biography: '',
-  notes: '',
-  wikidata_id: '',
-  gnd_id: '',
-  viaf_id: '',
-  aa_id: '',
-});
-
-function recordToDraft(p: ProsopoRecord): FormDraft {
-  const ident = (scheme: string) =>
-    p.identifiers?.find(i => i.scheme === scheme)?.id ?? '';
-  return {
-    name_label: p.name.label ?? '',
-    name_family: p.name.family_name ?? '',
-    name_first: p.name.first_name ?? '',
-    name_qualifier: p.name.qualifier ?? '',
-    name_aliases: p.name.aliases ?? [],
-    gender: p.gender ?? '',
-    birth: {
-      year: p.birth?.date ? p.birth.date.slice(0, 4) : '',
-      month: p.birth?.date && p.birth.precision !== 'year' ? String(parseInt(p.birth.date.slice(5, 7))) : '',
-      day: p.birth?.date && p.birth.precision === 'day' ? String(parseInt(p.birth.date.slice(8, 10))) : '',
-      circa: p.birth?.is_circa ?? false,
-      bound: p.birth?.bound ?? '',
-      calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
-      place: p.birth?.place?.label ?? '',
-    },
-    death: {
-      year: p.death?.date ? p.death.date.slice(0, 4) : '',
-      month: p.death?.date && p.death.precision !== 'year' ? String(parseInt(p.death.date.slice(5, 7))) : '',
-      day: p.death?.date && p.death.precision === 'day' ? String(parseInt(p.death.date.slice(8, 10))) : '',
-      circa: p.death?.is_circa ?? false,
-      bound: p.death?.bound ?? '',
-      calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
-      place: p.death?.place?.label ?? '',
-    },
-    origin_city: p.origin?.city ? { label: p.origin.city, id: p.origin.city_id ?? null, labels: p.origin.city_labels ?? null, source: 'wikidata' } : null,
-    origin_region: p.origin?.region ? { label: p.origin.region, id: p.origin.region_id ?? null, labels: p.origin.region_labels ?? null, source: 'wikidata' } : null,
-    floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
-    floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
-    status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
-    confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
-    occupations: (p.occupations ?? []).map((o: any) => ({
-      label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
-      institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
-      year_from: o.year_from ? String(o.year_from) : (o.year ? String(o.year) : ''),
-      year_to: o.year_to ? String(o.year_to) : '',
-    })),
-    education: (p.education ?? []).map((e: any) => ({
-      institution: e.institution ?? e.label ?? String(e),
-      institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined,
-      year_from: e.year_from ? String(e.year_from) : (e.year ? String(e.year) : ''),
-      year_to: e.year_to ? String(e.year_to) : '',
-    })),
-    tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
-    relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? '', type: r.type ?? '', target_id: r.target_id ?? null })),
-    sources: (p.sources ?? []).map((s: any) => ({ text: s.text ?? String(s), note: s.note ?? '' })),
-    biography: p.biography ?? '',
-    notes: p.notes ?? '',
-    wikidata_id: ident('wikidata'),
-    gnd_id: ident('gnd'),
-    viaf_id: ident('viaf'),
-    aa_id: ident('album_academicum'),
-  };
-}
-
-function buildDatePayload(d: DateDraft): any {
-  if (!d.year) return null;
-  const y = d.year.padStart(4, '0');
-  const m = d.month ? d.month.padStart(2, '0') : '01';
-  const day = d.day ? d.day.padStart(2, '0') : '01';
-  const precision = d.day && d.month ? 'day' : d.month ? 'month' : 'year';
-  return {
-    original_text: null,
-    date: `${y}-${m}-${day}`,
-    date_to: null,
-    bound: d.bound || null,
-    precision,
-    calendar: d.calendar || null,
-    is_circa: d.circa,
-    place: d.place ? { id: null, label: d.place } : null,
-    notes: null,
-  };
-}
-
-function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<ProsopoRecord> {
-  // Identifikaatorid — säilita olemasolevad, uuenda/lisa muudetud
-  const existing = original?.identifiers ?? [];
-  const schemes: { scheme: string; key: keyof FormDraft }[] = [
-    { scheme: 'wikidata', key: 'wikidata_id' },
-    { scheme: 'gnd', key: 'gnd_id' },
-    { scheme: 'viaf', key: 'viaf_id' },
-    { scheme: 'album_academicum', key: 'aa_id' },
-  ];
-  const identifiers = schemes
-    .map(({ scheme, key }) => {
-      const val = (draft[key] as string).trim();
-      if (!val) return null;
-      const found = existing.find(i => i.scheme === scheme);
-      return { scheme, id: val, checked_at: found?.checked_at ?? null };
-    })
-    .filter(Boolean) as ProsopoRecord['identifiers'];
-
-  return {
-    name: {
-      label: draft.name_label.trim(),
-      family_name: draft.name_family.trim() || null,
-      first_name: draft.name_first.trim() || null,
-      qualifier: draft.name_qualifier.trim() || null,
-      qualifier_type: original?.name?.qualifier_type ?? null,
-      noble_status: original?.name?.noble_status ?? null,
-      maiden_name: original?.name?.maiden_name ?? null,
-      aliases: draft.name_aliases.filter(Boolean),
-      family_name_variants: original?.name?.family_name_variants ?? [],
-      first_name_variants: original?.name?.first_name_variants ?? [],
-    },
-    gender: (draft.gender || null) as 'M' | 'F' | null,
-    birth: buildDatePayload(draft.birth) ?? (original?.birth ?? null as any),
-    death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
-    status: draft.status
-      ? { id: draft.status.id || draft.status.label, label: draft.status.label, ...(draft.status.labels ? { labels: draft.status.labels } : {}) }
-      : null,
-    confession: draft.confession
-      ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
-      : null,
-    origin: {
-      city: draft.origin_city?.label ?? null,
-      city_id: draft.origin_city?.id ?? null,
-      city_labels: draft.origin_city?.labels ?? null,
-      region: draft.origin_region?.label ?? null,
-      region_id: draft.origin_region?.id ?? null,
-      region_labels: draft.origin_region?.labels ?? null,
-      geonames_id: original?.origin?.geonames_id ?? null,
-      coordinates: original?.origin?.coordinates ?? null,
-    },
-    floruit: (draft.floruit_from || draft.floruit_to) ? {
-      year_from: draft.floruit_from ? parseInt(draft.floruit_from) : null,
-      year_to: draft.floruit_to ? parseInt(draft.floruit_to) : null,
-    } : null,
-    occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({
-      label: o.label.trim(),
-      ...(o.id ? { id: o.id } : {}),
-      ...(o.labels ? { labels: o.labels } : {}),
-      ...(o.institution?.trim() ? { institution: o.institution.trim() } : {}),
-      ...(o.institution_id ? { institution_id: o.institution_id } : {}),
-      ...(o.institution_labels ? { institution_labels: o.institution_labels } : {}),
-      ...(o.year_from?.trim() ? { year_from: parseInt(o.year_from) } : {}),
-      ...(o.year_to?.trim() ? { year_to: parseInt(o.year_to) } : {}),
-    })),
-    education: draft.education.filter(e => e.institution.trim()).map(e => ({
-      institution: e.institution.trim(),
-      ...(e.institution_id ? { institution_id: e.institution_id } : {}),
-      ...(e.institution_labels ? { institution_labels: e.institution_labels } : {}),
-      ...(e.year_from?.trim() ? { year_from: parseInt(e.year_from) } : {}),
-      ...(e.year_to?.trim() ? { year_to: parseInt(e.year_to) } : {}),
-    })),
-    tags: draft.tags.filter(t => t.label.trim()).map(t => ({
-      label: t.label.trim(),
-      ...(t.id ? { id: t.id } : {}),
-      ...(t.labels ? { labels: t.labels } : {}),
-    })) as any,
-    relations: draft.relations.filter(r => r.name.trim() || r.target_id).map(r => ({
-      name: r.name.trim(),
-      ...(r.type.trim() ? { type: r.type.trim() } : {}),
-      ...(r.target_id ? { target_id: r.target_id } : {}),
-    })),
-    sources: draft.sources.filter(s => s.text.trim()).map(s => ({
-      text: s.text.trim(),
-      ...(s.note.trim() ? { note: s.note.trim() } : {}),
-    })),
-    biography: draft.biography.trim() || null,
-    notes: draft.notes.trim() || null,
-    identifiers,
-    ...(original ? { updated_at: original.updated_at } : {}),
-  };
-}
-
-// =========================================================
-// Kuupäevaväli — aasta esikohal, täpsem info klapitav
-// =========================================================
-const DateField: React.FC<{
-  label: string;
-  value: DateDraft;
-  onChange: (v: DateDraft) => void;
-}> = ({ label, value, onChange }) => {
-  const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
-
-  // Avatud kui on täpsemaid välju täidetud
-  const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || value.place);
-  const [open, setOpen] = useState(hasDetail);
-
-  // Kokkuvõte näidatakse kui detail on olemas aga paneel suletud
-  const summary = (() => {
-    const parts: string[] = [];
-    if (value.circa) parts.push('~');
-    if (value.bound === 'before') parts.push('enne');
-    if (value.bound === 'after') parts.push('pärast');
-    if (value.month) parts.push(value.day ? `${value.day}.${value.month}` : `kuu ${value.month}`);
-    if (value.calendar === 'julian') parts.push('jul.');
-    if (value.calendar === 'gregorian') parts.push('greg.');
-    if (value.place) parts.push(value.place);
-    return parts.join(' ');
-  })();
-
-  const inputCls = "px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white";
-
-  return (
-    <div>
-      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{label}</label>
-
-      {/* Peamine rida: aasta + avamise nupp */}
-      <div className="flex items-center gap-2">
-        <input
-          type="number" min={1000} max={1900}
-          placeholder="aasta"
-          value={value.year}
-          onChange={e => set({ year: e.target.value })}
-          className={`w-20 ${inputCls}`}
-        />
-        {/* Kokkuvõte kui detail olemas aga suletud */}
-        {!open && summary && (
-          <span className="text-xs text-gray-400 italic truncate max-w-[120px]">{summary}</span>
-        )}
-        <button
-          type="button"
-          onClick={() => setOpen(v => !v)}
-          className={`ml-auto flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors
-            ${open
-              ? 'text-primary-600 bg-primary-50 border border-primary-200'
-              : 'text-gray-400 border border-gray-200 hover:text-gray-600 hover:border-gray-300'}`}
-        >
-          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-          täpsem
-        </button>
-      </div>
-
-      {/* Täpsem info — klapitav */}
-      {open && (
-        <div className="mt-2 pl-3 border-l-2 border-gray-200 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              type="number" min={1} max={12}
-              placeholder="kuu"
-              value={value.month}
-              onChange={e => set({ month: e.target.value })}
-              className={`w-14 ${inputCls}`}
-            />
-            <input
-              type="number" min={1} max={31}
-              placeholder="päev"
-              value={value.day}
-              onChange={e => set({ day: e.target.value })}
-              className={`w-14 ${inputCls}`}
-            />
-            <label className="flex items-center gap-1 text-sm text-gray-600 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={value.circa}
-                onChange={e => set({ circa: e.target.checked })}
-                className="accent-primary-600"
-              />
-              <span className="font-mono">~</span> ligikaudu
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={value.bound}
-              onChange={e => set({ bound: e.target.value as DateDraft['bound'] })}
-              className={`${inputCls}`}
-            >
-              <option value="">täpne kuupäev</option>
-              <option value="before">enne seda</option>
-              <option value="after">pärast seda</option>
-            </select>
-            <select
-              value={value.calendar}
-              onChange={e => set({ calendar: e.target.value as DateDraft['calendar'] })}
-              className={`${inputCls}`}
-            >
-              <option value="">kalender märkimata</option>
-              <option value="julian">Juliuse kalender</option>
-              <option value="gregorian">Gregoriuse kalender</option>
-            </select>
-            <input
-              type="text"
-              placeholder="koht"
-              value={value.place}
-              onChange={e => set({ place: e.target.value })}
-              className={`w-28 ${inputCls}`}
-            />
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// =========================================================
-// Nimevariandid — tag-list
-// =========================================================
-const AliasesList: React.FC<{
-  aliases: string[];
-  onChange: (v: string[]) => void;
-}> = ({ aliases, onChange }) => {
-  const [input, setInput] = useState('');
-
-  const add = () => {
-    const v = input.trim();
-    if (v && !aliases.includes(v)) onChange([...aliases, v]);
-    setInput('');
-  };
-
-  const remove = (i: number) => onChange(aliases.filter((_, j) => j !== i));
-
-  return (
-    <div>
-      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Nimevariandid</label>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {aliases.map((a, i) => (
-          <span
-            key={i}
-            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded"
-          >
-            {a}
-            <button onClick={() => remove(i)} className="text-gray-400 hover:text-gray-700 transition-colors">
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          placeholder="Lisa variant…"
-          className="flex-1 text-sm px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-        />
-        <button
-          type="button"
-          onClick={add}
-          disabled={!input.trim()}
-          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
-        >
-          <Plus size={12} /> Lisa
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// =========================================================
-// ProsopoPersonPicker — otsib vutt:P isikuid seose jaoks
-// =========================================================
-const ProsopoPersonPicker: React.FC<{
-  value: RelationDraft;
-  onChange: (v: RelationDraft) => void;
-  token: string;
-  currentId?: string;  // välistab iseenda tulemi
-}> = ({ value, onChange, token, currentId }) => {
-  const [query, setQuery] = useState(value.name);
-  const [results, setResults] = useState<ProsopoIndexEntry[]>([]);
-  const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  // Sulge dropdown väljaklõpsel
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const search = useCallback((q: string) => {
-    clearTimeout(timerRef.current);
-    if (!q.trim()) { setResults([]); return; }
-    timerRef.current = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await listPersons({ q }, token);
-        setResults(res.results.filter(r => r.id !== currentId).slice(0, 8));
-      } catch { setResults([]); }
-      finally { setLoading(false); }
-    }, 250);
-  }, [token, currentId]);
-
-  const select = (person: ProsopoIndexEntry) => {
-    onChange({ ...value, name: person.label, target_id: person.id });
-    setQuery(person.label);
-    setOpen(false);
-    setResults([]);
-  };
-
-  const clear = () => {
-    onChange({ ...value, name: '', target_id: null });
-    setQuery('');
-    setResults([]);
-  };
-
-  return (
-    <div ref={containerRef} className="relative flex-1 min-w-0">
-      <div className="flex items-center gap-1">
-        <div className="relative flex-1">
-          <input
-            type="text"
-            value={query}
-            onChange={e => {
-              setQuery(e.target.value);
-              onChange({ ...value, name: e.target.value, target_id: null });
-              setOpen(true);
-              search(e.target.value);
-            }}
-            onFocus={() => { if (query) setOpen(true); }}
-            placeholder="Isiku nimi…"
-            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none pr-6"
-          />
-          {loading && <Loader2 size={12} className="absolute right-2 top-2.5 animate-spin text-gray-400" />}
-        </div>
-        {value.target_id && (
-          <span title={value.target_id} className="shrink-0">
-            <Link2 size={13} className="text-primary-500" />
-          </span>
-        )}
-        {(query || value.target_id) && (
-          <button type="button" onClick={clear} className="text-gray-300 hover:text-gray-500 shrink-0">
-            <X size={13} />
-          </button>
-        )}
-      </div>
-      {open && results.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-          {results.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              onMouseDown={() => select(p)}
-              className="w-full text-left px-3 py-2 hover:bg-primary-50 text-sm flex items-baseline justify-between gap-2"
-            >
-              <span className="text-gray-800 truncate">{p.label}</span>
-              <span className="text-xs text-gray-400 shrink-0">
-                {p.birth_year && p.death_year ? `${p.birth_year}–${p.death_year}` : p.birth_year ? `s. ${p.birth_year}` : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// =========================================================
-// TagsList — LinkedEntity märksõnade loend
-// =========================================================
-const TagsList: React.FC<{
-  tags: TagDraft[];
-  onChange: (v: TagDraft[]) => void;
-}> = ({ tags, onChange }) => {
-  const [pickerValue, setPickerValue] = useState<any>(null);
-
-  const add = (v: any) => {
-    if (!v?.label?.trim()) return;
-    const tag: TagDraft = { label: v.label, id: v.id ?? null, labels: v.labels ?? undefined };
-    onChange([...tags, tag]);
-    setPickerValue(null);
-  };
-
-  const remove = (i: number) => onChange(tags.filter((_, j) => j !== i));
-
-  return (
-    <div>
-      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Märksõnad</label>
-      <div className="flex flex-wrap gap-1.5 mb-2">
-        {tags.map((tag, i) => (
-          <span
-            key={i}
-            className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-primary-50 text-primary-700 border border-primary-200 rounded"
-          >
-            {tag.label}
-            {tag.id && <span className="text-primary-400 font-mono">{tag.id}</span>}
-            <button onClick={() => remove(i)} className="text-primary-400 hover:text-primary-700 transition-colors ml-0.5">
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <EntityPicker
-        placeholder="kreeka keele professor, jesuiit…"
-        type="topic"
-        value={pickerValue}
-        onChange={v => { if (v) add(v); else setPickerValue(null); }}
-        lang="et"
-      />
-    </div>
-  );
-};
-
-// =========================================================
-// CollapsibleSection — ühtne klapitav kaart
-// =========================================================
-const CollapsibleSection: React.FC<{
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}> = ({ title, open, onToggle, children }) => (
-  <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-5">
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-5 py-4 text-gray-700 hover:text-primary-700 transition-colors"
-    >
-      <span className="font-bold text-sm capitalize-first">{title}</span>
-      <span className="ml-auto text-gray-400">
-        {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-      </span>
-    </button>
-    {open && (
-      <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-5">
-        {children}
-      </div>
-    )}
-  </div>
-);
-
-// =========================================================
-// DynamicList — üldine dünaamiline massiiv
-// =========================================================
-function DynamicList<T>({
-  label, items, renderItem, onAdd, onChange,
-}: {
-  label: string;
-  items: T[];
-  renderItem: (item: T, onChange: (v: T) => void, onRemove: () => void) => React.ReactNode;
-  onAdd: () => void;
-  onChange: (items: T[]) => void;
-}): React.ReactElement {
-  const updateItem = (i: number, v: T) => {
-    const next = [...items];
-    next[i] = v;
-    onChange(next);
-  };
-  const removeItem = (i: number) => onChange(items.filter((_, j) => j !== i));
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <label className="block text-xs text-gray-500 uppercase tracking-wide">{label}</label>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
-        >
-          <Plus size={11} /> Lisa
-        </button>
-      </div>
-      {items.length === 0 && (
-        <p className="text-xs text-gray-400 italic">Kirjeid pole. Klõpsa "Lisa" lisamiseks.</p>
-      )}
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div key={i}>{renderItem(item, v => updateItem(i, v), () => removeItem(i))}</div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// =========================================================
-// PersonEditPage
-// =========================================================
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -684,7 +42,6 @@ const PersonEditPage: React.FC = () => {
   const [imageDragOver, setImageDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Ligipääsukontroll
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
 
   useEffect(() => {
@@ -701,18 +58,9 @@ const PersonEditPage: React.FC = () => {
   }, [id, token]);
 
   const handleImageFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setImageError('Palun vali pildifail (JPEG, PNG, WebP).');
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setImageError('Fail on liiga suur (max 10 MB).');
-      return;
-    }
-    if (isNew) {
-      setImageError('Salvesta isik esmalt, seejärel lisa pilt.');
-      return;
-    }
+    if (!file.type.startsWith('image/')) { setImageError('Palun vali pildifail (JPEG, PNG, WebP).'); return; }
+    if (file.size > 10 * 1024 * 1024) { setImageError('Fail on liiga suur (max 10 MB).'); return; }
+    if (isNew) { setImageError('Salvesta isik esmalt, seejärel lisa pilt.'); return; }
     setImageUploading(true);
     setImageError(null);
     try {
@@ -740,8 +88,6 @@ const PersonEditPage: React.FC = () => {
   };
 
   const set = (patch: Partial<FormDraft>) => setDraft(d => ({ ...d, ...patch }));
-  const setBirth = (patch: Partial<DateDraft>) => setDraft(d => ({ ...d, birth: { ...d.birth, ...patch } }));
-  const setDeath = (patch: Partial<DateDraft>) => setDraft(d => ({ ...d, death: { ...d.death, ...patch } }));
 
   const handleSave = async () => {
     if (!draft.name_label.trim()) { setError('Nimi on kohustuslik.'); return; }
@@ -749,7 +95,6 @@ const PersonEditPage: React.FC = () => {
     setError(null);
     try {
       if (isNew) {
-        // Loo uus isik minimaalse andmetega
         const created = await createPerson(
           {
             name: draft.name_label.trim(),
@@ -759,7 +104,6 @@ const PersonEditPage: React.FC = () => {
           },
           token,
         );
-        // Uuenda täieliku andmetega
         const payload = draftToPayload(draft, created);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
         navigate(`/persons/${encodeURIComponent(created.id)}`);
@@ -793,7 +137,6 @@ const PersonEditPage: React.FC = () => {
     );
   }
 
-  // ── Ligipääsu puudumine ──────────────────────────────────
   if (!canEdit) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -811,6 +154,8 @@ const PersonEditPage: React.FC = () => {
   const pageTitle = isNew
     ? t('prosopography.addPerson', 'Lisa isik')
     : original?.name.label ?? t('prosopography.edit', 'Muuda isikut');
+
+  const inputCls = "px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none";
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -850,7 +195,6 @@ const PersonEditPage: React.FC = () => {
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-3">Profiilipilt</label>
           <div className="flex items-start gap-4">
-            {/* Eelvaade */}
             <div
               className={`relative w-24 h-24 rounded-lg border-2 flex items-center justify-center overflow-hidden shrink-0 transition-colors cursor-pointer
                 ${imageDragOver ? 'border-primary-400 bg-primary-50' : 'border-dashed border-gray-300 bg-gray-50 hover:border-primary-300 hover:bg-primary-50/40'}`}
@@ -865,11 +209,7 @@ const PersonEditPage: React.FC = () => {
               }}
             >
               {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt="Profiilipilt"
-                  className="w-full h-full object-cover"
-                />
+                <img src={imageUrl} alt="Profiilipilt" className="w-full h-full object-cover" />
               ) : (
                 <ImagePlus size={24} className="text-gray-300" />
               )}
@@ -880,7 +220,6 @@ const PersonEditPage: React.FC = () => {
               )}
             </div>
 
-            {/* Nupud ja selgitus */}
             <div className="flex flex-col gap-2 min-w-0">
               <input
                 ref={fileInputRef}
@@ -921,7 +260,6 @@ const PersonEditPage: React.FC = () => {
         {/* ── Identiteedi kaart ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5 space-y-5">
 
-          {/* Nimi */}
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
               Kanooniline nimi <span className="text-red-500">*</span>
@@ -942,7 +280,7 @@ const PersonEditPage: React.FC = () => {
               value={draft.name_first}
               onChange={e => set({ name_first: e.target.value })}
               placeholder="Johann Friedrich Wilhelm"
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              className={`w-full ${inputCls}`}
             />
           </div>
 
@@ -954,7 +292,7 @@ const PersonEditPage: React.FC = () => {
                 value={draft.name_family}
                 onChange={e => set({ name_family: e.target.value })}
                 placeholder="von Münchhausen"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className={`w-full ${inputCls}`}
               />
             </div>
             <div>
@@ -964,7 +302,7 @@ const PersonEditPage: React.FC = () => {
                 value={draft.name_qualifier}
                 onChange={e => set({ name_qualifier: e.target.value })}
                 placeholder="von, van, de…"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className={`w-full ${inputCls}`}
               />
             </div>
           </div>
@@ -1043,7 +381,7 @@ const PersonEditPage: React.FC = () => {
             />
           </div>
 
-          {/* Floruit — tegutsemisperiood */}
+          {/* Floruit */}
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
               Tegutsemisperiood <span className="normal-case font-normal text-gray-400">(floruit, kui sünd/surm teadmata)</span>
@@ -1054,7 +392,7 @@ const PersonEditPage: React.FC = () => {
                 placeholder="alates"
                 value={draft.floruit_from}
                 onChange={e => set({ floruit_from: e.target.value })}
-                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className={`w-20 ${inputCls}`}
               />
               <span className="text-gray-400">–</span>
               <input
@@ -1062,7 +400,7 @@ const PersonEditPage: React.FC = () => {
                 placeholder="kuni"
                 value={draft.floruit_to}
                 onChange={e => set({ floruit_to: e.target.value })}
-                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                className={`w-20 ${inputCls}`}
               />
             </div>
           </div>
@@ -1108,7 +446,7 @@ const PersonEditPage: React.FC = () => {
                     value={draft[key as keyof FormDraft] as string}
                     onChange={e => set({ [key]: e.target.value } as Partial<FormDraft>)}
                     placeholder={placeholder}
-                    className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none font-mono"
+                    className={`flex-1 ${inputCls} font-mono`}
                   />
                 </div>
               ))}
@@ -1122,11 +460,10 @@ const PersonEditPage: React.FC = () => {
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
-          {/* Ametid */}
           <DynamicList
             label={t('prosopography.occupations', 'Ametid')}
             items={draft.occupations}
-            renderItem={(item, onChange, onRemove) => (
+            renderItem={(item: OccupationDraft, onChange, onRemove) => (
               <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
                 <div className="flex gap-2 items-start">
                   <div className="flex-1 min-w-0">
@@ -1155,21 +492,9 @@ const PersonEditPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-xs text-gray-400 shrink-0">Periood</span>
-                  <input
-                    type="number" min={1000} max={1900}
-                    value={item.year_from ?? ''}
-                    onChange={e => onChange({ ...item, year_from: e.target.value })}
-                    placeholder="alates"
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  />
+                  <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
                   <span className="text-gray-400">–</span>
-                  <input
-                    type="number" min={1000} max={1900}
-                    value={item.year_to ?? ''}
-                    onChange={e => onChange({ ...item, year_to: e.target.value })}
-                    placeholder="kuni"
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  />
+                  <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
                 </div>
               </div>
             )}
@@ -1177,11 +502,10 @@ const PersonEditPage: React.FC = () => {
             onChange={items => set({ occupations: items })}
           />
 
-          {/* Haridus */}
           <DynamicList
             label={t('prosopography.education', 'Haridus')}
             items={draft.education}
-            renderItem={(item, onChange, onRemove) => (
+            renderItem={(item: EducationDraft, onChange, onRemove) => (
               <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
                 <div className="flex gap-2 items-start">
                   <div className="flex-1 min-w-0">
@@ -1200,21 +524,9 @@ const PersonEditPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-gray-400 shrink-0">Periood</span>
-                  <input
-                    type="number" min={1000} max={1900}
-                    value={item.year_from ?? ''}
-                    onChange={e => onChange({ ...item, year_from: e.target.value })}
-                    placeholder="alates"
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  />
+                  <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
                   <span className="text-gray-400">–</span>
-                  <input
-                    type="number" min={1000} max={1900}
-                    value={item.year_to ?? ''}
-                    onChange={e => onChange({ ...item, year_to: e.target.value })}
-                    placeholder="kuni"
-                    className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                  />
+                  <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
                 </div>
               </div>
             )}
@@ -1222,11 +534,7 @@ const PersonEditPage: React.FC = () => {
             onChange={items => set({ education: items })}
           />
 
-          {/* Märksõnad */}
-          <TagsList
-            tags={draft.tags}
-            onChange={v => set({ tags: v })}
-          />
+          <TagsList tags={draft.tags} onChange={v => set({ tags: v })} />
         </CollapsibleSection>
 
         {/* ── Seosed ja märkmed (klapitav) ── */}
@@ -1235,24 +543,18 @@ const PersonEditPage: React.FC = () => {
           open={relOpen}
           onToggle={() => setRelOpen(v => !v)}
         >
-          {/* Seosed */}
           <DynamicList
             label={t('prosopography.relations', 'Seosed')}
             items={draft.relations}
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
-                <ProsopoPersonPicker
-                  value={item}
-                  onChange={onChange}
-                  token={token}
-                  currentId={id}
-                />
+                <ProsopoPersonPicker value={item} onChange={onChange} token={token} currentId={id} />
                 <input
                   type="text"
                   value={item.type}
                   onChange={e => onChange({ ...item, type: e.target.value })}
                   placeholder="suhe (abikaasa, isa…)"
-                  className="w-36 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none shrink-0"
+                  className={`w-36 ${inputCls} shrink-0`}
                 />
                 <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
                   <X size={14} />
@@ -1263,7 +565,6 @@ const PersonEditPage: React.FC = () => {
             onChange={items => set({ relations: items })}
           />
 
-          {/* Märkmed */}
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
               {t('prosopography.notes', 'Märkmed')}
@@ -1296,7 +597,7 @@ const PersonEditPage: React.FC = () => {
                       value={item.text}
                       onChange={e => onChange({ ...item, text: e.target.value })}
                       placeholder="Allikaviide — arhiivifond, trükis, veebiaadress…"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                      className={`w-full ${inputCls}`}
                     />
                   </div>
                   <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-0.5">
@@ -1308,7 +609,7 @@ const PersonEditPage: React.FC = () => {
                   value={item.note}
                   onChange={e => onChange({ ...item, note: e.target.value })}
                   placeholder={'Märkus — nt \u201esuri 15. jaanuar 1642 Tallinnas\u201c'}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white text-gray-600 italic"
+                  className={`w-full ${inputCls} bg-white text-gray-600 italic`}
                 />
               </div>
             )}
