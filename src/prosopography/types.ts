@@ -59,14 +59,19 @@ export interface ProsopoRecord {
   gender: 'M' | 'F' | null;
   birth: HistoricalDate;
   death: HistoricalDate;
-  origin: { city: string | null; region: string | null; geonames_id: string | null; coordinates: string | null };
+  origin: {
+    city: string | null; city_id?: string | null; city_labels?: Record<string,string> | null;
+    region: string | null; region_id?: string | null; region_labels?: Record<string,string> | null;
+    geonames_id: string | null; coordinates: string | null;
+  };
+  floruit?: { year_from?: number | null; year_to?: number | null } | null;
   status: { id: string; label: string } | null;
   confession: { id: string; label: string } | null;
   occupations: any[];
   education: any[];
   burial: any | null;
-  relations: any[];
-  sources: any[];
+  relations: { name: string; type?: string; target_id?: string | null }[];
+  sources: { text: string; note?: string | null }[];
   biography: string | null;
   notes: string | null;
   image_url: string | null;

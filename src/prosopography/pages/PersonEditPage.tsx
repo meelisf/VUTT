@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2, ImagePlus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2, ImagePlus, Trash2, Link2 } from 'lucide-react';
 import Header from '../../components/Header';
 import EntityPicker from '../../components/EntityPicker';
-import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
+import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage, listPersons } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
-import type { ProsopoRecord } from '../types';
+import type { ProsopoRecord, ProsopoIndexEntry } from '../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 
 // =========================================================
@@ -33,7 +33,8 @@ interface EducationDraft {
   year_from?: string; year_to?: string;
 }
 interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }
-interface RelationDraft  { name: string; type: string }
+interface RelationDraft  { name: string; type: string; target_id?: string | null }
+interface SourceDraft   { text: string; note: string }
 
 interface FormDraft {
   name_label: string;
@@ -44,14 +45,17 @@ interface FormDraft {
   gender: '' | 'M' | 'F';
   birth: DateDraft;
   death: DateDraft;
-  origin_city: string;
-  origin_region: string;
+  origin_city: LinkedEntity | null;
+  origin_region: LinkedEntity | null;
+  floruit_from: string;
+  floruit_to: string;
   status: LinkedEntity | null;
   confession: LinkedEntity | null;
   occupations: OccupationDraft[];
   education: EducationDraft[];
   tags: TagDraft[];
   relations: RelationDraft[];
+  sources: SourceDraft[];
   biography: string;
   notes: string;
   wikidata_id: string;
@@ -69,14 +73,17 @@ const emptyDraft = (): FormDraft => ({
   gender: '',
   birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
   death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
-  origin_city: '',
-  origin_region: '',
+  origin_city: null,
+  origin_region: null,
+  floruit_from: '',
+  floruit_to: '',
   status: null,
   confession: null,
   occupations: [],
   education: [],
   tags: [],
   relations: [],
+  sources: [],
   biography: '',
   notes: '',
   wikidata_id: '',
@@ -113,8 +120,10 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
       calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
       place: p.death?.place?.label ?? '',
     },
-    origin_city: p.origin?.city ?? '',
-    origin_region: p.origin?.region ?? '',
+    origin_city: p.origin?.city ? { label: p.origin.city, id: p.origin.city_id ?? null, labels: p.origin.city_labels ?? null, source: 'wikidata' } : null,
+    origin_region: p.origin?.region ? { label: p.origin.region, id: p.origin.region_id ?? null, labels: p.origin.region_labels ?? null, source: 'wikidata' } : null,
+    floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
+    floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
     status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
     confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
     occupations: (p.occupations ?? []).map((o: any) => ({
@@ -130,7 +139,8 @@ function recordToDraft(p: ProsopoRecord): FormDraft {
       year_to: e.year_to ? String(e.year_to) : '',
     })),
     tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
-    relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? r.target_id ?? '', type: r.type ?? '' })),
+    relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? '', type: r.type ?? '', target_id: r.target_id ?? null })),
+    sources: (p.sources ?? []).map((s: any) => ({ text: s.text ?? String(s), note: s.note ?? '' })),
     biography: p.biography ?? '',
     notes: p.notes ?? '',
     wikidata_id: ident('wikidata'),
@@ -200,11 +210,19 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
       ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,
     origin: {
-      city: draft.origin_city.trim() || null,
-      region: draft.origin_region.trim() || null,
+      city: draft.origin_city?.label ?? null,
+      city_id: draft.origin_city?.id ?? null,
+      city_labels: draft.origin_city?.labels ?? null,
+      region: draft.origin_region?.label ?? null,
+      region_id: draft.origin_region?.id ?? null,
+      region_labels: draft.origin_region?.labels ?? null,
       geonames_id: original?.origin?.geonames_id ?? null,
       coordinates: original?.origin?.coordinates ?? null,
     },
+    floruit: (draft.floruit_from || draft.floruit_to) ? {
+      year_from: draft.floruit_from ? parseInt(draft.floruit_from) : null,
+      year_to: draft.floruit_to ? parseInt(draft.floruit_to) : null,
+    } : null,
     occupations: draft.occupations.filter(o => o.label.trim()).map(o => ({
       label: o.label.trim(),
       ...(o.id ? { id: o.id } : {}),
@@ -227,9 +245,14 @@ function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<Pro
       ...(t.id ? { id: t.id } : {}),
       ...(t.labels ? { labels: t.labels } : {}),
     })) as any,
-    relations: draft.relations.filter(r => r.name.trim()).map(r => ({
+    relations: draft.relations.filter(r => r.name.trim() || r.target_id).map(r => ({
       name: r.name.trim(),
       ...(r.type.trim() ? { type: r.type.trim() } : {}),
+      ...(r.target_id ? { target_id: r.target_id } : {}),
+    })),
+    sources: draft.sources.filter(s => s.text.trim()).map(s => ({
+      text: s.text.trim(),
+      ...(s.note.trim() ? { note: s.note.trim() } : {}),
     })),
     biography: draft.biography.trim() || null,
     notes: draft.notes.trim() || null,
@@ -414,6 +437,109 @@ const AliasesList: React.FC<{
 };
 
 // =========================================================
+// ProsopoPersonPicker — otsib vutt:P isikuid seose jaoks
+// =========================================================
+const ProsopoPersonPicker: React.FC<{
+  value: RelationDraft;
+  onChange: (v: RelationDraft) => void;
+  token: string;
+  currentId?: string;  // välistab iseenda tulemi
+}> = ({ value, onChange, token, currentId }) => {
+  const [query, setQuery] = useState(value.name);
+  const [results, setResults] = useState<ProsopoIndexEntry[]>([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Sulge dropdown väljaklõpsel
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const search = useCallback((q: string) => {
+    clearTimeout(timerRef.current);
+    if (!q.trim()) { setResults([]); return; }
+    timerRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await listPersons({ q }, token);
+        setResults(res.results.filter(r => r.id !== currentId).slice(0, 8));
+      } catch { setResults([]); }
+      finally { setLoading(false); }
+    }, 250);
+  }, [token, currentId]);
+
+  const select = (person: ProsopoIndexEntry) => {
+    onChange({ ...value, name: person.label, target_id: person.id });
+    setQuery(person.label);
+    setOpen(false);
+    setResults([]);
+  };
+
+  const clear = () => {
+    onChange({ ...value, name: '', target_id: null });
+    setQuery('');
+    setResults([]);
+  };
+
+  return (
+    <div ref={containerRef} className="relative flex-1 min-w-0">
+      <div className="flex items-center gap-1">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={query}
+            onChange={e => {
+              setQuery(e.target.value);
+              onChange({ ...value, name: e.target.value, target_id: null });
+              setOpen(true);
+              search(e.target.value);
+            }}
+            onFocus={() => { if (query) setOpen(true); }}
+            placeholder="Isiku nimi…"
+            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none pr-6"
+          />
+          {loading && <Loader2 size={12} className="absolute right-2 top-2.5 animate-spin text-gray-400" />}
+        </div>
+        {value.target_id && (
+          <span title={value.target_id} className="shrink-0">
+            <Link2 size={13} className="text-primary-500" />
+          </span>
+        )}
+        {(query || value.target_id) && (
+          <button type="button" onClick={clear} className="text-gray-300 hover:text-gray-500 shrink-0">
+            <X size={13} />
+          </button>
+        )}
+      </div>
+      {open && results.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+          {results.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={() => select(p)}
+              className="w-full text-left px-3 py-2 hover:bg-primary-50 text-sm flex items-baseline justify-between gap-2"
+            >
+              <span className="text-gray-800 truncate">{p.label}</span>
+              <span className="text-xs text-gray-400 shrink-0">
+                {p.birth_year && p.death_year ? `${p.birth_year}–${p.death_year}` : p.birth_year ? `s. ${p.birth_year}` : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =========================================================
 // TagsList — LinkedEntity märksõnade loend
 // =========================================================
 const TagsList: React.FC<{
@@ -549,6 +675,7 @@ const PersonEditPage: React.FC = () => {
   const [namesOpen, setNamesOpen] = useState(false);
   const [occupOpen, setOccupOpen] = useState(false);
   const [relOpen, setRelOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   // Profiilipilt
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -898,28 +1025,44 @@ const PersonEditPage: React.FC = () => {
 
           {/* Päritolu */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-                {t('prosopography.origin', 'Päritolu')} — linn
-              </label>
+            <EntityPicker
+              label={`${t('prosopography.origin', 'Päritolu')} — linn`}
+              placeholder="Tallinn, Riia…"
+              type="place"
+              value={draft.origin_city}
+              onChange={v => set({ origin_city: v })}
+              lang="et"
+            />
+            <EntityPicker
+              label={`${t('prosopography.origin', 'Päritolu')} — piirkond`}
+              placeholder="Liivimaa, Saksimaa…"
+              type="place"
+              value={draft.origin_region}
+              onChange={v => set({ origin_region: v })}
+              lang="et"
+            />
+          </div>
+
+          {/* Floruit — tegutsemisperiood */}
+          <div>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
+              Tegutsemisperiood <span className="normal-case font-normal text-gray-400">(floruit, kui sünd/surm teadmata)</span>
+            </label>
+            <div className="flex items-center gap-2">
               <input
-                type="text"
-                value={draft.origin_city}
-                onChange={e => set({ origin_city: e.target.value })}
-                placeholder="Tallinn, Riia…"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                type="number" min={1000} max={1900}
+                placeholder="alates"
+                value={draft.floruit_from}
+                onChange={e => set({ floruit_from: e.target.value })}
+                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
               />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-                {t('prosopography.origin', 'Päritolu')} — piirkond
-              </label>
+              <span className="text-gray-400">–</span>
               <input
-                type="text"
-                value={draft.origin_region}
-                onChange={e => set({ origin_region: e.target.value })}
-                placeholder="Liivimaa, Saksimaa…"
-                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                type="number" min={1000} max={1900}
+                placeholder="kuni"
+                value={draft.floruit_to}
+                onChange={e => set({ floruit_to: e.target.value })}
+                className="w-20 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
               />
             </div>
           </div>
@@ -1098,26 +1241,25 @@ const PersonEditPage: React.FC = () => {
             items={draft.relations}
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={item.name}
-                  onChange={e => onChange({ ...item, name: e.target.value })}
-                  placeholder="Isiku nimi"
-                  className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                <ProsopoPersonPicker
+                  value={item}
+                  onChange={onChange}
+                  token={token}
+                  currentId={id}
                 />
                 <input
                   type="text"
                   value={item.type}
                   onChange={e => onChange({ ...item, type: e.target.value })}
                   placeholder="suhe (abikaasa, isa…)"
-                  className="w-40 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                  className="w-36 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none shrink-0"
                 />
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
                   <X size={14} />
                 </button>
               </div>
             )}
-            onAdd={() => set({ relations: [...draft.relations, { name: '', type: '' }] })}
+            onAdd={() => set({ relations: [...draft.relations, { name: '', type: '', target_id: null }] })}
             onChange={items => set({ relations: items })}
           />
 
@@ -1134,6 +1276,45 @@ const PersonEditPage: React.FC = () => {
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"
             />
           </div>
+        </CollapsibleSection>
+
+        {/* ── Allikad ja bibliograafia (klapitav) ── */}
+        <CollapsibleSection
+          title="Allikad ja bibliograafia"
+          open={sourcesOpen}
+          onToggle={() => setSourcesOpen(v => !v)}
+        >
+          <DynamicList
+            label="Allikad"
+            items={draft.sources}
+            renderItem={(item, onChange, onRemove) => (
+              <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      value={item.text}
+                      onChange={e => onChange({ ...item, text: e.target.value })}
+                      placeholder="Allikaviide — arhiivifond, trükis, veebiaadress…"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
+                    />
+                  </div>
+                  <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0 mt-0.5">
+                    <X size={14} />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={item.note}
+                  onChange={e => onChange({ ...item, note: e.target.value })}
+                  placeholder={'Märkus — nt \u201esuri 15. jaanuar 1642 Tallinnas\u201c'}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none bg-white text-gray-600 italic"
+                />
+              </div>
+            )}
+            onAdd={() => set({ sources: [...draft.sources, { text: '', note: '' }] })}
+            onChange={items => set({ sources: items })}
+          />
         </CollapsibleSection>
 
         {/* Alumine salvesta nupp */}
