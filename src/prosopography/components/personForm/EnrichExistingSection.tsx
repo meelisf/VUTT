@@ -11,6 +11,7 @@ interface Props {
   draft: FormDraft;
   token: string;
   onChange: (newDraft: FormDraft) => void;
+  onApplied?: (fields: string[]) => void;
 }
 
 const FIELD_LABELS: Record<string, string> = {
@@ -46,12 +47,13 @@ type DiffResult = {
   error?: string;
 };
 
-const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, draft, token, onChange }) => {
+const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, draft, token, onChange, onApplied }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [diff, setDiff] = useState<DiffResult | null>(null);
   const [activeScheme, setActiveScheme] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [appliedFields, setAppliedFields] = useState<string[] | null>(null);
 
   const schemes = [
     ...(wikidataId ? [{ scheme: 'wikidata', label: 'Wikidata', icon: <Globe size={12} className="text-blue-500" /> }] : []),
@@ -80,6 +82,9 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, d
     if (!diff) return;
     const newDraft = applyEnrichmentToDraft(diff.auto_filled, draft);
     onChange(newDraft);
+    const fields = autoKeys.map(k => FIELD_LABELS[k] ?? k);
+    setAppliedFields(fields);
+    onApplied?.(autoKeys);
     setDiff(null);
     setActiveScheme(null);
   };
@@ -116,6 +121,12 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, d
               </button>
             ))}
           </div>
+
+          {appliedFields && (
+            <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1.5">
+              ✓ Rakendatud: {appliedFields.join(', ')}
+            </p>
+          )}
 
           {error && (
             <p className="flex items-center gap-1.5 text-xs text-red-600">

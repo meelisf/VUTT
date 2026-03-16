@@ -529,6 +529,9 @@ const PersonEditPage: React.FC = () => {
               draft={draft}
               token={token}
               onChange={newDraft => setDraft(newDraft)}
+              onApplied={fields => {
+                if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
+              }}
             />
           )}
         </CollapsibleSection>

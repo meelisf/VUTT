@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { DateDraft } from './types';
 
@@ -11,6 +11,8 @@ const DateField: React.FC<{
 
   const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || value.place);
   const [open, setOpen] = useState(hasDetail);
+  // Ava automaatselt kui rikastamine lisab koha/täpsuse väljalt
+  useEffect(() => { if (hasDetail) setOpen(true); }, [hasDetail]);
 
   const summary = (() => {
     const parts: string[] = [];
