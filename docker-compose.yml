@@ -21,6 +21,8 @@ services:
       - ./uploads:/app/uploads
       # SSH võti OCR serverisse ühendumiseks (read-only)
       - ~/.ssh:/root/.ssh:ro
+      # Album Academicum referentsandmed (read-only)
+      - ./reference_data:/app/reference_data:ro
     # Pordid suletud välismaailmale (ainult sisevõrk või nginx kasutab)
     # Avame localhostile host Nginxi jaoks
     ports:

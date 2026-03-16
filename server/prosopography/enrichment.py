@@ -1,8 +1,9 @@
 """
-Väliste allikate rikastus: Wikidata SPARQL + GND (lobid.org REST).
+Väliste allikate rikastus: Wikidata SPARQL + GND (lobid.org REST) + AA (kohalik fail).
 fetch_and_diff(scheme, ext_id, person) → {auto_filled, conflicts}
 """
 import json
+import os
 import urllib.request
 import urllib.parse
 from typing import Optional
@@ -31,6 +32,8 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
         remote = _fetch_wikidata(ext_id)
     elif scheme == "gnd":
         remote = _fetch_gnd(ext_id)
+    elif scheme == "aa":
+        remote = _fetch_aa(ext_id)
     else:
         return {"auto_filled": {}, "conflicts": [], "error": f"Tundmatu skeem: {scheme}"}
 
@@ -308,6 +311,93 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
                 occs.append({"id": None, "label": label})
         if occs:
             result["_occupations"] = occs[:5]
+    except Exception:
+        pass
+
+    return result
+
+
+# =========================================================
+# AA (Album Academicum — kohalik fail)
+# =========================================================
+
+_aa_data: Optional[list] = None
+
+
+def _load_aa() -> list:
+    """Laeb AA andmed mällu (lazy, üks kord)."""
+    global _aa_data
+    if _aa_data is not None:
+        return _aa_data
+    try:
+        from ..config import AA_FILE
+        with open(AA_FILE, encoding="utf-8") as f:
+            _aa_data = json.load(f)
+    except Exception:
+        _aa_data = []
+    return _aa_data
+
+
+def _fetch_aa(aa_id: str) -> Optional[dict]:
+    """Otsib AA kirje numbri järgi (nt "AA:1390" → entry_number 1390)."""
+    raw = aa_id.replace("AA:", "").strip()
+    if not raw.isdigit():
+        return None
+    entry_num = int(raw)
+
+    entries = _load_aa()
+    entry = next((e for e in entries if e.get("entry_number") == entry_num), None)
+    if entry is None:
+        return None
+
+    result = {}
+    person = entry.get("person") or {}
+    name_obj = person.get("name") or {}
+
+    # Nimi: "Last, First" → "First Last"
+    try:
+        full = name_obj.get("full") or ""
+        if "," in full:
+            parts = full.split(",", 1)
+            canonical = f"{parts[1].strip()} {parts[0].strip()}"
+        else:
+            canonical = full.strip()
+        if canonical:
+            result["name.label"] = canonical
+    except Exception:
+        pass
+
+    # Nimevariandid
+    try:
+        family_name = name_obj.get("family_name") or ""
+        first_name = name_obj.get("first_name") or ""
+        aliases = []
+        for fv in (name_obj.get("family_name_variants") or []):
+            aliases.append(f"{first_name} {fv}".strip())
+        for fn_v in (name_obj.get("first_name_variants") or []):
+            aliases.append(f"{fn_v} {family_name}".strip())
+        if aliases:
+            result["name.aliases"] = aliases
+    except Exception:
+        pass
+
+    # Sünniaasta
+    try:
+        birth_date = (person.get("birth") or {}).get("date")
+        if birth_date:
+            date_str = str(birth_date).strip()
+            result["birth.date"] = date_str[:10]
+            result["birth.precision"] = "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
+    except Exception:
+        pass
+
+    # Surmaaasta
+    try:
+        death_date = (person.get("death") or {}).get("date")
+        if death_date:
+            date_str = str(death_date).strip()
+            result["death.date"] = date_str[:10]
+            result["death.precision"] = "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
     except Exception:
         pass
 

@@ -87,6 +87,9 @@ REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
 # Prosopograafia
 PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")
+
+# Album Academicum referentsandmed
+AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")
 PROSOPOGRAPHY_INDEX_FILE = os.path.join(_STATE_DIR, "prosopography_index.json")
 PERSON_TO_WORKS_FILE = os.path.join(_STATE_DIR, "person_to_works.json")
 
