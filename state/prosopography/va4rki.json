@@ -1,0 +1,111 @@
+{
+  "id": "vutt:Pva4rki",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q11773291",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "11930399X",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "3277721",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T17:56:17.202053+00:00",
+  "created_by": "import_script",
+  "updated_by": "mass_enrich_script",
+  "name": {
+    "label": "Jānis Reiters",
+    "family_name": null,
+    "first_name": null,
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Reiter, Jānis",
+      "Reuter, Johann",
+      "Reuter, Johannes",
+      "Rytter, Jānis"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1632-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q1773",
+      "label": "Riia"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1695-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": null,
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {},
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q14467526",
+      "label": "keeleteadlane"
+    },
+    {
+      "id": "Q2259532",
+      "label": "vaimulik"
+    },
+    {
+      "id": "Q1234713",
+      "label": "teoloog"
+    }
+  ]
+}

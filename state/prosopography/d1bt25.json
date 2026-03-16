@@ -1,0 +1,105 @@
+{
+  "id": "vutt:Pd1bt25",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q5809077",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "102511446",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "71786156",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T17:53:30.113363+00:00",
+  "created_by": "import_script",
+  "updated_by": "mass_enrich_script",
+  "name": {
+    "label": "Petrus Hoffwenius",
+    "family_name": null,
+    "first_name": null,
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Hoffvenias, Per",
+      "Hoffwen, Petrus",
+      "Hofwenius, Petrus"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1630-03-14",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q10726050",
+      "label": "Q10726050"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1682-05-23",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q10710237",
+      "label": "Uppsala toomkogudus"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": null,
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {},
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q39631",
+      "label": "arst"
+    }
+  ]
+}

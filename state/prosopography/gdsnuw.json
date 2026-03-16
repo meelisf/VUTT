@@ -1,0 +1,191 @@
+{
+  "id": "vutt:Pgdsnuw",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:117",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Nicolaus Ramsius (Ramzius)",
+    "family_name": "Ramsius",
+    "first_name": "Nicolaus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Ramzius"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västergötland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664351",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Lektor",
+      "id": null,
+      "labels": {},
+      "date_start": "1643",
+      "date_end": null,
+      "institution": "Schule in Göteborg",
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Prof.",
+      "id": null,
+      "labels": {},
+      "date_start": "1650",
+      "date_end": null,
+      "institution": "Gymn. in Göteborg",
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Lektor",
+      "id": null,
+      "labels": {},
+      "date_start": "1665",
+      "date_end": null,
+      "institution": null,
+      "notes": "wenigst.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1633-09-21",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        },
+        {
+          "role": "Konv.",
+          "start_date": "1633",
+          "end_date": "1638",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1638",
+          "end_date": "1641",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1641-05-12",
+          "praeses": null,
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1641-09-11",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1639-02-20",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1634-10-21",
+          "recipient": {
+            "name": "I. Hasselblad",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1638-10-13",
+          "recipient": {
+            "name": "A. Lyra",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1642-05",
+          "recipient": {
+            "name": "N. Rundelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

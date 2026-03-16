@@ -1,0 +1,185 @@
+{
+  "id": "vutt:Pzqyvmz",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q126845160",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "122792114",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "40269530",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1195",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Magnus Gabriel Edenius",
+    "family_name": "Edenius",
+    "first_name": "Magnus Gabriel",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Värmland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664870",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Voc.",
+      "id": null,
+      "labels": {},
+      "date_start": null,
+      "date_end": null,
+      "institution": null,
+      "notes": "an e. Pastorat in (erw. 25. 5. 1692, als Pastor 6. 3. 1693).",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Univ. Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1679-09-14",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "beabsichtigte zu disputieren (21. 10. 1685, erw. als Stip, noch 21. 6. 1688)",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "AGC",
+      "institution_id": null,
+      "type": "Stip.",
+      "date_start": "1690",
+      "date_end": "1691-II",
+      "degree": null,
+      "subject": "Phil.",
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "AGC",
+      "institution_id": null,
+      "type": "Bb.",
+      "date_start": "1692-05-08",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "AGC",
+      "institution_id": null,
+      "type": "ex. rig.",
+      "date_start": "1692-05-03",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1691-02-14",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": "/statt 22. 11. 1690/"
+        },
+        {
+          "date": "1692-06-11",
+          "praeses": "Hermelin",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1691-09",
+          "recipient": {
+            "name": "P. Barthelius",
+            "reference": null
+          },
+          "notes": "(10. 10. 1691) →"
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

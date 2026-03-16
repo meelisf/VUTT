@@ -1,0 +1,172 @@
+{
+  "id": "vutt:Pzsptm2",
+  "identifiers": [
+    {
+      "scheme": "viaf",
+      "id": "19169017304366981341",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:230",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Jacobus Friedrichs",
+    "family_name": "Friedrichs",
+    "first_name": "Jacobus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Fridenrich",
+      "Friedenreich"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Riga",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Livland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "456173",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [
+    {
+      "institution": "Gymn. Riga",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "Disp. 1637 u. Samson",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Univ. Straßburg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1640-04",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "Disp. theol. u. Joh. Schmidt 17. 9. 1640",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1637-04-16",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1639-02-22",
+          "praeses": null,
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1639-04-30",
+          "praeses": "Virginius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1638-03-24",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1639-01-01",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1637-08-10",
+          "recipient": {
+            "name": "Joh. Schlechter",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1637-10-30",
+          "recipient": {
+            "name": "P. Langius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

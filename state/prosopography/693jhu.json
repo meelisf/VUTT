@@ -1,0 +1,260 @@
+{
+  "id": "vutt:P693jhu",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q1174956",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "129331880",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "71583337",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1332",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "David Kellner",
+    "family_name": "Kellner",
+    "first_name": "David",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "David Köllner"
+    ],
+    "family_name_variants": [
+      "Köllner"
+    ],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1670-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q1506750",
+      "label": "Liebertwolkwitz"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1748-04-06",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q2079",
+      "label": "Leipzig"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": "Liebertwolkwitz",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Sachsen",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Ratssekr.",
+      "id": null,
+      "labels": {},
+      "date_start": "1682",
+      "date_end": "1694",
+      "institution": null,
+      "notes": "in",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Rhr.",
+      "id": null,
+      "labels": {},
+      "date_start": "1693",
+      "date_end": "1708",
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Advokatur",
+      "id": null,
+      "labels": {},
+      "date_start": "1694-09-21",
+      "date_end": null,
+      "institution": null,
+      "notes": "Bat um d.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Landgerichtsadv.",
+      "id": null,
+      "labels": {},
+      "date_start": "1696",
+      "date_end": null,
+      "institution": null,
+      "notes": "wenigst.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Organistendienst",
+      "id": null,
+      "labels": {},
+      "date_start": "1696-12-08",
+      "date_end": null,
+      "institution": "St. Johanniskirche",
+      "notes": "bewarb sich um d. in d.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Organist",
+      "id": null,
+      "labels": {},
+      "date_start": "1699",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Auditeur",
+      "id": null,
+      "labels": {},
+      "date_start": "1701",
+      "date_end": null,
+      "institution": null,
+      "notes": "in",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Kptn.",
+      "id": null,
+      "labels": {},
+      "date_start": "1711",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Organist",
+      "id": null,
+      "labels": {},
+      "date_start": null,
+      "date_end": null,
+      "institution": null,
+      "notes": "in, lebte noch 1741",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Åbo",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1692",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [
+    {
+      "name": "Ph. K.",
+      "type": "Br.",
+      "target_id": null,
+      "notes": null
+    }
+  ],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [
+        {
+          "type": "Or.",
+          "date": "1697",
+          "notes": null
+        }
+      ],
+      "positions": [],
+      "stipends": [
+        {
+          "start_date": null,
+          "end_date": null,
+          "semester": null,
+          "notes": "bat um e. Stipendium 15. 9. 1694"
+        }
+      ],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q21166956",
+      "label": "lautomängija"
+    },
+    {
+      "id": "Q16031530",
+      "label": "muusikateoreetik"
+    },
+    {
+      "id": "Q14915627",
+      "label": "muusikateadlane"
+    },
+    {
+      "id": "Q1209498",
+      "label": "poet lawyer"
+    },
+    {
+      "id": "Q36834",
+      "label": "helilooja"
+    }
+  ]
+}

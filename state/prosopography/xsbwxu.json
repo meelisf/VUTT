@@ -1,0 +1,145 @@
+{
+  "id": "vutt:Pxsbwxu",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:375",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Olaus Attorpius",
+    "family_name": "Attorpius",
+    "first_name": "Olaus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västergötland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664351",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1647",
+      "date_end": "1657",
+      "institution": null,
+      "notes": "wenigst.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1661",
+      "date_end": "1666",
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1639-09-24",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1640",
+          "end_date": "1653",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1644-10-19",
+          "praeses": "Joh. Erici",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1642-07-06",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1645-03-27",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

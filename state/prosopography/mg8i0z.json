@@ -1,0 +1,157 @@
+{
+  "id": "vutt:Pmg8i0z",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:190",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Johannes Bus(sch)man(nus)",
+    "family_name": "Bus(sch)man(nus)",
+    "first_name": "Johannes",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Kalmar",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Småland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "6692538",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Kantor",
+      "id": null,
+      "labels": {},
+      "date_start": "1640",
+      "date_end": null,
+      "institution": "Domschule",
+      "notes": "Wohl an d. um",
+      "source": "album_academicum"
+    },
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1641-05-16",
+      "date_end": null,
+      "institution": null,
+      "notes": "voc., konf. 29. 6. 1642",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1636-06-03",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        },
+        {
+          "role": "Konv.",
+          "start_date": "1636-06-20",
+          "end_date": "1638",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1638",
+          "end_date": null,
+          "semester": null,
+          "notes": "(39?)"
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1640-09-30",
+          "praeses": null,
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1641-02-10",
+          "praeses": "Virginius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1638-04-06",
+          "recipient": {
+            "name": "E. Löfingius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

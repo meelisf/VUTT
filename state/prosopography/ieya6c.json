@@ -1,0 +1,217 @@
+{
+  "id": "vutt:Pieya6c",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q55195757",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "1202439284",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "8157882944060442605",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:739",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Johannes Megalinus",
+    "family_name": "Megalinus",
+    "first_name": "Johannes",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Megalinus, Johann"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Småland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "6692538",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Informator",
+      "id": null,
+      "labels": {},
+      "date_start": "1653",
+      "date_end": null,
+      "institution": null,
+      "notes": "b. G. Stiernhielm",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [
+    {
+      "name": "292",
+      "type": "Br.",
+      "target_id": null,
+      "notes": "v. Nr."
+    }
+  ],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1648-10-06",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1648",
+          "end_date": "1652",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1650-08",
+          "praeses": null,
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1651",
+          "praeses": "Crellius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1651-08-27",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1651",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1651-03-19",
+          "recipient": {
+            "name": "A. Flojerus",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1651-09-08",
+          "recipient": {
+            "name": "A. Winsbergius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1651-10-08",
+          "recipient": {
+            "name": "G. Lidenius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1651",
+          "recipient": {
+            "name": "A. Mahlstedt",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1651",
+          "recipient": {
+            "name": "G. Witting",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1652-12",
+          "recipient": {
+            "name": "L. Bonelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

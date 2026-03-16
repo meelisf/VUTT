@@ -1,0 +1,335 @@
+{
+  "id": "vutt:Phodd93",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q5816952",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "1055680713",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "61532468",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1189",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Gustaf Adolf Humble",
+    "family_name": "Humble",
+    "first_name": "Gustavus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1674-02-20",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q10542102",
+      "label": "Jönköpings Kristina församling"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1741-11-29",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q10512529",
+      "label": "Q10512529"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Småland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "6692538",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1700",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Sup.",
+      "id": null,
+      "labels": {},
+      "date_start": "1719",
+      "date_end": null,
+      "institution": null,
+      "notes": "v.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Bf.",
+      "id": null,
+      "labels": {},
+      "date_start": "1730",
+      "date_end": null,
+      "institution": null,
+      "notes": "v.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Schule Visingsö",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1679",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Jönköping",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1680",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Univ. Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1687-11-05",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Rostock",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1695-09",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "Kgl. Stip. f. Studienreisen 14. 11. 1694",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Wittenberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1696-11-04",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Zögling",
+          "start_date": null,
+          "end_date": null,
+          "semester": null,
+          "notes": "v. O. Hermelin"
+        },
+        {
+          "role": "Stip.",
+          "start_date": "1690",
+          "end_date": "1694-01",
+          "semester": null,
+          "notes": "(Phil.)"
+        },
+        {
+          "role": "Bb.",
+          "start_date": "1692-10-22",
+          "end_date": "1694-03-07",
+          "semester": null,
+          "notes": "14×"
+        }
+      ],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1691-11-25",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1691-11-28",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1691-12-03",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-01-03",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-02-03",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-02-13",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-03-05",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-03-18",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1692-04-20",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1693-08-12",
+          "praeses": "Hermelin",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1694-01-31",
+          "praeses": "Sjöberg",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1693-02-11",
+          "recipient": {
+            "name": "G. Follenius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1693-05-27",
+          "recipient": {
+            "name": "G. Camitz",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1693-10-14",
+          "recipient": {
+            "name": "E. Albogius",
+            "reference": "262"
+          },
+          "notes": "(Nr.)"
+        }
+      ],
+      "departures": [
+        {
+          "date": "1694-05-17",
+          "semester": null,
+          "notes": "Testim."
+        }
+      ]
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q42603",
+      "label": "preester"
+    }
+  ]
+}

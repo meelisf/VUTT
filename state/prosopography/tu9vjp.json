@@ -1,0 +1,150 @@
+{
+  "id": "vutt:Ptu9vjp",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q20933426",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:855",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Ericus Johannes Albogius",
+    "family_name": "Albogius",
+    "first_name": "Ericus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Erik Albogius"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1610-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q213551",
+      "label": "Västergötland"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1678-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q102158",
+      "label": "Narva"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västergötland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664351",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1643",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Propst",
+      "id": null,
+      "labels": {},
+      "date_start": "1651",
+      "date_end": null,
+      "institution": null,
+      "notes": "ebd.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "Imm.",
+      "date_start": "1628-11-25",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1651-03-19",
+          "praeses": "Joh. Erici",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q2259532",
+      "label": "vaimulik"
+    }
+  ]
+}

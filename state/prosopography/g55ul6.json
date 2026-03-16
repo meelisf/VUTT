@@ -1,0 +1,159 @@
+{
+  "id": "vutt:Pg55ul6",
+  "identifiers": [
+    {
+      "scheme": "viaf",
+      "id": "55154074446511741835",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:758",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Dunte, Georgius",
+    "family_name": "Dunt(e)",
+    "first_name": "Georgius",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "1631",
+    "date": "1631",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Reval",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Estland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "453733",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Prof.",
+      "id": null,
+      "labels": {},
+      "date_start": "1672",
+      "date_end": "1677",
+      "institution": "Gymn. Reval",
+      "notes": "d. griech. Spr. am.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Gießen",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1651-09-16",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Tübingen",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1652-10-13",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Wittenberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1653-08-16",
+      "date_end": null,
+      "degree": "Mag.",
+      "subject": null,
+      "notes": "Disp. 30. 8. 1653 u. J. Sperling, 11. 10, 1653",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Rostock",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1656-01",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "in phil. Fak. receptus 1656, erw. 29. 10. 1661 als Bibliotheksbenutzer",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1649-01-09",
+          "end_date": null,
+          "semester": null,
+          "notes": "stipul."
+        }
+      ],
+      "stipends": [],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

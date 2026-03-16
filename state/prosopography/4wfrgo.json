@@ -1,0 +1,180 @@
+{
+  "id": "vutt:P4wfrgo",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q111846119",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "22120299",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:806",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Erlandus Erlandi Hiärne",
+    "family_name": "Hiärne",
+    "first_name": "Erlandus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Erland Erlandson Hiärne",
+      "Erlandus Jerne"
+    ],
+    "family_name_variants": [
+      "Jerne"
+    ],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1637-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Ingermanland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "562172",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Banksekr.",
+      "id": null,
+      "labels": {},
+      "date_start": null,
+      "date_end": null,
+      "institution": null,
+      "notes": "in",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1650-06-17",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1651-07",
+          "end_date": "1654",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1653-06-29",
+          "praeses": "Lidenius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1651",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1652-05-29",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1652-12-18",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1652-05-04",
+          "recipient": {
+            "name": "E. Holstenius",
+            "reference": null
+          },
+          "notes": "zur Hochzeit"
+        },
+        {
+          "date": "1652-05",
+          "recipient": {
+            "name": "J. Boestrenius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1652-12-18",
+          "recipient": {
+            "name": "B. Govinius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

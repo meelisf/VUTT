@@ -1,0 +1,206 @@
+{
+  "id": "vutt:Po1mzzv",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1359",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Ericus Castelius",
+    "family_name": "Castelius",
+    "first_name": "Ericus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Åbo",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Finnland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "660013",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Kand.",
+      "id": null,
+      "labels": {},
+      "date_start": "1696-06-09",
+      "date_end": null,
+      "institution": "Trivialschule",
+      "notes": "für d. Konrektorat d. (wurde v. Professoren d. UD empfohlen)",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Präzeptor",
+      "id": null,
+      "labels": {},
+      "date_start": "1699",
+      "date_end": null,
+      "institution": null,
+      "notes": "v. Rolandi (Nr. 1364)",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Åbo",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1698-09-07",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "als Präzeptor noch 21. 2. 1699",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [],
+      "stipends": [
+        {
+          "start_date": "1695",
+          "end_date": "1698",
+          "semester": "II",
+          "notes": "Med., Theol."
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1697-12-15",
+          "praeses": "Sarcovius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1690-06-24",
+          "recipient": {
+            "name": "J. Gezelius",
+            "reference": null
+          },
+          "notes": "TGed."
+        },
+        {
+          "date": "1691-05-15",
+          "recipient": {
+            "name": "Henr. Bonerus",
+            "reference": null
+          },
+          "notes": "G."
+        },
+        {
+          "date": "1691-11-14",
+          "recipient": {
+            "name": "Joh. Rungius",
+            "reference": null
+          },
+          "notes": "G."
+        },
+        {
+          "date": "1693-12-20",
+          "recipient": {
+            "name": "C. Procopaeus",
+            "reference": null
+          },
+          "notes": "G."
+        },
+        {
+          "date": "1695-11-05",
+          "recipient": {
+            "name": "D. Sarcovius",
+            "reference": null
+          },
+          "notes": "G."
+        },
+        {
+          "date": "1696-05-20",
+          "recipient": {
+            "name": "L. Salvius",
+            "reference": null
+          },
+          "notes": "G."
+        },
+        {
+          "date": "1697-12-21",
+          "recipient": {
+            "name": "L. Molin",
+            "reference": null
+          },
+          "notes": "G."
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

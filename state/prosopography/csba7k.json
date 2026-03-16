@@ -1,0 +1,172 @@
+{
+  "id": "vutt:Pcsba7k",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:206",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Ambernus Storch (Storck)",
+    "family_name": "Storch",
+    "first_name": "Ambernus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Storck"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Mariestad",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västergötland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664351",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Rektor",
+      "id": null,
+      "labels": {},
+      "date_start": "1643",
+      "date_end": "1650",
+      "institution": null,
+      "notes": "d. Schule in (Ingerm.)",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1636-09-15",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1638",
+          "end_date": "1640-10",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1640-09-19",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1638-02-21",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1638-03-25",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1639-03-13",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1639-12-19",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1638-04-13",
+          "recipient": {
+            "name": "I. Smetander",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1638-04-26",
+          "recipient": {
+            "name": "Joh. Jonae",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1640-03-28",
+          "recipient": {
+            "name": "S. Vallander",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

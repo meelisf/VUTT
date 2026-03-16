@@ -1,0 +1,133 @@
+{
+  "id": "vutt:P2nqvxq",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q16403558",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "130132985",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "95138164",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1596",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Michael Dau",
+    "family_name": "Dau",
+    "first_name": "Michael",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Micael Dau",
+      "Micail Dau"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1653-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q146820",
+      "label": "Malbork"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1710-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q102365",
+      "label": "Pärnu"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": "Dorpat",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Livland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "457850",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [
+        {
+          "type": "Or.",
+          "date": "1709-01-28",
+          "notes": null
+        }
+      ],
+      "positions": [],
+      "stipends": [
+        {
+          "start_date": "1703",
+          "end_date": "1709",
+          "semester": "II",
+          "notes": "Phil., Jura"
+        }
+      ],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q3315492",
+      "label": "clergyman"
+    }
+  ]
+}
