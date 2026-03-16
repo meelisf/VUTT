@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, BookMarked, Loader2, RefreshCw, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
+import { Globe, BookMarked, BookOpen, Loader2, RefreshCw, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
 import { fetchPersonEnrichmentPreview } from '../../services/prosopographyService';
 import { applyEnrichmentToDraft } from './helpers';
 import type { FormDraft } from './types';
@@ -8,6 +8,7 @@ interface Props {
   personId: string;
   wikidataId: string;
   gndId: string;
+  aaId: string;
   draft: FormDraft;
   token: string;
   onChange: (newDraft: FormDraft) => void;
@@ -47,7 +48,7 @@ type DiffResult = {
   error?: string;
 };
 
-const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, draft, token, onChange, onApplied }) => {
+const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, aaId, draft, token, onChange, onApplied }) => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
   const [diff, setDiff] = useState<DiffResult | null>(null);
@@ -58,6 +59,7 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, d
   const schemes = [
     ...(wikidataId ? [{ scheme: 'wikidata', label: 'Wikidata', icon: <Globe size={12} className="text-blue-500" /> }] : []),
     ...(gndId ? [{ scheme: 'gnd', label: 'GND', icon: <BookMarked size={12} className="text-orange-500" /> }] : []),
+    ...(aaId ? [{ scheme: 'album_academicum', label: 'Album Academicum', icon: <BookOpen size={12} className="text-purple-500" /> }] : []),
   ];
 
   if (schemes.length === 0) return null;
@@ -140,7 +142,7 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, d
               {autoKeys.length > 0 && (
                 <div>
                   <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-                    Täidetakse ({activeScheme === 'gnd' ? 'GND' : 'Wikidata'})
+                    Täidetakse ({schemes.find(s => s.scheme === activeScheme)?.label ?? activeScheme})
                   </p>
                   <div className="space-y-1">
                     {autoKeys.map(k => (

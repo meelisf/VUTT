@@ -236,7 +236,7 @@ const PersonEditPage: React.FC = () => {
           <div className="mb-5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 flex items-start gap-2">
             <span className="shrink-0 mt-0.5">✓</span>
             <span className="flex-1">
-              <strong>Rikastatud {enrichedWith.scheme === 'wikidata' ? 'Wikidatast' : enrichedWith.scheme === 'gnd' ? 'GND-st' : 'VIAF-ist'}</strong>
+              <strong>Rikastatud {enrichedWith.scheme === 'wikidata' ? 'Wikidatast' : enrichedWith.scheme === 'gnd' ? 'GND-st' : enrichedWith.scheme === 'album_academicum' ? 'Album Academicumist' : 'VIAF-ist'}</strong>
               {' '}({enrichedWith.id})
               {enrichedWith.fields.length > 0 && (
                 <span className="text-green-700"> — täideti: {enrichedWith.fields.join(', ')}</span>
@@ -533,6 +533,7 @@ const PersonEditPage: React.FC = () => {
               personId={id!}
               wikidataId={draft.wikidata_id}
               gndId={draft.gnd_id}
+              aaId={draft.aa_id}
               draft={draft}
               token={token}
               onChange={newDraft => setDraft(newDraft)}

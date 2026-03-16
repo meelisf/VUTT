@@ -32,7 +32,7 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
         remote = _fetch_wikidata(ext_id)
     elif scheme == "gnd":
         remote = _fetch_gnd(ext_id)
-    elif scheme == "aa":
+    elif scheme in ("aa", "album_academicum"):
         remote = _fetch_aa(ext_id)
     else:
         return {"auto_filled": {}, "conflicts": [], "error": f"Tundmatu skeem: {scheme}"}
