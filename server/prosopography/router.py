@@ -117,6 +117,30 @@ async def enrichment_preview(
 
 # ── Spetsiifilised /{person_id}/X ruutid enne generaalset /{person_id} ──
 
+@router.get("/{person_id:path}/enrich/preview")
+async def enrichment_preview_for_person(
+    person_id: str,
+    scheme: str,
+    user=Depends(_require_role("editor")),
+):
+    """
+    Tagastab rikastuse diff-i olemasoleva isiku suhtes.
+    Identifikaator loetakse isiku enda kirjest (identifiers[scheme]).
+    """
+    from .enrichment import fetch_and_diff
+    person = get_person(person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    ext_id = next(
+        (i["id"] for i in (person.get("identifiers") or []) if i.get("scheme") == scheme),
+        None,
+    )
+    if not ext_id:
+        raise HTTPException(status_code=400, detail=f"Isikul puudub {scheme} identifikaator")
+    diff = fetch_and_diff(scheme, ext_id, person)
+    return diff
+
+
 @router.post("/{person_id:path}/identifiers")
 async def prosopography_add_identifier(
     person_id: str,

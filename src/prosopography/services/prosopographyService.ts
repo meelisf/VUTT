@@ -97,6 +97,20 @@ export async function fetchEnrichmentPreview(scheme: string, id: string, token: 
   return resp.json();
 }
 
+export async function fetchPersonEnrichmentPreview(personId: string, scheme: string, token: string): Promise<{
+  auto_filled: Record<string, any>;
+  conflicts: { field: string; local: any; remote: any }[];
+  error?: string;
+}> {
+  const encoded = encodeURIComponent(personId);
+  const url = new URL(`${BASE}/${encoded}/enrich/preview`, window.location.origin);
+  url.searchParams.set('scheme', scheme);
+  url.searchParams.set('token', token);
+  const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
+  if (!resp.ok) throw new Error(`fetchPersonEnrichmentPreview: ${resp.status}`);
+  return resp.json();
+}
+
 export async function deletePersonImage(personId: string, token: string): Promise<void> {
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {

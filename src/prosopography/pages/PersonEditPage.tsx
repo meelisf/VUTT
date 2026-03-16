@@ -18,6 +18,7 @@ import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
 import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
+import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -520,6 +521,16 @@ const PersonEditPage: React.FC = () => {
               })}
             </div>
           </div>
+          {!isNew && (
+            <EnrichExistingSection
+              personId={id!}
+              wikidataId={draft.wikidata_id}
+              gndId={draft.gnd_id}
+              draft={draft}
+              token={token}
+              onChange={newDraft => setDraft(newDraft)}
+            />
+          )}
         </CollapsibleSection>
 
         {/* ── Ametid ja haridus (klapitav) ── */}
