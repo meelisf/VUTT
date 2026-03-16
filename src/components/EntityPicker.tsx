@@ -158,7 +158,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     const timer = setTimeout(async () => {
       const currentId = ++prosopoSearchIdRef.current;
       try {
-        const res = await listPersons({ q: inputValue });
+        const res = await listPersons({ q: inputValue }, token);
         if (prosopoSearchIdRef.current !== currentId) return;
         setProsopoResults(res.results.slice(0, 6));
       } catch {
