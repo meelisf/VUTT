@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.getcwd()
 STATE_DIR = os.path.join(PROJECT_ROOT, "state")
 PROSOPO_DIR = os.path.join(STATE_DIR, "prosopography")
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
@@ -46,7 +46,8 @@ def main():
 
     # Leia kõik _metadata.json failid
     meta_files = glob.glob(os.path.join(DATA_DIR, "*", "_metadata.json"))
-    print(f"Teosed: {len(meta_files)}\n")
+    print(f"Teosed: {len(meta_files)}")
+    print(f"Prosopo kaust: {PROSOPO_DIR}\n")
 
     changed_works = 0
     changed_creators = 0
