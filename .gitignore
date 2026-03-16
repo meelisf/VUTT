@@ -26,6 +26,7 @@ state_SAFE_BACKUP/
 meilisearch
 # State files with sensitive data (keep templates, not actual data)
 state/*.json
+state/prosopography/
 !state/*.example
 !state/*.json.example
 
