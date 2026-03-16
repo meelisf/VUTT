@@ -66,3 +66,27 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
   if (!resp.ok) throw new Error(`updatePerson: ${resp.status}`);
   return resp.json();
 }
+
+export async function uploadPersonImage(personId: string, file: File, token: string): Promise<{ image_url: string }> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': file.type },
+    body: file,
+    timeout: 30000,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.detail ?? `uploadPersonImage: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function deletePersonImage(personId: string, token: string): Promise<void> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
+    method: 'DELETE',
+    timeout: 10000,
+  });
+  if (!resp.ok) throw new Error(`deletePersonImage: ${resp.status}`);
+}

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Plus, X, ChevronDown, ChevronRight, Loader2, ImagePlus, Trash2 } from 'lucide-react';
 import Header from '../../components/Header';
-import { getPerson, createPerson, updatePerson } from '../services/prosopographyService';
+import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
 
@@ -390,6 +390,13 @@ const PersonEditPage: React.FC = () => {
   const [occupOpen, setOccupOpen] = useState(false);
   const [relOpen, setRelOpen] = useState(false);
 
+  // Profiilipilt
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageDragOver, setImageDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Ligipääsukontroll
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
 
@@ -400,10 +407,50 @@ const PersonEditPage: React.FC = () => {
       .then(data => {
         setOriginal(data);
         setDraft(recordToDraft(data));
+        setImageUrl(data.image_url ?? null);
       })
       .catch(() => setError('Isiku laadimine ebaõnnestus.'))
       .finally(() => setLoading(false));
   }, [id, token]);
+
+  const handleImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setImageError('Palun vali pildifail (JPEG, PNG, WebP).');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setImageError('Fail on liiga suur (max 10 MB).');
+      return;
+    }
+    if (isNew) {
+      setImageError('Salvesta isik esmalt, seejärel lisa pilt.');
+      return;
+    }
+    setImageUploading(true);
+    setImageError(null);
+    try {
+      const result = await uploadPersonImage(id!, file, token);
+      setImageUrl(result.image_url);
+    } catch (e: any) {
+      setImageError(e.message ?? 'Pildi üleslaadimine ebaõnnestus.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImageDelete = async () => {
+    if (!id || isNew) return;
+    setImageUploading(true);
+    setImageError(null);
+    try {
+      await deletePersonImage(id, token);
+      setImageUrl(null);
+    } catch {
+      setImageError('Pildi kustutamine ebaõnnestus.');
+    } finally {
+      setImageUploading(false);
+    }
+  };
 
   const set = (patch: Partial<FormDraft>) => setDraft(d => ({ ...d, ...patch }));
   const setBirth = (patch: Partial<DateDraft>) => setDraft(d => ({ ...d, birth: { ...d.birth, ...patch } }));
@@ -511,6 +558,78 @@ const PersonEditPage: React.FC = () => {
             {error}
           </div>
         )}
+
+        {/* ── Profiilipilt ── */}
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-3">Profiilipilt</label>
+          <div className="flex items-start gap-4">
+            {/* Eelvaade */}
+            <div
+              className={`relative w-24 h-24 rounded-lg border-2 flex items-center justify-center overflow-hidden shrink-0 transition-colors cursor-pointer
+                ${imageDragOver ? 'border-primary-400 bg-primary-50' : 'border-dashed border-gray-300 bg-gray-50 hover:border-primary-300 hover:bg-primary-50/40'}`}
+              onClick={() => !imageUploading && fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setImageDragOver(true); }}
+              onDragLeave={() => setImageDragOver(false)}
+              onDrop={e => {
+                e.preventDefault();
+                setImageDragOver(false);
+                const file = e.dataTransfer.files[0];
+                if (file) handleImageFile(file);
+              }}
+            >
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt="Profiilipilt"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <ImagePlus size={24} className="text-gray-300" />
+              )}
+              {imageUploading && (
+                <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                  <Loader2 size={18} className="animate-spin text-primary-500" />
+                </div>
+              )}
+            </div>
+
+            {/* Nupud ja selgitus */}
+            <div className="flex flex-col gap-2 min-w-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile(f); e.target.value = ''; }}
+              />
+              <button
+                type="button"
+                disabled={imageUploading || isNew}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+              >
+                <ImagePlus size={13} />
+                {imageUrl ? 'Vaheta pilt' : 'Lisa pilt'}
+              </button>
+              {imageUrl && (
+                <button
+                  type="button"
+                  disabled={imageUploading}
+                  onClick={handleImageDelete}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Eemalda pilt
+                </button>
+              )}
+              <p className="text-xs text-gray-400 leading-snug">
+                JPEG, PNG või WebP, max 10 MB.<br />
+                {isNew && <span className="text-amber-600">Salvesta isik esmalt.</span>}
+              </p>
+              {imageError && <p className="text-xs text-red-600">{imageError}</p>}
+            </div>
+          </div>
+        </div>
 
         {/* ── Identiteedi kaart ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5 space-y-5">

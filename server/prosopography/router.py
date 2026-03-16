@@ -4,6 +4,7 @@ Registreeritakse main.py-s: app.include_router(router, prefix="/prosopography")
 """
 import json
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import FileResponse
 
 from ..auth import require_token
 from .ops import (
@@ -15,6 +16,9 @@ from .ops import (
     add_identifier,
     apply_enrichment,
     rebuild_indices,
+    upload_person_image,
+    get_person_image_path,
+    delete_person_image,
 )
 
 router = APIRouter()
@@ -80,25 +84,6 @@ async def prosopography_list(
     return {"results": results, "total": len(results)}
 
 
-@router.get("/{person_id:path}")
-async def prosopography_get(
-    person_id: str,
-    user=Depends(_require_role("contributor")),
-):
-    """Tagastab ühe isiku täisandmed + seotud teosed pöördindeksist."""
-    person = get_person_with_works(person_id)
-    if person is None:
-        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
-    # Redirectid: merged_into
-    if person.get("merged_into"):
-        raise HTTPException(
-            status_code=301,
-            headers={"Location": f"/prosopography/{person['merged_into']}"},
-            detail=f"Kirje on liidendatud: {person['merged_into']}",
-        )
-    return person
-
-
 @router.post("")
 async def prosopography_create(
     request: Request,
@@ -110,36 +95,7 @@ async def prosopography_create(
     return person
 
 
-@router.put("/{person_id:path}")
-async def prosopography_update(
-    person_id: str,
-    request: Request,
-    user=Depends(_require_role("editor")),
-):
-    """
-    Uuendab isiku kirjet.
-    Nõuab updated_at välja — kui ei klapi → 409 Conflict.
-    """
-    data = await _get_json(request)
-    try:
-        person = update_person(person_id, data, username=user["username"])
-    except KeyError:
-        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
-    except ValueError as e:
-        msg = str(e)
-        if msg.startswith("conflict:"):
-            current_updated_at = msg.split(":", 1)[1]
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error": "conflict",
-                    "message": "Kirjet on vahepeal muudetud.",
-                    "current_updated_at": current_updated_at,
-                },
-            )
-        raise HTTPException(status_code=400, detail=msg)
-    return person
-
+# ── Spetsiifilised /{person_id}/X ruutid enne generaalset /{person_id} ──
 
 @router.post("/{person_id:path}/identifiers")
 async def prosopography_add_identifier(
@@ -181,6 +137,105 @@ async def prosopography_enrich(
         person = apply_enrichment(person_id, approved, username=user["username"])
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    return person
+
+
+@router.post("/{person_id:path}/image")
+async def prosopography_upload_image(
+    person_id: str,
+    request: Request,
+    user=Depends(_require_role("editor")),
+):
+    """
+    Laeb üles isiku profiilipildi (JPEG, PNG, WebP).
+    Body: raw binaar, Content-Type päis määrab formaadi.
+    """
+    content_type = request.headers.get("content-type", "").split(";")[0].strip()
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Fail puudub")
+    try:
+        person = upload_person_image(person_id, body, content_type, username=user["username"])
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"image_url": person["image_url"]}
+
+
+@router.get("/{person_id:path}/image")
+async def prosopography_get_image(person_id: str):
+    """Tagastab isiku pildi. Ei nõua autentimist (avalik)."""
+    path = get_person_image_path(person_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Pilt puudub")
+    media_type = "image/webp" if path.endswith(".webp") else "image/jpeg"
+    return FileResponse(path, media_type=media_type)
+
+
+@router.delete("/{person_id:path}/image")
+async def prosopography_delete_image(
+    person_id: str,
+    request: Request,
+    user=Depends(_require_role("editor")),
+):
+    """Kustutab isiku pildi."""
+    try:
+        delete_person_image(person_id, username=user["username"])
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    return {"status": "ok"}
+
+
+# ── Generaalsed /{person_id} ruutid — PEAVAD tulema PÄRAST spetsiifilisi ──
+
+@router.get("/{person_id:path}")
+async def prosopography_get(
+    person_id: str,
+    user=Depends(_require_role("contributor")),
+):
+    """Tagastab ühe isiku täisandmed + seotud teosed pöördindeksist."""
+    person = get_person_with_works(person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    # Redirectid: merged_into
+    if person.get("merged_into"):
+        raise HTTPException(
+            status_code=301,
+            headers={"Location": f"/prosopography/{person['merged_into']}"},
+            detail=f"Kirje on liidendatud: {person['merged_into']}",
+        )
+    return person
+
+
+@router.put("/{person_id:path}")
+async def prosopography_update(
+    person_id: str,
+    request: Request,
+    user=Depends(_require_role("editor")),
+):
+    """
+    Uuendab isiku kirjet.
+    Nõuab updated_at välja — kui ei klapi → 409 Conflict.
+    """
+    data = await _get_json(request)
+    try:
+        person = update_person(person_id, data, username=user["username"])
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except ValueError as e:
+        msg = str(e)
+        if msg.startswith("conflict:"):
+            current_updated_at = msg.split(":", 1)[1]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "conflict",
+                    "message": "Kirjet on vahepeal muudetud.",
+                    "current_updated_at": current_updated_at,
+                },
+            )
+        raise HTTPException(status_code=400, detail=msg)
     return person
 
 

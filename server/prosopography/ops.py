@@ -10,6 +10,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional
 
+PERSON_IMAGES_DIR_NAME = "images"  # PROSOPOGRAPHY_DIR / images /
+
 from ..config import (
     PROSOPOGRAPHY_DIR,
     PROSOPOGRAPHY_INDEX_FILE,
@@ -363,6 +365,96 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person, diff
+
+
+def _person_image_path(person_id: str, ext: str) -> str:
+    """Tagastab isiku pildi failitee."""
+    nanoid = person_id.removeprefix("vutt:P")
+    img_dir = os.path.join(PROSOPOGRAPHY_DIR, PERSON_IMAGES_DIR_NAME)
+    return os.path.join(img_dir, f"{nanoid}{ext}")
+
+
+def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
+    """
+    Salvestab isiku pildi ja uuendab image_url kirjes.
+    Toetab JPEG ja PNG. PNG teisendatakse JPEG-iks.
+    Tagastab uuendatud isiku kirje.
+    """
+    person = get_person(person_id)
+    if person is None:
+        raise KeyError(person_id)
+
+    if content_type not in ("image/jpeg", "image/png", "image/webp"):
+        raise ValueError("Toetatud formaadid: JPEG, PNG, WebP")
+
+    # Teisenda PNG → JPEG pillow abil
+    if content_type == "image/png":
+        try:
+            from PIL import Image
+            import io
+            img = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=90)
+            file_bytes = buf.getvalue()
+            content_type = "image/jpeg"
+        except Exception as e:
+            raise ValueError(f"PNG teisendamine ebaõnnestus: {e}")
+
+    ext = ".jpg" if content_type in ("image/jpeg",) else ".webp"
+
+    # Kustuta vana pilt (kui teise laiendiga)
+    for old_ext in (".jpg", ".webp"):
+        old_path = _person_image_path(person_id, old_ext)
+        if old_path.endswith(ext):
+            continue
+        if os.path.exists(old_path):
+            os.remove(old_path)
+
+    img_dir = os.path.join(PROSOPOGRAPHY_DIR, PERSON_IMAGES_DIR_NAME)
+    os.makedirs(img_dir, exist_ok=True)
+    img_path = _person_image_path(person_id, ext)
+    with open(img_path, "wb") as f:
+        f.write(file_bytes)
+
+    # image_url — suhteline URL frontendi jaoks
+    encoded_id = person_id.replace(":", "%3A")
+    person["image_url"] = f"/api/files/prosopography/{encoded_id}/image"
+
+    now = datetime.now(timezone.utc).isoformat()
+    person["updated_at"] = now
+    person["updated_by"] = username
+    _atomic_write(_id_to_path(person_id), person)
+    _update_index_entry(person)
+    return person
+
+
+def get_person_image_path(person_id: str) -> Optional[str]:
+    """Tagastab isiku pildi failitee kui olemas, muidu None."""
+    for ext in (".jpg", ".webp"):
+        path = _person_image_path(person_id, ext)
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def delete_person_image(person_id: str, username: str) -> dict:
+    """Kustutab isiku pildi ja tühjendab image_url. Tagastab uuendatud kirje."""
+    person = get_person(person_id)
+    if person is None:
+        raise KeyError(person_id)
+
+    for ext in (".jpg", ".webp"):
+        path = _person_image_path(person_id, ext)
+        if os.path.exists(path):
+            os.remove(path)
+
+    person["image_url"] = None
+    now = datetime.now(timezone.utc).isoformat()
+    person["updated_at"] = now
+    person["updated_by"] = username
+    _atomic_write(_id_to_path(person_id), person)
+    _update_index_entry(person)
+    return person
 
 
 def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
