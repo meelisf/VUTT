@@ -30,7 +30,7 @@ def load_prosopo_names() -> dict:
             with open(path, encoding="utf-8") as f:
                 card = json.load(f)
             pid = card.get("id")
-            name = card.get("name_label")
+            name = (card.get("name") or {}).get("label")
             if pid and name and pid.startswith("vutt:P"):
                 names[pid] = name
         except Exception:
