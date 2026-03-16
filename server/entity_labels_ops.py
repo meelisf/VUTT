@@ -78,13 +78,37 @@ def _collect_qcodes(metadata):
     return qcodes
 
 
-def enrich_entity_labels_async(metadata):
-    """Lisab puuduvad Q-koodid labels.json-i taustal.
+def _collect_qcodes_from_person(person):
+    """Kogub Q-koodid prosopograafia kirje väljadelt (seisus, amet, asutus jne)."""
+    qcodes = set()
 
-    Kutsutakse metaandmete salvestamisel. Leiab žanri/tüübi/märksõnade
-    Q-koodid mis puuduvad labels.json-ist ja pärib need Wikidatast.
-    """
-    qcodes = _collect_qcodes(metadata)
+    def add(val):
+        if isinstance(val, dict):
+            qid = val.get('id', '')
+            if qid and isinstance(qid, str) and qid.startswith('Q'):
+                qcodes.add(qid)
+
+    add(person.get('status'))
+    add(person.get('confession'))
+    add(person.get('origin_city'))
+    add(person.get('origin_region'))
+    for occ in person.get('occupations', []) or []:
+        if isinstance(occ, dict):
+            add({'id': occ.get('id')})
+            add({'id': occ.get('institution_id')})
+    for edu in person.get('education', []) or []:
+        if isinstance(edu, dict):
+            add({'id': edu.get('institution_id')})
+    return qcodes
+
+
+def enrich_entity_labels_from_person_async(person):
+    """Lisab prosopograafia kirje Q-koodid labels.json-i taustal."""
+    enrich_entity_labels_async_qcodes(_collect_qcodes_from_person(person))
+
+
+def enrich_entity_labels_async_qcodes(qcodes):
+    """Lisab puuduvad Q-koodid labels.json-i taustal (sisemine apifunktsioon)."""
     if not qcodes:
         return
 
@@ -110,3 +134,12 @@ def enrich_entity_labels_async(metadata):
     thread = threading.Thread(target=task)
     thread.daemon = True
     thread.start()
+
+
+def enrich_entity_labels_async(metadata):
+    """Lisab puuduvad Q-koodid labels.json-i taustal.
+
+    Kutsutakse metaandmete salvestamisel. Leiab žanri/tüübi/märksõnade
+    Q-koodid mis puuduvad labels.json-ist ja pärib need Wikidatast.
+    """
+    enrich_entity_labels_async_qcodes(_collect_qcodes(metadata))

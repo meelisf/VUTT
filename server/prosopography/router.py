@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
 
 from ..auth import require_token
+from ..entity_labels_ops import enrich_entity_labels_from_person_async
 from .ops import (
     get_person,
     get_person_with_works,
@@ -92,6 +93,7 @@ async def prosopography_create(
     """Loob uue vutt:P kirje."""
     data = await _get_json(request)
     person = create_person(data, username=user["username"])
+    enrich_entity_labels_from_person_async(person)
     return person
 
 
@@ -254,6 +256,7 @@ async def prosopography_update(
                 },
             )
         raise HTTPException(status_code=400, detail=msg)
+    enrich_entity_labels_from_person_async(person)
     return person
 
 
