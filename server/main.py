@@ -848,7 +848,12 @@ async def admin_upload_files(upload_id: str, request: Request, user=Depends(requ
         with open(tmp_path, 'wb') as f:
             async for chunk in request.stream():
                 f.write(chunk)
-        pages = add_image_page(upload_id, tmp_path, x_pg, x_total) if x_pg > 0 else save_and_transfer_to_ocr(upload_id, tmp_path)
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if x_pg > 0:
+            pages = await loop.run_in_executor(None, add_image_page, upload_id, tmp_path, x_pg, x_total)
+        else:
+            pages = await loop.run_in_executor(None, save_and_transfer_to_ocr, upload_id, tmp_path)
         return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
     except ValueError as e:
         if os.path.exists(tmp_path):
