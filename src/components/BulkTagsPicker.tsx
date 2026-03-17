@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tag, X, Plus, Loader2, Check, Replace, ListPlus } from 'lucide-react';
+import { Tag, X, Loader2, Check, Replace, ListPlus, User } from 'lucide-react';
 import EntityPicker from './EntityPicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { FILE_API_URL } from '../config';
@@ -161,35 +161,31 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
               </label>
               <div className="flex flex-wrap gap-2">
                 {selectedTags.map((tag, idx) => {
-                  const isLinked = tag.id && tag.source !== 'manual';
-                  const entityUrl = getEntityUrl(tag.id, tag.source);
+                  const isPerson = tag.entity_type === 'person' || tag.id?.startsWith('vutt:P');
+                  const entityUrl = !isPerson ? getEntityUrl(tag.id, tag.source) : null;
                   return (
                     <span
                       key={idx}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
-                        isLinked
+                        isPerson
+                          ? 'bg-primary-100 text-primary-800'
+                          : tag.id && tag.source !== 'manual'
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-700'
                       }`}
                     >
-                      <Tag size={14} className={isLinked ? 'text-green-600' : 'text-gray-400'} />
+                      {isPerson
+                        ? <User size={14} className="text-primary-600" />
+                        : <Tag size={14} className={tag.id && tag.source !== 'manual' ? 'text-green-600' : 'text-gray-400'} />
+                      }
                       {entityUrl ? (
-                        <a
-                          href={entityUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <a href={entityUrl} target="_blank" rel="noopener noreferrer" className="hover:underline" onClick={(e) => e.stopPropagation()}>
                           {getLabel(tag, lang)}
                         </a>
                       ) : (
                         <span>{getLabel(tag, lang)}</span>
                       )}
-                      <button
-                        onClick={() => handleRemoveTag(idx)}
-                        className="ml-1 p-0.5 rounded-full hover:bg-black/10 transition-colors"
-                      >
+                      <button onClick={() => handleRemoveTag(idx)} className="ml-1 p-0.5 rounded-full hover:bg-black/10 transition-colors">
                         <X size={14} />
                       </button>
                     </span>
@@ -200,7 +196,7 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
           )}
 
           {/* EntityPicker märksõnade lisamiseks */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
               {t('bulkAssign.addTag')}
             </label>
@@ -210,14 +206,29 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
                 <span className="text-sm">{t('common:labels.loading')}</span>
               </div>
             ) : (
-              <EntityPicker
-                type="topic"
-                value={null}
-                onChange={handleAddTag}
-                placeholder={t('bulkAssign.searchTag')}
-                lang={lang}
-                localSuggestions={suggestions}
-              />
+              <>
+                <div className="space-y-1">
+                  <span className="text-xs text-gray-400 flex items-center gap-1"><Tag size={11} /> Teema</span>
+                  <EntityPicker
+                    type="topic"
+                    value={null}
+                    onChange={handleAddTag}
+                    placeholder={t('bulkAssign.searchTag')}
+                    lang={lang}
+                    localSuggestions={suggestions}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-gray-400 flex items-center gap-1"><User size={11} /> Isik</span>
+                  <EntityPicker
+                    type="person"
+                    value={null}
+                    onChange={handleAddTag}
+                    placeholder="Otsi isikut…"
+                    lang={lang}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>

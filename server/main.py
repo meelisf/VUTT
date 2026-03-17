@@ -764,13 +764,21 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
         with metadata_lock:
             with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
             cur = meta.get('tags', [])
-            if data.get('mode') == 'add': 
+            if data.get('mode') == 'add':
                 for t in data.get('tags', []):
                     if t not in cur: cur.append(t)
             else: cur = data.get('tags', [])
             meta['tags'] = cur
             save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk tags: {work_id}")
             background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+        tags_for_ptw = [t for t in meta.get('tags', []) if isinstance(t, dict)]
+        background_tasks.add_task(
+            update_person_to_works,
+            meta.get("id"),
+            meta.get("creators", []),
+            tags_for_ptw,
+            meta.get("publisher_object"),
+        )
     invalidate_cache()
     return {"status": "success"}
 
