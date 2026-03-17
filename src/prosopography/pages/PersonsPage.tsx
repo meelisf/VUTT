@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
@@ -14,15 +14,21 @@ const PersonsPage: React.FC = () => {
   const { t } = useTranslation(['common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [allPersons, setAllPersons] = useState<ProsopoIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [query, setQuery] = useState('');
-  const [gender, setGender] = useState<GenderFilter>('');
-  const [source, setSource] = useState<SourceFilter>('');
-  const [level, setLevel] = useState<LevelFilter>('');
+  const query  = searchParams.get('q') ?? '';
+  const gender = (searchParams.get('gender') ?? '') as GenderFilter;
+  const source = (searchParams.get('source') ?? '') as SourceFilter;
+  const level  = (searchParams.get('level')  ?? '') as LevelFilter;
+
+  const setQuery  = (v: string)        => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('q', v) : n.delete('q'); return n; }, { replace: true });
+  const setGender = (v: GenderFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('gender', v) : n.delete('gender'); return n; }, { replace: true });
+  const setSource = (v: SourceFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('source', v) : n.delete('source'); return n; }, { replace: true });
+  const setLevel  = (v: LevelFilter)   => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('level', v) : n.delete('level'); return n; }, { replace: true });
 
   // Liitmise select-mood (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
