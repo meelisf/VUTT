@@ -1062,6 +1062,18 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     except Exception as e:
         logger.warning(f"import {upload_id}: git commit ebaõnnestus: {e}")
 
+    # Person-to-works indeks (uus teos võib juba sisaldada creators/tags isikuid)
+    try:
+        from .prosopography.ops import update_person_to_works
+        update_person_to_works(
+            work_id,
+            metadata.get("creators", []),
+            metadata.get("tags") or [],
+            metadata.get("publisher"),
+        )
+    except Exception as e:
+        logger.warning(f"import {upload_id}: person_to_works viga: {e}")
+
     # Meilisearch sünk (sünkroonne — ootame lõpuni, et teos oleks kohe kättesaadav)
     try:
         from .meilisearch_ops import sync_work_to_meilisearch

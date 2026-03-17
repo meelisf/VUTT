@@ -44,7 +44,7 @@ from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pa
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
-from .prosopography.ops import update_person_to_works
+from .metadata_ops import save_work_metadata, ALLOWED_METADATA_FIELDS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -622,51 +622,24 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
 
-# Lubatud metaandmete väljad (v2 standard)
-ALLOWED_METADATA_FIELDS = {
-    "title", "year", "year_display", "location", "publisher", "creators", "tags",
-    "collections", "type", "genre", "languages", "ester_id", "external_url",
-    "series", "relations"
-}
-
 @app.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
     path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
     meta_path = os.path.join(path, '_metadata.json')
-    
-    incoming_meta = data.get('metadata', {})
-    
-    with metadata_lock:
-        if os.path.exists(meta_path):
-            with open(meta_path, 'r', encoding='utf-8') as f: 
-                meta = json.load(f)
-        else:
-            meta = {}
-            
-        # Puhastame sissetulevad andmed - lubame ainult v2 välju
-        clean_meta = {k: v for k, v in incoming_meta.items() if k in ALLOWED_METADATA_FIELDS}
-        
-        # Säilitame olemasolevad väljad, mida sissetulevas sõnumis pole (nt id, slug)
-        # aga asendame sissetulevad v2 väljad
-        meta.update(clean_meta)
-        
-        # Eemaldame igaks juhuks vanad v1 väljad, kui need peaksid failis veel olema
-        for v1_field in ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]:
-            meta.pop(v1_field, None)
+    slug = os.path.basename(path)
 
-        save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
+    meta = save_work_metadata(
+        meta_path,
+        data.get('metadata', {}),
+        user['username'],
+        f"Meta: {slug}",
+        background_tasks=background_tasks,
+        sync_meili=True,
+        call_ptw=True,
+    )
     background_tasks.add_task(process_person_fields_metadata, meta)
     background_tasks.add_task(enrich_entity_labels_async, meta)
-    tags_for_ptw = meta.get("tags") or []
-    background_tasks.add_task(
-        update_person_to_works,
-        meta.get("id"),
-        meta.get("creators", []),
-        tags_for_ptw,
-        meta.get("publisher"),
-    )
-    sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))
     invalidate_cache()
     return {"status": "success"}
 
@@ -738,18 +711,25 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
         with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
-            current = meta.get('collections', [])
-            if mode == 'add':
-                if collection_id and collection_id not in current:
-                    current = current + [collection_id]
-            elif mode == 'remove':
-                current = [c for c in current if c != collection_id]
-            else:  # set
-                current = [collection_id] if collection_id else []
-            meta['collections'] = current
-            save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk collection: {work_id}")
-            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
+                cur_meta = json.load(f)
+        current = cur_meta.get('collections', [])
+        if mode == 'add':
+            if collection_id and collection_id not in current:
+                current = current + [collection_id]
+        elif mode == 'remove':
+            current = [c for c in current if c != collection_id]
+        else:  # set
+            current = [collection_id] if collection_id else []
+        save_work_metadata(
+            os.path.join(path, '_metadata.json'),
+            {'collections': current},
+            user['username'],
+            f"Bulk collection: {work_id}",
+            background_tasks=background_tasks,
+            sync_meili=False,
+            call_ptw=False,
+        )
     invalidate_cache()
     return {"status": "success"}
 
@@ -759,23 +739,24 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
     for work_id in data.get('work_ids', []):
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+        # Loe praegused tägid, arvuta uus nimekiri
         with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
-            cur = meta.get('tags', [])
-            if data.get('mode') == 'add':
-                for t in data.get('tags', []):
-                    if t not in cur: cur.append(t)
-            else: cur = data.get('tags', [])
-            meta['tags'] = cur
-            save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk tags: {work_id}")
-            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
-        tags_for_ptw = meta.get('tags') or []
-        background_tasks.add_task(
-            update_person_to_works,
-            meta.get("id"),
-            meta.get("creators", []),
-            tags_for_ptw,
-            meta.get("publisher"),
+            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
+                cur_meta = json.load(f)
+        cur = cur_meta.get('tags', [])
+        if data.get('mode') == 'add':
+            for t in data.get('tags', []):
+                if t not in cur: cur.append(t)
+        else:
+            cur = data.get('tags', [])
+        save_work_metadata(
+            os.path.join(path, '_metadata.json'),
+            {'tags': cur},
+            user['username'],
+            f"Bulk tags: {work_id}",
+            background_tasks=background_tasks,
+            sync_meili=False,
+            call_ptw=True,
         )
     invalidate_cache()
     return {"status": "success"}
@@ -797,18 +778,25 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
         with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f: meta = json.load(f)
-            current = meta.get('genre', [])
-            if not isinstance(current, list): current = [current] if current else []
-            if mode == 'add':
-                if genre and genre not in current: current.append(genre)
-            elif mode == 'remove':
-                current = [g for g in current if g != genre]
-            else:  # set
-                current = [genre] if genre else []
-            meta['genre'] = current
-            save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk genre: {work_id}")
-            background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
+                cur_meta = json.load(f)
+        current = cur_meta.get('genre', [])
+        if not isinstance(current, list): current = [current] if current else []
+        if mode == 'add':
+            if genre and genre not in current: current.append(genre)
+        elif mode == 'remove':
+            current = [g for g in current if g != genre]
+        else:  # set
+            current = [genre] if genre else []
+        save_work_metadata(
+            os.path.join(path, '_metadata.json'),
+            {'genre': current},
+            user['username'],
+            f"Bulk genre: {work_id}",
+            background_tasks=background_tasks,
+            sync_meili=False,
+            call_ptw=False,
+        )
     invalidate_cache()
     return {"status": "success"}
 
