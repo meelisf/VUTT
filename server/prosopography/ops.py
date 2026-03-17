@@ -376,6 +376,7 @@ def list_persons(
             e for e in results
             if q_lower in (e.get("label") or "").lower()
             or q_lower in (e.get("sort_name") or "").lower()
+            or any(q_lower in a.lower() for a in (e.get("aliases") or []))
         ]
     if gender:
         results = [e for e in results if e.get("gender") == gender]
