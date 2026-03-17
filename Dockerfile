@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server/ ./server/
 COPY scripts/ ./scripts/
 COPY state/ ./state/
+COPY reference_data/ ./reference_data/
 
 # Make sure scripts are executable
 RUN chmod +x server/*.py
