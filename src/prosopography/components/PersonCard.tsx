@@ -24,15 +24,29 @@ const getStatusDotStyle = (level: string) => {
   }
 };
 
+// Deterministlik taustavärv nime põhjal (igal isikul unikaalne muted toon)
+const nameToColor = (name: string): { bg: string; fg: string } => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return {
+    bg: `hsl(${hue}, 20%, 90%)`,
+    fg: `hsl(${hue}, 25%, 52%)`,
+  };
+};
+
 // Initsiaalid varufotona (nagu WorkCard thumbnail fallback)
 const Initials: React.FC<{ name: string }> = ({ name }) => {
   const parts = name.trim().split(/\s+/);
   const initials = parts.length >= 2
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : name.slice(0, 2).toUpperCase();
+  const { bg, fg } = nameToColor(name);
   return (
-    <div className="w-full h-full flex items-center justify-center bg-gray-100">
-      <span className="text-3xl font-bold text-gray-300 select-none">{initials}</span>
+    <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: bg }}>
+      <span className="text-3xl font-bold select-none" style={{ color: fg }}>{initials}</span>
     </div>
   );
 };
