@@ -5,6 +5,9 @@ import type { ProsopoIndexEntry } from '../types';
 
 interface PersonCardProps {
   person: ProsopoIndexEntry;
+  selectMode?: boolean;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
 }
 
 const ExternalBadge: React.FC<{ label: string }> = ({ label }) => (
@@ -34,8 +37,76 @@ const Initials: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-const PersonCard: React.FC<PersonCardProps> = ({ person }) => {
+// Kaardi sisu — kasutatakse nii Link- kui select-režiimis
+const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: string }> = ({
+  person, lifespan,
+}) => {
   const { t } = useTranslation(['common']);
+  return (
+  <>
+    {/* Foto ala — nagu WorkCard h-40 thumbnail */}
+    <div className="h-40 bg-gray-100 relative overflow-hidden">
+      {person.image_url ? (
+        <img
+          src={person.image_url}
+          alt={person.label}
+          loading="lazy"
+          className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+        />
+      ) : (
+        <Initials name={person.label} />
+      )}
+    </div>
+
+    <div className="p-4 flex-1 flex flex-col">
+      {/* Nimi */}
+      <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight">
+        {person.label}
+      </h3>
+
+      <div className="mt-1 space-y-1.5 flex-1">
+        {/* Eluaastad */}
+        <p className="text-sm text-gray-500">{lifespan}</p>
+
+        {/* Seisus */}
+        {person.status_label && (
+          <p className="text-sm text-gray-600">{person.status_label}</p>
+        )}
+
+        {/* Biograafia snippet */}
+        {person.biography_snippet && (
+          <p className="text-xs text-gray-500 italic leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-2 mt-2">
+            „{person.biography_snippet}…"
+          </p>
+        )}
+      </div>
+
+      {/* Alumine rida — nagu WorkCard */}
+      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1 flex-1 min-w-0">
+          {person.has_wikidata && <ExternalBadge label="WD" />}
+          {person.has_gnd     && <ExternalBadge label="GND" />}
+          {person.has_aa      && <ExternalBadge label="AA" />}
+        </div>
+
+        {person.work_count > 0 && (
+          <span className="text-xs text-gray-400 shrink-0">
+            {person.work_count} {t('prosopography.works', 'teost')}
+          </span>
+        )}
+
+        <span
+          className={`block w-2.5 h-2.5 rounded-full shrink-0 ${getStatusDotStyle(person.verification_level)}`}
+          title={person.verification_level}
+        />
+      </div>
+    </div>
+  </>
+  );
+};
+
+const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect }) => {
+  const { t } = useTranslation(['common']); // ainult lifespan fallback-teksti jaoks
 
   const lifespan = (() => {
     const b = person.birth_year ? `*${person.birth_year}` : '';
@@ -46,68 +117,40 @@ const PersonCard: React.FC<PersonCardProps> = ({ person }) => {
     return t('prosopography.unknownYears', 'eluaastad teadm.');
   })();
 
+  if (selectMode) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect?.(person.id)}
+        onKeyDown={e => e.key === 'Enter' && onSelect?.(person.id)}
+        className={`relative bg-white border-2 rounded-lg shadow-sm cursor-pointer transition-all duration-200 flex flex-col overflow-hidden ${
+          selected
+            ? 'border-primary-500 ring-2 ring-primary-200'
+            : 'border-gray-200 hover:border-primary-300'
+        }`}
+      >
+        {/* Checkbox overlay */}
+        <div className={`absolute top-2.5 right-2.5 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+          selected ? 'bg-primary-600 border-primary-600' : 'bg-white/80 border-gray-300'
+        }`}>
+          {selected && (
+            <svg viewBox="0 0 10 8" fill="none" className="w-3 h-3">
+              <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+        </div>
+        <CardInner person={person} lifespan={lifespan} />
+      </div>
+    );
+  }
+
   return (
     <Link
       to={`/persons/${person.id}`}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden"
     >
-      {/* Foto ala — nagu WorkCard h-40 thumbnail */}
-      <div className="h-40 bg-gray-100 relative overflow-hidden">
-        {person.image_url ? (
-          <img
-            src={person.image_url}
-            alt={person.label}
-            loading="lazy"
-            className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
-          />
-        ) : (
-          <Initials name={person.label} />
-        )}
-      </div>
-
-      <div className="p-4 flex-1 flex flex-col">
-        {/* Nimi */}
-        <h3 className="text-lg font-bold text-gray-900 mb-1 leading-tight">
-          {person.label}
-        </h3>
-
-        <div className="mt-1 space-y-1.5 flex-1">
-          {/* Eluaastad */}
-          <p className="text-sm text-gray-500">{lifespan}</p>
-
-          {/* Seisus */}
-          {person.status_label && (
-            <p className="text-sm text-gray-600">{person.status_label}</p>
-          )}
-
-          {/* Biograafia snippet */}
-          {person.biography_snippet && (
-            <p className="text-xs text-gray-500 italic leading-relaxed line-clamp-2 border-l-2 border-gray-200 pl-2 mt-2">
-              „{person.biography_snippet}…"
-            </p>
-          )}
-        </div>
-
-        {/* Alumine rida — nagu WorkCard */}
-        <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-1.5 min-w-0">
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            {person.has_wikidata && <ExternalBadge label="WD" />}
-            {person.has_gnd     && <ExternalBadge label="GND" />}
-            {person.has_aa      && <ExternalBadge label="AA" />}
-          </div>
-
-          {person.work_count > 0 && (
-            <span className="text-xs text-gray-400 shrink-0">
-              {person.work_count} {t('prosopography.works', 'teost')}
-            </span>
-          )}
-
-          <span
-            className={`block w-2.5 h-2.5 rounded-full shrink-0 ${getStatusDotStyle(person.verification_level)}`}
-            title={person.verification_level}
-          />
-        </div>
-      </div>
+      <CardInner person={person} lifespan={lifespan} />
     </Link>
   );
 };

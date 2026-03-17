@@ -3,6 +3,7 @@ Prosopograafia CRUD operatsioonid.
 Per-person failid state/prosopography/{nanoid}.json.
 Jagatud indeksid (prosopography_index.json, person_to_works.json) kaitstud threading.Lock()-iga.
 """
+import glob as _glob
 import json
 import os
 import re
@@ -641,3 +642,67 @@ def rebuild_indices():
 
     with _aliases_lock:
         _atomic_write(PERSON_ALIASES_FILE, aliases_data)
+
+
+# =========================================================
+# LIITMINE (MERGE)
+# =========================================================
+
+def merge_person(source_id: str, target_id: str, username: str) -> dict:
+    """
+    Liidab source kirje target kirjesse.
+      - source → record_status=tombstone, merged_into=target_id
+      - Relations teistes kaartides, mis viitasid source-le → uuendatakse target-ile
+      - rebuild_indices() sünkroniseerib kõik kolm read-mudelit
+    Tagastab uuendatud target kirje.
+    """
+    if source_id == target_id:
+        raise ValueError("Source ja target ei tohi olla samad.")
+
+    source = get_person(source_id)
+    target = get_person(target_id)
+
+    if source is None:
+        raise KeyError(source_id)
+    if target is None:
+        raise KeyError(target_id)
+    if source.get("record_status") == "tombstone":
+        raise ValueError(f"Source on juba tombstone: {source_id}")
+    if target.get("record_status") == "tombstone":
+        raise ValueError(f"Target on tombstone, ei saa liita: {target_id}")
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    # 1. Source → tombstone
+    source["record_status"] = "tombstone"
+    source["merged_into"] = target_id
+    source["updated_at"] = now
+    source["updated_by"] = username
+    _atomic_write(_id_to_path(source_id), source)
+
+    # 2. Relations teistes kaartides: source_id → target_id
+    for fpath in _glob.glob(os.path.join(PROSOPOGRAPHY_DIR, "*.json")):
+        if PERSON_IMAGES_DIR_NAME in fpath:
+            continue
+        try:
+            p = json.load(open(fpath, encoding="utf-8"))
+        except Exception:
+            continue
+        if p.get("id") in (source_id, target_id):
+            continue
+        if p.get("record_status") == "tombstone":
+            continue
+        changed = False
+        for rel in p.get("relations", []):
+            if rel.get("target_id") == source_id:
+                rel["target_id"] = target_id
+                changed = True
+        if changed:
+            p["updated_at"] = now
+            p["updated_by"] = username
+            _atomic_write(fpath, p)
+
+    # 3. Rebuild — eemaldab source indeksist, uuendab person_to_works
+    rebuild_indices()
+
+    return get_person(target_id)

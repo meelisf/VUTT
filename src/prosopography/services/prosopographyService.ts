@@ -119,3 +119,22 @@ export async function deletePersonImage(personId: string, token: string): Promis
   });
   if (!resp.ok) throw new Error(`deletePersonImage: ${resp.status}`);
 }
+
+export async function mergePersons(
+  sourceId: string,
+  targetId: string,
+  token: string,
+): Promise<{ id: string }> {
+  const encoded = encodeURIComponent(sourceId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/merge?token=${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_id: targetId }),
+    timeout: 30000,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || `mergePersons: ${resp.status}`);
+  }
+  return resp.json();
+}

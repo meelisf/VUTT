@@ -16,6 +16,7 @@ from .ops import (
     list_persons,
     add_identifier,
     apply_enrichment,
+    merge_person,
     rebuild_indices,
     upload_person_image,
     get_person_image_path,
@@ -232,6 +233,30 @@ async def prosopography_delete_image(
 
 
 # ── Generaalsed /{person_id} ruutid — PEAVAD tulema PÄRAST spetsiifilisi ──
+
+@router.post("/{source_id:path}/merge")
+async def prosopography_merge(
+    source_id: str,
+    request: Request,
+    user=Depends(_require_role("admin")),
+):
+    """
+    Liidab source kirje target kirjesse (admin only).
+    Body: { "target_id": "vutt:Pxxx" }
+    Source → tombstone. Tagastab uuendatud target kirje.
+    """
+    data = await _get_json(request)
+    target_id = (data.get("target_id") or "").strip()
+    if not target_id:
+        raise HTTPException(status_code=400, detail="target_id on kohustuslik.")
+    try:
+        result = merge_person(source_id, target_id, username=user["username"])
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
+
 
 @router.get("/{person_id:path}")
 async def prosopography_get(
