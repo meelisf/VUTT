@@ -760,9 +760,12 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
             p["updated_by"] = username
             _atomic_write(fpath, p)
 
-    # 3. Teoste _metadata.json: creator source_id → target_id
+    # 3. Teoste _metadata.json: creator source_id → target_id + git + Meilisearch
     target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
     from ..config import BASE_DIR as _DATA_DIR
+    from ..git_ops import save_with_git
+    from ..meilisearch_ops import sync_work_to_meilisearch_async
+    changed_files = []
     if os.path.exists(_DATA_DIR):
         for work_entry in os.scandir(_DATA_DIR):
             if not work_entry.is_dir():
@@ -779,9 +782,26 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
                 if isinstance(c, dict) and c.get("id") == source_id:
                     c["id"] = target_id
                     c["label"] = target_label
+                    c["name"] = target_label
+                    changed = True
+            # tags_object: source_id → target_id
+            for tag in meta.get("tags_object", []):
+                if isinstance(tag, dict) and tag.get("id") == source_id:
+                    tag["id"] = target_id
+                    tag["label"] = target_label
                     changed = True
             if changed:
-                _atomic_write(meta_path, meta)
+                changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
+
+    if changed_files:
+        commit_msg = f"Prosopo liitmine: {source_id} → {target_id} ({target_label})"
+        primary_path, primary_content = changed_files[0]
+        additional = changed_files[1:] if len(changed_files) > 1 else None
+        save_with_git(primary_path, primary_content, username,
+                      message=commit_msg, additional_files=additional)
+        for meta_path, _ in changed_files:
+            dir_name = os.path.basename(os.path.dirname(meta_path))
+            sync_work_to_meilisearch_async(dir_name)
 
     # 4. Rebuild — eemaldab source indeksist, uuendab person_to_works
     rebuild_indices()
