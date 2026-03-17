@@ -24,9 +24,8 @@ data/
 *_backup/
 state_SAFE_BACKUP/
 meilisearch
-# State files with sensitive data (keep templates, not actual data)
-state/*.json
-state/prosopography/
+# State kataloog tervikuna (andmed ei kuulu reposse, ainult näidised)
+state/
 !state/*.example
 !state/*.json.example
 
