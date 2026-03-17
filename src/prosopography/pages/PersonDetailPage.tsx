@@ -173,6 +173,7 @@ const PersonDetailPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; collections: string[] }>>({});
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -267,7 +268,6 @@ const PersonDetailPage: React.FC = () => {
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
 
   const uniqueRoles = [...new Set(works.map(w => w.role))];
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
 
   return (
