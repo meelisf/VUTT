@@ -140,7 +140,8 @@
       "gratulator": "Õnnitleja",
       "dedicator": "Pühendaja",
       "editor": "Toimetaja",
-      "aui": "Eessõna/järelsõna autor"
+      "aui": "Eessõna/järelsõna autor",
+      "subject": "Tema kohta"
     },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",

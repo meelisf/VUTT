@@ -140,7 +140,8 @@
       "gratulator": "Gratulator",
       "dedicator": "Dedicator",
       "editor": "Editor",
-      "aui": "Author of preface/afterword"
+      "aui": "Author of preface/afterword",
+      "subject": "Subject of"
     },
     "addCreator": "Add person",
     "removeCreator": "Remove",

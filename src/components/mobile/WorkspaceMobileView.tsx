@@ -311,21 +311,23 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                         <div className="space-y-1.5">
                           {work.creators.map((creator, idx) => {
                             const roleLabel = t(`metadata.roles.${creator.role}`, { defaultValue: creator.role });
+                            const hasProsopoId = creator.id?.startsWith('vutt:P');
                             return (
                               <div key={idx} className="flex items-center gap-2 flex-wrap">
                                 <div className="flex items-center gap-1.5 text-gray-900">
                                   <User size={13} className="text-gray-400 shrink-0" />
-                                  <span className="font-medium">{creator.name}</span>
+                                  {hasProsopoId ? (
+                                    <Link
+                                      to={`/persons/${creator.id}`}
+                                      className="font-medium hover:text-primary-600 transition-colors"
+                                    >
+                                      {creator.name}
+                                    </Link>
+                                  ) : (
+                                    <span className="font-medium">{creator.name}</span>
+                                  )}
                                 </div>
-                                {creator.id?.startsWith('vutt:P') ? (
-                                  <Link
-                                    to={`/persons/${creator.id}`}
-                                    className="text-gray-400 hover:text-primary-600 p-0.5"
-                                    title={creator.id}
-                                  >
-                                    <IdCard size={11} />
-                                  </Link>
-                                ) : getEntityUrl(creator.id, creator.source) ? (
+                                {!hasProsopoId && getEntityUrl(creator.id, creator.source) ? (
                                   <a
                                     href={getEntityUrl(creator.id, creator.source)!}
                                     target="_blank"

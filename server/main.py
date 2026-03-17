@@ -659,11 +659,13 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
     background_tasks.add_task(process_person_fields_metadata, meta)
     background_tasks.add_task(enrich_entity_labels_async, meta)
+    # tags_object eelistus, tagasiühilduvus: tags massiiv (võib sisaldada LinkedEntity dikteid)
+    tags_for_ptw = meta.get("tags_object") or [t for t in meta.get("tags", []) if isinstance(t, dict)]
     background_tasks.add_task(
         update_person_to_works,
         meta.get("id"),
         meta.get("creators", []),
-        meta.get("tags_object", []),
+        tags_for_ptw,
         meta.get("publisher_object"),
     )
     sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))

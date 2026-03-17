@@ -85,27 +85,30 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           {displayCreators.map((creator, idx) => {
             const isRespondens = creator.role === 'respondens';
             const paramName = isRespondens ? 'respondens' : 'author';
-            
+            const hasProsopoId = creator.id?.startsWith('vutt:P');
+
             return (
               <span key={idx} className="flex items-center gap-1">
-                <Link
-                  to={`/?${paramName}=${encodeURIComponent(creator.name)}`}
-                  onClick={(e) => e.stopPropagation()}
-                  className="hover:text-primary-600 transition-colors truncate max-w-[150px] hover:underline"
-                  title={t('workCard.searchAuthor', 'Otsi autorit')}
-                >
-                  {creator.name}
-                </Link>
-                {creator.id?.startsWith('vutt:P') ? (
+                {hasProsopoId ? (
                   <Link
                     to={`/persons/${creator.id}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
-                    title={creator.id}
+                    className="hover:text-primary-600 transition-colors truncate max-w-[150px] hover:underline"
+                    title={t('workCard.viewPerson', 'Vaata isiku lehte')}
                   >
-                    <IdCard size={10} />
+                    {creator.name}
                   </Link>
-                ) : getEntityUrl(creator.id, creator.source) ? (
+                ) : (
+                  <Link
+                    to={`/?${paramName}=${encodeURIComponent(creator.name)}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="hover:text-primary-600 transition-colors truncate max-w-[150px] hover:underline"
+                    title={t('workCard.searchAuthor', 'Otsi autorit')}
+                  >
+                    {creator.name}
+                  </Link>
+                )}
+                {!hasProsopoId && getEntityUrl(creator.id, creator.source) ? (
                   <a
                     href={getEntityUrl(creator.id, creator.source)!}
                     target="_blank"
@@ -171,8 +174,37 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             <div className="flex flex-wrap items-center gap-1">
               {displayTags.slice(0, 3).map((tag, idx) => {
                 const label = getLabel(tag, lang);
-                // Kontrolli, kas on Wikidata ID
                 const tagId = typeof tag !== 'string' ? tag.id : null;
+                const entityType = typeof tag !== 'string' ? (tag as any).entity_type : null;
+                const isPersonTag = entityType === 'person' || tagId?.startsWith('vutt:P');
+                const prosopoId = tagId?.startsWith('vutt:P') ? tagId : null;
+
+                if (isPersonTag) {
+                  return prosopoId ? (
+                    <Link
+                      key={idx}
+                      to={`/persons/${prosopoId}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 bg-primary-600/80 hover:bg-primary-500/90 rounded backdrop-blur-sm transition-colors px-1.5 py-0.5"
+                      title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                    >
+                      <User size={8} className="text-white/80" />
+                      <span className="text-[10px] font-medium text-white">{label}</span>
+                    </Link>
+                  ) : (
+                    <a
+                      key={idx}
+                      href={getEntityUrl(tagId, typeof tag !== 'string' ? tag.source : undefined) ?? '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 bg-primary-600/80 hover:bg-primary-500/90 rounded backdrop-blur-sm transition-colors px-1.5 py-0.5"
+                    >
+                      <User size={8} className="text-white/80" />
+                      <span className="text-[10px] font-medium text-white">{label}</span>
+                    </a>
+                  );
+                }
 
                 return (
                   <div key={idx} className="flex items-center bg-slate-800/60 hover:bg-primary-600/80 rounded backdrop-blur-sm transition-colors overflow-hidden">
@@ -180,7 +212,6 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        // Kasuta Q-koodi kui olemas (keelest sõltumatu), muidu labeli
                         const tagUrlValue = tagId || label;
                         navigate(`/?tags=${encodeURIComponent(tagUrlValue)}`);
                       }}

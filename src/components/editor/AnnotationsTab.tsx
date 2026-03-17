@@ -191,33 +191,30 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   {work.creators.map((creator, idx) => {
                     const roleLabel = t(`metadata.roles.${creator.role}`, { defaultValue: creator.role });
                     const dashboardParam = creator.role === 'respondens' ? 'respondens' : 'author';
-                    
+                    const hasProsopoId = creator.id?.startsWith('vutt:P');
+
                     return (
                       <div key={idx} className="flex items-center gap-2 group">
                         <div className="flex items-center gap-1.5 text-gray-900">
-                          <button
-                            onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
-                            className="text-gray-400 hover:text-primary-600 transition-colors"
-                            title={t('workCard.searchAuthor', 'Filtreeri dashboardil')}
-                          >
-                            <User size={14} />
-                          </button>
-                          <span 
-                            className="font-medium select-text cursor-pointer hover:text-primary-600 transition-colors"
-                            onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
-                          >
-                            {creator.name}
-                          </span>
+                          <User size={14} className="text-gray-400 shrink-0" />
+                          {hasProsopoId ? (
+                            <Link
+                              to={`/persons/${creator.id}`}
+                              className="font-medium hover:text-primary-600 transition-colors"
+                              title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                            >
+                              {creator.name}
+                            </Link>
+                          ) : (
+                            <span
+                              className="font-medium select-text cursor-pointer hover:text-primary-600 transition-colors"
+                              onClick={() => navigate(`/?${dashboardParam}=${encodeURIComponent(creator.name)}`)}
+                            >
+                              {creator.name}
+                            </span>
+                          )}
                         </div>
-                        {creator.id?.startsWith('vutt:P') ? (
-                          <Link
-                            to={`/persons/${creator.id}`}
-                            className="text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
-                            title={creator.id}
-                          >
-                            <IdCard size={12} />
-                          </Link>
-                        ) : getEntityUrl(creator.id, creator.source) ? (
+                        {!hasProsopoId && getEntityUrl(creator.id, creator.source) ? (
                           <a
                             href={getEntityUrl(creator.id, creator.source)!}
                             target="_blank"
@@ -441,6 +438,34 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {
               const label = getLabel(tag, lang);
               const tagId = typeof tag !== 'string' ? (tag as any).id : null;
+              const entityType = typeof tag !== 'string' ? (tag as any).entity_type : null;
+              const isPersonTag = entityType === 'person' || tagId?.startsWith('vutt:P');
+              const prosopoId = tagId?.startsWith('vutt:P') ? tagId : null;
+              if (isPersonTag) {
+                return prosopoId ? (
+                  <Link
+                    key={idx}
+                    to={`/persons/${prosopoId}`}
+                    className="inline-flex items-center gap-1.5 bg-primary-50 border border-primary-200 rounded-full px-2.5 py-1 text-sm text-primary-700 hover:bg-primary-100 transition-colors"
+                    title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                  >
+                    <User size={12} className="opacity-60" />
+                    {label}
+                  </Link>
+                ) : (
+                  <a
+                    key={idx}
+                    href={getEntityUrl(tagId, (tag as any).source) ?? '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 bg-primary-50 border border-primary-200 rounded-full px-2.5 py-1 text-sm text-primary-700 hover:bg-primary-100 transition-colors"
+                  >
+                    <User size={12} className="opacity-60" />
+                    {label}
+                    <ExternalLink size={10} className="opacity-50" />
+                  </a>
+                );
+              }
               return (
                 <div key={idx} className="inline-flex items-center bg-green-50 border border-green-100 rounded-full overflow-hidden">
                   <button
