@@ -652,7 +652,8 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     """
     Liidab source kirje target kirjesse.
       - source → record_status=tombstone, merged_into=target_id
-      - Relations teistes kaartides, mis viitasid source-le → uuendatakse target-ile
+      - Relations teistes prosopo kaartides source_id → target_id
+      - Teoste _metadata.json creator kirjetes source_id → target_id
       - rebuild_indices() sünkroniseerib kõik kolm read-mudelit
     Tagastab uuendatud target kirje.
     """
@@ -702,7 +703,30 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
             p["updated_by"] = username
             _atomic_write(fpath, p)
 
-    # 3. Rebuild — eemaldab source indeksist, uuendab person_to_works
+    # 3. Teoste _metadata.json: creator source_id → target_id
+    target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
+    from ..config import BASE_DIR as _DATA_DIR
+    if os.path.exists(_DATA_DIR):
+        for work_entry in os.scandir(_DATA_DIR):
+            if not work_entry.is_dir():
+                continue
+            meta_path = os.path.join(work_entry.path, "_metadata.json")
+            if not os.path.exists(meta_path):
+                continue
+            try:
+                meta = json.load(open(meta_path, encoding="utf-8"))
+            except Exception:
+                continue
+            changed = False
+            for c in meta.get("creators", []):
+                if isinstance(c, dict) and c.get("id") == source_id:
+                    c["id"] = target_id
+                    c["label"] = target_label
+                    changed = True
+            if changed:
+                _atomic_write(meta_path, meta)
+
+    # 4. Rebuild — eemaldab source indeksist, uuendab person_to_works
     rebuild_indices()
 
     return get_person(target_id)
