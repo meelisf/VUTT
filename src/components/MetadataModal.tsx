@@ -595,6 +595,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                   localSuggestions={suggestions.printers}
                   peopleRegister={peopleRegister}
                   showPersonToggle
+                  defaultPersonSearch
                   token={authToken}
                 />
               </div>

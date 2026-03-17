@@ -397,6 +397,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               localSuggestions={suggestions.printers}
               peopleRegister={peopleRegister}
               showPersonToggle
+              defaultPersonSearch
               token={authToken}
             />
           </div>
