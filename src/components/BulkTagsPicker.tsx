@@ -206,32 +206,16 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
                 <span className="text-sm">{t('common:labels.loading')}</span>
               </div>
             ) : (
-              <>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-400 flex items-center gap-1"><Tag size={11} /> Teema</span>
-                  <EntityPicker
-                    type="topic"
-                    value={null}
-                    onChange={handleAddTag}
-                    placeholder={t('bulkAssign.searchTag')}
-                    lang={lang}
-                    localSuggestions={suggestions}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <span className="text-xs text-gray-400 flex items-center gap-1"><User size={11} /> Isik</span>
-                  <EntityPicker
-                    type="person"
-                    value={null}
-                    onChange={handleAddTag}
-                    placeholder="Otsi isikut…"
-                    lang={lang}
-                    showPersonToggle
-                    defaultPersonSearch
-                    token={localStorage.getItem('vutt_token') ?? undefined}
-                  />
-                </div>
-              </>
+              <EntityPicker
+                type="topic"
+                value={null}
+                onChange={handleAddTag}
+                placeholder={t('bulkAssign.searchTag')}
+                lang={lang}
+                localSuggestions={suggestions}
+                showPersonToggle
+                token={localStorage.getItem('vutt_token') ?? undefined}
+              />
             )}
           </div>
         </div>
