@@ -267,11 +267,17 @@ def _make_date_obj(year) -> dict:
     }
 
 
-def _propagate_name_to_works(person_id: str, new_label: str) -> None:
-    """Uuendab teoste _metadata.json creator labelid kui nimi muutus."""
+def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> None:
+    """
+    Uuendab teoste _metadata.json creator labelid kui nimi muutus.
+    Kõik muutused pannakse ühte git commit'i.
+    """
     from ..config import BASE_DIR as _DATA_DIR
+    from ..git_ops import save_with_git
     if not os.path.exists(_DATA_DIR):
         return
+
+    changed_files = []  # [(meta_path, json_content_str), ...]
     for work_entry in os.scandir(_DATA_DIR):
         if not work_entry.is_dir():
             continue
@@ -288,7 +294,16 @@ def _propagate_name_to_works(person_id: str, new_label: str) -> None:
                 c["label"] = new_label
                 changed = True
         if changed:
-            _atomic_write(meta_path, meta)
+            changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
+
+    if not changed_files:
+        return
+
+    commit_msg = f"Prosopo nime uuendus ({person_id}): {new_label}"
+    primary_path, primary_content = changed_files[0]
+    additional = changed_files[1:] if len(changed_files) > 1 else None
+    save_with_git(primary_path, primary_content, username,
+                  message=commit_msg, additional_files=additional)
 
 
 def update_person(person_id: str, data: dict, username: str) -> dict:
@@ -324,7 +339,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
     new_label = (person.get("name") or {}).get("label") or ""
     if new_label and new_label != old_label:
-        _propagate_name_to_works(person_id, new_label)
+        _propagate_name_to_works(person_id, new_label, username)
 
     return person
 
