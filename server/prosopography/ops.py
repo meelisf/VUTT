@@ -335,7 +335,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     # Säilitame süsteemiväljad, ülekirjutame kasutaja andmed
     for key in ("id", "created_at", "created_by", "schema_version",
-                "import_batch_ids", "merged_into"):
+                "import_batch_ids", "merged_into", "auth_token", "token"):
         data.pop(key, None)
 
     person.update(data)
