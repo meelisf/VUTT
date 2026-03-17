@@ -49,6 +49,15 @@ async def _get_user(request: Request, min_role: str = "contributor"):
     return user
 
 
+async def _optional_user(request: Request):
+    """Loeb tokeni kui on olemas, aga ei nõua autentimist."""
+    token = request.query_params.get("token")
+    if not token:
+        return None
+    user, error = require_token({"auth_token": token}, min_role="contributor")
+    return None if error else user
+
+
 def _require_role(role: str):
     async def dep(request: Request):
         return await _get_user(request, min_role=role)
@@ -73,7 +82,7 @@ async def prosopography_list(
     status_id: str = None,
     source: str = None,
     verification_level: str = None,
-    user=Depends(_require_role("contributor")),
+    user=Depends(_optional_user),
 ):
     """Tagastab isikute nimekirja prosopography_index.json-st."""
     results = list_persons(
@@ -262,7 +271,7 @@ async def prosopography_merge(
 @router.get("/{person_id:path}")
 async def prosopography_get(
     person_id: str,
-    user=Depends(_require_role("contributor")),
+    user=Depends(_optional_user),
 ):
     """Tagastab ühe isiku täisandmed + seotud teosed pöördindeksist."""
     person = get_person_with_works(person_id)

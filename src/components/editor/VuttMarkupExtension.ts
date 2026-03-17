@@ -220,7 +220,7 @@ export const vuttMarkupField = StateField.define<MarkupSets>({
   },
   provide: f => [
     EditorView.decorations.from(f, val => val.deco),
-    EditorView.atomicRanges.from(f, val => val.atomic),
+    EditorView.atomicRanges.from(f, val => () => val.atomic),
   ],
 });
 

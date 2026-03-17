@@ -28,9 +28,10 @@ export async function listPersons(params?: {
   return resp.json();
 }
 
-export async function getPerson(personId: string, token: string): Promise<ProsopoRecord> {
+export async function getPerson(personId: string, token?: string): Promise<ProsopoRecord> {
   const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}?token=${token}`, { timeout: 10000 });
+  const url = token ? `${BASE}/${encoded}?token=${token}` : `${BASE}/${encoded}`;
+  const resp = await fetchWithTimeout(url, { timeout: 10000 });
   if (!resp.ok) throw new Error(`getPerson: ${resp.status}`);
   return resp.json();
 }
@@ -68,7 +69,7 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
   return resp.json();
 }
 
-export async function uploadPersonImage(personId: string, file: File, token: string): Promise<{ image_url: string }> {
+export async function uploadPersonImage(personId: string, file: File, token: string): Promise<{ image_url: string; updated_at?: string }> {
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
     method: 'POST',

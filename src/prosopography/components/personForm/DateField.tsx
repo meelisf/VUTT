@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { DateDraft } from './types';
+import EntityPicker from '../../../components/EntityPicker';
 
 const DateField: React.FC<{
   label: string;
   value: DateDraft;
   onChange: (v: DateDraft) => void;
-}> = ({ label, value, onChange }) => {
+  lang?: string;
+}> = ({ label, value, onChange, lang = 'et' }) => {
   const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
 
   const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || value.place);
@@ -22,7 +24,7 @@ const DateField: React.FC<{
     if (value.month) parts.push(value.day ? `${value.day}.${value.month}` : `kuu ${value.month}`);
     if (value.calendar === 'julian') parts.push('jul.');
     if (value.calendar === 'gregorian') parts.push('greg.');
-    if (value.place) parts.push(value.place);
+    if (value.place?.label) parts.push(value.place.label);
     return parts.join(' ');
   })();
 
@@ -102,12 +104,13 @@ const DateField: React.FC<{
               <option value="julian">Juliuse kalender</option>
               <option value="gregorian">Gregoriuse kalender</option>
             </select>
-            <input
-              type="text"
+            <EntityPicker
+              label=""
               placeholder="koht"
+              type="place"
               value={value.place}
-              onChange={e => set({ place: e.target.value })}
-              className={`w-28 ${inputCls}`}
+              onChange={v => set({ place: v })}
+              lang={lang}
             />
           </div>
         </div>

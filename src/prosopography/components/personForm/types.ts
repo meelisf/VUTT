@@ -7,7 +7,7 @@ export interface DateDraft {
   circa: boolean;
   bound: '' | 'before' | 'after';
   calendar: '' | 'julian' | 'gregorian';
-  place: string;
+  place: LinkedEntity | null;
 }
 
 export interface OccupationDraft {
@@ -34,8 +34,6 @@ export interface FormDraft {
   gender: '' | 'M' | 'F';
   birth: DateDraft;
   death: DateDraft;
-  origin_city: LinkedEntity | null;
-  origin_region: LinkedEntity | null;
   floruit_from: string;
   floruit_to: string;
   status: LinkedEntity | null;
@@ -60,10 +58,8 @@ export const emptyDraft = (): FormDraft => ({
   name_qualifier: '',
   name_aliases: [],
   gender: '',
-  birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
-  death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: '' },
-  origin_city: null,
-  origin_region: null,
+  birth: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },
+  death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },
   floruit_from: '',
   floruit_to: '',
   status: null,

@@ -526,7 +526,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                             ...creator,
                             name: val?.label || '',
                             id: val?.id || null,
-                            source: val?.source || 'manual'
+                            source: (val?.source === 'local' ? 'manual' : val?.source) || 'manual'
                           };
                           setMetaForm({ ...metaForm, creators: newCreators });
                         }}

@@ -419,7 +419,7 @@ const PersonDetailPage: React.FC = () => {
                 const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
                 return (
                   <Link
-                    key={work_id}
+                    key={`${work_id}-${role}`}
                     to={`/work/${work_id}/1`}
                     className={`flex items-center justify-between py-2 -mx-1 px-1 rounded group transition-colors ${inCollection ? `${colorClasses?.bg} hover:opacity-90` : 'hover:bg-gray-50'}`}
                   >

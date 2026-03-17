@@ -30,7 +30,8 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   }
   // Sünnikoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['birth.place']?.label && !draft.birth.place) {
-    patch.birth = { ...(patch.birth ?? draft.birth), place: autoFilled['birth.place'].label };
+    const bp = autoFilled['birth.place'];
+    patch.birth = { ...(patch.birth ?? draft.birth), place: { label: bp.label, id: bp.id ?? null, labels: null, source: 'wikidata' as const } };
   }
 
   // Surmaaeg
@@ -48,7 +49,8 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   }
   // Surmakoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['death.place']?.label && !draft.death.place) {
-    patch.death = { ...(patch.death ?? draft.death), place: autoFilled['death.place'].label };
+    const dp = autoFilled['death.place'];
+    patch.death = { ...(patch.death ?? draft.death), place: { label: dp.label, id: dp.id ?? null, labels: null, source: 'wikidata' as const } };
   }
 
   // Konfessioon
@@ -99,7 +101,13 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       circa: p.birth?.is_circa ?? false,
       bound: p.birth?.bound ?? '',
       calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
-      place: p.birth?.place?.label ?? '',
+      place: p.birth?.place?.label
+        ? { label: p.birth.place.label, id: p.birth.place.id ?? null, labels: null, source: 'wikidata' as const }
+        : p.origin?.city
+        ? { label: p.origin.city, id: p.origin.city_id ?? null, labels: p.origin.city_labels ?? null, source: 'wikidata' as const }
+        : p.origin?.region
+        ? { label: p.origin.region, id: p.origin.region_id ?? null, labels: p.origin.region_labels ?? null, source: 'wikidata' as const }
+        : null,
     },
     death: {
       year: p.death?.date ? p.death.date.slice(0, 4) : '',
@@ -108,10 +116,10 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       circa: p.death?.is_circa ?? false,
       bound: p.death?.bound ?? '',
       calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
-      place: p.death?.place?.label ?? '',
+      place: p.death?.place?.label
+        ? { label: p.death.place.label, id: p.death.place.id ?? null, labels: null, source: 'wikidata' as const }
+        : null,
     },
-    origin_city: p.origin?.city ? { label: p.origin.city, id: p.origin.city_id ?? null, labels: p.origin.city_labels ?? null, source: 'wikidata' } : null,
-    origin_region: p.origin?.region ? { label: p.origin.region, id: p.origin.region_id ?? null, labels: p.origin.region_labels ?? null, source: 'wikidata' } : null,
     floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
     floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
     status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
@@ -154,7 +162,7 @@ export function buildDatePayload(d: DateDraft): any {
     precision,
     calendar: d.calendar || null,
     is_circa: d.circa,
-    place: d.place ? { id: null, label: d.place } : null,
+    place: d.place?.label ? { id: d.place.id ?? null, label: d.place.label } : null,
     notes: null,
   };
 }
@@ -170,8 +178,11 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
   ];
   const identifiers = schemes
     .map(({ scheme, key }) => {
-      const val = (draft[key] as string).trim();
+      let val = (draft[key] as string).trim();
       if (!val) return null;
+      // Eemalda skeemi eesliide (nt "gnd:12345" → "12345", "AA:123" → "123")
+      if (scheme === 'gnd') val = val.replace(/^gnd:/i, '');
+      if (scheme === 'album_academicum') val = val.replace(/^aa:/i, '');
       const found = existing.find(i => i.scheme === scheme);
       return { scheme, id: val, checked_at: found?.checked_at ?? null };
     })
@@ -200,12 +211,12 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
       ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,
     origin: {
-      city: draft.origin_city?.label ?? null,
-      city_id: draft.origin_city?.id ?? null,
-      city_labels: draft.origin_city?.labels ?? null,
-      region: draft.origin_region?.label ?? null,
-      region_id: draft.origin_region?.id ?? null,
-      region_labels: draft.origin_region?.labels ?? null,
+      city: draft.birth?.place?.label ?? null,
+      city_id: draft.birth?.place?.id ?? null,
+      city_labels: draft.birth?.place?.labels ?? null,
+      region: original?.origin?.region ?? null,
+      region_id: original?.origin?.region_id ?? null,
+      region_labels: original?.origin?.region_labels ?? null,
       geonames_id: original?.origin?.geonames_id ?? null,
       coordinates: original?.origin?.coordinates ?? null,
     },

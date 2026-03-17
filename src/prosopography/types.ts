@@ -72,6 +72,7 @@ export interface ProsopoRecord {
   education: any[];
   burial: any | null;
   relations: { name: string; type?: string; target_id?: string | null }[];
+  tags?: any[];
   sources: { text: string; note?: string | null }[];
   biography: string | null;
   notes: string | null;

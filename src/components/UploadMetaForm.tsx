@@ -298,7 +298,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
                           ...creator,
                           name: val?.label || '',
                           id: val?.id || null,
-                          source: val?.source || 'manual',
+                          source: (val?.source === 'local' ? 'manual' : val?.source) || 'manual',
                         };
                         setForm({ ...form, creators: next });
                       }}

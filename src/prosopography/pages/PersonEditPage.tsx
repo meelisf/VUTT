@@ -62,6 +62,11 @@ const PersonEditPage: React.FC = () => {
 
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
 
+  // Suuna mitteeditor kasutaja tagasi
+  useEffect(() => {
+    if (!canEdit) navigate(isNew ? '/persons' : `/persons/${encodeURIComponent(id!)}`, { replace: true });
+  }, [canEdit]);
+
   useEffect(() => {
     fetchWithTimeout(`${FILE_API_URL}/entity-labels`)
       .then(r => r.json())
@@ -432,25 +437,6 @@ const PersonEditPage: React.FC = () => {
             />
           </div>
 
-          {/* Päritolu */}
-          <div className="grid grid-cols-2 gap-3">
-            <EntityPicker
-              label={`${t('prosopography.origin', 'Päritolu')} — linn`}
-              placeholder="Tallinn, Riia…"
-              type="place"
-              value={draft.origin_city}
-              onChange={v => set({ origin_city: v })}
-              lang="et"
-            />
-            <EntityPicker
-              label={`${t('prosopography.origin', 'Päritolu')} — piirkond`}
-              placeholder="Liivimaa, Saksimaa…"
-              type="place"
-              value={draft.origin_region}
-              onChange={v => set({ origin_region: v })}
-              lang="et"
-            />
-          </div>
 
           {/* Floruit */}
           <div>
