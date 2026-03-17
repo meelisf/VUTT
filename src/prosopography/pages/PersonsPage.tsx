@@ -155,8 +155,19 @@ const PersonsPage: React.FC = () => {
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder={t('prosopography.searchPlaceholder', 'Otsi nime järgi…')}
-                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400"
+                className={`w-full pl-9 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 ${query ? 'pr-8' : 'pr-4'}`}
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                  aria-label="Tühjenda otsing"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
 
             {/* Admin: liitmise select-mood */}
