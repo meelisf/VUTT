@@ -266,6 +266,10 @@ const PersonDetailPage: React.FC = () => {
   });
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
 
+  const uniqueRoles = [...new Set(works.map(w => w.role))];
+  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -407,10 +411,29 @@ const PersonDetailPage: React.FC = () => {
             <CardHeader
               icon={<BookOpen size={18} />}
               title={t('prosopography.relatedWorks', 'Seotud teosed')}
-              count={works.length}
+              count={selectedRole ? filteredWorks.length : works.length}
             />
+            {uniqueRoles.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  onClick={() => setSelectedRole(null)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${!selectedRole ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                >
+                  {t('prosopography.allRoles', 'Kõik')} ({works.length})
+                </button>
+                {uniqueRoles.map(role => (
+                  <button
+                    key={role}
+                    onClick={() => setSelectedRole(role === selectedRole ? null : role)}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedRole === role ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
+                  >
+                    {t(`workspace:metadata.roles.${role}`, { defaultValue: role })} ({works.filter(w => w.role === role).length})
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="space-y-1">
-              {works.map(({ work_id, role }) => {
+              {filteredWorks.map(({ work_id, role }) => {
                 const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
