@@ -56,7 +56,7 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
         last = parts[-1]
         local_val = local_obj.get(last) if isinstance(local_obj, dict) else None
 
-        if local_val is None or local_val == "":
+        if local_val is None or local_val == "" or local_val == []:
             auto_filled[field_path] = remote_val
         elif local_val != remote_val:
             conflicts.append({"field": field_path, "local": local_val, "remote": remote_val})
@@ -103,6 +103,7 @@ def _fetch_wikidata(qid: str) -> Optional[dict]:
     sparql1 = f"""
 SELECT ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
        ?birthPlaceLabel ?birthPlaceQ ?deathPlaceLabel ?deathPlaceQ
+       (GROUP_CONCAT(DISTINCT ?altLabel; SEPARATOR="||") AS ?altLabels)
 WHERE {{
   OPTIONAL {{ wd:{qid} wdt:P21 ?gender. }}
   OPTIONAL {{ wd:{qid} p:P569/psv:P569 ?birthNode.
@@ -113,9 +114,11 @@ WHERE {{
               ?deathNode wikibase:timePrecision ?deathPrec. }}
   OPTIONAL {{ wd:{qid} wdt:P19 ?birthPlace. BIND(?birthPlace AS ?birthPlaceQ) }}
   OPTIONAL {{ wd:{qid} wdt:P20 ?deathPlace. BIND(?deathPlace AS ?deathPlaceQ) }}
+  OPTIONAL {{ wd:{qid} skos:altLabel ?altLabel. FILTER(LANG(?altLabel) IN ("et","en","de","la")) }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "et,en". }}
 }}
-LIMIT 1
+GROUP BY ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
+         ?birthPlaceLabel ?birthPlaceQ ?deathPlaceLabel ?deathPlaceQ
 """
 
     # ── Päring 2: mitme väärtusega omadused ──────────────────────────────────
@@ -179,6 +182,14 @@ LIMIT 10
         dp_q = (b1.get("deathPlaceQ") or {}).get("value", "").split("/")[-1]
         if dp_label:
             result["death.place"] = {"id": dp_q if dp_q.startswith("Q") else None, "label": dp_label}
+    except Exception:
+        pass
+
+    try:
+        alt_raw = (b1.get("altLabels") or {}).get("value", "")
+        aliases = [a.strip() for a in alt_raw.split("||") if a.strip()]
+        if aliases:
+            result["name.aliases"] = aliases
     except Exception:
         pass
 
