@@ -97,7 +97,12 @@ export async function fetchEnrichmentPreview(scheme: string, id: string, token: 
   return resp.json();
 }
 
-export async function fetchPersonEnrichmentPreview(personId: string, scheme: string, token: string): Promise<{
+export async function fetchPersonEnrichmentPreview(
+  personId: string,
+  scheme: string,
+  token: string,
+  extId?: string,
+): Promise<{
   auto_filled: Record<string, any>;
   conflicts: { field: string; local: any; remote: any }[];
   error?: string;
@@ -106,6 +111,7 @@ export async function fetchPersonEnrichmentPreview(personId: string, scheme: str
   const url = new URL(`${BASE}/${encoded}/enrich/preview`, window.location.origin);
   url.searchParams.set('scheme', scheme);
   url.searchParams.set('token', token);
+  if (extId) url.searchParams.set('id', extId);
   const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
   if (!resp.ok) throw new Error(`fetchPersonEnrichmentPreview: ${resp.status}`);
   return resp.json();

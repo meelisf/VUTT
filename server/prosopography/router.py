@@ -122,17 +122,18 @@ async def enrichment_preview(
 async def enrichment_preview_for_person(
     person_id: str,
     scheme: str,
+    id: str = None,
     user=Depends(_require_role("editor")),
 ):
     """
     Tagastab rikastuse diff-i olemasoleva isiku suhtes.
-    Identifikaator loetakse isiku enda kirjest (identifiers[scheme]).
+    Identifikaator: ?id= query param (draft väärtus) või salvestatud kirjest.
     """
     from .enrichment import fetch_and_diff
     person = get_person(person_id)
     if person is None:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
-    ext_id = next(
+    ext_id = id or next(
         (i["id"] for i in (person.get("identifiers") or []) if i.get("scheme") == scheme),
         None,
     )

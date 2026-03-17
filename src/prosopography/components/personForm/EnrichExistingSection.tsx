@@ -57,20 +57,20 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
   const [appliedFields, setAppliedFields] = useState<string[] | null>(null);
 
   const schemes = [
-    ...(wikidataId ? [{ scheme: 'wikidata', label: 'Wikidata', icon: <Globe size={12} className="text-blue-500" /> }] : []),
-    ...(gndId ? [{ scheme: 'gnd', label: 'GND', icon: <BookMarked size={12} className="text-orange-500" /> }] : []),
-    ...(aaId ? [{ scheme: 'album_academicum', label: 'Album Academicum', icon: <BookOpen size={12} className="text-purple-500" /> }] : []),
+    ...(wikidataId ? [{ scheme: 'wikidata', label: 'Wikidata', extId: wikidataId, icon: <Globe size={12} className="text-blue-500" /> }] : []),
+    ...(gndId ? [{ scheme: 'gnd', label: 'GND', extId: gndId, icon: <BookMarked size={12} className="text-orange-500" /> }] : []),
+    ...(aaId ? [{ scheme: 'album_academicum', label: 'Album Academicum', extId: aaId, icon: <BookOpen size={12} className="text-purple-500" /> }] : []),
   ];
 
   if (schemes.length === 0) return null;
 
-  const handleFetch = async (scheme: string) => {
+  const handleFetch = async (scheme: string, extId: string) => {
     setLoading(scheme);
     setDiff(null);
     setError(null);
     setActiveScheme(scheme);
     try {
-      const result = await fetchPersonEnrichmentPreview(personId, scheme, token);
+      const result = await fetchPersonEnrichmentPreview(personId, scheme, token, extId);
       if (result.error) { setError(result.error); return; }
       setDiff(result);
     } catch {
@@ -110,12 +110,12 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
         <div className="px-3 py-3 space-y-3 bg-white border-t border-blue-100">
           {/* Allikasd nupud */}
           <div className="flex gap-2">
-            {schemes.map(({ scheme, label, icon }) => (
+            {schemes.map(({ scheme, label, extId, icon }) => (
               <button
                 key={scheme}
                 type="button"
                 disabled={!!loading}
-                onClick={() => handleFetch(scheme)}
+                onClick={() => handleFetch(scheme, extId)}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition-colors"
               >
                 {loading === scheme ? <Loader2 size={11} className="animate-spin" /> : icon}
