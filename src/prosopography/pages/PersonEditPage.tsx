@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
@@ -23,6 +23,8 @@ import EnrichExistingSection from '../components/personForm/EnrichExistingSectio
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backTo: string = (location.state as any)?.from ?? '/persons';
   const [searchParams] = useSearchParams();
   const { t } = useTranslation(['common']);
   const { user, authToken } = useUser();
@@ -177,7 +179,7 @@ const PersonEditPage: React.FC = () => {
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-gray-600 text-sm mb-4">Muutmiseks pead olema sisse logitud toimetajana.</p>
-          <button onClick={() => navigate(-1 as any)} className="text-primary-600 hover:underline text-sm">
+          <button onClick={() => navigate(backTo)} className="text-primary-600 hover:underline text-sm">
             ← Tagasi isikute nimekirja
           </button>
         </div>

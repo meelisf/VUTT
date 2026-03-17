@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
@@ -149,6 +149,8 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
 const PersonDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const backTo: string = (location.state as any)?.from ?? '/persons';
   const { t } = useTranslation(['common']);
   const { user, authToken } = useUser();
 
@@ -224,7 +226,7 @@ const PersonDetailPage: React.FC = () => {
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-red-600 text-sm mb-4">{error ?? t('prosopography.notFound', 'Isikut ei leitud.')}</p>
-          <button onClick={() => navigate(-1 as any)} className="text-primary-600 hover:underline text-sm">
+          <button onClick={() => navigate(backTo)} className="text-primary-600 hover:underline text-sm">
             ← {t('prosopography.backToList', 'Tagasi isikute nimekirja')}
           </button>
         </div>
@@ -246,7 +248,7 @@ const PersonDetailPage: React.FC = () => {
 
         {/* Tagasi */}
         <button
-          onClick={() => navigate(-1 as any)}
+          onClick={() => navigate(backTo)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
         >
           <ArrowLeft size={15} />
@@ -261,6 +263,7 @@ const PersonDetailPage: React.FC = () => {
             action={canEdit ? (
               <Link
                 to={`/persons/${id}/edit`}
+                state={{ from: backTo }}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
               >
                 <Edit3 size={12} />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { ProsopoIndexEntry } from '../types';
 
@@ -122,6 +122,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: string }> = ({
 
 const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect }) => {
   const { t } = useTranslation(['common']); // ainult lifespan fallback-teksti jaoks
+  const location = useLocation();
 
   const lifespan = (() => {
     const b = person.birth_year ? `*${person.birth_year}` : '';
@@ -163,6 +164,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
   return (
     <Link
       to={`/persons/${person.id}`}
+      state={{ from: location.pathname + location.search }}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden"
     >
       <CardInner person={person} lifespan={lifespan} />
