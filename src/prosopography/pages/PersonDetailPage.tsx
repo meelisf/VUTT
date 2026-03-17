@@ -108,7 +108,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   if (person.education?.length > 0) {
     rows.push({
       label: t('prosopography.education', 'Haridus'),
-      value: person.education.map((e: any) => e.institution ?? getLabel(e) || e).join(', '),
+      value: person.education.map((e: any) => (e.institution ?? getLabel(e)) || e).join(', '),
     });
   }
   if (person.relations?.length > 0) {
