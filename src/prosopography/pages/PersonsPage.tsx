@@ -42,13 +42,16 @@ const PersonsPage: React.FC = () => {
     setCollectionLoading(true);
     index.search('', {
       filter: [`collections_hierarchy = "${selectedCollection}"`],
-      attributesToRetrieve: ['creators'],
+      attributesToRetrieve: ['creators', 'tags_object'],
       limit: 5000,
     }).then(res => {
       const ids = new Set<string>();
       for (const hit of res.hits) {
         for (const c of (hit.creators ?? [])) {
           if (typeof c.id === 'string' && c.id.startsWith('vutt:P')) ids.add(c.id);
+        }
+        for (const tag of (hit.tags_object ?? [])) {
+          if (typeof tag.id === 'string' && tag.id.startsWith('vutt:P')) ids.add(tag.id);
         }
       }
       setCollectionPersonIds(ids);
