@@ -9,6 +9,8 @@ import {
 import Header from '../../components/Header';
 import { getPerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
+import { getCollectionColorClasses } from '../../services/collectionService';
 import { index } from '../../services/meiliService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
 
@@ -165,11 +167,12 @@ const PersonDetailPage: React.FC = () => {
   const { t } = useTranslation(['common']);
   const getLabel = useEntityLabel();
   const { user, authToken } = useUser();
+  const { selectedCollection, collections } = useCollection();
 
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null }>>({});
+  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; collections: string[] }>>({});
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -186,13 +189,13 @@ const PersonDetailPage: React.FC = () => {
           const ids = workIds.map((wid: string) => `"${wid}"`).join(', ');
           index.search('', {
             filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
-            attributesToRetrieve: ['work_id', 'title', 'year'],
+            attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy'],
             limit: workIds.length,
           }).then(res => {
             const map: Record<string, { title: string; year: number | null }> = {};
             for (const hit of res.hits) {
               if (hit.work_id && !map[hit.work_id]) {
-                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null };
+                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, collections: hit.collections_hierarchy ?? [] };
               }
             }
             setWorkTitles(map);
@@ -401,24 +404,26 @@ const PersonDetailPage: React.FC = () => {
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
                 const year = meta?.year;
+                const inCollection = selectedCollection && meta?.collections?.includes(selectedCollection);
+                const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
                 return (
                   <Link
                     key={work_id}
                     to={`/work/${work_id}/1`}
-                    className="flex items-center justify-between py-2 -mx-1 px-1 rounded hover:bg-gray-50 group transition-colors"
+                    className={`flex items-center justify-between py-2 -mx-1 px-1 rounded group transition-colors ${inCollection ? `${colorClasses?.bg} hover:opacity-90` : 'hover:bg-gray-50'}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <BookOpen size={13} className="text-gray-300 shrink-0" />
-                      <span className="text-sm text-gray-700 group-hover:text-primary-700 transition-colors truncate">
+                      <BookOpen size={13} className={`shrink-0 ${inCollection ? colorClasses?.text : 'text-gray-300'}`} />
+                      <span className={`text-sm transition-colors truncate ${inCollection ? colorClasses?.text : 'text-gray-700 group-hover:text-primary-700'}`}>
                         {title}
                       </span>
-                      {year && <span className="text-xs text-gray-400 shrink-0">{year}</span>}
+                      {year && <span className={`text-xs shrink-0 ${inCollection ? colorClasses?.text + ' opacity-70' : 'text-gray-400'}`}>{year}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
-                      <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${inCollection ? `${colorClasses?.text} bg-white/50` : 'text-gray-400 bg-gray-100'}`}>
                         {roleLabel}
                       </span>
-                      <ExternalLink size={12} className="text-gray-300 group-hover:text-primary-500 transition-colors" />
+                      <ExternalLink size={12} className={`transition-colors ${inCollection ? colorClasses?.text : 'text-gray-300 group-hover:text-primary-500'}`} />
                     </div>
                   </Link>
                 );
