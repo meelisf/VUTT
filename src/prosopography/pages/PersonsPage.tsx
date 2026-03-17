@@ -8,6 +8,8 @@ import MergePersonsModal from '../components/MergePersonsModal';
 import PersonAdvancedFilters, { type GenderFilter, type SourceFilter, type LevelFilter } from '../components/PersonAdvancedFilters';
 import { listPersons, mergePersons } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
+import { index } from '../../services/meiliService';
 import type { ProsopoIndexEntry } from '../types';
 
 const PersonsPage: React.FC = () => {
@@ -29,6 +31,29 @@ const PersonsPage: React.FC = () => {
   const setGender = (v: GenderFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('gender', v) : n.delete('gender'); return n; }, { replace: true });
   const setSource = (v: SourceFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('source', v) : n.delete('source'); return n; }, { replace: true });
   const setLevel  = (v: LevelFilter)   => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('level', v) : n.delete('level'); return n; }, { replace: true });
+
+  // Kollektsiooni filter — headerist
+  const { selectedCollection } = useCollection();
+  const [collectionPersonIds, setCollectionPersonIds] = useState<Set<string> | null>(null);
+  const [collectionLoading, setCollectionLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedCollection) { setCollectionPersonIds(null); return; }
+    setCollectionLoading(true);
+    index.search('', {
+      filter: [`collections_hierarchy = "${selectedCollection}"`],
+      attributesToRetrieve: ['creators'],
+      limit: 5000,
+    }).then(res => {
+      const ids = new Set<string>();
+      for (const hit of res.hits) {
+        for (const c of (hit.creators ?? [])) {
+          if (typeof c.id === 'string' && c.id.startsWith('vutt:P')) ids.add(c.id);
+        }
+      }
+      setCollectionPersonIds(ids);
+    }).finally(() => setCollectionLoading(false));
+  }, [selectedCollection]);
 
   // Liitmise select-mood (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
@@ -55,6 +80,7 @@ const PersonsPage: React.FC = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return allPersons.filter(p => {
+      if (collectionPersonIds && !collectionPersonIds.has(p.id)) return false;
       if (q && !(p.label.toLowerCase().includes(q) || p.sort_name.toLowerCase().includes(q) || (p.aliases || []).some(a => a.toLowerCase().includes(q)))) return false;
       if (gender === 'M' && p.gender !== 'M') return false;
       if (gender === 'F' && p.gender !== 'F') return false;
@@ -64,7 +90,7 @@ const PersonsPage: React.FC = () => {
       if (level && p.verification_level !== level) return false;
       return true;
     });
-  }, [allPersons, query, gender, source, level]);
+  }, [allPersons, query, gender, source, level, collectionPersonIds]);
 
   const hasActiveFilters = !!(gender || source || level);
 
@@ -196,7 +222,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Arv */}
-        {!loading && !error && (
+        {!(loading || collectionLoading) && !error && (
           <p className="text-xs text-gray-400 mb-4">
             {filtered.length === allPersons.length
               ? t('prosopography.totalCount', '{{count}} isikut', { count: allPersons.length })
@@ -205,7 +231,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Sisu */}
-        {loading && (
+        {(loading || collectionLoading) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
@@ -217,7 +243,7 @@ const PersonsPage: React.FC = () => {
           <div className="text-center py-16 text-red-600 text-sm">{error}</div>
         )}
 
-        {!loading && !error && filtered.length === 0 && (
+        {!(loading || collectionLoading) && !error && filtered.length === 0 && (
           <div className="text-center py-16 text-gray-400 text-sm">
             {query || hasActiveFilters
               ? t('prosopography.noResults', 'Otsingule vastavaid isikuid ei leitud.')
@@ -225,7 +251,7 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {!loading && !error && filtered.length > 0 && (
+        {!(loading || collectionLoading) && !error && filtered.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filtered.map(person => (
               <PersonCard
