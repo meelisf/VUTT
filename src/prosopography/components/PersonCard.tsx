@@ -52,7 +52,7 @@ const Initials: React.FC<{ name: string }> = ({ name }) => {
 };
 
 // Kaardi sisu — kasutatakse nii Link- kui select-režiimis
-const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: string }> = ({
+const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode }> = ({
   person, lifespan,
 }) => {
   const { t } = useTranslation(['common']);
@@ -124,13 +124,14 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
   const { t } = useTranslation(['common']); // ainult lifespan fallback-teksti jaoks
   const location = useLocation();
 
-  const lifespan = (() => {
-    const b = person.birth_year ? `*${person.birth_year}` : '';
-    const d = person.death_year ? `†${person.death_year}` : '';
-    if (b && d) return `${b}  ${d}`;
+  const lifespanNode = (() => {
+    const sym = 'text-primary-500';
+    const b = person.birth_year ? <><span className={sym}>*</span>{person.birth_year}</> : null;
+    const d = person.death_year ? <><span className={sym}>†</span>{person.death_year}</> : null;
+    if (b && d) return <>{b}{'  '}{d}</>;
     if (b) return b;
     if (d) return d;
-    return t('prosopography.unknownYears', 'eluaastad teadm.');
+    return <span>{t('prosopography.unknownYears', 'eluaastad teadm.')}</span>;
   })();
 
   if (selectMode) {
@@ -156,7 +157,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
             </svg>
           )}
         </div>
-        <CardInner person={person} lifespan={lifespan} />
+        <CardInner person={person} lifespan={lifespanNode} />
       </div>
     );
   }
@@ -167,7 +168,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
       state={{ from: location.pathname + location.search }}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden"
     >
-      <CardInner person={person} lifespan={lifespan} />
+      <CardInner person={person} lifespan={lifespanNode} />
     </Link>
   );
 };

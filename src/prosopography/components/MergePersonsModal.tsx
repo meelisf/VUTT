@@ -15,10 +15,14 @@ interface MergePersonsModalProps {
 const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highlight: 'source' | 'target' }> = ({
   person, label, highlight,
 }) => {
-  const lifespan = (() => {
-    const b = person.birth_year ? `*${person.birth_year}` : '';
-    const d = person.death_year ? `†${person.death_year}` : '';
-    return [b, d].filter(Boolean).join('  ') || '—';
+  const lifespanNode = (() => {
+    const sym = 'text-primary-500';
+    const b = person.birth_year ? <><span className={sym}>*</span>{person.birth_year}</> : null;
+    const d = person.death_year ? <><span className={sym}>†</span>{person.death_year}</> : null;
+    if (b && d) return <>{b}{'  '}{d}</>;
+    if (b) return b;
+    if (d) return d;
+    return <>—</>;
   })();
 
   const isSource = highlight === 'source';
@@ -28,7 +32,7 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
         {label}
       </p>
       <h3 className="text-base font-bold text-gray-900 leading-tight mb-1">{person.label}</h3>
-      <p className="text-sm text-gray-500 mb-2">{lifespan}</p>
+      <p className="text-sm text-gray-500 mb-2">{lifespanNode}</p>
       {person.status_label && <p className="text-xs text-gray-600">{person.status_label}</p>}
       <div className="mt-3 flex items-center gap-1 flex-wrap">
         {person.has_wikidata && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">WD</span>}
