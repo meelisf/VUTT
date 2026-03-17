@@ -224,7 +224,7 @@ const PersonDetailPage: React.FC = () => {
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-red-600 text-sm mb-4">{error ?? t('prosopography.notFound', 'Isikut ei leitud.')}</p>
-          <button onClick={() => navigate('/persons')} className="text-primary-600 hover:underline text-sm">
+          <button onClick={() => navigate(-1 as any)} className="text-primary-600 hover:underline text-sm">
             ← {t('prosopography.backToList', 'Tagasi isikute nimekirja')}
           </button>
         </div>
@@ -246,7 +246,7 @@ const PersonDetailPage: React.FC = () => {
 
         {/* Tagasi */}
         <button
-          onClick={() => navigate('/persons')}
+          onClick={() => navigate(-1 as any)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
         >
           <ArrowLeft size={15} />

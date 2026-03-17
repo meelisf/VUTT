@@ -177,7 +177,7 @@ const PersonEditPage: React.FC = () => {
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <p className="text-gray-600 text-sm mb-4">Muutmiseks pead olema sisse logitud toimetajana.</p>
-          <button onClick={() => navigate('/persons')} className="text-primary-600 hover:underline text-sm">
+          <button onClick={() => navigate(-1 as any)} className="text-primary-600 hover:underline text-sm">
             ← Tagasi isikute nimekirja
           </button>
         </div>
