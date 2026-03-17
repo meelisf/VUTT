@@ -252,7 +252,11 @@ const PersonDetailPage: React.FC = () => {
   // ── Andmed ───────────────────────────────────────────────
   const birth = formatHistoricalDate(person.birth, '*');
   const death = formatHistoricalDate(person.death, '†');
-  const works: { work_id: string; role: string }[] = person.works ?? [];
+  const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort((a, b) => {
+    const ya = workTitles[a.work_id]?.year ?? 9999;
+    const yb = workTitles[b.work_id]?.year ?? 9999;
+    return ya - yb;
+  });
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
 
   return (
