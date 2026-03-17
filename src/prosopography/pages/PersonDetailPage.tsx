@@ -61,8 +61,19 @@ const CardHeader: React.FC<{
 // =========================================================
 // Struktureeritud info (klapitav kaart)
 // =========================================================
+// Tagastab LinkedEntity labeli aktiivses keeles
+const useEntityLabel = () => {
+  const { i18n } = useTranslation();
+  return (entity: any): string => {
+    if (!entity) return '';
+    const lang = i18n.language?.slice(0, 2) ?? 'et';
+    return entity.labels?.[lang] || entity.labels?.en || entity.label || '';
+  };
+};
+
 const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => {
   const { t } = useTranslation(['common']);
+  const getLabel = useEntityLabel();
   const [open, setOpen] = useState(false);
 
   const rows: { label: string; value: React.ReactNode }[] = [];
@@ -82,7 +93,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
     });
   }
   if (person.confession) {
-    rows.push({ label: t('prosopography.confession', 'Konfessioon'), value: person.confession.label });
+    rows.push({ label: t('prosopography.confession', 'Konfessioon'), value: getLabel(person.confession) });
   }
   const aliases = person.name.aliases ?? [];
   if (aliases.length > 0) {
@@ -91,13 +102,13 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   if (person.occupations?.length > 0) {
     rows.push({
       label: t('prosopography.occupations', 'Ametid'),
-      value: person.occupations.map((o: any) => o.label ?? o).join(', '),
+      value: person.occupations.map((o: any) => getLabel(o) || o).join(', '),
     });
   }
   if (person.education?.length > 0) {
     rows.push({
       label: t('prosopography.education', 'Haridus'),
-      value: person.education.map((e: any) => e.institution ?? e.label ?? e).join(', '),
+      value: person.education.map((e: any) => e.institution ?? getLabel(e) || e).join(', '),
     });
   }
   if (person.relations?.length > 0) {
@@ -152,6 +163,7 @@ const PersonDetailPage: React.FC = () => {
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
   const { t } = useTranslation(['common']);
+  const getLabel = useEntityLabel();
   const { user, authToken } = useUser();
 
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
@@ -315,7 +327,7 @@ const PersonDetailPage: React.FC = () => {
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
                       {t('prosopography.status', 'Seisus')}
                     </span>
-                    <p className="text-gray-900">{person.status.label}</p>
+                    <p className="text-gray-900">{getLabel(person.status)}</p>
                   </div>
                 )}
                 {person.confession && (
@@ -323,7 +335,7 @@ const PersonDetailPage: React.FC = () => {
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
                       {t('prosopography.confession', 'Konfessioon')}
                     </span>
-                    <p className="text-gray-900">{person.confession.label}</p>
+                    <p className="text-gray-900">{getLabel(person.confession)}</p>
                   </div>
                 )}
               </div>
