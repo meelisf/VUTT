@@ -65,7 +65,8 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: string }> = ({
           src={person.image_url}
           alt={person.label}
           loading="lazy"
-          className="w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity"
+          className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+          style={{ objectPosition: 'center 15%' }}
         />
       ) : (
         <Initials name={person.label} />
