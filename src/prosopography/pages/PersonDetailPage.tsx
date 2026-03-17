@@ -184,22 +184,29 @@ const PersonDetailPage: React.FC = () => {
       .then(data => {
         setPerson(data);
         setError(null);
-        const workIds = (data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean);
-        if (workIds.length > 0) {
-          const ids = workIds.map((wid: string) => `"${wid}"`).join(', ');
-          index.search('', {
-            filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
-            attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy'],
-            limit: 500,
-          }).then(res => {
+        const uniqueWorkIds = [...new Set((data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean))];
+        if (uniqueWorkIds.length > 0) {
+          // Teoste pealkirjad: päri partiidena (max 50 korraga), et vältida Meilisearch IN-filtri piiranguid
+          const BATCH = 50;
+          const allHits: any[] = [];
+          const batches = [];
+          for (let i = 0; i < uniqueWorkIds.length; i += BATCH) batches.push(uniqueWorkIds.slice(i, i + BATCH));
+          Promise.all(batches.map(batch => {
+            const ids = batch.map((wid: string) => `"${wid}"`).join(', ');
+            return index.search('', {
+              filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
+              attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy'],
+              limit: BATCH,
+            }).then(res => allHits.push(...res.hits)).catch(() => {});
+          })).then(() => {
             const map: Record<string, { title: string; year: number | null; collections: string[] }> = {};
-            for (const hit of res.hits) {
+            for (const hit of allHits) {
               if (hit.work_id && !map[hit.work_id]) {
                 map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, collections: hit.collections_hierarchy ?? [] };
               }
             }
             setWorkTitles(map);
-          }).catch(() => {});
+          });
         }
       })
       .catch(() => setError(t('prosopography.loadError', 'Isiku laadimine ebaõnnestus.')))
