@@ -339,8 +339,8 @@ def _load_aa() -> list:
 
 
 def _fetch_aa(aa_id: str) -> Optional[dict]:
-    """Otsib AA kirje numbri järgi (nt "AA:1390" → entry_number 1390)."""
-    raw = aa_id.replace("AA:", "").strip()
+    """Otsib AA kirje numbri järgi (nt "AA:1390" või "AA-1390" → entry_number 1390)."""
+    raw = aa_id.replace("AA:", "").replace("AA-", "").strip()
     if not raw.isdigit():
         return None
     entry_num = int(raw)
