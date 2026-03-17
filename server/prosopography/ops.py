@@ -305,6 +305,12 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
     save_with_git(primary_path, primary_content, username,
                   message=commit_msg, additional_files=additional)
 
+    # Meilisearch sync muutunud teoste jaoks (async)
+    from ..meilisearch_ops import sync_work_to_meilisearch_async
+    for meta_path, _ in changed_files:
+        dir_name = os.path.basename(os.path.dirname(meta_path))
+        sync_work_to_meilisearch_async(dir_name)
+
 
 def update_person(person_id: str, data: dict, username: str) -> dict:
     """
