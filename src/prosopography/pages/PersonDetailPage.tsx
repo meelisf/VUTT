@@ -188,10 +188,9 @@ const PersonDetailPage: React.FC = () => {
         if (workIds.length > 0) {
           const ids = workIds.map((wid: string) => `"${wid}"`).join(', ');
           index.search('', {
-            filter: `work_id IN [${ids}]`,
-            attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy', 'lehekylje_number'],
-            sort: ['lehekylje_number:asc'],
-            limit: workIds.length * 5,
+            filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
+            attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy'],
+            limit: 500,
           }).then(res => {
             const map: Record<string, { title: string; year: number | null; collections: string[] }> = {};
             for (const hit of res.hits) {
