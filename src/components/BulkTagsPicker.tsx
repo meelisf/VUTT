@@ -226,6 +226,9 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
                     onChange={handleAddTag}
                     placeholder="Otsi isikut…"
                     lang={lang}
+                    showPersonToggle
+                    defaultPersonSearch
+                    token={localStorage.getItem('vutt_token') ?? undefined}
                   />
                 </div>
               </>
