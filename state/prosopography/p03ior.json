@@ -1,0 +1,233 @@
+{
+  "id": "vutt:Pp03ior",
+  "identifiers": [
+    {
+      "scheme": "gnd",
+      "id": "1055538917",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "309698474",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:11",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Johannes Raulinus",
+    "family_name": "Raulin",
+    "first_name": "Johannes",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Raulinius, Johannes",
+      "Raulinus, Joh."
+    ],
+    "family_name_variants": [
+      "Raulinius"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "um 1610",
+    "date": "um 1610",
+    "date_to": null,
+    "bound": null,
+    "precision": "month",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1677",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Goldingen",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Kurland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "460496",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1641",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1667",
+      "date_end": null,
+      "institution": null,
+      "notes": "zu St. Jakobi in",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Ass.",
+      "id": null,
+      "labels": {},
+      "date_start": "1662",
+      "date_end": null,
+      "institution": "Oberkonsist.",
+      "notes": "d. v.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Schule Kolmar",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Gymn. Dorpat",
+      "institution_id": null,
+      "type": null,
+      "date_start": "1631",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "angekommen 7. 8.",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Univ. Königsberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1638-06-19",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [
+        {
+          "type": "Or.",
+          "date": "1633-11-06",
+          "notes": null
+        }
+      ],
+      "positions": [
+        {
+          "role": "Konv.",
+          "start_date": "1632",
+          "end_date": "1633",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1634-10-02",
+          "praeses": "Mancelius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1635-04-18",
+          "recipient": {
+            "name": "P. Luth",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1634-05-16",
+          "recipient": {
+            "name": "Nicolaus Olai",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1634-10-15",
+          "recipient": {
+            "name": "M. Ulfsbeckius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1634-10-14",
+          "recipient": {
+            "name": "C. Osaengius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1635-06-17",
+          "recipient": {
+            "name": "A. Palma",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

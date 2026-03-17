@@ -1,0 +1,161 @@
+{
+  "id": "vutt:Pk61hus",
+  "identifiers": [
+    {
+      "scheme": "viaf",
+      "id": "76295446",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:612",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Laurentius Wallerius",
+    "family_name": "Wallerius",
+    "first_name": "Laurentius",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Wallerius"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Hudiksvall",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Hälsingland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2708325",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1643-09-04",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "erw. 24. 1. 1644",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Pedell",
+          "start_date": "1645",
+          "end_date": "1646",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1648",
+          "end_date": "1650-03",
+          "semester": null,
+          "notes": "wenigst."
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1647-05-12",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1649-04",
+          "praeses": "Joh. Erici",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1649",
+          "praeses": "Gezelius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1645-11-03",
+          "recipient": {
+            "name": "J. Gezelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": [
+        {
+          "date": null,
+          "semester": null,
+          "notes": "verreist nach Reval (erw. 20. 3. 1650)"
+        }
+      ]
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

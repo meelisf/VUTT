@@ -1,0 +1,128 @@
+{
+  "id": "vutt:P9z8w1c",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:831",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Johannes Boestrenius (Boistrenius)",
+    "family_name": "Boestrenius",
+    "first_name": "Johannes",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Boistrenius"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Nöteborg",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Ingermanland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "562172",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1666",
+      "date_end": "1680",
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep",
+          "start_date": "1651-01-27",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1652-05",
+          "praeses": "Virginius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1652",
+          "recipient": {
+            "name": "M. Brandskyld",
+            "reference": null
+          },
+          "notes": "TGed."
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

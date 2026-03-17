@@ -1,0 +1,136 @@
+{
+  "id": "vutt:Pp2y7yd",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q15106254",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "123748178",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "929031",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:669",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Salomon Matthiae",
+    "family_name": "Matthiae",
+    "first_name": "Salomon",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1609-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q3920",
+      "label": "Lüneburg"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1665-09-09",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q102158",
+      "label": "Narva"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": "Dorpat",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Livland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "457850",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": {
+    "id": "Q75809",
+    "label": "luterlus"
+  },
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1646-10-12",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q2259532",
+      "label": "vaimulik"
+    },
+    {
+      "id": "Q1622272",
+      "label": "õppejõud"
+    },
+    {
+      "id": "Q1234713",
+      "label": "teoloog"
+    }
+  ]
+}

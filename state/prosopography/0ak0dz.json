@@ -1,0 +1,185 @@
+{
+  "id": "vutt:P0ak0dz",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q20933569",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "316024504",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:222",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Michael Scholbach",
+    "family_name": "Scholbach",
+    "first_name": "Michael",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1618-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q1770",
+      "label": "Tallinn"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1673-10-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q3138825",
+      "label": "Viru-Nigula"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": "Reval",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Estland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "453733",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Deutscher Pred.",
+      "id": null,
+      "labels": {},
+      "date_start": "1644",
+      "date_end": null,
+      "institution": null,
+      "notes": "stipul.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Pred.",
+      "id": null,
+      "labels": {},
+      "date_start": null,
+      "date_end": null,
+      "institution": null,
+      "notes": "(Ingerm.)",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Pred.",
+      "id": null,
+      "labels": {},
+      "date_start": "1656",
+      "date_end": null,
+      "institution": null,
+      "notes": "(Estl.)",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Gymn. Reval",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1637",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "noch",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Univ. Königsberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1639-06-28",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Rostock",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1642-01",
+      "date_end": null,
+      "degree": "Mag.",
+      "subject": null,
+      "notes": "5. 5. 1642",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1636-12-31",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q2259532",
+      "label": "vaimulik"
+    }
+  ]
+}

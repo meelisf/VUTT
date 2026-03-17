@@ -1,0 +1,168 @@
+{
+  "id": "vutt:P9u3xok",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1124",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Gellius Dreylich (Dreilick)",
+    "family_name": "Dreylich",
+    "first_name": "Gellius",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Dreilick"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "1666",
+    "date": "1666",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västmanland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664179",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Auskultant",
+      "id": null,
+      "labels": {},
+      "date_start": null,
+      "date_end": null,
+      "institution": "Svea-Hofgericht",
+      "notes": "d.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Åbo",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1683",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "aman. bibl.",
+          "start_date": "1691-10-14",
+          "end_date": "1695",
+          "semester": "Sommer",
+          "notes": null
+        },
+        {
+          "role": null,
+          "start_date": "1693-08-19",
+          "end_date": "1693-09-23",
+          "semester": null,
+          "notes": "Mandatar v. S. Dimberg"
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1690",
+          "end_date": "1696-01",
+          "semester": null,
+          "notes": "(Jura)"
+        },
+        {
+          "start_date": "1696-02",
+          "end_date": "1697-02",
+          "semester": null,
+          "notes": "f. Auslandsreise"
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1694",
+          "praeses": "Hermelin",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1692-04-24",
+          "recipient": {
+            "name": "J. Gezelius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1693-02-25",
+          "recipient": {
+            "name": "L. Höjer",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

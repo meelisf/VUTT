@@ -1,0 +1,170 @@
+{
+  "id": "vutt:Pi6wrah",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:439",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Michael Bostadius",
+    "family_name": "Bostadius",
+    "first_name": "Michael",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västerbotten",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664415",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1638",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Rgt.-P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1644",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1648",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1659",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "riksdagsman",
+      "id": null,
+      "labels": {},
+      "date_start": "1649",
+      "date_end": null,
+      "institution": null,
+      "notes": "55",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "Imm.",
+      "date_start": "1629-10-01",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1641-09-25",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1643",
+          "recipient": {
+            "name": "Gezelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

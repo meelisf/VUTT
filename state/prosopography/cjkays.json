@@ -1,0 +1,247 @@
+{
+  "id": "vutt:Pcjkays",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:224",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Ericus Bobergius",
+    "family_name": "Bobergius",
+    "first_name": "Ericus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "1604",
+    "date": "1604",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Västergötland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664351",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Lektor",
+      "id": null,
+      "labels": {},
+      "date_start": "1643",
+      "date_end": null,
+      "institution": "Gymn. in Skara",
+      "notes": "am",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Rektor",
+      "id": null,
+      "labels": {},
+      "date_start": "1652",
+      "date_end": null,
+      "institution": "Gymn. in Skara",
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "Imm.",
+      "date_start": "1636-10-18",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [],
+      "stipends": [
+        {
+          "start_date": "1638",
+          "end_date": "1641",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1639",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1639-10-05",
+          "praeses": "Schomerus",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1641-08-18",
+          "praeses": "Ludenius",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1640-03-31",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1638-02-21",
+          "recipient": {
+            "name": "A. Storch",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1638-04-13",
+          "recipient": {
+            "name": "I. Smetander",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1639-03-13",
+          "recipient": {
+            "name": "A. Storch",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1639-04-27",
+          "recipient": {
+            "name": "S. Wallander",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1639-05-11",
+          "recipient": {
+            "name": "P. Undenius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1639-05-15",
+          "recipient": {
+            "name": "Joh. Jonae",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1639-12-19",
+          "recipient": {
+            "name": "A. Storch",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1640-09-19",
+          "recipient": {
+            "name": "A. Storch",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1640-12-24",
+          "recipient": {
+            "name": "P. Bock",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1641-09-25",
+          "recipient": {
+            "name": "M. Bostadius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1642-01-29",
+          "recipient": {
+            "name": "I. Smetander",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

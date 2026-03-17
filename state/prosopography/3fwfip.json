@@ -1,0 +1,266 @@
+{
+  "id": "vutt:P3fwfip",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:1",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Benedictus (Bengt) Baaz(ius) (Baacius, Basius, Bazius)",
+    "family_name": "Baaz",
+    "first_name": "Benedictus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Baacius",
+      "Basius",
+      "Bazius"
+    ],
+    "first_name_variants": [
+      "Bengt"
+    ]
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "1612",
+    "date": "1612",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": "Jönköping",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Småland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "6692538",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Informator",
+      "id": null,
+      "labels": {},
+      "date_start": "1635",
+      "date_end": null,
+      "institution": null,
+      "notes": "v. Karl Gustav (wurde v. Johan Skytte und\nK. Gylldenhielm rekomm.)",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Auskultant",
+      "id": null,
+      "labels": {},
+      "date_start": "1635",
+      "date_end": null,
+      "institution": "Svea-Hofgericht",
+      "notes": "d.",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Sekr.",
+      "id": null,
+      "labels": {},
+      "date_start": "1642",
+      "date_end": null,
+      "institution": "Svea-Hofgericht",
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "label": "Unterstatthalter",
+      "id": null,
+      "labels": {},
+      "date_start": "1648",
+      "date_end": null,
+      "institution": null,
+      "notes": "v.",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Univ. Rostock",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1627-12",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1628-04",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "Or.",
+      "date_start": "1629-06-07",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Gymn. Dorpat",
+      "institution_id": null,
+      "type": null,
+      "date_start": "1631",
+      "date_end": "1632",
+      "degree": null,
+      "subject": null,
+      "notes": "erw. 27. 8",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Depositor",
+          "start_date": "1632-04-21",
+          "end_date": "1633-05-28",
+          "semester": null,
+          "notes": null
+        },
+        {
+          "role": "Pedell",
+          "start_date": "1633",
+          "end_date": null,
+          "semester": "I Hj.",
+          "notes": null
+        },
+        {
+          "role": "Konv.",
+          "start_date": "1631-09-01",
+          "end_date": "1633-05-01",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [
+        {
+          "date": "1632-09-15",
+          "praeses": "Jacob Skytte",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1632",
+          "praeses": "Oldenburg",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1633-06-29",
+          "praeses": null,
+          "role": "praeses",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1633-06-22",
+          "praeses": "Savonius",
+          "role": "respondent",
+          "pro_gradu": true,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1632-10-03",
+          "recipient": {
+            "name": "M. Anethulander",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1633-03-28",
+          "recipient": {
+            "name": "Petrus Andreae",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1633-05-04",
+          "recipient": {
+            "name": "N. Prytz",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1633-06-22",
+          "recipient": {
+            "name": "J. Lannerus",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

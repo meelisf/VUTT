@@ -1,0 +1,170 @@
+{
+  "id": "vutt:P4e8c29",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:591",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Johannes Cronman",
+    "family_name": "Cronman",
+    "first_name": "Johannes",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": "Nob",
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Livland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "457850",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Rittm.",
+      "id": null,
+      "labels": {},
+      "date_start": "1655",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Uppsala",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1647-09-21",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Groningen",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1649-05-24",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [
+    {
+      "name": "590",
+      "type": "Br.",
+      "target_id": null,
+      "notes": "v. Nr."
+    }
+  ],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1645-05-08",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [],
+      "orations": [
+        {
+          "date": "1647-02-05",
+          "topic": null,
+          "notes": null
+        },
+        {
+          "date": "1647-06-02",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [
+        {
+          "date": "1645-11-03",
+          "recipient": {
+            "name": "J. Gezelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

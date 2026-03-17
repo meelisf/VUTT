@@ -1,0 +1,103 @@
+{
+  "id": "vutt:Psiznr2",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q2661641",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "12457615X",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "3409117",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T17:55:57.154984+00:00",
+  "created_by": "import_script",
+  "updated_by": "mass_enrich_script",
+  "name": {
+    "label": "Johan Skytte",
+    "family_name": null,
+    "first_name": null,
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Johann Skytte"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1577-05-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "month",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q54356",
+      "label": "Nyköping"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1645-03-15",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q10688847",
+      "label": "Söderåkra"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": null,
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {},
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q82955",
+      "label": "poliitik"
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+{
+  "id": "vutt:Pbnp71z",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:319",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Jonas Bech(a)elius (Bekerius, Bigelius)",
+    "family_name": "Bech(a)elius",
+    "first_name": "Jonas",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [
+      "Bekerius",
+      "Bigelius"
+    ],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Värmland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "2664870",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1643",
+      "date_end": "1652",
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1638-10-31",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1643",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1642-09",
+          "praeses": "Virginius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [
+        {
+          "date": "1641-11-10",
+          "topic": null,
+          "notes": null
+        }
+      ],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

@@ -1,0 +1,87 @@
+{
+  "id": "vutt:P71inws",
+  "identifiers": [
+    {
+      "scheme": "gnd",
+      "id": "100766609",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-15T19:35:18.147890+00:00",
+  "updated_at": "2026-03-16T17:52:48.868872+00:00",
+  "created_by": "meelis",
+  "updated_by": "mass_enrich_script",
+  "name": {
+    "label": "Hermann Leopold von Böhlendorff",
+    "family_name": "Böhlendorff",
+    "first_name": "Hermann Leopold",
+    "qualifier": "von",
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1650-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": null,
+      "label": "Jelgava"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1693-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": null,
+      "label": "Tartu"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "region": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "pastor"
+    }
+  ],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "source_data": {},
+  "auth_token": "26385ba0-726b-49c8-a847-22d50ee08d41",
+  "_occupations": [
+    {
+      "id": null,
+      "label": "Prediger"
+    }
+  ]
+}

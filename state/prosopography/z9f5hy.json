@@ -1,0 +1,179 @@
+{
+  "id": "vutt:Pz9f5hy",
+  "identifiers": [
+    {
+      "scheme": "album_academicum",
+      "id": "AA:429",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:12:02.934513+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Petrus Angelstadius",
+    "family_name": "Angelstadius",
+    "first_name": "Petrus",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": null,
+  "birth": {
+    "original_text": "1621",
+    "date": "1621",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": null,
+    "date_to": null,
+    "bound": null,
+    "precision": null,
+    "calendar": null,
+    "is_circa": false,
+    "place": null,
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": "Småland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "6692538",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "P.",
+      "id": null,
+      "labels": {},
+      "date_start": "1651",
+      "date_end": null,
+      "institution": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Schule Växjö",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1630",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Linköping",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": "1638",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1641-08-23",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [
+        {
+          "start_date": "1641",
+          "end_date": "1650",
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "disputations": [
+        {
+          "date": "1645-08",
+          "praeses": "Joh. Erici",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        },
+        {
+          "date": "1646-05",
+          "praeses": "Virginius",
+          "role": "respondent",
+          "pro_gradu": false,
+          "notes": null
+        }
+      ],
+      "orations": [],
+      "gratulations": [
+        {
+          "date": "1643-09",
+          "recipient": {
+            "name": "A. Megalinus",
+            "reference": null
+          },
+          "notes": "als stud. theol"
+        },
+        {
+          "date": "1645-08",
+          "recipient": {
+            "name": "S. Löfingius",
+            "reference": null
+          },
+          "notes": null
+        },
+        {
+          "date": "1645-11-03",
+          "recipient": {
+            "name": "J. Gezelius",
+            "reference": null
+          },
+          "notes": null
+        }
+      ],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": []
+}

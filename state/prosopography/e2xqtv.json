@@ -1,0 +1,117 @@
+{
+  "id": "vutt:Pe2xqtv",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q432895",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "123826039",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "10763998",
+      "checked_at": null
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T17:53:45.772899+00:00",
+  "created_by": "import_script",
+  "updated_by": "mass_enrich_script",
+  "name": {
+    "label": "Olof Hermelin",
+    "family_name": null,
+    "first_name": null,
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Catus Irenaeus",
+      "Catus Irenæus",
+      "Olaus Hermelin",
+      "Olaus Skragge",
+      "Olef Skragge",
+      "Olof Nilsson Hermelin",
+      "Olof Nilsson Skragge"
+    ],
+    "family_name_variants": [],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1658-01-01",
+    "date_to": null,
+    "bound": null,
+    "precision": "year",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q847769",
+      "label": "Filipstad"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1709-06-28",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q649",
+      "label": "Moskva"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": null,
+    "city_id": null,
+    "city_labels": null,
+    "region": null,
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": null,
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [],
+  "education": [],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {},
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q1622272",
+      "label": "õppejõud"
+    },
+    {
+      "id": "Q193391",
+      "label": "diplomaat"
+    },
+    {
+      "id": "Q82955",
+      "label": "poliitik"
+    }
+  ]
+}

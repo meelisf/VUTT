@@ -1,0 +1,224 @@
+{
+  "id": "vutt:Pd9h4ol",
+  "identifiers": [
+    {
+      "scheme": "wikidata",
+      "id": "Q20933472",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "gnd",
+      "id": "132184192",
+      "checked_at": "2026-03-16"
+    },
+    {
+      "scheme": "viaf",
+      "id": "75153833154964331341",
+      "checked_at": null
+    },
+    {
+      "scheme": "album_academicum",
+      "id": "AA:450",
+      "checked_at": "2026-03-16"
+    }
+  ],
+  "merged_into": null,
+  "import_batch_ids": [
+    "aliases-import-2026",
+    "aa-enrich-2026"
+  ],
+  "schema_version": 1,
+  "record_status": "draft",
+  "verification_level": "draft",
+  "created_at": "2026-03-16T16:28:05.414722+00:00",
+  "updated_at": "2026-03-16T18:28:47.115692+00:00",
+  "created_by": "import_script",
+  "updated_by": "enrich_aa_script",
+  "name": {
+    "label": "Gabriel Elvering",
+    "family_name": "Elvering",
+    "first_name": "Gabriel",
+    "qualifier": null,
+    "qualifier_type": null,
+    "noble_status": null,
+    "maiden_name": null,
+    "aliases": [
+      "Gabriel Elffring",
+      "Gabriel Elfrin",
+      "Gabriel Elfring",
+      "Gabriel Lifrin"
+    ],
+    "family_name_variants": [
+      "Elfering"
+    ],
+    "first_name_variants": []
+  },
+  "gender": "M",
+  "birth": {
+    "original_text": null,
+    "date": "1625-12-21",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q1770",
+      "label": "Tallinn"
+    },
+    "notes": null
+  },
+  "death": {
+    "original_text": null,
+    "date": "1670-07-18",
+    "date_to": null,
+    "bound": null,
+    "precision": "day",
+    "calendar": null,
+    "is_circa": false,
+    "place": {
+      "id": "Q1770",
+      "label": "Tallinn"
+    },
+    "notes": null
+  },
+  "origin": {
+    "city": "Reval",
+    "city_id": null,
+    "city_labels": null,
+    "region": "Estland",
+    "region_id": null,
+    "region_labels": null,
+    "geonames_id": "453733",
+    "coordinates": null
+  },
+  "status": null,
+  "confession": null,
+  "occupations": [
+    {
+      "label": "Prof.",
+      "id": null,
+      "labels": {},
+      "date_start": "1652",
+      "date_end": null,
+      "institution": "UD",
+      "notes": "an (rekomm. v. Z. Klingius)",
+      "source": "album_academicum"
+    },
+    {
+      "label": "Sup.",
+      "id": null,
+      "labels": {},
+      "date_start": "1658",
+      "date_end": null,
+      "institution": null,
+      "notes": "zu St. Olai in",
+      "source": "album_academicum"
+    }
+  ],
+  "education": [
+    {
+      "institution": "Gymn. Reval",
+      "institution_id": null,
+      "type": "Stud.",
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Univ. Königsberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1646-10-01",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "disp. u. M. Eifler",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Wittenberg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1649-03-10",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "disp. PG u. J. Martini",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Leipzig",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1648",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "disp. 22. 1. 1650 u. D. Henrici",
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Straßburg",
+      "institution_id": null,
+      "type": "imm.",
+      "date_start": "1650-06-11",
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": null,
+      "source": "album_academicum"
+    },
+    {
+      "institution": "Gießen",
+      "institution_id": null,
+      "type": null,
+      "date_start": null,
+      "date_end": null,
+      "degree": null,
+      "subject": null,
+      "notes": "disp. u. J. Feurbornius",
+      "source": "album_academicum"
+    }
+  ],
+  "burial": null,
+  "relations": [],
+  "sources": [],
+  "biography": null,
+  "notes": null,
+  "image_url": null,
+  "source_data": {
+    "album_academicum": {
+      "academic_ceremonies": [],
+      "positions": [
+        {
+          "role": "Dep.",
+          "start_date": "1642-02-03",
+          "end_date": null,
+          "semester": null,
+          "notes": null
+        }
+      ],
+      "stipends": [],
+      "disputations": [],
+      "orations": [],
+      "gratulations": [],
+      "departures": []
+    }
+  },
+  "floruit": null,
+  "tags": [],
+  "_occupations": [
+    {
+      "id": "Q2259532",
+      "label": "vaimulik"
+    },
+    {
+      "id": "Q1234713",
+      "label": "teoloog"
+    }
+  ]
+}
