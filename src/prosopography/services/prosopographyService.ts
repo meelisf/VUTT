@@ -117,13 +117,14 @@ export async function fetchPersonEnrichmentPreview(
   return resp.json();
 }
 
-export async function deletePersonImage(personId: string, token: string): Promise<void> {
+export async function deletePersonImage(personId: string, token: string): Promise<{ updated_at: string }> {
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
     method: 'DELETE',
     timeout: 10000,
   });
   if (!resp.ok) throw new Error(`deletePersonImage: ${resp.status}`);
+  return resp.json();
 }
 
 export async function mergePersons(

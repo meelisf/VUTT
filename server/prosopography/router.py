@@ -206,7 +206,7 @@ async def prosopography_upload_image(
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"image_url": person["image_url"]}
+    return {"image_url": person["image_url"], "updated_at": person["updated_at"]}
 
 
 @router.get("/{person_id:path}/image")
@@ -227,10 +227,10 @@ async def prosopography_delete_image(
 ):
     """Kustutab isiku pildi."""
     try:
-        delete_person_image(person_id, username=user["username"])
+        person = delete_person_image(person_id, username=user["username"])
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
-    return {"status": "ok"}
+    return {"status": "ok", "updated_at": person["updated_at"]}
 
 
 # ── Generaalsed /{person_id} ruutid — PEAVAD tulema PÄRAST spetsiifilisi ──

@@ -94,6 +94,9 @@ const PersonEditPage: React.FC = () => {
     try {
       const result = await uploadPersonImage(id!, file, token);
       setImageUrl(result.image_url);
+      if (result.updated_at) {
+        setOriginal(prev => prev ? { ...prev, updated_at: result.updated_at } : prev);
+      }
     } catch (e: any) {
       setImageError(e.message ?? 'Pildi üleslaadimine ebaõnnestus.');
     } finally {
@@ -106,8 +109,11 @@ const PersonEditPage: React.FC = () => {
     setImageUploading(true);
     setImageError(null);
     try {
-      await deletePersonImage(id, token);
+      const result = await deletePersonImage(id, token);
       setImageUrl(null);
+      if (result.updated_at) {
+        setOriginal(prev => prev ? { ...prev, updated_at: result.updated_at } : prev);
+      }
     } catch {
       setImageError('Pildi kustutamine ebaõnnestus.');
     } finally {
