@@ -49,7 +49,7 @@ const PersonsPage: React.FC = () => {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return allPersons.filter(p => {
-      if (q && !(p.label.toLowerCase().includes(q) || p.sort_name.toLowerCase().includes(q))) return false;
+      if (q && !(p.label.toLowerCase().includes(q) || p.sort_name.toLowerCase().includes(q) || (p.aliases || []).some(a => a.toLowerCase().includes(q)))) return false;
       if (gender === 'M' && p.gender !== 'M') return false;
       if (gender === 'F' && p.gender !== 'F') return false;
       if (source === 'wikidata' && !p.has_wikidata) return false;

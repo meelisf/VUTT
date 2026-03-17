@@ -18,6 +18,7 @@ export interface ProsopoIndexEntry {
   work_count: number;
   biography_snippet: string;
   image_url: string | null;
+  aliases: string[];
 }
 
 export interface HistoricalDate {

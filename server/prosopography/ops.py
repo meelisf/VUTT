@@ -100,6 +100,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     label = name_obj.get("label") or person.get("id", "")
     family_name = name_obj.get("family_name") or ""
     sort_name = family_name or label
+    aliases = name_obj.get("aliases") or []
 
     # birth/death_year — võtame täisarvuna kui date olemas
     def _extract_year(date_obj: dict):
@@ -129,6 +130,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "work_count": work_count,
         "biography_snippet": _make_snippet(person),
         "image_url": person.get("image_url"),
+        "aliases": aliases,
     }
 
 
