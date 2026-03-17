@@ -446,6 +446,12 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
                 else:
                     sftp.put(tmp_path, remote_tmp, callback=_progress)
 
+                # Kustuta sihtfail kui see juba eksisteerib (uuesti üleslaadimine)
+                try:
+                    sftp.stat(remote_dst)
+                    sftp.unlink(remote_dst)
+                except FileNotFoundError:
+                    pass
                 sftp.rename(remote_tmp, remote_dst)
                 logger.info(f"Pilt edastatud OCR serverisse: {upload_id} ({remote_img_name})")
 
@@ -840,6 +846,12 @@ def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages:
         else:
             sftp.put(tmp_path, remote_tmp)
 
+        # Kustuta sihtfail kui see juba eksisteerib (uuesti üleslaadimine)
+        try:
+            sftp.stat(remote_dst)
+            sftp.unlink(remote_dst)
+        except FileNotFoundError:
+            pass
         sftp.rename(remote_tmp, remote_dst)
         logger.info(f"Multi-image: lk {page_number}/{total_pages} edastatud → {upload_id} ({remote_img_name})")
 
