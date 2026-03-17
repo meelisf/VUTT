@@ -74,6 +74,11 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     patch.occupations = [{ label: autoFilled['_occupation_label'] }];
   }
 
+  // Biograafia (AA raw_text) — ainult kui tühi
+  if (autoFilled['biography'] && !draft.biography.trim()) {
+    patch.biography = autoFilled['biography'];
+  }
+
   return { ...draft, ...patch };
 }
 

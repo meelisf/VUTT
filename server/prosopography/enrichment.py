@@ -401,4 +401,21 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
     except Exception:
         pass
 
+    # Sünnikoht päritolu järgi (kui sünnikoht puudub)
+    try:
+        origin = entry.get("person", {}).get("origin") or {}
+        region = origin.get("standardized_region") or origin.get("region")
+        if region:
+            result["birth.place"] = {"id": None, "label": region}
+    except Exception:
+        pass
+
+    # Raw text → biograafia
+    try:
+        raw = entry.get("raw_text", "").strip()
+        if raw:
+            result["biography"] = raw
+    except Exception:
+        pass
+
     return result

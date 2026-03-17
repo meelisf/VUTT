@@ -27,6 +27,7 @@ const FIELD_LABELS: Record<string, string> = {
   status: 'Seisus',
   'name.label': 'Kanooniline nimi',
   'name.aliases': 'Nimevariandid',
+  biography: 'Biograafia',
 };
 
 function formatVal(val: any): string {
