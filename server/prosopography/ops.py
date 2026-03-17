@@ -267,10 +267,35 @@ def _make_date_obj(year) -> dict:
     }
 
 
+def _propagate_name_to_works(person_id: str, new_label: str) -> None:
+    """Uuendab teoste _metadata.json creator labelid kui nimi muutus."""
+    from ..config import BASE_DIR as _DATA_DIR
+    if not os.path.exists(_DATA_DIR):
+        return
+    for work_entry in os.scandir(_DATA_DIR):
+        if not work_entry.is_dir():
+            continue
+        meta_path = os.path.join(work_entry.path, "_metadata.json")
+        if not os.path.exists(meta_path):
+            continue
+        try:
+            meta = json.load(open(meta_path, encoding="utf-8"))
+        except Exception:
+            continue
+        changed = False
+        for c in meta.get("creators", []):
+            if isinstance(c, dict) and c.get("id") == person_id and c.get("label") != new_label:
+                c["label"] = new_label
+                changed = True
+        if changed:
+            _atomic_write(meta_path, meta)
+
+
 def update_person(person_id: str, data: dict, username: str) -> dict:
     """
     Uuendab isiku kirjet optimistliku konkurentsikontrolliga.
     Kui data["updated_at"] ei klapi failiga → tõstatab ValueError("conflict").
+    Kui name.label muutus, uuendatakse ka teoste creator labelid.
     """
     person = get_person(person_id)
     if person is None:
@@ -280,6 +305,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     client_updated_at = data.get("updated_at")
     if client_updated_at and person.get("updated_at") != client_updated_at:
         raise ValueError(f"conflict:{person['updated_at']}")
+
+    old_label = (person.get("name") or {}).get("label") or ""
 
     now = datetime.now(timezone.utc).isoformat()
     # Säilitame süsteemiväljad, ülekirjutame kasutaja andmed
@@ -294,6 +321,11 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     _atomic_write(_id_to_path(person_id), person)
     _update_index_entry(person)
     _update_aliases_entry(person)
+
+    new_label = (person.get("name") or {}).get("label") or ""
+    if new_label and new_label != old_label:
+        _propagate_name_to_works(person_id, new_label)
+
     return person
 
 
