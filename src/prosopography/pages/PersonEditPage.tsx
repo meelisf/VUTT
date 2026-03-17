@@ -500,7 +500,7 @@ const PersonEditPage: React.FC = () => {
                 { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${v}` },
                 { key: 'gnd_id', label: 'GND', placeholder: '123456789', url: (v: string) => `https://d-nb.info/gnd/${v}` },
                 { key: 'viaf_id', label: 'VIAF', placeholder: '12345678', url: (v: string) => `https://viaf.org/viaf/${v}` },
-                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA-123', url: null },
+                { key: 'aa_id', label: 'Album Academicum', placeholder: 'AA:123', url: null },
               ].map(({ key, label, placeholder, url }) => {
                 const val = draft[key as keyof FormDraft] as string;
                 const href = url && val.trim() ? url(val.trim()) : null;
