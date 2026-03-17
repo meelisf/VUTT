@@ -57,17 +57,13 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
 
   // Žanrid massiivist (toetab nii massiivi kui üksikut väärtust)
   const genres: any[] = (() => {
-    const raw = work.genre_object;
+    const raw = work.genre;
     if (Array.isArray(raw) && raw.length > 0) return raw;
     if (raw) return [raw];
-    if (work.genre) return [work.genre];
     return [];
   })();
 
-  // Eelistame tags_object (LinkedEntity[]) mitmekeelsuse jaoks
-  const displayTags = work.tags_object && work.tags_object.length > 0 
-    ? work.tags_object 
-    : (work.tags || []);
+  const displayTags = work.tags || [];
 
   const lang = getLangCode(i18n.language);
 
@@ -372,18 +368,18 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             )}
 
             {/* Trükkal ja trükikoht */}
-            {((work.publisher || work.publisher_object) || (work.location || work.location_object)) && (
+            {(work.publisher || work.location) && (
               <div className="border-t border-white/10 pt-2 mt-auto space-y-1">
-                {(work.publisher || work.publisher_object) && (
+                {work.publisher && (
                   <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
                     <BookDown size={10} className="text-gray-500 shrink-0" />
-                    <span className="truncate">{getLabel(work.publisher_object ?? (work.publisher as any), lang)}</span>
+                    <span className="truncate">{getLabel(work.publisher, lang)}</span>
                   </div>
                 )}
-                {(work.location || work.location_object) && (
+                {work.location && (
                   <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
                     <MapPin size={10} className="text-gray-500 shrink-0" />
-                    <span>{getLabel(work.location_object ?? (work.location as any), lang)}</span>
+                    <span>{getLabel(work.location, lang)}</span>
                   </div>
                 )}
               </div>

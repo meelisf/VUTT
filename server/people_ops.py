@@ -204,10 +204,10 @@ def process_person_fields_metadata(meta):
             update_person_async(c_id, c_source)
 
     # Trükkal / kirjastaja
-    process_linked_entity(meta.get('publisher_object'))
+    process_linked_entity(meta.get('publisher'))
 
     # Märksõnad (tags) — kõik mis omavad ID-d (Wikidata Q-kood või GND)
-    for tag in meta.get('tags_object') or []:
+    for tag in meta.get('tags') or []:
         process_linked_entity(tag)
 
 

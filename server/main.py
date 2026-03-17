@@ -626,7 +626,6 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 ALLOWED_METADATA_FIELDS = {
     "title", "year", "year_display", "location", "publisher", "creators", "tags",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
-    "location_object", "publisher_object", "type_object", "genre_object", "tags_object",
     "series", "relations"
 }
 
@@ -659,14 +658,13 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         save_with_git(meta_path, json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Meta: {os.path.basename(os.path.dirname(meta_path))}")
     background_tasks.add_task(process_person_fields_metadata, meta)
     background_tasks.add_task(enrich_entity_labels_async, meta)
-    # tags_object eelistus, tagasiühilduvus: tags massiiv (võib sisaldada LinkedEntity dikteid)
-    tags_for_ptw = meta.get("tags_object") or [t for t in meta.get("tags", []) if isinstance(t, dict)]
+    tags_for_ptw = meta.get("tags") or []
     background_tasks.add_task(
         update_person_to_works,
         meta.get("id"),
         meta.get("creators", []),
         tags_for_ptw,
-        meta.get("publisher_object"),
+        meta.get("publisher"),
     )
     sync_work_to_meilisearch(os.path.basename(os.path.dirname(meta_path)))
     invalidate_cache()
@@ -771,13 +769,13 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
             meta['tags'] = cur
             save_with_git(os.path.join(path, '_metadata.json'), json.dumps(meta, indent=2, ensure_ascii=False), user['username'], message=f"Bulk tags: {work_id}")
             background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
-        tags_for_ptw = [t for t in meta.get('tags', []) if isinstance(t, dict)]
+        tags_for_ptw = meta.get('tags') or []
         background_tasks.add_task(
             update_person_to_works,
             meta.get("id"),
             meta.get("creators", []),
             tags_for_ptw,
-            meta.get("publisher_object"),
+            meta.get("publisher"),
         )
     invalidate_cache()
     return {"status": "success"}

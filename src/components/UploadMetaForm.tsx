@@ -114,14 +114,14 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             title: m.title || initialTitle,
             year: String(m.year || initialYear || ''),
             year_display: m.year_display || '',
-            type: m.type_object ?? m.type ?? null,
+            type: m.type ?? null,
             genre: (() => {
-              const g = m.genre_object ?? m.genre;
+              const g = m.genre;
               return Array.isArray(g) ? g : g ? [g] : [];
             })(),
-            tags: m.tags_object ?? m.tags ?? [],
-            location: m.location_object ?? m.location ?? '',
-            publisher: m.publisher_object ?? m.publisher ?? '',
+            tags: m.tags ?? [],
+            location: m.location ?? '',
+            publisher: m.publisher ?? '',
             creators: m.creators ?? [],
             languages: m.languages ?? [],
             collections: Array.isArray(m.collections) ? m.collections : initialCollections,
@@ -196,11 +196,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       type: form.type || null,
       genre: form.genre.length > 0 ? form.genre : null,
       tags: cleanTags,
-      tags_object: cleanTags,
       location: form.location,
-      location_object: form.location,
       publisher: form.publisher,
-      publisher_object: form.publisher,
       creators: cleanCreators,
       languages: form.languages,
       collections: form.collections,
@@ -306,6 +303,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
                       lang={lang}
                       localSuggestions={suggestions.authors}
                       peopleRegister={peopleRegister}
+                      showPersonToggle
+                      defaultPersonSearch
+                      token={authToken}
                     />
                   </div>
                   <select
@@ -396,6 +396,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               lang={lang}
               localSuggestions={suggestions.printers}
               peopleRegister={peopleRegister}
+              showPersonToggle
+              token={authToken}
             />
           </div>
         </div>
@@ -558,6 +560,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               placeholder={t('workspace:metadata.tagsPlaceholder', 'Lisa märksõna...')}
               lang={lang}
               localSuggestions={suggestions.tags}
+              showPersonToggle
+              token={authToken}
             />
           </div>
         </div>

@@ -245,14 +245,14 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 <div>
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.type')}</span>
                   <div className="flex items-center gap-1.5">
-                    <p className="text-gray-900">{getLabel(work.type_object || work.type, lang)}</p>
-                    {getEntityUrl(work.type_object?.id, work.type_object?.source) && (
+                    <p className="text-gray-900">{getLabel(work.type, lang)}</p>
+                    {getEntityUrl((work.type as any)?.id, (work.type as any)?.source) && (
                       <a
-                        href={getEntityUrl(work.type_object?.id, work.type_object?.source)!}
+                        href={getEntityUrl((work.type as any)?.id, (work.type as any)?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title={work.type_object?.id || ''}
+                        title={(work.type as any)?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -266,13 +266,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
                   <div className="flex items-center gap-1.5">
                     <p className="text-gray-900">{getLabel(work.location, lang)}</p>
-                    {getEntityUrl(work.location_object?.id, work.location_object?.source) && (
+                    {getEntityUrl((work.location as any)?.id, (work.location as any)?.source) && (
                       <a
-                        href={getEntityUrl(work.location_object?.id, work.location_object?.source)!}
+                        href={getEntityUrl((work.location as any)?.id, (work.location as any)?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-                        title={work.location_object?.id || ''}
+                        title={(work.location as any)?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -287,7 +287,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <div className="flex items-center gap-1.5 group">
                     <div className="flex items-center gap-1.5 text-gray-900 overflow-hidden">
                       <button
-                        onClick={() => { const pubId = (work.publisher_object as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
+                        onClick={() => { const pubId = (work.publisher as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
                         className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
                         title="Filtreeri trükkali järgi"
                       >
@@ -295,18 +295,18 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       </button>
                       <span
                         className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
-                        onClick={() => { const pubId = (work.publisher_object as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
+                        onClick={() => { const pubId = (work.publisher as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
                       >
                         {getLabel(work.publisher, lang)}
                       </span>
                     </div>
-                    {getEntityUrl(work.publisher_object?.id, work.publisher_object?.source) && (
+                    {getEntityUrl((work.publisher as any)?.id, (work.publisher as any)?.source) && (
                       <a
-                        href={getEntityUrl(work.publisher_object?.id, work.publisher_object?.source)!}
+                        href={getEntityUrl((work.publisher as any)?.id, (work.publisher as any)?.source)!}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors shrink-0"
-                        title={work.publisher_object?.id || ''}
+                        title={(work.publisher as any)?.id || ''}
                       >
                         <ExternalLink size={12} />
                       </a>
@@ -318,8 +318,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
             {/* Žanrid - eraldi sektsioon */}
             {(() => {
-              const raw = work.genre_object;
-              const genres: any[] = Array.isArray(raw) ? raw : (raw ? [raw] : (work.genre ? [work.genre] : []));
+              const raw = work.genre;
+              const genres: any[] = Array.isArray(raw) ? raw : (raw ? [raw] : []);
               if (genres.length === 0) return null;
               return (
                 <div className="mt-3 pt-3 border-t border-gray-100">
@@ -428,14 +428,14 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       )}
 
       {/* Genre / Teose märksõnad */}
-      {work && ((work.tags && work.tags.length > 0) || (work.tags_object && work.tags_object.length > 0)) && (
+      {work && work.tags && work.tags.length > 0 && (
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
           <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
             <BookOpen size={18} className="text-green-600" />
             <h4 className="font-bold">{t('metadata.tags')}</h4>
           </div>
           <div className="flex flex-wrap gap-2">
-            {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {
+            {work.tags.map((tag, idx) => {
               const label = getLabel(tag, lang);
               const tagId = typeof tag !== 'string' ? (tag as any).id : null;
               const entityType = typeof tag !== 'string' ? (tag as any).entity_type : null;

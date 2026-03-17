@@ -97,17 +97,13 @@ export interface Work {
   title: string;            // Pealkiri
   year: number | null;      // Ilmumisaasta (number filtri/sortimise jaoks)
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
-  location: string;         // Trükikoht (string facetiks)
-  location_object?: LinkedEntity; // Trükikoht (objekt)
-  publisher: string;        // Trükkal (string facetiks)
-  publisher_object?: LinkedEntity; // Trükkal (objekt)
+  location?: LinkedEntity | null; // Trükikoht (LinkedEntity objekt)
+  publisher?: LinkedEntity | null; // Trükkal (LinkedEntity objekt)
   publisher_id?: string;    // Trükkal (Wikidata Q-kood)
 
   // Taksonoomia
-  type?: string;            // 'impressum' | 'manuscriptum'
-  type_object?: LinkedEntity;
-  genre?: string | null;    // 'disputatio' jne (string facetiks)
-  genre_object?: LinkedEntity | LinkedEntity[] | null;
+  type?: LinkedEntity | null;  // Teose tüüp (LinkedEntity)
+  genre?: LinkedEntity | LinkedEntity[] | null; // Žanr(id)
   collections?: string[];
   collections_hierarchy?: string[];
 
@@ -116,8 +112,7 @@ export interface Work {
   authors_text?: string[];  // Denormaliseeritud otsinguks
 
   // Märksõnad ja keeled
-  tags?: string[];          // Märksõnad (stringid facetiks)
-  tags_object?: LinkedEntity[]; // Märksõnad (objektid)
+  tags?: LinkedEntity[];    // Märksõnad (LinkedEntity objektid)
   languages?: string[];     // Keeled (ISO 639-3: lat, deu, est, ...)
 
   // Seosed
@@ -181,20 +176,15 @@ export interface Page {
   title?: string;
   year?: number | null;
   year_display?: string | null; // Kuvatav aasta (nt "ca. 1680", "1670–1690")
-  location?: string;
-  location_object?: LinkedEntity;
-  publisher?: string;
-  publisher_object?: LinkedEntity;
-  type?: string;
-  type_object?: LinkedEntity;
-  genre?: string | null;
-  genre_object?: LinkedEntity | LinkedEntity[] | null;
+  location?: LinkedEntity | null;
+  publisher?: LinkedEntity | null;
+  type?: LinkedEntity | null;
+  genre?: LinkedEntity | LinkedEntity[] | null;
   collections?: string[];
   collections_hierarchy?: string[];
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];
-  tags?: string[];
-  tags_object?: LinkedEntity[];
+  tags?: LinkedEntity[];
   languages?: string[];
   series?: Series;
   series_title?: string;
@@ -263,19 +253,14 @@ export interface ContentSearchHit {
   // V2 VÄLJAD - KASUTA NEID
   title?: string;
   year?: number | string | null;
-  location?: string;
-  location_object?: LinkedEntity;
-  publisher?: string;
-  publisher_object?: LinkedEntity;
-  genre?: string | null;
-  genre_object?: LinkedEntity | LinkedEntity[] | null;
-  type?: string | null;
-  type_object?: LinkedEntity | null;
+  location?: LinkedEntity | null;
+  publisher?: LinkedEntity | null;
+  genre?: LinkedEntity | LinkedEntity[] | null;
+  type?: LinkedEntity | null;
   collections?: string[];
   creators?: Creator[];
   authors_text?: string[];
-  tags?: string[]; // Added support for V3
-  tags_object?: LinkedEntity[];
+  tags?: LinkedEntity[];
   page_tags?: (string | LinkedEntity)[]; // Per-page tags
 
   comments?: Annotation[];

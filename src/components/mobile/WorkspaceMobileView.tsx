@@ -356,9 +356,9 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                         <div>
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.type')}</span>
                           <div className="flex items-center gap-1">
-                            <p className="text-gray-900">{getLabel(work.type_object || work.type, lang)}</p>
-                            {getEntityUrl(work.type_object?.id, work.type_object?.source) && (
-                              <a href={getEntityUrl(work.type_object?.id, work.type_object?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600">
+                            <p className="text-gray-900">{getLabel(work.type, lang)}</p>
+                            {getEntityUrl((work.type as any)?.id, (work.type as any)?.source) && (
+                              <a href={getEntityUrl((work.type as any)?.id, (work.type as any)?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600">
                                 <ExternalLink size={11} />
                               </a>
                             )}
@@ -370,8 +370,8 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.place')}</span>
                           <div className="flex items-center gap-1">
                             <p className="text-gray-900">{getLabel(work.location, lang)}</p>
-                            {getEntityUrl(work.location_object?.id, work.location_object?.source) && (
-                              <a href={getEntityUrl(work.location_object?.id, work.location_object?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600">
+                            {getEntityUrl((work.location as any)?.id, (work.location as any)?.source) && (
+                              <a href={getEntityUrl((work.location as any)?.id, (work.location as any)?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600">
                                 <ExternalLink size={11} />
                               </a>
                             )}
@@ -383,8 +383,8 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                           <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
                           <div className="flex items-center gap-1">
                             <p className="text-gray-900 truncate">{getLabel(work.publisher, lang)}</p>
-                            {getEntityUrl(work.publisher_object?.id, work.publisher_object?.source) && (
-                              <a href={getEntityUrl(work.publisher_object?.id, work.publisher_object?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600 shrink-0">
+                            {getEntityUrl((work.publisher as any)?.id, (work.publisher as any)?.source) && (
+                              <a href={getEntityUrl((work.publisher as any)?.id, (work.publisher as any)?.source)!} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600 shrink-0">
                                 <ExternalLink size={11} />
                               </a>
                             )}
@@ -400,11 +400,11 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                         <div className="flex items-center gap-1.5">
                           <span className="flex items-center gap-1 text-sm font-medium px-2 py-0.5 rounded bg-violet-50 text-violet-700">
                             <Bookmark size={12} className="fill-violet-200" />
-                            {getLabel(work.genre_object || work.genre, lang)}
+                            {getLabel(work.genre, lang)}
                           </span>
                           {(() => {
-                            const genreObj = Array.isArray(work.genre_object) ? work.genre_object[0] : work.genre_object;
-                            const url = getEntityUrl(genreObj?.id, genreObj?.source);
+                            const genreObj = Array.isArray(work.genre) ? work.genre[0] : work.genre;
+                            const url = getEntityUrl((genreObj as any)?.id, (genreObj as any)?.source);
                             return url && (
                               <a href={url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-blue-600">
                                 <ExternalLink size={11} />
@@ -466,14 +466,14 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                 </div>
 
                 {/* Teose märksõnad */}
-                {work && ((work.tags && work.tags.length > 0) || (work.tags_object && work.tags_object.length > 0)) && (
+                {work && work.tags && work.tags.length > 0 && (
                   <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                     <div className="flex items-center gap-2 mb-3 text-gray-800 border-b border-gray-100 pb-2">
                       <BookOpen size={16} className="text-green-600" />
                       <h4 className="font-bold text-sm">{t('metadata.tags')}</h4>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {(work.tags_object && work.tags_object.length > 0 ? work.tags_object : work.tags).map((tag, idx) => {
+                      {work.tags.map((tag, idx) => {
                         const label = getLabel(tag, lang);
                         const tagId = typeof tag !== 'string' ? (tag as any).id : null;
                         return (

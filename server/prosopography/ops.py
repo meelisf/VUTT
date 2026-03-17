@@ -653,12 +653,13 @@ def rebuild_indices():
                 if pid.startswith("vutt:P"):
                     role = creator.get("role") or "creator"
                     ptw.setdefault(pid, []).append({"work_id": work_id, "role": role})
-            for tag in meta.get("tags_object") or []:
+            tags_list = meta.get("tags") or []
+            for tag in tags_list:
                 if isinstance(tag, dict) and tag.get("entity_type") == "person":
                     pid = tag.get("id") or ""
                     if pid.startswith("vutt:P"):
                         ptw.setdefault(pid, []).append({"work_id": work_id, "role": "subject"})
-            pub = meta.get("publisher_object")
+            pub = meta.get("publisher")
             if pub and isinstance(pub, dict) and pub.get("entity_type") == "person":
                 pid = pub.get("id") or ""
                 if pid.startswith("vutt:P"):
@@ -784,8 +785,8 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
                     c["label"] = target_label
                     c["name"] = target_label
                     changed = True
-            # tags_object: source_id → target_id
-            for tag in meta.get("tags_object", []):
+            # tags: source_id → target_id
+            for tag in meta.get("tags", []):
                 if isinstance(tag, dict) and tag.get("id") == source_id:
                     tag["id"] = target_id
                     tag["label"] = target_label

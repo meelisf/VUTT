@@ -594,7 +594,7 @@ def create_meilisearch_data_per_page():
             meili_doc['location'] = doc_metadata.get('location')
             meili_doc['publisher'] = doc_metadata.get('publisher')
             meili_doc['location_search'] = get_all_labels(doc_metadata.get('location'))
-            meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher')) + get_entity_aliases(doc_metadata.get('publisher_object'), people_data)
+            meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher')) + get_entity_aliases(doc_metadata.get('publisher'), people_data)
 
             pages.append(meili_doc)
 

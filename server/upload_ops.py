@@ -229,9 +229,8 @@ def create_upload(meta: dict) -> dict:
     Loob uue upload staging'u ja tagastab state.json sisu.
 
     meta peab sisaldama: title, year, slug
-    Valikulised: type, type_object, genre, genre_object, creators,
-                 location, location_object, publisher, publisher_object,
-                 collections, languages, tags, tags_object
+    Valikulised: type, genre, creators, location, publisher,
+                 collections, languages, tags
     """
     upload_id = generate_nanoid()
     while os.path.isdir(_upload_dir(upload_id)):
@@ -252,18 +251,13 @@ def create_upload(meta: dict) -> dict:
             "year": year,
             "slug": slug,
             "type": meta.get('type'),
-            "type_object": meta.get('type_object'),
             "genre": meta.get('genre'),
-            "genre_object": meta.get('genre_object'),
             "creators": meta.get('creators', []),
             "location": meta.get('location'),
-            "location_object": meta.get('location_object'),
             "publisher": meta.get('publisher'),
-            "publisher_object": meta.get('publisher_object'),
             "collections": meta.get('collections', []),
             "languages": meta.get('languages', []),
             "tags": meta.get('tags', []),
-            "tags_object": meta.get('tags_object', []),
         },
         "expected_pages": None,
         "remote_staging_path": f"AUTO-OCR/{upload_id}",
@@ -286,9 +280,9 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
         return False
     allowed = {
         'title', 'year', 'collections', 'languages',
-        'type', 'type_object', 'genre', 'genre_object',
-        'creators', 'location', 'location_object',
-        'publisher', 'publisher_object', 'tags', 'tags_object',
+        'type', 'genre',
+        'creators', 'location',
+        'publisher', 'tags',
     }
     lock = _get_upload_lock(upload_id)
     with lock:
@@ -1033,18 +1027,28 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
             except Exception:
                 pass
 
-    # _metadata.json
+    # _metadata.json — kõik upload formis sisestatud metaandmed
+    OPTIONAL_META_FIELDS = [
+        "creators", "tags",
+        "type", "genre",
+        "location", "publisher",
+        "ester_id", "external_url", "year_display",
+    ]
     metadata = {
         "id": work_id,
         "slug": slug,
         "title": title,
-        "creators": [],
-        "tags": [],
         "collections": work_collections,
         "languages": languages,
     }
     if year is not None:
         metadata["year"] = year
+    for field in OPTIONAL_META_FIELDS:
+        if field in meta and meta[field] not in (None, [], ""):
+            metadata[field] = meta[field]
+    # tags ja creators peavad alati olemas olema (tühi list kui puudub)
+    metadata.setdefault("tags", [])
+    metadata.setdefault("creators", [])
     meta_path = os.path.join(work_dir, '_metadata.json')
     with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)

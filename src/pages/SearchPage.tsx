@@ -141,7 +141,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const obj = (hit as any).genre_object;
+            const obj = (hit as any).genre_object ?? hit.genre;
             if (!obj) continue;
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
@@ -163,7 +163,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const obj = (hit as any).genre_object;
+            const obj = (hit as any).genre_object ?? hit.genre;
             if (!obj) continue;
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
@@ -202,7 +202,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const obj = (hit as any).type_object;
+            const obj = (hit as any).type_object ?? hit.type;
             if (!obj) continue;
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
@@ -224,7 +224,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const obj = (hit as any).type_object;
+            const obj = (hit as any).type_object ?? hit.type;
             if (!obj) continue;
             const items = Array.isArray(obj) ? obj : [obj];
             for (const item of items) {
@@ -269,7 +269,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const objs = (hit as any).tags_object;
+            const objs = (hit as any).tags_object ?? hit.tags;
             if (!objs || !Array.isArray(objs)) continue;
             for (const item of objs) {
                 if (!item?.labels) continue;
@@ -314,7 +314,7 @@ const SearchPage: React.FC = () => {
         const lang = getLangCode(i18n.language);
         if (!results?.hits) return map;
         for (const hit of results.hits) {
-            const objs = (hit as any).tags_object;
+            const objs = (hit as any).tags_object ?? hit.tags;
             if (!objs || !Array.isArray(objs)) continue;
             for (const item of objs) {
                 if (item?.id && item?.labels) {

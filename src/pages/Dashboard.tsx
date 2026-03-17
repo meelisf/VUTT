@@ -186,19 +186,19 @@ const Dashboard: React.FC = () => {
 
   // Genre kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: genreIdMap, labelToId: genreLabelToId } = useMemo(() => {
-    const items = collectLinkedEntities(works, w => w.genre_object);
+    const items = collectLinkedEntities(works, w => w.genre);
     return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
   // Tags kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: tagsIdMap, labelToId: tagsLabelToId } = useMemo(() => {
-    const items = collectLinkedEntities(works, w => w.tags_object);
+    const items = collectLinkedEntities(works, w => w.tags);
     return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
   // Type kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: typeIdMap, labelToId: typeLabelToId } = useMemo(() => {
-    const items = collectLinkedEntities(works, w => (w as any).type_object);
+    const items = collectLinkedEntities(works, w => w.type);
     return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 

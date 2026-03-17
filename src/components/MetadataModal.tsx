@@ -196,10 +196,10 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       year: work?.year || page.year || page.aasta || 0,
       year_display: work?.year_display || page.year_display || '',
       type: work?.type || page.type || null,
-      genre: (() => { const g = (work as any)?.genre_object ?? (page as any)?.genre_object ?? work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
-      tags: work?.tags_object || work?.tags || page.tags_object || page.tags || [],
-      location: work?.location_object || work?.location || page.location_object || page.location || '',
-      publisher: work?.publisher_object || work?.publisher || page.publisher_object || page.publisher || '',
+      genre: (() => { const g = work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
+      tags: work?.tags || page.tags || [],
+      location: work?.location || page.location || '',
+      publisher: work?.publisher || page.publisher || '',
       creators: work?.creators || page.creators || initialCreators,
       languages: work?.languages || page.languages || [],
       ester_id: work?.ester_id || page.ester_id || '',
@@ -276,9 +276,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         // V2 formaat (v1 fallback turvavõrguna)
         const title = m.title ?? m.pealkiri ?? '';
         const year = m.year ?? m.aasta ?? 0;
-        const location = m.location_object ?? m.location ?? m.koht ?? '';
-        const publisher = m.publisher_object ?? m.publisher ?? m.trükkal ?? '';
-        const tags = m.tags_object ?? m.tags ?? m.teose_tags ?? [];
+        const location = m.location ?? m.koht ?? '';
+        const publisher = m.publisher ?? m.trükkal ?? '';
+        const tags = m.tags ?? m.teose_tags ?? [];
 
         // Creators: v2 esmalt, v1 fallback
         let creators: Creator[] = [];
@@ -382,43 +382,18 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         const mainAuthor = auctor || praeses || cleanCreators.find(c => c.role !== 'respondens');
         const respondens = cleanCreators.find(c => c.role === 'respondens');
 
-        const locationLabel = typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label;
-        const publisherLabel = typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label;
-
-        // Teata parent komponendile uuendatud andmetest
-        // NB: Tüübiassertsioonid vajalikud, kuna metaForm kasutab ühtset formaati,
-        // aga Page/Work interface'id ootavad eraldi _object välju LinkedEntity tüübina.
-        // Runtime'is töötab, sest backend käsitleb mõlemat formaati.
-        // Abifunktsioonid label'i ekstraktimiseks LinkedEntity objektidest
-        const getTypeLabel = (t: typeof metaForm.type): string | undefined => {
-          if (!t) return undefined;
-          if (typeof t === 'string') return t;
-          return t.label;
-        };
-        const getGenreLabel = (genres: typeof metaForm.genre): string | undefined => {
-          if (!genres || genres.length === 0) return undefined;
-          const g = genres[0];
-          if (typeof g === 'string') return g;
-          return g.label;
-        };
-
         onSaveSuccess(
           {
             title: metaForm.title,
             year: metaForm.year,
             year_display: metaForm.year_display.trim() || null,
-            type: getTypeLabel(metaForm.type),
-            type_object: metaForm.type as LinkedEntity | undefined,
-            genre: getGenreLabel(metaForm.genre),
-            genre_object: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : undefined,
+            type: metaForm.type as LinkedEntity | null,
+            genre: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : null,
             creators: cleanCreators,
-            tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
-            tags_object: tagsArray as LinkedEntity[],
+            tags: tagsArray as LinkedEntity[],
             languages: metaForm.languages,
-            location: typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label,
-            location_object: metaForm.location as LinkedEntity,
-            publisher: typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label,
-            publisher_object: metaForm.publisher as LinkedEntity,
+            location: metaForm.location as LinkedEntity | null,
+            publisher: metaForm.publisher as LinkedEntity | null,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collections: metaForm.collections,
@@ -427,18 +402,13 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             title: metaForm.title,
             year: metaForm.year,
             year_display: metaForm.year_display.trim() || null,
-            type: getTypeLabel(metaForm.type),
-            type_object: metaForm.type as LinkedEntity | undefined,
-            genre: getGenreLabel(metaForm.genre),
-            genre_object: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : undefined,
+            type: metaForm.type as LinkedEntity | null,
+            genre: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : null,
             creators: cleanCreators,
-            tags: tagsArray.map(t => typeof t === 'string' ? t : t.label),
-            tags_object: tagsArray as LinkedEntity[],
+            tags: tagsArray as LinkedEntity[],
             languages: metaForm.languages,
-            location: typeof metaForm.location === 'string' ? metaForm.location : metaForm.location.label,
-            location_object: metaForm.location as LinkedEntity,
-            publisher: typeof metaForm.publisher === 'string' ? metaForm.publisher : metaForm.publisher.label,
-            publisher_object: metaForm.publisher as LinkedEntity,
+            location: metaForm.location as LinkedEntity | null,
+            publisher: metaForm.publisher as LinkedEntity | null,
             ester_id: cleanEsterId || undefined,
             external_url: metaForm.external_url.trim() || undefined,
             collections: metaForm.collections,
