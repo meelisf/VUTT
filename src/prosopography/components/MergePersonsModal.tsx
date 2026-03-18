@@ -15,6 +15,7 @@ interface MergePersonsModalProps {
 const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highlight: 'source' | 'target' }> = ({
   person, label, highlight,
 }) => {
+  const { t } = useTranslation(['prosopography']);
   const lifespanNode = (() => {
     const sym = 'text-primary-500';
     const b = person.birth_year ? <><span className={sym}>*</span>{person.birth_year}</> : null;
