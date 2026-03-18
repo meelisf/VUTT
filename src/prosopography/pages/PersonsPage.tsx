@@ -42,7 +42,7 @@ const PersonsPage: React.FC = () => {
     setCollectionLoading(true);
     index.search('', {
       filter: [`collections_hierarchy = "${selectedCollection}"`],
-      attributesToRetrieve: ['creators', 'tags_object', 'tags'],
+      attributesToRetrieve: ['creators', 'tags_object', 'tags', 'publisher_object'],
       limit: 5000,
     }).then(res => {
       const ids = new Set<string>();
@@ -53,6 +53,8 @@ const PersonsPage: React.FC = () => {
         for (const tag of ((hit as any).tags_object ?? hit.tags ?? [])) {
           if (typeof tag.id === 'string' && tag.id.startsWith('vutt:P')) ids.add(tag.id);
         }
+        const pub = (hit as any).publisher_object;
+        if (pub && typeof pub.id === 'string' && pub.id.startsWith('vutt:P')) ids.add(pub.id);
       }
       setCollectionPersonIds(ids);
     }).finally(() => setCollectionLoading(false));
