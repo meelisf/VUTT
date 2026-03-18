@@ -31,13 +31,18 @@ const PersonsPage: React.FC = () => {
   const level  = (searchParams.get('level')  ?? '') as LevelFilter;
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
 
-  const setParam = (key: string, value: string) =>
-    setSearchParams(p => { const n = new URLSearchParams(p); value ? n.set(key, value) : n.delete(key); return n; }, { replace: true });
+  const setFilterParam = (key: string, value: string) =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      value ? n.set(key, value) : n.delete(key);
+      n.delete('offset');
+      return n;
+    }, { replace: true });
 
-  const setQuery  = (v: string)        => { setParam('q', v); resetOffset(); };
-  const setGender = (v: GenderFilter)  => { setParam('gender', v); resetOffset(); };
-  const setSource = (v: SourceFilter)  => { setParam('source', v); resetOffset(); };
-  const setLevel  = (v: LevelFilter)   => { setParam('level', v); resetOffset(); };
+  const setQuery  = (v: string)       => setFilterParam('q', v);
+  const setGender = (v: GenderFilter) => setFilterParam('gender', v);
+  const setSource = (v: SourceFilter) => setFilterParam('source', v);
+  const setLevel  = (v: LevelFilter)  => setFilterParam('level', v);
 
   const resetOffset = () =>
     setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
