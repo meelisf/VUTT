@@ -18,7 +18,7 @@ import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState, EditorSelection, Compartment, Transaction } from '@codemirror/state';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
-import { createVuttSearchPanel, setSearchDisplayText } from './editor/VuttSearchPanel';
+import { createVuttSearchPanel } from './editor/VuttSearchPanel';
 
 // --- wrapWithTag abifunktsioonid ---
 
@@ -91,12 +91,12 @@ interface TextEditorProps {
   currentStatus?: PageStatus | null;
   onStatusChange?: (status: PageStatus) => void;
   triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
-  initialSearch?: string;
+
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, initialSearch }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const lang = getLangCode(i18n.language);
@@ -159,6 +159,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     return false;
   }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments]);
 
+  // --- Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit ---
+  useEffect(() => {
+    const handleCtrlF = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        const view = viewRef.current;
+        if (view) {
+          e.preventDefault();
+          e.stopPropagation();
+          openSearchPanel(view);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleCtrlF, true); // capture=true: enne CM6 ja brauserit
+    return () => window.removeEventListener('keydown', handleCtrlF, true);
+  }, []);
+
   // --- CM6 editori loomine (üks kord mount'il) ---
   useEffect(() => {
     if (!editorContainerRef.current) return;
@@ -217,12 +233,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     });
 
     viewRef.current = view;
-
-    // Kui tuldi otsingust, ava otsingupaneel algse otsinguterminiga
-    if (initialSearch) {
-      setSearchDisplayText(initialSearch);
-      openSearchPanel(view);
-    }
 
     return () => {
       view.destroy();

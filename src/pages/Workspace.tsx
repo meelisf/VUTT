@@ -27,7 +27,6 @@ const Workspace: React.FC = () => {
   const lang = getLangCode(i18n.language);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const [searchParams] = useSearchParams();
-  const initialSearch = searchParams.get('q') || undefined;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -661,7 +660,7 @@ const Workspace: React.FC = () => {
             currentStatus={currentStatus}
             onStatusChange={user && !isContributor ? setCurrentStatus : undefined}
             triggerSave={editorSaveRef}
-            initialSearch={initialSearch}
+
           />
           </div>
         </div>

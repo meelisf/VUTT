@@ -68,10 +68,6 @@ function buildDiacriticPattern(text: string, caseSensitive: boolean): string {
 let lastSearchDisplay = '';
 let lastReplaceDisplay = '';
 
-/** Võimaldab TextEditoril seada initsiaalse otsingutermi (nt URL ?q= parameetrist). */
-export function setSearchDisplayText(text: string): void {
-    lastSearchDisplay = text;
-}
 
 export function createVuttSearchPanel(view: EditorView) {
     return new VuttSearchPanel(view);
@@ -88,7 +84,7 @@ class VuttSearchPanel {
         this.dom = document.createElement('div');
         this.dom.className = 'cm-search';
 
-        this.searchInput = this.makeInput('Otsi', lastSearchDisplay);
+        this.searchInput = this.makeInput('Otsi', lastSearchDisplay, true);
         this.replaceInput = this.makeInput('Asenda', lastReplaceDisplay);
         this.caseCheckbox = this.makeCheckbox('case');
         this.wordCheckbox = this.makeCheckbox('word');
@@ -112,11 +108,12 @@ class VuttSearchPanel {
         });
     }
 
-    private makeInput(placeholder: string, value: string): HTMLInputElement {
+    private makeInput(placeholder: string, value: string, isMain = false): HTMLInputElement {
         const el = document.createElement('input');
         el.className = 'cm-textfield';
         el.placeholder = placeholder;
         el.setAttribute('aria-label', placeholder);
+        if (isMain) el.setAttribute('main-field', '');
         el.value = value;
         el.addEventListener('input', () => this.commit());
         return el;
@@ -211,7 +208,9 @@ class VuttSearchPanel {
         this.searchInput.focus();
         if (this.searchInput.value) {
             this.searchInput.select();
-            this.commit();
+            // commit() kutsub view.dispatch() — mount() käib CM6 update'i sees (updateState!=0),
+            // otse dispatch() kutsumine throws. Defer mikrotaskini kus update on lõppenud.
+            Promise.resolve().then(() => this.commit());
         }
     }
 
