@@ -130,7 +130,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     </span>
                     <span className="text-gray-300">|</span>
                     <button
-                        onClick={() => navigate(`/work/${hit.work_id}/${hit.lehekylje_number}`)}
+                        onClick={() => navigate(`/work/${hit.work_id}/${hit.lehekylje_number}${queryParam ? `?q=${encodeURIComponent(queryParam)}` : ''}`)}
                         className="text-xs font-bold text-primary-600 hover:text-primary-700 hover:underline"
                     >
                         {t('results.openWorkspace')}
@@ -171,7 +171,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     </div>
                     {hit.lehekylje_pilt && (
                         <button
-                            onClick={() => navigate(`/work/${hit.work_id}/${hit.lehekylje_number}`)}
+                            onClick={() => navigate(`/work/${hit.work_id}/${hit.lehekylje_number}${queryParam ? `?q=${encodeURIComponent(queryParam)}` : ''}`)}
                             className="shrink-0 w-20 h-28 bg-gray-100 rounded overflow-hidden hidden sm:block hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer self-start"
                             title={t('results.openWorkspaceTitle')}
                         >

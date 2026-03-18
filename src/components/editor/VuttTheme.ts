@@ -56,4 +56,53 @@ export const vuttTheme = EditorView.theme({
   '.cm-line': {
     padding: '0',
   },
+  // Otsingupaneel — block-layout et <br> töötaks, kõik read eraldi
+  '.cm-search': {
+    padding: '5px 8px 6px',
+    fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+    fontSize: '13px',
+    backgroundColor: '#f9fafb',
+    borderTop: '1px solid #e5e7eb',
+    lineHeight: '2',
+  },
+  '.cm-search .cm-textfield': {
+    fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+    fontSize: '13px',
+    padding: '2px 6px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    outline: 'none',
+    width: '130px',
+  },
+  '.cm-search .cm-textfield:focus': {
+    borderColor: '#6366f1',
+    boxShadow: '0 0 0 2px rgba(99, 102, 241, 0.2)',
+  },
+  '.cm-search .cm-button': {
+    padding: '2px 7px',
+    fontSize: '12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    backgroundColor: 'white',
+    cursor: 'pointer',
+  },
+  '.cm-search .cm-button:hover': {
+    backgroundColor: '#f3f4f6',
+  },
+  '.cm-search label': {
+    fontSize: '11px !important',
+    color: '#6b7280',
+    cursor: 'pointer',
+    marginRight: '4px',
+    whiteSpace: 'nowrap !important',
+  },
+  '.cm-searchMatch': {
+    backgroundColor: '#fef08a',
+    outline: '1px solid #fbbf24',
+    borderRadius: '2px',
+  },
+  '.cm-searchMatch-selected': {
+    backgroundColor: '#fde68a',
+    outline: '1px solid #f59e0b',
+  },
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate, Link, useBlocker, useSearchParams } from 'react-router-dom';
 import { getPage, savePage, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -26,6 +26,8 @@ const Workspace: React.FC = () => {
   const { collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('q') || undefined;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -659,6 +661,7 @@ const Workspace: React.FC = () => {
             currentStatus={currentStatus}
             onStatusChange={user && !isContributor ? setCurrentStatus : undefined}
             triggerSave={editorSaveRef}
+            initialSearch={initialSearch}
           />
           </div>
         </div>
