@@ -41,7 +41,7 @@ const PersonsPage: React.FC = () => {
     if (!selectedCollection) { setCollectionPersonIds(null); return; }
     setCollectionLoading(true);
     index.search('', {
-      filter: [`collections_hierarchy = "${selectedCollection}"`],
+      filter: [`collections_hierarchy = "${selectedCollection}"`, 'lehekylje_number = 1'],
       attributesToRetrieve: ['creators', 'tags_object', 'tags', 'publisher_object'],
       limit: 5000,
     }).then(res => {
