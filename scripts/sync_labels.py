@@ -25,7 +25,7 @@ DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 LABELS_FILE = os.path.join(PROJECT_ROOT, "state", "labels.json")
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
-WIKIDATA_LANGS = ["et", "en"]
+WIKIDATA_LANGS = ["et", "en", "la", "de"]
 WIKIDATA_BATCH_SIZE = 50  # max ids per request
 
 

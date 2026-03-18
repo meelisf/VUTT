@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
-from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async
+from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
 from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
@@ -1142,6 +1142,12 @@ async def people_register(): return {"status": "success", "people": get_cached_p
 
 @app.get("/entity-labels")
 async def entity_labels(): return load_entity_labels()
+
+@app.post("/admin/refresh-entity-labels")
+async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
+    """Värskendab kõik labels.json Q-koodid Wikidatast (admin)."""
+    count = refresh_all_entity_labels()
+    return {"updated": count}
 
 @app.get("/user-chars")
 async def get_user_chars(request: Request, user=Depends(get_user)):

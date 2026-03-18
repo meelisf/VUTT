@@ -108,20 +108,28 @@ def enrich_entity_labels_from_person_async(person):
 
 
 def enrich_entity_labels_async_qcodes(qcodes):
-    """Lisab puuduvad Q-koodid labels.json-i taustal (sisemine apifunktsioon)."""
+    """Lisab/uuendab Q-koodid labels.json-is taustal.
+
+    Re-fetchib ka Q-koodid kus mõni sihtkeel (nt 'et') puudub —
+    kasutaja võis vahepeal Wikidata tõlke lisada.
+    """
     if not qcodes:
         return
 
     def task():
         with _LABELS_LOCK:
             existing = load_entity_labels()
-            missing = {qid for qid in qcodes if qid not in existing}
+            to_fetch = {
+                qid for qid in qcodes
+                if qid not in existing
+                or any(lang not in existing[qid] for lang in _TARGET_LANGS)
+            }
 
-        if not missing:
+        if not to_fetch:
             return
 
-        print(f"LABELS: Pärin {len(missing)} uut Q-koodi Wikidatast: {sorted(missing)}")
-        fetched = _fetch_wikidata_labels(missing)
+        print(f"LABELS: Pärin {len(to_fetch)} Q-koodi Wikidatast: {sorted(to_fetch)}")
+        fetched = _fetch_wikidata_labels(to_fetch)
 
         if fetched:
             with _LABELS_LOCK:
@@ -129,11 +137,27 @@ def enrich_entity_labels_async_qcodes(qcodes):
                 existing.update(fetched)
                 os.makedirs(os.path.dirname(LABELS_FILE), exist_ok=True)
                 atomic_write_json(LABELS_FILE, existing)
-            print(f"LABELS: Lisatud {len(fetched)} kirjet labels.json-i")
+            print(f"LABELS: Uuendatud {len(fetched)} kirjet labels.json-is")
 
     thread = threading.Thread(target=task)
     thread.daemon = True
     thread.start()
+
+
+def refresh_all_entity_labels():
+    """Värskendab kõik labels.json Q-koodid Wikidatast (admin toiming)."""
+    existing = load_entity_labels()
+    qcodes = list(existing.keys())
+    if not qcodes:
+        return 0
+    print(f"LABELS: Täielik värskendus — {len(qcodes)} Q-koodi")
+    fetched = _fetch_wikidata_labels(qcodes)
+    if fetched:
+        with _LABELS_LOCK:
+            current = load_entity_labels()
+            current.update(fetched)
+            atomic_write_json(LABELS_FILE, current)
+    return len(fetched)
 
 
 def enrich_entity_labels_async(metadata):
