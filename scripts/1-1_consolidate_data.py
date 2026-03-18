@@ -516,8 +516,10 @@ def create_meilisearch_data_per_page():
                 'year': doc_metadata.get('year'),
                 'location': get_label(doc_metadata.get('location')),
                 'location_id': get_id(doc_metadata.get('location')),
+                'location_object': doc_metadata.get('location'),
                 'publisher': get_label(doc_metadata.get('publisher')),
                 'publisher_id': get_id(doc_metadata.get('publisher')),
+                'publisher_object': doc_metadata.get('publisher'),
 
                 # Taksonoomia
                 'type': get_label(doc_metadata.get('type', 'impressum')), # Vaikimisi (et)
