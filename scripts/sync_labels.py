@@ -14,6 +14,7 @@ Kasutus:
 import json
 import os
 import sys
+import time
 import urllib.request
 import urllib.parse
 
@@ -26,7 +27,8 @@ LABELS_FILE = os.path.join(PROJECT_ROOT, "state", "labels.json")
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 WIKIDATA_LANGS = ["et", "en", "la", "de"]
-WIKIDATA_BATCH_SIZE = 50  # max ids per request
+WIKIDATA_BATCH_SIZE = 50   # max ids per request
+WIKIDATA_SLEEP_SECS = 1.0  # ooteaeg batchide vahel (Wikidata rate limit)
 
 
 def load_labels():
@@ -115,12 +117,15 @@ def fetch_wikidata_labels(qcodes):
         url = f"{WIKIDATA_API}?{params}"
 
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "VUTT-sync/1.0"})
+            req = urllib.request.Request(url, headers={"User-Agent": "VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)"})
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except Exception as e:
             print(f"Viga Wikidata päringul (batch {i//WIKIDATA_BATCH_SIZE + 1}): {e}")
             continue
+
+        if i + WIKIDATA_BATCH_SIZE < len(qcodes_list):
+            time.sleep(WIKIDATA_SLEEP_SECS)
 
         entities = data.get("entities", {})
         for qid, entity in entities.items():
