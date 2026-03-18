@@ -881,6 +881,12 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
                     tag["id"] = target_id
                     tag["label"] = target_label
                     changed = True
+            # publisher: source_id → target_id
+            pub = meta.get("publisher")
+            if isinstance(pub, dict) and pub.get("id") == source_id:
+                meta["publisher"]["id"] = target_id
+                meta["publisher"]["label"] = target_label
+                changed = True
             if changed:
                 changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
 
