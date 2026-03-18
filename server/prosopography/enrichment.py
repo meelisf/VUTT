@@ -34,6 +34,8 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
         remote = _fetch_gnd(ext_id)
     elif scheme in ("aa", "album_academicum"):
         remote = _fetch_aa(ext_id)
+    elif scheme == "viaf":
+        remote = _fetch_viaf(ext_id)
     else:
         return {"auto_filled": {}, "conflicts": [], "error": f"Tundmatu skeem: {scheme}"}
 
@@ -326,6 +328,105 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
         pass
 
     return result
+
+
+# =========================================================
+# VIAF (Virtual International Authority File)
+# =========================================================
+
+def _fetch_viaf(viaf_id: str) -> Optional[dict]:
+    """Küsib VIAF andmed JSON API kaudu.
+
+    Tagastab:
+      name.aliases  — nimevariandid kõigist kirjetest
+      _linked_wikidata — Wikidata Q-kood (kui leidub)
+      _linked_gnd      — GND ID (kui leidub)
+    """
+    # Puhasta ID (eralda "VIAF:" prefiksist kui on)
+    raw_id = viaf_id.replace("VIAF:", "").replace("viaf:", "").strip()
+    if not raw_id.isdigit():
+        return None
+
+    url = f"https://viaf.org/viaf/{raw_id}/justlinks.json"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+
+    result = {}
+
+    # Seotud identifikaatorid: Wikidata + GND
+    try:
+        wd_list = data.get("WKP") or []
+        if not isinstance(wd_list, list):
+            wd_list = [wd_list]
+        for item in wd_list:
+            qid = (item.get("@") if isinstance(item, dict) else str(item)).strip()
+            if qid.startswith("Q") and qid[1:].isdigit():
+                result["_linked_wikidata"] = qid
+                break
+    except Exception:
+        pass
+
+    try:
+        gnd_list = data.get("DNB") or []
+        if not isinstance(gnd_list, list):
+            gnd_list = [gnd_list]
+        for item in gnd_list:
+            gnd_id = (item.get("@") if isinstance(item, dict) else str(item)).strip()
+            if gnd_id:
+                result["_linked_gnd"] = gnd_id
+                break
+    except Exception:
+        pass
+
+    # Nimevariandid — küsi täiskirje
+    try:
+        names_url = f"https://viaf.org/viaf/{raw_id}/viaf.json"
+        req2 = urllib.request.Request(names_url, headers=HEADERS)
+        with urllib.request.urlopen(req2, timeout=15) as resp2:
+            full = json.loads(resp2.read().decode("utf-8"))
+
+        seen = set()
+        aliases = []
+
+        # mainHeadings
+        main = full.get("mainHeadings") or {}
+        headings = main.get("data") or []
+        if not isinstance(headings, list):
+            headings = [headings]
+        for h in headings:
+            text = h.get("text") if isinstance(h, dict) else None
+            if text and text not in seen:
+                seen.add(text)
+                aliases.append(text)
+
+        # x400 (variantNamesForThePerson)
+        x400 = full.get("x400s") or {}
+        x400_data = x400.get("x400") or []
+        if not isinstance(x400_data, list):
+            x400_data = [x400_data]
+        for entry in x400_data:
+            if not isinstance(entry, dict):
+                continue
+            subfields = entry.get("datafield", {}).get("subfield") or []
+            if not isinstance(subfields, list):
+                subfields = [subfields]
+            parts = [sf.get("#text", "") for sf in subfields
+                     if isinstance(sf, dict) and sf.get("@code") in ("a", "b", "c")]
+            name = " ".join(p.strip().rstrip(",") for p in parts if p.strip())
+            if name and name not in seen and len(aliases) < 20:
+                seen.add(name)
+                aliases.append(name)
+
+        if aliases:
+            result["name.aliases"] = aliases
+    except Exception:
+        pass
+
+    return result if result else {}
 
 
 # =========================================================

@@ -1049,6 +1049,17 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     # tags ja creators peavad alati olemas olema (tühi list kui puudub)
     metadata.setdefault("tags", [])
     metadata.setdefault("creators", [])
+
+    # Asenda Wikidata Q-koodid vutt:P ID-dega (loo stub kaardid vajadusel)
+    try:
+        from .prosopography.ops import ensure_prosopo_stubs
+        metadata = {**metadata, **{
+            k: v for k, v in ensure_prosopo_stubs(metadata, username).items()
+            if k in ("creators", "tags", "publisher")
+        }}
+    except Exception as e:
+        logger.warning(f"import {upload_id}: prosopo stub loomine ebaõnnestus: {e}")
+
     meta_path = os.path.join(work_dir, '_metadata.json')
     with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(metadata, f, ensure_ascii=False, indent=2)

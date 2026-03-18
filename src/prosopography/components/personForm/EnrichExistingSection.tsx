@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe, BookMarked, BookOpen, Loader2, RefreshCw, AlertTriangle, ChevronRight, ChevronDown } from 'lucide-react';
-import { fetchPersonEnrichmentPreview } from '../../services/prosopographyService';
+import { fetchEnrichmentPreview, fetchPersonEnrichmentPreview } from '../../services/prosopographyService';
 import { applyEnrichmentToDraft } from './helpers';
 import type { FormDraft } from './types';
 
 interface Props {
-  personId: string;
+  personId: string | undefined;
   wikidataId: string;
   gndId: string;
   aaId: string;
+  viafId: string;
   draft: FormDraft;
   token: string;
   onChange: (newDraft: FormDraft) => void;
@@ -30,6 +31,8 @@ const FIELD_I18N: Record<string, string> = {
   'name.label': 'nameLabel',
   'name.aliases': 'nameAliases',
   biography: 'biography',
+  _linked_wikidata: 'linkedWikidata',
+  _linked_gnd: 'linkedGnd',
 };
 
 type DiffResult = {
@@ -38,7 +41,7 @@ type DiffResult = {
   error?: string;
 };
 
-const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, aaId, draft, token, onChange, onApplied }) => {
+const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, aaId, viafId, draft, token, onChange, onApplied }) => {
   const { t } = useTranslation(['prosopography']);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState<string | null>(null);
@@ -51,6 +54,7 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
     ...(wikidataId ? [{ scheme: 'wikidata', label: 'Wikidata', extId: wikidataId, icon: <Globe size={12} className="text-blue-500" /> }] : []),
     ...(gndId ? [{ scheme: 'gnd', label: 'GND', extId: gndId, icon: <BookMarked size={12} className="text-orange-500" /> }] : []),
     ...(aaId ? [{ scheme: 'album_academicum', label: 'Album Academicum', extId: aaId, icon: <BookOpen size={12} className="text-purple-500" /> }] : []),
+    ...(viafId ? [{ scheme: 'viaf', label: 'VIAF', extId: viafId, icon: <BookOpen size={12} className="text-violet-500" /> }] : []),
   ];
 
   if (schemes.length === 0) return null;
@@ -61,7 +65,9 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
     setError(null);
     setActiveScheme(scheme);
     try {
-      const result = await fetchPersonEnrichmentPreview(personId, scheme, token, extId);
+      const result = personId
+        ? await fetchPersonEnrichmentPreview(personId, scheme, token, extId)
+        : await fetchEnrichmentPreview(scheme, extId, token);
       if (result.error) { setError(result.error); return; }
       setDiff(result);
     } catch {
@@ -90,6 +96,13 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
   const handleApply = () => {
     if (!diff) return;
     const newDraft = applyEnrichmentToDraft(diff.auto_filled, draft);
+    // VIAF seotud ID-d
+    if (activeScheme === 'viaf') {
+      if (diff.auto_filled['_linked_wikidata'] && !newDraft.wikidata_id)
+        newDraft.wikidata_id = diff.auto_filled['_linked_wikidata'];
+      if (diff.auto_filled['_linked_gnd'] && !newDraft.gnd_id)
+        newDraft.gnd_id = diff.auto_filled['_linked_gnd'];
+    }
     onChange(newDraft);
     const fields = autoKeys.map(fieldLabel);
     setAppliedFields(fields);

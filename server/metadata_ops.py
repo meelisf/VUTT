@@ -10,7 +10,7 @@ import os
 from .utils import metadata_lock
 from .git_ops import save_with_git
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
-from .prosopography.ops import update_person_to_works
+from .prosopography.ops import update_person_to_works, ensure_prosopo_stubs
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
@@ -49,6 +49,10 @@ def save_work_metadata(
 
     Tagastab uuendatud meta dict-i.
     """
+    # Loo prosopo stub kaardid Wikidata Q-koodiga creators/tags/publisher jaoks
+    if any(k in updates for k in ("creators", "tags", "publisher")):
+        updates = ensure_prosopo_stubs(updates, username)
+
     with metadata_lock:
         if os.path.exists(meta_path):
             with open(meta_path, "r", encoding="utf-8") as f:

@@ -161,6 +161,8 @@
       "nameLabel": "Canonical name",
       "nameAliases": "Name variants",
       "biography": "Biography",
+      "linkedWikidata": "Wikidata link",
+      "linkedGnd": "GND link",
       "genderM": "Male",
       "genderF": "Female"
     },

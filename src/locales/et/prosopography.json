@@ -161,6 +161,8 @@
       "nameLabel": "Kanooniline nimi",
       "nameAliases": "Nimevariandid",
       "biography": "Biograafia",
+      "linkedWikidata": "Wikidata link",
+      "linkedGnd": "GND link",
       "genderM": "Meessoost",
       "genderF": "Naissoost"
     },

@@ -554,6 +554,86 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
 # PÖÖRDINDEKS: person → teosed
 # =========================================================
 
+def _find_by_external_id(scheme: str, ext_id: str) -> Optional[dict]:
+    """Otsib prosopo kaarti välise identifikaatori (scheme + id) järgi."""
+    for fpath in _glob.glob(os.path.join(PROSOPOGRAPHY_DIR, "*.json")):
+        if PERSON_IMAGES_DIR_NAME in fpath:
+            continue
+        try:
+            p = json.load(open(fpath, encoding="utf-8"))
+        except Exception:
+            continue
+        if p.get("record_status") == "tombstone":
+            continue
+        for ident in p.get("identifiers") or []:
+            if ident.get("scheme") == scheme and ident.get("id") == ext_id:
+                return p
+    return None
+
+
+def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:
+    """
+    Tagab, et LinkedEntity objektil on vutt:P ID.
+    Wikidata / GND / VIAF → otsi olemasolev kaart, kui pole → loo stub.
+    Kõik muud ID-d (manual, tundmatu) tagastatakse muutmata.
+    """
+    if not isinstance(entity, dict):
+        return entity
+    eid = (entity.get("id") or "").strip()
+    if eid.startswith("vutt:P") or not eid:
+        return entity
+
+    source = (entity.get("source") or "").lower()
+    # Toetatud välisallikad
+    if source not in ("wikidata", "gnd", "viaf"):
+        return entity
+
+    scheme = source  # source nimi = prosopo scheme nimi
+
+    existing = _find_by_external_id(scheme, eid)
+    if existing:
+        return {**entity, "id": existing["id"]}
+
+    label = (entity.get("label") or entity.get("name") or eid).strip()
+    stub = create_person(
+        {"name": label, "identifiers": [{"scheme": scheme, "id": eid}]},
+        username=username,
+    )
+    return {**entity, "id": stub["id"]}
+
+
+def ensure_prosopo_stubs(updates: dict, username: str) -> dict:
+    """
+    Käitleb updates dict-i creators/tags/publisher väljad:
+    asendab Wikidata Q-koodid vutt:P ID-dega (luues stub kaardid vajadusel).
+    Tagastab uuendatud updates koopiaga.
+    """
+    changed = {}
+
+    if "creators" in updates:
+        changed["creators"] = [
+            ensure_prosopo_for_entity(c, username)
+            if isinstance(c, dict) else c
+            for c in (updates["creators"] or [])
+        ]
+
+    if "tags" in updates:
+        changed["tags"] = [
+            ensure_prosopo_for_entity(t, username)
+            if isinstance(t, dict) and t.get("entity_type") == "person" else t
+            for t in (updates["tags"] or [])
+        ]
+
+    if "publisher" in updates:
+        pub = updates["publisher"]
+        if isinstance(pub, dict) and pub.get("entity_type") == "person":
+            changed["publisher"] = ensure_prosopo_for_entity(pub, username)
+
+    if changed:
+        return {**updates, **changed}
+    return updates
+
+
 def update_person_to_works(
     work_id: str,
     creators: list,
@@ -731,6 +811,17 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         raise ValueError(f"Target on tombstone, ei saa liita: {target_id}")
 
     now = datetime.now(timezone.utc).isoformat()
+
+    # 0. Tõsta source identifikaatorid target'ile (skeemid, mis target'il puuduvad)
+    src_idents = source.get("identifiers") or []
+    tgt_idents = target.get("identifiers") or []
+    tgt_schemes = {i.get("scheme") for i in tgt_idents}
+    added_idents = [i for i in src_idents if i.get("scheme") not in tgt_schemes]
+    if added_idents:
+        target["identifiers"] = tgt_idents + added_idents
+        target["updated_at"] = now
+        target["updated_by"] = username
+        _atomic_write(_id_to_path(target_id), target)
 
     # 1. Source → tombstone
     source["record_status"] = "tombstone"

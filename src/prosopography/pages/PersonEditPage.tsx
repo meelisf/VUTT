@@ -527,20 +527,19 @@ const PersonEditPage: React.FC = () => {
               })}
             </div>
           </div>
-          {!isNew && (
-            <EnrichExistingSection
-              personId={id!}
-              wikidataId={draft.wikidata_id}
-              gndId={draft.gnd_id}
-              aaId={draft.aa_id}
-              draft={draft}
-              token={token}
-              onChange={newDraft => setDraft(newDraft)}
-              onApplied={fields => {
-                if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
-              }}
-            />
-          )}
+          <EnrichExistingSection
+            personId={isNew ? undefined : id}
+            wikidataId={draft.wikidata_id}
+            gndId={draft.gnd_id}
+            aaId={draft.aa_id}
+            viafId={draft.viaf_id}
+            draft={draft}
+            token={token}
+            onChange={newDraft => setDraft(newDraft)}
+            onApplied={fields => {
+              if (fields.some(f => f === '_occupations' || f === '_occupation_label')) setOccupOpen(true);
+            }}
+          />
         </CollapsibleSection>
 
         {/* ── Ametid ja haridus (klapitav) ── */}
