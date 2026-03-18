@@ -141,7 +141,8 @@
       "dedicator": "Pühendaja",
       "editor": "Toimetaja",
       "aui": "Eessõna/järelsõna autor",
-      "subject": "Tema kohta"
+      "subject": "Tema kohta",
+      "publisher": "Trükkal"
     },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",

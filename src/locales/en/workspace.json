@@ -141,7 +141,8 @@
       "dedicator": "Dedicator",
       "editor": "Editor",
       "aui": "Author of preface/afterword",
-      "subject": "Subject of"
+      "subject": "Subject of",
+      "publisher": "Publisher"
     },
     "addCreator": "Add person",
     "removeCreator": "Remove",
