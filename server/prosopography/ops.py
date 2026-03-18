@@ -660,10 +660,9 @@ def update_person_to_works(
                 new_entries.setdefault(pid, set()).add("subject")
 
     if publisher and isinstance(publisher, dict):
-        if publisher.get("entity_type") == "person":
-            pid = publisher.get("id") or ""
-            if pid.startswith("vutt:P"):
-                new_entries.setdefault(pid, set()).add("publisher")
+        pid = publisher.get("id") or ""
+        if pid.startswith("vutt:P"):
+            new_entries.setdefault(pid, set()).add("publisher")
 
     with _works_lock:
         data = _load_person_to_works()
@@ -740,7 +739,7 @@ def rebuild_indices():
                     if pid.startswith("vutt:P"):
                         ptw.setdefault(pid, []).append({"work_id": work_id, "role": "subject"})
             pub = meta.get("publisher")
-            if pub and isinstance(pub, dict) and pub.get("entity_type") == "person":
+            if pub and isinstance(pub, dict):
                 pid = pub.get("id") or ""
                 if pid.startswith("vutt:P"):
                     ptw.setdefault(pid, []).append({"work_id": work_id, "role": "publisher"})

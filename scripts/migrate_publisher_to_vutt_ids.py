@@ -309,10 +309,11 @@ def main():
         if vutt_id:
             if not args.dry_run:
                 if isinstance(meta['publisher'], str):
-                    meta['publisher'] = {'label': name, 'id': vutt_id, 'source': 'local'}
+                    meta['publisher'] = {'label': name, 'id': vutt_id, 'source': 'local', 'entity_type': 'person'}
                 else:
                     meta['publisher']['id'] = vutt_id
                     meta['publisher']['source'] = 'local'
+                    meta['publisher']['entity_type'] = 'person'
                 # publisher_id väli (kui on) — eemalda, on vananenud
                 meta.pop('publisher_id', None)
                 atomic_write(meta_f, meta)
