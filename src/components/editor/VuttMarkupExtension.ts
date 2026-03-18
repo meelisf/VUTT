@@ -1,8 +1,13 @@
 // VuttMarkupExtension.ts — CM6 dekoraatoriextension VUTT XML märgenduse jaoks
-// Tägid alati peidetud (Decoration.replace + atomicRanges).
+// TÖÖTAV MUDEL (2026-03):
+// - tavalised paaristägid (<i>, </i>, <b>, </b>, ...) EI tohi olla Decoration.replace().
+//   See murdis plain caret ArrowLeft/ArrowRight liikumise, kuigi Shift+Arrow selection töötas.
+// - paaristägid on mark-dekoratsioon + atomicRanges: DOM-is peidetud, aga editori liikumine
+//   käsitleb neid ühe vahemikuna.
+// - replace/atomic on jäetud ainult päris widget-plokkidele (<pb/>, <fn>...</fn>).
 // Orv tägid eemaldatakse automaatselt pärast kasutaja muudatust (vuttAutoSanitizer).
 
-import { Decoration, DecorationSet, EditorView, WidgetType, keymap } from '@codemirror/view';
+import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
 import { Annotation, RangeSetBuilder, StateField, Transaction } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 
@@ -55,7 +60,7 @@ export interface TagRange {
 interface MarkupSets {
   deco: DecorationSet;
   atomic: DecorationSet;
-  tagRanges: TagRange[]; // kõik tägi positsioonid (cleanMarkup valiku laiendamiseks)
+  tagRanges: TagRange[]; // kõik tägi positsioonid; hoitud tulevaste editori operatsioonide jaoks
 }
 
 const atomicMark = Decoration.mark({});
@@ -106,6 +111,9 @@ function buildMarkup(text: string): MarkupSets {
   const decoRanges: { from: number; to: number; deco: Decoration; isReplace: boolean }[] = [];
   const atomicRanges: { from: number; to: number }[] = [];
   const tagRanges: TagRange[] = [];
+  // CSS peidab selle klassi täielikult, aga tekst jääb dokumenti alles.
+  // Koos atomicRanges-iga annab see stabiilsema kursori liikumise kui replace-dekoratsioon.
+  const hiddenTagMark = Decoration.mark({ class: 'vutt-hidden-tag' });
 
   const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
   let m;
@@ -136,7 +144,7 @@ function buildMarkup(text: string): MarkupSets {
         const open = stack[openIdx];
         stack.splice(openIdx, 1);
 
-        decoRanges.push({ from, to, deco: Decoration.replace({ atomic: true }), isReplace: true });
+        decoRanges.push({ from, to, deco: hiddenTagMark, isReplace: false });
         atomicRanges.push({ from, to });
         tagRanges.push({ from, to });
 
@@ -166,7 +174,7 @@ function buildMarkup(text: string): MarkupSets {
           tagRegex.lastIndex = totalTo;
         }
       } else {
-        decoRanges.push({ from, to, deco: Decoration.replace({ atomic: true }), isReplace: true });
+        decoRanges.push({ from, to, deco: hiddenTagMark, isReplace: false });
         atomicRanges.push({ from, to });
         tagRanges.push({ from, to });
         stack.push({ tag: cleanTagName, from, openEnd: to });
@@ -191,19 +199,11 @@ function buildMarkup(text: string): MarkupSets {
     decoBuilder.add(r.from, r.to, r.deco);
   }
 
-  // Ühendame külgnevad atomilised vahemikud: <i><b> → üks hüpe, mitte kaks
-  const mergedAtomic: { from: number; to: number }[] = [];
-  for (const r of atomicRanges) {
-    const last = mergedAtomic[mergedAtomic.length - 1];
-    if (last && r.from <= last.to) {
-      last.to = Math.max(last.to, r.to);
-    } else {
-      mergedAtomic.push({ from: r.from, to: r.to });
-    }
-  }
-
+  // EI ühenda atomilisi vahemikke.
+  // Varasem katse naabervahemikke ühendada tekitas olukorra, kus kursor jäi ühendatud peitva
+  // vahemiku sisse "kinni". Eraldi tag-range'id olid viimane töötav variant.
   const atomicBuilder = new RangeSetBuilder<Decoration>();
-  for (const r of mergedAtomic) {
+  for (const r of atomicRanges) {
     atomicBuilder.add(r.from, r.to, atomicMark);
   }
 
@@ -249,55 +249,7 @@ const vuttAutoSanitizer = EditorView.updateListener.of(update => {
     annotations: [SANITIZE.of(true), Transaction.userEvent.of('input.format')],
   });
 });
-
-// Nooleklahvide keymap: hüppab üle kõigi järjestikuste tägide ühe vajutusega.
-// Lahendab CM6 atomicRanges piirangu — kursor võib peatuda range alguspiiril.
-const vuttArrowKeymap = keymap.of([
-  {
-    key: 'ArrowRight',
-    run: (view) => {
-      const { main } = view.state.selection;
-      if (!main.empty) return false;
-      const { tagRanges } = view.state.field(vuttMarkupField);
-      let pos = main.head;
-      let moved = false;
-      // Korda kuni enam tägipiiril ei ole (lahendab <m><i> → üks hüpe)
-      let found = true;
-      while (found) {
-        found = false;
-        for (const r of tagRanges) {
-          if (r.from === pos) { pos = r.to; moved = true; found = true; break; }
-        }
-      }
-      if (!moved) return false;
-      view.dispatch({ selection: { anchor: pos, head: pos }, scrollIntoView: true });
-      return true;
-    },
-  },
-  {
-    key: 'ArrowLeft',
-    run: (view) => {
-      const { main } = view.state.selection;
-      if (!main.empty) return false;
-      const { tagRanges } = view.state.field(vuttMarkupField);
-      let pos = main.head;
-      let moved = false;
-      let found = true;
-      while (found) {
-        found = false;
-        for (const r of tagRanges) {
-          if (r.to === pos) { pos = r.from; moved = true; found = true; break; }
-        }
-      }
-      if (!moved) return false;
-      view.dispatch({ selection: { anchor: pos, head: pos }, scrollIntoView: true });
-      return true;
-    },
-  },
-]);
-
 export const vuttMarkupExtension: Extension = [
   vuttMarkupField,
   vuttAutoSanitizer,
-  vuttArrowKeymap,
 ];

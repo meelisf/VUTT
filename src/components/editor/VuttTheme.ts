@@ -56,6 +56,12 @@ export const vuttTheme = EditorView.theme({
   '.cm-line': {
     padding: '0',
   },
+  // Paaristägid peidetakse CSS-iga, mitte replace-widgetina.
+  // See käib kokku VuttMarkupExtensioni mark+atomic mudeliga, mis oli viimane stabiilselt töötanud
+  // lahendus plain caret nooleliikumise jaoks tagide ümber.
+  '.vutt-hidden-tag': {
+    display: 'none',
+  },
   // Otsingupaneel — block-layout et <br> töötaks, kõik read eraldi
   '.cm-search': {
     padding: '5px 8px 6px',
