@@ -178,6 +178,7 @@ const PersonDetailPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; collections: string[] }>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(30);
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -274,6 +275,7 @@ const PersonDetailPage: React.FC = () => {
 
   const uniqueRoles = [...new Set(works.map(w => w.role))];
   const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
+  const displayedWorks = filteredWorks.slice(0, visibleCount);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -421,7 +423,7 @@ const PersonDetailPage: React.FC = () => {
             {uniqueRoles.length > 1 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
                 <button
-                  onClick={() => setSelectedRole(null)}
+                  onClick={() => { setSelectedRole(null); setVisibleCount(30); }}
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${!selectedRole ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
                 >
                   {t('allRoles', 'Kõik')} ({works.length})
@@ -429,7 +431,7 @@ const PersonDetailPage: React.FC = () => {
                 {uniqueRoles.map(role => (
                   <button
                     key={role}
-                    onClick={() => setSelectedRole(role === selectedRole ? null : role)}
+                    onClick={() => { setSelectedRole(role === selectedRole ? null : role); setVisibleCount(30); }}
                     className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${selectedRole === role ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
                   >
                     {t(`workspace:metadata.roles.${role}`, { defaultValue: role })} ({works.filter(w => w.role === role).length})
@@ -438,7 +440,7 @@ const PersonDetailPage: React.FC = () => {
               </div>
             )}
             <div className="space-y-1">
-              {filteredWorks.map(({ work_id, role }) => {
+              {displayedWorks.map(({ work_id, role }) => {
                 const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
@@ -468,6 +470,14 @@ const PersonDetailPage: React.FC = () => {
                 );
               })}
             </div>
+            {filteredWorks.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount(v => v + 30)}
+                className="mt-3 w-full text-xs text-gray-500 hover:text-primary-600 py-1.5 border border-gray-200 rounded hover:border-primary-300 transition-colors"
+              >
+                {t('loadMore', 'Lae veel')} ({filteredWorks.length - visibleCount})
+              </button>
+            )}
           </div>
         )}
 

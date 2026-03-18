@@ -286,19 +286,47 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.printer')}</span>
                   <div className="flex items-center gap-1.5 group">
                     <div className="flex items-center gap-1.5 text-gray-900 overflow-hidden">
-                      <button
-                        onClick={() => { const pubId = (work.publisher as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
-                        className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
-                        title="Filtreeri trükkali järgi"
-                      >
-                        <BookDown size={14} />
-                      </button>
-                      <span
-                        className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
-                        onClick={() => { const pubId = (work.publisher as any)?.id; navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`); }}
-                      >
-                        {getLabel(work.publisher, lang)}
-                      </span>
+                      {(() => {
+                        const pubId = (work.publisher as any)?.id;
+                        const hasProsopoId = pubId?.startsWith('vutt:P');
+                        if (hasProsopoId) {
+                          return (
+                            <>
+                              <Link
+                                to={`/persons/${pubId}`}
+                                className="text-gray-400 hover:text-primary-600 transition-colors shrink-0"
+                                title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                              >
+                                <IdCard size={14} />
+                              </Link>
+                              <Link
+                                to={`/persons/${pubId}`}
+                                className="truncate hover:text-primary-600 transition-colors"
+                                title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                              >
+                                {getLabel(work.publisher, lang)}
+                              </Link>
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            <button
+                              onClick={() => navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`)}
+                              className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
+                              title="Filtreeri trükkali järgi"
+                            >
+                              <BookDown size={14} />
+                            </button>
+                            <span
+                              className="truncate select-text cursor-pointer hover:text-amber-600 transition-colors"
+                              onClick={() => navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`)}
+                            >
+                              {getLabel(work.publisher, lang)}
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     {getEntityUrl((work.publisher as any)?.id, (work.publisher as any)?.source) && (
                       <a
