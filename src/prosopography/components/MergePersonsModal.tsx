@@ -40,7 +40,7 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
         {person.has_gnd     && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">GND</span>}
         {person.has_aa      && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">AA</span>}
         {person.work_count > 0 && (
-          <span className="text-xs text-gray-500 ml-1">{t('works', { count: person.work_count })}</span>
+          <span className="text-xs text-gray-500 ml-1">{person.work_count} {t('works', { count: person.work_count })}</span>
         )}
       </div>
       {isSource && (

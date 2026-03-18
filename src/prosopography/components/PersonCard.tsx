@@ -106,7 +106,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
 
         {person.work_count > 0 && (
           <span className="text-xs text-gray-400 shrink-0">
-            {t('works', { count: person.work_count })}
+            {person.work_count} {t('works', { count: person.work_count })}
           </span>
         )}
 
