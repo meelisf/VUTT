@@ -101,6 +101,25 @@ async def prosopography_list(
     )
 
 
+@router.post("/query")
+async def prosopography_query(request: Request):
+    """
+    Body-põhine listingu endpoint suuremate filtrikomplektide jaoks.
+    Väldib liiga pikka query stringi, kui ids massiiv on suur.
+    """
+    data = await _get_json(request)
+    return list_persons(
+        q=data.get("q"),
+        gender=data.get("gender"),
+        status_id=data.get("status_id"),
+        source=data.get("source"),
+        verification_level=data.get("verification_level"),
+        ids=data.get("ids"),
+        limit=data.get("limit", 48),
+        offset=data.get("offset", 0),
+    )
+
+
 @router.post("")
 async def prosopography_create(
     request: Request,

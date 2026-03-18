@@ -18,6 +18,20 @@ export async function listPersons(params?: {
   limit?: number;
   offset?: number;
 }, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number; offset: number; limit: number }> {
+  if (params?.ids?.length) {
+    const url = new URL(`${BASE}/query`, window.location.origin);
+    if (token) url.searchParams.set('token', token);
+
+    const resp = await fetchWithTimeout(url.toString(), {
+      method: 'POST',
+      headers: authHeader(token || ''),
+      body: JSON.stringify(params),
+      timeout: 10000,
+    });
+    if (!resp.ok) throw new Error(`listPersons: ${resp.status}`);
+    return resp.json();
+  }
+
   const url = new URL(BASE, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
