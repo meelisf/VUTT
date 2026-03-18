@@ -82,17 +82,23 @@ async def prosopography_list(
     status_id: str = None,
     source: str = None,
     verification_level: str = None,
+    ids: str = None,
+    limit: int = 48,
+    offset: int = 0,
     user=Depends(_optional_user),
 ):
-    """Tagastab isikute nimekirja prosopography_index.json-st."""
-    results = list_persons(
+    """Tagastab isikute nimekirja prosopography_index.json-st, pagineeritult."""
+    id_list = [i for i in ids.split(",") if i] if ids else None
+    return list_persons(
         q=q,
         gender=gender,
         status_id=status_id,
         source=source,
         verification_level=verification_level,
+        ids=id_list,
+        limit=limit,
+        offset=offset,
     )
-    return {"results": results, "total": len(results)}
 
 
 @router.post("")

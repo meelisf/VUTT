@@ -359,9 +359,12 @@ def list_persons(
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
-) -> list:
+    ids: Optional[list] = None,
+    limit: int = 48,
+    offset: int = 0,
+) -> dict:
     """
-    Tagastab prosopography_index.json kirjed filtreeritult.
+    Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
     Otsing q= töötab label + sort_name vastu (väiketähelistena).
     """
     index = _load_index()
@@ -370,6 +373,9 @@ def list_persons(
         if e.get("record_status") != "tombstone"
     ]
 
+    if ids is not None:
+        id_set = set(ids)
+        results = [e for e in results if e.get("id") in id_set]
     if q:
         q_lower = q.lower()
         results = [
@@ -391,7 +397,13 @@ def list_persons(
             results = [e for e in results if e.get(field)]
 
     results.sort(key=lambda e: (e.get("sort_name") or "").lower())
-    return results
+    total = len(results)
+    return {
+        "results": results[offset:offset + limit],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> tuple:

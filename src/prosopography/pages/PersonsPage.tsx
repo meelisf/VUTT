@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X } from 'lucide-react';
+import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
@@ -12,13 +12,16 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { index } from '../../services/meiliService';
 import type { ProsopoIndexEntry } from '../types';
 
+const LIMIT = 48;
+
 const PersonsPage: React.FC = () => {
   const { t } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [allPersons, setAllPersons] = useState<ProsopoIndexEntry[]>([]);
+  const [persons, setPersons] = useState<ProsopoIndexEntry[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,11 +29,21 @@ const PersonsPage: React.FC = () => {
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
   const source = (searchParams.get('source') ?? '') as SourceFilter;
   const level  = (searchParams.get('level')  ?? '') as LevelFilter;
+  const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
 
-  const setQuery  = (v: string)        => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('q', v) : n.delete('q'); return n; }, { replace: true });
-  const setGender = (v: GenderFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('gender', v) : n.delete('gender'); return n; }, { replace: true });
-  const setSource = (v: SourceFilter)  => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('source', v) : n.delete('source'); return n; }, { replace: true });
-  const setLevel  = (v: LevelFilter)   => setSearchParams(p => { const n = new URLSearchParams(p); v ? n.set('level', v) : n.delete('level'); return n; }, { replace: true });
+  const setParam = (key: string, value: string) =>
+    setSearchParams(p => { const n = new URLSearchParams(p); value ? n.set(key, value) : n.delete(key); return n; }, { replace: true });
+
+  const setQuery  = (v: string)        => { setParam('q', v); resetOffset(); };
+  const setGender = (v: GenderFilter)  => { setParam('gender', v); resetOffset(); };
+  const setSource = (v: SourceFilter)  => { setParam('source', v); resetOffset(); };
+  const setLevel  = (v: LevelFilter)   => { setParam('level', v); resetOffset(); };
+
+  const resetOffset = () =>
+    setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
+
+  const setOffset = (v: number) =>
+    setSearchParams(p => { const n = new URLSearchParams(p); v > 0 ? n.set('offset', String(v)) : n.delete('offset'); return n; }, { replace: true });
 
   // Kollektsiooni filter — headerist
   const { selectedCollection } = useCollection();
@@ -62,7 +75,7 @@ const PersonsPage: React.FC = () => {
 
   // Liitmise select-mood (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedPersons, setSelectedPersons] = useState<ProsopoIndexEntry[]>([]);
   const [mergeLoading, setMergeLoading] = useState(false);
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -71,57 +84,57 @@ const PersonsPage: React.FC = () => {
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
   const token = authToken ?? '';
 
-  useEffect(() => {
+  const selectedIds = new Set(selectedPersons.map(p => p.id));
+
+  // Serveripäring — käivitatakse filtri/offset muutusel
+  const fetchPersons = useCallback(() => {
+    if (collectionLoading) return;
     setLoading(true);
-    listPersons(undefined, token)
+    const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
+    listPersons({
+      q: query || undefined,
+      gender: gender || undefined,
+      source: source || undefined,
+      verification_level: level || undefined,
+      ids: idsParam,
+      limit: LIMIT,
+      offset,
+    }, token)
       .then(data => {
-        setAllPersons(data.results);
+        setPersons(data.results);
+        setTotal(data.total);
         setError(null);
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [query, gender, source, level, offset, token, collectionPersonIds, collectionLoading]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return allPersons.filter(p => {
-      if (collectionPersonIds && !collectionPersonIds.has(p.id)) return false;
-      if (q && !(p.label.toLowerCase().includes(q) || p.sort_name.toLowerCase().includes(q) || (p.aliases || []).some(a => a.toLowerCase().includes(q)))) return false;
-      if (gender === 'M' && p.gender !== 'M') return false;
-      if (gender === 'F' && p.gender !== 'F') return false;
-      if (source === 'wikidata' && !p.has_wikidata) return false;
-      if (source === 'gnd'      && !p.has_gnd)      return false;
-      if (source === 'aa'       && !p.has_aa)        return false;
-      if (level && p.verification_level !== level) return false;
-      return true;
-    });
-  }, [allPersons, query, gender, source, level, collectionPersonIds]);
+  useEffect(() => {
+    fetchPersons();
+  }, [fetchPersons]);
 
   const hasActiveFilters = !!(gender || source || level);
+  const totalPages = Math.ceil(total / LIMIT);
+  const currentPage = Math.floor(offset / LIMIT) + 1;
 
   // Select-mood helpers
   const exitSelectMode = () => {
     setSelectMode(false);
-    setSelectedIds(new Set());
+    setSelectedPersons([]);
     setMergeError(null);
   };
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else if (next.size < 2) {
-        next.add(id);
+  const toggleSelect = (person: ProsopoIndexEntry) => {
+    setSelectedPersons(prev => {
+      if (prev.some(p => p.id === person.id)) {
+        return prev.filter(p => p.id !== person.id);
       }
-      return next;
+      if (prev.length < 2) {
+        return [...prev, person];
+      }
+      return prev;
     });
   };
-
-  const selectedPersons = useMemo(
-    () => allPersons.filter(p => selectedIds.has(p.id)),
-    [allPersons, selectedIds],
-  );
 
   const handleMergeConfirm = async (sourceId: string, targetId: string) => {
     setMergeLoading(true);
@@ -130,8 +143,7 @@ const PersonsPage: React.FC = () => {
       const result = await mergePersons(sourceId, targetId, token);
       setShowMergeModal(false);
       exitSelectMode();
-      // Uuenda lokaalne nimekiri: eemalda source
-      setAllPersons(prev => prev.filter(p => p.id !== sourceId));
+      fetchPersons();
       navigate(`/persons/${result.id}`);
     } catch (e) {
       setMergeError(e instanceof Error ? e.message : t('loadError'));
@@ -240,9 +252,9 @@ const PersonsPage: React.FC = () => {
         {/* Arv */}
         {!(loading || collectionLoading) && !error && (
           <p className="text-xs text-gray-400 mb-4">
-            {filtered.length === allPersons.length
-              ? t('totalCount', '{{count}} isikut', { count: allPersons.length })
-              : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: filtered.length, total: allPersons.length })}
+            {offset === 0 && total <= LIMIT
+              ? t('totalCount', '{{count}} isikut', { count: total })
+              : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: Math.min(offset + LIMIT, total), total })}
           </p>
         )}
 
@@ -259,7 +271,7 @@ const PersonsPage: React.FC = () => {
           <div className="text-center py-16 text-red-600 text-sm">{error}</div>
         )}
 
-        {!(loading || collectionLoading) && !error && filtered.length === 0 && (
+        {!(loading || collectionLoading) && !error && persons.length === 0 && (
           <div className="text-center py-16 text-gray-400 text-sm">
             {query || hasActiveFilters
               ? t('noResults', 'Otsingule vastavaid isikuid ei leitud.')
@@ -267,17 +279,42 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {!(loading || collectionLoading) && !error && filtered.length > 0 && (
+        {!(loading || collectionLoading) && !error && persons.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filtered.map(person => (
+            {persons.map(person => (
               <PersonCard
                 key={person.id}
                 person={person}
                 selectMode={selectMode}
                 selected={selectedIds.has(person.id)}
-                onSelect={toggleSelect}
+                onSelect={() => toggleSelect(person)}
               />
             ))}
+          </div>
+        )}
+
+        {/* Paginatsioon */}
+        {!(loading || collectionLoading) && totalPages > 1 && (
+          <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200">
+            <button
+              onClick={() => setOffset(offset - LIMIT)}
+              disabled={offset === 0}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+              {t('common:pagination.previous', 'Eelmine')}
+            </button>
+            <span className="text-sm text-gray-500 font-mono">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setOffset(offset + LIMIT)}
+              disabled={offset + LIMIT >= total}
+              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              {t('common:pagination.next', 'Järgmine')}
+              <ChevronRight size={16} />
+            </button>
           </div>
         )}
       </main>

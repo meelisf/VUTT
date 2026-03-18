@@ -14,13 +14,19 @@ export async function listPersons(params?: {
   status_id?: string;
   source?: string;
   verification_level?: string;
-}, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number }> {
+  ids?: string[];
+  limit?: number;
+  offset?: number;
+}, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number; offset: number; limit: number }> {
   const url = new URL(BASE, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
+  if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
+  if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
+  if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
   if (token) url.searchParams.set('token', token);
 
   const resp = await fetchWithTimeout(url.toString(), { timeout: 10000 });
