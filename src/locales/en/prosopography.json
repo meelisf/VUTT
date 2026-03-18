@@ -13,6 +13,8 @@
   "totalCount": "{{count}} persons",
   "filteredCount": "{{filtered}} / {{total}} persons",
   "unknownYears": "years unknown",
+  "advancedTitle": "Advanced filters",
+  "clearAllFilters": "Clear all filters",
   "works": "works",
   "born": "Born",
   "died": "Died",

@@ -51,7 +51,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          {t('common:filters.advanced', 'Täpsemad valikud')}
+          {t('advancedTitle', 'Täpsemad valikud')}
           {hasActive && (
             <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full">
               {activeCount}
@@ -156,7 +156,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                 onClick={clearAll}
                 className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
               >
-                {t('common:filters.clearAdvanced', 'Tühjenda kõik filtrid')}
+                {t('clearAllFilters', 'Tühjenda kõik filtrid')}
               </button>
             </div>
           )}

@@ -13,6 +13,8 @@
   "totalCount": "{{count}} isikut",
   "filteredCount": "{{filtered}} / {{total}} isikut",
   "unknownYears": "eluaastad teadm.",
+  "advancedTitle": "Täpsemad valikud",
+  "clearAllFilters": "Tühjenda kõik filtrid",
   "works": "teost",
   "born": "Sündinud",
   "died": "Surnud",
