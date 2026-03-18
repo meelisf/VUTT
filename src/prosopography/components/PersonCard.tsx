@@ -55,7 +55,7 @@ const Initials: React.FC<{ name: string }> = ({ name }) => {
 const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode }> = ({
   person, lifespan,
 }) => {
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography']);
   return (
   <>
     {/* Foto ala — nagu WorkCard h-40 thumbnail */}
@@ -106,7 +106,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
 
         {person.work_count > 0 && (
           <span className="text-xs text-gray-400 shrink-0">
-            {person.work_count} {t('prosopography.works', 'teost')}
+            {person.work_count} {t('works', 'teost')}
           </span>
         )}
 
@@ -121,7 +121,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
 };
 
 const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect }) => {
-  const { t } = useTranslation(['common']); // ainult lifespan fallback-teksti jaoks
+  const { t } = useTranslation(['prosopography']);
   const location = useLocation();
 
   const lifespanNode = (() => {
@@ -131,7 +131,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
     if (b && d) return <>{b}{'  '}{d}</>;
     if (b) return b;
     if (d) return d;
-    return <span>{t('prosopography.unknownYears', 'eluaastad teadm.')}</span>;
+    return <span>{t('unknownYears', 'eluaastad teadm.')}</span>;
   })();
 
   if (selectMode) {

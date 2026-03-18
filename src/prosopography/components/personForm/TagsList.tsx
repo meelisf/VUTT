@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import EntityPicker from '../../../components/EntityPicker';
 import type { TagDraft } from './types';
@@ -7,6 +8,7 @@ const TagsList: React.FC<{
   tags: TagDraft[];
   onChange: (v: TagDraft[]) => void;
 }> = ({ tags, onChange }) => {
+  const { t } = useTranslation(['prosopography']);
   const [pickerValue, setPickerValue] = useState<any>(null);
 
   const add = (v: any) => {
@@ -20,7 +22,7 @@ const TagsList: React.FC<{
 
   return (
     <div>
-      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Märksõnad</label>
+      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('tagsList.label')}</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {tags.map((tag, i) => (
           <span

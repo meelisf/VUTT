@@ -13,7 +13,7 @@ import { index } from '../../services/meiliService';
 import type { ProsopoIndexEntry } from '../types';
 
 const PersonsPage: React.FC = () => {
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -76,7 +76,7 @@ const PersonsPage: React.FC = () => {
         setAllPersons(data.results);
         setError(null);
       })
-      .catch(() => setError(t('prosopography.loadError', 'Isikute laadimine ebaõnnestus.')))
+      .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -132,7 +132,7 @@ const PersonsPage: React.FC = () => {
       setAllPersons(prev => prev.filter(p => p.id !== sourceId));
       navigate(`/persons/${result.id}`);
     } catch (e) {
-      setMergeError(e instanceof Error ? e.message : 'Liitmine ebaõnnestus.');
+      setMergeError(e instanceof Error ? e.message : t('loadError'));
     } finally {
       setMergeLoading(false);
     }
@@ -141,7 +141,7 @@ const PersonsPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header
-        pageTitle={t('prosopography.pageTitle', 'Isikud')}
+        pageTitle={t('pageTitle', 'Isikud')}
         pageTitleIcon={<Users size={20} className="text-primary-600" />}
       />
 
@@ -157,7 +157,7 @@ const PersonsPage: React.FC = () => {
                 type="search"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder={t('prosopography.searchPlaceholder', 'Otsi nime järgi…')}
+                placeholder={t('searchPlaceholder', 'Otsi nime järgi…')}
                 className={`w-full pl-9 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 ${query ? 'pr-8' : 'pr-4'}`}
               />
               {query && (
@@ -182,10 +182,10 @@ const PersonsPage: React.FC = () => {
                     ? 'text-white bg-primary-600 hover:bg-primary-700'
                     : 'text-gray-600 bg-white border border-gray-200 hover:bg-gray-50'
                 }`}
-                title={selectMode ? t('prosopography.merge.exitSelect', 'Välju valikust') : t('prosopography.merge.enterSelect', 'Vali liitmiseks')}
+                title={selectMode ? t('merge.exitSelect', 'Välju valikust') : t('merge.enterSelect', 'Vali liitmiseks')}
               >
                 {selectMode ? <CheckSquare size={15} /> : <Square size={15} />}
-                {selectMode ? t('prosopography.merge.exitSelect', 'Tühista') : t('prosopography.merge.enterSelect', 'Liida')}
+                {selectMode ? t('merge.exitSelect', 'Tühista') : t('merge.enterSelect', 'Liida')}
               </button>
             )}
 
@@ -195,7 +195,7 @@ const PersonsPage: React.FC = () => {
                 className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-2 rounded-lg transition-colors whitespace-nowrap"
               >
                 <UserPlus size={15} />
-                {t('prosopography.addPerson', 'Lisa isik')}
+                {t('addPerson', 'Lisa isik')}
               </Link>
             )}
           </div>
@@ -216,9 +216,9 @@ const PersonsPage: React.FC = () => {
           <div className="mb-4 flex items-center gap-3 bg-primary-50 border border-primary-200 rounded-lg px-4 py-2.5">
             <GitMerge size={16} className="text-primary-600 shrink-0" />
             <p className="text-sm text-primary-800 flex-1">
-              {selectedIds.size === 0 && t('prosopography.merge.hint', 'Vali täpselt 2 isikut liitmiseks.')}
-              {selectedIds.size === 1 && t('prosopography.merge.hintOne', 'Vali veel 1 isik.')}
-              {selectedIds.size === 2 && t('prosopography.merge.hintReady', '2 isikut valitud — saad liita.')}
+              {selectedIds.size === 0 && t('merge.hint', 'Vali täpselt 2 isikut liitmiseks.')}
+              {selectedIds.size === 1 && t('merge.hintOne', 'Vali veel 1 isik.')}
+              {selectedIds.size === 2 && t('merge.hintReady', '2 isikut valitud — saad liita.')}
             </p>
             {selectedIds.size === 2 && (
               <button
@@ -226,7 +226,7 @@ const PersonsPage: React.FC = () => {
                 className="flex items-center gap-1.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 px-3 py-1.5 rounded-lg transition-colors"
               >
                 <GitMerge size={14} />
-                {t('prosopography.merge.open', 'Liida…')}
+                {t('merge.open', 'Liida…')}
               </button>
             )}
             <button onClick={exitSelectMode} className="text-primary-400 hover:text-primary-600 transition-colors">
@@ -239,8 +239,8 @@ const PersonsPage: React.FC = () => {
         {!(loading || collectionLoading) && !error && (
           <p className="text-xs text-gray-400 mb-4">
             {filtered.length === allPersons.length
-              ? t('prosopography.totalCount', '{{count}} isikut', { count: allPersons.length })
-              : t('prosopography.filteredCount', '{{filtered}} / {{total}} isikut', { filtered: filtered.length, total: allPersons.length })}
+              ? t('totalCount', '{{count}} isikut', { count: allPersons.length })
+              : t('filteredCount', '{{filtered}} / {{total}} isikut', { filtered: filtered.length, total: allPersons.length })}
           </p>
         )}
 
@@ -260,8 +260,8 @@ const PersonsPage: React.FC = () => {
         {!(loading || collectionLoading) && !error && filtered.length === 0 && (
           <div className="text-center py-16 text-gray-400 text-sm">
             {query || hasActiveFilters
-              ? t('prosopography.noResults', 'Otsingule vastavaid isikuid ei leitud.')
-              : t('prosopography.empty', 'Prosopograafia andmebaas on tühi.')}
+              ? t('noResults', 'Otsingule vastavaid isikuid ei leitud.')
+              : t('empty', 'Prosopograafia andmebaas on tühi.')}
           </div>
         )}
 

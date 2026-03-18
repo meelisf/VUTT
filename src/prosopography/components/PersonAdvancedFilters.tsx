@@ -18,7 +18,7 @@ interface PersonAdvancedFiltersProps {
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
   gender, source, level, onGenderChange, onSourceChange, onLevelChange,
 }) => {
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography', 'common']);
   const hasActive = gender || source || level;
   const activeCount = [gender, source, level].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -37,9 +37,9 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
   };
 
   const levelLabels: Record<string, string> = {
-    draft:    t('prosopography.levelDraft',    'Mustand'),
-    reviewed: t('prosopography.levelReviewed', 'Üle vaadatud'),
-    verified: t('prosopography.levelVerified', 'Kontrollitud'),
+    draft:    t('levelDraft',    'Mustand'),
+    reviewed: t('levelReviewed', 'Üle vaadatud'),
+    verified: t('levelVerified', 'Kontrollitud'),
   };
 
   return (
@@ -51,7 +51,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
       >
         <span className="flex items-center gap-2 text-sm font-semibold text-gray-700">
           {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          {t('filters.advanced', 'Täpsemad valikud')}
+          {t('common:filters.advanced', 'Täpsemad valikud')}
           {hasActive && (
             <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full">
               {activeCount}
@@ -67,10 +67,10 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Venus size={13} className="text-primary-600" />
-              {t('prosopography.filterGenderAll', 'Sugu')}
+              {t('filterGenderAll', 'Sugu')}
             </h4>
             <div className="flex flex-wrap gap-2">
-              {([['M', t('prosopography.filterMale', 'Meessoost')], ['F', t('prosopography.filterFemale', 'Naissoost')]] as const).map(([val, label]) => (
+              {([['M', t('filterMale', 'Meessoost')], ['F', t('filterFemale', 'Naissoost')]] as const).map(([val, label]) => (
                 <button
                   key={val}
                   onClick={() => onGenderChange(gender === val ? '' : val)}
@@ -88,7 +88,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Database size={13} className="text-primary-600" />
-              {t('prosopography.filterSourceAll', 'Allikas')}
+              {t('filterSourceAll', 'Allikas')}
             </h4>
             <div className="flex flex-wrap gap-2">
               {(['wikidata', 'gnd', 'aa'] as const).map(val => {
@@ -112,7 +112,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <CircleDot size={13} className="text-primary-600" />
-              {t('prosopography.filterLevelAll', 'Olek')}
+              {t('filterLevelAll', 'Olek')}
             </h4>
             <div className="flex flex-wrap gap-2">
               {(['draft', 'reviewed', 'verified'] as const).map(val => (
@@ -135,7 +135,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
               <div className="flex flex-wrap gap-1.5">
                 {gender && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {gender === 'M' ? t('prosopography.filterMale', 'Meessoost') : t('prosopography.filterFemale', 'Naissoost')}
+                    {gender === 'M' ? t('filterMale', 'Meessoost') : t('filterFemale', 'Naissoost')}
                     <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
@@ -156,7 +156,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                 onClick={clearAll}
                 className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
               >
-                {t('filters.clearAdvanced', 'Tühjenda kõik filtrid')}
+                {t('common:filters.clearAdvanced', 'Tühjenda kõik filtrid')}
               </button>
             </div>
           )}

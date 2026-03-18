@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { DateDraft } from './types';
 import EntityPicker from '../../../components/EntityPicker';
@@ -9,6 +10,7 @@ const DateField: React.FC<{
   onChange: (v: DateDraft) => void;
   lang?: string;
 }> = ({ label, value, onChange, lang = 'et' }) => {
+  const { t } = useTranslation(['prosopography']);
   const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
 
   const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || value.place);
@@ -19,11 +21,11 @@ const DateField: React.FC<{
   const summary = (() => {
     const parts: string[] = [];
     if (value.circa) parts.push('~');
-    if (value.bound === 'before') parts.push('enne');
-    if (value.bound === 'after') parts.push('pärast');
-    if (value.month) parts.push(value.day ? `${value.day}.${value.month}` : `kuu ${value.month}`);
-    if (value.calendar === 'julian') parts.push('jul.');
-    if (value.calendar === 'gregorian') parts.push('greg.');
+    if (value.bound === 'before') parts.push(t('dateField.beforeShort'));
+    if (value.bound === 'after') parts.push(t('dateField.afterShort'));
+    if (value.month) parts.push(value.day ? `${value.day}.${value.month}` : `${t('dateField.month')} ${value.month}`);
+    if (value.calendar === 'julian') parts.push(t('dateField.julianShort'));
+    if (value.calendar === 'gregorian') parts.push(t('dateField.gregorianShort'));
     if (value.place?.label) parts.push(value.place.label);
     return parts.join(' ');
   })();
@@ -37,7 +39,7 @@ const DateField: React.FC<{
       <div className="flex items-center gap-2">
         <input
           type="number" min={1000} max={1900}
-          placeholder="aasta"
+          placeholder={t('dateField.year')}
           value={value.year}
           onChange={e => set({ year: e.target.value })}
           className={`w-20 ${inputCls}`}
@@ -54,7 +56,7 @@ const DateField: React.FC<{
               : 'text-gray-400 border border-gray-200 hover:text-gray-600 hover:border-gray-300'}`}
         >
           {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-          täpsem
+          {t('dateField.more')}
         </button>
       </div>
 
@@ -63,14 +65,14 @@ const DateField: React.FC<{
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="number" min={1} max={12}
-              placeholder="kuu"
+              placeholder={t('dateField.month')}
               value={value.month}
               onChange={e => set({ month: e.target.value })}
               className={`w-14 ${inputCls}`}
             />
             <input
               type="number" min={1} max={31}
-              placeholder="päev"
+              placeholder={t('dateField.day')}
               value={value.day}
               onChange={e => set({ day: e.target.value })}
               className={`w-14 ${inputCls}`}
@@ -82,7 +84,7 @@ const DateField: React.FC<{
                 onChange={e => set({ circa: e.target.checked })}
                 className="accent-primary-600"
               />
-              <span className="font-mono">~</span> ligikaudu
+              <span className="font-mono">~</span> {t('dateField.circa')}
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -91,22 +93,22 @@ const DateField: React.FC<{
               onChange={e => set({ bound: e.target.value as DateDraft['bound'] })}
               className={inputCls}
             >
-              <option value="">täpne kuupäev</option>
-              <option value="before">enne seda</option>
-              <option value="after">pärast seda</option>
+              <option value="">{t('dateField.exactDate')}</option>
+              <option value="before">{t('dateField.before')}</option>
+              <option value="after">{t('dateField.after')}</option>
             </select>
             <select
               value={value.calendar}
               onChange={e => set({ calendar: e.target.value as DateDraft['calendar'] })}
               className={inputCls}
             >
-              <option value="">kalender märkimata</option>
-              <option value="julian">Juliuse kalender</option>
-              <option value="gregorian">Gregoriuse kalender</option>
+              <option value="">{t('dateField.noCalendar')}</option>
+              <option value="julian">{t('dateField.julian')}</option>
+              <option value="gregorian">{t('dateField.gregorian')}</option>
             </select>
             <EntityPicker
               label=""
-              placeholder="koht"
+              placeholder={t('dateField.place')}
               type="place"
               value={value.place}
               onChange={v => set({ place: v })}

@@ -26,7 +26,7 @@ const PersonEditPage: React.FC = () => {
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
   const [searchParams] = useSearchParams();
-  const { t } = useTranslation(['common']);
+  const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
 
   const isNew = !id || id === 'new';
@@ -51,7 +51,7 @@ const PersonEditPage: React.FC = () => {
 
   // labels.json kohalikud soovitused topic-tüüpi EntityPickeritele
   const [entityLabels, setEntityLabels] = useState<{ label: string; id: string }[]>([]);
-  const lang = 'et';
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -88,14 +88,14 @@ const PersonEditPage: React.FC = () => {
         setDraft(recordToDraft(data));
         setImageUrl(data.image_url ?? null);
       })
-      .catch(() => setError('Isiku laadimine ebaõnnestus.'))
+      .catch(() => setError(t('loadErrorSingle')))
       .finally(() => setLoading(false));
   }, [id, token]);
 
   const handleImageFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) { setImageError('Palun vali pildifail (JPEG, PNG, WebP).'); return; }
-    if (file.size > 10 * 1024 * 1024) { setImageError('Fail on liiga suur (max 10 MB).'); return; }
-    if (isNew) { setImageError('Salvesta isik esmalt, seejärel lisa pilt.'); return; }
+    if (!file.type.startsWith('image/')) { setImageError(t('form.photoError.notImage')); return; }
+    if (file.size > 10 * 1024 * 1024) { setImageError(t('form.photoError.tooLarge')); return; }
+    if (isNew) { setImageError(t('form.saveFirstPhoto')); return; }
     setImageUploading(true);
     setImageError(null);
     try {
@@ -105,7 +105,7 @@ const PersonEditPage: React.FC = () => {
         setOriginal(prev => prev ? { ...prev, updated_at: result.updated_at } : prev);
       }
     } catch (e: any) {
-      setImageError(e.message ?? 'Pildi üleslaadimine ebaõnnestus.');
+      setImageError(e.message ?? t('form.photoError.uploadFailed'));
     } finally {
       setImageUploading(false);
     }
@@ -122,7 +122,7 @@ const PersonEditPage: React.FC = () => {
         setOriginal(prev => prev ? { ...prev, updated_at: result.updated_at } : prev);
       }
     } catch {
-      setImageError('Pildi kustutamine ebaõnnestus.');
+      setImageError(t('form.photoError.deleteFailed'));
     } finally {
       setImageUploading(false);
     }
@@ -131,7 +131,7 @@ const PersonEditPage: React.FC = () => {
   const set = (patch: Partial<FormDraft>) => setDraft(d => ({ ...d, ...patch }));
 
   const handleSave = async () => {
-    if (!draft.name_label.trim()) { setError('Nimi on kohustuslik.'); return; }
+    if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return; }
     setSaving(true);
     setError(null);
     try {
@@ -155,9 +155,9 @@ const PersonEditPage: React.FC = () => {
       }
     } catch (e: any) {
       if (e?.conflict) {
-        setError('Andmeid on vahepeal muudetud. Laadi leht uuesti ja proovi uuesti.');
+        setError(t('form.conflictError'));
       } else {
-        setError('Salvestamine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.');
+        setError(t('form.saveError'));
       }
     } finally {
       setSaving(false);
@@ -183,9 +183,9 @@ const PersonEditPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
-          <p className="text-gray-600 text-sm mb-4">Muutmiseks pead olema sisse logitud toimetajana.</p>
+          <p className="text-gray-600 text-sm mb-4">{t('form.loginRequired')}</p>
           <button onClick={() => navigate(backTo)} className="text-primary-600 hover:underline text-sm">
-            ← Tagasi isikute nimekirja
+            ← {t('backToList')}
           </button>
         </div>
       </div>
@@ -193,8 +193,8 @@ const PersonEditPage: React.FC = () => {
   }
 
   const pageTitle = isNew
-    ? t('prosopography.addPerson', 'Lisa isik')
-    : original?.name.label ?? t('prosopography.edit', 'Muuda isikut');
+    ? t('addPerson', 'Lisa isik')
+    : original?.name.label ?? t('edit', 'Muuda isikut');
 
   const inputCls = "px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none";
 
@@ -210,7 +210,7 @@ const PersonEditPage: React.FC = () => {
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
         >
           <ArrowLeft size={15} />
-          {isNew ? t('prosopography.backToList', 'Tagasi isikute nimekirja') : 'Tagasi profiilile'}
+          {isNew ? t('backToList') : t('backToProfile')}
         </button>
 
         {/* Pealkiri + salvesta */}
@@ -222,7 +222,7 @@ const PersonEditPage: React.FC = () => {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60 transition-colors"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {saving ? 'Salvestamine…' : 'Salvesta'}
+            {saving ? t('form.saving') : t('form.save')}
           </button>
         </div>
 
@@ -249,10 +249,15 @@ const PersonEditPage: React.FC = () => {
           <div className="mb-5 px-4 py-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 flex items-start gap-2">
             <span className="shrink-0 mt-0.5">✓</span>
             <span className="flex-1">
-              <strong>Rikastatud {enrichedWith.scheme === 'wikidata' ? 'Wikidatast' : enrichedWith.scheme === 'gnd' ? 'GND-st' : enrichedWith.scheme === 'album_academicum' ? 'Album Academicumist' : 'VIAF-ist'}</strong>
+              <strong>{t('enrich.enrichedWith', { source:
+                enrichedWith.scheme === 'wikidata' ? t('enrich.sourceWikidata') :
+                enrichedWith.scheme === 'gnd' ? t('enrich.sourceGnd') :
+                enrichedWith.scheme === 'album_academicum' ? t('enrich.sourceAa') :
+                t('enrich.sourceViaf')
+              })}</strong>
               {' '}({enrichedWith.id})
               {enrichedWith.fields.length > 0 && (
-                <span className="text-green-700"> — täideti: {enrichedWith.fields.join(', ')}</span>
+                <span className="text-green-700"> — {t('enrich.enrichedFields')} {enrichedWith.fields.join(', ')}</span>
               )}
             </span>
             <button
@@ -267,7 +272,7 @@ const PersonEditPage: React.FC = () => {
 
         {/* ── Profiilipilt ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
-          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-3">Profiilipilt</label>
+          <label className="block text-xs text-gray-500 uppercase tracking-wide mb-3">{t('form.profilePhoto')}</label>
           <div className="flex items-start gap-4">
             <div
               className={`relative w-24 h-24 rounded-lg border-2 flex items-center justify-center overflow-hidden shrink-0 transition-colors cursor-pointer
@@ -309,7 +314,7 @@ const PersonEditPage: React.FC = () => {
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors"
               >
                 <ImagePlus size={13} />
-                {imageUrl ? 'Vaheta pilt' : 'Lisa pilt'}
+                {imageUrl ? t('form.changePhoto') : t('form.addPhoto')}
               </button>
               {imageUrl && (
                 <button
@@ -319,12 +324,12 @@ const PersonEditPage: React.FC = () => {
                   className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-40 transition-colors"
                 >
                   <Trash2 size={13} />
-                  Eemalda pilt
+                  {t('form.removePhoto')}
                 </button>
               )}
               <p className="text-xs text-gray-400 leading-snug">
-                JPEG, PNG või WebP, max 10 MB.<br />
-                {isNew && <span className="text-amber-600">Salvesta isik esmalt.</span>}
+                {t('form.photoHint')}<br />
+                {isNew && <span className="text-amber-600">{t('form.saveFirst')}</span>}
               </p>
               {imageError && <p className="text-xs text-red-600">{imageError}</p>}
             </div>
@@ -336,7 +341,7 @@ const PersonEditPage: React.FC = () => {
 
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-              Kanooniline nimi <span className="text-red-500">*</span>
+              {t('form.nameLabel')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -348,7 +353,7 @@ const PersonEditPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Eesnimi</label>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{t('form.nameFirst')}</label>
             <input
               type="text"
               value={draft.name_first}
@@ -360,7 +365,7 @@ const PersonEditPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Perekonnanimi</label>
+              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{t('form.nameFamily')}</label>
               <input
                 type="text"
                 value={draft.name_family}
@@ -370,7 +375,7 @@ const PersonEditPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">Täiend (qualifier)</label>
+              <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">{t('form.nameQualifier')}</label>
               <input
                 type="text"
                 value={draft.name_qualifier}
@@ -383,7 +388,7 @@ const PersonEditPage: React.FC = () => {
 
           {/* Sugu */}
           <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1.5">Sugu</label>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1.5">{t('form.gender')}</label>
             <div className="flex gap-4 text-sm text-gray-700">
               {(['', 'M', 'F'] as const).map(v => (
                 <label key={v} className="flex items-center gap-1.5 cursor-pointer">
@@ -395,7 +400,7 @@ const PersonEditPage: React.FC = () => {
                     onChange={() => set({ gender: v })}
                     className="accent-primary-600"
                   />
-                  {v === '' ? 'Teadmata' : v === 'M' ? t('prosopography.filterMale', 'Meessoost') : t('prosopography.filterFemale', 'Naissoost')}
+                  {v === '' ? t('form.genderUnknown') : v === 'M' ? t('filterMale') : t('filterFemale')}
                 </label>
               ))}
             </div>
@@ -404,12 +409,12 @@ const PersonEditPage: React.FC = () => {
           {/* Eluaastad */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <DateField
-              label={t('prosopography.born', 'Sündinud')}
+              label={t('born', 'Sündinud')}
               value={draft.birth}
               onChange={v => set({ birth: v })}
             />
             <DateField
-              label={t('prosopography.died', 'Surnud')}
+              label={t('died', 'Surnud')}
               value={draft.death}
               onChange={v => set({ death: v })}
             />
@@ -418,7 +423,7 @@ const PersonEditPage: React.FC = () => {
           {/* Seisus + konfessioon */}
           <div className="grid grid-cols-2 gap-3">
             <EntityPicker
-              label={t('prosopography.status', 'Seisus')}
+              label={t('status', 'Seisus')}
               placeholder="aadlik, vaimulik…"
               type="topic"
               value={draft.status}
@@ -427,7 +432,7 @@ const PersonEditPage: React.FC = () => {
               localSuggestions={entityLabels}
             />
             <EntityPicker
-              label={t('prosopography.confession', 'Konfessioon')}
+              label={t('confession', 'Konfessioon')}
               placeholder="luterlik, katoliiklik…"
               type="topic"
               value={draft.confession}
@@ -441,12 +446,12 @@ const PersonEditPage: React.FC = () => {
           {/* Floruit */}
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-              Tegutsemisperiood <span className="normal-case font-normal text-gray-400">(floruit, kui sünd/surm teadmata)</span>
+              {t('form.floruit')} <span className="normal-case font-normal text-gray-400">({t('form.floruitHint')})</span>
             </label>
             <div className="flex items-center gap-2">
               <input
                 type="number" min={1000} max={1900}
-                placeholder="alates"
+                placeholder={t('form.from')}
                 value={draft.floruit_from}
                 onChange={e => set({ floruit_from: e.target.value })}
                 className={`w-20 ${inputCls}`}
@@ -454,7 +459,7 @@ const PersonEditPage: React.FC = () => {
               <span className="text-gray-400">–</span>
               <input
                 type="number" min={1000} max={1900}
-                placeholder="kuni"
+                placeholder={t('form.to')}
                 value={draft.floruit_to}
                 onChange={e => set({ floruit_to: e.target.value })}
                 className={`w-20 ${inputCls}`}
@@ -466,7 +471,7 @@ const PersonEditPage: React.FC = () => {
         {/* ── Elulugu ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">
-            {t('prosopography.biography', 'Elulugu')} <span className="font-normal lowercase">(markdown)</span>
+            {t('biography', 'Elulugu')} <span className="font-normal lowercase">(markdown)</span>
           </label>
           <textarea
             value={draft.biography}
@@ -479,7 +484,7 @@ const PersonEditPage: React.FC = () => {
 
         {/* ── Nimevariandid ja identifikaatorid (klapitav) ── */}
         <CollapsibleSection
-          title="Nimevariandid ja identifikaatorid"
+          title={t('form.namesAndIdentifiers')}
           open={namesOpen}
           onToggle={() => setNamesOpen(v => !v)}
         >
@@ -488,7 +493,7 @@ const PersonEditPage: React.FC = () => {
             onChange={v => set({ name_aliases: v })}
           />
           <div>
-            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Identifikaatorid</label>
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('form.identifiers')}</label>
             <div className="space-y-2">
               {[
                 { key: 'wikidata_id', label: 'Wikidata', placeholder: 'Q12345', url: (v: string) => `https://www.wikidata.org/wiki/${v}` },
@@ -540,18 +545,18 @@ const PersonEditPage: React.FC = () => {
 
         {/* ── Ametid ja haridus (klapitav) ── */}
         <CollapsibleSection
-          title={`${t('prosopography.occupations', 'Ametid')} ja ${t('prosopography.education', 'haridus').toLowerCase()}`}
+          title={t('form.occupationsAndEducation')}
           open={occupOpen}
           onToggle={() => setOccupOpen(v => !v)}
         >
           <DynamicList
-            label={t('prosopography.occupations', 'Ametid')}
+            label={t('occupations', 'Ametid')}
             items={draft.occupations}
             renderItem={(item: OccupationDraft, onChange, onRemove) => (
               <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
                 <div className="flex gap-2 items-start">
                   <div className="flex-1 min-w-0">
-                    <label className="block text-xs text-gray-400 mb-0.5">Amet</label>
+                    <label className="block text-xs text-gray-400 mb-0.5">{t('form.occupation')}</label>
                     <EntityPicker
                       placeholder="pastor, jurist, professor…"
                       type="topic"
@@ -562,7 +567,7 @@ const PersonEditPage: React.FC = () => {
                     />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <label className="block text-xs text-gray-400 mb-0.5">Asutus / töökoht</label>
+                    <label className="block text-xs text-gray-400 mb-0.5">{t('form.institution')}</label>
                     <EntityPicker
                       placeholder="Academia Gustaviana…"
                       type="topic"
@@ -577,7 +582,7 @@ const PersonEditPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="text-xs text-gray-400 shrink-0">Periood</span>
+                  <span className="text-xs text-gray-400 shrink-0">{t('form.period')}</span>
                   <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
                   <span className="text-gray-400">–</span>
                   <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
@@ -589,13 +594,13 @@ const PersonEditPage: React.FC = () => {
           />
 
           <DynamicList
-            label={t('prosopography.education', 'Haridus')}
+            label={t('education', 'Haridus')}
             items={draft.education}
             renderItem={(item: EducationDraft, onChange, onRemove) => (
               <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
                 <div className="flex gap-2 items-start">
                   <div className="flex-1 min-w-0">
-                    <label className="block text-xs text-gray-400 mb-0.5">Asutus</label>
+                    <label className="block text-xs text-gray-400 mb-0.5">{t('form.educationInstitution')}</label>
                     <EntityPicker
                       placeholder="Academia Gustaviana, Wittenberg…"
                       type="topic"
@@ -610,7 +615,7 @@ const PersonEditPage: React.FC = () => {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 shrink-0">Periood</span>
+                  <span className="text-xs text-gray-400 shrink-0">{t('form.period')}</span>
                   <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
                   <span className="text-gray-400">–</span>
                   <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
@@ -626,12 +631,12 @@ const PersonEditPage: React.FC = () => {
 
         {/* ── Seosed ja märkmed (klapitav) ── */}
         <CollapsibleSection
-          title={`${t('prosopography.relations', 'Seosed')} ja ${t('prosopography.notes', 'märkmed').toLowerCase()}`}
+          title={t('form.relationsAndNotes')}
           open={relOpen}
           onToggle={() => setRelOpen(v => !v)}
         >
           <DynamicList
-            label={t('prosopography.relations', 'Seosed')}
+            label={t('relations', 'Seosed')}
             items={draft.relations}
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
@@ -640,7 +645,7 @@ const PersonEditPage: React.FC = () => {
                   type="text"
                   value={item.type}
                   onChange={e => onChange({ ...item, type: e.target.value })}
-                  placeholder="suhe (abikaasa, isa…)"
+                  placeholder={t('form.relationPlaceholder')}
                   className={`w-36 ${inputCls} shrink-0`}
                 />
                 <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
@@ -654,7 +659,7 @@ const PersonEditPage: React.FC = () => {
 
           <div>
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
-              {t('prosopography.notes', 'Märkmed')}
+              {t('notes', 'Märkmed')}
             </label>
             <textarea
               value={draft.notes}
@@ -668,12 +673,12 @@ const PersonEditPage: React.FC = () => {
 
         {/* ── Allikad ja bibliograafia (klapitav) ── */}
         <CollapsibleSection
-          title="Allikad ja bibliograafia"
+          title={t('form.sourcesAndBibliography')}
           open={sourcesOpen}
           onToggle={() => setSourcesOpen(v => !v)}
         >
           <DynamicList
-            label="Allikad"
+            label={t('form.sources')}
             items={draft.sources}
             renderItem={(item, onChange, onRemove) => (
               <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
@@ -683,7 +688,7 @@ const PersonEditPage: React.FC = () => {
                       type="text"
                       value={item.text}
                       onChange={e => onChange({ ...item, text: e.target.value })}
-                      placeholder="Allikaviide — arhiivifond, trükis, veebiaadress…"
+                      placeholder={t('form.sourcePlaceholder')}
                       className={`w-full ${inputCls}`}
                     />
                   </div>
@@ -695,7 +700,7 @@ const PersonEditPage: React.FC = () => {
                   type="text"
                   value={item.note}
                   onChange={e => onChange({ ...item, note: e.target.value })}
-                  placeholder={'Märkus — nt \u201esuri 15. jaanuar 1642 Tallinnas\u201c'}
+                  placeholder={t('form.sourceNote')}
                   className={`w-full ${inputCls} bg-white text-gray-600 italic`}
                 />
               </div>
@@ -713,7 +718,7 @@ const PersonEditPage: React.FC = () => {
             className="flex items-center gap-1.5 px-4 py-2 rounded text-sm font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60 transition-colors"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {saving ? 'Salvestamine…' : 'Salvesta'}
+            {saving ? t('form.saving') : t('form.save')}
           </button>
         </div>
 

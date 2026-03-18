@@ -18,12 +18,16 @@ import type { ProsopoRecord, HistoricalDate } from '../types';
 // Abifunktsioonid
 // =========================================================
 
-function formatHistoricalDate(d: HistoricalDate | null | undefined, symbol: string): string {
+function formatHistoricalDate(
+  d: HistoricalDate | null | undefined,
+  symbol: string,
+  boundLabels: { before: string; after: string },
+): string {
   if (!d) return '';
   const year = d.date ? d.date.slice(0, 4) : null;
   if (!year) return '';
   const circa = d.is_circa ? '~' : '';
-  const bound = d.bound === 'before' ? 'enne ' : d.bound === 'after' ? 'pärast ' : '';
+  const bound = d.bound === 'before' ? `${boundLabels.before} ` : d.bound === 'after' ? `${boundLabels.after} ` : '';
   const place = d.place?.label ? `, ${d.place.label}` : '';
   return `${symbol}${bound}${circa}${year}${place}`;
 }
@@ -74,7 +78,7 @@ const useEntityLabel = () => {
 };
 
 const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => {
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography', 'common']);
   const getLabel = useEntityLabel();
   const [open, setOpen] = useState(false);
 
@@ -82,45 +86,45 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
 
   if (person.gender) {
     rows.push({
-      label: t('prosopography.filterGenderAll', 'Sugu'),
+      label: t('filterGenderAll', 'Sugu'),
       value: person.gender === 'M'
-        ? t('prosopography.filterMale', 'Meessoost')
-        : t('prosopography.filterFemale', 'Naissoost'),
+        ? t('filterMale', 'Meessoost')
+        : t('filterFemale', 'Naissoost'),
     });
   }
   if (person.origin?.city || person.origin?.region) {
     rows.push({
-      label: t('prosopography.origin', 'Päritolu'),
+      label: t('origin', 'Päritolu'),
       value: [person.origin.city, person.origin.region].filter(Boolean).join(', '),
     });
   }
   if (person.confession) {
-    rows.push({ label: t('prosopography.confession', 'Konfessioon'), value: getLabel(person.confession) });
+    rows.push({ label: t('confession', 'Konfessioon'), value: getLabel(person.confession) });
   }
   const aliases = person.name.aliases ?? [];
   if (aliases.length > 0) {
-    rows.push({ label: t('prosopography.aliases', 'Nimevariandid'), value: aliases.join(', ') });
+    rows.push({ label: t('aliases', 'Nimevariandid'), value: aliases.join(', ') });
   }
   if (person.occupations?.length > 0) {
     rows.push({
-      label: t('prosopography.occupations', 'Ametid'),
+      label: t('occupations', 'Ametid'),
       value: person.occupations.map((o: any) => getLabel(o) || o).join(', '),
     });
   }
   if (person.education?.length > 0) {
     rows.push({
-      label: t('prosopography.education', 'Haridus'),
+      label: t('education', 'Haridus'),
       value: person.education.map((e: any) => (e.institution ?? getLabel(e)) || e).join(', '),
     });
   }
   if (person.relations?.length > 0) {
     rows.push({
-      label: t('prosopography.relations', 'Seosed'),
+      label: t('relations', 'Seosed'),
       value: person.relations.map((r: any) => `${r.name ?? r.target_id}${r.type ? ` (${r.type})` : ''}`).join(', '),
     });
   }
   if (person.notes) {
-    rows.push({ label: t('prosopography.notes', 'Märkmed'), value: person.notes });
+    rows.push({ label: t('notes', 'Märkmed'), value: person.notes });
   }
 
   if (rows.length === 0) return null;
@@ -134,7 +138,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
         <span className="text-primary-600">
           <Users size={18} />
         </span>
-        <span className="font-bold">{t('prosopography.structuredInfo', 'Struktureeritud info')}</span>
+        <span className="font-bold">{t('structuredInfo', 'Struktureeritud info')}</span>
         <span className="ml-auto text-gray-400">
           {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
@@ -164,7 +168,7 @@ const PersonDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography', 'common']);
   const getLabel = useEntityLabel();
   const { user, authToken } = useUser();
   const { selectedCollection, collections } = useCollection();
@@ -210,7 +214,7 @@ const PersonDetailPage: React.FC = () => {
           });
         }
       })
-      .catch(() => setError(t('prosopography.loadError', 'Isiku laadimine ebaõnnestus.')))
+      .catch(() => setError(t('loadError', 'Isiku laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
   }, [id, token]);
 
@@ -248,9 +252,9 @@ const PersonDetailPage: React.FC = () => {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
-          <p className="text-red-600 text-sm mb-4">{error ?? t('prosopography.notFound', 'Isikut ei leitud.')}</p>
+          <p className="text-red-600 text-sm mb-4">{error ?? t('notFound', 'Isikut ei leitud.')}</p>
           <button onClick={() => navigate(backTo)} className="text-primary-600 hover:underline text-sm">
-            ← {t('prosopography.backToList', 'Tagasi isikute nimekirja')}
+            ← {t('backToList', 'Tagasi isikute nimekirja')}
           </button>
         </div>
       </div>
@@ -258,8 +262,9 @@ const PersonDetailPage: React.FC = () => {
   }
 
   // ── Andmed ───────────────────────────────────────────────
-  const birth = formatHistoricalDate(person.birth, '*');
-  const death = formatHistoricalDate(person.death, '†');
+  const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
+  const birth = formatHistoricalDate(person.birth, '*', boundLabels);
+  const death = formatHistoricalDate(person.death, '†', boundLabels);
   const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort((a, b) => {
     const ya = workTitles[a.work_id]?.year ?? 9999;
     const yb = workTitles[b.work_id]?.year ?? 9999;
@@ -282,7 +287,7 @@ const PersonDetailPage: React.FC = () => {
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
         >
           <ArrowLeft size={15} />
-          {t('prosopography.backToList', 'Tagasi isikute nimekirja')}
+          {t('backToList', 'Tagasi isikute nimekirja')}
         </button>
 
         {/* ── Isiku info ── */}
@@ -297,7 +302,7 @@ const PersonDetailPage: React.FC = () => {
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
               >
                 <Edit3 size={12} />
-                {t('prosopography.edit', 'Muuda')}
+                {t('edit', 'Muuda')}
               </Link>
             ) : undefined}
           />
@@ -321,7 +326,7 @@ const PersonDetailPage: React.FC = () => {
                 {birth && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('prosopography.born', 'Sündinud')}
+                      {t('born', 'Sündinud')}
                     </span>
                     <p className="text-gray-900">{birth.replace('*', '')}</p>
                   </div>
@@ -329,7 +334,7 @@ const PersonDetailPage: React.FC = () => {
                 {death && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('prosopography.died', 'Surnud')}
+                      {t('died', 'Surnud')}
                     </span>
                     <p className="text-gray-900">{death.replace('†', '')}</p>
                   </div>
@@ -343,7 +348,7 @@ const PersonDetailPage: React.FC = () => {
                 {person.status && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('prosopography.status', 'Seisus')}
+                      {t('status', 'Seisus')}
                     </span>
                     <p className="text-gray-900">{getLabel(person.status)}</p>
                   </div>
@@ -351,7 +356,7 @@ const PersonDetailPage: React.FC = () => {
                 {person.confession && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('prosopography.confession', 'Konfessioon')}
+                      {t('confession', 'Konfessioon')}
                     </span>
                     <p className="text-gray-900">{getLabel(person.confession)}</p>
                   </div>
@@ -398,7 +403,7 @@ const PersonDetailPage: React.FC = () => {
         {/* ── Elulugu ── */}
         {person.biography && (
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-            <CardHeader icon={<BookMarked size={18} />} title={t('prosopography.biography', 'Elulugu')} />
+            <CardHeader icon={<BookMarked size={18} />} title={t('biography', 'Elulugu')} />
             <div className="markdown-preview text-sm text-gray-800 leading-relaxed">
               <ReactMarkdown>{person.biography}</ReactMarkdown>
             </div>
@@ -410,7 +415,7 @@ const PersonDetailPage: React.FC = () => {
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
             <CardHeader
               icon={<BookOpen size={18} />}
-              title={t('prosopography.relatedWorks', 'Seotud teosed')}
+              title={t('relatedWorks', 'Seotud teosed')}
               count={selectedRole ? filteredWorks.length : works.length}
             />
             {uniqueRoles.length > 1 && (
@@ -419,7 +424,7 @@ const PersonDetailPage: React.FC = () => {
                   onClick={() => setSelectedRole(null)}
                   className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${!selectedRole ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
                 >
-                  {t('prosopography.allRoles', 'Kõik')} ({works.length})
+                  {t('allRoles', 'Kõik')} ({works.length})
                 </button>
                 {uniqueRoles.map(role => (
                   <button

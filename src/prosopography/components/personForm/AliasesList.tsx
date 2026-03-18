@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, X } from 'lucide-react';
 
 const AliasesList: React.FC<{
   aliases: string[];
   onChange: (v: string[]) => void;
 }> = ({ aliases, onChange }) => {
+  const { t } = useTranslation(['prosopography']);
   const [input, setInput] = useState('');
 
   const add = () => {
@@ -17,7 +19,7 @@ const AliasesList: React.FC<{
 
   return (
     <div>
-      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">Nimevariandid</label>
+      <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">{t('aliasesList.label')}</label>
       <div className="flex flex-wrap gap-1.5 mb-2">
         {aliases.map((a, i) => (
           <span
@@ -37,7 +39,7 @@ const AliasesList: React.FC<{
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-          placeholder="Lisa variant…"
+          placeholder={t('aliasesList.placeholder')}
           className="flex-1 text-sm px-2 py-1.5 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none"
         />
         <button
@@ -46,7 +48,7 @@ const AliasesList: React.FC<{
           disabled={!input.trim()}
           className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 disabled:opacity-40 transition-colors"
         >
-          <Plus size={12} /> Lisa
+          <Plus size={12} /> {t('aliasesList.add')}
         </button>
       </div>
     </div>

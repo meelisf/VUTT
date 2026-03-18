@@ -39,12 +39,12 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
         {person.has_gnd     && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">GND</span>}
         {person.has_aa      && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">AA</span>}
         {person.work_count > 0 && (
-          <span className="text-xs text-gray-500 ml-1">{person.work_count} teost</span>
+          <span className="text-xs text-gray-500 ml-1">{person.work_count} {t('works')}</span>
         )}
       </div>
       {isSource && (
         <p className="mt-3 flex items-center gap-1 text-xs text-red-600">
-          <Trash2 size={11} /> muutub tombstone-iks
+          <Trash2 size={11} /> {t('merge.tombstone')}
         </p>
       )}
     </div>
@@ -54,7 +54,7 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
 const MergePersonsModal: React.FC<MergePersonsModalProps> = ({
   personA, personB, onConfirm, onClose, loading, error,
 }) => {
-  const { t } = useTranslation(['common']);
+  const { t } = useTranslation(['prosopography', 'common']);
   // source = kustutatav, target = säilitatav
   const [sourceIsA, setSourceIsA] = useState(true);
 
@@ -68,7 +68,7 @@ const MergePersonsModal: React.FC<MergePersonsModalProps> = ({
         {/* Päis */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <h2 className="text-base font-semibold text-gray-900">
-            {t('prosopography.merge.title', 'Liida kaks isikut')}
+            {t('merge.title', 'Liida kaks isikut')}
           </h2>
           <button onClick={onClose} disabled={loading} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X size={18} />
@@ -77,28 +77,28 @@ const MergePersonsModal: React.FC<MergePersonsModalProps> = ({
 
         {/* Kaardid kõrvuti */}
         <div className="px-5 py-5 flex items-center gap-3">
-          <PersonSummary person={source} label={t('prosopography.merge.source', 'Kustutatav')} highlight="source" />
+          <PersonSummary person={source} label={t('merge.source', 'Kustutatav')} highlight="source" />
 
           <div className="flex flex-col items-center gap-2 shrink-0">
             <ArrowRight size={20} className="text-gray-400" />
             <button
               onClick={() => setSourceIsA(v => !v)}
               disabled={loading}
-              title={t('prosopography.merge.swap', 'Vaheta kohad')}
+              title={t('merge.swap', 'Vaheta kohad')}
               className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
             >
               <ArrowLeftRight size={14} />
             </button>
           </div>
 
-          <PersonSummary person={target} label={t('prosopography.merge.target', 'Säilitatav')} highlight="target" />
+          <PersonSummary person={target} label={t('merge.target', 'Säilitatav')} highlight="target" />
         </div>
 
         {/* Selgitus */}
         <div className="mx-5 mb-4 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
           <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
           <p className="text-xs text-amber-800 leading-relaxed">
-            {t('prosopography.merge.warning',
+            {t('merge.warning',
               '«{{source}}» märgitakse tombstone-iks ja suunatakse «{{target}}»-ile. Toiming on pöördumatu.',
               { source: source.label, target: target.label })}
           </p>
@@ -127,7 +127,7 @@ const MergePersonsModal: React.FC<MergePersonsModalProps> = ({
             ) : (
               <ArrowRight size={14} />
             )}
-            {t('prosopography.merge.confirm', 'Liida')}
+            {t('merge.confirm', 'Liida')}
           </button>
         </div>
       </div>

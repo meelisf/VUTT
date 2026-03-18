@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Loader2, X, CheckCircle, Globe, BookMarked, Library, ChevronDown, ChevronRight } from 'lucide-react';
 import { searchWikidata, WikidataSearchResult } from '../../../services/wikidataService';
 import { searchGnd, GndSearchResult } from '../../../services/gndService';
@@ -28,21 +29,8 @@ type ExternalResult = {
   scheme: 'wikidata' | 'gnd' | 'viaf';
 };
 
-function describeAutoFilled(af: Record<string, any>): string[] {
-  const fields: string[] = [];
-  if (af['gender']) fields.push('sugu');
-  if (af['birth.date']) fields.push('sünnikuupäev');
-  if (af['death.date']) fields.push('surmakuupäev');
-  if (af['birth.place']) fields.push('sünnikoht');
-  if (af['death.place']) fields.push('surmakoht');
-  if (af['_occupations']?.length || af['_occupation_label']) fields.push('ametid');
-  if (af['confession']) fields.push('konfessioon');
-  if (af['status']) fields.push('seisus');
-  if (af['name.aliases']?.length) fields.push('nimevariandid');
-  return fields;
-}
-
 const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
+  const { t } = useTranslation(['prosopography']);
   const [open, setOpen] = useState(true);
   const [query, setQuery] = useState(draft.name_label || '');
   const [results, setResults] = useState<ExternalResult[]>([]);
@@ -50,6 +38,20 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
   const [isEnriching, setIsEnriching] = useState<string | null>(null); // enrichimisel oleva kirje ID
   const [searchError, setSearchError] = useState<string | null>(null);
   const [enrichError, setEnrichError] = useState<string | null>(null);
+
+  const describeAutoFilled = (af: Record<string, any>): string[] => {
+    const fields: string[] = [];
+    if (af['gender']) fields.push(t('enrich.fieldsBrief.gender'));
+    if (af['birth.date']) fields.push(t('enrich.fieldsBrief.birthDate'));
+    if (af['death.date']) fields.push(t('enrich.fieldsBrief.deathDate'));
+    if (af['birth.place']) fields.push(t('enrich.fieldsBrief.birthPlace'));
+    if (af['death.place']) fields.push(t('enrich.fieldsBrief.deathPlace'));
+    if (af['_occupations']?.length || af['_occupation_label']) fields.push(t('enrich.fieldsBrief.occupations'));
+    if (af['confession']) fields.push(t('enrich.fieldsBrief.confession'));
+    if (af['status']) fields.push(t('enrich.fieldsBrief.status'));
+    if (af['name.aliases']?.length) fields.push(t('enrich.fieldsBrief.nameAliases'));
+    return fields;
+  };
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -80,9 +82,9 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
         })));
       }
       setResults(all);
-      if (all.length === 0) setSearchError('Tulemusi ei leitud. Proovi lühemat nime.');
+      if (all.length === 0) setSearchError(t('enrich.noResults'));
     } catch {
-      setSearchError('Otsing ebaõnnestus. Kontrolli ühendust.');
+      setSearchError(t('enrich.searchError'));
     } finally {
       setIsSearching(false);
     }
@@ -100,7 +102,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
     try {
       const preview = await fetchEnrichmentPreview(result.scheme, result.id, token);
       if (preview.error) {
-        setEnrichError(`Rikastamine ebaõnnestus: ${preview.error}`);
+        setEnrichError(`${t('enrich.errorPrefix')} ${preview.error}`);
         return;
       }
       const newDraft = applyEnrichmentToDraft(preview.auto_filled, draft);
@@ -110,7 +112,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
       const fields = describeAutoFilled(preview.auto_filled);
       onEnrich(newDraft, { scheme: result.scheme, id: result.id, label: result.label, fields });
     } catch {
-      setEnrichError('Rikastamine ebaõnnestus. Proovi uuesti.');
+      setEnrichError(t('enrich.enrichError'));
     } finally {
       setIsEnriching(null);
     }
@@ -137,7 +139,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
         className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-blue-100/60 transition-colors"
       >
         <Globe size={14} className="text-blue-500 shrink-0" />
-        <span className="text-sm font-medium text-blue-800">Otsi välisallikatest</span>
+        <span className="text-sm font-medium text-blue-800">{t('enrich.searchTitle')}</span>
         <span className="text-xs text-blue-500 ml-1">Wikidata · GND · VIAF</span>
         <span className="ml-auto text-blue-400">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -153,7 +155,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSearch(); } }}
-              placeholder="Isiku nimi…"
+              placeholder={t('enrich.searchPlaceholder')}
               className="flex-1 px-3 py-1.5 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
             />
             <button
@@ -163,7 +165,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {isSearching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
-              Otsi
+              {t('enrich.searchBtn')}
             </button>
           </div>
 
@@ -209,7 +211,7 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
           {enrichError && <p className="text-xs text-red-600">{enrichError}</p>}
 
           <p className="text-xs text-blue-500 italic">
-            Klõpsa tulemusel — täidab vormi automaatselt soo, kuupäevade ja ametiga.
+            {t('enrich.hint')}
           </p>
         </div>
       )}

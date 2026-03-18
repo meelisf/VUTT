@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 
 export const CollapsibleSection: React.FC<{
@@ -34,6 +35,7 @@ export function DynamicList<T>({
   onAdd: () => void;
   onChange: (items: T[]) => void;
 }): React.ReactElement {
+  const { t } = useTranslation(['prosopography']);
   const updateItem = (i: number, v: T) => {
     const next = [...items];
     next[i] = v;
@@ -50,11 +52,11 @@ export function DynamicList<T>({
           onClick={onAdd}
           className="flex items-center gap-1 text-xs px-2 py-1 rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
         >
-          <Plus size={11} /> Lisa
+          <Plus size={11} /> {t('form.add')}
         </button>
       </div>
       {items.length === 0 && (
-        <p className="text-xs text-gray-400 italic">Kirjeid pole. Klõpsa "Lisa" lisamiseks.</p>
+        <p className="text-xs text-gray-400 italic">{t('form.noItems')}</p>
       )}
       <div className="space-y-2">
         {items.map((item, i) => (
