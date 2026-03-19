@@ -61,18 +61,22 @@ _cleanup_thread = threading.Thread(target=_cleanup_rate_limit_store, daemon=True
 _cleanup_thread.start()
 
 
-def get_client_ip(handler):
-    """Tagastab kliendi IP aadressi, arvestades X-Real-IP ja X-Forwarded-For päiseid."""
-    # Nginx saadab X-Real-IP päise
-    ip = handler.headers.get('X-Real-IP')
-    if ip:
-        return ip
-    # Fallback: X-Forwarded-For (esimene IP)
-    forwarded = handler.headers.get('X-Forwarded-For')
+def get_client_ip(request):
+    """Tagastab kliendi IP aadressi FastAPI Request objektist.
+    Usaldab X-Real-IP päist (nginx seab selle) ja X-Forwarded-For (esimene IP).
+    Fallback: request.client.host (otseühendus)."""
+    # Nginx seab X-Real-IP päringu tegeliku allika IP-le
+    ip = request.headers.get('X-Real-IP')
+    if ip and ip.strip():
+        return ip.strip()
+    # Alternatiiv: X-Forwarded-For (esimene IP, proxyde ahela algus)
+    forwarded = request.headers.get('X-Forwarded-For')
     if forwarded:
         return forwarded.split(',')[0].strip()
-    # Viimane võimalus: otseühenduse IP
-    return handler.client_address[0]
+    # Otseühenduse IP — FastAPI Request API
+    if request.client:
+        return request.client.host
+    return '0.0.0.0'
 
 
 def check_rate_limit(ip, endpoint):

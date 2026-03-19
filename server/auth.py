@@ -118,23 +118,26 @@ def verify_user(username, password):
 def create_session(user):
     """Loob uue sessiooni ja tagastab tokeni."""
     token = str(uuid.uuid4())
-    sessions[token] = {
-        "user": user,
-        "created_at": datetime.now().isoformat()
-    }
-    print(f"Uus sessioon loodud: {user['username']} (aktiivseid sessioone: {len(sessions)})")
+    with _sessions_lock:
+        sessions[token] = {
+            "user": user,
+            "created_at": datetime.now().isoformat()
+        }
+        count = len(sessions)
+    print(f"Uus sessioon loodud: {user['username']} (aktiivseid sessioone: {count})")
     return token
 
 
 def get_session(token):
     """Tagastab sessiooni tokeni järgi või None."""
-    return sessions.get(token)
+    with _sessions_lock:
+        return sessions.get(token)
 
 
 def delete_session(token):
     """Kustutab sessiooni."""
-    if token in sessions:
-        del sessions[token]
+    with _sessions_lock:
+        sessions.pop(token, None)
 
 
 def require_token(data, min_role=None):
@@ -149,18 +152,19 @@ def require_token(data, min_role=None):
     if not token:
         return None, {"status": "error", "message": "Autentimine nõutud (token puudub)"}
 
-    session = sessions.get(token)
-    if not session:
-        return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
+    with _sessions_lock:
+        session = sessions.get(token)
+        if not session:
+            return None, {"status": "error", "message": "Sessioon aegunud, palun logi uuesti sisse"}
 
-    # Kontrolli sessiooni aegumist (24h)
-    created_at = datetime.fromisoformat(session["created_at"])
-    if datetime.now() - created_at > SESSION_DURATION:
-        # Eemalda aegunud sessioon
-        del sessions[token]
-        return None, {"status": "error", "message": "Sessioon aegunud (24h), palun logi uuesti sisse"}
+        # Kontrolli sessiooni aegumist (24h)
+        created_at = datetime.fromisoformat(session["created_at"])
+        if datetime.now() - created_at > SESSION_DURATION:
+            # Eemalda aegunud sessioon
+            del sessions[token]
+            return None, {"status": "error", "message": "Sessioon aegunud (24h), palun logi uuesti sisse"}
 
-    user = session["user"]
+        user = session["user"]
 
     # Rollide hierarhia kontroll
     # contributor = kaastööline (muudatused vajavad ülevaatust)

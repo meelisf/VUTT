@@ -25,7 +25,7 @@ import UploadMetaForm from '../components/UploadMetaForm';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 
 // ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ const Upload: React.FC = () => {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!authToken) return;
-    fetchWithTimeout(`${FILE_API_URL}/admin/uploads?token=${authToken}`)
+    fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, { headers: getAuthHeaders(authToken) })
       .then((r) => r.json())
       .then((d) => setPendingUploads(d.uploads || []))
       .catch(() => {})
@@ -301,7 +301,8 @@ const Upload: React.FC = () => {
       if (!authToken) return;
       try {
         const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${id}/status?token=${authToken}`
+          `${FILE_API_URL}/admin/upload/${id}/status`,
+          { headers: getAuthHeaders(authToken) }
         );
         if (!r.ok) return;
         const d: PollResult = await r.json();
@@ -400,10 +401,10 @@ const Upload: React.FC = () => {
 
     try {
       const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/upload/${uploadId}/files?token=${authToken}`,
+        `${FILE_API_URL}/admin/upload/${uploadId}/files`,
         {
           method: 'POST',
-          headers: { 'X-Filename': encodeURIComponent(file.name) },
+          headers: { 'X-Filename': encodeURIComponent(file.name), ...getAuthHeaders(authToken) },
           body: file,
           timeout: 300_000, // 5 min suurtele failidele
         }
@@ -441,13 +442,14 @@ const Upload: React.FC = () => {
       setMultiCurrentNum(i + 1);
       try {
         const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${uploadId}/files?token=${authToken}`,
+          `${FILE_API_URL}/admin/upload/${uploadId}/files`,
           {
             method: 'POST',
             headers: {
               'X-Filename': encodeURIComponent(files[i].name),
               'X-Page-Number': String(i + 1),
               'X-Total-Pages': String(files.length),
+              ...getAuthHeaders(authToken),
             },
             body: files[i],
             timeout: 300_000,
@@ -588,7 +590,7 @@ const Upload: React.FC = () => {
     setMultiTotalNum(0);
     // Värskenda pooleliolevate nimekirja
     if (authToken) {
-      fetchWithTimeout(`${FILE_API_URL}/admin/uploads?token=${authToken}`)
+      fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, { headers: getAuthHeaders(authToken) })
         .then((r) => r.json())
         .then((d) => setPendingUploads(d.uploads || []))
         .catch(() => {});
@@ -602,8 +604,9 @@ const Upload: React.FC = () => {
     if (!window.confirm(t('cancelConfirm'))) return;
     stopPolling();
     if (uploadId && authToken) {
-      await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}?token=${authToken}`, {
+      await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(authToken),
       }).catch(() => {});
     }
     setUploadId(null);
@@ -757,8 +760,8 @@ const Upload: React.FC = () => {
                           onClick={async () => {
                             if (!window.confirm(t('cancelConfirm'))) return;
                             await fetchWithTimeout(
-                              `${FILE_API_URL}/admin/upload/${u.id}?token=${authToken}`,
-                              { method: 'DELETE' }
+                              `${FILE_API_URL}/admin/upload/${u.id}`,
+                              { method: 'DELETE', headers: getAuthHeaders(authToken) }
                             ).catch(() => {});
                             setPendingUploads((prev) => prev.filter((p) => p.id !== u.id));
                           }}

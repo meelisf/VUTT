@@ -9,7 +9,7 @@ import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { vuttTheme } from './editor/VuttTheme';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { FILE_API_URL } from '../config';
 
@@ -292,7 +292,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const loadSpecialCharacters = async () => {
       try {
         if (authToken) {
-          const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars?token=${authToken}`, { timeout: 5000 });
+          const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, { headers: getAuthHeaders(authToken), timeout: 5000 });
           if (response.ok) {
             const data = await response.json();
             if (data.is_custom) {
@@ -595,8 +595,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const poll = async () => {
         try {
           const pr = await fetchWithTimeout(
-            `${FILE_API_URL}/admin/reocr/${jobId}/status?token=${authToken}`,
-            { timeout: 10000 }
+            `${FILE_API_URL}/admin/reocr/${jobId}/status`,
+            { headers: getAuthHeaders(authToken), timeout: 10000 }
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
           const pd = await pr.json();
@@ -624,8 +624,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       // 1. Kontrolli .ocr faili (elab serverirestate üle)
       try {
         const res = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
-          { timeout: 5000 }
+          `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
+          { headers: getAuthHeaders(authToken), timeout: 5000 }
         );
         if (res.ok) {
           const data = await res.json();
@@ -644,8 +644,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
       try {
         const pr = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/reocr/${savedJobId}/status?token=${authToken}`,
-          { timeout: 10000 }
+          `${FILE_API_URL}/admin/reocr/${savedJobId}/status`,
+          { headers: getAuthHeaders(authToken), timeout: 10000 }
         );
         const pd = await pr.json();
         if (pd.status === 'done') {
@@ -676,8 +676,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     try {
       const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${page.work_id}/reocr-page`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ page_filename: pageFilename, page_number: page.page_number, auth_token: authToken }),
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({ page_filename: pageFilename, page_number: page.page_number }),
         timeout: 30000,
       });
       if (!res.ok) {
@@ -691,8 +691,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const poll = async () => {
         try {
           const pr = await fetchWithTimeout(
-            `${FILE_API_URL}/admin/reocr/${job_id}/status?token=${authToken}`,
-            { timeout: 10000 }
+            `${FILE_API_URL}/admin/reocr/${job_id}/status`,
+            { headers: getAuthHeaders(authToken), timeout: 10000 }
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
           const pd = await pr.json();
@@ -730,8 +730,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     // Kustuta .ocr fail — tulemus on rakendatud
     if (pageFilename && authToken && page.work_id) {
       fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
-        { method: 'DELETE', timeout: 5000 }
+        `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
+        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 5000 }
       ).catch(() => {});
     }
     if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
@@ -742,8 +742,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const deleteOcrFile = useCallback(async () => {
     if (!pageFilename || !authToken || !page.work_id) return;
     await fetchWithTimeout(
-      `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}&token=${authToken}`,
-      { method: 'DELETE', timeout: 5000 }
+      `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
+      { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 5000 }
     ).catch(() => {});
     if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
     setReocrStatus('idle');

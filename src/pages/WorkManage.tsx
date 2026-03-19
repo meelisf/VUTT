@@ -19,7 +19,7 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface PageInfo {
   page_num: number;
@@ -107,8 +107,8 @@ const WorkManage: React.FC = () => {
     setLoadError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/pages?token=${authToken}`,
-        { method: 'GET' }
+        `${FILE_API_URL}/admin/work/${workId}/pages`,
+        { method: 'GET', headers: getAuthHeaders(authToken) }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -130,8 +130,8 @@ const WorkManage: React.FC = () => {
     setTrashError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/trash-pages?token=${authToken}`,
-        { method: 'GET' }
+        `${FILE_API_URL}/admin/work/${workId}/trash-pages`,
+        { method: 'GET', headers: getAuthHeaders(authToken) }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -203,10 +203,10 @@ const WorkManage: React.FC = () => {
     setReorderError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/reorder-pages?token=${authToken}`,
+        `${FILE_API_URL}/admin/work/${workId}/reorder-pages`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify({ order }),
           timeout: 30000,
         }
@@ -232,8 +232,8 @@ const WorkManage: React.FC = () => {
     setDeletePageError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}?token=${authToken}`,
-        { method: 'DELETE', timeout: 15000 }
+        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}`,
+        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 15000 }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -261,8 +261,8 @@ const WorkManage: React.FC = () => {
       formData.append('file', file);
 
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image?token=${authToken}`,
-        { method: 'POST', body: formData, timeout: 30000 }
+        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image`,
+        { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -302,8 +302,8 @@ const WorkManage: React.FC = () => {
       formData.append('after_page_num', String(addAfterPage));
 
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/add-page?token=${authToken}`,
-        { method: 'POST', body: formData, timeout: 30000 }
+        `${FILE_API_URL}/admin/work/${workId}/add-page`,
+        { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -332,8 +332,8 @@ const WorkManage: React.FC = () => {
     setRestoreMessage(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/trash-pages/${encodeURIComponent(filename)}/restore?token=${authToken}`,
-        { method: 'POST', timeout: 30000 }
+        `${FILE_API_URL}/admin/work/${workId}/trash-pages/${encodeURIComponent(filename)}/restore`,
+        { method: 'POST', headers: getAuthHeaders(authToken), timeout: 30000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
@@ -357,8 +357,8 @@ const WorkManage: React.FC = () => {
     setDeleteWorkError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}?token=${authToken}`,
-        { method: 'DELETE', timeout: 15000 }
+        `${FILE_API_URL}/admin/work/${workId}`,
+        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 15000 }
       );
       if (res.ok) {
         navigate('/');

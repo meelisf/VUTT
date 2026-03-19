@@ -30,8 +30,13 @@ router = APIRouter()
 # =========================================================
 
 async def _get_user(request: Request, min_role: str = "contributor"):
-    """Loeb tokeni query-st või JSON body-st."""
-    token = request.query_params.get("token")
+    """Loeb tokeni Authorization headerist, JSON body-st või query-st (deprecated)."""
+    token = None
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+
     if not token:
         try:
             body = await request.body()
@@ -41,6 +46,10 @@ async def _get_user(request: Request, min_role: str = "contributor"):
                 request.state.json_data = data
         except Exception:
             pass
+
+    if not token:
+        token = request.query_params.get("token")
+
     if not token:
         raise HTTPException(status_code=401, detail="Autentimine nõutud")
     user, error = require_token({"auth_token": token}, min_role=min_role)

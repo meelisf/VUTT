@@ -1,12 +1,8 @@
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import type { ProsopoIndexEntry, ProsopoRecord } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
-
-function authHeader(token: string) {
-  return { 'Content-Type': 'application/json' };
-}
 
 export async function listPersons(params?: {
   q?: string;
@@ -19,12 +15,9 @@ export async function listPersons(params?: {
   offset?: number;
 }, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number; offset: number; limit: number }> {
   if (params?.ids?.length) {
-    const url = new URL(`${BASE}/query`, window.location.origin);
-    if (token) url.searchParams.set('token', token);
-
-    const resp = await fetchWithTimeout(url.toString(), {
+    const resp = await fetchWithTimeout(`${BASE}/query`, {
       method: 'POST',
-      headers: authHeader(token || ''),
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
       body: JSON.stringify(params),
       timeout: 10000,
     });
@@ -41,17 +34,21 @@ export async function listPersons(params?: {
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
   if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
   if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
-  if (token) url.searchParams.set('token', token);
 
-  const resp = await fetchWithTimeout(url.toString(), { timeout: 10000 });
+  const resp = await fetchWithTimeout(url.toString(), {
+    headers: getAuthHeaders(token),
+    timeout: 10000,
+  });
   if (!resp.ok) throw new Error(`listPersons: ${resp.status}`);
   return resp.json();
 }
 
 export async function getPerson(personId: string, token?: string): Promise<ProsopoRecord> {
   const encoded = encodeURIComponent(personId);
-  const url = token ? `${BASE}/${encoded}?token=${token}` : `${BASE}/${encoded}`;
-  const resp = await fetchWithTimeout(url, { timeout: 10000 });
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}`, {
+    headers: getAuthHeaders(token),
+    timeout: 10000,
+  });
   if (!resp.ok) throw new Error(`getPerson: ${resp.status}`);
   return resp.json();
 }
@@ -65,8 +62,8 @@ export async function createPerson(data: {
 }, token: string): Promise<ProsopoRecord> {
   const resp = await fetchWithTimeout(BASE, {
     method: 'POST',
-    headers: authHeader(token),
-    body: JSON.stringify({ ...data, auth_token: token }),
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify(data),
     timeout: 10000,
   });
   if (!resp.ok) throw new Error(`createPerson: ${resp.status}`);
@@ -77,8 +74,8 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
   const encoded = encodeURIComponent(personId);
   const resp = await fetchWithTimeout(`${BASE}/${encoded}`, {
     method: 'PUT',
-    headers: authHeader(token),
-    body: JSON.stringify({ ...data, auth_token: token }),
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify(data),
     timeout: 10000,
   });
   if (resp.status === 409) {
@@ -91,9 +88,9 @@ export async function updatePerson(personId: string, data: Partial<ProsopoRecord
 
 export async function uploadPersonImage(personId: string, file: File, token: string): Promise<{ image_url: string; updated_at?: string }> {
   const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image`, {
     method: 'POST',
-    headers: { 'Content-Type': file.type },
+    headers: { 'Content-Type': file.type, ...getAuthHeaders(token) },
     body: file,
     timeout: 30000,
   });
@@ -112,8 +109,10 @@ export async function fetchEnrichmentPreview(scheme: string, id: string, token: 
   const url = new URL(`${BASE}/enrich/preview`, window.location.origin);
   url.searchParams.set('scheme', scheme);
   url.searchParams.set('id', id);
-  url.searchParams.set('token', token);
-  const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
+  const resp = await fetchWithTimeout(url.toString(), {
+    headers: getAuthHeaders(token),
+    timeout: 15000,
+  });
   if (!resp.ok) throw new Error(`fetchEnrichmentPreview: ${resp.status}`);
   return resp.json();
 }
@@ -131,17 +130,20 @@ export async function fetchPersonEnrichmentPreview(
   const encoded = encodeURIComponent(personId);
   const url = new URL(`${BASE}/${encoded}/enrich/preview`, window.location.origin);
   url.searchParams.set('scheme', scheme);
-  url.searchParams.set('token', token);
   if (extId) url.searchParams.set('id', extId);
-  const resp = await fetchWithTimeout(url.toString(), { timeout: 15000 });
+  const resp = await fetchWithTimeout(url.toString(), {
+    headers: getAuthHeaders(token),
+    timeout: 15000,
+  });
   if (!resp.ok) throw new Error(`fetchPersonEnrichmentPreview: ${resp.status}`);
   return resp.json();
 }
 
 export async function deletePersonImage(personId: string, token: string): Promise<{ updated_at: string }> {
   const encoded = encodeURIComponent(personId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image?token=${token}`, {
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/image`, {
     method: 'DELETE',
+    headers: getAuthHeaders(token),
     timeout: 10000,
   });
   if (!resp.ok) throw new Error(`deletePersonImage: ${resp.status}`);
@@ -154,9 +156,9 @@ export async function mergePersons(
   token: string,
 ): Promise<{ id: string }> {
   const encoded = encodeURIComponent(sourceId);
-  const resp = await fetchWithTimeout(`${BASE}/${encoded}/merge?token=${token}`, {
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/merge`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
     body: JSON.stringify({ target_id: targetId }),
     timeout: 30000,
   });

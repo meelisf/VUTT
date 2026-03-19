@@ -1,3 +1,10 @@
+// Tagastab Authorization: Bearer headeri tokeni jaoks.
+// Kasuta seda kõigis autentitud fetchWithTimeout päringutes query-param asemel.
+export function getAuthHeaders(token: string | null | undefined): Record<string, string> {
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
+}
+
 // Fetch wrapper mis lisab automaatse timeout'i.
 // Kui server ei vasta etteantud aja jooksul, katkestatakse päring AbortError'iga.
 

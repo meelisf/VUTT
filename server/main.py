@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, get_logger
-from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid
+from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
 
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
@@ -19,7 +19,7 @@ from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
-from .auth import verify_user, create_session, sessions, SESSION_DURATION, require_token, get_all_users, update_user_role, delete_user
+from .auth import verify_user, create_session, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
@@ -73,10 +73,17 @@ app.add_middleware(
 
 async def get_user(request: Request, min_role: str = "contributor"):
     """
-    Ühtne autentimine. Loeb tokenit query-st (GET) või body-st (POST).
-    Süstemaatiline lähenemine: token on kas 'token' või 'auth_token'.
+    Ühtne autentimine. Järjekord:
+    1. Authorization: Bearer <token> header (eelistatud)
+    2. JSON body auth_token (POST päringud)
+    3. query-param 'token' (deprecated fallback — ainult <img src> tüüpi GET-id)
     """
-    token = request.query_params.get("token")
+    token = None
+
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:].strip()
+
     if not token:
         try:
             body_bytes = await request.body()
@@ -85,6 +92,9 @@ async def get_user(request: Request, min_role: str = "contributor"):
                 token = body_data.get("auth_token")
                 request.state.json_data = body_data
         except: pass
+
+    if not token:
+        token = request.query_params.get("token")
 
     if not token:
         raise HTTPException(status_code=401, detail="Autentimine nõutud")
@@ -120,13 +130,10 @@ async def login(request: Request):
 async def verify_token(request: Request):
     data = await request.json()
     token = data.get("token", "").strip()
-    session = sessions.get(token)
-    if session:
-        if datetime.now() - datetime.fromisoformat(session["created_at"]) > SESSION_DURATION:
-            del sessions[token]
-            return {"status": "error", "valid": False, "message": "Sessioon aegunud"}
-        return {"status": "success", "user": session["user"], "valid": True}
-    return {"status": "error", "valid": False, "message": "Token kehtetu"}
+    user, error = require_token({"auth_token": token})
+    if error:
+        return {"status": "error", "valid": False, "message": error["message"]}
+    return {"status": "success", "user": user, "valid": True}
 
 @app.post("/register")
 async def register(request: Request):
@@ -995,8 +1002,7 @@ async def admin_update_collection(collection_id: str, request: Request, user=Dep
             del data[collection_id]["color"]
 
     # Kirjuta tagasi
-    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(COLLECTIONS_FILE, data)
 
     # Invalideerib cache → järgmine /collections päring laeb uued andmed
     invalidate_cache()
@@ -1040,8 +1046,7 @@ async def admin_create_collection(request: Request, user=Depends(require_role("a
 
     data[collection_id] = new_col
 
-    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(COLLECTIONS_FILE, data)
 
     invalidate_cache()
     return {"status": "success"}
@@ -1125,8 +1130,7 @@ async def admin_delete_collection(collection_id: str, background_tasks: Backgrou
 
     # Kustuta kollektsioonist
     del data[collection_id]
-    with open(COLLECTIONS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    atomic_write_json(COLLECTIONS_FILE, data)
 
     invalidate_cache()
     return {"status": "success", "affected_works": len(affected)}
@@ -1165,7 +1169,7 @@ async def save_user_chars(request: Request, user=Depends(get_user)):
     if data.get('reset'):
         if os.path.exists(path): os.remove(path)
         return {"status": "success", "reset": True}
-    with open(path, 'w', encoding='utf-8') as f: json.dump({"characters": data.get('characters', [])}, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, {"characters": data.get('characters', [])})
     return {"status": "success"}
 
 @app.get("/download/{work_id}")
@@ -1177,7 +1181,6 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
       'both'   → ZIP piltide + kokku liidetud tekstifailiga
     """
     import zipfile
-    import io
 
     client_ip = get_client_ip(request)
     allowed, retry_after = check_rate_limit(client_ip, '/download')
@@ -1242,32 +1245,53 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
         )
 
     # ZIP (images või both) — failid nimetatud {file_slug}_pg_NNN.ext sequence järjekorras
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        if os.path.exists(meta_path):
-            zf.write(meta_path, f"{file_slug}/_metadata.json")
+    import tempfile
 
-        for i, img_fname in enumerate(sorted_images, start=1):
-            base = os.path.splitext(img_fname)[0]
-            ext = img_fname.rsplit('.', 1)[-1].lower()
-            
-            # Lisa pilt
-            img_path = os.path.join(folder, img_fname)
-            if os.path.isfile(img_path):
-                zf.write(img_path, f"{file_slug}/{file_slug}_pg_{i:03d}.{ext}")
-            
-            # Lisa tekst eraldi failina (ainult 'both' puhul)
-            if content == 'both':
-                txt_path = os.path.join(folder, base + '.txt')
-                if os.path.exists(txt_path):
-                    zf.write(txt_path, f"{file_slug}/{file_slug}_pg_{i:03d}.txt")
+    tmp = tempfile.NamedTemporaryFile(suffix='.zip', delete=False)
+    try:
+        with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as zf:
+            if os.path.exists(meta_path):
+                zf.write(meta_path, f"{file_slug}/_metadata.json")
 
-    buf.seek(0)
-    return StreamingResponse(
-        buf,
-        media_type="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{file_slug}.zip"'}
-    )
+            for i, img_fname in enumerate(sorted_images, start=1):
+                base = os.path.splitext(img_fname)[0]
+                ext = img_fname.rsplit('.', 1)[-1].lower()
+
+                # Lisa pilt
+                img_path = os.path.join(folder, img_fname)
+                if os.path.isfile(img_path):
+                    zf.write(img_path, f"{file_slug}/{file_slug}_pg_{i:03d}.{ext}")
+
+                # Lisa tekst eraldi failina (ainult 'both' puhul)
+                if content == 'both':
+                    txt_path = os.path.join(folder, base + '.txt')
+                    if os.path.exists(txt_path):
+                        zf.write(txt_path, f"{file_slug}/{file_slug}_pg_{i:03d}.txt")
+
+        tmp.seek(0)
+
+        def _stream_and_cleanup():
+            try:
+                with open(tmp.name, 'rb') as f:
+                    while chunk := f.read(65536):
+                        yield chunk
+            finally:
+                try:
+                    os.unlink(tmp.name)
+                except OSError:
+                    pass
+
+        return StreamingResponse(
+            _stream_and_cleanup(),
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{file_slug}.zip"'}
+        )
+    except Exception:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+        raise
 
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str):

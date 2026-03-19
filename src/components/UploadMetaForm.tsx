@@ -13,7 +13,7 @@ import { Collections, getVocabularies, Vocabularies } from '../services/collecti
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { CollectionDropdown } from './MetadataModal';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { getLabel } from '../utils/metadataUtils';
 
@@ -104,7 +104,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     const loadMeta = async () => {
       try {
         const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${uploadId}/meta?token=${authToken}`
+          `${FILE_API_URL}/admin/upload/${uploadId}/meta`,
+          { headers: getAuthHeaders(authToken) }
         );
         if (!r.ok || cancelled) return;
         const d = await r.json();

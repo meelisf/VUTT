@@ -4,7 +4,7 @@ import { Check, Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-rea
 import { useCollection } from '../contexts/CollectionContext';
 import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 // Tailwind 400-taseme värvid värviplaaatide jaoks (inline style — ei sõltu Tailwind JIT kompileerimisest)
 const COLOR_SWATCHES: Record<string, string> = {
@@ -124,10 +124,10 @@ const CollectionEditor: React.FC = () => {
     setSaved(false);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}?token=${encodeURIComponent(token || '')}`,
+        `${FILE_API_URL}/admin/collections/${selectedId}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
           body: JSON.stringify({
             description: { et: descEt.trim(), en: descEn.trim() },
             description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
@@ -159,8 +159,8 @@ const CollectionEditor: React.FC = () => {
     setDeleteError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}/works-count?token=${encodeURIComponent(token || '')}`,
-        { timeout: 10000 }
+        `${FILE_API_URL}/admin/collections/${selectedId}/works-count`,
+        { headers: getAuthHeaders(token), timeout: 10000 }
       );
       const data = await res.json();
       if (data.status === 'success') setDeleteWorksCount(data.count);
@@ -175,8 +175,8 @@ const CollectionEditor: React.FC = () => {
     setDeleteError(null);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections/${selectedId}?token=${encodeURIComponent(token || '')}`,
-        { method: 'DELETE', timeout: 30000 }
+        `${FILE_API_URL}/admin/collections/${selectedId}`,
+        { method: 'DELETE', headers: getAuthHeaders(token), timeout: 30000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
@@ -208,10 +208,10 @@ const CollectionEditor: React.FC = () => {
     setCreating(true);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/collections?token=${encodeURIComponent(token || '')}`,
+        `${FILE_API_URL}/admin/collections`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
           body: JSON.stringify({
             id: newId.trim(),
             name_et: newNameEt.trim(),

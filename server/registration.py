@@ -152,23 +152,40 @@ def validate_invite_token(token):
     return None, "Token ei leitud"
 
 
-def use_invite_token(token):
-    """Märgib tokeni kasutatuks."""
-    data = load_invite_tokens()
+def _validate_and_consume_token(token):
+    """Atomaarne: valideerib tokeni ja märgib kasutatuks ühe lukustatud sektsiooni sees.
+    Tagastab (token_data, error). Ebaõnnestumise korral token jääb muutmata."""
+    with tokens_lock:
+        if not os.path.exists(INVITE_TOKENS_FILE):
+            return None, "Token ei leitud"
+        with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
 
-    for t in data["tokens"]:
-        if t["token"] == token:
-            t["used"] = True
-            t["used_at"] = datetime.now().isoformat()
-            save_invite_tokens(data)
-            return True
+        token_obj = None
+        for t in data["tokens"]:
+            if t["token"] == token:
+                token_obj = t
+                break
 
-    return False
+        if token_obj is None:
+            return None, "Token ei leitud"
+        if token_obj["used"]:
+            return None, "Token on juba kasutatud"
+        expires = datetime.fromisoformat(token_obj["expires_at"])
+        if datetime.now() > expires:
+            return None, "Token on aegunud"
+
+        token_obj["used"] = True
+        token_obj["used_at"] = datetime.now().isoformat()
+        atomic_write_json(INVITE_TOKENS_FILE, data)
+
+        return dict(token_obj), None
 
 
 def create_user_from_invite(token, password):
     """Loob kasutaja invite tokeni põhjal."""
-    token_data, error = validate_invite_token(token)
+    # Atomaarne validate + consume — kaitseb race condition'i eest
+    token_data, error = _validate_and_consume_token(token)
     if error:
         return None, error
 
@@ -205,9 +222,6 @@ def create_user_from_invite(token, password):
     # Salvesta users.json (atomic write + lock)
     with users_lock:
         atomic_write_json(USERS_FILE, users)
-
-    # Märgi token kasutatuks
-    use_invite_token(token)
 
     print(f"Loodud uus kasutaja: {username} ({name})")
     return {"username": username, "name": name, "role": "editor"}, None

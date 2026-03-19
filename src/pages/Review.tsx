@@ -33,7 +33,7 @@ import {
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface RecentCommit {
   commit_hash: string;
@@ -141,7 +141,7 @@ const Review: React.FC = () => {
     if (!token || !isAdmin) return;
     if (showLoader) setReocrLoading(true);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/jobs?token=${token}`, { timeout: 10000 });
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/jobs`, { headers: getAuthHeaders(token), timeout: 10000 });
       const data = await res.json();
       if (data.status === 'success') setReocrJobs(data.jobs);
     } catch {
@@ -175,8 +175,8 @@ const Review: React.FC = () => {
     setReocrLogLoading(true);
     try {
       const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/reocr/log?offset=${fromOffset}&limit=50&token=${token}`,
-        { timeout: 10000 }
+        `${FILE_API_URL}/admin/reocr/log?offset=${fromOffset}&limit=50`,
+        { headers: getAuthHeaders(token), timeout: 10000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
@@ -202,14 +202,14 @@ const Review: React.FC = () => {
     setError(null);
 
     try {
-      let url = `${FILE_API_URL}/recent-edits?token=${token}&limit=50&offset=${fromOffset}`;
+      let url = `${FILE_API_URL}/recent-edits?limit=50&offset=${fromOffset}`;
 
       // Kui admin on valinud konkreetse kasutaja
       if (selectedUser) {
         url += `&user=${encodeURIComponent(selectedUser)}`;
       }
 
-      const response = await fetchWithTimeout(url);
+      const response = await fetchWithTimeout(url, { headers: getAuthHeaders(token) });
       const data = await response.json();
 
       if (data.status === 'success') {
