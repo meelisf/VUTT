@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Briefcase, X, Loader2, Check, Replace, ListPlus } from 'lucide-react';
 import EntityPicker from '../../components/EntityPicker';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { getLangCode } from '../../utils/getLangCode';
+import { getPersonFacets } from '../services/prosopographyService';
 
 interface BulkOccupationModalProps {
   personCount: number;
@@ -23,6 +24,20 @@ const BulkOccupationModal: React.FC<BulkOccupationModalProps> = ({
   const [mode, setMode] = useState<'add' | 'replace'>('replace');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [localSuggestions, setLocalSuggestions] = useState<{ label: string; id: string }[]>([]);
+
+  useEffect(() => {
+    getPersonFacets().then(data => {
+      setLocalSuggestions(
+        (data.occupations || [])
+          .filter(o => o.id && o.id.startsWith('Q'))
+          .map(o => ({
+            id: o.id!,
+            label: o.labels?.[lang] || o.labels?.et || o.labels?.en || o.label,
+          }))
+      );
+    }).catch(() => {});
+  }, [lang]);
 
   const handleApply = async () => {
     if (!occupation) return;
@@ -98,6 +113,7 @@ const BulkOccupationModal: React.FC<BulkOccupationModalProps> = ({
               value={occupation}
               onChange={v => setOccupation(v)}
               lang={lang}
+              localSuggestions={localSuggestions}
             />
           </div>
 
