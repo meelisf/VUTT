@@ -412,11 +412,13 @@ const PersonEditPage: React.FC = () => {
               label={t('born', 'Sündinud')}
               value={draft.birth}
               onChange={v => set({ birth: v })}
+              localSuggestions={entityLabels}
             />
             <DateField
               label={t('died', 'Surnud')}
               value={draft.death}
               onChange={v => set({ death: v })}
+              localSuggestions={entityLabels}
             />
           </div>
 

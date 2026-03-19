@@ -9,7 +9,8 @@ const DateField: React.FC<{
   value: DateDraft;
   onChange: (v: DateDraft) => void;
   lang?: string;
-}> = ({ label, value, onChange, lang = 'et' }) => {
+  localSuggestions?: { label: string; id: string }[];
+}> = ({ label, value, onChange, lang = 'et', localSuggestions }) => {
   const { t } = useTranslation(['prosopography']);
   const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
 
@@ -113,6 +114,7 @@ const DateField: React.FC<{
               value={value.place}
               onChange={v => set({ place: v })}
               lang={lang}
+              localSuggestions={localSuggestions}
             />
           </div>
         </div>

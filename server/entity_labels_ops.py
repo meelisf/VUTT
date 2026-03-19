@@ -92,6 +92,12 @@ def _collect_qcodes_from_person(person):
     add(person.get('confession'))
     add(person.get('origin_city'))
     add(person.get('origin_region'))
+    birth = person.get('birth') or {}
+    if isinstance(birth, dict):
+        add(birth.get('place'))
+    death = person.get('death') or {}
+    if isinstance(death, dict):
+        add(death.get('place'))
     for occ in person.get('occupations', []) or []:
         if isinstance(occ, dict):
             add({'id': occ.get('id')})
