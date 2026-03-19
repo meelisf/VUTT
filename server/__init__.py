@@ -31,7 +31,7 @@ from .registration import (
     load_pending_registrations, save_pending_registrations,
     add_registration, get_registration_by_id, update_registration_status,
     load_invite_tokens, save_invite_tokens, create_invite_token,
-    validate_invite_token, use_invite_token, create_user_from_invite
+    validate_invite_token, create_user_from_invite
 )
 
 # Pending edits (äriloogika)
