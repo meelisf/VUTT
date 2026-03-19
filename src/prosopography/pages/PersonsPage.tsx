@@ -292,6 +292,13 @@ const PersonsPage: React.FC = () => {
             occupations={occupationFacets}
             onOccupationChange={setOccupation}
             onGenderChange={setGender}
+            onClearAll={() => setSearchParams(p => {
+              const n = new URLSearchParams(p);
+              n.delete('occupation');
+              n.delete('gender');
+              n.delete('offset');
+              return n;
+            }, { replace: true })}
           />
         </div>
 

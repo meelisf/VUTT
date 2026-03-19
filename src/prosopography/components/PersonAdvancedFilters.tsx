@@ -26,6 +26,7 @@ interface PersonAdvancedFiltersProps {
   occupations: OccupationFacetItem[];
   onGenderChange: (v: GenderFilter) => void;
   onOccupationChange: (v: string) => void;
+  onClearAll: () => void;
 }
 
 const FilterSection: React.FC<FilterSectionProps> = ({
@@ -102,6 +103,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
   occupations,
   onGenderChange,
   onOccupationChange,
+  onClearAll,
 }) => {
   const { t } = useTranslation('prosopography');
   const hasActive = !!(occupation || gender);
@@ -112,10 +114,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
     if (hasActive && !isExpanded) setIsExpanded(true);
   }, [hasActive, isExpanded]);
 
-  const clearAll = () => {
-    onOccupationChange('');
-    onGenderChange('');
-  };
+  const clearAll = onClearAll;
 
   return (
     <div className="bg-white/50 rounded-lg border border-gray-200">
