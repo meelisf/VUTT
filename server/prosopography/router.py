@@ -22,6 +22,7 @@ from .ops import (
     upload_person_image,
     get_person_image_path,
     delete_person_image,
+    bulk_update_occupation,
 )
 
 router = APIRouter()
@@ -391,3 +392,28 @@ async def prosopography_rebuild(
     """Taastab kõik kolm read-modeli nullist (admin only)."""
     rebuild_indices()
     return {"status": "ok", "message": "Indeksid taastatud."}
+
+
+@router.post("/bulk-occupation")
+async def prosopography_bulk_occupation(
+    request: Request,
+    user=Depends(_require_role("editor")),
+):
+    """Massiga ameti määramine/asendamine. Nõuab editor-rolli."""
+    data = await _get_json(request)
+    occupation = data.get("occupation")
+    mode = data.get("mode", "add")
+    person_ids = data.get("person_ids") or []
+
+    if not occupation or not isinstance(occupation, dict):
+        raise HTTPException(status_code=400, detail="occupation on kohustuslik")
+    if mode not in ("add", "replace"):
+        raise HTTPException(status_code=400, detail="mode peab olema 'add' või 'replace'")
+    if not person_ids:
+        raise HTTPException(status_code=400, detail="person_ids on kohustuslik")
+
+    return bulk_update_occupation(
+        occupation=occupation,
+        mode=mode,
+        person_ids=person_ids,
+    )

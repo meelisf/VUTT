@@ -1043,3 +1043,47 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     rebuild_indices()
 
     return get_person(target_id)
+
+
+def bulk_update_occupation(
+    occupation: dict,
+    mode: str,
+    person_ids: list,
+) -> dict:
+    """
+    Massiga ameti määramine/asendamine mitmele isikule korraga.
+    mode='add'     — lisab ameti kui seda veel pole
+    mode='replace' — asendab kõik olemasolevad ametid uuega
+    """
+    updated = 0
+    skipped = 0
+    occ_id = occupation.get("id")
+    occ_label = (occupation.get("label") or "").strip().lower()
+
+    for person_id in person_ids:
+        person = get_person(person_id)
+        if not person:
+            skipped += 1
+            continue
+
+        existing = person.get("occupations") or []
+
+        if mode == "replace":
+            new_occupations = [occupation]
+        else:
+            already = any(
+                (occ_id and isinstance(item, dict) and item.get("id") == occ_id)
+                or (not occ_id and isinstance(item, dict) and (item.get("label") or "").strip().lower() == occ_label)
+                for item in existing
+            )
+            if already:
+                skipped += 1
+                continue
+            new_occupations = list(existing) + [occupation]
+
+        person["occupations"] = new_occupations
+        _atomic_write(_id_to_path(person_id), person)
+        _update_index_entry(person)
+        updated += 1
+
+    return {"updated": updated, "skipped": skipped, "total": len(person_ids)}

@@ -180,6 +180,25 @@ export async function deletePersonImage(personId: string, token: string): Promis
   return resp.json();
 }
 
+export async function bulkUpdateOccupation(
+  occupation: { id: string | null; label: string; labels?: Record<string, string> | null; source?: string },
+  mode: 'add' | 'replace',
+  personIds: string[],
+  token: string,
+): Promise<{ updated: number; skipped: number; total: number }> {
+  const resp = await fetchWithTimeout(`${BASE}/bulk-occupation`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ occupation, mode, person_ids: personIds }),
+    timeout: 30000,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || `bulkUpdateOccupation: ${resp.status}`);
+  }
+  return resp.json();
+}
+
 export async function mergePersons(
   sourceId: string,
   targetId: string,

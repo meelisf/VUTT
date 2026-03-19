@@ -180,5 +180,14 @@
       "status": "status",
       "nameAliases": "name variants"
     }
+  },
+  "bulkOccupation": {
+    "title": "Assign occupation",
+    "description": "Will be applied to {{count}} persons.",
+    "modeAdd": "Add",
+    "modeReplace": "Replace all",
+    "modeAddHint": "Adds the occupation to those who do not already have it.",
+    "modeReplaceHint": "Removes all existing occupations and replaces with the selected one.",
+    "apply": "Apply"
   }
 }

@@ -180,5 +180,14 @@
       "status": "seisus",
       "nameAliases": "nimevariandid"
     }
+  },
+  "bulkOccupation": {
+    "title": "Määra amet",
+    "description": "Rakendatakse {{count}} isikule.",
+    "modeAdd": "Lisa",
+    "modeReplace": "Asenda kõik",
+    "modeAddHint": "Lisab ameti neile, kellel seda veel pole.",
+    "modeReplaceHint": "Eemaldab kõik olemasolevad ametid ja asendab valitud ametiga.",
+    "apply": "Rakenda"
   }
 }
