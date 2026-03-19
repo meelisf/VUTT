@@ -6,6 +6,7 @@ export type GenderFilter = '' | 'M' | 'F';
 
 interface OccupationFacetItem {
   value: string;
+  label: string;
   count: number;
 }
 
@@ -42,7 +43,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items;
     const lowerQuery = searchQuery.trim().toLowerCase();
-    return items.filter(item => item.value.toLowerCase().includes(lowerQuery));
+    return items.filter(item => item.label.toLowerCase().includes(lowerQuery));
   }, [items, searchQuery]);
 
   return (
@@ -72,7 +73,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           {filteredItems.length === 0 ? (
             <span className="text-sm text-gray-400 italic py-1">{emptyLabel}</span>
           ) : (
-            filteredItems.map(({ value, count }) => {
+            filteredItems.map(({ value, label, count }) => {
               const isSelected = selectedValue === value;
               return (
                 <button
@@ -84,7 +85,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
-                  {value} <span className="opacity-60 text-xs">({count})</span>
+                  {label} <span className="opacity-60 text-xs">({count})</span>
                 </button>
               );
             })

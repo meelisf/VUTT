@@ -19,7 +19,7 @@ export interface ProsopoIndexEntry {
   biography_snippet: string;
   image_url: string | null;
   aliases: string[];
-  occupations?: string[];
+  occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
 }
 
 export interface HistoricalDate {

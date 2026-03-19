@@ -101,7 +101,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     family_name = name_obj.get("family_name") or ""
     sort_name = family_name or label
     aliases = name_obj.get("aliases") or []
-    occupations = _extract_occupation_labels(person)
+    occupations = _extract_occupation_entries(person)
 
     # birth/death_year — võtame täisarvuna kui date olemas
     def _extract_year(date_obj: dict):
@@ -136,26 +136,66 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     }
 
 
-def _extract_occupation_labels(person: dict) -> list[str]:
+def _extract_occupation_entries(person: dict) -> list[dict]:
     raw_occupations = person.get("occupations") or []
 
-    def _occupation_label(item):
+    def _occupation_entry(item):
         if isinstance(item, dict):
             label = item.get("label")
-            if isinstance(label, str):
-                return label.strip()
-            return ""
+            occ_id = item.get("id")
+            labels = item.get("labels")
+            if (not isinstance(label, str) or not label.strip()) and isinstance(labels, dict):
+                label = labels.get("et") or labels.get("en") or next((v for v in labels.values() if isinstance(v, str) and v.strip()), "")
+            label = label.strip() if isinstance(label, str) else ""
+            occ_id = occ_id.strip() if isinstance(occ_id, str) else None
+            normalized_labels = {
+                key: value.strip()
+                for key, value in labels.items()
+                if isinstance(key, str) and isinstance(value, str) and value.strip()
+            } if isinstance(labels, dict) else None
+            if occ_id or label:
+                return {"id": occ_id, "label": label, "labels": normalized_labels}
+            return None
         if isinstance(item, str):
-            return item.strip()
-        return ""
+            label = item.strip()
+            return {"id": None, "label": label, "labels": None} if label else None
+        return None
 
-    return sorted({label for label in (_occupation_label(item) for item in raw_occupations) if label})
+    deduped: dict[str, dict] = {}
+    for item in raw_occupations:
+        entry = _occupation_entry(item)
+        if not entry:
+            continue
+        key = entry["id"] or f"label:{entry['label'].lower()}"
+        if key not in deduped:
+            deduped[key] = entry
+    return sorted(deduped.values(), key=lambda item: (item.get("label") or "").lower())
 
 
-def _entry_occupations(entry: dict) -> list[str]:
+def _entry_occupations(entry: dict) -> list[dict]:
     occupations = entry.get("occupations")
     if occupations is not None:
-        return [item for item in occupations if isinstance(item, str) and item.strip()]
+        normalized = []
+        for item in occupations:
+            if isinstance(item, dict):
+                label = item.get("label")
+                occ_id = item.get("id")
+                labels = item.get("labels")
+                normalized_labels = {
+                    key: value.strip()
+                    for key, value in labels.items()
+                    if isinstance(key, str) and isinstance(value, str) and value.strip()
+                } if isinstance(labels, dict) else None
+                if isinstance(label, str) and label.strip():
+                    normalized.append({
+                        "id": occ_id if isinstance(occ_id, str) and occ_id.strip() else None,
+                        "label": label.strip(),
+                        "labels": normalized_labels,
+                    })
+            elif isinstance(item, str) and item.strip():
+                normalized.append({"id": None, "label": item.strip(), "labels": None})
+        if normalized:
+            return normalized
 
     person_id = entry.get("id")
     if not person_id:
@@ -163,7 +203,7 @@ def _entry_occupations(entry: dict) -> list[str]:
     person = get_person(person_id)
     if not person:
         return []
-    return _extract_occupation_labels(person)
+    return _extract_occupation_entries(person)
 
 
 def _update_index_entry(person: dict):
@@ -420,10 +460,14 @@ def list_persons(
     if gender:
         results = [e for e in results if e.get("gender") == gender]
     if occupation:
-        occupation_lower = occupation.strip().lower()
+        occupation_filter = occupation.strip()
         results = [
             e for e in results
-            if any(occupation_lower == item.strip().lower() for item in _entry_occupations(e))
+            if any(
+                (item.get("id") and item.get("id") == occupation_filter)
+                or ((not item.get("id")) and item.get("label", "").strip().lower() == occupation_filter.lower())
+                for item in _entry_occupations(e)
+            )
         ]
     if status_id:
         results = [e for e in results if e.get("status_id") == status_id]
@@ -462,15 +506,30 @@ def get_person_facets(
         offset=0,
     )["results"]
 
-    occupation_counts: dict[str, int] = {}
+    occupation_counts: dict[str, dict] = {}
     for entry in filtered:
         for occupation in _entry_occupations(entry):
-            if not occupation:
+            occ_id = occupation.get("id")
+            occ_label = occupation.get("label") or ""
+            if not occ_id and not occ_label:
                 continue
-            occupation_counts[occupation] = occupation_counts.get(occupation, 0) + 1
+            key = occ_id or f"label:{occ_label.lower()}"
+            existing = occupation_counts.get(key)
+            if existing:
+                existing["count"] += 1
+            else:
+                occupation_counts[key] = {
+                    "id": occ_id,
+                    "label": occ_label,
+                    "labels": occupation.get("labels"),
+                    "count": 1,
+                }
 
     return {
-        "occupations": dict(sorted(occupation_counts.items(), key=lambda item: (-item[1], item[0].lower()))),
+        "occupations": sorted(
+            occupation_counts.values(),
+            key=lambda item: (-item["count"], (item["label"] or "").lower()),
+        ),
     }
 
 

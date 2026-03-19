@@ -15,7 +15,7 @@ import type { ProsopoIndexEntry } from '../types';
 const LIMIT = 48;
 
 const PersonsPage: React.FC = () => {
-  const { t } = useTranslation(['prosopography', 'common']);
+  const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,7 +29,7 @@ const PersonsPage: React.FC = () => {
   const occupation = searchParams.get('occupation') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
-  const [occupationFacets, setOccupationFacets] = useState<{ value: string; count: number }[]>([]);
+  const [occupationFacets, setOccupationFacets] = useState<{ value: string; label: string; count: number }[]>([]);
 
   const setFilterParam = (key: string, value: string) =>
     setSearchParams(p => {
@@ -130,12 +130,14 @@ const PersonsPage: React.FC = () => {
       ids: idsParam,
     }, token)
       .then(data => {
-        setOccupationFacets(
-          Object.entries(data.occupations || {}).map(([value, count]) => ({ value, count }))
-        );
+        setOccupationFacets((data.occupations || []).map(item => ({
+          value: item.id || item.label,
+          label: item.labels?.[i18n.language] || item.labels?.et || item.labels?.en || item.label || item.id || '',
+          count: item.count,
+        })));
       })
       .catch(() => setOccupationFacets([]));
-  }, [query, gender, token, collectionPersonIds, collectionLoading]);
+  }, [query, gender, token, collectionPersonIds, collectionLoading, i18n.language]);
 
   useEffect(() => {
     fetchPersons();

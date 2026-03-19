@@ -49,7 +49,7 @@ export async function getPersonFacets(params?: {
   q?: string;
   gender?: string;
   ids?: string[];
-}, token?: string): Promise<{ occupations: Record<string, number> }> {
+}, token?: string): Promise<{ occupations: { id: string | null; label: string; labels?: Record<string, string> | null; count: number }[] }> {
   const url = new URL(`${BASE}/facets`, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
