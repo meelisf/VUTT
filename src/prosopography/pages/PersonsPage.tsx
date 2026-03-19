@@ -54,6 +54,15 @@ const PersonsPage: React.FC = () => {
   const { selectedCollection } = useCollection();
   const [collectionPersonIds, setCollectionPersonIds] = useState<Set<string> | null>(null);
   const [collectionLoading, setCollectionLoading] = useState(false);
+  const prevSelectedCollectionRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    const prev = prevSelectedCollectionRef.current;
+    if (prev !== undefined && prev !== selectedCollection) {
+      resetOffset();
+    }
+    prevSelectedCollectionRef.current = selectedCollection;
+  }, [selectedCollection]);
 
   useEffect(() => {
     if (!selectedCollection) { setCollectionPersonIds(null); return; }
