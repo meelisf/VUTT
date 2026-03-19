@@ -148,6 +148,18 @@ async def prosopography_facets(
     )
 
 
+@router.post("/facets")
+async def prosopography_facets_post(request: Request):
+    """POST variant /facets — kasuta kui ids nimekiri on pikk (414 vältimiseks)."""
+    data = await _get_json(request)
+    id_list = data.get("ids") or None
+    return get_person_facets(
+        q=data.get("q"),
+        gender=data.get("gender"),
+        ids=id_list,
+    )
+
+
 @router.post("")
 async def prosopography_create(
     request: Request,

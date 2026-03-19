@@ -50,10 +50,20 @@ export async function getPersonFacets(params?: {
   gender?: string;
   ids?: string[];
 }, token?: string): Promise<{ occupations: { id: string | null; label: string; labels?: Record<string, string> | null; count: number }[] }> {
+  if (params?.ids?.length) {
+    const resp = await fetchWithTimeout(`${BASE}/facets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify(params),
+      timeout: 10000,
+    });
+    if (!resp.ok) throw new Error(`getPersonFacets: ${resp.status}`);
+    return resp.json();
+  }
+
   const url = new URL(`${BASE}/facets`, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
-  if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
 
   const resp = await fetchWithTimeout(url.toString(), {
     headers: getAuthHeaders(token),
