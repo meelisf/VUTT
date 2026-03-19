@@ -1,50 +1,123 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Venus, Database, CircleDot, X } from 'lucide-react';
+import { Briefcase, ChevronDown, ChevronRight, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
-export type SourceFilter = '' | 'wikidata' | 'gnd' | 'aa';
-export type LevelFilter = '' | 'draft' | 'reviewed' | 'verified';
+
+interface OccupationFacetItem {
+  value: string;
+  count: number;
+}
+
+interface FilterSectionProps {
+  title: string;
+  icon: React.ReactNode;
+  items: OccupationFacetItem[];
+  selectedValue: string;
+  onSelect: (value: string) => void;
+  searchPlaceholder: string;
+  emptyLabel: string;
+}
 
 interface PersonAdvancedFiltersProps {
   gender: GenderFilter;
-  source: SourceFilter;
-  level: LevelFilter;
+  occupation: string;
+  occupations: OccupationFacetItem[];
   onGenderChange: (v: GenderFilter) => void;
-  onSourceChange: (v: SourceFilter) => void;
-  onLevelChange: (v: LevelFilter) => void;
+  onOccupationChange: (v: string) => void;
 }
 
-const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, source, level, onGenderChange, onSourceChange, onLevelChange,
+const FilterSection: React.FC<FilterSectionProps> = ({
+  title,
+  icon,
+  items,
+  selectedValue,
+  onSelect,
+  searchPlaceholder,
+  emptyLabel,
 }) => {
-  const { t } = useTranslation(['prosopography', 'common']);
-  const hasActive = gender || source || level;
-  const activeCount = [gender, source, level].filter(Boolean).length;
+  const [searchQuery, setSearchQuery] = useState('');
+  const showSearch = items.length > 8;
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const lowerQuery = searchQuery.trim().toLowerCase();
+    return items.filter(item => item.value.toLowerCase().includes(lowerQuery));
+  }, [items, searchQuery]);
+
+  return (
+    <div>
+      <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+        <span className="text-primary-600">{icon}</span>
+        {title}
+      </h4>
+
+      {showSearch && (
+        <div className="relative mb-1.5">
+          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <Search size={14} className="text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder={searchPlaceholder}
+            className="w-full pl-8 pr-3 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
+          />
+        </div>
+      )}
+
+      <div className="max-h-32 overflow-y-auto custom-scrollbar pr-1">
+        <div className="flex flex-wrap gap-2">
+          {filteredItems.length === 0 ? (
+            <span className="text-sm text-gray-400 italic py-1">{emptyLabel}</span>
+          ) : (
+            filteredItems.map(({ value, count }) => {
+              const isSelected = selectedValue === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => onSelect(isSelected ? '' : value)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
+                    isSelected
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {value} <span className="opacity-60 text-xs">({count})</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
+  gender,
+  occupation,
+  occupations,
+  onGenderChange,
+  onOccupationChange,
+}) => {
+  const { t } = useTranslation('prosopography');
+  const hasActive = !!(occupation || gender);
+  const activeCount = [occupation, gender].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Laienda automaatselt kui filter on aktiivne
   useEffect(() => {
     if (hasActive && !isExpanded) setIsExpanded(true);
-  }, [hasActive]);
+  }, [hasActive, isExpanded]);
 
-  const clearAll = () => { onGenderChange(''); onSourceChange(''); onLevelChange(''); };
-
-  const levelColors: Record<string, string> = {
-    verified: 'bg-green-100 text-green-700 hover:bg-green-200',
-    reviewed: 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-    draft:    'bg-gray-100 text-gray-700 hover:bg-gray-200',
-  };
-
-  const levelLabels: Record<string, string> = {
-    draft:    t('levelDraft',    'Mustand'),
-    reviewed: t('levelReviewed', 'Üle vaadatud'),
-    verified: t('levelVerified', 'Kontrollitud'),
+  const clearAll = () => {
+    onOccupationChange('');
+    onGenderChange('');
   };
 
   return (
     <div className="bg-white/50 rounded-lg border border-gray-200">
-      {/* Päis */}
       <button
         onClick={() => setIsExpanded(v => !v)}
         className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-gray-50 transition-colors rounded-lg"
@@ -62,8 +135,16 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
 
       {isExpanded && (
         <div className="px-4 pb-4 space-y-3">
+          <FilterSection
+            title={t('filterOccupationAll', 'Amet')}
+            icon={<Briefcase size={13} />}
+            items={occupations}
+            selectedValue={occupation}
+            onSelect={onOccupationChange}
+            searchPlaceholder={t('filterOccupationSearch', 'Otsi ametit…')}
+            emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
+          />
 
-          {/* Sugu */}
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Venus size={13} className="text-primary-600" />
@@ -84,71 +165,23 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
             </div>
           </div>
 
-          {/* Allikas */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <Database size={13} className="text-primary-600" />
-              {t('filterSourceAll', 'Allikas')}
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {(['wikidata', 'gnd', 'aa'] as const).map(val => {
-                const label = val === 'aa' ? 'Album Acad.' : val.charAt(0).toUpperCase() + val.slice(1);
-                return (
-                  <button
-                    key={val}
-                    onClick={() => onSourceChange(source === val ? '' : val)}
-                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                      source === val ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Olek */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-              <CircleDot size={13} className="text-primary-600" />
-              {t('filterLevelAll', 'Olek')}
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {(['draft', 'reviewed', 'verified'] as const).map(val => (
-                <button
-                  key={val}
-                  onClick={() => onLevelChange(level === val ? '' : val)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                    level === val ? 'bg-primary-600 text-white' : levelColors[val]
-                  }`}
-                >
-                  {levelLabels[val]}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Aktiivsed filtrid + tühjenda */}
           {hasActive && (
             <div className="pt-2 border-t border-gray-100 space-y-2">
               <div className="flex flex-wrap gap-1.5">
+                {occupation && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    {occupation}
+                    <button onClick={() => onOccupationChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
+                      <X size={11} />
+                    </button>
+                  </span>
+                )}
                 {gender && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
                     {gender === 'M' ? t('filterMale', 'Meessoost') : t('filterFemale', 'Naissoost')}
-                    <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
-                  </span>
-                )}
-                {source && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {source === 'aa' ? 'Album Acad.' : source.charAt(0).toUpperCase() + source.slice(1)}
-                    <button onClick={() => onSourceChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
-                  </span>
-                )}
-                {level && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {levelLabels[level]}
-                    <button onClick={() => onLevelChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                    <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
+                      <X size={11} />
+                    </button>
                   </span>
                 )}
               </div>

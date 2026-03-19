@@ -5,8 +5,8 @@ import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft,
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
-import PersonAdvancedFilters, { type GenderFilter, type SourceFilter, type LevelFilter } from '../components/PersonAdvancedFilters';
-import { listPersons, mergePersons } from '../services/prosopographyService';
+import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
+import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { index } from '../../services/meiliService';
@@ -26,10 +26,10 @@ const PersonsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const query  = searchParams.get('q') ?? '';
+  const occupation = searchParams.get('occupation') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
-  const source = (searchParams.get('source') ?? '') as SourceFilter;
-  const level  = (searchParams.get('level')  ?? '') as LevelFilter;
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
+  const [occupationFacets, setOccupationFacets] = useState<{ value: string; count: number }[]>([]);
 
   const setFilterParam = (key: string, value: string) =>
     setSearchParams(p => {
@@ -40,9 +40,8 @@ const PersonsPage: React.FC = () => {
     }, { replace: true });
 
   const setQuery  = (v: string)       => setFilterParam('q', v);
+  const setOccupation = (v: string)   => setFilterParam('occupation', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
-  const setSource = (v: SourceFilter) => setFilterParam('source', v);
-  const setLevel  = (v: LevelFilter)  => setFilterParam('level', v);
 
   const resetOffset = () =>
     setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
@@ -107,9 +106,8 @@ const PersonsPage: React.FC = () => {
     const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     listPersons({
       q: query || undefined,
+      occupation: occupation || undefined,
       gender: gender || undefined,
-      source: source || undefined,
-      verification_level: level || undefined,
       ids: idsParam,
       limit: LIMIT,
       offset,
@@ -121,13 +119,33 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, gender, source, level, offset, token, collectionPersonIds, collectionLoading]);
+  }, [query, occupation, gender, offset, token, collectionPersonIds, collectionLoading, t]);
+
+  const fetchFacets = useCallback(() => {
+    if (collectionLoading) return;
+    const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
+    getPersonFacets({
+      q: query || undefined,
+      gender: gender || undefined,
+      ids: idsParam,
+    }, token)
+      .then(data => {
+        setOccupationFacets(
+          Object.entries(data.occupations || {}).map(([value, count]) => ({ value, count }))
+        );
+      })
+      .catch(() => setOccupationFacets([]));
+  }, [query, gender, token, collectionPersonIds, collectionLoading]);
 
   useEffect(() => {
     fetchPersons();
   }, [fetchPersons]);
 
-  const hasActiveFilters = !!(gender || source || level);
+  useEffect(() => {
+    fetchFacets();
+  }, [fetchFacets]);
+
+  const hasActiveFilters = !!(occupation || gender);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -230,12 +248,11 @@ const PersonsPage: React.FC = () => {
 
           {/* Täpsemad filtrid */}
           <PersonAdvancedFilters
+            occupation={occupation}
             gender={gender}
-            source={source}
-            level={level}
+            occupations={occupationFacets}
+            onOccupationChange={setOccupation}
             onGenderChange={setGender}
-            onSourceChange={setSource}
-            onLevelChange={setLevel}
           />
         </div>
 

@@ -101,6 +101,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     family_name = name_obj.get("family_name") or ""
     sort_name = family_name or label
     aliases = name_obj.get("aliases") or []
+    occupations = _extract_occupation_labels(person)
 
     # birth/death_year — võtame täisarvuna kui date olemas
     def _extract_year(date_obj: dict):
@@ -131,7 +132,38 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "biography_snippet": _make_snippet(person),
         "image_url": person.get("image_url"),
         "aliases": aliases,
+        "occupations": occupations,
     }
+
+
+def _extract_occupation_labels(person: dict) -> list[str]:
+    raw_occupations = person.get("occupations") or []
+
+    def _occupation_label(item):
+        if isinstance(item, dict):
+            label = item.get("label")
+            if isinstance(label, str):
+                return label.strip()
+            return ""
+        if isinstance(item, str):
+            return item.strip()
+        return ""
+
+    return sorted({label for label in (_occupation_label(item) for item in raw_occupations) if label})
+
+
+def _entry_occupations(entry: dict) -> list[str]:
+    occupations = entry.get("occupations")
+    if occupations is not None:
+        return [item for item in occupations if isinstance(item, str) and item.strip()]
+
+    person_id = entry.get("id")
+    if not person_id:
+        return []
+    person = get_person(person_id)
+    if not person:
+        return []
+    return _extract_occupation_labels(person)
 
 
 def _update_index_entry(person: dict):
@@ -356,6 +388,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 def list_persons(
     q: Optional[str] = None,
     gender: Optional[str] = None,
+    occupation: Optional[str] = None,
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
@@ -386,6 +419,12 @@ def list_persons(
         ]
     if gender:
         results = [e for e in results if e.get("gender") == gender]
+    if occupation:
+        occupation_lower = occupation.strip().lower()
+        results = [
+            e for e in results
+            if any(occupation_lower == item.strip().lower() for item in _entry_occupations(e))
+        ]
     if status_id:
         results = [e for e in results if e.get("status_id") == status_id]
     if verification_level:
@@ -403,6 +442,35 @@ def list_persons(
         "total": total,
         "offset": offset,
         "limit": limit,
+    }
+
+
+def get_person_facets(
+    q: Optional[str] = None,
+    gender: Optional[str] = None,
+    ids: Optional[list] = None,
+) -> dict:
+    """
+    Tagastab persons-listingu jaoks facetid.
+    Praegu toetab ametite loendit koos sagedustega.
+    """
+    filtered = list_persons(
+        q=q,
+        gender=gender,
+        ids=ids,
+        limit=10**9,
+        offset=0,
+    )["results"]
+
+    occupation_counts: dict[str, int] = {}
+    for entry in filtered:
+        for occupation in _entry_occupations(entry):
+            if not occupation:
+                continue
+            occupation_counts[occupation] = occupation_counts.get(occupation, 0) + 1
+
+    return {
+        "occupations": dict(sorted(occupation_counts.items(), key=lambda item: (-item[1], item[0].lower()))),
     }
 
 

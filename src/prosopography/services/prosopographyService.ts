@@ -7,6 +7,7 @@ const BASE = `${FILE_API_URL}/prosopography`;
 export async function listPersons(params?: {
   q?: string;
   gender?: string;
+  occupation?: string;
   status_id?: string;
   source?: string;
   verification_level?: string;
@@ -28,6 +29,7 @@ export async function listPersons(params?: {
   const url = new URL(BASE, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
+  if (params?.occupation) url.searchParams.set('occupation', params.occupation);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
@@ -40,6 +42,24 @@ export async function listPersons(params?: {
     timeout: 10000,
   });
   if (!resp.ok) throw new Error(`listPersons: ${resp.status}`);
+  return resp.json();
+}
+
+export async function getPersonFacets(params?: {
+  q?: string;
+  gender?: string;
+  ids?: string[];
+}, token?: string): Promise<{ occupations: Record<string, number> }> {
+  const url = new URL(`${BASE}/facets`, window.location.origin);
+  if (params?.q) url.searchParams.set('q', params.q);
+  if (params?.gender) url.searchParams.set('gender', params.gender);
+  if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
+
+  const resp = await fetchWithTimeout(url.toString(), {
+    headers: getAuthHeaders(token),
+    timeout: 10000,
+  });
+  if (!resp.ok) throw new Error(`getPersonFacets: ${resp.status}`);
   return resp.json();
 }
 

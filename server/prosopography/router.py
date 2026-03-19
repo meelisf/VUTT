@@ -14,6 +14,7 @@ from .ops import (
     create_person,
     update_person,
     list_persons,
+    get_person_facets,
     add_identifier,
     apply_enrichment,
     merge_person,
@@ -88,6 +89,7 @@ async def prosopography_list(
     request: Request,
     q: str = None,
     gender: str = None,
+    occupation: str = None,
     status_id: str = None,
     source: str = None,
     verification_level: str = None,
@@ -101,6 +103,7 @@ async def prosopography_list(
     return list_persons(
         q=q,
         gender=gender,
+        occupation=occupation,
         status_id=status_id,
         source=source,
         verification_level=verification_level,
@@ -120,12 +123,28 @@ async def prosopography_query(request: Request):
     return list_persons(
         q=data.get("q"),
         gender=data.get("gender"),
+        occupation=data.get("occupation"),
         status_id=data.get("status_id"),
         source=data.get("source"),
         verification_level=data.get("verification_level"),
         ids=data.get("ids"),
         limit=data.get("limit", 48),
         offset=data.get("offset", 0),
+    )
+
+
+@router.get("/facets")
+async def prosopography_facets(
+    q: str = None,
+    gender: str = None,
+    ids: str = None,
+):
+    """Tagastab persons-lehe facetid filtripaneeli jaoks."""
+    id_list = [i for i in ids.split(",") if i] if ids else None
+    return get_person_facets(
+        q=q,
+        gender=gender,
+        ids=id_list,
     )
 
 
