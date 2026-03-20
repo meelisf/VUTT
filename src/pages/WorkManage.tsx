@@ -173,15 +173,23 @@ const WorkManage: React.FC = () => {
 
   const hasReorderChanges = pages.some(p => draftPositions[p.filename] !== p.page_num);
 
-  // Swap-loogika: liigutab currentFile uuele positsioonile ja vahetab seal oleva lehega
-  const applySwap = (currentFile: string, newPos: number) => {
-    const currentDraft = draftPositions[currentFile] ?? pages.find(p => p.filename === currentFile)?.page_num ?? newPos;
-    const conflictFile = pages.find(
-      p => p.filename !== currentFile && (draftPositions[p.filename] ?? p.page_num) === newPos
-    )?.filename;
+  // Insert-loogika: liigutab currentFile uuele positsioonile ja nihutab vahepealse massiivi
+  const applyInsert = (currentFile: string, newPos: number) => {
+    const currentPos = draftPositions[currentFile] ?? pages.find(p => p.filename === currentFile)?.page_num ?? newPos;
+    if (currentPos === newPos) return;
     setDraftPositions(prev => {
       const next = { ...prev, [currentFile]: newPos };
-      if (conflictFile) next[conflictFile] = currentDraft;
+      pages.forEach(p => {
+        if (p.filename === currentFile) return;
+        const pos = prev[p.filename] ?? p.page_num;
+        if (currentPos < newPos) {
+          // Liigub allapoole: vahemikus (currentPos, newPos] nihkub -1
+          if (pos > currentPos && pos <= newPos) next[p.filename] = pos - 1;
+        } else {
+          // Liigub ülespoole: vahemikus [newPos, currentPos) nihkub +1
+          if (pos >= newPos && pos < currentPos) next[p.filename] = pos + 1;
+        }
+      });
       return next;
     });
   };
@@ -596,7 +604,7 @@ const WorkManage: React.FC = () => {
                             const parsed = parseInt(raw, 10);
                             const newPos = isNaN(parsed) ? (draftPositions[page.filename] ?? page.page_num)
                               : Math.max(1, Math.min(pages.length, parsed));
-                            applySwap(page.filename, newPos);
+                            applyInsert(page.filename, newPos);
                             setInputValues(prev => { const next = { ...prev }; delete next[page.filename]; return next; });
                           }}
                           onKeyDown={(e) => {
@@ -613,7 +621,7 @@ const WorkManage: React.FC = () => {
                           <button
                             onClick={() => {
                               const currentPos = draftPositions[page.filename] ?? page.page_num;
-                              applySwap(page.filename, Math.max(1, currentPos - 1));
+                              applyInsert(page.filename, Math.max(1, currentPos - 1));
                             }}
                             disabled={(draftPositions[page.filename] ?? page.page_num) <= 1}
                             className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
@@ -623,7 +631,7 @@ const WorkManage: React.FC = () => {
                           <button
                             onClick={() => {
                               const currentPos = draftPositions[page.filename] ?? page.page_num;
-                              applySwap(page.filename, Math.min(pages.length, currentPos + 1));
+                              applyInsert(page.filename, Math.min(pages.length, currentPos + 1));
                             }}
                             disabled={(draftPositions[page.filename] ?? page.page_num) >= pages.length}
                             className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
