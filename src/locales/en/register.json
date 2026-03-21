@@ -18,11 +18,16 @@
     "title": "Request submitted!",
     "message": "Your request has been sent for review. If approved by an administrator, you will receive an email with instructions and a link to set your password."
   },
+  "gdprConsent": {
+    "label": "I consent to the processing of my personal data (name, email address, affiliation) for the purpose of creating and managing a workbench account.",
+    "required": "Consent to personal data processing is required"
+  },
   "errors": {
     "nameRequired": "Name is required",
     "emailRequired": "Email address is required",
     "emailInvalid": "Invalid email address",
     "motivationRequired": "Motivation is required",
+    "consentRequired": "Consent to personal data processing is required",
     "submitFailed": "Failed to submit request"
   },
   "setPassword": {

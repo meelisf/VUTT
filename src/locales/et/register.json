@@ -18,11 +18,16 @@
     "title": "Taotlus esitatud!",
     "message": "Sinu taotlus on saadetud ülevaatusele. Kui administraator selle kinnitab, saad e-kirja juhiste ja lingiga parooli seadmiseks."
   },
+  "gdprConsent": {
+    "label": "Nõustun oma isikuandmete (nimi, e-posti aadress, asutus) töötlemisega kasutajakonto loomiseks ja haldamiseks.",
+    "required": "Isikuandmete töötlemisega nõustumine on kohustuslik"
+  },
   "errors": {
     "nameRequired": "Nimi on kohustuslik",
     "emailRequired": "E-posti aadress on kohustuslik",
     "emailInvalid": "Vigane e-posti aadress",
     "motivationRequired": "Motivatsioon on kohustuslik",
+    "consentRequired": "Isikuandmete töötlemisega nõustumine on kohustuslik",
     "submitFailed": "Taotluse esitamine ebaõnnestus"
   },
   "setPassword": {

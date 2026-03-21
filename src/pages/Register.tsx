@@ -16,6 +16,7 @@ const Register: React.FC = () => {
     motivation: '',
     website: ''  // Honeypot väli - botid täidavad, inimesed ei näe
   });
+  const [gdprConsent, setGdprConsent] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -35,6 +36,9 @@ const Register: React.FC = () => {
     }
     if (!formData.motivation.trim()) {
       return t('errors.motivationRequired');
+    }
+    if (!gdprConsent) {
+      return t('errors.consentRequired');
     }
     return null;
   };
@@ -62,6 +66,7 @@ const Register: React.FC = () => {
           email: formData.email.trim().toLowerCase(),
           affiliation: formData.affiliation.trim() || null,
           motivation: formData.motivation.trim(),
+          gdpr_consent: true,
           website: formData.website  // Honeypot
         })
       });
@@ -206,6 +211,21 @@ const Register: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors resize-none"
                 disabled={isSubmitting}
               />
+            </div>
+
+            {/* GDPR nõusolek */}
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                id="gdpr-consent"
+                checked={gdprConsent}
+                onChange={(e) => setGdprConsent(e.target.checked)}
+                disabled={isSubmitting}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer flex-shrink-0"
+              />
+              <label htmlFor="gdpr-consent" className="text-sm text-gray-700 cursor-pointer leading-snug">
+                {t('gdprConsent.label')} <span className="text-red-500">*</span>
+              </label>
             </div>
 
             {/* Submit */}

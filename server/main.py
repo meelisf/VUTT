@@ -142,7 +142,7 @@ async def register(request: Request):
     if not allowed: return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"})
     data = await request.json()
     if data.get('website'): return {"status": "success"}
-    registration, error = add_registration(data.get('name', ''), data.get('email', ''), data.get('affiliation'), data.get('motivation', ''))
+    registration, error = add_registration(data.get('name', ''), data.get('email', ''), data.get('affiliation'), data.get('motivation', ''), gdpr_consent=bool(data.get('gdpr_consent')))
     if not registration: raise HTTPException(status_code=400, detail=error)
     return {"status": "success", "id": registration["id"]}
 

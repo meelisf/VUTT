@@ -35,7 +35,7 @@ def save_pending_registrations(data):
         atomic_write_json(PENDING_REGISTRATIONS_FILE, data)
 
 
-def add_registration(name, email, affiliation, motivation):
+def add_registration(name, email, affiliation, motivation, gdpr_consent=False):
     """Lisab uue registreerimistaotluse."""
     data = load_pending_registrations()
 
@@ -56,6 +56,7 @@ def add_registration(name, email, affiliation, motivation):
         "email": email.lower(),
         "affiliation": affiliation,
         "motivation": motivation,
+        "gdpr_consent_at": datetime.now().isoformat() if gdpr_consent else None,
         "submitted_at": datetime.now().isoformat(),
         "status": "pending",
         "reviewed_by": None,
