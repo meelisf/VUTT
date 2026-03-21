@@ -26,6 +26,14 @@ npm install
 npm run dev           # Frontend: http://localhost:5173
 ```
 
+Backend smoke-testid:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest -q
+```
+
 ### Tootmine
 
 Serveris (`~/VUTT`):

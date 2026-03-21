@@ -825,7 +825,9 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
 
 @app.get("/admin/upload/{upload_id}/status")
 async def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
-    return {"status": "success", **poll_and_sync_thumbs(upload_id)}
+    # poll_and_sync_thumbs tagastab oma "status" välja (upload olek: pending/processing/done jne)
+    # mis kirjutab üle siinsest "success" — seega tagastatav "status" on upload olek, mitte HTTP wrapper
+    return poll_and_sync_thumbs(upload_id)
 
 @app.get("/admin/upload/{upload_id}/thumb/{page_num}")
 async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
