@@ -10,8 +10,8 @@
     "emailPlaceholder": "nimi@näide.ee",
     "affiliation": "Asutus (valikuline)",
     "affiliationPlaceholder": "Ülikool, raamatukogu vms",
-    "motivation": "Miks soovid liituda?",
-    "motivationPlaceholder": "Kirjelda lühidalt oma huvi varauusaegsete tekstide vastu...",
+    "motivation": "Kuidas plaanid töölauda kasutada?",
+    "motivationPlaceholder": "nt uurin 17. saj. trükiseid, õpin ajalugu, tõlgin vms",
     "submit": "Esita taotlus"
   },
   "success": {

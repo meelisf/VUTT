@@ -10,8 +10,8 @@
     "emailPlaceholder": "name@example.com",
     "affiliation": "Affiliation (optional)",
     "affiliationPlaceholder": "University, library, etc.",
-    "motivation": "Why do you want to join?",
-    "motivationPlaceholder": "Briefly describe your interest in early modern texts...",
+    "motivation": "How do you plan to use the workbench?",
+    "motivationPlaceholder": "e.g. researching 17th-century prints, studying history, translating, etc.",
     "submit": "Submit request"
   },
   "success": {
