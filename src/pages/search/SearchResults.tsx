@@ -340,7 +340,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
                                                     {/* Žanr */}
                                                     {(() => {
-                                                        let label = getLabel(firstHit.genre, i18n.language);
+                                                        let label = getLabel((firstHit as any).genre_object ?? firstHit.genre, i18n.language);
                                                         if (!label && firstHit.genre && typeof firstHit.genre === 'string') {
                                                             const val = firstHit.genre.toLowerCase();
                                                             label = vocabularies?.genres?.[val]?.[lang as 'et' | 'en'] || firstHit.genre;

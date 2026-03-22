@@ -49,7 +49,10 @@
     "filterByGenre": "Filter by genre \"{{genre}}\"",
     "searchGenre": "Search genre: {{genre}}",
     "searchTag": "Search keyword: {{tag}}",
-    "openWorkspace": "Open workspace"
+    "openWorkspace": "Open workspace",
+    "viewPerson": "View person page",
+    "searchAuthor": "Search by author",
+    "showMetadata": "Show metadata"
   },
   "bulkAssign": {
     "select": "Select",

@@ -240,7 +240,9 @@
       "fractur": "Font switch (fractur)",
       "marginalia": "Marginalia",
       "footnote": "Footnote",
-      "pageBreak": "Page break"
+      "pageBreak": "Page break",
+      "cleanMarkup": "Remove markup from selection",
+      "cleanMarkupButton": "Clean"
     },
     "reocr": {
       "button": "Re-transcribe page",

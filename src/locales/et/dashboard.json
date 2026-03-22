@@ -49,7 +49,10 @@
     "filterByGenre": "Filtreeri žanri \"{{genre}}\" järgi",
     "searchGenre": "Otsi žanrit: {{genre}}",
     "searchTag": "Otsi märksõna: {{tag}}",
-    "openWorkspace": "Ava töölaud"
+    "openWorkspace": "Ava töölaud",
+    "viewPerson": "Vaata isiku lehte",
+    "searchAuthor": "Otsi autorit",
+    "showMetadata": "Näita metaandmeid"
   },
   "bulkAssign": {
     "select": "Vali",

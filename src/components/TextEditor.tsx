@@ -828,7 +828,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title="Puhasta valik märgendusest">Puhasta</button>
+                    <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title={t('editor.tooltips.cleanMarkup')}>{t('editor.tooltips.cleanMarkupButton')}</button>
                   </div>
                 )}
               </div>

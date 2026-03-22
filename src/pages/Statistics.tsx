@@ -287,7 +287,7 @@ const Statistics: React.FC = () => {
                 <Library className={colorClasses.text} size={20} />
                 <div>
                   <span className={`text-sm ${colorClasses.text}`}>{t('common:collections.activeFilter')}:</span>
-                  <span className={`ml-2 font-bold ${colorClasses.text}`}>{getCollectionName(selectedCollection)}</span>
+                  <span className={`ml-2 font-bold ${colorClasses.text}`}>{getCollectionName(selectedCollection, lang)}</span>
                 </div>
               </div>
               <button
@@ -519,7 +519,7 @@ const Statistics: React.FC = () => {
           <h2 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2 flex-wrap">
             <PieChartIcon size={20} className="text-gray-400 shrink-0" />
             {selectedCollection
-              ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection) })
+              ? t('charts.pageStatusInCollection', { collection: getCollectionName(selectedCollection, lang) })
               : t('charts.pageStatus')}
             {selectedGenre && (
               <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 text-sm font-medium rounded-full">

@@ -139,7 +139,13 @@
     "empty": "No collections added yet",
     "hint": "Selection is saved and applies to all views",
     "activeFilter": "Active Collection",
-    "changeInHeader": "Change from the selector in header"
+    "changeInHeader": "Change from the selector in header",
+    "copyLink": "Copy link",
+    "linkCopied": "Link copied!"
+  },
+  "error": {
+    "unknown": "Error",
+    "network": "Network error"
   },
   "notFound": {
     "title": "Page Not Found",

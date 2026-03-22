@@ -720,7 +720,7 @@ const SearchPage: React.FC = () => {
                                     return (
                                         <div className={`ml-auto flex items-center gap-1 px-2 py-0.5 ${colorClasses.bg} ${colorClasses.text} rounded-full text-xs font-medium border ${colorClasses.border}`}>
                                             <Library size={11} />
-                                            <span className="truncate max-w-xs">{getCollectionName(selectedCollection)}</span>
+                                            <span className="truncate max-w-xs">{getCollectionName(selectedCollection, getLangCode(i18n.language))}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => setSelectedCollection(null)}

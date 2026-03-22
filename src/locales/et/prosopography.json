@@ -181,6 +181,7 @@
       "nameAliases": "nimevariandid"
     }
   },
+  "loadMore": "Lae veel",
   "bulkOccupation": {
     "title": "Määra amet",
     "description": "Rakendatakse {{count}} isikule.",

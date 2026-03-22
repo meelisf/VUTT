@@ -181,6 +181,7 @@
       "nameAliases": "name variants"
     }
   },
+  "loadMore": "Load more",
   "bulkOccupation": {
     "title": "Assign occupation",
     "description": "Will be applied to {{count}} persons.",

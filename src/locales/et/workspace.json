@@ -240,7 +240,9 @@
       "fractur": "Koodivahetus (fraktuur)",
       "marginalia": "Ääremärkus",
       "footnote": "Joonealune märkus",
-      "pageBreak": "Lehekülje vahetus"
+      "pageBreak": "Lehekülje vahetus",
+      "cleanMarkup": "Puhasta valik märgendusest",
+      "cleanMarkupButton": "Puhasta"
     },
     "reocr": {
       "button": "Tee uus transkriptsioon",

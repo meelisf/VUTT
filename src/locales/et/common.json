@@ -139,7 +139,13 @@
     "empty": "Kollektsioone pole veel lisatud",
     "hint": "Valik salvestub ja kehtib kõigis vaadetes",
     "activeFilter": "Aktiivne kollektsioon",
-    "changeInHeader": "Muuda päises olevast valijast"
+    "changeInHeader": "Muuda päises olevast valijast",
+    "copyLink": "Kopeeri link",
+    "linkCopied": "Link kopeeritud!"
+  },
+  "error": {
+    "unknown": "Viga",
+    "network": "Võrgu viga"
   },
   "notFound": {
     "title": "Lehekülge ei leitud",
