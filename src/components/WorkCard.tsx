@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, Tag, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, IdCard } from 'lucide-react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { BookOpen, Calendar, User, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { useCollection } from '../contexts/CollectionContext';
@@ -21,7 +21,6 @@ interface WorkCardProps {
 const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelected = false, onToggleSelect, isPriority = false }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'workspace']);
   const navigate = useNavigate();
-  const location = useLocation();
   const { collections, getCollectionName } = useCollection();
 
   // Kasuta denormaliseeritud teose staatust (work.work_status)

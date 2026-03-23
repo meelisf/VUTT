@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, Link, useBlocker, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
 import { getPage, savePage, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -16,17 +16,13 @@ import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogOut, LogIn, Settings, History, Copy, Check, Upload } from 'lucide-react';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
-import { FILE_API_URL } from '../config';
 import { getLabel } from '../utils/metadataUtils';
-import { getLangCode } from '../utils/getLangCode';
 
 const Workspace: React.FC = () => {
-  const { t, i18n } = useTranslation(['workspace', 'common', 'auth']);
+  const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
   const { collections } = useCollection();
-  const lang = getLangCode(i18n.language);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -380,14 +376,6 @@ const Workspace: React.FC = () => {
       navCallback();
     }
     requestAnimationFrame(() => { skipBlockerRef.current = false; });
-  };
-
-  const handleCancelLeave = () => {
-    if (isBlockerActive) {
-      blocker.reset();
-    } else {
-      setPendingNavigation(null);
-    }
   };
 
   const showLeaveConfirm = isBlockerActive || pendingNavigation !== null;

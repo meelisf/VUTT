@@ -3,7 +3,7 @@
  */
 
 import { Work, WorkStatus, PageStatus } from '../types';
-import { index, normalizeWork, calculateWorkStatus, checkMixedContent } from './meiliService';
+import { index, calculateWorkStatus, checkMixedContent } from './meiliService';
 import { getThumbUrl, getPageThumbUrl } from './workImageService';
 
 // Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Download, LayoutGrid } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, LayoutGrid } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface ImageViewerProps {

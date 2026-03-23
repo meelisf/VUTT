@@ -5,8 +5,8 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X, IdCard } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, BookOpen, User, ExternalLink, Bookmark, FolderOpen, Copy, Check, X } from 'lucide-react';
 import ImageViewer from '../ImageViewer';
 import LanguageSwitcher from '../LanguageSwitcher';
 import type { Page, Work } from '../../types';
@@ -51,8 +51,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   onSelectPage,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common', 'dashboard']);
-  const navigate = useNavigate();
-  const { collections, getCollectionPath } = useCollection();
+  const { collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [activeTab, setActiveTab] = useState<'image' | 'text' | 'info'>('image');
   const [copied, setCopied] = useState(false);

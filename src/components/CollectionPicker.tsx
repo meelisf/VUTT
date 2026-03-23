@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
-import { Collection, buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
+import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
 
 interface CollectionPickerProps {

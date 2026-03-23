@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
-import { Work, Page, Annotation, Creator } from '../../types';
+import { Work, Page, Annotation } from '../../types';
 import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
@@ -32,7 +32,7 @@ interface AnnotationsTabProps {
 
 const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   work,
-  page,
+  page: _page,
   page_tags,
   setPageTags,
   comments,
@@ -46,7 +46,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 }) => {
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
-  const { collections, getCollectionName, getCollectionPath } = useCollection();
+  const { collections } = useCollection();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);

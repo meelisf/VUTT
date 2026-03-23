@@ -10,7 +10,7 @@ import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonI
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
 
-import { type FormDraft, type DateDraft, type OccupationDraft, type EducationDraft, emptyDraft } from '../components/personForm/types';
+import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft } from '../components/personForm/types';
 import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
 import DateField from '../components/personForm/DateField';
 import AliasesList from '../components/personForm/AliasesList';

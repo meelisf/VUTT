@@ -81,7 +81,7 @@ const Review: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [filterUser, setFilterUser] = useState<string | null>(null);
+  const [_filterUser, setFilterUser] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null); // null = kõik kasutajad
   const [showUserFilter, setShowUserFilter] = useState(false);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);

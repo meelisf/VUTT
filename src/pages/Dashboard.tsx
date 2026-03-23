@@ -16,11 +16,12 @@ import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
+import { getLabel } from '../utils/metadataUtils';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const ITEMS_PER_PAGE = 12;
@@ -30,7 +31,7 @@ const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user, isLoading: userLoading } = useUser();
+  const { user } = useUser();
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -83,7 +84,6 @@ const Dashboard: React.FC = () => {
   const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);  // Triggers re-fetch
 
-  const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
 
   // Sünkroonib selectedCollection → URL ?collection= param (Context → URL suund)
@@ -214,7 +214,7 @@ const Dashboard: React.FC = () => {
     const map: Record<string, string> = {};
     for (const work of works) {
       const id = work.publisher_id;
-      const label = work.publisher;
+      const label = getLabel(work.publisher, lang);
       if (id && label) map[id] = label;
     }
     return map;

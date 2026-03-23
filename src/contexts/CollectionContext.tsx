@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
-import { getCollections, Collections, Collection } from '../services/collectionService';
+import { getCollections, Collections } from '../services/collectionService';
 
 interface CollectionContextType {
   // Valitud kollektsiooni ID (null = kõik tööd)

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Loader2, X, CheckCircle, Globe, BookMarked, Library, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Loader2, Globe, BookMarked, Library, ChevronDown, ChevronRight } from 'lucide-react';
 import { searchWikidata, WikidataSearchResult } from '../../../services/wikidataService';
 import { searchGnd, GndSearchResult } from '../../../services/gndService';
 import { searchViaf, ViafSearchResult } from '../../../services/viafService';

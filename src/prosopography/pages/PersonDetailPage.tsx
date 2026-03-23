@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users, MapPin,
+  BookOpen, User, BookMarked, Users,
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { getPerson } from '../services/prosopographyService';

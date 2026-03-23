@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Loader2, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Loader2, Plus, Trash2, ChevronUp } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
 import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';

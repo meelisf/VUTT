@@ -377,11 +377,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
       const data = await response.json();
       if (data.status === 'success') {
-        const praeses = cleanCreators.find(c => c.role === 'praeses');
-        const auctor = cleanCreators.find(c => c.role === 'auctor');
-        const mainAuthor = auctor || praeses || cleanCreators.find(c => c.role !== 'respondens');
-        const respondens = cleanCreators.find(c => c.role === 'respondens');
-
         onSaveSuccess(
           {
             title: metaForm.title,

@@ -11,13 +11,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
 import { getLangCode } from '../utils/getLangCode';
-import { getGenreFacets, getTypeFacets, getTeoseTagsFacets, FacetDistribution } from '../services/searchService';
+import { FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
-
-interface FacetItem {
-  value: string;
-  count: number;
-}
 
 type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 
@@ -152,9 +147,6 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   onTagsChange,
   onTypeChange,
   onStatusChange,
-  collection,
-  yearStart,
-  yearEnd,
   defaultExpanded = false,
   facets,
   genreIdMap,

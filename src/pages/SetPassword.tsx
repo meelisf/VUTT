@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Key, Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { FILE_API_URL } from '../config';
@@ -16,7 +16,6 @@ interface TokenInfo {
 const SetPassword: React.FC = () => {
   const { t } = useTranslation(['register', 'common']);
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const token = searchParams.get('token') || '';
 
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
