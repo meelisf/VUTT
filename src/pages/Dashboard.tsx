@@ -218,7 +218,7 @@ const Dashboard: React.FC = () => {
       if (id && label) map[id] = label;
     }
     return map;
-  }, [works]);
+  }, [works, i18n.language]);
 
   // Debounce input updates to URL
   useEffect(() => {
