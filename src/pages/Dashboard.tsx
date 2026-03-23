@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/searchService';
-import { isQCode } from '../services/meiliService';
+import { isQCode } from '../utils/qcodeUtils';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';

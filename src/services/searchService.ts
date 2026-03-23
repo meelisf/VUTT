@@ -4,7 +4,8 @@
 
 import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST } from '../config';
-import { index, isQCode, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
+import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
+import { isQCode } from '../utils/qcodeUtils';
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {

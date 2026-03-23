@@ -8,7 +8,7 @@ import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
 import { getAllTags } from '../../services/searchService';
-import { isQCode } from '../../services/meiliService';
+import { isQCode } from '../../utils/qcodeUtils';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';

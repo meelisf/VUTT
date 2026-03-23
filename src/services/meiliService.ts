@@ -6,7 +6,7 @@
  * See fail sisaldab ainult:
  *   - Meilisearch client init (index eksportitud teiste teenuste jaoks)
  *   - Jagatud normaliseerijad (normalizeWork, normalizePage, normalizeContentSearchHit)
- *   - Jagatud utiliidid (isQCode, calculateWorkStatus, checkMixedContent)
+ *   - Jagatud utiliidid (calculateWorkStatus, checkMixedContent)
  *
  * Teosed ja leheküljed:
  *   searchService.ts  — otsing, facetid, sirvimispäringud
@@ -48,9 +48,6 @@ export const checkMixedContent = () => {
     );
   }
 };
-
-// Wikidata Q-koodi tuvastamine (nt "Q12345")
-export const isQCode = (val: string) => /^Q\d+$/.test(val);
 
 // Arvutab teose koondstaatuse lehekülgede staatuste põhjal
 // Loogika: Kõik Valmis → Valmis, Kõik Toores → Toores, muidu → Töös
