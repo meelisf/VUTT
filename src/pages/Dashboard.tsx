@@ -732,9 +732,6 @@ const Dashboard: React.FC = () => {
                 onTagsChange={setSelectedTags}
                 onTypeChange={setSelectedType}
                 onStatusChange={setSelectedStatus}
-                collection={selectedCollection}
-                yearStart={parseInt(yearStart) || undefined}
-                yearEnd={parseInt(yearEnd) || undefined}
                 facets={facets}
                 genreIdMap={genreIdMap}
                 genreLabelToId={genreLabelToId}

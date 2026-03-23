@@ -27,11 +27,6 @@ interface AdvancedFiltersProps {
   onTagsChange: (tags: string[]) => void;
   onTypeChange: (type: string | null) => void;
   onStatusChange: (status: WorkStatus | null) => void;
-  // Kollektsiooni filter - facetid filtreeritakse selle järgi
-  collection?: string | null;
-  // Aasta vahemik - facetid filtreeritakse selle järgi
-  yearStart?: number;
-  yearEnd?: number;
   // Valikuline: kas panna alguses lahti
   defaultExpanded?: boolean;
   // Dünaamilised facetid otsingutulemustest (live counts)
