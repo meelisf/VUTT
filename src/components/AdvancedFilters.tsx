@@ -13,6 +13,7 @@ import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, 
 import { getLangCode } from '../utils/getLangCode';
 import { FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
+import { mergeFacetItems, FilterItem } from '../utils/facetUtils';
 
 type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 
@@ -47,12 +48,6 @@ interface AdvancedFiltersProps {
   lang?: 'et' | 'en';
   // Enriched labels cache fallback-ina Q-koodide lahendamiseks
   enrichedLabels?: Record<string, Record<string, string>>;
-}
-
-interface FilterItem {
-  value: string;
-  label: string;
-  count: number;
 }
 
 interface FilterSectionProps {
@@ -209,32 +204,6 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     }
     return map;
   }, [lang, vocabularies]);
-
-  // Abifunktsioon: ühenda facet-itemid sama Q-koodi all
-  // Lahendab Wikidatas muutunud labelid: "Oratsioon" + "Kõne" → Q861911 (üks item)
-  const mergeFacetItems = (
-    items: FilterItem[],
-    labelToId?: Record<string, string>,  // label → Q-kood
-    idToLabel?: Record<string, string>   // Q-kood → kuvatav label
-  ): FilterItem[] => {
-    const merged = new Map<string, FilterItem>();
-    for (const item of items) {
-      // Proovi lahendada Q-koodiks — üks kood tabab kõiki selle žanri labeli variante
-      const qCode = labelToId?.[item.value] || labelToId?.[item.value.charAt(0).toUpperCase() + item.value.slice(1).toLowerCase()];
-      // Grupeeri Q-koodi järgi (stabiilne ID), muidu labeli järgi
-      const groupKey = qCode || item.value;
-      // Kuvatav label: Q-koodi praegune label, muidu originaal
-      const displayLabel = (qCode && idToLabel?.[qCode]) || idToLabel?.[item.value] || item.value;
-      const existing = merged.get(groupKey);
-      if (existing) {
-        existing.count += item.count;
-      } else {
-        // value = Q-kood → filtreerimisel kasutatakse genre_ids, mitte genre_et stringi
-        merged.set(groupKey, { value: qCode || item.value, label: displayLabel, count: item.count });
-      }
-    }
-    return Array.from(merged.values());
-  };
 
   // Ettevalmistatud andmed FilterSection jaoks
   const genreItems = useMemo<FilterItem[]>(() => {

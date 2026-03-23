@@ -5,6 +5,7 @@ import CollapsibleSection from '../../components/CollapsibleSection';
 import SearchableFilterList from './SearchableFilterList';
 import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText } from 'lucide-react';
 import { getLangCode } from '../../utils/getLangCode';
+import { mergeFacetItems } from '../../utils/facetUtils';
 
 interface WorkInfo {
     title: string;
@@ -96,27 +97,6 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
             return cap(enrichedLabels[qCode][lang] || enrichedLabels[qCode]['et'] || qCode);
         }
         return idToLabel?.[qCode] || qCode;
-    };
-
-    // Ühendab erineva keele labelid ja Q-koodid üheks kirjeks (nagu AdvancedFilters)
-    const mergeFacetItems = (
-        items: { value: string; count: number; label: string }[],
-        labelToId?: Record<string, string>,
-        idToLabel?: Record<string, string>
-    ) => {
-        const merged = new Map<string, { value: string; count: number; label: string }>();
-        for (const item of items) {
-            const qCode = labelToId?.[item.value] || labelToId?.[item.value.charAt(0).toUpperCase() + item.value.slice(1).toLowerCase()];
-            const groupKey = qCode || item.value;
-            const displayLabel = (qCode && idToLabel?.[qCode]) || idToLabel?.[item.value] || item.label;
-            const existing = merged.get(groupKey);
-            if (existing) {
-                existing.count += item.count;
-            } else {
-                merged.set(groupKey, { value: qCode || item.value, label: displayLabel, count: item.count });
-            }
-        }
-        return Array.from(merged.values());
     };
 
     // Laiendab valiku massiivi et sisaldaks nii Q-koodi kui labeli variante —
