@@ -165,12 +165,11 @@ const Workspace: React.FC = () => {
   // Kontrolli pending-edit staatust ja salvesta originaaltekst kaastöölise jaoks
   useEffect(() => {
     const checkPending = async () => {
+      if (!isContributor) return;
       if (!page || !authToken || !workId) return;
 
       // Salvesta originaaltekst, et saaksime pending-edit loomisel kasutada
-      if (isContributor) {
-        setOriginalTextForPending(page.text_content || '');
-      }
+      setOriginalTextForPending(page.text_content || '');
 
       // Kontrolli pending-staatust
       try {

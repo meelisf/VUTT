@@ -81,7 +81,6 @@ const Review: React.FC = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [_filterUser, setFilterUser] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null); // null = kõik kasutajad
   const [showUserFilter, setShowUserFilter] = useState(false);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
@@ -219,7 +218,6 @@ const Review: React.FC = () => {
           setCommits(data.commits);
         }
         setIsAdmin(data.is_admin);
-        setFilterUser(data.filtered_by);
         setHasMore(data.has_more);
         setOffset(fromOffset + data.commits.length);
       } else {
