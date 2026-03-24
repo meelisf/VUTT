@@ -8,7 +8,7 @@ import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 
 interface MetadataModalProps {
@@ -223,8 +223,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken, lang })
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({ lang })
       });
       const data = await response.json();
       if (data.status === 'success') {
@@ -256,7 +256,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   };
 
   const fetchServerMetadata = async () => {
-    let payload: any = { auth_token: authToken, work_id: workId };
+    let payload: any = { work_id: workId };
     if (page.originaal_kataloog) {
       payload.original_path = page.originaal_kataloog;
     }
@@ -264,7 +264,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/get-work-metadata`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify(payload)
       });
 
@@ -345,7 +345,6 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
       // V2/V3 formaat
       let payload: any = {
-        auth_token: authToken,
         work_id: workId,
         metadata: {
           title: metaForm.title,
@@ -370,7 +369,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/update-work-metadata`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify(payload),
         timeout: 30000
       });

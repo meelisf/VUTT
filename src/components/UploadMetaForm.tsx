@@ -139,8 +139,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       try {
         const r = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken, lang }),
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({ lang }),
         });
         const d = await r.json();
         if (!cancelled && d.status === 'success') {
@@ -190,7 +190,6 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     if (esterMatch) cleanEsterId = esterMatch[1];
 
     const payload: Record<string, unknown> = {
-      auth_token: authToken,
       title: form.title.trim(),
       year: form.year,
       year_display: form.year_display.trim() || null,
@@ -211,7 +210,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         `${FILE_API_URL}/admin/upload/${uploadId}/meta`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify(payload),
         }
       );
