@@ -4,17 +4,12 @@
 
 import { Page, PageStatus } from '../types';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { index, checkMixedContent } from './meiliService';
 import { getFullImageUrl } from './workImageService';
 
-// Autentimisandmete tüüp API päringute jaoks (tõendipõhine)
-interface AuthToken {
-  token: string;
-}
-
 // Abifunktsioon failisüsteemi salvestamiseks
-const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, auth?: AuthToken): Promise<boolean> => {
+const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, authToken?: string): Promise<boolean> => {
   try {
     const imageFilename = image_url.split('/').pop() || '';
     const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
@@ -41,14 +36,9 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       work_id: page.work_id
     };
 
-    // Lisa autentimistõend kui olemas
-    if (auth) {
-      payload.auth_token = auth.token;
-    }
-
     const response = await fetchWithTimeout(`${FILE_API_URL}/save`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
       body: JSON.stringify(payload),
       timeout: 30000
     });
@@ -144,14 +134,14 @@ export const savePage = async (
   page: Page,
   _actionDescription: string = 'Muutis andmeid',
   _userName: string = 'Anonüümne',
-  auth?: AuthToken
+  authToken?: string
 ): Promise<Page> => {
   try {
     // Meilisearchi uuendamine toimub backendis (file_server.py kutsub sync_work_to_meilisearch)
     // Frontend kasutab ainult otsinguvõtit, millel pole kirjutamisõigust
 
     if (page.original_path && page.image_url) {
-      await saveToFileSystem(page, page.original_path, page.image_url, auth);
+      await saveToFileSystem(page, page.original_path, page.image_url, authToken);
     } else {
       console.warn("Ei saa faili salvestada: puudub original_path või image_url");
     }

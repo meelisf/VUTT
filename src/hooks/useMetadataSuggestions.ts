@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface SuggestionItem {
   label: string;
@@ -33,8 +33,8 @@ export function useMetadataSuggestions(
         const token = localStorage.getItem('vutt_token');
         const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: token, lang })
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+          body: JSON.stringify({ lang })
         });
         const result = await response.json();
         if (!cancelled && result.status === 'success') {
