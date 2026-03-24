@@ -87,7 +87,7 @@ export function useSearchFacets(
         setAvailableGenres(prev => mergeFacetsWithExisting(prev, newGenres, urlParams.genres));
         setAvailableTypes(prev => mergeFacetsWithExisting(prev, newTypes, urlParams.types));
         setAvailableAuthors(newAuthors);
-    }, [results, lang]);
+    }, [results, lang, urlParams.teoseTags.join(','), urlParams.genres.join(','), urlParams.types.join(',')]);
 
     return { availableTeoseTags, availableGenres, availableTypes, availableAuthors, vocabularies, aliasMap };
 }
