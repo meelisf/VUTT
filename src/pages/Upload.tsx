@@ -348,9 +348,8 @@ const Upload: React.FC = () => {
       while (attempts < 3) {
         const r = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify({
-            auth_token: authToken,
             title: title.trim(),
             year: year.trim(),
             slug: candidateSlug,
@@ -518,8 +517,8 @@ const Upload: React.FC = () => {
     setLocalDeleted((prev) => new Set(prev).add(page));
     await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auth_token: authToken, filename }),
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+      body: JSON.stringify({ filename }),
     }).catch(() => {});
   }
 
@@ -532,8 +531,8 @@ const Upload: React.FC = () => {
     });
     await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auth_token: authToken, filename, deleted: false }),
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+      body: JSON.stringify({ filename, deleted: false }),
     }).catch(() => {});
   }
 
@@ -549,8 +548,8 @@ const Upload: React.FC = () => {
         `${FILE_API_URL}/admin/upload/${uploadId}/import`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken }),
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({}),
           timeout: 60_000,
         }
       );
