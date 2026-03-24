@@ -185,7 +185,7 @@ export function useQCodeMaps(
         if (changed) {
             setSearchParams(prev => { prev.set('genre', resolved.join(',')); return prev; }, { replace: true });
         }
-    }, [genreLabelToId, searchParams, setSearchParams]);
+    }, [genreLabelToId, searchParams]);
 
     // Normaliseeri tüübid URL-is Q-koodideks
     useEffect(() => {
@@ -202,7 +202,7 @@ export function useQCodeMaps(
         if (changed) {
             setSearchParams(prev => { prev.set('type', resolved.join(',')); return prev; }, { replace: true });
         }
-    }, [typeLabelToId, searchParams, setSearchParams]);
+    }, [typeLabelToId, searchParams]);
 
     // Normaliseeri märksõnad URL-is Q-koodideks
     useEffect(() => {
@@ -219,7 +219,7 @@ export function useQCodeMaps(
         if (changed) {
             setSearchParams(prev => { prev.set('teoseTags', resolved.join(',')); return prev; }, { replace: true });
         }
-    }, [tagsLabelToId, searchParams, setSearchParams]);
+    }, [tagsLabelToId, searchParams]);
 
     return {
         genreIdMap, genreLabelToId, typeIdMap, typeLabelToId,
