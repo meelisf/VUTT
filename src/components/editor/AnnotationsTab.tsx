@@ -11,7 +11,7 @@ import { getAllTags } from '../../services/searchService';
 import { isQCode } from '../../utils/qcodeUtils';
 import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 
@@ -66,8 +66,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       try {
         const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken, lang })
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({ lang })
         });
         const data = await response.json();
         if (data.status === 'success') {

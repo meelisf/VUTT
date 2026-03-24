@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
 
 // Git ajaloo kirje tüüp
@@ -105,11 +105,10 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/git-history`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
           original_path: page.original_path,
-          file_name: txtFilename,
-          auth_token: authToken
+          file_name: txtFilename
         })
       });
 
@@ -151,9 +150,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
-          auth_token: authToken,
           commit_hash: entry.full_hash,
           filepath: filepath
         })
@@ -317,12 +315,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/git-restore`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
           original_path: page.original_path,
           file_name: txtFilename,
-          commit_hash: entry.full_hash,
-          auth_token: authToken
+          commit_hash: entry.full_hash
         }),
         timeout: 30000
       });
