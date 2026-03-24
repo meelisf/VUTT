@@ -121,8 +121,8 @@ const Review: React.FC = () => {
     if (!user || !token) return;
     fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ auth_token: token })
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify({})
     })
       .then(res => res.json())
       .then(data => {
@@ -259,9 +259,8 @@ const Review: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/commit-diff`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
         body: JSON.stringify({
-          auth_token: token,
           commit_hash: commit.full_hash,
           filepath: commit.filepath
         })

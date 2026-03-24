@@ -152,8 +152,8 @@ const WorkManage: React.FC = () => {
     if (!workId || !authToken) return;
     fetchWithTimeout(`${FILE_API_URL}/get-work-metadata`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ work_id: workId, auth_token: authToken })
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+      body: JSON.stringify({ work_id: workId })
     })
       .then(r => r.json())
       .then(d => { if (d.status === 'success') setWorkTitle(d.metadata?.title || workId || ''); })

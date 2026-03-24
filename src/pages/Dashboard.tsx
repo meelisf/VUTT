@@ -18,7 +18,7 @@ import { LinkedEntity } from '../types/LinkedEntity';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
 import { getLabel } from '../utils/metadataUtils';
@@ -408,9 +408,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
         body: JSON.stringify({
-          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
           mode: collectionId === null ? 'set' : 'add',
@@ -447,9 +446,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
         body: JSON.stringify({
-          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           tags,
           mode
@@ -483,9 +481,8 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
         body: JSON.stringify({
-          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           genre,
           mode: genre ? 'add' : 'set'
