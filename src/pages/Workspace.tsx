@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
-import { getPage, savePage, checkPendingEdits, savePageAsPending, PendingEditInfo } from '../services/pageService';
+import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
 import { PageStatus } from '../types';
@@ -50,14 +50,6 @@ const Workspace: React.FC = () => {
 
   // Metaandmete muutmise modal
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
-
-  // Pending-edit olek (kaastöölistele)
-  // MÄRKUS: Contributor/pending-edit süsteem on implementeeritud, kuid EI OLE KASUTUSEL.
-  // Uued kasutajad saavad editor rolli, seega isContributor on alati false.
-  // Vt server/pending_edits.py ja server/registration.py kommentaare.
-  const [pendingEditInfo, setPendingEditInfo] = useState<PendingEditInfo | null>(null);
-  const [originalTextForPending, setOriginalTextForPending] = useState<string>('');
-  const isContributor = user?.role === 'contributor';
 
   // Salvestamata muudatuste kinnitusdialoogi olek
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
@@ -148,7 +140,6 @@ const Workspace: React.FC = () => {
           // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
           // update the URL to reflect reality.
           if (pageData.page_number !== currentPageNum) {
-            console.log(`Redirecting from requested page ${currentPageNum} to found page ${pageData.page_number}`);
             navigate(`/work/${workId}/${pageData.page_number}`, { replace: true });
           }
         }
@@ -161,27 +152,6 @@ const Workspace: React.FC = () => {
     };
     loadData();
   }, [workId, currentPageNum, navigate]);
-
-  // Kontrolli pending-edit staatust ja salvesta originaaltekst kaastöölise jaoks
-  useEffect(() => {
-    const checkPending = async () => {
-      if (!isContributor) return;
-      if (!page || !authToken || !workId) return;
-
-      // Salvesta originaaltekst, et saaksime pending-edit loomisel kasutada
-      setOriginalTextForPending(page.text_content || '');
-
-      // Kontrolli pending-staatust
-      try {
-        const info = await checkPendingEdits(workId, currentPageNum, authToken);
-        setPendingEditInfo(info);
-      } catch (e) {
-        console.error('Pending check error:', e);
-      }
-    };
-
-    checkPending();
-  }, [page, authToken, workId, currentPageNum, isContributor]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
@@ -210,33 +180,6 @@ const Workspace: React.FC = () => {
       return;
     }
 
-    // Kaastöölise muudatused lähevad pending-olekusse
-    if (isContributor && workId) {
-      const result = await savePageAsPending(
-        workId,
-        currentPageNum,
-        originalTextForPending,
-        updatedPage.text_content || '',
-        authToken
-      );
-
-      if (result.success) {
-        // Uuenda pending info
-        const info = await checkPendingEdits(workId, currentPageNum, authToken);
-        setPendingEditInfo(info);
-        setEditorChanges(false);
-
-        // Näita teadet
-        if (result.hasOtherPending) {
-          alert(t('workspace:pendingEdit.savedWithConflict') || 'Muudatus salvestatud ülevaatusele. NB: Teine kasutaja on samale lehele juba muudatuse esitanud.');
-        } else {
-          alert(t('workspace:pendingEdit.saved') || 'Muudatus salvestatud ülevaatusele. Toimetaja vaatab selle üle.');
-        }
-      } else {
-        alert(result.error || 'Salvestamine ebaõnnestus');
-      }
-      return;
-    }
 
     // Toimetaja/admin muudatused salvestatakse otse
     const pageWithStatus = { ...updatedPage, status: currentStatus || updatedPage.status };
@@ -612,29 +555,6 @@ const Workspace: React.FC = () => {
 
         {/* Right: Text Editor */}
         <div className="w-full h-1/2 md:w-1/2 md:h-full bg-white relative flex flex-col">
-          {/* Pending-edit staatuse banner */}
-          {pendingEditInfo?.has_own_pending && (
-            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center gap-2 text-sm text-amber-800">
-              <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
-              <span>
-                {t('workspace:pendingEdit.hasPending') || 'Sul on selle lehe kohta muudatus ülevaatusel.'}
-                {pendingEditInfo.own_pending_edit && (
-                  <span className="text-amber-600 ml-1">
-                    ({new Date(pendingEditInfo.own_pending_edit.submitted_at).toLocaleDateString('et-EE')})
-                  </span>
-                )}
-              </span>
-            </div>
-          )}
-          {pendingEditInfo && pendingEditInfo.other_pending_count > 0 && (
-            <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2 text-sm text-blue-800">
-              <AlertTriangle size={16} className="text-blue-600 flex-shrink-0" />
-              <span>
-                {t('workspace:pendingEdit.otherPending', { count: pendingEditInfo.other_pending_count }) ||
-                  `Sellel lehel on ${pendingEditInfo.other_pending_count} ootel muudatus(t) teistelt kasutajatelt.`}
-              </span>
-            </div>
-          )}
           <div className="flex-1 min-h-0">
           <TextEditor
             page={page}
@@ -645,7 +565,7 @@ const Workspace: React.FC = () => {
             readOnly={!user}
             statusDirty={statusDirty}
             currentStatus={currentStatus}
-            onStatusChange={user && !isContributor ? setCurrentStatus : undefined}
+            onStatusChange={user ? setCurrentStatus : undefined}
             triggerSave={editorSaveRef}
 
           />

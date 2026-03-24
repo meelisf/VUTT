@@ -7,11 +7,13 @@
  * - Album Academicum (AA:123) → null (pole avalik)
  * - Tundmatud → null
  */
+import { isQCode } from './qcodeUtils';
+
 export function getEntityUrl(id: string | null | undefined, source?: string): string | null {
   if (!id) return null;
 
   // Wikidata Q-koodid
-  if (id.startsWith('Q') && /^Q\d+$/.test(id)) {
+  if (isQCode(id)) {
     return `https://www.wikidata.org/wiki/${id}`;
   }
 
@@ -36,9 +38,3 @@ export function getEntityUrl(id: string | null | undefined, source?: string): st
   return null;
 }
 
-/**
- * Kontrollib, kas ID on linkitav (kas URL on olemas).
- */
-export function isLinkableEntity(id: string | null | undefined, source?: string): boolean {
-  return getEntityUrl(id, source) !== null;
-}

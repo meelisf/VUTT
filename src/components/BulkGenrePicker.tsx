@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BookOpen, X, Loader2, Check, Trash2 } from 'lucide-react';
 import EntityPicker from './EntityPicker';
 import { LinkedEntity } from '../types/LinkedEntity';
-import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { getLangCode } from '../utils/getLangCode';
-
-interface SuggestionItem {
-  label: string;
-  id: string | null;
-}
+import { useMetadataSuggestions } from '../hooks/useMetadataSuggestions';
 
 interface BulkGenrePickerProps {
   isOpen: boolean;
@@ -31,36 +25,8 @@ const BulkGenrePicker: React.FC<BulkGenrePickerProps> = ({
   const lang = getLangCode(i18n.language);
 
   const [selectedGenre, setSelectedGenre] = useState<LinkedEntity | null>(null);
-  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Laadime soovitused serverist
-  useEffect(() => {
-    if (isOpen) {
-      loadSuggestions();
-    }
-  }, [isOpen]);
-
-  const loadSuggestions = async () => {
-    setIsLoadingSuggestions(true);
-    try {
-      const token = localStorage.getItem('vutt_token');
-      const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: token, lang })
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        setSuggestions(result.genres || []);
-      }
-    } catch (e) {
-      console.error('Failed to load suggestions:', e);
-    } finally {
-      setIsLoadingSuggestions(false);
-    }
-  };
+  const { suggestions, isLoadingSuggestions } = useMetadataSuggestions(isOpen, lang, 'genres');
 
   const handleSave = () => {
     setIsSaving(true);

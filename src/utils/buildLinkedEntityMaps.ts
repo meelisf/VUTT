@@ -1,9 +1,5 @@
 import { LinkedEntity } from '../types/LinkedEntity';
-
-/**
- * Abifunktsioon: esimene täht suureks (ühtib Meilisearchi facet labelitega)
- */
-const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
+import { capitalizeFirst } from './metadataUtils';
 
 /**
  * Ehitab ID→label ja label→ID kaardid LinkedEntity objektidest.
@@ -34,7 +30,7 @@ export function buildLinkedEntityMaps(
       item.label;
 
     if (!rawLabel) continue;
-    const currentLabel = cap(rawLabel);
+    const currentLabel = capitalizeFirst(rawLabel);
 
     // idToLabel: Q-kood → praeguse keele label
     if (item.id) {
@@ -48,10 +44,10 @@ export function buildLinkedEntityMaps(
       for (const labelVal of Object.values(item.labels)) {
         if (labelVal) {
           idToLabel[labelVal as string] = currentLabel;
-          idToLabel[cap(labelVal as string)] = currentLabel;
+          idToLabel[capitalizeFirst(labelVal as string)] = currentLabel;
           if (item.id) {
             labelToId[labelVal as string] = item.id;
-            labelToId[cap(labelVal as string)] = item.id;
+            labelToId[capitalizeFirst(labelVal as string)] = item.id;
           }
         }
       }
@@ -60,10 +56,10 @@ export function buildLinkedEntityMaps(
     // Fallback label
     if (item.label) {
       idToLabel[item.label] = currentLabel;
-      idToLabel[cap(item.label)] = currentLabel;
+      idToLabel[capitalizeFirst(item.label)] = currentLabel;
       if (item.id) {
         labelToId[item.label] = item.id;
-        labelToId[cap(item.label)] = item.id;
+        labelToId[capitalizeFirst(item.label)] = item.id;
       }
     }
   }

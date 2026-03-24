@@ -199,12 +199,6 @@
     "saveAndLeave": "Jah, salvesta",
     "leaveWithoutSaving": "Ei, lahku"
   },
-  "pendingEdit": {
-    "hasPending": "Sul on selle lehe kohta muudatus ülevaatusel.",
-    "otherPending": "Sellel lehel on {{count}} ootel muudatus(t) teistelt kasutajatelt.",
-    "saved": "Muudatus salvestatud ülevaatusele. Toimetaja vaatab selle üle.",
-    "savedWithConflict": "Muudatus salvestatud ülevaatusele. NB: Teine kasutaja on samale lehele juba muudatuse esitanud."
-  },
   "mobile": {
     "imageTab": "Pilt",
     "gridTab": "Ruudustik",

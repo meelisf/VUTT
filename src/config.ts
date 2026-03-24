@@ -20,4 +20,3 @@ export const FILE_API_URL = '/api/files';
 
 export const MEILI_INDEX = 'teosed';
 
-console.log("VUTT Config Loaded:", { MEILI_HOST, IMAGE_BASE_URL, FILE_API_URL });

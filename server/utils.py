@@ -28,6 +28,8 @@ def atomic_write_json(filepath, data, indent=2):
         indent: JSON indentatsiooni tase (default 2)
     """
     dir_name = os.path.dirname(filepath)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
     tmp_path = None
 
     try:

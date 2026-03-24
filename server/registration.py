@@ -205,11 +205,7 @@ def create_user_from_invite(token, password):
         username = f"{base_username}{counter}"
         counter += 1
 
-    # Loo uus kasutaja
-    # NB: Vaikimisi editor, mitte contributor.
-    # Contributor-roll ja pending-edits süsteem on implementeeritud, kuid
-    # praegu ei kasutata - see tekitaks liiga suure halduskoormuse.
-    # Vt server/pending_edits.py kommentaare.
+    # Loo uus kasutaja (vaikimisi editor-roll)
     password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     users[username] = {

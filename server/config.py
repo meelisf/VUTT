@@ -78,7 +78,6 @@ STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
-PENDING_EDITS_FILE = os.path.join(_STATE_DIR, "pending_edits.json")
 COLLECTIONS_FILE = os.path.join(_STATE_DIR, "collections.json")
 VOCABULARIES_FILE = os.path.join(_STATE_DIR, "vocabularies.json")
 PERSON_ALIASES_FILE = os.path.join(_STATE_DIR, "person_aliases.json")

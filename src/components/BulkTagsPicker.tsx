@@ -1,18 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tag, X, Loader2, Check, Replace, ListPlus, User } from 'lucide-react';
 import EntityPicker from './EntityPicker';
 import { LinkedEntity } from '../types/LinkedEntity';
-import { FILE_API_URL } from '../config';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { getLangCode } from '../utils/getLangCode';
-
-interface SuggestionItem {
-  label: string;
-  id: string | null;
-}
+import { useMetadataSuggestions } from '../hooks/useMetadataSuggestions';
 
 interface BulkTagsPickerProps {
   isOpen: boolean;
@@ -32,36 +26,8 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
 
   const [selectedTags, setSelectedTags] = useState<LinkedEntity[]>([]);
   const [mode, setMode] = useState<'add' | 'replace'>('add');
-  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Laadime soovitused serverist
-  useEffect(() => {
-    if (isOpen) {
-      loadSuggestions();
-    }
-  }, [isOpen]);
-
-  const loadSuggestions = async () => {
-    setIsLoadingSuggestions(true);
-    try {
-      const token = localStorage.getItem('vutt_token');
-      const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: token, lang })
-      });
-      const result = await response.json();
-      if (result.status === 'success') {
-        setSuggestions(result.tags || []);
-      }
-    } catch (e) {
-      console.error('Failed to load suggestions:', e);
-    } finally {
-      setIsLoadingSuggestions(false);
-    }
-  };
+  const { suggestions, isLoadingSuggestions } = useMetadataSuggestions(isOpen, lang, 'tags');
 
   const handleAddTag = (entity: LinkedEntity | null) => {
     if (!entity) return;

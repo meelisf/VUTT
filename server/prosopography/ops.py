@@ -19,7 +19,7 @@ from ..config import (
     PERSON_TO_WORKS_FILE,
     PERSON_ALIASES_FILE,
 )
-from ..utils import generate_nanoid
+from ..utils import generate_nanoid, atomic_write_json
 
 # Jagatud indeksite kirjutuslukkud
 _index_lock = threading.Lock()
@@ -30,14 +30,6 @@ _aliases_lock = threading.Lock()
 # =========================================================
 # ABIFUNKTSIOONID
 # =========================================================
-
-def _atomic_write(path: str, data: dict):
-    """Kirjutab JSON faili atomically (tmp + os.replace)."""
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, path)
 
 
 def _id_to_path(person_id: str) -> str:
@@ -219,7 +211,7 @@ def _update_index_entry(person: dict):
         if person.get("record_status") != "tombstone":
             entries.append(new_entry)
         index["entries"] = entries
-        _atomic_write(PROSOPOGRAPHY_INDEX_FILE, index)
+        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
 
 
 def _update_aliases_entry(person: dict):
@@ -240,7 +232,7 @@ def _update_aliases_entry(person: dict):
                 "aliases": all_names,
                 "ids": {},
             }
-        _atomic_write(PERSON_ALIASES_FILE, data)
+        atomic_write_json(PERSON_ALIASES_FILE, data)
 
 
 # =========================================================
@@ -320,7 +312,7 @@ def create_person(data: dict, username: str) -> dict:
     }
 
     os.makedirs(PROSOPOGRAPHY_DIR, exist_ok=True)
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person
@@ -417,7 +409,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     person["updated_at"] = now
     person["updated_by"] = username
 
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     _update_aliases_entry(person)
 
@@ -561,7 +553,7 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person, diff
@@ -623,7 +615,7 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     return person
 
@@ -652,7 +644,7 @@ def delete_person_image(person_id: str, username: str) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     return person
 
@@ -686,7 +678,7 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    _atomic_write(_id_to_path(person_id), person)
+    atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person
@@ -820,7 +812,7 @@ def update_person_to_works(
             for role in roles:
                 data[pid].append({"work_id": work_id, "role": role})
 
-        _atomic_write(PERSON_TO_WORKS_FILE, data)
+        atomic_write_json(PERSON_TO_WORKS_FILE, data)
 
 
 # =========================================================
@@ -888,7 +880,7 @@ def rebuild_indices():
 
     # Kirjuta person_to_works
     with _works_lock:
-        _atomic_write(PERSON_TO_WORKS_FILE, ptw)
+        atomic_write_json(PERSON_TO_WORKS_FILE, ptw)
 
     # Ehita index entries
     entries = []
@@ -914,13 +906,13 @@ def rebuild_indices():
     entries.sort(key=lambda e: (e.get("sort_name") or "").lower())
 
     with _index_lock:
-        _atomic_write(PROSOPOGRAPHY_INDEX_FILE, {
+        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, {
             "rebuilt_at": datetime.now(timezone.utc).isoformat(),
             "entries": entries,
         })
 
     with _aliases_lock:
-        _atomic_write(PERSON_ALIASES_FILE, aliases_data)
+        atomic_write_json(PERSON_ALIASES_FILE, aliases_data)
 
 
 # =========================================================
@@ -962,14 +954,14 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         target["identifiers"] = tgt_idents + added_idents
         target["updated_at"] = now
         target["updated_by"] = username
-        _atomic_write(_id_to_path(target_id), target)
+        atomic_write_json(_id_to_path(target_id), target)
 
     # 1. Source → tombstone
     source["record_status"] = "tombstone"
     source["merged_into"] = target_id
     source["updated_at"] = now
     source["updated_by"] = username
-    _atomic_write(_id_to_path(source_id), source)
+    atomic_write_json(_id_to_path(source_id), source)
 
     # 2. Relations teistes kaartides: source_id → target_id
     for fpath in _glob.glob(os.path.join(PROSOPOGRAPHY_DIR, "*.json")):
@@ -991,7 +983,7 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
         if changed:
             p["updated_at"] = now
             p["updated_by"] = username
-            _atomic_write(fpath, p)
+            atomic_write_json(fpath, p)
 
     # 3. Teoste _metadata.json: creator source_id → target_id + git + Meilisearch
     target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
@@ -1085,7 +1077,7 @@ def bulk_update_occupation(
             new_occupations = list(existing) + [occupation]
 
         person["occupations"] = new_occupations
-        _atomic_write(_id_to_path(person_id), person)
+        atomic_write_json(_id_to_path(person_id), person)
         _update_index_entry(person)
         updated += 1
 

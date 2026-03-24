@@ -6,7 +6,7 @@ Eraldatud file_server.py-st parema hallatavuse jaoks.
 # Konfiguratsioon
 from .config import (
     BASE_DIR, PORT, USERS_FILE, PENDING_REGISTRATIONS_FILE,
-    INVITE_TOKENS_FILE, PENDING_EDITS_FILE, ALLOWED_ORIGINS,
+    INVITE_TOKENS_FILE, ALLOWED_ORIGINS,
     RATE_LIMITS, SESSION_DURATION, MEILI_URL, MEILI_KEY, INDEX_NAME,
     COLLECTIONS_FILE, VOCABULARIES_FILE,
     UPLOAD_ENABLED,
@@ -32,14 +32,6 @@ from .registration import (
     add_registration, get_registration_by_id, update_registration_status,
     load_invite_tokens, save_invite_tokens, create_invite_token,
     validate_invite_token, create_user_from_invite
-)
-
-# Pending edits (äriloogika)
-from .pending_edits import (
-    load_pending_edits, save_pending_edits, create_pending_edit,
-    get_pending_edit_by_id, get_pending_edits_for_page,
-    get_user_pending_edit_for_page, update_pending_edit_status,
-    check_base_text_conflict
 )
 
 # Git operatsioonid

@@ -61,32 +61,17 @@ export const mergeFacetsWithExisting = (
     return result.sort((a, b) => b.count - a.count);
 };
 
-// Sama loogika teoseTags jaoks (erinev struktuur: tag vs value)
+// Sama loogika teoseTags jaoks — delegeerib mergeFacetsWithExisting-le, kaardistab tag↔value
 export const mergeTagsWithExisting = (
     existing: { tag: string; count: number }[],
     newTags: { tag: string; count: number }[],
     selected: string[]
-): { tag: string; count: number }[] => {
-    const newMap = new Map(newTags.map(t => [t.tag, t.count]));
-    const result: { tag: string; count: number }[] = [];
-    const seen = new Set<string>();
-
-    for (const item of existing) {
-        if (!item.tag) continue;
-        result.push({ tag: item.tag, count: newMap.get(item.tag) ?? 0 });
-        seen.add(item.tag);
-    }
-    for (const item of newTags) {
-        if (item.tag && !seen.has(item.tag)) {
-            result.push(item);
-            seen.add(item.tag);
-        }
-    }
-    for (const sel of selected) {
-        if (sel && !seen.has(sel)) result.push({ tag: sel, count: 0 });
-    }
-    return result.sort((a, b) => b.count - a.count);
-};
+): { tag: string; count: number }[] =>
+    mergeFacetsWithExisting(
+        existing.map(t => ({ value: t.tag, count: t.count })),
+        newTags.map(t => ({ value: t.tag, count: t.count })),
+        selected
+    ).map(f => ({ tag: f.value, count: f.count }));
 
 // Lihtne merge valitud väärtuste lisamiseks (initial load jaoks)
 export const mergeSelectedIntoFacets = (
@@ -104,11 +89,8 @@ export const mergeSelectedIntoFacets = (
 export const mergeSelectedIntoTags = (
     tags: { tag: string; count: number }[],
     selected: string[]
-): { tag: string; count: number }[] => {
-    const existing = new Set(tags.map(t => t.tag));
-    const merged = [...tags];
-    for (const sel of selected) {
-        if (sel && !existing.has(sel)) merged.push({ tag: sel, count: 0 });
-    }
-    return merged;
-};
+): { tag: string; count: number }[] =>
+    mergeSelectedIntoFacets(
+        tags.map(t => ({ value: t.tag, count: t.count })),
+        selected
+    ).map(f => ({ tag: f.value, count: f.count }));
