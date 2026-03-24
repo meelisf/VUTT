@@ -75,23 +75,13 @@ async def get_user(request: Request, min_role: str = "contributor"):
     """
     Ühtne autentimine. Järjekord:
     1. Authorization: Bearer <token> header (eelistatud)
-    2. JSON body auth_token (POST päringud)
-    3. query-param 'token' (deprecated fallback — ainult <img src> tüüpi GET-id)
+    2. query-param 'token' (ainult <img src> tüüpi GET-id, nt upload thumb)
     """
     token = None
 
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:].strip()
-
-    if not token:
-        try:
-            body_bytes = await request.body()
-            if body_bytes:
-                body_data = json.loads(body_bytes)
-                token = body_data.get("auth_token")
-                request.state.json_data = body_data
-        except: pass
 
     if not token:
         token = request.query_params.get("token")
@@ -109,7 +99,6 @@ def require_role(role: str):
     return role_dependency
 
 async def get_json_data(request: Request):
-    if hasattr(request.state, "json_data"): return request.state.json_data
     return await request.json()
 
 # =========================================================
