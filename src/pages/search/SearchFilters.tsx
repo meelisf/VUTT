@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Vocabularies } from '../../services/collectionService';
 import CollapsibleSection from '../../components/CollapsibleSection';
@@ -21,42 +22,48 @@ interface AvailableWork {
     count: number;
 }
 
-export interface SearchFiltersProps {
-    // Filter state (kontrollitud SearchPage-st)
-    selectedScope: 'all' | 'original' | 'annotation';
+export interface FilterDraftProps {
+    inputValue: string;
     yearStart: string;
     yearEnd: string;
+    selectedScope: 'all' | 'original' | 'annotation';
+    selectedWork: string;
+    selectedWorkInfo: WorkInfo | null;
+    selectedTeoseTags: string[];
+    selectedPageTags: string[];
     selectedGenres: string[];
     selectedTypes: string[];
-    selectedTeoseTags: string[];
     selectedAuthor: string;
     authorInput: string;
     showAuthorSuggestions: boolean;
-    selectedWork: string;
-    selectedWorkInfo: WorkInfo | null;
     showFiltersMobile: boolean;
+}
 
-    // Facetite loendid (otsingutulemustest)
+export interface FacetsProps {
     availableGenres: { value: string; count: number }[];
     availableTypes: { value: string; count: number }[];
     availableTeoseTags: { tag: string; count: number }[];
     availableAuthors: { value: string; count: number }[];
     availableWorks: AvailableWork[];
-
-    // Sõnavara ja aliased
     vocabularies: Vocabularies | null;
     aliasMap: Record<string, string>;
-    // labels.json cache — primaarne Q-kood → {lang: label} allikas
+    loading: boolean;
+}
+
+export interface QCodeMapsProps {
     enrichedLabels?: Record<string, Record<string, string>>;
-    // Q-kood → praeguse keele label (tulemuste genre/type/tags_object-ist)
     genreIdMap?: Record<string, string>;
     genreLabelToId?: Record<string, string>;
     typeIdMap?: Record<string, string>;
     typeLabelToId?: Record<string, string>;
     tagsIdMap?: Record<string, string>;
     tagsLabelToId?: Record<string, string>;
-    loading: boolean;
+}
 
+export interface SearchFiltersProps {
+    draft: FilterDraftProps;
+    facets: FacetsProps;
+    qCodeMaps: QCodeMapsProps;
     // Callback-id
     onScopeChange: (scope: 'all' | 'original' | 'annotation') => void;
     onYearStartChange: (year: string) => void;
@@ -70,25 +77,25 @@ export interface SearchFiltersProps {
     onAuthorClear: () => void;
     onWorkSelect: (id: string, info: WorkInfo | null) => void;
     onSetMobileFilters: (show: boolean) => void;
-    onSearch: (e?: React.FormEvent) => void;
+    onSearch: (e?: FormEvent) => void;
     onClearFilters: () => void;
 }
 
 const SearchFilters: React.FC<SearchFiltersProps> = ({
-    selectedScope, yearStart, yearEnd,
-    selectedGenres, selectedTypes, selectedTeoseTags,
-    selectedAuthor, authorInput, showAuthorSuggestions,
-    selectedWork, selectedWorkInfo, showFiltersMobile,
-    availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks,
-    vocabularies, aliasMap, enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, loading,
+    draft, facets, qCodeMaps,
     onScopeChange, onYearStartChange, onYearEndChange,
     onGenreToggle, onTypeToggle, onTagToggle,
-    onAuthorInputChange, onShowAuthorSuggestions, onAuthorSelect, onAuthorClear,
-    onWorkSelect, onSetMobileFilters, onSearch, onClearFilters,
+    onAuthorInputChange, onShowAuthorSuggestions,
+    onAuthorSelect, onAuthorClear, onWorkSelect,
+    onSetMobileFilters, onSearch, onClearFilters
 }) => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const authorInputRef = useRef<HTMLInputElement>(null);
     const lang = getLangCode(i18n.language);
+
+    const { enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId } = qCodeMaps;
+    const { availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks, vocabularies, aliasMap, loading } = facets;
+    const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
 
     // Q-kood → label: enrichedLabels (labels.json) primaarne, seejärel idToLabel map
     const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) => {
