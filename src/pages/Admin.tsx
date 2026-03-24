@@ -24,7 +24,7 @@ import Header from '../components/Header';
 import CollectionEditor from '../components/CollectionEditor';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface Registration {
   id: string;
@@ -149,8 +149,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({})
       });
 
       const data = await response.json();
@@ -175,9 +175,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
-          auth_token: authToken,
           registration_id: regId
         })
       });
@@ -212,9 +211,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/reject`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
-          auth_token: authToken,
           registration_id: regId
         })
       });
@@ -244,8 +242,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/trash`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({})
       });
       const data = await response.json();
       if (data.status === 'success') {
@@ -269,8 +267,8 @@ const Admin: React.FC = () => {
         `${FILE_API_URL}/admin/trash/${workId}/restore`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken }),
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({}),
           timeout: 30000
         }
       );
@@ -308,8 +306,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken })
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({})
       });
 
       const data = await response.json();
@@ -334,9 +332,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/update-role`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
-          auth_token: authToken,
           username,
           new_role: newRole
         })
@@ -370,9 +367,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/delete`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
-          auth_token: authToken,
           username
         })
       });
@@ -414,8 +410,8 @@ const Admin: React.FC = () => {
       try {
         const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh-status`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ auth_token: authToken })
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({})
         });
         const data = await response.json();
 
@@ -447,8 +443,8 @@ const Admin: React.FC = () => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auth_token: authToken }),
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({}),
         timeout: 30000
       });
 
