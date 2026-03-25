@@ -260,8 +260,8 @@ async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
         meta_path = os.path.join(path, '_metadata.json')
         if os.path.exists(meta_path):
             with open(meta_path, 'r', encoding='utf-8') as f: title = json.load(f).get('title', work_id)
-    except: pass
-    
+    except Exception: pass
+
     trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
     os.makedirs(trash_dir, exist_ok=True)
     for fname in os.listdir(path):

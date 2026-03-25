@@ -193,7 +193,7 @@ def _build_suggestions(preferred_lang):
                             if isinstance(g, list):
                                 for item in g: add_item(genres, item, 'genres')
                             else: add_item(genres, g, 'genres')
-                except: pass
+                except Exception: pass
             try:
                 for page_file in os.scandir(entry.path):
                     if page_file.name.endswith('.json') and page_file.name != '_metadata.json':
@@ -202,8 +202,8 @@ def _build_suggestions(preferred_lang):
                                 page_data = json.load(f)
                                 source = page_data.get('meta_content', page_data)
                                 for pt in source.get('page_tags', source.get('tags', [])): add_item(tags, pt, 'tags')
-                        except: pass
-            except: pass
+                        except Exception: pass
+            except Exception: pass
 
     for p in ['Tartu', 'Pärnu']:
         if p.lower() not in places: places[p.lower()] = {'label': p, 'id': None}
