@@ -337,8 +337,8 @@ const Registrations: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-800 mb-4">
                 {t('registrations.processed')} ({processedRegistrations.length})
               </h2>
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full">
+              <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
+                <table className="w-full min-w-[480px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.name')}</th>
