@@ -80,6 +80,9 @@
     "admin": "Admin",
     "settings": "Seaded"
   },
+  "form": {
+    "clearSearch": "Tühjenda otsing"
+  },
   "prosopography": {
     "pageTitle": "Isikud",
     "searchPlaceholder": "Otsi nime järgi…",

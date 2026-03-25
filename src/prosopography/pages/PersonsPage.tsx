@@ -239,7 +239,7 @@ const PersonsPage: React.FC = () => {
                   onClick={() => setQuery('')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
-                  aria-label="Tühjenda otsing"
+                  aria-label={t('form.clearSearch')}
                 >
                   <X size={14} />
                 </button>

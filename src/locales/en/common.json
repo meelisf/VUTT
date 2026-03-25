@@ -80,6 +80,9 @@
     "admin": "Admin",
     "settings": "Settings"
   },
+  "form": {
+    "clearSearch": "Clear search"
+  },
   "prosopography": {
     "pageTitle": "Persons",
     "searchPlaceholder": "Search by name…",
