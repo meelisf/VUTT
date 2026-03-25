@@ -3,7 +3,7 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import i18n from '../i18n';
 
-export interface UserPreferences {
+export interface UserSettings {
   language?: 'et' | 'en';
   default_tab?: 'edit' | 'annotate';
   custom_characters?: Array<{ char: string; name: string }>;
@@ -13,34 +13,35 @@ interface User {
   username: string;
   name: string;
   role: string;
-  preferences?: UserPreferences;
 }
 
 interface UserContextType {
   user: User | null;
-  authToken: string | null;  // Sessioonitõend API päringute jaoks
+  authToken: string | null;
+  userSettings: UserSettings;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isLoading: boolean;
   sessionExpired: boolean;
   clearSessionExpired: () => void;
-  updatePreferences: (prefs: Partial<UserPreferences>) => Promise<boolean>;
+  updateSettings: (settings: Partial<UserSettings>) => Promise<boolean>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'vutt_user';
 const TOKEN_KEY = 'vutt_token';
+const SETTINGS_KEY = 'vutt_settings';
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<UserSettings>({});
   const [isLoading, setIsLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const tokenCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Tokeni verifitseerimine serverist
-  // Tagastab: User (kehtiv) | null (server ütles aegunud) | 'network-error' (võrguviga, ärge logige välja)
   const verifyToken = async (token: string): Promise<User | null | 'network-error'> => {
     try {
       const response = await fetchWithTimeout(`${FILE_API_URL}/verify-token`, {
@@ -60,11 +61,27 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Lae kasutaja seaded serverist
+  const loadUserSettings = async (token: string): Promise<UserSettings> => {
+    try {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/user-settings`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+        timeout: 5000
+      });
+      const data = await response.json();
+      if (data.status === 'success' && data.settings) {
+        return data.settings;
+      }
+    } catch (e) {
+      console.warn('User settings load failed:', e);
+    }
+    return {};
+  };
+
   // Rakenda kasutaja eelistused (keel jne)
-  const applyPreferences = useCallback((prefs?: UserPreferences) => {
-    if (!prefs) return;
-    if (prefs.language && prefs.language !== i18n.language) {
-      i18n.changeLanguage(prefs.language);
+  const applySettings = useCallback((settings: UserSettings) => {
+    if (settings.language && settings.language !== i18n.language) {
+      i18n.changeLanguage(settings.language);
     }
   }, []);
 
@@ -73,32 +90,37 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const initAuth = async () => {
       const storedToken = localStorage.getItem(TOKEN_KEY);
       const storedUser = localStorage.getItem(STORAGE_KEY);
+      const storedSettings = localStorage.getItem(SETTINGS_KEY);
 
       if (storedToken && storedUser) {
-        // Kontrolli, kas token on veel kehtiv
         const verifiedUser = await verifyToken(storedToken);
         if (verifiedUser && verifiedUser !== 'network-error') {
           setUser(verifiedUser);
           setAuthToken(storedToken);
-          applyPreferences(verifiedUser.preferences);
+          // Lae seaded serverist
+          const settings = await loadUserSettings(storedToken);
+          setUserSettings(settings);
+          localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+          applySettings(settings);
         } else if (verifiedUser === 'network-error') {
-          // Võrguviga käivitusel — laadime localStorage'ist (optimistlik)
+          // Võrguviga — kasuta localStorage'i
           try {
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
+            setUser(JSON.parse(storedUser));
             setAuthToken(storedToken);
-            applyPreferences(parsedUser.preferences);
+            const settings = storedSettings ? JSON.parse(storedSettings) : {};
+            setUserSettings(settings);
+            applySettings(settings);
           } catch {}
         } else {
-          // Server kinnitas et token on aegunud
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(SETTINGS_KEY);
         }
       }
       setIsLoading(false);
     };
     initAuth();
-  }, []);
+  }, [applySettings]);
 
   // Perioodiline tokeni kontroll (iga 5 min)
   useEffect(() => {
@@ -153,11 +175,13 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.status === 'success' && data.user && data.token) {
         setUser(data.user);
         setAuthToken(data.token);
-        // Salvestame tokeni localStorage'i (mitte parooli!)
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         localStorage.setItem(TOKEN_KEY, data.token);
-        // Rakenda kasutaja eelistused
-        applyPreferences(data.user.preferences);
+        // Lae kasutaja seaded serverist
+        const settings = await loadUserSettings(data.token);
+        setUserSettings(settings);
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        applySettings(settings);
         return { success: true };
       } else {
         return { success: false, error: data.message || 'Sisselogimine ebaõnnestus' };
@@ -166,46 +190,46 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login error:', e);
       return { success: false, error: 'Serveriga ühendamine ebaõnnestus' };
     }
-  }, [applyPreferences]);
+  }, [applySettings]);
 
   const logout = useCallback(() => {
     setUser(null);
     setAuthToken(null);
+    setUserSettings({});
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
   }, []);
 
-  const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>): Promise<boolean> => {
+  const updateSettings = useCallback(async (newSettings: Partial<UserSettings>): Promise<boolean> => {
     if (!authToken || !user) return false;
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/user-prefs`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/user-settings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
-        body: JSON.stringify(prefs)
+        body: JSON.stringify(newSettings)
       });
       const data = await response.json();
       if (data.status === 'success') {
-        // Uuenda lokaalne user objekt
-        const updatedUser = { ...user, preferences: { ...user.preferences, ...prefs } };
-        setUser(updatedUser);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-        // Rakenda koheselt
-        applyPreferences(prefs as UserPreferences);
+        const updated = { ...userSettings, ...newSettings };
+        setUserSettings(updated);
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(updated));
+        applySettings(newSettings as UserSettings);
         return true;
       }
       return false;
     } catch (e) {
-      console.error('updatePreferences error:', e);
+      console.error('updateSettings error:', e);
       return false;
     }
-  }, [authToken, user, applyPreferences]);
+  }, [authToken, user, userSettings, applySettings]);
 
   const value = useMemo(() => ({
-    user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired, updatePreferences
-  }), [user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired, updatePreferences]);
+    user, authToken, userSettings, login, logout, isLoading, sessionExpired, clearSessionExpired, updateSettings
+  }), [user, authToken, userSettings, login, logout, isLoading, sessionExpired, clearSessionExpired, updateSettings]);
 
   return (
     <UserContext.Provider value={value}>

@@ -19,7 +19,7 @@ from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
-from .auth import verify_user, create_session, require_token, get_all_users, update_user_role, delete_user, get_user_preferences, save_user_preferences
+from .auth import verify_user, create_session, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
@@ -125,8 +125,6 @@ async def verify_token(request: Request):
     user, error = require_token({"auth_token": token})
     if error:
         return {"status": "error", "valid": False, "message": error["message"]}
-    # Lisa värskemad preferences otse users.json failist
-    user["preferences"] = get_user_preferences(user["username"])
     return {"status": "success", "user": user, "valid": True}
 
 @app.post("/register")
@@ -1161,38 +1159,67 @@ async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
     count = refresh_all_entity_labels()
     return {"updated": count}
 
+# =========================================================
+# KASUTAJA SEADED (state/user_settings/{username}.json)
+# =========================================================
+
+def _get_user_settings_path(username: str) -> str:
+    """Tagastab kasutaja seadete faili tee."""
+    return os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_settings', f"{username}.json")
+
+def _load_user_settings(username: str) -> dict:
+    """Laeb kasutaja seaded failist."""
+    path = _get_user_settings_path(username)
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def _save_user_settings(username: str, settings: dict):
+    """Salvestab kasutaja seaded faili."""
+    dir_path = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_settings')
+    os.makedirs(dir_path, exist_ok=True)
+    path = _get_user_settings_path(username)
+    atomic_write_json(path, settings)
+
+@app.get("/user-settings")
+async def get_user_settings(request: Request, user=Depends(get_user)):
+    """Tagastab kasutaja kõik seaded."""
+    settings = _load_user_settings(user['username'])
+    return {"status": "success", "settings": settings}
+
+@app.post("/user-settings")
+async def save_user_settings(request: Request, user=Depends(get_user)):
+    """Salvestab kasutaja seaded (keel, vaiketab, erimärgid jne)."""
+    data = await get_json_data(request)
+    settings = _load_user_settings(user['username'])
+    # Uuenda ainult lubatud väljad
+    allowed_fields = ['language', 'default_tab', 'custom_characters']
+    for field in allowed_fields:
+        if field in data:
+            settings[field] = data[field]
+    _save_user_settings(user['username'], settings)
+    return {"status": "success", "settings": settings}
+
 @app.get("/user-chars")
 async def get_user_chars(request: Request, user=Depends(get_user)):
-    """Tagastab kasutaja kohandatud erimärgid users.json preferences alt."""
-    prefs = get_user_preferences(user['username'])
-    chars = prefs.get('custom_characters', [])
+    """Tagastab kasutaja kohandatud erimärgid."""
+    settings = _load_user_settings(user['username'])
+    chars = settings.get('custom_characters', [])
     is_custom = len(chars) > 0
     return {"status": "success", "characters": chars, "is_custom": is_custom}
 
 @app.post("/user-chars")
 async def save_user_chars(request: Request, user=Depends(get_user)):
-    """Salvestab kasutaja kohandatud erimärgid users.json preferences alla."""
+    """Salvestab kasutaja kohandatud erimärgid."""
     data = await get_json_data(request)
-    prefs = get_user_preferences(user['username'])
+    settings = _load_user_settings(user['username'])
     if data.get('reset'):
-        prefs.pop('custom_characters', None)
+        settings.pop('custom_characters', None)
     else:
-        prefs['custom_characters'] = data.get('characters', [])
-    save_user_preferences(user['username'], prefs)
+        settings['custom_characters'] = data.get('characters', [])
+    _save_user_settings(user['username'], settings)
     return {"status": "success", "reset": bool(data.get('reset'))}
-
-@app.post("/user-prefs")
-async def api_save_user_prefs(request: Request, user=Depends(get_user)):
-    """Salvestab kasutaja eelistused (keel, vaiketab jne)."""
-    data = await get_json_data(request)
-    prefs = get_user_preferences(user['username'])
-    # Uuenda ainult lubatud väljad
-    if 'language' in data:
-        prefs['language'] = data['language']
-    if 'default_tab' in data:
-        prefs['default_tab'] = data['default_tab']
-    save_user_preferences(user['username'], prefs)
-    return {"status": "success", "preferences": prefs}
 
 @app.get("/download/{work_id}")
 async def download_work(request: Request, work_id: str, content: str = "both"):

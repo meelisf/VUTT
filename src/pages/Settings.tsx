@@ -6,20 +6,20 @@ import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation('settings');
-  const { user, updatePreferences } = useUser();
+  const { user, userSettings, updateSettings } = useUser();
 
   // Ainult autentitud kasutajatele
   if (!user) return <Navigate to="/" replace />;
 
-  const currentLang = (user.preferences?.language || (i18n.language.startsWith('et') ? 'et' : 'en')) as 'et' | 'en';
-  const defaultTab = user.preferences?.default_tab || 'edit';
+  const currentLang = (userSettings.language || (i18n.language.startsWith('et') ? 'et' : 'en')) as 'et' | 'en';
+  const defaultTab = userSettings.default_tab || 'edit';
 
   const handleLangChange = (lang: 'et' | 'en') => {
-    updatePreferences({ language: lang });
+    updateSettings({ language: lang });
   };
 
   const handleTabChange = (tab: 'edit' | 'annotate') => {
-    updatePreferences({ default_tab: tab });
+    updateSettings({ default_tab: tab });
   };
 
   return (

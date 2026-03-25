@@ -99,11 +99,10 @@ type TabType = 'edit' | 'annotate' | 'history';
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
-  const { user, authToken } = useUser();
+  const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
-  // Kasuta kasutaja eelistust serverist, tagavaraks localStorage (vanad sessioonid)
   const [activeTab, setActiveTab] = useState<TabType>(
-    () => (user?.preferences?.default_tab as TabType) ?? (localStorage.getItem('vutt_workspace_default_tab') as TabType) ?? 'edit'
+    () => (userSettings.default_tab as TabType) || 'edit'
   );
 
   // Redaktori sisu muudatuste jälgimine

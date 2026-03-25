@@ -2,12 +2,7 @@
   "admin": {
     "password_hash": "<sha256-of-password>",
     "name": "Administrator",
-    "role": "admin",
-    "preferences": {
-      "language": "et",
-      "default_tab": "edit",
-      "custom_characters": []
-    }
+    "role": "admin"
   },
   "editor": {
     "password_hash": "<sha256-of-password>",
