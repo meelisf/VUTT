@@ -28,7 +28,6 @@ import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
-import { searchWorks } from '../services/searchService';
 
 // ---------------------------------------------------------------------------
 // Tüübid
@@ -217,11 +216,6 @@ const Upload: React.FC = () => {
   // --- Asenda olemasolevat teost ---
   const [replaceWorkId, setReplaceWorkId] = useState<string | null>(null);
   const [replaceWorkTitle, setReplaceWorkTitle] = useState<string | null>(null);
-  const [replaceSearch, setReplaceSearch] = useState('');
-  const [replaceResults, setReplaceResults] = useState<Array<{ work_id: string; title: string; year: number | null }>>([]);
-  const [replaceSearching, setReplaceSearching] = useState(false);
-  const [replaceDropdownOpen, setReplaceDropdownOpen] = useState(false);
-  const replaceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // --- Samm 2 ---
   const [dragging, setDragging] = useState(false);
@@ -285,71 +279,9 @@ const Upload: React.FC = () => {
     setStep1Error('');
   }, [slug, year]);
 
-  // ---------------------------------------------------------------------------
-  // Puhasta debounce timer unmount korral
-  // ---------------------------------------------------------------------------
-  useEffect(() => () => {
-    if (replaceDebounceRef.current) clearTimeout(replaceDebounceRef.current);
-  }, []);
-
-  // ---------------------------------------------------------------------------
-  // Asenda olemasolevat teost — debounce otsing
-  // ---------------------------------------------------------------------------
-  function handleReplaceSearchChange(q: string) {
-    setReplaceSearch(q);
-    setReplaceDropdownOpen(true);
-    if (replaceDebounceRef.current) clearTimeout(replaceDebounceRef.current);
-    if (!q.trim()) {
-      setReplaceResults([]);
-      setReplaceDropdownOpen(false);
-      return;
-    }
-    replaceDebounceRef.current = setTimeout(async () => {
-      setReplaceSearching(true);
-      try {
-        const res = await searchWorks(q, { sort: 'relevance' });
-        setReplaceResults(
-          res.works.slice(0, 8).map((w) => ({ work_id: w.work_id, title: w.title, year: w.year ?? null }))
-        );
-      } catch {
-        setReplaceResults([]);
-      } finally {
-        setReplaceSearching(false);
-      }
-    }, 300);
-  }
-
-  async function handleReplaceWorkSelect(workId: string, workTitle: string) {
-    setReplaceWorkId(workId);
-    setReplaceWorkTitle(workTitle);
-    setReplaceSearch('');
-    setReplaceResults([]);
-    setReplaceDropdownOpen(false);
-    // Täida samm 1 vormiväljad teose metaandmetest
-    if (!authToken) return;
-    try {
-      const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/metadata`,
-        { headers: getAuthHeaders(authToken) }
-      );
-      if (!r.ok) return;
-      const meta = await r.json();
-      if (meta.title) setTitle(meta.title);
-      if (meta.year) setYear(String(meta.year));
-      if (Array.isArray(meta.collections) && meta.collections.length > 0) {
-        setSelectedCollection(meta.collections[0]);
-      }
-    } catch {
-      // Algväärtused jäävad
-    }
-  }
-
   function handleReplaceDismiss() {
     setReplaceWorkId(null);
     setReplaceWorkTitle(null);
-    setReplaceSearch('');
-    setReplaceResults([]);
-    setReplaceDropdownOpen(false);
   }
 
   // ---------------------------------------------------------------------------
@@ -911,15 +843,13 @@ const Upload: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('step1.title')}</h2>
 
-            {/* Asenda olemasolevat teost */}
-            <div className="mb-6 border border-amber-200 rounded-lg bg-amber-50/60 overflow-hidden">
-              <div className="px-4 py-2.5 bg-amber-100/70 border-b border-amber-200 flex items-center gap-2">
-                <span className="text-xs font-semibold text-amber-900">{t('replaceWork.label')}</span>
-                <span className="text-xs text-amber-600 font-normal">({t('replaceWork.none')})</span>
-              </div>
-              <div className="p-3">
-                {replaceWorkId ? (
-                  /* Valitud olek */
+            {/* Asenda olemasolevat teost — näidatakse ainult kui replaceWorkId on URL parameetritest loetud */}
+            {replaceWorkId && (
+              <div className="mb-6 border border-amber-200 rounded-lg bg-amber-50/60 overflow-hidden">
+                <div className="px-4 py-2.5 bg-amber-100/70 border-b border-amber-200 flex items-center gap-2">
+                  <span className="text-xs font-semibold text-amber-900">{t('replaceWork.label')}</span>
+                </div>
+                <div className="p-3">
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={14} className="text-amber-600 shrink-0" />
                     <span className="text-xs font-medium text-amber-800">{t('replaceWork.selected')}</span>
@@ -933,44 +863,13 @@ const Upload: React.FC = () => {
                       <X size={14} />
                     </button>
                   </div>
-                ) : (
-                  /* Otsinguväli */
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={replaceSearch}
-                      onChange={(e) => handleReplaceSearchChange(e.target.value)}
-                      onFocus={() => replaceSearch.trim() && setReplaceDropdownOpen(true)}
-                      onBlur={() => setTimeout(() => setReplaceDropdownOpen(false), 150)}
-                      placeholder={t('replaceWork.placeholder')}
-                      className="w-full border border-amber-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white placeholder-gray-400"
-                    />
-                    {replaceSearching && (
-                      <Loader2 size={14} className="absolute right-3 top-2.5 text-gray-400 animate-spin" />
-                    )}
-                    {replaceDropdownOpen && replaceResults.length > 0 && (
-                      <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-                        {replaceResults.map((w) => (
-                          <button
-                            key={w.work_id}
-                            type="button"
-                            onMouseDown={() => handleReplaceWorkSelect(w.work_id, w.title)}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0"
-                          >
-                            <span className="font-medium text-gray-800 block truncate">{w.title}</span>
-                            {w.year && <span className="text-xs text-gray-400">{w.year}</span>}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs text-amber-700 mt-2 flex items-start gap-1">
-                  <AlertTriangle size={11} className="shrink-0 mt-0.5" />
-                  {t('replaceWork.warning')}
-                </p>
+                  <p className="text-xs text-amber-700 mt-2 flex items-start gap-1">
+                    <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                    {t('replaceWork.warning')}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Pealkiri */}
             <div className="mb-4">
