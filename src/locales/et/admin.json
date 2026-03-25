@@ -96,6 +96,21 @@
     "createError": "Lisamine ebaõnnestus",
     "createErrorDuplicateId": "ID \"{{id}}\" on juba olemas"
   },
+  "cards": {
+    "registrations": "Taotlused",
+    "users": "Registreerunud kasutajad",
+    "upload": "Laadi üles",
+    "collections": "Kollektsioonid",
+    "changes": "Muudatused",
+    "trash": "Prügikast",
+    "pending": "{{count}} ootel"
+  },
+  "groups": {
+    "users": "Kasutajad",
+    "content": "Sisu",
+    "settings": "Seadistus",
+    "workflow": "Töövoog"
+  },
   "trash": {
     "tab": "Prügikast",
     "title": "Kustutatud teosed",

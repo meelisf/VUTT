@@ -96,6 +96,21 @@
     "createError": "Failed to add",
     "createErrorDuplicateId": "ID \"{{id}}\" already exists"
   },
+  "cards": {
+    "registrations": "Registrations",
+    "users": "Registered users",
+    "upload": "Upload",
+    "collections": "Collections",
+    "changes": "Changes",
+    "trash": "Trash",
+    "pending": "{{count}} pending"
+  },
+  "groups": {
+    "users": "Users",
+    "content": "Content",
+    "settings": "Settings",
+    "workflow": "Workflow"
+  },
   "trash": {
     "tab": "Trash",
     "title": "Deleted works",

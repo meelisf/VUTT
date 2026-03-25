@@ -1,1013 +1,120 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
-import {
-  Users,
-  UserPlus,
-  Check,
-  X,
-  Loader2,
-  Copy,
-  CheckCircle,
-  Clock,
-  Building,
-  Mail,
-  MessageSquare,
-  Trash2,
-  BookUser,
-  Library,
-  RefreshCw,
-  RotateCcw,
-  Image
-} from 'lucide-react';
+import { UserPlus, Users, Upload, Library, History, Trash2 } from 'lucide-react';
 import Header from '../components/Header';
-import CollectionEditor from '../components/CollectionEditor';
-import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
-interface Registration {
-  id: string;
-  name: string;
-  email: string;
-  affiliation: string | null;
-  motivation: string;
-  submitted_at: string;
-  status: 'pending' | 'approved' | 'rejected';
-  reviewed_by: string | null;
-  reviewed_at: string | null;
-}
+const FILE_SERVER = import.meta.env.VITE_FILE_SERVER_URL;
 
-interface InviteResult {
-  invite_url: string;
-  invite_token: string;
-  expires_at: string;
-  email: string;
-  name: string;
-}
-
-interface User {
-  username: string;
-  name: string;
-  email: string;
-  role: 'contributor' | 'editor' | 'admin';
-  created_at: string | null;
+interface AdminCard {
+  key: string;
+  icon: React.ReactNode;
+  group: string;
+  href: string;
+  count?: number;
+  countColor?: string;
 }
 
 const Admin: React.FC = () => {
-  const { t } = useTranslation(['admin', 'common', 'auth']);
-  const { user, authToken, isLoading: userLoading } = useUser();
+  const { t } = useTranslation(['admin', 'common']);
+  const { user, authToken } = useUser();
   const navigate = useNavigate();
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'registrations' | 'users' | 'collections' | 'trash'>('registrations');
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Kinnitamise tulemus (invite link)
-  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  // Töötlemise staatus
-  const [processingId, setProcessingId] = useState<string | null>(null);
-
-  // Kasutajate haldus
-  const [users, setUsers] = useState<User[]>([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [usersError, setUsersError] = useState<string | null>(null);
-  const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-
-  // Prügikast
-  interface DeletedWork {
-    work_id: string;
-    title: string;
-    deleted_at: string | null;
-    deleted_by: string | null;
-    commit_hash: string | null;
-    jpg_count: number;
-  }
-  const [trashItems, setTrashItems] = useState<DeletedWork[]>([]);
-  const [trashLoading, setTrashLoading] = useState(false);
-  const [trashError, setTrashError] = useState<string | null>(null);
-  const [trashLoaded, setTrashLoaded] = useState(false);
-  const [restoringId, setRestoringId] = useState<string | null>(null);
-  const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
-
-  // Isikute register
-  const [peopleCount, setPeopleCount] = useState<number | null>(null);
-  const [peopleRefreshing, setPeopleRefreshing] = useState(false);
-  const [peopleMessage, setPeopleMessage] = useState<string | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Puhasta polling timer unmount'il
   useEffect(() => {
-    return () => {
-      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-    };
-  }, []);
-
-  // Kontrolli ligipääsu
-  useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) {
+    if (!user || user.role !== 'admin') {
       navigate('/');
+      return;
     }
-  }, [user, userLoading, navigate]);
+  }, [user, navigate]);
 
-  // Lae taotlused
   useEffect(() => {
-    if (authToken && user?.role === 'admin') {
-      loadRegistrations();
-    }
-  }, [authToken, user]);
+    if (!authToken) return;
+    fetchWithTimeout(`${FILE_SERVER}/registrations`, {
+      headers: getAuthHeaders(authToken),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const pending = (data || []).filter((r: any) => r.status === 'pending').length;
+        setPendingCount(pending);
+      })
+      .catch(() => {});
+  }, [authToken]);
 
-  // Lae kasutajad kui Users tab on aktiivne
-  useEffect(() => {
-    if (activeTab === 'users' && authToken && user?.role === 'admin' && users.length === 0) {
-      loadUsers();
-    }
-  }, [activeTab, authToken, user]);
+  if (!user || user.role !== 'admin') return null;
 
-  // Lae isikute arv
-  useEffect(() => {
-    if (activeTab === 'users' && authToken && user?.role === 'admin' && peopleCount === null) {
-      loadPeopleCount();
-    }
-  }, [activeTab, authToken, user]);
-
-  // Lae prügikast kui tab on aktiivne
-  useEffect(() => {
-    if (activeTab === 'trash' && authToken && user?.role === 'admin' && !trashLoaded) {
-      loadTrash();
-    }
-  }, [activeTab, authToken, user]);
-
-  const loadRegistrations = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        setRegistrations(data.registrations);
-      } else {
-        setError(data.message || 'Viga taotluste laadimisel');
-      }
-    } catch (e) {
-      console.error('Load registrations error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleApprove = async (regId: string) => {
-    setProcessingId(regId);
-    setInviteResult(null);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          registration_id: regId
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        // Näita invite linki
-        setInviteResult({
-          invite_url: data.invite_url,
-          invite_token: data.invite_token,
-          expires_at: data.expires_at,
-          email: data.email,
-          name: data.name
-        });
-        // Lae nimekiri uuesti
-        await loadRegistrations();
-      } else {
-        setError(data.message || 'Kinnitamine ebaõnnestus');
-      }
-    } catch (e) {
-      console.error('Approve error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleReject = async (regId: string) => {
-    setProcessingId(regId);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          registration_id: regId
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        await loadRegistrations();
-      } else {
-        setError(data.message || 'Tagasilükkamine ebaõnnestus');
-      }
-    } catch (e) {
-      console.error('Reject error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  // =========================================================
-  // PRÜGIKAST
-  // =========================================================
-
-  const loadTrash = async () => {
-    setTrashLoading(true);
-    setTrashError(null);
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/trash`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-      const data = await response.json();
-      if (data.status === 'success') {
-        setTrashItems(data.items);
-        setTrashLoaded(true);
-      } else {
-        setTrashError(t('trash.loadError'));
-      }
-    } catch {
-      setTrashError(t('trash.loadError'));
-    } finally {
-      setTrashLoading(false);
-    }
-  };
-
-  const handleRestore = async (workId: string, title: string) => {
-    setRestoringId(workId);
-    setRestoreMessage(null);
-    try {
-      const response = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/trash/${workId}/restore`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({}),
-          timeout: 30000
-        }
-      );
-      const data = await response.json();
-      if (data.status === 'success') {
-        setRestoreMessage(t('trash.restoreSuccess', { title: data.title || title }));
-        setTrashItems(prev => prev.filter(item => item.work_id !== workId));
-      } else {
-        setRestoreMessage(`${t('trash.restoreError')}: ${data.detail || data.message || t('common:error.unknown')}`);
-      }
-    } catch {
-      setRestoreMessage(t('trash.restoreError'));
-    } finally {
-      setRestoringId(null);
-    }
-  };
-
-  const copyInviteLink = () => {
-    if (inviteResult) {
-      const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
-      navigator.clipboard.writeText(fullUrl);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    }
-  };
-
-  // =========================================================
-  // KASUTAJATE HALDUS
-  // =========================================================
-
-  const loadUsers = async () => {
-    setUsersLoading(true);
-    setUsersError(null);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        setUsers(data.users);
-      } else {
-        setUsersError(data.message || t('users.loadError'));
-      }
-    } catch (e) {
-      console.error('Load users error:', e);
-      setUsersError(t('users.connectionError'));
-    } finally {
-      setUsersLoading(false);
-    }
-  };
-
-  const handleRoleChange = async (username: string, newRole: string) => {
-    setRoleUpdating(username);
-    setUsersError(null);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/update-role`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          username,
-          new_role: newRole
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        // Uuenda kohalikku listi
-        setUsers(users.map(u =>
-          u.username === username
-            ? { ...u, role: newRole as User['role'] }
-            : u
-        ));
-      } else {
-        setUsersError(data.message || t('users.roleChangeError'));
-      }
-    } catch (e) {
-      console.error('Role change error:', e);
-      setUsersError(t('users.connectionError'));
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  const handleDeleteUser = async (username: string) => {
-    setDeleteConfirm(null);
-    setRoleUpdating(username);
-    setUsersError(null);
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          username
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        // Eemalda kohalikust listist
-        setUsers(users.filter(u => u.username !== username));
-      } else {
-        setUsersError(data.message || t('users.deleteError'));
-      }
-    } catch (e) {
-      console.error('Delete user error:', e);
-      setUsersError(t('users.connectionError'));
-    } finally {
-      setRoleUpdating(null);
-    }
-  };
-
-  // =========================================================
-  // ISIKUTE REGISTER
-  // =========================================================
-
-  const loadPeopleCount = async () => {
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/people-register`);
-      const data = await response.json();
-      if (data.status === 'success') {
-        setPeopleCount(data.people?.length ?? 0);
-      }
-    } catch (e) {
-      console.error('Load people count error:', e);
-    }
-  };
-
-  const pollRefreshStatus = async () => {
-    const poll = async () => {
-      try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh-status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({})
-        });
-        const data = await response.json();
-
-        if (data.state === 'done') {
-          setPeopleMessage(t('people.refreshDone', { updated: data.updated, errors: data.errors, total: data.total }));
-          setPeopleRefreshing(false);
-          loadPeopleCount();
-          return;
-        } else if (data.state === 'error') {
-          setPeopleMessage(t('people.refreshError'));
-          setPeopleRefreshing(false);
-          return;
-        }
-        // Veel käib — polli uuesti 3s pärast
-        pollTimerRef.current = setTimeout(poll, 3000);
-      } catch {
-        setPeopleMessage(t('people.refreshError'));
-        setPeopleRefreshing(false);
-      }
-    };
-    // Esimene poll 2s pärast käivitust
-    pollTimerRef.current = setTimeout(poll, 2000);
-  };
-
-  const handlePeopleRefresh = async () => {
-    setPeopleRefreshing(true);
-    setPeopleMessage(t('people.refreshStarted'));
-
-    try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/people-refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({}),
-        timeout: 30000
-      });
-
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        pollRefreshStatus();
-      } else {
-        setPeopleMessage(data.message || t('people.refreshError'));
-        setPeopleRefreshing(false);
-      }
-    } catch (e) {
-      console.error('People refresh error:', e);
-      setPeopleMessage(t('people.refreshError'));
-      setPeopleRefreshing(false);
-    }
-  };
-
-  const formatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString('et-EE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Ootel taotlused
-  const pendingRegistrations = registrations.filter(r => r.status === 'pending');
-  // Käsitletud taotlused
-  const processedRegistrations = registrations.filter(r => r.status !== 'pending');
-
-  if (userLoading || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
-      </div>
-    );
-  }
+  const cards: AdminCard[] = [
+    {
+      key: 'registrations',
+      icon: <UserPlus size={18} className="text-indigo-700" />,
+      group: t('admin:groups.users'),
+      href: '/admin/registrations',
+      count: pendingCount ?? undefined,
+      countColor: 'text-red-600',
+    },
+    {
+      key: 'users',
+      icon: <Users size={18} className="text-blue-600" />,
+      group: t('admin:groups.users'),
+      href: '/admin/users',
+    },
+    {
+      key: 'upload',
+      icon: <Upload size={18} className="text-teal-600" />,
+      group: t('admin:groups.content'),
+      href: '/upload',
+    },
+    {
+      key: 'collections',
+      icon: <Library size={18} className="text-violet-600" />,
+      group: t('admin:groups.settings'),
+      href: '/admin/collections',
+    },
+    {
+      key: 'changes',
+      icon: <History size={18} className="text-amber-600" />,
+      group: t('admin:groups.workflow'),
+      href: '/review',
+    },
+    {
+      key: 'trash',
+      icon: <Trash2 size={18} className="text-rose-600" />,
+      group: t('admin:groups.content'),
+      href: '/admin/trash',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-y-auto">
-      <Header />
-
-      {/* Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4">
-          <nav className="flex gap-4">
-            <button
-              onClick={() => setActiveTab('registrations')}
-              className={`py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === 'registrations'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
+    <div className="min-h-screen bg-gray-50">
+      <Header showSearchButton={false} pageTitle="Admin" />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+          {cards.map(card => (
+            <Link
+              key={card.key}
+              to={card.href}
+              className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
             >
-              <UserPlus size={18} />
-              {t('tabs.registrations')}
-              {pendingRegistrations.length > 0 && (
-                <span className="bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full text-xs">
-                  {pendingRegistrations.length}
+              <div className="flex items-center gap-2 mb-2">
+                {card.icon}
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  {card.group}
                 </span>
+              </div>
+              <p className="font-semibold text-gray-900 text-sm">
+                {t(`admin:cards.${card.key}`)}
+              </p>
+              {card.count !== undefined && card.count > 0 && (
+                <p className={`text-xs font-medium mt-1 ${card.countColor}`}>
+                  {t('admin:cards.pending', { count: card.count })}
+                </p>
               )}
-            </button>
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === 'users'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Users size={18} />
-              {t('tabs.users')}
-            </button>
-            <button
-              onClick={() => setActiveTab('collections')}
-              className={`py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === 'collections'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Library size={18} />
-              {t('collections.tab')}
-            </button>
-            <button
-              onClick={() => setActiveTab('trash')}
-              className={`py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors ${
-                activeTab === 'trash'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Trash2 size={18} />
-              {t('tabs.trash')}
-              {trashItems.length > 0 && (
-                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">
-                  {trashItems.length}
-                </span>
-              )}
-            </button>
-          </nav>
+            </Link>
+          ))}
         </div>
       </div>
-
-      {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 pb-20">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('title')}</h1>
-
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
-          </div>
-        )}
-
-        {/* Invite link modal */}
-        {inviteResult && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-start gap-3">
-              <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-medium text-green-800">{t('registrations.inviteLinkGenerated')}</h3>
-                <p className="text-sm text-green-700 mt-1">
-                  {inviteResult.name} ({inviteResult.email})
-                </p>
-                <div className="mt-3 flex items-center gap-2">
-                  <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
-                    {window.location.origin}{inviteResult.invite_url}
-                  </code>
-                  <button
-                    onClick={copyInviteLink}
-                    className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1"
-                  >
-                    {linkCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
-                    {linkCopied ? t('registrations.linkCopied') : t('registrations.copyLink')}
-                  </button>
-                  <a
-                    href={(() => {
-                      const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
-                      const subject = encodeURIComponent('VUTT – konto aktiveerimise link');
-                      const body = encodeURIComponent(
-                        `Tere ${inviteResult.name},\n\n` +
-                        `Teie juurdepääsutaotlus VUTT platvormile on kinnitatud.\n\n` +
-                        `Palun seadistage oma parool alloleva lingi kaudu (link kehtib 48 tundi):\n` +
-                        `${fullUrl}\n\n` +
-                        `Lugupidamisega,\nVUTT meeskonna nimel`
-                      );
-                      return `mailto:${inviteResult.email}?subject=${subject}&body=${body}`;
-                    })()}
-                    className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
-                  >
-                    <Mail size={16} />
-                    {t('registrations.sendEmail')}
-                  </a>
-                </div>
-                <p className="text-xs text-green-600 mt-2">
-                  Aegub: {formatDate(inviteResult.expires_at)}
-                </p>
-              </div>
-              <button
-                onClick={() => setInviteResult(null)}
-                className="text-green-600 hover:text-green-800"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'registrations' && (
-          <div className="space-y-6">
-            {/* Ootel taotlused */}
-            <section>
-              <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <Clock size={20} className="text-amber-500" />
-                {t('registrations.title')} ({pendingRegistrations.length})
-              </h2>
-
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
-                </div>
-              ) : pendingRegistrations.length === 0 ? (
-                <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-                  {t('registrations.empty')}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {pendingRegistrations.map((reg) => (
-                    <div key={reg.id} className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900 text-lg">{reg.name}</h3>
-                          <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                            <span className="flex items-center gap-1">
-                              <Mail size={14} />
-                              {reg.email}
-                            </span>
-                            {reg.affiliation && (
-                              <span className="flex items-center gap-1">
-                                <Building size={14} />
-                                {reg.affiliation}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock size={14} />
-                              {formatDate(reg.submitted_at)}
-                            </span>
-                          </div>
-                          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                            <div className="flex items-start gap-2">
-                              <MessageSquare size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                              <p className="text-sm text-gray-700">{reg.motivation}</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => handleApprove(reg.id)}
-                            disabled={processingId === reg.id}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-green-400 transition-colors flex items-center gap-1"
-                          >
-                            {processingId === reg.id ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <Check size={16} />
-                            )}
-                            {t('registrations.approve')}
-                          </button>
-                          <button
-                            onClick={() => handleReject(reg.id)}
-                            disabled={processingId === reg.id}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-400 transition-colors flex items-center gap-1"
-                          >
-                            {processingId === reg.id ? (
-                              <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                              <X size={16} />
-                            )}
-                            {t('registrations.reject')}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* Käsitletud taotlused */}
-            {processedRegistrations.length > 0 && (
-              <section>
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                  Käsitletud taotlused ({processedRegistrations.length})
-                </h2>
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.name')}</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.email')}</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.submitted')}</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Staatus</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {processedRegistrations.map((reg) => (
-                        <tr key={reg.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm text-gray-900">{reg.name}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{reg.email}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{formatDate(reg.submitted_at)}</td>
-                          <td className="px-4 py-3">
-                            {reg.status === 'approved' ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                                <Check size={12} />
-                                {t('registrations.approved')}
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                                <X size={12} />
-                                {t('registrations.rejected')}
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'users' && (
-          <div className="space-y-8">
-          <section>
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <Users size={20} className="text-primary-600" />
-              {t('users.title')} ({users.length})
-            </h2>
-
-            {usersError && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                {usersError}
-              </div>
-            )}
-
-            {usersLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary-600" />
-              </div>
-            ) : users.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-500">
-                {t('users.empty')}
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.name')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.username')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.email')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.role')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.created')}</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">{t('users.actions')}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {users.map((u) => {
-                      const isCurrentUser = u.username === user?.username;
-                      const isProcessing = roleUpdating === u.username;
-
-                      return (
-                        <tr key={u.username} className={`hover:bg-gray-50 ${isCurrentUser ? 'bg-primary-50' : ''}`}>
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            <div className="flex items-center gap-2">
-                              {u.name}
-                              {isCurrentUser && (
-                                <span className="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
-                                  {t('users.you')}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 font-mono">{u.username}</td>
-                          <td className="px-4 py-3 text-sm text-gray-600">{u.email || '-'}</td>
-                          <td className="px-4 py-3 text-sm">
-                            {isCurrentUser ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                                {t(`common:roles.${u.role}`)}
-                              </span>
-                            ) : (
-                              <select
-                                value={u.role}
-                                onChange={(e) => handleRoleChange(u.username, e.target.value)}
-                                disabled={isProcessing}
-                                className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                              >
-                                <option value="contributor">{t('common:roles.contributor')}</option>
-                                <option value="editor">{t('common:roles.editor')}</option>
-                                <option value="admin">{t('common:roles.admin')}</option>
-                              </select>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {u.created_at ? formatDate(u.created_at) : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right">
-                            {isCurrentUser ? (
-                              <span className="text-gray-400">-</span>
-                            ) : deleteConfirm === u.username ? (
-                              <div className="flex items-center justify-end gap-2">
-                                <span className="text-xs text-red-600">{t('users.confirmDelete')}</span>
-                                <button
-                                  onClick={() => handleDeleteUser(u.username)}
-                                  disabled={isProcessing}
-                                  className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
-                                >
-                                  {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
-                                </button>
-                                <button
-                                  onClick={() => setDeleteConfirm(null)}
-                                  disabled={isProcessing}
-                                  className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400 disabled:opacity-50"
-                                >
-                                  {t('users.no')}
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                onClick={() => setDeleteConfirm(u.username)}
-                                disabled={isProcessing}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
-                                title={t('users.delete')}
-                              >
-                                {isProcessing ? (
-                                  <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                  <Trash2 size={16} />
-                                )}
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* Isikute register */}
-          <section>
-            <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <BookUser size={20} className="text-primary-600" />
-              {t('people.title')}
-            </h2>
-            <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
-                  {t('people.count')}: {peopleCount !== null ? (
-                    <span className="font-medium text-gray-900">{peopleCount}</span>
-                  ) : (
-                    <Loader2 size={14} className="inline animate-spin" />
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {peopleMessage && (
-                    <span className="text-sm text-green-600">{peopleMessage}</span>
-                  )}
-                  <button
-                    onClick={handlePeopleRefresh}
-                    disabled={peopleRefreshing}
-                    className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-primary-400 transition-colors flex items-center gap-2 text-sm"
-                  >
-                    {peopleRefreshing ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={16} />
-                    )}
-                    {t('people.refreshAliases')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </section>
-          </div>
-        )}
-
-        {/* KOLLEKTSIOONID TAB */}
-        {activeTab === 'collections' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <CollectionEditor />
-          </div>
-        )}
-
-        {/* PRÜGIKAST TAB */}
-        {activeTab === 'trash' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Trash2 size={20} className="text-gray-500" />
-                {t('trash.title')}
-              </h2>
-              <button
-                onClick={() => { setTrashLoaded(false); loadTrash(); }}
-                disabled={trashLoading}
-                className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
-              >
-                {trashLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                {t('trash.load')}
-              </button>
-            </div>
-
-            {restoreMessage && (
-              <div className={`p-3 rounded-lg text-sm border ${
-                restoreMessage.includes(t('trash.restoreError').split(':')[0])
-                  ? 'bg-red-50 border-red-200 text-red-700'
-                  : 'bg-green-50 border-green-200 text-green-700'
-              }`}>
-                {restoreMessage}
-              </div>
-            )}
-
-            {trashError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {trashError}
-              </div>
-            )}
-
-            {trashLoading && (
-              <div className="flex items-center gap-2 text-gray-500 py-8 justify-center">
-                <Loader2 size={20} className="animate-spin" />
-              </div>
-            )}
-
-            {!trashLoading && trashLoaded && trashItems.length === 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400">
-                {t('trash.empty')}
-              </div>
-            )}
-
-            {trashItems.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('common:labels.title')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('trash.deletedAt')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('trash.deletedBy')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600"></th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-600"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200">
-                    {trashItems.map(item => (
-                      <tr key={item.work_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900">{item.title}</div>
-                          <div className="text-xs text-gray-400 font-mono">{item.work_id}</div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {item.deleted_at
-                            ? new Date(item.deleted_at).toLocaleString('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                            : t('trash.unknownDate')}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {item.deleted_by || t('trash.unknownUser')}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <Image size={12} />
-                            {t('trash.jpgCount', { count: item.jpg_count })}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleRestore(item.work_id, item.title)}
-                            disabled={restoringId === item.work_id}
-                            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1 ml-auto"
-                          >
-                            {restoringId === item.work_id
-                              ? <><Loader2 size={12} className="animate-spin" />{t('trash.restoring')}</>
-                              : <><RotateCcw size={12} />{t('trash.restore')}</>
-                            }
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
-
-
-      </main>
     </div>
   );
 };
