@@ -1192,9 +1192,8 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
                 old_tracked.append(fname)
                 fpath = os.path.join(work_dir, fname)
                 if os.path.exists(fpath):
-                    os.remove(fpath)
+                    repo.git.rm(os.path.join(slug, fname))
         if old_tracked:
-            repo.git.add('-u', slug)
             logger.info(f"replace {upload_id}: git rm {len(old_tracked)} vana faili")
     except Exception as e:
         logger.warning(f"replace {upload_id}: git rm viga: {e}")
@@ -1279,7 +1278,9 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
                 metadata_updates,
                 username,
                 "Uuenda metadata asendusel",
+                background_tasks=background_tasks,
                 sync_meili=False,
+                call_ptw=False,
             )
             logger.info(f"replace {upload_id}: metadata uuendatud")
         except Exception as e:
