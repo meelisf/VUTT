@@ -277,7 +277,7 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
         # Kui faili ajalugu on olemas, pole esimene commit
         list(repo.iter_commits(paths=relative_path, max_count=1))
         is_first_commit = False
-    except:
+    except Exception:
         is_first_commit = True
 
     # Kirjuta põhifail
@@ -347,7 +347,7 @@ def get_file_git_history(paths, max_count=50):
 
     try:
         commits = list(repo.iter_commits(paths=paths, max_count=max_count))
-    except:
+    except Exception:
         return []
 
     if not commits:
@@ -625,7 +625,7 @@ def get_recent_commits(username=None, limit=50, skip=0):
         # Võtame piisavalt commiteid, arvestades skip + limit + puhver filtreerimiseks
         max_commits = (skip + limit) * 3 + 50
         all_commits = list(repo.iter_commits(max_count=max_commits))
-    except:
+    except Exception:
         return {"commits": [], "has_more": False}
 
     results = []

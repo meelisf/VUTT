@@ -169,7 +169,7 @@ def find_directory_by_id(target_id):
                             slug = meta.get('slug')
                             if slug == target_id:
                                 return entry.path
-                    except:
+                    except Exception:
                         pass
 
                 # 4. Kontrolli kausta nime (sanitiseeritult)

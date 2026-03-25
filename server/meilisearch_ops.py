@@ -84,7 +84,7 @@ def load_people_aliases():
         try:
             with open(PEOPLE_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {}
 
@@ -95,7 +95,7 @@ def load_labels_store():
         try:
             with open(LABELS_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {}
 
@@ -157,7 +157,7 @@ def load_collections():
         try:
             with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {}
 
@@ -383,7 +383,7 @@ def sync_work_to_meilisearch(dir_name):
             try:
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     page_text = f.read()
-            except:
+            except Exception:
                 pass
 
         # Lehekülje meta (status, tags, comments)
@@ -408,7 +408,7 @@ def sync_work_to_meilisearch(dir_name):
                     # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
                     if not page_text and 'text_content' in p_data:
                         page_text = p_data['text_content']
-            except:
+            except Exception:
                 pass
 
         page_statuses.append(page_meta['status'])

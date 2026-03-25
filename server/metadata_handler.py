@@ -31,7 +31,7 @@ def build_meta_html(work_id: str) -> str:
                     year = meta.get('year', '')
                     if creators:
                         description = f"Autor(id): {creators}. {year}"
-            except:
+            except Exception:
                 pass
 
         # Kasutame spetsiaalset thumbnaili otspunkti, mis genereerib väikese pildi
