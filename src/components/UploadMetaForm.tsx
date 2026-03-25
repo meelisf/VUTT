@@ -246,7 +246,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           <div className="flex items-start gap-2 p-2 bg-amber-100 border border-amber-300 rounded-lg text-xs">
             <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
             <span className="text-amber-800">
-              {t('replaceWork.selected', 'Asendatav teos:')}{' '}
+              {t('replaceWork.selected')}{' '}
               <span className="font-semibold">{replaceWorkTitle}</span>
             </span>
           </div>

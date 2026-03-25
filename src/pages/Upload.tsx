@@ -273,6 +273,13 @@ const Upload: React.FC = () => {
   }, [slug, year]);
 
   // ---------------------------------------------------------------------------
+  // Puhasta debounce timer unmount korral
+  // ---------------------------------------------------------------------------
+  useEffect(() => () => {
+    if (replaceDebounceRef.current) clearTimeout(replaceDebounceRef.current);
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Asenda olemasolevat teost — debounce otsing
   // ---------------------------------------------------------------------------
   function handleReplaceSearchChange(q: string) {
