@@ -101,6 +101,9 @@
     "managePageHint": "Lehekülgede järjestus, lisamine ja kustutamine.",
     "tabPages": "Leheküljed",
     "tabTrash": "Prügikast",
+    "tabs": {
+      "replace": "Asenda leheküljed"
+    },
     "trash": {
       "load": "Lae kustutatud lehed",
       "empty": "Kustutatud lehekülgi pole",

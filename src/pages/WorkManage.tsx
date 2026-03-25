@@ -15,6 +15,7 @@ import {
   ChevronDown,
   Download,
   Upload,
+  RefreshCw,
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
@@ -39,7 +40,7 @@ interface DeletedPage {
   commit_hash: string | null;
 }
 
-type ActiveTab = 'pages' | 'trash';
+type ActiveTab = 'pages' | 'trash' | 'replace';
 
 const WorkManage: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common']);
@@ -480,6 +481,17 @@ const WorkManage: React.FC = () => {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('replace')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'replace'
+                ? 'border-primary-600 text-primary-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <RefreshCw size={14} />
+            {t('manage.tabs.replace', 'Asenda leheküljed')}
+          </button>
         </div>
 
         {/* TAB: Leheküljed */}
@@ -878,6 +890,36 @@ const WorkManage: React.FC = () => {
           </div>
         </div>
           </>
+        )}
+
+        {/* TAB: Asenda leheküljed */}
+        {activeTab === 'replace' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-gray-100">
+              <RefreshCw size={16} className="text-gray-500" />
+              <h2 className="font-semibold text-gray-800">{t('manage.tabs.replace', 'Asenda leheküljed')}</h2>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Lae üles uus skänn, mis asendab kõik olemasolevad leheküljed. Metaandmed säilitatakse.
+              </p>
+              <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">
+                  Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.
+                </p>
+              </div>
+              <button
+                onClick={() =>
+                  navigate(`/upload?replaceWorkId=${workId}&replaceWorkTitle=${encodeURIComponent(workTitle || workId || '')}`)
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Upload size={15} />
+                Ava üleslaadimise viisard
+              </button>
+            </div>
+          </div>
         )}
 
       </div>

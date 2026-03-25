@@ -87,10 +87,8 @@
   },
   "replaceWork": {
     "label": "Replace existing work",
-    "placeholder": "Search for a work...",
     "warning": "Replacement will delete all existing pages and replace them with new ones.",
     "selected": "Work to replace:",
-    "none": "New work (no replacement)",
     "replaceBtn": "Replace: {{title}}"
   },
   "status": {
