@@ -526,6 +526,7 @@ def create_meilisearch_data_per_page():
                 'type_et': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'et'),
                 'type_en': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'en'),
                 'type_object': doc_metadata.get('type'),
+                'type_ids': get_all_ids(doc_metadata.get('type')),
                 
                 'genre': get_label(doc_metadata.get('genre')), # Vaikimisi (et)
                 'genre_et': get_labels_by_lang(doc_metadata.get('genre'), 'et'),
