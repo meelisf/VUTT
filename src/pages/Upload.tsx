@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Upload as UploadIcon,
   ChevronLeft,
@@ -192,6 +192,7 @@ const Upload: React.FC = () => {
   const { user, authToken, isLoading: authLoading } = useUser();
   const { collections } = useCollection();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const lang = getLangCode(i18n.language);
 
   // --- Samm ja upload olek ---
@@ -248,6 +249,18 @@ const Upload: React.FC = () => {
     if (authLoading) return;
     if (!user || user.role !== 'admin') navigate('/');
   }, [user, navigate, authLoading]);
+
+  // ---------------------------------------------------------------------------
+  // Loe replaceWorkId ja replaceWorkTitle URL parameetritest
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const rid = searchParams.get('replaceWorkId');
+    const rtitle = searchParams.get('replaceWorkTitle');
+    if (rid && rtitle) {
+      setReplaceWorkId(rid);
+      setReplaceWorkTitle(rtitle);
+    }
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Laadi pooleliolevad üleslaadimised

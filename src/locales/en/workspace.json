@@ -101,6 +101,9 @@
     "managePageHint": "Page order, adding and deletion.",
     "tabPages": "Pages",
     "tabTrash": "Trash",
+    "tabs": {
+      "replace": "Replace pages"
+    },
     "trash": {
       "load": "Load deleted pages",
       "empty": "No deleted pages",
