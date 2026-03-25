@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { useUser } from '../contexts/UserContext';
 
 interface SuggestionItem {
   label: string;
@@ -20,6 +21,7 @@ export function useMetadataSuggestions(
   lang: string,
   field: 'genres' | 'tags'
 ): { suggestions: SuggestionItem[]; isLoadingSuggestions: boolean } {
+  const { authToken } = useUser();
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([]);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
 
@@ -30,10 +32,9 @@ export function useMetadataSuggestions(
     const load = async () => {
       setIsLoadingSuggestions(true);
       try {
-        const token = localStorage.getItem('vutt_token');
         const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify({ lang })
         });
         const result = await response.json();
@@ -49,7 +50,7 @@ export function useMetadataSuggestions(
 
     load();
     return () => { cancelled = true; };
-  }, [isOpen, lang, field]);
+  }, [isOpen, lang, field, authToken]);
 
   return { suggestions, isLoadingSuggestions };
 }

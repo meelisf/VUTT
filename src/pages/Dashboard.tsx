@@ -31,7 +31,7 @@ const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user } = useUser();
+  const { user, authToken } = useUser();
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -405,10 +405,9 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
-      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
           work_ids: Array.from(selectedWorkIds),
           // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
@@ -443,10 +442,9 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
-      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
           work_ids: Array.from(selectedWorkIds),
           tags,
@@ -478,10 +476,9 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
-      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({
           work_ids: Array.from(selectedWorkIds),
           genre,

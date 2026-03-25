@@ -7,6 +7,7 @@ import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { getLangCode } from '../utils/getLangCode';
 import { useMetadataSuggestions } from '../hooks/useMetadataSuggestions';
+import { useUser } from '../contexts/UserContext';
 
 interface BulkTagsPickerProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
   selectedCount
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common']);
+  const { authToken } = useUser();
   const lang = getLangCode(i18n.language);
 
   const [selectedTags, setSelectedTags] = useState<LinkedEntity[]>([]);
@@ -180,7 +182,7 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
                 lang={lang}
                 localSuggestions={suggestions}
                 showPersonToggle
-                token={localStorage.getItem('vutt_token') ?? undefined}
+                token={authToken ?? undefined}
               />
             )}
           </div>

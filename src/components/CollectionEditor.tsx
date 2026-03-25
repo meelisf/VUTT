@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, Loader2, Plus, Trash2, ChevronUp } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
+import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -57,6 +58,7 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
 
 const CollectionEditor: React.FC = () => {
   const { t } = useTranslation('admin');
+  const { authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
 
   // --- Kirjelduse muutmine ---
@@ -115,7 +117,6 @@ const CollectionEditor: React.FC = () => {
     setEditColor(col.color || 'indigo');
   }, [selectedId, collections]);
 
-  const token = localStorage.getItem('vutt_token');
 
   const handleSave = async () => {
     if (!selectedId) return;
@@ -127,7 +128,7 @@ const CollectionEditor: React.FC = () => {
         `${FILE_API_URL}/admin/collections/${selectedId}`,
         {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify({
             description: { et: descEt.trim(), en: descEn.trim() },
             description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
@@ -160,7 +161,7 @@ const CollectionEditor: React.FC = () => {
     try {
       const res = await fetchWithTimeout(
         `${FILE_API_URL}/admin/collections/${selectedId}/works-count`,
-        { headers: getAuthHeaders(token), timeout: 10000 }
+        { headers: getAuthHeaders(authToken), timeout: 10000 }
       );
       const data = await res.json();
       if (data.status === 'success') setDeleteWorksCount(data.count);
@@ -176,7 +177,7 @@ const CollectionEditor: React.FC = () => {
     try {
       const res = await fetchWithTimeout(
         `${FILE_API_URL}/admin/collections/${selectedId}`,
-        { method: 'DELETE', headers: getAuthHeaders(token), timeout: 30000 }
+        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 30000 }
       );
       const data = await res.json();
       if (data.status === 'success') {
@@ -211,7 +212,7 @@ const CollectionEditor: React.FC = () => {
         `${FILE_API_URL}/admin/collections`,
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
           body: JSON.stringify({
             id: newId.trim(),
             name_et: newNameEt.trim(),
