@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown, ExternalLink } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
 import { Creator, CreatorRole, Page, Work } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
@@ -703,12 +704,21 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 {metaForm.tags.map((tag, idx) => {
                   const tagObj = typeof tag !== 'string' ? tag as any : null;
                   const url = tagObj ? getEntityUrl(tagObj.id, tagObj.source) : null;
+                  const isPerson = tagObj?.entity_type === 'person' || tagObj?.id?.startsWith('vutt:P');
+                  const personId = isPerson && tagObj?.id?.startsWith('vutt:P') ? tagObj.id : null;
                   return (
                     <span key={idx} className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border ${
-                      tagObj?.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-100 border-gray-200 text-gray-700'
+                      isPerson ? 'bg-primary-50 border-primary-200 text-primary-700'
+                      : tagObj?.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                      : 'bg-gray-100 border-gray-200 text-gray-700'
                     }`}>
                       {getLabel(tag, lang)}
-                      {url && (
+                      {personId && (
+                        <Link to={`/persons/${personId}`} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title="Vaata isiku lehte" onClick={e => e.stopPropagation()}>
+                          <UserRound size={10} />
+                        </Link>
+                      )}
+                      {!personId && url && (
                         <a href={url} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title={tagObj?.id || ''} onClick={e => e.stopPropagation()}>
                           <ExternalLink size={10} />
                         </a>
