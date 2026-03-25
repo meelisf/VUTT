@@ -297,6 +297,13 @@ const Upload: React.FC = () => {
             slug: fetchedSlug,
             collections: fetchedCollection ? [fetchedCollection] : [],
             replace_work_id: rid,
+            creators: meta.creators || [],
+            genre: meta.genre || null,
+            type: meta.type || null,
+            tags: meta.tags || [],
+            location: meta.location || null,
+            publisher: meta.publisher || null,
+            languages: meta.languages || [],
           }),
         });
         const createData = await createRes.json();
