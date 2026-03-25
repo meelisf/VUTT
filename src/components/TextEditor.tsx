@@ -100,7 +100,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const lang = getLangCode(i18n.language);
-  const [activeTab, setActiveTab] = useState<TabType>('edit');
+  const [activeTab, setActiveTab] = useState<TabType>(
+    () => (localStorage.getItem('vutt_workspace_default_tab') as TabType) ?? 'edit'
+  );
 
   // Redaktori sisu muudatuste jälgimine
   const [isDirty, setIsDirty] = useState(false);
