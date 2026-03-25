@@ -216,6 +216,8 @@ const Upload: React.FC = () => {
   // --- Asenda olemasolevat teost ---
   const [replaceWorkId, setReplaceWorkId] = useState<string | null>(null);
   const [replaceWorkTitle, setReplaceWorkTitle] = useState<string | null>(null);
+  const [autoCreateLoading, setAutoCreateLoading] = useState(false);
+  const [autoCreateError, setAutoCreateError] = useState('');
 
   // --- Samm 2 ---
   const [dragging, setDragging] = useState(false);
@@ -245,16 +247,73 @@ const Upload: React.FC = () => {
   }, [user, navigate, authLoading]);
 
   // ---------------------------------------------------------------------------
-  // Loe replaceWorkId ja replaceWorkTitle URL parameetritest
+  // Loe replaceWorkId URL parameetritest ja loo upload automaatselt (samm 1 vahelejätmine)
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const rid = searchParams.get('replaceWorkId');
     const rtitle = searchParams.get('replaceWorkTitle');
-    if (rid && rtitle) {
-      setReplaceWorkId(rid);
-      setReplaceWorkTitle(rtitle);
-    }
-  }, []);
+    if (!rid) return;
+
+    setReplaceWorkId(rid);
+    setReplaceWorkTitle(rtitle);
+
+    // Oota kuni authToken on saadaval (auth võib olla laadimises)
+    if (!authToken) return;
+
+    setAutoCreateLoading(true);
+    setAutoCreateError('');
+
+    (async () => {
+      try {
+        // 1. Lae teose metaandmed
+        const metaRes = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/work/${rid}/metadata`,
+          { headers: getAuthHeaders(authToken) }
+        );
+        if (!metaRes.ok) throw new Error(`Metaandmete laadimine ebaõnnestus (HTTP ${metaRes.status})`);
+        const meta = await metaRes.json();
+
+        const fetchedTitle: string = meta.title || '';
+        const fetchedYear: string = meta.year ? String(meta.year) : '';
+        const fetchedSlug: string = meta.slug || sanitizeSlug((fetchedYear ? fetchedYear + '-' : '') + fetchedTitle);
+        const fetchedCollection: string = Array.isArray(meta.collections) && meta.collections.length > 0
+          ? meta.collections[0]
+          : '';
+
+        // Täida vormiväljad juhuks kui auto-loomine ebaõnnestub
+        setTitle(fetchedTitle);
+        setYear(fetchedYear);
+        setSlug(fetchedSlug);
+        setSlugManual(true);
+        if (fetchedCollection) setSelectedCollection(fetchedCollection);
+
+        // 2. Loo upload staging automaatselt
+        const createRes = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({
+            title: fetchedTitle,
+            year: fetchedYear,
+            slug: fetchedSlug,
+            collections: fetchedCollection ? [fetchedCollection] : [],
+            replace_work_id: rid,
+          }),
+        });
+        const createData = await createRes.json();
+        if (!createRes.ok) {
+          throw new Error(createData.message || `Upload loomine ebaõnnestus (HTTP ${createRes.status})`);
+        }
+
+        // 3. Eduka loomise korral hüppa samm 2-sse
+        setUploadId(createData.upload.id);
+        setStep(2);
+      } catch (e: any) {
+        setAutoCreateError(e.message || 'Viga uploadi automaatsel loomisel');
+      } finally {
+        setAutoCreateLoading(false);
+      }
+    })();
+  }, [authToken]);
 
   // ---------------------------------------------------------------------------
   // Laadi pooleliolevad üleslaadimised
@@ -843,8 +902,23 @@ const Upload: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('step1.title')}</h2>
 
+            {/* Automaatne laadimine — replace mode, loome uploadi ilma kasutaja sekkumiseta */}
+            {autoCreateLoading && (
+              <div className="flex items-center gap-3 py-8 justify-center text-gray-500">
+                <Loader2 size={20} className="animate-spin text-primary-600" />
+                <span className="text-sm">Laen...</span>
+              </div>
+            )}
+
+            {/* Automaatse loomise viga — näita vormi eeltäidetult */}
+            {!autoCreateLoading && autoCreateError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {autoCreateError}
+              </div>
+            )}
+
             {/* Asenda olemasolevat teost — näidatakse ainult kui replaceWorkId on URL parameetritest loetud */}
-            {replaceWorkId && (
+            {!autoCreateLoading && replaceWorkId && (
               <div className="mb-6 border border-amber-200 rounded-lg bg-amber-50/60 overflow-hidden">
                 <div className="px-4 py-2.5 bg-amber-100/70 border-b border-amber-200 flex items-center gap-2">
                   <span className="text-xs font-semibold text-amber-900">{t('replaceWork.label')}</span>
@@ -871,85 +945,90 @@ const Upload: React.FC = () => {
               </div>
             )}
 
-            {/* Pealkiri */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('step1.titleLabel')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder={t('step1.titlePlaceholder')}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
+            {/* Vormi sisu — peidetud auto-loomise ajal */}
+            {!autoCreateLoading && (
+              <>
+                {/* Pealkiri */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('step1.titleLabel')} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder={t('step1.titlePlaceholder')}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
 
-            {/* Aasta */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('step1.yearLabel')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                placeholder={t('step1.yearPlaceholder')}
-                min={1200}
-                max={1800}
-                className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-400 mt-1">{t('step1.yearHint')}</p>
-            </div>
+                {/* Aasta */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('step1.yearLabel')} <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    placeholder={t('step1.yearPlaceholder')}
+                    min={1200}
+                    max={1800}
+                    className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">{t('step1.yearHint')}</p>
+                </div>
 
-            {/* Slug — automaatne, nähtav ainult vihjena */}
-            {slug ? (
-              <p className="text-xs text-gray-400 mb-4 font-mono">
-                data/{slug}/
-              </p>
-            ) : null}
+                {/* Slug — automaatne, nähtav ainult vihjena */}
+                {slug ? (
+                  <p className="text-xs text-gray-400 mb-4 font-mono">
+                    data/{slug}/
+                  </p>
+                ) : null}
 
-            {/* Kollektsioon */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {t('step1.collectionLabel')}
-              </label>
-              <select
-                value={selectedCollection}
-                onChange={(e) => setSelectedCollection(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
-              >
-                <option value="">{t('step1.collectionNone')}</option>
-                {collectionList.map(([id, col]) => (
-                  <option key={id} value={id}>
-                    {typeof col.name === 'object'
-                      ? (col.name[lang] ?? col.name['et'] ?? id)
-                      : String(col.name)}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {/* Kollektsioon */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('step1.collectionLabel')}
+                  </label>
+                  <select
+                    value={selectedCollection}
+                    onChange={(e) => setSelectedCollection(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
+                  >
+                    <option value="">{t('step1.collectionNone')}</option>
+                    {collectionList.map(([id, col]) => (
+                      <option key={id} value={id}>
+                        {typeof col.name === 'object'
+                          ? (col.name[lang] ?? col.name['et'] ?? id)
+                          : String(col.name)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Vea teade */}
-            {step1Error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {step1Error}
-              </div>
+                {/* Vea teade */}
+                {step1Error && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                    {step1Error}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleStep1Submit}
+                  disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading}
+                  className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+                >
+                  {step1Loading ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : null}
+                  {t('step1.continue')}
+                </button>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  ⏱ {t('step1.timeEstimate')}
+                </p>
+              </>
             )}
-
-            <button
-              onClick={handleStep1Submit}
-              disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading}
-              className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-            >
-              {step1Loading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : null}
-              {t('step1.continue')}
-            </button>
-            <p className="text-xs text-gray-400 text-center mt-2">
-              ⏱ {t('step1.timeEstimate')}
-            </p>
           </div>
         )}
 
