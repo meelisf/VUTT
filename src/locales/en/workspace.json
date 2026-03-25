@@ -52,6 +52,10 @@
     "adminOnly": "Version restoration is only available to administrators.",
     "restoreHint": "Restoring will load the selected version into the editor. Press \"Save\" to apply changes."
   },
+  "saveError": {
+    "notLoggedIn": "You must be logged in to save.",
+    "tokenMissing": "You must be logged in to save. Please log out and log in again."
+  },
   "management": {
     "title": "Work management",
     "deleteWork": "Delete work",

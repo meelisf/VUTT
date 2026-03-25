@@ -65,8 +65,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       throw e;
     }
     console.error("Failed to save to file system:", e);
-    alert(`Hoiatus: ${e.message || 'Failisüsteemi kirjutamine ebaõnnestus.'}`);
-    return false;
+    throw new Error(`Salvestamine ebaõnnestus: ${e.message || 'Failisüsteemi kirjutamine ebaõnnestus.'}`);
   }
 };
 

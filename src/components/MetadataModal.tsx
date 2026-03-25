@@ -10,6 +10,7 @@ import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
+import { ErrorBanner } from './ErrorBanner';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -172,6 +173,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [peopleRegister, setPeopleRegister] = useState<PeopleRegisterEntry[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Lae andmed kui modal avatakse
   useEffect(() => {
@@ -416,12 +418,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         }, 1500);
       } else {
         setSaveStatus('error');
-        alert('Viga salvestamisel: ' + data.message);
+        setSaveError('Viga salvestamisel: ' + data.message);
       }
     } catch (e) {
       console.error("Metadata save failed", e);
       setSaveStatus('error');
-      alert('Serveri viga andmete salvestamisel.');
+      setSaveError('Serveri viga andmete salvestamisel.');
     } finally {
       setIsSaving(false);
     }
@@ -793,6 +795,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             {suggestions.printers.map((p, i) => <option key={i} value={p.label} />)}
           </datalist>
         </div>
+        {saveError && (
+          <div className="px-4 pt-3 shrink-0">
+            <ErrorBanner
+              message={saveError}
+              onClose={() => setSaveError(null)}
+            />
+          </div>
+        )}
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-end gap-2 shrink-0">
           <button
             onClick={onClose}

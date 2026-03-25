@@ -52,6 +52,10 @@
     "adminOnly": "Varukoopiate taastamine on saadaval ainult administraatoritele.",
     "restoreHint": "Taastamine laeb valitud versiooni teksti redaktorisse. Muudatuste salvestamiseks vajuta \"Salvesta\"."
   },
+  "saveError": {
+    "notLoggedIn": "Salvestamiseks pead olema sisse logitud.",
+    "tokenMissing": "Salvestamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse."
+  },
   "management": {
     "title": "Teose haldus",
     "deleteWork": "Kustuta teos",

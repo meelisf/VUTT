@@ -18,6 +18,7 @@ import UserMenu from '../components/UserMenu';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { getLabel } from '../utils/metadataUtils';
+import { ErrorBanner } from '../components/ErrorBanner';
 
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
@@ -31,6 +32,7 @@ const Workspace: React.FC = () => {
   const [work, setWork] = useState<Work | undefined>(undefined);
   const [editorChanges, setEditorChanges] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleCopyPermalink = () => {
     if (!workId) return;
@@ -171,12 +173,12 @@ const Workspace: React.FC = () => {
   const handleSave = async (updatedPage: Page) => {
     // Kontrolli, kas kasutaja on sisse logitud
     if (!user) {
-      alert('Salvestamiseks pead olema sisse logitud.');
+      setSaveError(t('saveError.notLoggedIn'));
       return;
     }
     // Kontrolli autentimistõendit
     if (!authToken) {
-      alert('Salvestamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse.');
+      setSaveError(t('saveError.tokenMissing'));
       return;
     }
 
@@ -458,6 +460,12 @@ const Workspace: React.FC = () => {
           <LanguageSwitcher />
         </div>
       </div>
+
+      {saveError && (
+        <div className="hidden md:block px-4 py-2 shrink-0 z-40">
+          <ErrorBanner message={saveError} onClose={() => setSaveError(null)} />
+        </div>
+      )}
 
       {/* Split View Content (desktop only) */}
       <div className="hidden md:flex flex-1 flex-row overflow-hidden relative z-0">

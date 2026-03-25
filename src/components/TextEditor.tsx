@@ -12,6 +12,7 @@ import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { FILE_API_URL } from '../config';
+import { ErrorBanner } from './ErrorBanner';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
@@ -110,6 +111,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [comments, setComments] = useState<Annotation[]>(page.comments);
   const [page_tags, setPageTags] = useState<(string | LinkedEntity)[]>(page.page_tags || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Re-OCR state
   type ReocrStatus = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
@@ -353,7 +355,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
-      alert(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
+      setSaveError(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
@@ -373,7 +375,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
-      alert(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
+      setSaveError(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
@@ -808,6 +810,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             </div>
           )}
         </div>
+        {saveError && (
+          <ErrorBanner
+            message={saveError}
+            onClose={() => setSaveError(null)}
+            className="mx-4 mb-2"
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
