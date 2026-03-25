@@ -33,13 +33,15 @@ import time
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE, get_logger
 from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,
     calculate_work_status, get_label, get_id, get_all_labels, get_all_ids, get_primary_labels,
     get_labels_by_lang
 )
+
+logger = get_logger(__name__)
 
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
@@ -220,19 +222,19 @@ def wait_for_task(task_uid, timeout=30):
 
                 if status == 'succeeded':
                     elapsed = time.time() - start_time
-                    print(f"Meilisearch task {task_uid} õnnestus ({elapsed:.2f}s)")
+                    logger.info(f"Meilisearch task {task_uid} õnnestus ({elapsed:.2f}s)")
                     return True
                 elif status == 'failed':
-                    print(f"Meilisearch task {task_uid} ebaõnnestus: {task_data.get('error')}")
+                    logger.error(f"Meilisearch task {task_uid} ebaõnnestus: {task_data.get('error')}")
                     return False
                 # status on 'enqueued' või 'processing' - ootame edasi
         except Exception as e:
-            print(f"Viga taski staatuse kontrollimisel: {e}")
+            logger.error(f"Viga taski staatuse kontrollimisel: {e}")
             return False
 
         time.sleep(0.1)  # Oota 100ms enne järgmist kontrolli
 
-    print(f"Meilisearch task timeout ({timeout}s)")
+    logger.warning(f"Meilisearch task timeout ({timeout}s)")
     return False
 
 
@@ -244,7 +246,7 @@ def send_to_meilisearch(documents, wait=True):
         wait: Kui True, ootab kuni indekseerimine on lõppenud
     """
     if not MEILI_KEY:
-        print("HOIATUS: Meilisearchi võti puudub, ei saa indekseerida.")
+        logger.warning("HOIATUS: Meilisearchi võti puudub, ei saa indekseerida.")
         return False
 
     url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents"
@@ -257,13 +259,13 @@ def send_to_meilisearch(documents, wait=True):
         with urllib.request.urlopen(req, timeout=MEILI_TIMEOUT) as response:
             res_data = json.loads(response.read().decode('utf-8'))
             task_uid = res_data.get('taskUid')
-            print(f"Meilisearch task: {task_uid}")
+            logger.info(f"Meilisearch task: {task_uid}")
 
             if wait and task_uid:
                 return wait_for_task(task_uid)
             return True
     except Exception as e:
-        print(f"Viga Meilisearchi saatmisel: {e}")
+        logger.error(f"Viga Meilisearchi saatmisel: {e}")
         return False
 
 
@@ -274,7 +276,7 @@ def sync_work_to_meilisearch(dir_name):
     """
     dir_path = os.path.join(BASE_DIR, dir_name)
     if not os.path.exists(dir_path):
-        print(f"SÜNK: Kausta ei leitud: {dir_path}")
+        logger.warning(f"SÜNK: Kausta ei leitud: {dir_path}")
         return False
 
     # 1. Lae teose metaandmed
@@ -285,7 +287,7 @@ def sync_work_to_meilisearch(dir_name):
             with open(meta_path, 'r', encoding='utf-8') as f:
                 metadata = json.load(f)
         except Exception as e:
-            print(f"SÜNK: Viga metaandmete lugemisel: {e}")
+            logger.error(f"SÜNK: Viga metaandmete lugemisel: {e}")
             return False
 
     if not metadata:
@@ -356,7 +358,7 @@ def sync_work_to_meilisearch(dir_name):
     images_list = [f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
     images = sorted(images_list, key=lambda f: (_get_page_sequence(f), f))
     if not images:
-        print(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
+        logger.warning(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
         return False
 
     documents = []
@@ -364,7 +366,7 @@ def sync_work_to_meilisearch(dir_name):
 
     # Dokumendi ID = nanoid + lehekülje number (nt "cymbv7-1")
     if not work_id:
-        print(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
+        logger.warning(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
         work_id = slug  # Fallback slugile
 
     # Lae inimeste aliased ja kanooniilised labelid ÜKS KORD enne tsüklit
@@ -536,7 +538,7 @@ def sync_work_to_meilisearch(dir_name):
     # NB: Ära kustuta enne lisamist — sellel ajal oleks teos otsinguks kättesaamatu (race condition).
     if documents and work_id:
         new_count = len(documents)
-        print(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
+        logger.info(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
         result = send_to_meilisearch(documents)
         _delete_extra_pages(work_id, new_count)
         return result
@@ -580,9 +582,9 @@ def _delete_extra_pages(work_id, new_count):
             task_uid = res_data.get('taskUid')
             if task_uid:
                 wait_for_task(task_uid)
-                print(f"Kustutatud üleliigsed leheküljed (work_id={work_id}, new_count={new_count})")
+                logger.info(f"Kustutatud üleliigsed leheküljed (work_id={work_id}, new_count={new_count})")
     except Exception as e:
-        print(f"Viga üleliigsete lehekülgede kustutamisel: {e}")
+        logger.error(f"Viga üleliigsete lehekülgede kustutamisel: {e}")
 
 
 def delete_work_from_meilisearch(work_id):
@@ -602,7 +604,7 @@ def delete_work_from_meilisearch(work_id):
             if task_uid:
                 return wait_for_task(task_uid)
     except Exception as e:
-        print(f"Viga Meilisearchi kustutamisel: {e}")
+        logger.error(f"Viga Meilisearchi kustutamisel: {e}")
     return False
 
 
@@ -630,7 +632,7 @@ def _sync_work_task(dir_name):
     try:
         sync_work_to_meilisearch(dir_name)
     except Exception as e:
-        print(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
+        logger.error(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
 
 
 def sync_work_to_meilisearch_async(dir_name):
@@ -645,7 +647,7 @@ def sync_work_to_meilisearch_async(dir_name):
 
 def metadata_watcher_loop():
     """Taustalõim, mis otsib uusi kaustu ja loob neile metaandmed."""
-    print(f"Metaandmete jälgija käivitatud (kataloog: {BASE_DIR})")
+    logger.info(f"Metaandmete jälgija käivitatud (kataloog: {BASE_DIR})")
     while True:
         try:
             if not os.path.exists(BASE_DIR):
@@ -675,7 +677,7 @@ def metadata_watcher_loop():
                             try:
                                 metadata = generate_default_metadata(entry.name)
                                 atomic_write_json(meta_path, metadata)
-                                print(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
+                                logger.info(f"AUTOMAATNE METADATA: Loodud fail {meta_path}")
 
                                 # Indekseeri kohe Meilisearchis
                                 index_new_work(entry.name, metadata)
@@ -683,10 +685,10 @@ def metadata_watcher_loop():
                                 # Lisa txt failid Giti originaal-OCR commitina
                                 commit_new_work_to_git(entry.name)
                             except Exception as e:
-                                print(f"Viga metaandmete loomisel ({entry.name}): {e}")
+                                logger.error(f"Viga metaandmete loomisel ({entry.name}): {e}")
 
             # Oota 60 sekundit järgmise skannimiseni
             time.sleep(60)
         except Exception as e:
-            print(f"Jälgija viga: {e}")
+            logger.error(f"Jälgija viga: {e}")
             time.sleep(60)

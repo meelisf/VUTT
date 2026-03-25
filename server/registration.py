@@ -8,9 +8,11 @@ import hashlib
 import uuid
 import threading
 from datetime import datetime, timedelta
-from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE
+from .config import PENDING_REGISTRATIONS_FILE, INVITE_TOKENS_FILE, USERS_FILE, get_logger
 from .auth import load_users, users_lock
 from .utils import atomic_write_json
+
+logger = get_logger(__name__)
 
 # Lukud failioperatsioonide jaoks
 registrations_lock = threading.RLock()
@@ -66,7 +68,7 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False):
     data["registrations"].append(registration)
     save_pending_registrations(data)
 
-    print(f"Uus registreerimistaotlus: {name} ({email})")
+    logger.info(f"Uus registreerimistaotlus: {name} ({email})")
     return registration, None
 
 
@@ -131,7 +133,7 @@ def create_invite_token(email, name, created_by):
     data["tokens"].append(token_data)
     save_invite_tokens(data)
 
-    print(f"Loodud invite token kasutajale {name} ({email})")
+    logger.info(f"Loodud invite token kasutajale {name} ({email})")
     return token_data
 
 
@@ -220,5 +222,5 @@ def create_user_from_invite(token, password):
     with users_lock:
         atomic_write_json(USERS_FILE, users)
 
-    print(f"Loodud uus kasutaja: {username} ({name})")
+    logger.info(f"Loodud uus kasutaja: {username} ({name})")
     return {"username": username, "name": name, "role": "editor"}, None

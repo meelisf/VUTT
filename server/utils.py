@@ -9,7 +9,9 @@ import string
 import tempfile
 import threading
 import unicodedata
-from .config import BASE_DIR
+from .config import BASE_DIR, get_logger
+
+logger = get_logger(__name__)
 
 # Jagatud lukud failioperatsioonide jaoks (race condition'ide vältimine)
 metadata_lock = threading.RLock()  # _metadata.json operatsioonid
@@ -101,10 +103,10 @@ def build_work_id_cache():
     """
     global WORK_ID_CACHE
     WORK_ID_CACHE = {}
-    print("Building Work ID cache...")
+    logger.info("Building Work ID cache...")
     
     if not os.path.exists(BASE_DIR):
-        print(f"Hoiatus: Andmekausta {BASE_DIR} ei leitud.")
+        logger.warning(f"Hoiatus: Andmekausta {BASE_DIR} ei leitud.")
         return
 
     count = 0
@@ -121,11 +123,11 @@ def build_work_id_cache():
                                 WORK_ID_CACHE[work_id] = entry.path
                                 count += 1
                     except Exception as e:
-                        print(f"Viga metaandmete lugemisel {entry.name}: {e}")
+                        logger.error(f"Viga metaandmete lugemisel {entry.name}: {e}")
     except Exception as e:
-        print(f"Viga cache ehitamisel: {e}")
+        logger.error(f"Viga cache ehitamisel: {e}")
     
-    print(f"Work ID cache built: {count} entries.")
+    logger.info(f"Work ID cache built: {count} entries.")
 
 
 def find_directory_by_id(target_id):

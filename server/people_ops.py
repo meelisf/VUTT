@@ -4,8 +4,10 @@ import time
 import threading
 import urllib.request
 import urllib.parse
-from .config import BASE_DIR, PERSON_ALIASES_FILE as PEOPLE_FILE
+from .config import BASE_DIR, PERSON_ALIASES_FILE as PEOPLE_FILE, get_logger
 from .utils import atomic_write_json
+
+logger = get_logger(__name__)
 
 PEOPLE_LOCK = threading.Lock()
 
@@ -85,7 +87,7 @@ def fetch_wikidata_aliases(wikidata_id):
                 "ids": ids
             }
     except Exception as e:
-        print(f"Wikidata fetch error ({wikidata_id}): {e}")
+        logger.error(f"Wikidata fetch error ({wikidata_id}): {e}")
         return None
 
 def invert_gnd_name(name):
@@ -131,7 +133,7 @@ def fetch_gnd_aliases(gnd_id):
                 "ids": ids
             }
     except Exception as e:
-        print(f"GND fetch error ({gnd_id}): {e}")
+        logger.error(f"GND fetch error ({gnd_id}): {e}")
         return None
 
 def update_person_async(creator_id, source=None, force=False):
@@ -146,7 +148,7 @@ def update_person_async(creator_id, source=None, force=False):
                 if people_data[creator_id].get('aliases'):
                     return
             
-            print(f"PEOPLE: Otsin andmeid isikule {creator_id}...")
+            logger.info(f"PEOPLE: Otsin andmeid isikule {creator_id}...")
             
             new_info = None
             if creator_id.startswith('Q'):
@@ -164,9 +166,9 @@ def update_person_async(creator_id, source=None, force=False):
                         people_data[val] = new_info
                 
                 save_people_data(people_data)
-                print(f"PEOPLE: Uuendatud isik {creator_id} ({new_info['primary_name']})")
+                logger.info(f"PEOPLE: Uuendatud isik {creator_id} ({new_info['primary_name']})")
             else:
-                print(f"PEOPLE: Ei leitud andmeid isikule {creator_id}")
+                logger.warning(f"PEOPLE: Ei leitud andmeid isikule {creator_id}")
 
     thread = threading.Thread(target=task)
     thread.daemon = True
@@ -247,7 +249,7 @@ def refresh_all_people():
     updated = 0
     errors = 0
 
-    print(f"PEOPLE REFRESH: Alustan {total} isiku uuendamist...")
+    logger.info(f"PEOPLE REFRESH: Alustan {total} isiku uuendamist...")
 
     for primary_name, (best_id, source) in seen.items():
         try:
@@ -271,14 +273,14 @@ def refresh_all_people():
             else:
                 errors += 1
         except Exception as e:
-            print(f"PEOPLE REFRESH: Viga isikul {best_id} ({primary_name}): {e}")
+            logger.error(f"PEOPLE REFRESH: Viga isikul {best_id} ({primary_name}): {e}")
             errors += 1
 
         # Rate limit: 1 päring sekundis
         time.sleep(1)
 
     result = {"updated": updated, "errors": errors, "total": total}
-    print(f"PEOPLE REFRESH: Valmis — {updated} uuendatud, {errors} viga, {total} kokku")
+    logger.info(f"PEOPLE REFRESH: Valmis — {updated} uuendatud, {errors} viga, {total} kokku")
     return result
 
 
@@ -298,7 +300,7 @@ def refresh_all_people_safe():
     """Käivitab refresh_all_people() kui teine ei jookse juba."""
     global _refresh_status
     if not _refresh_running.acquire(blocking=False):
-        print("PEOPLE REFRESH: Juba käimas, jätan vahele")
+        logger.info("PEOPLE REFRESH: Juba käimas, jätan vahele")
         return None
     try:
         _refresh_status = {"state": "running"}
@@ -319,10 +321,10 @@ PEOPLE_REFRESH_INITIAL_DELAY = 300  # 5 min pärast starti
 def people_refresh_loop():
     """Daemon loop: uuendab people.json aliased iga 24h."""
     time.sleep(PEOPLE_REFRESH_INITIAL_DELAY)
-    print("PEOPLE REFRESH: Taustalõim käivitunud")
+    logger.info("PEOPLE REFRESH: Taustalõim käivitunud")
     while True:
         try:
             refresh_all_people_safe()
         except Exception as e:
-            print(f"PEOPLE REFRESH LOOP: Viga: {e}")
+            logger.error(f"PEOPLE REFRESH LOOP: Viga: {e}")
         time.sleep(PEOPLE_REFRESH_INTERVAL)
