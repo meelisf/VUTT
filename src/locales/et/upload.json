@@ -85,6 +85,13 @@
     "networkError": "Võrgu viga — proovi uuesti",
     "invalidPdf": "Vigane PDF — faili ei saa lugeda"
   },
+  "replaceWork": {
+    "label": "Asenda olemasolevat teost",
+    "placeholder": "Otsi teost...",
+    "warning": "Asendamine kustutab kõik olemasolevad leheküljed ja asendab need uutega.",
+    "selected": "Asendatav teos:",
+    "none": "Uus teos (ei asenda)"
+  },
   "status": {
     "pending": "Ootel",
     "uploading": "Üles laadimisel",
