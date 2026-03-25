@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, Link, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate, useBlocker } from 'react-router-dom';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -13,7 +13,8 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import MetadataModal from '../components/MetadataModal';
-import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogOut, LogIn, Settings, History, Copy, Check, Upload } from 'lucide-react';
+import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check } from 'lucide-react';
+import UserMenu from '../components/UserMenu';
 import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { getLabel } from '../utils/metadataUtils';
@@ -55,8 +56,7 @@ const Workspace: React.FC = () => {
   const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
   const editorSaveRef = useRef<(() => Promise<void>) | null>(null);
 
-  // Kasutaja menüü ja login modaali olek
-  const [showUserMenu, setShowUserMenu] = useState(false);
+  // Login modaali olek
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   // Thumbnail grid-vaate olek
@@ -445,63 +445,7 @@ const Workspace: React.FC = () => {
         <div className="flex items-center gap-2">
           {/* Kasutaja menüü */}
           {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center justify-center h-8 w-8 bg-primary-100 rounded-full text-primary-700 font-bold text-xs hover:bg-primary-200 transition-colors"
-                title={user.name}
-              >
-                {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-              </button>
-
-              {showUserMenu && (
-                <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-48 z-[110]">
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                      <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-                    </div>
-                    <Link
-                      to="/review"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <History size={16} />
-                      {t('common:nav.review')}
-                    </Link>
-                    {user.role === 'admin' && (
-                      <>
-                        <Link
-                          to="/upload"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <Upload size={16} />
-                          {t('common:nav.upload')}
-                        </Link>
-                        <Link
-                          to="/admin"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <Settings size={16} />
-                          {t('common:nav.admin')}
-                        </Link>
-                      </>
-                    )}
-                    <div className="border-t border-gray-100 my-1" />
-                    <button
-                      onClick={() => { setShowUserMenu(false); logout(); }}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <LogOut size={16} />
-                      {t('auth:login.logout')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <UserMenu />
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}

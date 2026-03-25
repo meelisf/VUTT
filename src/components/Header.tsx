@@ -11,9 +11,10 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, LogOut, LogIn, History, Settings, ChevronDown, Library, Upload, Users } from 'lucide-react';
+import { Search, LogIn, ChevronDown, Library } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 import LoginModal from './LoginModal';
+import UserMenu from './UserMenu';
 import CollectionPicker from './CollectionPicker';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
@@ -38,10 +39,9 @@ const Header: React.FC<HeaderProps> = ({
   children
 }) => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user, logout, sessionExpired, clearSessionExpired } = useUser();
+  const { user, sessionExpired, clearSessionExpired } = useUser();
   const { selectedCollection, getCollectionName, collections } = useCollection();
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false);
   const [showCollectionPicker, setShowCollectionPicker] = useState(false);
   const lang = getLangCode(i18n.language);
   const headerNavigate = useNavigate();
@@ -116,83 +116,7 @@ const Header: React.FC<HeaderProps> = ({
         {/* Parem pool: kasutajamenüü + keelevahetaja */}
         <div className="flex items-center gap-2 sm:gap-3">
           {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 hover:bg-gray-100 rounded-lg px-2 py-1 transition-colors"
-              >
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                  <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-                </div>
-                <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-xs">
-                  {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-                <ChevronDown size={14} className={`text-gray-400 transition-transform ${showUserMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {showUserMenu && (
-                <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-44 z-[110]">
-                    {/* Mobiilne kasutajainfo */}
-                    <div className="sm:hidden px-3 py-2 border-b border-gray-100">
-                      <p className="font-medium text-gray-900 text-sm">{user.name}</p>
-                      <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
-                    </div>
-
-                    <Link
-                      to="/persons"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <Users size={16} />
-                      {t('common:nav.persons', 'Isikud')}
-                    </Link>
-
-                    <Link
-                      to="/review"
-                      onClick={() => setShowUserMenu(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <History size={16} />
-                      {t('common:nav.review')}
-                    </Link>
-
-                    {user.role === 'admin' && (
-                      <>
-                        <Link
-                          to="/upload"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <Upload size={16} />
-                          {t('common:nav.upload', 'Laadi üles')}
-                        </Link>
-                        <Link
-                          to="/admin"
-                          onClick={() => setShowUserMenu(false)}
-                          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          <Settings size={16} />
-                          {t('common:nav.admin')}
-                        </Link>
-                      </>
-                    )}
-
-                    <div className="border-t border-gray-100 my-1" />
-
-                    <button
-                      onClick={() => { setShowUserMenu(false); logout(); }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
-                    >
-                      <LogOut size={16} />
-                      {t('auth:login.logout')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <UserMenu />
           ) : (
             <button
               onClick={() => setShowLoginModal(true)}

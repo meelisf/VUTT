@@ -79,7 +79,8 @@
     "review": "Changes",
     "admin": "Admin",
     "upload": "Upload",
-    "persons": "Persons"
+    "persons": "Persons",
+    "settings": "Settings"
   },
   "prosopography": {
     "pageTitle": "Persons",
