@@ -29,6 +29,7 @@ const Upload = lazyRetry(() => import('./pages/Upload'));
 const Review = lazyRetry(() => import('./pages/Review'));
 const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
 const NotFound = lazyRetry(() => import('./pages/NotFound'));
+const Settings = lazyRetry(() => import('./pages/Settings'));
 const PersonsPage = lazyRetry(() => import('./prosopography/pages/PersonsPage'));
 const PersonDetailPage = lazyRetry(() => import('./prosopography/pages/PersonDetailPage'));
 const PersonEditPage = lazyRetry(() => import('./prosopography/pages/PersonEditPage'));
@@ -95,6 +96,11 @@ const router = createBrowserRouter([
   {
     path: "/review",
     element: <Lazy><Review /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/settings",
+    element: <Lazy><Settings /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   // Prosopograafia

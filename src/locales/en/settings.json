@@ -1,0 +1,18 @@
+{
+  "pageTitle": "Settings",
+  "ui": {
+    "heading": "Interface"
+  },
+  "language": {
+    "label": "Language"
+  },
+  "workspace": {
+    "heading": "Workspace",
+    "defaultTab": {
+      "label": "Default tab",
+      "description": "Which tab opens when opening a work"
+    },
+    "edit": "Edit",
+    "info": "Info & annotations"
+  }
+}

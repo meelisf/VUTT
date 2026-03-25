@@ -1,0 +1,18 @@
+{
+  "pageTitle": "Seaded",
+  "ui": {
+    "heading": "Kasutajaliides"
+  },
+  "language": {
+    "label": "Keel"
+  },
+  "workspace": {
+    "heading": "Workspace",
+    "defaultTab": {
+      "label": "Vaikimisi tab",
+      "description": "Milline tab avaneb teose avamisel"
+    },
+    "edit": "Muutmine",
+    "info": "Info & annotatsioonid"
+  }
+}

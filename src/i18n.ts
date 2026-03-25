@@ -14,6 +14,7 @@ import etRegister from './locales/et/register.json';
 import etReview from './locales/et/review.json';
 import etUpload from './locales/et/upload.json';
 import etProsopography from './locales/et/prosopography.json';
+import etSettings from './locales/et/settings.json';
 
 import enCommon from './locales/en/common.json';
 import enAuth from './locales/en/auth.json';
@@ -26,6 +27,7 @@ import enRegister from './locales/en/register.json';
 import enReview from './locales/en/review.json';
 import enUpload from './locales/en/upload.json';
 import enProsopography from './locales/en/prosopography.json';
+import enSettings from './locales/en/settings.json';
 
 const resources = {
   et: {
@@ -40,6 +42,7 @@ const resources = {
     review: etReview,
     upload: etUpload,
     prosopography: etProsopography,
+    settings: etSettings,
   },
   en: {
     common: enCommon,
@@ -53,6 +56,7 @@ const resources = {
     review: enReview,
     upload: enUpload,
     prosopography: enProsopography,
+    settings: enSettings,
   },
 };
 
@@ -63,7 +67,7 @@ i18n
     resources,
     fallbackLng: 'et',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload', 'prosopography'],
+    ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload', 'prosopography', 'settings'],
 
     detection: {
       order: ['localStorage'],
