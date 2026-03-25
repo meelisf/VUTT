@@ -178,6 +178,10 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     loadVocabularies();
   }, []);
 
+  // TODO: crossLangTypeMap ja crossLangGenreMap on eemaldatavad kui kõigil teostel
+  // on type_ids ja genre_ids indekseeritud. Kontrollida: Meilisearch filter
+  // 'type_ids NOT EXISTS OR type_ids IS EMPTY' — kui 0 tulemust, saab eemaldada.
+
   // Keelteülene tõlketabel: teise keele väärtus → praeguse keele väärtus
   const crossLangGenreMap = useMemo(() => {
     const map: Record<string, string> = {};

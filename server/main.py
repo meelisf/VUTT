@@ -593,6 +593,10 @@ async def admin_reorder_pages(work_id: str, request: Request, user=Depends(requi
 # =========================================================
 
 @app.post("/save")
+# NB: contributor roll on reserveeritud tulevaste pending-edits funktsioonide jaoks.
+# Praegu loob registreerimine kõik kasutajad 'editor' rolliga (registration.py).
+# Kui contributor-roll kunagi aktiveeritakse, tuleb /save endpoint uuendada
+# (hetkel nõuab 'editor' miinimumi, mis blokeerib contributor kasutajate salvestused).
 async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     text = unicodedata.normalize('NFC', data.get('text_content', '')) if data.get('text_content') else ""
@@ -693,6 +697,9 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
 
 @app.post("/works/bulk-collection")
 async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
+    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
+    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     """Määrab mitme teose kollektsioonid korraga.
 
     Body: { work_ids: [...], mode: "add"|"set"|"remove", collection_id: "..." }
@@ -733,6 +740,9 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
 
 @app.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
+    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
+    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     data = await get_json_data(request)
     for work_id in data.get('work_ids', []):
         path = find_directory_by_id(work_id)
@@ -761,6 +771,9 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
 
 @app.post("/works/bulk-genre")
 async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
+    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
+    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     """Määrab žanri mitmele teosele korraga.
 
     Body: { work_ids: [...], genre: LinkedEntity|null, mode: "add"|"set"|"remove" }
