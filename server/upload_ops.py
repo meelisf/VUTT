@@ -1291,22 +1291,43 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
             except Exception:
                 pass
 
-    # 8. Uuenda metaandmeid (kui antud)
-    if metadata_updates:
+    # 8. Uuenda metaandmeid upload state['meta'] põhjal (säilita id ja slug originaalist)
+    try:
+        upload_meta = state.get('meta', {})
+        OPTIONAL_META_FIELDS = [
+            "creators", "genre", "type", "tags",
+            "location", "publisher",
+            "ester_id", "external_url", "year_display",
+        ]
+        updates = {}
+        if upload_meta.get('title'):
+            updates['title'] = upload_meta['title']
         try:
+            updates['year'] = int(str(upload_meta.get('year', '')))
+        except (ValueError, TypeError):
+            pass
+        if upload_meta.get('collections') is not None:
+            updates['collections'] = upload_meta.get('collections') or []
+        if upload_meta.get('languages') is not None:
+            updates['languages'] = upload_meta.get('languages') or []
+        for field in OPTIONAL_META_FIELDS:
+            if field in upload_meta:
+                updates[field] = upload_meta[field]
+        # Kirjuta otse (säilita id ja slug originaalist)
+        if updates:
             from .metadata_ops import save_work_metadata
             save_work_metadata(
                 meta_path,
-                metadata_updates,
+                updates,
                 username,
                 "Uuenda metadata asendusel",
                 background_tasks=background_tasks,
                 sync_meili=False,
                 call_ptw=False,
             )
-            logger.info(f"replace {upload_id}: metadata uuendatud")
-        except Exception as e:
-            logger.warning(f"replace {upload_id}: metadata uuendamine ebaõnnestus: {e}")
+            logger.info(f"replace {upload_id}: metadata uuendatud ({len(updates)} välja)")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: metadata uuendamine ebaõnnestus: {e}")
 
     # 9. Git commit uuendatud sisuga
     try:
