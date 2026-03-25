@@ -79,9 +79,9 @@ export function useSearchFacets(
                 .map(([value, count]) => ({ value, count: count as number }))
                 .sort((a, b) => b.count - a.count);
         };
-        const newGenres = processFacets(`genre_${facetLang}`);
-        const newTypes = processFacets(`type_${facetLang}`);
-        const newTags = processFacets(`tags_${facetLang}`).map(t => ({ tag: t.value, count: t.count }));
+        const newGenres = processFacets('genre_ids');
+        const newTypes = processFacets('type_ids');
+        const newTags = processFacets('tags_ids').map(t => ({ tag: t.value, count: t.count }));
         const newAuthors = processFacets('author_names');
         setAvailableTeoseTags(prev => mergeTagsWithExisting(prev, newTags, urlParams.teoseTags));
         setAvailableGenres(prev => mergeFacetsWithExisting(prev, newGenres, urlParams.genres));

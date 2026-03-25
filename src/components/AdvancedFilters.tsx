@@ -215,50 +215,47 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
 
   // Ettevalmistatud andmed FilterSection jaoks
   const genreItems = useMemo<FilterItem[]>(() => {
-    const genreKey = `genre_${lang}` as keyof FacetDistribution;
-    const genreData = facets?.[genreKey] as Record<string, number> | undefined;
+    const genreData = facets?.['genre_ids'];
     if (!genreData) return [];
 
     const raw = Object.entries(genreData)
       .map(([value, count]) => ({
         value,
         count,
-        label: vocabularies?.genres?.[value]?.[lang] || vocabularies?.genres?.[value]?.et || value
+        label: genreIdMap?.[value] || value
       }));
     return mergeFacetItems(raw, genreLabelToId, genreIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies, genreLabelToId, genreIdMap]);
+  }, [facets, genreLabelToId, genreIdMap]);
 
   const tagItems = useMemo<FilterItem[]>(() => {
-    const tagsKey = `tags_${lang}` as keyof FacetDistribution;
-    const tagsData = facets?.[tagsKey] as Record<string, number> | undefined;
+    const tagsData = facets?.['tags_ids'];
     if (!tagsData) return [];
 
     const raw = Object.entries(tagsData)
       .map(([tag, count]) => ({
         value: tag,
-        label: tag,
+        label: tagsIdMap?.[tag] || tag,
         count
       }));
     // tagsLabelToId: label→Q-kood (grupeering), tagsIdMap: Q-kood→praeguse keele label (kuvamine)
     return mergeFacetItems(raw, tagsLabelToId, tagsIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, tagsIdMap, tagsLabelToId]);
+  }, [facets, tagsIdMap, tagsLabelToId]);
 
   const typeItems = useMemo<FilterItem[]>(() => {
-    const typeKey = `type_${lang}` as keyof FacetDistribution;
-    const typeData = facets?.[typeKey] as Record<string, number> | undefined;
+    const typeData = facets?.['type_ids'];
     if (!typeData) return [];
 
     const raw = Object.entries(typeData)
       .map(([value, count]) => ({
         value,
         count,
-        label: vocabularies?.types?.[value]?.[lang] || vocabularies?.types?.[value]?.et || value
+        label: typeIdMap?.[value] || value
       }));
     return mergeFacetItems(raw, typeLabelToId, typeIdMap)
       .sort((a, b) => b.count - a.count);
-  }, [facets, lang, vocabularies, typeLabelToId, typeIdMap]);
+  }, [facets, typeLabelToId, typeIdMap]);
 
   // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
   const effectiveSelectedGenre = useMemo(

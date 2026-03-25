@@ -407,7 +407,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
@@ -446,7 +446,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),
@@ -482,7 +482,7 @@ const Dashboard: React.FC = () => {
       const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           auth_token: token,
           work_ids: Array.from(selectedWorkIds),

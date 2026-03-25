@@ -29,12 +29,9 @@ export interface DashboardSearchOptions {
 
 // Facetide vastuse tüüp
 export interface FacetDistribution {
-  genre_et?: Record<string, number>;
-  genre_en?: Record<string, number>;
-  tags_et?: Record<string, number>;
-  tags_en?: Record<string, number>;
-  type_et?: Record<string, number>;
-  type_en?: Record<string, number>;
+  genre_ids?: Record<string, number>; // Q-koodid, keeleneutraalne
+  type_ids?: Record<string, number>;  // Q-koodid, keeleneutraalne
+  tags_ids?: Record<string, number>;  // Q-koodid, keeleneutraalne
   teose_staatus?: Record<string, number>;
 }
 
@@ -57,9 +54,8 @@ export const getTeoseTagsFacets = async (
   checkMixedContent();
 
   // Vali õige väli vastavalt keelele
-  // Kasutame alati keelespetsiifilisi välju (tags_et, tags_en)
-  // sest põhiväli 'tags' võib sisaldada segamini keeli (Wikidata default label)
-  const facetField = `tags_${lang}`;
+  // Kasutame tags_ids (Q-koodid) — keeleneutraalne, väldib duplikaate kui sama Q-koodi label erineb teoseti
+  const facetField = 'tags_ids';
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -88,8 +84,6 @@ export const getTeoseTagsFacets = async (
     return result;
   } catch (error) {
     console.error("getTeoseTagsFacets error:", error);
-    // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getTeoseTagsFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };
@@ -104,8 +98,8 @@ export const getGenreFacets = async (
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
 
-  // Kasutame alati keelespetsiifilisi välju (genre_et, genre_en)
-  const facetField = `genre_${lang}`;
+  // Kasutame genre_ids (Q-koodid) — keeleneutraalne, väldib duplikaate kui sama Q-koodi label erineb teoseti
+  const facetField = 'genre_ids';
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -134,8 +128,6 @@ export const getGenreFacets = async (
     return result;
   } catch (error) {
     console.error("getGenreFacets error:", error);
-    // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getGenreFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };
@@ -150,8 +142,8 @@ export const getTypeFacets = async (
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
 
-  // Kasutame alati keelespetsiifilisi välju (type_et, type_en)
-  const facetField = `type_${lang}`;
+  // Kasutame type_ids (Q-koodid) — keeleneutraalne, väldib duplikaate kui sama Q-koodi label erineb teoseti
+  const facetField = 'type_ids';
 
   try {
     const filter: string[] = ['lehekylje_number = 1'];
@@ -180,8 +172,6 @@ export const getTypeFacets = async (
     return result;
   } catch (error) {
     console.error("getTypeFacets error:", error);
-    // Fallback eesti keelele kui keelepõhist välja ei leidu
-    if (lang !== 'et') return getTypeFacets(collection, 'et', yearStart, yearEnd);
     return [];
   }
 };
@@ -278,11 +268,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(buildMultiFilter(options.type, buildTypeFilter));
     }
 
-    // Vali facet väljad vastavalt keelele
-    const facetLang = options?.lang || 'et';
-    const genreFacetField = `genre_${facetLang}`;
-    const typeFacetField = `type_${facetLang}`;
-    const tagsFacetField = `tags_${facetLang}`;
+    // Kasutame ID-põhiseid facet välju (Q-koodid) — keeleneutraalsed, ei tekita duplikaate
+    const genreFacetField = 'genre_ids';
+    const typeFacetField = 'type_ids';
+    const tagsFacetField = 'tags_ids';
 
     const searchParams: any = {
       attributesToRetrieve: [
@@ -381,9 +370,9 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     return {
       works,
       facets: {
-        [`genre_${facetLang}`]: facetDistribution[genreFacetField],
-        [`type_${facetLang}`]: facetDistribution[typeFacetField],
-        [`tags_${facetLang}`]: facetDistribution[tagsFacetField],
+        genre_ids: facetDistribution['genre_ids'],
+        type_ids: facetDistribution['type_ids'],
+        tags_ids: facetDistribution['tags_ids'],
         teose_staatus: facetDistribution['teose_staatus']
       } as FacetDistribution,
       totalHits: response.estimatedTotalHits || works.length
@@ -435,10 +424,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
-  const facetLang = options.lang || 'et';
-  const genreFacetField = `genre_${facetLang}`;
-  const typeFacetField = `type_${facetLang}`;
-  const tagsFacetField = `tags_${facetLang}`;
+  const genreFacetField = 'genre_ids';
+  const typeFacetField = 'type_ids';
+  const tagsFacetField = 'tags_ids';
 
   let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
