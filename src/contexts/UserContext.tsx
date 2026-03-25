@@ -1,11 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, ReactNode } from 'react';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import i18n from '../i18n';
+
+export interface UserPreferences {
+  language?: 'et' | 'en';
+  default_tab?: 'edit' | 'annotate';
+  custom_characters?: Array<{ char: string; name: string }>;
+}
 
 interface User {
   username: string;
   name: string;
   role: string;
+  preferences?: UserPreferences;
 }
 
 interface UserContextType {
@@ -16,6 +24,7 @@ interface UserContextType {
   isLoading: boolean;
   sessionExpired: boolean;
   clearSessionExpired: () => void;
+  updatePreferences: (prefs: Partial<UserPreferences>) => Promise<boolean>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -51,6 +60,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  // Rakenda kasutaja eelistused (keel jne)
+  const applyPreferences = useCallback((prefs?: UserPreferences) => {
+    if (!prefs) return;
+    if (prefs.language && prefs.language !== i18n.language) {
+      i18n.changeLanguage(prefs.language);
+    }
+  }, []);
+
   // Lae kasutaja ja token localStorage'ist ning verifitseeri
   useEffect(() => {
     const initAuth = async () => {
@@ -63,11 +80,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (verifiedUser && verifiedUser !== 'network-error') {
           setUser(verifiedUser);
           setAuthToken(storedToken);
+          applyPreferences(verifiedUser.preferences);
         } else if (verifiedUser === 'network-error') {
           // Võrguviga käivitusel — laadime localStorage'ist (optimistlik)
           try {
-            setUser(JSON.parse(storedUser));
+            const parsedUser = JSON.parse(storedUser);
+            setUser(parsedUser);
             setAuthToken(storedToken);
+            applyPreferences(parsedUser.preferences);
           } catch {}
         } else {
           // Server kinnitas et token on aegunud
@@ -136,6 +156,8 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Salvestame tokeni localStorage'i (mitte parooli!)
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         localStorage.setItem(TOKEN_KEY, data.token);
+        // Rakenda kasutaja eelistused
+        applyPreferences(data.user.preferences);
         return { success: true };
       } else {
         return { success: false, error: data.message || 'Sisselogimine ebaõnnestus' };
@@ -144,7 +166,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login error:', e);
       return { success: false, error: 'Serveriga ühendamine ebaõnnestus' };
     }
-  }, []);
+  }, [applyPreferences]);
 
   const logout = useCallback(() => {
     setUser(null);
@@ -153,9 +175,37 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.removeItem(TOKEN_KEY);
   }, []);
 
+  const updatePreferences = useCallback(async (prefs: Partial<UserPreferences>): Promise<boolean> => {
+    if (!authToken || !user) return false;
+    try {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/user-prefs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify(prefs)
+      });
+      const data = await response.json();
+      if (data.status === 'success') {
+        // Uuenda lokaalne user objekt
+        const updatedUser = { ...user, preferences: { ...user.preferences, ...prefs } };
+        setUser(updatedUser);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
+        // Rakenda koheselt
+        applyPreferences(prefs as UserPreferences);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('updatePreferences error:', e);
+      return false;
+    }
+  }, [authToken, user, applyPreferences]);
+
   const value = useMemo(() => ({
-    user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired
-  }), [user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired]);
+    user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired, updatePreferences
+  }), [user, authToken, login, logout, isLoading, sessionExpired, clearSessionExpired, updatePreferences]);
 
   return (
     <UserContext.Provider value={value}>

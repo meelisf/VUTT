@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
@@ -6,24 +6,20 @@ import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
   const { t, i18n } = useTranslation('settings');
-  const { user } = useUser();
+  const { user, updatePreferences } = useUser();
 
   // Ainult autentitud kasutajatele
   if (!user) return <Navigate to="/" replace />;
 
-  const currentLang = i18n.language.startsWith('et') ? 'et' : 'en';
+  const currentLang = (user.preferences?.language || (i18n.language.startsWith('et') ? 'et' : 'en')) as 'et' | 'en';
+  const defaultTab = user.preferences?.default_tab || 'edit';
 
   const handleLangChange = (lang: 'et' | 'en') => {
-    i18n.changeLanguage(lang);
+    updatePreferences({ language: lang });
   };
 
-  const [defaultTab, setDefaultTab] = useState<'edit' | 'annotate'>(
-    () => (localStorage.getItem('vutt_workspace_default_tab') as 'edit' | 'annotate') ?? 'edit'
-  );
-
   const handleTabChange = (tab: 'edit' | 'annotate') => {
-    localStorage.setItem('vutt_workspace_default_tab', tab);
-    setDefaultTab(tab);
+    updatePreferences({ default_tab: tab });
   };
 
   return (

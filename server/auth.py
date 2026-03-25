@@ -110,9 +110,28 @@ def verify_user(username, password):
         return {
             "username": username,
             "name": users[username]["name"],
-            "role": users[username].get("role", "user")
+            "role": users[username].get("role", "user"),
+            "preferences": users[username].get("preferences", {})
         }
     return None
+
+
+def get_user_preferences(username):
+    """Tagastab kasutaja eelistused."""
+    users = load_users()
+    if username not in users:
+        return {}
+    return users[username].get("preferences", {})
+
+
+def save_user_preferences(username, preferences):
+    """Salvestab kasutaja eelistused users.json faili."""
+    users = load_users()
+    if username not in users:
+        return False, "Kasutajat ei leitud"
+    users[username]["preferences"] = preferences
+    save_users(users)
+    return True, "Eelistused salvestatud"
 
 
 def create_session(user):

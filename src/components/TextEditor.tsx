@@ -101,8 +101,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken } = useUser();
   const lang = getLangCode(i18n.language);
+  // Kasuta kasutaja eelistust serverist, tagavaraks localStorage (vanad sessioonid)
   const [activeTab, setActiveTab] = useState<TabType>(
-    () => (localStorage.getItem('vutt_workspace_default_tab') as TabType) ?? 'edit'
+    () => (user?.preferences?.default_tab as TabType) ?? (localStorage.getItem('vutt_workspace_default_tab') as TabType) ?? 'edit'
   );
 
   // Redaktori sisu muudatuste jälgimine
