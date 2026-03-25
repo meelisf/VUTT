@@ -14,6 +14,8 @@ import { getLangCode } from '../utils/getLangCode';
 import { FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 import { mergeFacetItems, FilterItem } from '../utils/facetUtils';
+import { resolveFilterValue, resolveItemValue } from '../utils/filterNormalization';
+import { resolveFilterValue, resolveItemValue } from '../utils/filterNormalization';
 
 type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 
@@ -259,42 +261,26 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   }, [facets, lang, vocabularies, typeLabelToId, typeIdMap]);
 
   // Efektiivne valitud väärtus: tõlgi kohe sünkroonselt, et nupp oleks sinine ka enne useEffect'i
-  const effectiveSelectedGenre = useMemo(() => {
-    if (!selectedGenre) return null;
-    const found = genreItems.find(item => item.value === selectedGenre);
-    if (found) return selectedGenre; // Q-kood on juba õige väärtus, ära konverdi labeliks
-    // Q-kood → label (Wikidata žanrid, keeleülene normaliseerimine)
-    if (genreIdMap?.[selectedGenre]) return genreIdMap[selectedGenre];
-    // Vocabulary-põhine tõlge (vocabularies-is defineeritud žanrid)
-    return crossLangGenreMap[selectedGenre] || selectedGenre;
-  }, [selectedGenre, genreItems, genreIdMap, crossLangGenreMap]);
+  const effectiveSelectedGenre = useMemo(
+    () => resolveFilterValue(selectedGenre, genreItems, genreIdMap, crossLangGenreMap),
+    [selectedGenre, genreItems, genreIdMap, crossLangGenreMap]
+  );
 
   // item.value formaadis (Q-kood) — FilterSection selectedValues ja onToggle jaoks
-  const selectedGenreItemValue = useMemo(() => {
-    if (!selectedGenre) return null;
-    if (genreItems.some(item => item.value === selectedGenre)) return selectedGenre;
-    const qcode = genreLabelToId?.[selectedGenre];
-    if (qcode && genreItems.some(item => item.value === qcode)) return qcode;
-    return null;
-  }, [selectedGenre, genreItems, genreLabelToId]);
+  const selectedGenreItemValue = useMemo(
+    () => resolveItemValue(selectedGenre, genreItems, genreLabelToId),
+    [selectedGenre, genreItems, genreLabelToId]
+  );
 
-  const effectiveSelectedType = useMemo(() => {
-    if (!selectedType) return null;
-    const found = typeItems.find(item => item.value === selectedType);
-    if (found) return selectedType; // Q-kood on jõige väärtus, ära konverdi labeliks
-    // Q-kood → label (Wikidata tüübid)
-    if (typeIdMap?.[selectedType]) return typeIdMap[selectedType];
-    // Vocabulary-põhine fallback
-    return crossLangTypeMap[selectedType] || selectedType;
-  }, [selectedType, typeItems, typeIdMap, crossLangTypeMap]);
+  const effectiveSelectedType = useMemo(
+    () => resolveFilterValue(selectedType, typeItems, typeIdMap, crossLangTypeMap),
+    [selectedType, typeItems, typeIdMap, crossLangTypeMap]
+  );
 
-  const selectedTypeItemValue = useMemo(() => {
-    if (!selectedType) return null;
-    if (typeItems.some(item => item.value === selectedType)) return selectedType;
-    const qcode = typeLabelToId?.[selectedType];
-    if (qcode && typeItems.some(item => item.value === qcode)) return qcode;
-    return null;
-  }, [selectedType, typeItems, typeLabelToId]);
+  const selectedTypeItemValue = useMemo(
+    () => resolveItemValue(selectedType, typeItems, typeLabelToId),
+    [selectedType, typeItems, typeLabelToId]
+  );
 
   // Efektiivsed valitud märksõnad: lahenda Q-koodid labeliteks
   const effectiveSelectedTags = useMemo(() => {

@@ -6,6 +6,7 @@ import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } f
 import { MEILI_HOST } from '../config';
 import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
 import { isQCode } from '../utils/qcodeUtils';
+import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
@@ -255,26 +256,14 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`respondens_names = "${options.respondens}"`);
     }
     if (options?.printer) {
-      // Q-kood → publisher_id filter, muidu label täpne vaste
-      if (isQCode(options.printer)) {
-        filter.push(`publisher_id = "${options.printer}"`);
-      } else {
-        filter.push(`publisher = "${options.printer}"`);
-      }
+      filter.push(buildPrinterFilter(options.printer));
     }
     if (options?.workStatus) {
       filter.push(`teose_staatus = "${options.workStatus}"`);
     }
     // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
-    // Q-kood või vutt:-ID → tags_ids, label → keelespetsiifiline väli
     if (options?.teoseTags && options.teoseTags.length > 0) {
-      for (const tag of options.teoseTags) {
-        if (isQCode(tag) || tag.startsWith('vutt:')) {
-          filter.push(`tags_ids = "${tag}"`);
-        } else {
-          filter.push(`(tags_et = "${tag}" OR tags_en = "${tag}")`);
-        }
-      }
+      for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
     }
     // V2: Kollektsiooni filter (kasutab collections_hierarchy, et kaasata alamkollektsioonid)
     if (options?.collection) {
@@ -282,19 +271,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
     }
     // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
     if (options?.genre && options.genre.length > 0) {
-      const genreConditions = options.genre.map(g => {
-        if (isQCode(g)) return `genre_ids = "${g}"`;
-        return `(genre_et = "${g}" OR genre_en = "${g}")`;
-      }).join(' OR ');
-      filter.push(options.genre.length === 1 ? genreConditions : `(${genreConditions})`);
+      filter.push(buildMultiFilter(options.genre, buildGenreFilter));
     }
     // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
     if (options?.type && options.type.length > 0) {
-      const typeConditions = options.type.map(t => {
-        if (isQCode(t)) return `type_ids = "${t}"`;
-        return `(type_et = "${t}" OR type_en = "${t}")`;
-      }).join(' OR ');
-      filter.push(options.type.length === 1 ? typeConditions : `(${typeConditions})`);
+      filter.push(buildMultiFilter(options.type, buildTypeFilter));
     }
 
     // Vali facet väljad vastavalt keelele
@@ -429,46 +410,24 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
   // Teose märksõnade filter (AND loogika)
-  // Q-kood või vutt:-ID → tags_ids, label → bilinguaalne OR
   if (options.teoseTags && options.teoseTags.length > 0) {
-    for (const tag of options.teoseTags) {
-      if (isQCode(tag) || tag.startsWith('vutt:')) {
-        filter.push(`tags_ids = "${tag}"`);
-      } else {
-        filter.push(`(tags_et = "${tag}" OR tags_en = "${tag}")`);
-      }
-    }
+    for (const tag of options.teoseTags) filter.push(buildTagFilter(tag));
   }
   // Lehekülje märksõnade filter (AND loogika)
-  // Q-kood → page_tags_ids, label → bilinguaalne OR
   if (options.pageTags && options.pageTags.length > 0) {
-    for (const tag of options.pageTags) {
-      if (isQCode(tag)) {
-        filter.push(`page_tags_ids = "${tag}"`);
-      } else {
-        filter.push(`(page_tags_et = "${tag}" OR page_tags_en = "${tag}")`);
-      }
-    }
+    for (const tag of options.pageTags) filter.push(buildPageTagFilter(tag));
   }
   // V2: Kollektsiooni filter
   if (options.collection) {
     filter.push(`collections_hierarchy = "${options.collection}"`);
   }
-  // V2: Žanri filter (Q-kood → genre_ids, label → bilinguaalne OR)
+  // V2: Žanri filter
   if (options.genre && options.genre.length > 0) {
-    const genreConditions = options.genre.map(g => {
-      if (isQCode(g)) return `genre_ids = "${g}"`;
-      return `(genre_et = "${g}" OR genre_en = "${g}")`;
-    }).join(' OR ');
-    filter.push(options.genre.length === 1 ? genreConditions : `(${genreConditions})`);
+    filter.push(buildMultiFilter(options.genre, buildGenreFilter));
   }
-  // V2: Tüübi filter (Q-kood → type_ids, label → bilinguaalne OR)
+  // V2: Tüübi filter
   if (options.type && options.type.length > 0) {
-    const typeConditions = options.type.map(t => {
-      if (isQCode(t)) return `type_ids = "${t}"`;
-      return `(type_et = "${t}" OR type_en = "${t}")`;
-    }).join(' OR ');
-    filter.push(options.type.length === 1 ? typeConditions : `(${typeConditions})`);
+    filter.push(buildMultiFilter(options.type, buildTypeFilter));
   }
   // V2: Autori filter (kõik creators: author_names + respondens_names)
   if (options.author) {
