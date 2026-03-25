@@ -137,18 +137,14 @@ const ThumbCard: React.FC<{
   entry: FileEntry;
   uploadId: string;
   authToken: string;
-  onDelete: (page: number, filename: string) => void;
-  onRestore: (page: number, filename: string) => void;
   t: (key: string) => string;
-}> = ({ entry, uploadId, authToken, onDelete, onRestore, t }) => {
+}> = ({ entry, uploadId, authToken, t }) => {
   const thumbUrl = `${FILE_API_URL}/admin/upload/${uploadId}/thumb/${entry.page}?token=${authToken}`;
 
   return (
     <div
       className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-        entry.deleted
-          ? 'border-red-300 opacity-50'
-          : entry.has_ocr
+        entry.has_ocr
           ? 'border-green-400'
           : 'border-yellow-300'
       }`}
@@ -170,39 +166,18 @@ const ThumbCard: React.FC<{
       {/* Staatusriba */}
       <div
         className={`px-2 py-1 text-xs font-medium flex items-center justify-between ${
-          entry.deleted
-            ? 'bg-red-50 text-red-600'
-            : entry.has_ocr
+          entry.has_ocr
             ? 'bg-green-50 text-green-700'
             : 'bg-yellow-50 text-yellow-700'
         }`}
       >
         <span>Lk {entry.page}</span>
         <span>
-          {entry.deleted
-            ? t('step3.deleted')
-            : entry.has_ocr
+          {entry.has_ocr
             ? t('step3.ocrReady')
             : t('step3.ocrProcessing')}
         </span>
       </div>
-
-      {/* Kustuta / Taasta nupp */}
-      <button
-        onClick={() =>
-          entry.deleted
-            ? onRestore(entry.page, entry.filename)
-            : onDelete(entry.page, entry.filename)
-        }
-        className={`absolute top-1 right-1 p-1 rounded-full shadow text-white transition-colors ${
-          entry.deleted
-            ? 'bg-gray-500 hover:bg-gray-600'
-            : 'bg-red-500 hover:bg-red-600'
-        }`}
-        title={entry.deleted ? t('step3.restore') : t('step3.delete')}
-      >
-        {entry.deleted ? <RotateCcw size={12} /> : <X size={12} />}
-      </button>
     </div>
   );
 };
@@ -1143,8 +1118,6 @@ const Upload: React.FC = () => {
                       entry={entry}
                       uploadId={uploadId}
                       authToken={authToken}
-                      onDelete={handleDeletePage}
-                      onRestore={handleRestorePage}
                       t={(key) => t(key)}
                     />
                   ) : null

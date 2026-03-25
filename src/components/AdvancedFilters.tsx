@@ -262,8 +262,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   const effectiveSelectedGenre = useMemo(() => {
     if (!selectedGenre) return null;
     const found = genreItems.find(item => item.value === selectedGenre);
-    if (found) return found.label;
-    // Q-kood → label (Wikidata žanrid)
+    if (found) return selectedGenre; // Q-kood on juba õige väärtus, ära konverdi labeliks
+    // Q-kood → label (Wikidata žanrid, keeleülene normaliseerimine)
     if (genreIdMap?.[selectedGenre]) return genreIdMap[selectedGenre];
     // Vocabulary-põhine tõlge (vocabularies-is defineeritud žanrid)
     return crossLangGenreMap[selectedGenre] || selectedGenre;
@@ -281,7 +281,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   const effectiveSelectedType = useMemo(() => {
     if (!selectedType) return null;
     const found = typeItems.find(item => item.value === selectedType);
-    if (found) return found.label;
+    if (found) return selectedType; // Q-kood on jõige väärtus, ära konverdi labeliks
     // Q-kood → label (Wikidata tüübid)
     if (typeIdMap?.[selectedType]) return typeIdMap[selectedType];
     // Vocabulary-põhine fallback
@@ -457,7 +457,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     {effectiveSelectedGenre && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700 border border-violet-200">
                         <Bookmark size={11} />
-                        {effectiveSelectedGenre}
+                        {genreIdMap?.[effectiveSelectedGenre] || effectiveSelectedGenre}
                         <button onClick={() => onGenreChange(null)} className="hover:bg-violet-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
@@ -476,7 +476,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                     {effectiveSelectedType && (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
                         <FileType size={11} />
-                        {effectiveSelectedType}
+                        {typeIdMap?.[effectiveSelectedType] || effectiveSelectedType}
                         <button onClick={() => onTypeChange(null)} className="hover:bg-sky-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}

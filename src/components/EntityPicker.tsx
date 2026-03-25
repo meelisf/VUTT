@@ -269,9 +269,10 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
               const bestId = person.ids.wikidata ? `Q${person.ids.wikidata.replace(/^Q/, '')}` :
                              person.ids.gnd ? `GND:${person.ids.gnd}` :
                              person.ids.viaf ? `VIAF:${person.ids.viaf}` : null;
-              if (!bestId || seenRegisterIds.has(bestId)) continue;
-              seenRegisterIds.add(bestId);
-              if (localIds.has(bestId)) continue;
+              const dedupeKey = bestId ?? `local-${person.primary_name}`;
+              if (seenRegisterIds.has(dedupeKey)) continue;
+              seenRegisterIds.add(dedupeKey);
+              if (bestId && localIds.has(bestId)) continue;
 
               const primaryLabel = normalizePersonName(person.primary_name);
               const displayLabel = matchingAlias && !nameMatch
@@ -279,7 +280,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
                 : undefined;
 
               registerMatches.push({
-                id: bestId,
+                id: bestId ?? `local-${person.primary_name}`,
                 label: primaryLabel,
                 displayLabel,
                 description: registerText,
