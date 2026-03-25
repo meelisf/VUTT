@@ -214,7 +214,7 @@ async def admin_trash_restore(work_id: str, user=Depends(require_role("admin")))
     return {"status": "success", "title": res.get('title')}
 
 @app.get("/admin/work/{work_id}/metadata")
-async def admin_work_metadata(work_id: str, user=Depends(require_role("editor"))):
+async def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
     """Tagastab teose _metadata.json sisu."""
     path = find_directory_by_id(work_id)
     if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
