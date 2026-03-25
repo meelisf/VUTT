@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tag, X, Loader2, Check, Replace, ListPlus, User } from 'lucide-react';
+import { Tag, X, Loader2, Check, Replace, ListPlus, User, Trash2 } from 'lucide-react';
 import EntityPicker from './EntityPicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
@@ -12,7 +12,7 @@ import { useUser } from '../contexts/UserContext';
 interface BulkTagsPickerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tags: LinkedEntity[], mode: 'add' | 'replace') => void;
+  onSave: (tags: LinkedEntity[], mode: 'add' | 'replace' | 'remove') => void;
   selectedCount: number;
 }
 
@@ -27,7 +27,7 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
   const lang = getLangCode(i18n.language);
 
   const [selectedTags, setSelectedTags] = useState<LinkedEntity[]>([]);
-  const [mode, setMode] = useState<'add' | 'replace'>('add');
+  const [mode, setMode] = useState<'add' | 'replace' | 'remove'>('add');
   const [isSaving, setIsSaving] = useState(false);
   const { suggestions, isLoadingSuggestions } = useMetadataSuggestions(isOpen, lang, 'tags');
 
@@ -55,6 +55,8 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
     setIsSaving(true);
     onSave(selectedTags, mode);
   };
+
+  const isRemoveMode = mode === 'remove';
 
   const handleClose = () => {
     setSelectedTags([]);
@@ -112,12 +114,25 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
               <Replace size={20} />
               <span className="font-medium">{t('bulkAssign.tagsMode.replace')}</span>
             </button>
+            <button
+              onClick={() => setMode('remove')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-all ${
+                mode === 'remove'
+                  ? 'border-red-500 bg-red-50 text-red-700'
+                  : 'border-gray-200 hover:border-gray-300 text-gray-600'
+              }`}
+            >
+              <Trash2 size={20} />
+              <span className="font-medium">{t('bulkAssign.tagsMode.remove')}</span>
+            </button>
           </div>
 
           {/* Mode selgitus */}
           <p className="text-xs text-gray-500 -mt-2">
             {mode === 'add'
               ? t('bulkAssign.tagsModeAddHint')
+              : mode === 'remove'
+              ? t('bulkAssign.tagsModeRemoveHint')
               : t('bulkAssign.tagsModeReplaceHint')}
           </p>
 
@@ -163,10 +178,10 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
             </div>
           )}
 
-          {/* EntityPicker märksõnade lisamiseks */}
+          {/* EntityPicker märksõnade lisamiseks/eemaldamiseks */}
           <div className="space-y-3">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">
-              {t('bulkAssign.addTag')}
+              {isRemoveMode ? t('bulkAssign.removeTag') : t('bulkAssign.addTag')}
             </label>
             {isLoadingSuggestions ? (
               <div className="flex items-center gap-2 text-gray-400 py-2">
@@ -198,8 +213,12 @@ const BulkTagsPicker: React.FC<BulkTagsPickerProps> = ({
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || (selectedTags.length === 0 && mode === 'add')}
-            className="flex items-center gap-2 px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isSaving || (selectedTags.length === 0 && mode === 'add') || (selectedTags.length === 0 && mode === 'remove')}
+            className={`flex items-center gap-2 px-6 py-2 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+              isRemoveMode
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-primary-600 hover:bg-primary-700'
+            }`}
           >
             {isSaving ? (
               <Loader2 size={18} className="animate-spin" />

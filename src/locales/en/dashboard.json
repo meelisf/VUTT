@@ -71,12 +71,15 @@
     "genreDescription": "Assign genre to {{count}} selected works.",
     "tagsMode": {
       "add": "Add to existing",
-      "replace": "Replace all"
+      "replace": "Replace all",
+      "remove": "Remove"
     },
     "tagsModeAddHint": "New tags will be added alongside existing ones",
     "tagsModeReplaceHint": "All existing tags will be replaced with new ones",
+    "tagsModeRemoveHint": "Selected tags will be removed from all selected works",
     "selectedTags": "Selected tags",
     "addTag": "Add tag",
+    "removeTag": "Remove tag",
     "searchTag": "Search tag...",
     "selectedGenre": "Selected genre",
     "selectGenreLabel": "Select genre",

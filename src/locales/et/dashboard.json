@@ -71,12 +71,15 @@
     "genreDescription": "Määra žanr {{count}} valitud teosele.",
     "tagsMode": {
       "add": "Lisa olemasolevatele",
-      "replace": "Asenda kõik"
+      "replace": "Asenda kõik",
+      "remove": "Eemalda"
     },
     "tagsModeAddHint": "Uued märksõnad lisatakse olemasolevate kõrvale",
     "tagsModeReplaceHint": "Kõik olemasolevad märksõnad asendatakse uutega",
+    "tagsModeRemoveHint": "Valitud märksõnad eemaldatakse kõikidelt valitud teostelt",
     "selectedTags": "Valitud märksõnad",
     "addTag": "Lisa märksõna",
+    "removeTag": "Eemalda märksõna",
     "searchTag": "Otsi märksõna...",
     "selectedGenre": "Valitud žanr",
     "selectGenreLabel": "Vali žanr",

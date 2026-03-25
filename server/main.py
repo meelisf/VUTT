@@ -755,6 +755,13 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
         if data.get('mode') == 'add':
             for t in data.get('tags', []):
                 if t not in cur: cur.append(t)
+        elif data.get('mode') == 'remove':
+            remove_ids = {t['id'] for t in data.get('tags', []) if t.get('id')}
+            remove_labels = {t.get('label', '').lower() for t in data.get('tags', []) if not t.get('id')}
+            cur = [t for t in cur if not (
+                (t.get('id') and t['id'] in remove_ids) or
+                (not t.get('id') and t.get('label', '').lower() in remove_labels)
+            )]
         else:
             cur = data.get('tags', [])
         save_work_metadata(

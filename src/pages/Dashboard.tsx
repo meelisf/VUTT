@@ -197,7 +197,7 @@ const Dashboard: React.FC = () => {
 
   // Type kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: typeIdMap, labelToId: typeLabelToId } = useMemo(() => {
-    const items = collectLinkedEntities(works, w => (w as any).type_object);
+    const items = collectLinkedEntities(works, w => w.type);
     return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
@@ -438,7 +438,7 @@ const Dashboard: React.FC = () => {
   };
 
   // Massiline märksõnade määramine
-  const handleBulkAssignTags = async (tags: LinkedEntity[], mode: 'add' | 'replace') => {
+  const handleBulkAssignTags = async (tags: LinkedEntity[], mode: 'add' | 'replace' | 'remove') => {
     if (selectedWorkIds.size === 0) return;
 
     setBulkAssignLoading(true);
