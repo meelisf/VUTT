@@ -263,7 +263,8 @@ def create_upload(meta: dict) -> dict:
         "remote_staging_path": f"AUTO-OCR/{upload_id}",
         "remote_work_path": f"AUTO-OCR/{upload_id}/{slug}",
         "files": [],
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
+        "replace_work_id": meta.get('replace_work_id') or None,
     }
 
     lock = _get_upload_lock(upload_id)
@@ -1120,6 +1121,248 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
 
     logger.info(f"import {upload_id}: valmis → work_id={work_id}, slug={slug}, lehed={downloaded}")
     return {"work_id": work_id, "slug": slug}
+
+
+async def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: dict, username: str, background_tasks) -> dict:
+    """
+    Asendab olemasoleva teose sisu uue OCR-itud materjaliga.
+
+    1. Laeb upload state, valideerib staatust
+    2. Leiab sihtteose kausta (target_work_id järgi)
+    3. Arhiveerib vanad JPG-d prügikasti
+    4. Git rm vanad lehed (txt + json, v.a. _metadata.json)
+    5. Laeb alla uued lehed SFTP kaudu (samasugune loogika nagu import_as_work)
+    6. Uuendab metaandmeid (kui metadata_updates pole tühi)
+    7. Git commit uuendatud sisuga
+    8. Meilisearch sünk
+    9. Märgib upload 'imported'-ks
+
+    Tagastab: {"work_id": target_work_id, "slug": slug}
+    """
+    from fastapi import HTTPException
+    from .utils import find_directory_by_id
+
+    # 1. Lae upload state
+    state_lock = _get_upload_lock(upload_id)
+    with state_lock:
+        state = _read_state(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Upload ei leitud")
+
+    current_status = state.get('status')
+    if current_status not in ('done', 'reviewing'):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Upload peab olema 'done' või 'reviewing' olekus, praegu: '{current_status}'"
+        )
+
+    # 2. Leia sihtteose kaust
+    work_dir = find_directory_by_id(target_work_id)
+    if not work_dir:
+        raise HTTPException(status_code=404, detail=f"Teos work_id='{target_work_id}' ei leitud")
+
+    # 3. Slug kaustnimest
+    slug = os.path.basename(work_dir)
+
+    # 4. Loe _metadata.json et saada originaalne work_id
+    meta_path = os.path.join(work_dir, '_metadata.json')
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        existing_meta = json.load(f)
+    work_id = existing_meta.get('id', target_work_id)
+
+    # Salvesta git HEAD rollback'i jaoks
+    from .git_ops import get_or_init_repo
+    repo = get_or_init_repo()
+    old_head = repo.head.commit.hexsha
+
+    # Lipp: kas destruktiivsed sammud on alanud (arhiveerimine/git rm)
+    destructive_started = False
+
+    # 5. Arhiveeri vanad JPG-d prügikasti
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    trash_dir = os.path.join(BASE_DIR, '._trash', target_work_id, 'replaced_content', timestamp)
+    os.makedirs(trash_dir, exist_ok=True)
+
+    destructive_started = True
+    for fname in os.listdir(work_dir):
+        if fname.endswith('.jpg') and os.path.isfile(os.path.join(work_dir, fname)):
+            shutil.move(os.path.join(work_dir, fname), os.path.join(trash_dir, fname))
+
+    logger.info(f"replace {upload_id}: vanad JPG-d arhiveeritud → {trash_dir}")
+
+    # 6. Git rm vanad lehed (txt + json, v.a. _metadata.json) — JPG-d on gitignore all
+    try:
+        old_tracked = []
+        for fname in os.listdir(work_dir):
+            if fname == '_metadata.json':
+                continue
+            if fname.endswith('.txt') or fname.endswith('.json'):
+                old_tracked.append(fname)
+                fpath = os.path.join(work_dir, fname)
+                if os.path.exists(fpath):
+                    repo.git.rm(os.path.join(slug, fname))
+        if old_tracked:
+            logger.info(f"replace {upload_id}: git rm {len(old_tracked)} vana faili")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: git rm viga: {e}")
+
+    # 7. Lae alla uued lehed SFTP kaudu
+    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
+    if not importable:
+        raise HTTPException(status_code=400, detail="Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
+    importable.sort(key=lambda f: f['page'])
+
+    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+
+    sftp = None
+    downloaded = 0
+    try:
+        sftp = _sftp_open(upload_id)
+
+        try:
+            remote_items = sftp.listdir(remote_work)
+        except Exception as e:
+            raise ValueError(f"Ei saa lugeda OCR kausta: {e}")
+
+        jpg_map = {}
+        for item in remote_items:
+            if item.endswith('.jpg') and '_pg_' in item:
+                pn = _extract_page_num(item.rsplit('.', 1)[0])
+                if pn > 0:
+                    jpg_map[pn] = item
+
+        for entry in importable:
+            pn = entry['page']
+            if pn not in jpg_map:
+                logger.warning(f"replace {upload_id}: lk {pn} JPG puudub, vahele jäetud")
+                continue
+
+            jpg_name = jpg_map[pn]
+            txt_name = jpg_name.replace('.jpg', '.txt')
+
+            base_name = f"{slug}-{work_id}-{pn:03d}"
+            local_jpg = os.path.join(work_dir, f"{base_name}.jpg")
+            local_txt = os.path.join(work_dir, f"{base_name}.txt")
+            local_json = os.path.join(work_dir, f"{base_name}.json")
+
+            sftp.get(f"{remote_work}/{jpg_name}", local_jpg)
+            os.chmod(local_jpg, 0o644)
+
+            try:
+                sftp.get(f"{remote_work}/{txt_name}", local_txt)
+            except FileNotFoundError:
+                open(local_txt, 'w').close()
+            os.chmod(local_txt, 0o644)
+
+            page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
+            with open(local_json, 'w', encoding='utf-8') as fh:
+                json.dump(page_json, fh, ensure_ascii=False, indent=2)
+            os.chmod(local_json, 0o644)
+            downloaded += 1
+
+        sftp.close()
+        sftp = None
+
+        if downloaded == 0:
+            raise ValueError("Ühtegi lehekülge ei õnnestunud alla laadida")
+
+    except (ValueError, Exception) as e:
+        # Rollback: taasta git-jälgitud failid ja JPG-d kui destruktiivsed sammud alustasid
+        if destructive_started:
+            logger.error(f"replace_work_content: rollback after error: {e}")
+            try:
+                repo.git.checkout(old_head, '--', slug)
+                logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
+            except Exception as rb_git_err:
+                logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
+            try:
+                for fname in os.listdir(trash_dir):
+                    if fname.endswith('.jpg'):
+                        shutil.move(os.path.join(trash_dir, fname), os.path.join(work_dir, fname))
+                logger.info(f"replace {upload_id}: rollback JPG-d tagasi liigutatud")
+            except Exception as rb_jpg_err:
+                logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
+        error_detail = str(e) if isinstance(e, ValueError) else f"Failide allalaadimine ebaõnnestus: {e}"
+        raise HTTPException(status_code=500, detail=error_detail)
+    finally:
+        if sftp:
+            try:
+                sftp.close()
+            except Exception:
+                pass
+
+    # 8. Uuenda metaandmeid (kui antud)
+    if metadata_updates:
+        try:
+            from .metadata_ops import save_work_metadata
+            save_work_metadata(
+                meta_path,
+                metadata_updates,
+                username,
+                "Uuenda metadata asendusel",
+                background_tasks=background_tasks,
+                sync_meili=False,
+                call_ptw=False,
+            )
+            logger.info(f"replace {upload_id}: metadata uuendatud")
+        except Exception as e:
+            logger.warning(f"replace {upload_id}: metadata uuendamine ebaõnnestus: {e}")
+
+    # 9. Git commit uuendatud sisuga
+    try:
+        from .git_ops import get_or_init_repo
+        from git import Actor
+        repo = get_or_init_repo()
+        repo.git.add(slug)
+        if repo.is_dirty(index=True):
+            author_name = username if username else "Automaatne"
+            actor = Actor(author_name, f"{author_name}@vutt.local")
+            repo.index.commit(
+                f"Asenda sisu: {slug} ({work_id})",
+                author=actor,
+                committer=actor,
+            )
+            logger.info(f"replace {upload_id}: git commit OK ({slug})")
+        else:
+            logger.info(f"replace {upload_id}: git — muutusi pole, commit vahele jäetud")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: git commit ebaõnnestus: {e}")
+
+    # 10. Meilisearch sünk
+    try:
+        from .meilisearch_ops import sync_work_to_meilisearch
+        ok = sync_work_to_meilisearch(slug)
+        if ok:
+            logger.info(f"replace {upload_id}: meilisearch sync OK ({slug})")
+        else:
+            logger.warning(f"replace {upload_id}: meilisearch sync ebaõnnestus ({slug})")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: meilisearch sync viga: {e}")
+
+    # 11. Koristame OCR serveri (mitte kriitiline)
+    remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    try:
+        transport = get_or_create_ssh(upload_id)
+        chan = transport.open_session()
+        chan.set_combine_stderr(True)
+        chan.exec_command(f'rm -rf "{remote_staging}"')
+        chan.recv_exit_status()
+        chan.close()
+        close_ssh(upload_id)
+        logger.info(f"replace {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: OCR koristamine ebaõnnestus: {e}")
+
+    # 12. Märgi upload 'imported'-ks
+    with state_lock:
+        s = _read_state(upload_id)
+        if s:
+            s['status'] = 'imported'
+            s['replace_work_id'] = target_work_id
+            _write_state(upload_id, s)
+
+    logger.info(f"replace {upload_id}: valmis → work_id={target_work_id}, slug={slug}, lehed={downloaded}")
+    return {"work_id": target_work_id, "slug": slug}
 
 
 def cancel_upload(upload_id: str) -> bool:

@@ -28,6 +28,7 @@ import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
+import { searchWorks } from '../services/searchService';
 
 // ---------------------------------------------------------------------------
 // Tüübid
@@ -212,6 +213,15 @@ const Upload: React.FC = () => {
   const [step1Loading, setStep1Loading] = useState(false);
   const [step1Error, setStep1Error] = useState('');
 
+  // --- Asenda olemasolevat teost ---
+  const [replaceWorkId, setReplaceWorkId] = useState<string | null>(null);
+  const [replaceWorkTitle, setReplaceWorkTitle] = useState<string | null>(null);
+  const [replaceSearch, setReplaceSearch] = useState('');
+  const [replaceResults, setReplaceResults] = useState<Array<{ work_id: string; title: string; year: number | null }>>([]);
+  const [replaceSearching, setReplaceSearching] = useState(false);
+  const [replaceDropdownOpen, setReplaceDropdownOpen] = useState(false);
+  const replaceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // --- Samm 2 ---
   const [dragging, setDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -261,6 +271,73 @@ const Upload: React.FC = () => {
   useEffect(() => {
     setStep1Error('');
   }, [slug, year]);
+
+  // ---------------------------------------------------------------------------
+  // Puhasta debounce timer unmount korral
+  // ---------------------------------------------------------------------------
+  useEffect(() => () => {
+    if (replaceDebounceRef.current) clearTimeout(replaceDebounceRef.current);
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Asenda olemasolevat teost — debounce otsing
+  // ---------------------------------------------------------------------------
+  function handleReplaceSearchChange(q: string) {
+    setReplaceSearch(q);
+    setReplaceDropdownOpen(true);
+    if (replaceDebounceRef.current) clearTimeout(replaceDebounceRef.current);
+    if (!q.trim()) {
+      setReplaceResults([]);
+      setReplaceDropdownOpen(false);
+      return;
+    }
+    replaceDebounceRef.current = setTimeout(async () => {
+      setReplaceSearching(true);
+      try {
+        const res = await searchWorks(q, { sort: 'relevance' });
+        setReplaceResults(
+          res.works.slice(0, 8).map((w) => ({ work_id: w.work_id, title: w.title, year: w.year ?? null }))
+        );
+      } catch {
+        setReplaceResults([]);
+      } finally {
+        setReplaceSearching(false);
+      }
+    }, 300);
+  }
+
+  async function handleReplaceWorkSelect(workId: string, workTitle: string) {
+    setReplaceWorkId(workId);
+    setReplaceWorkTitle(workTitle);
+    setReplaceSearch('');
+    setReplaceResults([]);
+    setReplaceDropdownOpen(false);
+    // Täida samm 1 vormiväljad teose metaandmetest
+    if (!authToken) return;
+    try {
+      const r = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/work/${workId}/metadata`,
+        { headers: getAuthHeaders(authToken) }
+      );
+      if (!r.ok) return;
+      const meta = await r.json();
+      if (meta.title) setTitle(meta.title);
+      if (meta.year) setYear(String(meta.year));
+      if (Array.isArray(meta.collections) && meta.collections.length > 0) {
+        setSelectedCollection(meta.collections[0]);
+      }
+    } catch {
+      // Algväärtused jäävad
+    }
+  }
+
+  function handleReplaceDismiss() {
+    setReplaceWorkId(null);
+    setReplaceWorkTitle(null);
+    setReplaceSearch('');
+    setReplaceResults([]);
+    setReplaceDropdownOpen(false);
+  }
 
   // ---------------------------------------------------------------------------
   // Polling
@@ -330,6 +407,7 @@ const Upload: React.FC = () => {
             year: year.trim(),
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
+            replace_work_id: replaceWorkId || null,
           }),
         });
         const d = await r.json();
@@ -546,6 +624,38 @@ const Upload: React.FC = () => {
   }
 
   // ---------------------------------------------------------------------------
+  // Asenda olemasoleva teose sisu (replace-work endpoint)
+  // ---------------------------------------------------------------------------
+  async function handleReplaceImport() {
+    if (!uploadId || !replaceWorkId || !authToken) return;
+    setImportLoading(true);
+    setImportError('');
+    try {
+      const r = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/upload/${uploadId}/replace-work/${replaceWorkId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({ metadata_updates: {} }),
+          timeout: 30_000,
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) {
+        setImportError(d.message || t('step3.importError'));
+        return;
+      }
+      stopPolling();
+      setFileUploading(false);
+      navigate(`/work/${d.work_id}/1`);
+    } catch {
+      setImportError(t('step3.importError'));
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sulge viisard (upload jääb taustal tööle)
   // ---------------------------------------------------------------------------
   function handleClose() {
@@ -563,6 +673,8 @@ const Upload: React.FC = () => {
     setPendingMultiFiles([]);
     setMultiCurrentNum(0);
     setMultiTotalNum(0);
+    setReplaceWorkId(null);
+    setReplaceWorkTitle(null);
     // Värskenda pooleliolevate nimekirja
     if (authToken) {
       fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, { headers: getAuthHeaders(authToken) })
@@ -597,6 +709,8 @@ const Upload: React.FC = () => {
     setPendingMultiFiles([]);
     setMultiCurrentNum(0);
     setMultiTotalNum(0);
+    setReplaceWorkId(null);
+    setReplaceWorkTitle(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -783,6 +897,67 @@ const Upload: React.FC = () => {
         {step === 1 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-5">{t('step1.title')}</h2>
+
+            {/* Asenda olemasolevat teost */}
+            <div className="mb-6 border border-amber-200 rounded-lg bg-amber-50/60 overflow-hidden">
+              <div className="px-4 py-2.5 bg-amber-100/70 border-b border-amber-200 flex items-center gap-2">
+                <span className="text-xs font-semibold text-amber-900">{t('replaceWork.label')}</span>
+                <span className="text-xs text-amber-600 font-normal">({t('replaceWork.none')})</span>
+              </div>
+              <div className="p-3">
+                {replaceWorkId ? (
+                  /* Valitud olek */
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                    <span className="text-xs font-medium text-amber-800">{t('replaceWork.selected')}</span>
+                    <span className="text-xs text-amber-900 font-semibold flex-1 truncate">{replaceWorkTitle}</span>
+                    <button
+                      type="button"
+                      onClick={handleReplaceDismiss}
+                      className="p-0.5 text-amber-600 hover:text-red-600 transition-colors shrink-0"
+                      title="Eemalda asendus"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  /* Otsinguväli */
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={replaceSearch}
+                      onChange={(e) => handleReplaceSearchChange(e.target.value)}
+                      onFocus={() => replaceSearch.trim() && setReplaceDropdownOpen(true)}
+                      onBlur={() => setTimeout(() => setReplaceDropdownOpen(false), 150)}
+                      placeholder={t('replaceWork.placeholder')}
+                      className="w-full border border-amber-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white placeholder-gray-400"
+                    />
+                    {replaceSearching && (
+                      <Loader2 size={14} className="absolute right-3 top-2.5 text-gray-400 animate-spin" />
+                    )}
+                    {replaceDropdownOpen && replaceResults.length > 0 && (
+                      <div className="absolute z-10 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                        {replaceResults.map((w) => (
+                          <button
+                            key={w.work_id}
+                            type="button"
+                            onMouseDown={() => handleReplaceWorkSelect(w.work_id, w.title)}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-amber-50 transition-colors border-b border-gray-100 last:border-0"
+                          >
+                            <span className="font-medium text-gray-800 block truncate">{w.title}</span>
+                            {w.year && <span className="text-xs text-gray-400">{w.year}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <p className="text-xs text-amber-700 mt-2 flex items-start gap-1">
+                  <AlertTriangle size={11} className="shrink-0 mt-0.5" />
+                  {t('replaceWork.warning')}
+                </p>
+              </div>
+            </div>
 
             {/* Pealkiri */}
             <div className="mb-4">
@@ -1084,6 +1259,8 @@ const Upload: React.FC = () => {
                 initialTitle={title}
                 initialYear={year}
                 initialCollections={selectedCollection ? [selectedCollection] : []}
+                replaceWorkId={replaceWorkId}
+                replaceWorkTitle={replaceWorkTitle}
               />
             )}
 
@@ -1132,19 +1309,35 @@ const Upload: React.FC = () => {
                 {importError}
               </div>
             )}
-            <button
-              onClick={handleImport}
-              disabled={!canImport}
-              title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
-              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-            >
-              {importLoading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <CheckCircle size={16} />
-              )}
-              {t('step3.importBtn')}
-            </button>
+            {replaceWorkId && replaceWorkTitle ? (
+              <button
+                onClick={handleReplaceImport}
+                disabled={!canImport}
+                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                {importLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <AlertTriangle size={16} />
+                )}
+                {t('replaceWork.replaceBtn', { title: replaceWorkTitle ?? '' })}
+              </button>
+            ) : (
+              <button
+                onClick={handleImport}
+                disabled={!canImport}
+                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                {importLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={16} />
+                )}
+                {t('step3.importBtn')}
+              </button>
+            )}
           </div>
         )}
 

@@ -6,7 +6,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Save, Plus, Trash2, X, Loader2, CheckCircle } from 'lucide-react';
+import { Save, Plus, Trash2, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Creator, CreatorRole } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
@@ -25,6 +25,10 @@ interface UploadMetaFormProps {
   initialTitle?: string;
   initialYear?: string;
   initialCollections?: string[];
+  /** Asendatava teose ID (kui kasutaja valis samm 1-s asendusteose) */
+  replaceWorkId?: string | null;
+  /** Asendatava teose pealkiri (kuvamiseks) */
+  replaceWorkTitle?: string | null;
 }
 
 interface MetaForm {
@@ -71,6 +75,8 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
   initialTitle = '',
   initialYear = '',
   initialCollections = [],
+  replaceWorkId = null,
+  replaceWorkTitle = null,
 }) => {
   const { t, i18n } = useTranslation(['upload', 'workspace', 'common']);
   const lang = getLangCode(i18n.language);
@@ -235,6 +241,17 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Asendatava teose indikaator */}
+        {replaceWorkId && replaceWorkTitle && (
+          <div className="flex items-start gap-2 p-2 bg-amber-100 border border-amber-300 rounded-lg text-xs">
+            <AlertTriangle size={13} className="text-amber-600 shrink-0 mt-0.5" />
+            <span className="text-amber-800">
+              {t('replaceWork.selected')}{' '}
+              <span className="font-semibold">{replaceWorkTitle}</span>
+            </span>
+          </div>
+        )}
+
         {/* Pealkiri */}
         <div>
           <label className="block text-xs font-bold text-gray-500 uppercase mb-1">
