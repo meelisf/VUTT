@@ -220,6 +220,8 @@
     "saving": "Salvestan...",
     "saved": "Salvestatud",
     "saveError": "Salvestamine ebaõnnestus",
+    "saveErrorWithMessage": "Viga salvestamisel: {{message}}",
+    "saveErrorServer": "Serveri viga andmete salvestamisel.",
     "save": "Salvesta",
     "lastModified": "Viimati muudetud",
     "by": "muutja",

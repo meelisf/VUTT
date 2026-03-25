@@ -220,6 +220,8 @@
     "saving": "Saving...",
     "saved": "Saved",
     "saveError": "Save failed",
+    "saveErrorWithMessage": "Error saving: {{message}}",
+    "saveErrorServer": "Server error saving data.",
     "save": "Save",
     "lastModified": "Last modified",
     "by": "by",

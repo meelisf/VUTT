@@ -355,7 +355,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
-      setSaveError(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
+      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
@@ -375,7 +375,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
-      setSaveError(`Viga salvestamisel: ${e.message || 'Tundmatu viga'}`);
+      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);

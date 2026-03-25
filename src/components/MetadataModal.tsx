@@ -418,12 +418,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         }, 1500);
       } else {
         setSaveStatus('error');
-        setSaveError('Viga salvestamisel: ' + data.message);
+        setSaveError(t('editor.saveErrorWithMessage', { message: data.message }));
       }
     } catch (e) {
       console.error("Metadata save failed", e);
       setSaveStatus('error');
-      setSaveError('Serveri viga andmete salvestamisel.');
+      setSaveError(t('editor.saveErrorServer'));
     } finally {
       setIsSaving(false);
     }

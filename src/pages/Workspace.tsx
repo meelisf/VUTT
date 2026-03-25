@@ -462,7 +462,7 @@ const Workspace: React.FC = () => {
       </div>
 
       {saveError && (
-        <div className="hidden md:block px-4 py-2 shrink-0 z-40">
+        <div className="px-4 py-2 shrink-0 z-40">
           <ErrorBanner message={saveError} onClose={() => setSaveError(null)} />
         </div>
       )}
