@@ -305,11 +305,11 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 
     const searchParams: any = {
       attributesToRetrieve: [
-        'id', 'work_id', 'title', 'year', 'year_display', 'location', 'publisher', 'publisher_id',
-        'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
-        'creators', 'authors_text', 'tags', 'tags_object', 'languages',
+        'id', 'work_id', 'title', 'year', 'year_display', 'publisher_id',
+        'type_object', 'genre_object', 'collections', 'collections_hierarchy',
+        'creators', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
-        'originaal_kataloog', 'lehekylje_number', 'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
+        'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text'], // Dashboard otsib pealkirjast ja autoritest
       filter: filter,
