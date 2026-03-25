@@ -408,7 +408,7 @@ const Review: React.FC = () => {
       <Header />
 
       {/* Main content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8">
         {isAdmin && (
           <Link to="/admin" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6">
             <ChevronLeft size={16} />

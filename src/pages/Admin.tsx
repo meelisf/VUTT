@@ -89,7 +89,7 @@ const Admin: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header showSearchButton={false} pageTitle="Admin" />
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {cards.map(card => (
             <Link
