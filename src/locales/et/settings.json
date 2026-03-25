@@ -9,8 +9,8 @@
   "workspace": {
     "heading": "Töölaud",
     "defaultTab": {
-      "label": "Vaikimisi tab",
-      "description": "Milline tab avaneb teose avamisel"
+      "label": "Vaikimisi sakk",
+      "description": "Milline sakk avaneb teose avamisel"
     },
     "edit": "Muutmine",
     "info": "Info & annotatsioonid"
