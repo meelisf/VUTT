@@ -147,6 +147,7 @@ describe('buildLinkedEntityMaps', () => {
 
   it('ilma Q-koodita entity → label kaardistub idToLabel-is aga labelToId jääb tühjaks', () => {
     const noId: LinkedEntity = {
+      id: null,
       label: 'käsikiri',
       source: 'manual',
       labels: { et: 'käsikiri', en: 'manuscript' },
