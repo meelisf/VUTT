@@ -61,13 +61,25 @@ const SearchPage: React.FC = () => {
     const workHitCounts = results?.facetDistribution?.['work_id'] || {};
     const uniqueWorkIds = new Set(results?.hits?.map(h => h.work_id) || []);
     const availableWorks = (results?.hits && !urlParams.workId && !loading && uniqueWorkIds.size > 1)
-        ? results.hits.map(hit => ({
-            id: hit.work_id,
-            title: hit.title || hit.work_id,
-            year: typeof hit.year === 'number' ? hit.year : undefined,
-            author: (() => { const a = (hit as any).autor; return Array.isArray(a) ? a[0] : a; })(),
-            count: workHitCounts[hit.work_id] || 1
-        }))
+        ? (() => {
+            const seenIds = new Set<string>();
+            return results.hits.reduce<Array<{id: string; title: string; year?: number; author?: string; count: number}>>(
+                (acc, hit) => {
+                    if (!seenIds.has(hit.work_id)) {
+                        seenIds.add(hit.work_id);
+                        acc.push({
+                            id: hit.work_id,
+                            title: hit.title || hit.work_id,
+                            year: typeof hit.year === 'number' ? hit.year : undefined,
+                            author: (() => { const a = (hit as any).autor; return Array.isArray(a) ? a[0] : a; })(),
+                            count: workHitCounts[hit.work_id] || 1
+                        });
+                    }
+                    return acc;
+                },
+                []
+            );
+        })()
         : [];
 
     const resolveLabel = (qCode: string, fallbackMap?: Record<string, string>) => {
