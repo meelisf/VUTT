@@ -1169,11 +1169,20 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
         existing_meta = json.load(f)
     work_id = existing_meta.get('id', target_work_id)
 
+    # Salvesta git HEAD rollback'i jaoks
+    from .git_ops import get_or_init_repo
+    repo = get_or_init_repo()
+    old_head = repo.head.commit.hexsha
+
+    # Lipp: kas destruktiivsed sammud on alanud (arhiveerimine/git rm)
+    destructive_started = False
+
     # 5. Arhiveeri vanad JPG-d prügikasti
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     trash_dir = os.path.join(BASE_DIR, '._trash', target_work_id, 'replaced_content', timestamp)
     os.makedirs(trash_dir, exist_ok=True)
 
+    destructive_started = True
     for fname in os.listdir(work_dir):
         if fname.endswith('.jpg') and os.path.isfile(os.path.join(work_dir, fname)):
             shutil.move(os.path.join(work_dir, fname), os.path.join(trash_dir, fname))
@@ -1182,8 +1191,6 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
 
     # 6. Git rm vanad lehed (txt + json, v.a. _metadata.json) — JPG-d on gitignore all
     try:
-        from .git_ops import get_or_init_repo
-        repo = get_or_init_repo()
         old_tracked = []
         for fname in os.listdir(work_dir):
             if fname == '_metadata.json':
@@ -1258,10 +1265,24 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
         if downloaded == 0:
             raise ValueError("Ühtegi lehekülge ei õnnestunud alla laadida")
 
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failide allalaadimine ebaõnnestus: {e}")
+    except (ValueError, Exception) as e:
+        # Rollback: taasta git-jälgitud failid ja JPG-d kui destruktiivsed sammud alustasid
+        if destructive_started:
+            logger.error(f"replace_work_content: rollback after error: {e}")
+            try:
+                repo.git.checkout(old_head, '--', slug)
+                logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
+            except Exception as rb_git_err:
+                logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
+            try:
+                for fname in os.listdir(trash_dir):
+                    if fname.endswith('.jpg'):
+                        shutil.move(os.path.join(trash_dir, fname), os.path.join(work_dir, fname))
+                logger.info(f"replace {upload_id}: rollback JPG-d tagasi liigutatud")
+            except Exception as rb_jpg_err:
+                logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
+        error_detail = str(e) if isinstance(e, ValueError) else f"Failide allalaadimine ebaõnnestus: {e}"
+        raise HTTPException(status_code=500, detail=error_detail)
     finally:
         if sftp:
             try:
@@ -1317,7 +1338,21 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
     except Exception as e:
         logger.warning(f"replace {upload_id}: meilisearch sync viga: {e}")
 
-    # 11. Märgi upload 'imported'-ks
+    # 11. Koristame OCR serveri (mitte kriitiline)
+    remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    try:
+        transport = get_or_create_ssh(upload_id)
+        chan = transport.open_session()
+        chan.set_combine_stderr(True)
+        chan.exec_command(f'rm -rf "{remote_staging}"')
+        chan.recv_exit_status()
+        chan.close()
+        close_ssh(upload_id)
+        logger.info(f"replace {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
+    except Exception as e:
+        logger.warning(f"replace {upload_id}: OCR koristamine ebaõnnestus: {e}")
+
+    # 12. Märgi upload 'imported'-ks
     with state_lock:
         s = _read_state(upload_id)
         if s:
