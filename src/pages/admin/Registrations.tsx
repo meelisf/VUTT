@@ -239,7 +239,7 @@ const Registrations: React.FC = () => {
                   </a>
                 </div>
                 <p className="text-xs text-green-600 mt-2">
-                  Aegub: {formatDate(inviteResult.expires_at)}
+                  {t('registrations.expires')}: {formatDate(inviteResult.expires_at)}
                 </p>
               </div>
               <button
@@ -335,7 +335,7 @@ const Registrations: React.FC = () => {
           {processedRegistrations.length > 0 && (
             <section>
               <h2 className="text-lg font-semibold text-gray-800 mb-4">
-                Käsitletud taotlused ({processedRegistrations.length})
+                {t('registrations.processed')} ({processedRegistrations.length})
               </h2>
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                 <table className="w-full">
@@ -344,7 +344,7 @@ const Registrations: React.FC = () => {
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.name')}</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.email')}</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.submitted')}</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Staatus</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('registrations.status')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">

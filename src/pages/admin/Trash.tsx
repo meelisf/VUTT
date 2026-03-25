@@ -34,6 +34,7 @@ const Trash: React.FC = () => {
   const [trashLoaded, setTrashLoaded] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [restoreMessage, setRestoreMessage] = useState<string | null>(null);
+  const [isRestoreError, setIsRestoreError] = useState(false);
 
   useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -73,6 +74,7 @@ const Trash: React.FC = () => {
   const handleRestore = async (workId: string, title: string) => {
     setRestoringId(workId);
     setRestoreMessage(null);
+    setIsRestoreError(false);
     try {
       const response = await fetchWithTimeout(
         `${FILE_API_URL}/admin/trash/${workId}/restore`,
@@ -86,12 +88,15 @@ const Trash: React.FC = () => {
       const data = await response.json();
       if (data.status === 'success') {
         setRestoreMessage(t('trash.restoreSuccess', { title: data.title || title }));
+        setIsRestoreError(false);
         setTrashItems(prev => prev.filter(item => item.work_id !== workId));
       } else {
         setRestoreMessage(`${t('trash.restoreError')}: ${data.detail || data.message || t('common:error.unknown')}`);
+        setIsRestoreError(true);
       }
     } catch {
       setRestoreMessage(t('trash.restoreError'));
+      setIsRestoreError(true);
     } finally {
       setRestoringId(null);
     }
@@ -134,7 +139,7 @@ const Trash: React.FC = () => {
 
           {restoreMessage && (
             <div className={`p-3 rounded-lg text-sm border ${
-              restoreMessage.includes(t('trash.restoreError').split(':')[0])
+              isRestoreError
                 ? 'bg-red-50 border-red-200 text-red-700'
                 : 'bg-green-50 border-green-200 text-green-700'
             }`}>
