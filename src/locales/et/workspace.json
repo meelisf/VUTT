@@ -42,6 +42,7 @@
     "deletions": "eemaldatud",
     "emptyDiff": "Muudatused puuduvad",
     "diffError": "Muudatuste laadimine ebaõnnestus",
+    "onlyTimestampChanges": "Ainult tehnilised muudatused (ajatempleid uuendatud)",
     "action": {
       "text_edit": "Muutis teksti",
       "status_change": "Muutis staatust",

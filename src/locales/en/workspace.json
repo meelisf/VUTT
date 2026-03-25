@@ -42,6 +42,7 @@
     "deletions": "removed",
     "emptyDiff": "No changes found",
     "diffError": "Failed to load changes",
+    "onlyTimestampChanges": "Only technical changes (timestamps updated)",
     "action": {
       "text_edit": "Edited text",
       "status_change": "Changed status",

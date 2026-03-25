@@ -281,7 +281,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     if (result.length === 0) {
       return (
         <div className="p-4 text-center text-gray-400 italic text-sm">
-          Ainult tehnilised muudatused (ajatempleid uuendatud)
+          {t('history.onlyTimestampChanges')}
         </div>
       );
     }
