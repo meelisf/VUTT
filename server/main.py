@@ -117,6 +117,9 @@ async def login(request: Request):
 
 @app.post("/verify-token")
 async def verify_token(request: Request):
+    # NB: See endpoint kasutab tahtlikult POST body tokenit, mitte Bearer päist.
+    # Põhjus: endpoint verifitseerib tokenit iseennast — get_user() dependency
+    # nõuaks kehtivat tokenit, mida me just kontrollima hakkame.
     data = await request.json()
     token = data.get("token", "").strip()
     user, error = require_token({"auth_token": token})
@@ -446,7 +449,6 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         form: FormData = await request.form()
         file: UploadFile = form.get('file')
         after_page_num = int(form.get('after_page_num', -1))
-        # ocr_requested = form.get('ocr_requested', 'false').lower() == 'true'  # tulevikuks
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
 
@@ -833,7 +835,7 @@ async def admin_upload_files(upload_id: str, request: Request, user=Depends(requ
             async for chunk in request.stream():
                 f.write(chunk)
         import asyncio
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         if x_pg > 0:
             pages = await loop.run_in_executor(None, add_image_page, upload_id, tmp_path, x_pg, x_total)
         else:
