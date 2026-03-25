@@ -307,7 +307,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       attributesToRetrieve: [
         'id', 'work_id', 'title', 'year', 'year_display', 'publisher_id',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
-        'creators', 'tags_object', 'languages',
+        'creators', 'authors_text', 'tags_object', 'languages',
         'series', 'series_title', 'ester_id', 'external_url',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
