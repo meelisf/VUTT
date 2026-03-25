@@ -1309,7 +1309,7 @@ const Upload: React.FC = () => {
                 {importError}
               </div>
             )}
-            {replaceWorkId ? (
+            {replaceWorkId && replaceWorkTitle ? (
               <button
                 onClick={handleReplaceImport}
                 disabled={!canImport}
