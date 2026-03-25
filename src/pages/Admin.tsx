@@ -5,6 +5,7 @@ import { UserPlus, Users, Upload, Library, History, Trash2 } from 'lucide-react'
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { FILE_API_URL } from '../config';
 
 const FILE_SERVER = import.meta.env.VITE_FILE_SERVER_URL;
 
@@ -42,7 +43,7 @@ const Admin: React.FC = () => {
         setPendingCount(pending);
       })
       .catch(() => {});
-    fetchWithTimeout(`${FILE_SERVER}/admin/uploads`, {
+    fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, {
       headers: getAuthHeaders(authToken),
     })
       .then(r => r.json())
