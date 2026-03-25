@@ -169,6 +169,4 @@ Workspace kasutab jagatud `UserMenu` komponenti oma kompaktses päises. Workspac
 ## Väljaspool skoopi
 
 - Isikute osa põhjalikum läbitöötamine (eraldi teema)
-- Muudatused lehe sisu refaktoring (praegu toimiv)
-- Pending-edit / contributor rolli süsteem (eraldi otsus)
 - LanguageSwitcher eemaldamine header'ist (võimalik tulevikus pärast Seadete lehe kasutuselevõttu)
