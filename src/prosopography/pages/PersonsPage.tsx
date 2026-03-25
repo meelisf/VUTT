@@ -33,6 +33,18 @@ const PersonsPage: React.FC = () => {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [occupationFacets, setOccupationFacets] = useState<{ value: string; label: string; count: number }[]>([]);
 
+  // Eraldi state otsingukastile — debounce enne URL uuendamist
+  const [inputValue, setInputValue] = useState(query);
+  // Sünkroniseeri inputValue kui URL muutub väljastpoolt (nt tagasinupp)
+  useEffect(() => { setInputValue(query); }, [query]);
+  // Debounce: uuenda URL 300ms pärast viimast klahvivajutust
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (inputValue !== query) setFilterParam('q', inputValue);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inputValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const setFilterParam = (key: string, value: string) =>
     setSearchParams(p => {
       const n = new URLSearchParams(p);
@@ -228,15 +240,15 @@ const PersonsPage: React.FC = () => {
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               <input
                 type="search"
-                value={query}
-                onChange={e => setQuery(e.target.value)}
+                value={inputValue}
+                onChange={e => setInputValue(e.target.value)}
                 placeholder={t('searchPlaceholder', 'Otsi nime järgi…')}
-                className={`w-full pl-9 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 ${query ? 'pr-8' : 'pr-4'}`}
+                className={`w-full pl-9 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-400 ${inputValue ? 'pr-8' : 'pr-4'}`}
               />
-              {query && (
+              {inputValue && (
                 <button
                   type="button"
-                  onClick={() => setQuery('')}
+                  onClick={() => { setInputValue(''); setQuery(''); }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                   tabIndex={-1}
                   aria-label={t('common:form.clearSearch')}

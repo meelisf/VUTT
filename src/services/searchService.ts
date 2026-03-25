@@ -266,10 +266,10 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
       filter.push(`teose_staatus = "${options.workStatus}"`);
     }
     // Teose märksõnade filter (AND loogika - teos peab vastama kõigile valitud märksõnadele)
-    // Q-kood → tags_ids, label → keelespetsiifiline väli
+    // Q-kood või vutt:-ID → tags_ids, label → keelespetsiifiline väli
     if (options?.teoseTags && options.teoseTags.length > 0) {
       for (const tag of options.teoseTags) {
-        if (isQCode(tag)) {
+        if (isQCode(tag) || tag.startsWith('vutt:')) {
           filter.push(`tags_ids = "${tag}"`);
         } else {
           filter.push(`(tags_et = "${tag}" OR tags_en = "${tag}")`);
@@ -429,10 +429,10 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
   // Teose märksõnade filter (AND loogika)
-  // Q-kood → tags_ids, label → bilinguaalne OR
+  // Q-kood või vutt:-ID → tags_ids, label → bilinguaalne OR
   if (options.teoseTags && options.teoseTags.length > 0) {
     for (const tag of options.teoseTags) {
-      if (isQCode(tag)) {
+      if (isQCode(tag) || tag.startsWith('vutt:')) {
         filter.push(`tags_ids = "${tag}"`);
       } else {
         filter.push(`(tags_et = "${tag}" OR tags_en = "${tag}")`);

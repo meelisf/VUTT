@@ -57,6 +57,7 @@ interface FilterSectionProps {
   selectedValues: string[];
   onToggle: (value: string) => void;
   searchPlaceholder: string;
+  getUnselectedClass?: (value: string) => string;
 }
 
 const FilterSection: React.FC<FilterSectionProps> = ({
@@ -65,7 +66,8 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   items,
   selectedValues,
   onToggle,
-  searchPlaceholder
+  searchPlaceholder,
+  getUnselectedClass
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const showSearch = items.length > 8;
@@ -114,7 +116,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
                     isSelected
                       ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : (getUnselectedClass ? getUnselectedClass(value) : 'bg-gray-100 text-gray-700 hover:bg-gray-200')
                   }`}
                 >
                   {label} <span className="opacity-60 text-xs">({count})</span>
@@ -421,6 +423,11 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                   selectedValues={effectiveSelectedTags}
                   onToggle={toggleTag}
                   searchPlaceholder={t('filters.searchTag', 'Otsi märksõna...')}
+                  getUnselectedClass={(value) =>
+                    value.startsWith('vutt:')
+                      ? 'bg-sky-50 text-sky-600 hover:bg-sky-100 border border-sky-200'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }
                 />
               )}
 

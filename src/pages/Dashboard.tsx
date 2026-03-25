@@ -18,10 +18,9 @@ import { LinkedEntity } from '../types/LinkedEntity';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FILE_API_URL } from '../config';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
-import { getLabel } from '../utils/metadataUtils';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 
 const ITEMS_PER_PAGE = 12;
@@ -31,7 +30,7 @@ const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
-  const { user, authToken } = useUser();
+  const { user } = useUser();
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -198,7 +197,7 @@ const Dashboard: React.FC = () => {
 
   // Type kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: typeIdMap, labelToId: typeLabelToId } = useMemo(() => {
-    const items = collectLinkedEntities(works, w => w.type);
+    const items = collectLinkedEntities(works, w => (w as any).type_object);
     return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
   }, [works, i18n.language, enrichedLabels]);
 
@@ -214,11 +213,11 @@ const Dashboard: React.FC = () => {
     const map: Record<string, string> = {};
     for (const work of works) {
       const id = work.publisher_id;
-      const label = getLabel(work.publisher, lang);
+      const label = work.publisher?.label;
       if (id && label) map[id] = label;
     }
     return map;
-  }, [works, i18n.language]);
+  }, [works]);
 
   // Debounce input updates to URL
   useEffect(() => {
@@ -405,10 +404,12 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
+      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
           mode: collectionId === null ? 'set' : 'add',
@@ -442,10 +443,12 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
+      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           tags,
           mode
@@ -476,10 +479,12 @@ const Dashboard: React.FC = () => {
 
     setBulkAssignLoading(true);
     try {
+      const token = localStorage.getItem('vutt_token');
       const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          auth_token: token,
           work_ids: Array.from(selectedWorkIds),
           genre,
           mode: genre ? 'add' : 'set'
@@ -544,7 +549,7 @@ const Dashboard: React.FC = () => {
                     onClick={() => setInputValue('')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                     tabIndex={-1}
-                    aria-label={t('common:form.clearSearch')}
+                    aria-label="Tühjenda otsing"
                   >
                     <X size={18} />
                   </button>
