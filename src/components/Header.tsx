@@ -50,7 +50,9 @@ const Header: React.FC<HeaderProps> = ({
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
     const dashboardUrl = sessionStorage.getItem('vutt_dashboard_url') || '/';
-    headerNavigate(dashboardUrl);
+    const url = new URL(dashboardUrl, window.location.origin);
+    url.searchParams.delete('page');
+    headerNavigate(url.pathname + (url.search ? url.search : ''));
   };
 
   return (
