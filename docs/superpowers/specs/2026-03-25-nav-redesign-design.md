@@ -61,16 +61,20 @@ settings.workspace.info     — "Info & annotatsioonid" / "Info & annotations"
 - Salvestamine: `localStorage` võti `vutt_workspace_default_tab = "edit" | "info"`
 - Rakendub koheselt, ilma eraldi "Salvesta" nuputa
 
-**Workspace.tsx muudatused (issue #10 lahendus):**
-`Workspace.tsx` desktopil **ei ole praegu tab-mudelit** — see on fikseeritud split-view (pilt vasakul, editor paremal). `WorkspaceMobileView.tsx`-il on tabs (`'image' | 'text' | 'info'`), aga need on teistsugused kui edit/info.
+**Workspace.tsx / TextEditor.tsx muudatused (issue #10 lahendus):**
+Tabid elavad `TextEditor` komponendis (`src/components/TextEditor.tsx`), mitte `Workspace.tsx`-is. `TextEditor`-il on kolm tabi: `'edit' | 'annotate' | 'history'`, algväärtus `'edit'`.
 
-See tähendab et issue #10 lahendus nõuab esmalt desktop tab UI loomist:
-1. Lisada tab-riba Workspace desktop vaatesse (`'edit' | 'info'`)
-2. Conditional rendering: `edit` tab näitab editori, `info` tab näitab annotatsioone/metaandmeid
-3. Tab algväärtus loetakse localStorage-ist: `localStorage.getItem('vutt_workspace_default_tab') ?? 'edit'`
-4. Seadete leht kirjutab sama võtme
+Muudatus on lihtne — `TextEditor.tsx` real 103:
+```tsx
+// Praegu:
+const [activeTab, setActiveTab] = useState<TabType>('edit');
+// Uus:
+const [activeTab, setActiveTab] = useState<TabType>(
+  () => (localStorage.getItem('vutt_workspace_default_tab') as TabType) ?? 'edit'
+);
+```
 
-See on suurem muudatus kui esmapilgul tundus — tab UI loomine Workspace desktopile on eraldi komponentide töö. Implementeerija peab otsustama kas `'info'` tab näitab `AnnotationsTab` sisu, `MetadataModal` sisu, või mõlemat.
+Seadete leht kirjutab `vutt_workspace_default_tab = "edit" | "annotate"` (mitte `"info"` — vastab `TabType` väärtustele). `"history"` ei pakuta vaikimisi valikuna.
 
 Lahendab GitHub issue #10.
 
@@ -128,8 +132,8 @@ Workspace kasutab jagatud `UserMenu` komponenti oma kompaktses päises. Workspac
 |------|---------|
 | `src/components/UserMenu.tsx` | **Luuakse** — eraldatakse Header.tsx-ist |
 | `src/components/Header.tsx` | Asendatakse inline menüü `<UserMenu />` komponendiga; eemaldatakse `nav.upload`, `nav.persons` kasutus |
-| `src/pages/Workspace.tsx` | (1) Asendatakse duplikaat-menüü `<UserMenu />` komponendiga; (2) `activeTab` algväärtus loetakse localStorage-ist |
-| `src/components/mobile/WorkspaceMobileView.tsx` | Kui on eraldi tab state — sama localStorage algväärtus |
+| `src/pages/Workspace.tsx` | Asendatakse duplikaat-menüü `<UserMenu />` komponendiga |
+| `src/components/TextEditor.tsx` | `activeTab` algväärtus loetakse localStorage-ist (`vutt_workspace_default_tab`) |
 | `src/pages/Settings.tsx` | **Luuakse** — keel + workspace tab eelistus |
 | `src/pages/Admin.tsx` | Muudetakse avaleheks kaartidega; eemaldatakse tabid ja "Isikute register" |
 | `src/pages/admin/Registrations.tsx` | **Luuakse** — praeguse "Taotlused" tabi sisu + admin rolli kontroll |
