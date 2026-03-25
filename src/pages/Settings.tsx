@@ -1,11 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { Navigate } from 'react-router-dom';
 
 const Settings: React.FC = () => {
-  const { t, i18n } = useTranslation(['settings', 'common']);
+  const { t, i18n } = useTranslation('settings');
   const { user } = useUser();
 
   // Ainult autentitud kasutajatele
@@ -17,12 +17,13 @@ const Settings: React.FC = () => {
     i18n.changeLanguage(lang);
   };
 
-  const defaultTab = (localStorage.getItem('vutt_workspace_default_tab') as 'edit' | 'annotate') ?? 'edit';
+  const [defaultTab, setDefaultTab] = useState<'edit' | 'annotate'>(
+    () => (localStorage.getItem('vutt_workspace_default_tab') as 'edit' | 'annotate') ?? 'edit'
+  );
 
   const handleTabChange = (tab: 'edit' | 'annotate') => {
     localStorage.setItem('vutt_workspace_default_tab', tab);
-    // Force re-render
-    window.dispatchEvent(new Event('storage'));
+    setDefaultTab(tab);
   };
 
   return (
