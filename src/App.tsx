@@ -33,6 +33,10 @@ const Settings = lazyRetry(() => import('./pages/Settings'));
 const PersonsPage = lazyRetry(() => import('./prosopography/pages/PersonsPage'));
 const PersonDetailPage = lazyRetry(() => import('./prosopography/pages/PersonDetailPage'));
 const PersonEditPage = lazyRetry(() => import('./prosopography/pages/PersonEditPage'));
+const AdminRegistrations = lazyRetry(() => import('./pages/admin/Registrations'));
+const AdminUsers = lazyRetry(() => import('./pages/admin/Users'));
+const AdminTrash = lazyRetry(() => import('./pages/admin/Trash'));
+const AdminCollections = lazyRetry(() => import('./pages/admin/Collections'));
 
 // Suspense fallback laadimise ajaks
 const PageLoader = () => (
@@ -86,6 +90,26 @@ const router = createBrowserRouter([
   {
     path: "/admin",
     element: <Lazy><Admin /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/registrations",
+    element: <Lazy><AdminRegistrations /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/users",
+    element: <Lazy><AdminUsers /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/trash",
+    element: <Lazy><AdminTrash /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/collections",
+    element: <Lazy><AdminCollections /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {
