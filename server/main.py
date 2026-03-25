@@ -1194,7 +1194,7 @@ async def save_user_settings(request: Request, user=Depends(get_user)):
     data = await get_json_data(request)
     settings = _load_user_settings(user['username'])
     # Uuenda ainult lubatud väljad
-    allowed_fields = ['language', 'default_tab', 'custom_characters']
+    allowed_fields = ['language', 'default_tab', 'characters']
     for field in allowed_fields:
         if field in data:
             settings[field] = data[field]
@@ -1205,7 +1205,7 @@ async def save_user_settings(request: Request, user=Depends(get_user)):
 async def get_user_chars(request: Request, user=Depends(get_user)):
     """Tagastab kasutaja kohandatud erimärgid."""
     settings = _load_user_settings(user['username'])
-    chars = settings.get('custom_characters', [])
+    chars = settings.get('characters', [])
     is_custom = len(chars) > 0
     return {"status": "success", "characters": chars, "is_custom": is_custom}
 
@@ -1215,9 +1215,9 @@ async def save_user_chars(request: Request, user=Depends(get_user)):
     data = await get_json_data(request)
     settings = _load_user_settings(user['username'])
     if data.get('reset'):
-        settings.pop('custom_characters', None)
+        settings.pop('characters', None)
     else:
-        settings['custom_characters'] = data.get('characters', [])
+        settings['characters'] = data.get('characters', [])
     _save_user_settings(user['username'], settings)
     return {"status": "success", "reset": bool(data.get('reset'))}
 

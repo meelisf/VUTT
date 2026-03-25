@@ -6,7 +6,7 @@ import i18n from '../i18n';
 export interface UserSettings {
   language?: 'et' | 'en';
   default_tab?: 'edit' | 'annotate';
-  custom_characters?: Array<{ char: string; name: string }>;
+  characters?: Array<{ char: string; name: string }>;
 }
 
 interface User {

@@ -101,9 +101,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
-  const [activeTab, setActiveTab] = useState<TabType>(
-    () => (userSettings.default_tab as TabType) || 'edit'
-  );
+  const [activeTab, setActiveTab] = useState<TabType>('edit');
+  const hasAppliedDefaultTab = useRef(false);
+
+  // Sünkrooni default_tab serverist (ainult esimesel laadimsel)
+  useEffect(() => {
+    if (!hasAppliedDefaultTab.current && userSettings.default_tab) {
+      setActiveTab(userSettings.default_tab as TabType);
+      hasAppliedDefaultTab.current = true;
+    }
+  }, [userSettings.default_tab]);
 
   // Redaktori sisu muudatuste jälgimine
   const [isDirty, setIsDirty] = useState(false);
