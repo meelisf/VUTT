@@ -48,7 +48,7 @@ const Admin: React.FC = () => {
       .then(r => r.json())
       .then(data => {
         const active = (data?.uploads || []).filter(
-          (u: any) => !['done', 'imported'].includes(u.status)
+          (u: any) => u.status !== 'imported'
         ).length;
         setUploadCount(active);
       })
