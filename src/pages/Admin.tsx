@@ -22,6 +22,7 @@ const Admin: React.FC = () => {
   const { user, authToken } = useUser();
   const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState<number | null>(null);
+  const [uploadCount, setUploadCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -39,6 +40,17 @@ const Admin: React.FC = () => {
       .then(data => {
         const pending = (data || []).filter((r: any) => r.status === 'pending').length;
         setPendingCount(pending);
+      })
+      .catch(() => {});
+    fetchWithTimeout(`${FILE_SERVER}/admin/uploads`, {
+      headers: getAuthHeaders(authToken),
+    })
+      .then(r => r.json())
+      .then(data => {
+        const active = (data?.uploads || []).filter(
+          (u: any) => !['done', 'imported'].includes(u.status)
+        ).length;
+        setUploadCount(active);
       })
       .catch(() => {});
   }, [authToken]);
@@ -65,6 +77,8 @@ const Admin: React.FC = () => {
       icon: <Upload size={18} className="text-teal-600" />,
       group: t('admin:groups.content'),
       href: '/upload',
+      count: uploadCount ?? undefined,
+      countColor: 'text-teal-700',
     },
     {
       key: 'collections',
