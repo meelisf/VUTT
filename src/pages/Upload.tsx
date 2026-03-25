@@ -400,6 +400,7 @@ const Upload: React.FC = () => {
             year: year.trim(),
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
+            replace_work_id: replaceWorkId || null,
           }),
         });
         const d = await r.json();

@@ -263,7 +263,8 @@ def create_upload(meta: dict) -> dict:
         "remote_staging_path": f"AUTO-OCR/{upload_id}",
         "remote_work_path": f"AUTO-OCR/{upload_id}/{slug}",
         "files": [],
-        "created_at": datetime.now().isoformat()
+        "created_at": datetime.now().isoformat(),
+        "replace_work_id": meta.get('replace_work_id') or None,
     }
 
     lock = _get_upload_lock(upload_id)
