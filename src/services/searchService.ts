@@ -759,36 +759,3 @@ export const getAllTags = async (lang: string = 'et'): Promise<{ label: string; 
     return [];
   }
 };
-
-// Lae alla kogu teose tekst ühes failis
-export const getWorkFullText = async (teoseId: string): Promise<{ text: string; title: string; author: string; year: number }> => {
-  checkMixedContent();
-  try {
-    // Pärime kõik teose leheküljed, sorteeritud lehekülje numbri järgi
-    const response = await index.search('', {
-      filter: `work_id = "${teoseId}"`,
-      sort: ['lehekylje_number:asc'],
-      limit: 1000, // Piisavalt suur, et kõik leheküljed mahuks
-      attributesToRetrieve: ['lehekylje_tekst', 'text_content', 'lehekylje_number', 'title', 'year']
-    });
-
-    if (response.hits.length === 0) {
-      throw new Error('Teost ei leitud');
-    }
-
-    const firstHit = response.hits[0] as any;
-    const title = firstHit.title || 'Tundmatu';
-    const author = firstHit.creators?.[0]?.name || 'Tundmatu';
-    const year = firstHit.year || 0;
-
-    // Liidame kõik leheküljed kokku, eraldades need "--- lk ---" märgendiga
-    const fullText = response.hits
-      .map((hit: any) => hit.text_content || hit.lehekylje_tekst || '')
-      .join('\n\n--- lk ---\n\n');
-
-    return { text: fullText, title, author, year };
-  } catch (e) {
-    console.error('getWorkFullText error:', e);
-    throw e;
-  }
-};
