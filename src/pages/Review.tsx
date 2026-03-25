@@ -21,6 +21,7 @@ import {
   Loader2,
   AlertCircle,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Filter,
   History,
@@ -408,6 +409,12 @@ const Review: React.FC = () => {
 
       {/* Main content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
+        {isAdmin && (
+          <Link to="/admin" className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-6">
+            <ChevronLeft size={16} />
+            Admin
+          </Link>
+        )}
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           {/* Title */}
           <div className="px-6 py-5 border-b border-gray-200">
