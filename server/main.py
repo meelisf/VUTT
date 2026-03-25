@@ -213,6 +213,16 @@ async def admin_trash_restore(work_id: str, user=Depends(require_role("admin")))
     if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
     return {"status": "success", "title": res.get('title')}
 
+@app.get("/admin/work/{work_id}/metadata")
+async def admin_work_metadata(work_id: str, user=Depends(require_role("editor"))):
+    """Tagastab teose _metadata.json sisu."""
+    path = find_directory_by_id(work_id)
+    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
+    meta_path = os.path.join(path, '_metadata.json')
+    if not os.path.exists(meta_path): raise HTTPException(status_code=404, detail="Metaandmete fail puudub")
+    with open(meta_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
 @app.get("/admin/work/{work_id}/trash-pages")
 async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
     """Loetleb teose kustutatud leheküljed."""
