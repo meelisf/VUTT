@@ -90,7 +90,8 @@
     "placeholder": "Otsi teost...",
     "warning": "Asendamine kustutab kõik olemasolevad leheküljed ja asendab need uutega.",
     "selected": "Asendatav teos:",
-    "none": "Uus teos (ei asenda)"
+    "none": "Uus teos (ei asenda)",
+    "replaceBtn": "Asenda: {{title}}"
   },
   "status": {
     "pending": "Ootel",

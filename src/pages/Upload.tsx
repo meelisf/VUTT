@@ -624,6 +624,38 @@ const Upload: React.FC = () => {
   }
 
   // ---------------------------------------------------------------------------
+  // Asenda olemasoleva teose sisu (replace-work endpoint)
+  // ---------------------------------------------------------------------------
+  async function handleReplaceImport() {
+    if (!uploadId || !replaceWorkId || !authToken) return;
+    setImportLoading(true);
+    setImportError('');
+    try {
+      const r = await fetchWithTimeout(
+        `${FILE_API_URL}/admin/upload/${uploadId}/replace-work/${replaceWorkId}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({ metadata_updates: {} }),
+          timeout: 30_000,
+        }
+      );
+      const d = await r.json();
+      if (!r.ok) {
+        setImportError(d.message || t('step3.importError'));
+        return;
+      }
+      stopPolling();
+      setFileUploading(false);
+      navigate(`/work/${d.work_id}/1`);
+    } catch {
+      setImportError(t('step3.importError'));
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Sulge viisard (upload jääb taustal tööle)
   // ---------------------------------------------------------------------------
   function handleClose() {
@@ -1277,19 +1309,35 @@ const Upload: React.FC = () => {
                 {importError}
               </div>
             )}
-            <button
-              onClick={handleImport}
-              disabled={!canImport}
-              title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
-              className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-            >
-              {importLoading ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <CheckCircle size={16} />
-              )}
-              {t('step3.importBtn')}
-            </button>
+            {replaceWorkId ? (
+              <button
+                onClick={handleReplaceImport}
+                disabled={!canImport}
+                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                {importLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <AlertTriangle size={16} />
+                )}
+                {t('replaceWork.replaceBtn', { title: replaceWorkTitle ?? '' })}
+              </button>
+            ) : (
+              <button
+                onClick={handleImport}
+                disabled={!canImport}
+                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
+                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
+              >
+                {importLoading ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={16} />
+                )}
+                {t('step3.importBtn')}
+              </button>
+            )}
           </div>
         )}
 
