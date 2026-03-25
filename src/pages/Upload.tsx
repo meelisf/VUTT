@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import UploadMetaForm from '../components/UploadMetaForm';
+import { buildReplaceUploadPayload } from '../utils/buildReplaceUploadPayload';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
@@ -291,20 +292,7 @@ const Upload: React.FC = () => {
         const createRes = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
-            title: fetchedTitle,
-            year: fetchedYear,
-            slug: fetchedSlug,
-            collections: fetchedCollection ? [fetchedCollection] : [],
-            replace_work_id: rid,
-            creators: meta.creators || [],
-            genre: meta.genre || null,
-            type: meta.type || null,
-            tags: meta.tags || [],
-            location: meta.location || null,
-            publisher: meta.publisher || null,
-            languages: meta.languages || [],
-          }),
+          body: JSON.stringify(buildReplaceUploadPayload(meta, rid)),
         });
         const createData = await createRes.json();
         if (!createRes.ok) {
