@@ -30,7 +30,7 @@ from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload, update_upload_meta,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work,
+    import_as_work, replace_work_content,
 )
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
@@ -881,6 +881,28 @@ async def admin_upload_import(upload_id: str, user=Depends(require_role("admin")
         build_work_id_cache()
         return {"status": "success", **res}
     except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/admin/upload/{upload_id}/replace-work/{work_id}")
+async def admin_upload_replace_work(
+    upload_id: str,
+    work_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(require_role("admin")),
+):
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    metadata_updates = (data.get("metadata_updates") or {}) if isinstance(data, dict) else {}
+    res = await replace_work_content(
+        upload_id,
+        work_id,
+        metadata_updates,
+        user['username'],
+        background_tasks,
+    )
+    return {"status": "success", **res}
 
 @app.get("/admin/upload/{upload_id}/meta")
 async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin"))):
