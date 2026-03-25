@@ -464,6 +464,17 @@ const WorkManage: React.FC = () => {
             )}
           </button>
           <button
+            onClick={() => setActiveTab('replace')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === 'replace'
+                ? 'border-primary-600 text-primary-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <RefreshCw size={14} />
+            {t('manage.tabs.replace', 'Asenda leheküljed')}
+          </button>
+          <button
             onClick={() => {
               setActiveTab('trash');
               if (!trashLoaded) loadTrashPages();
@@ -480,17 +491,6 @@ const WorkManage: React.FC = () => {
                 {trashPages.length}
               </span>
             )}
-          </button>
-          <button
-            onClick={() => setActiveTab('replace')}
-            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === 'replace'
-                ? 'border-primary-600 text-primary-700'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <RefreshCw size={14} />
-            {t('manage.tabs.replace', 'Asenda leheküljed')}
           </button>
         </div>
 
