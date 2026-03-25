@@ -413,8 +413,9 @@ def create_meilisearch_data_per_page():
     # Kogu andmed teose kaupa
     works_data = {}
 
+    SKIP_DIRS = {'prosopography'}
     doc_dirs = sorted([d for d in os.listdir(DATA_ROOT_DIR)
-                       if os.path.isdir(os.path.join(DATA_ROOT_DIR, d)) and not d.startswith('.')])
+                       if os.path.isdir(os.path.join(DATA_ROOT_DIR, d)) and not d.startswith('.') and d not in SKIP_DIRS])
 
     for dir_name in tqdm(doc_dirs, desc="Teoste töötlemine"):
         doc_path = os.path.join(DATA_ROOT_DIR, dir_name)
