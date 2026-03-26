@@ -120,11 +120,15 @@ export function useQCodeMaps(
             const objs = (hit as any).tags_object ?? hit.tags;
             if (!objs || !Array.isArray(objs)) continue;
             for (const item of objs) {
-                if (!item?.labels) continue;
-                const currentLabel = cap(item.labels[langCode] || item.labels['et'] || item.label);
+                if (!item) continue;
+                const rawLabel = item.labels?.[langCode] || item.labels?.['et'] || item.label;
+                if (!rawLabel) continue;
+                const currentLabel = cap(rawLabel);
                 if (item.id) map[item.id] = currentLabel;
-                for (const labelVal of Object.values(item.labels)) {
-                    if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
+                if (item.labels) {
+                    for (const labelVal of Object.values(item.labels)) {
+                        if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
+                    }
                 }
                 if (item.label) { map[item.label] = currentLabel; map[cap(item.label)] = currentLabel; }
             }
@@ -139,10 +143,9 @@ export function useQCodeMaps(
             const objs = (hit as any).tags_object ?? hit.tags;
             if (!objs || !Array.isArray(objs)) continue;
             for (const item of objs) {
-                if (item?.id && item?.labels) {
-                    const rawLabel = item.labels[langCode] || item.labels['et'] || item.label;
-                    map[rawLabel] = item.id; map[cap(rawLabel)] = item.id;
-                }
+                if (!item?.id) continue;
+                const rawLabel = item.labels?.[langCode] || item.labels?.['et'] || item.label;
+                if (rawLabel) { map[rawLabel] = item.id; map[cap(rawLabel)] = item.id; }
             }
         }
         return map;
