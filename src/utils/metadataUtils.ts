@@ -30,8 +30,8 @@ export function getLabel(
     label = getLabel(value[0], lang);
   } else if (typeof value === 'string') {
     label = value;
-  } else if (value.labels) {
-    // Proovi esmalt täpset vastet, siis base keelt
+  } else if (value.labels && value.source !== 'local') {
+    // Wikidata kirjetel kasuta mitmekeelseid tõlkeid; lokaalsetel (VUTT isikud) mitte
     label = value.labels[lang] || value.labels[baseLang] || value.label || '';
   } else {
     // LinkedEntity ilma eelistatud keeleta (fallback label)

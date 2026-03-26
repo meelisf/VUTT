@@ -358,19 +358,17 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
         for c in meta.get("creators", []):
             if not isinstance(c, dict) or c.get("id") != person_id:
                 continue
-            if c.get("label") == new_label and c.get("name") == new_label and not c.get("labels"):
+            if c.get("label") == new_label and c.get("name") == new_label:
                 continue
             c["label"] = new_label
             c["name"] = new_label
-            c.pop("labels", None)
             changed = True
         for t in meta.get("tags", []):
             if not isinstance(t, dict) or t.get("id") != person_id:
                 continue
-            if t.get("label") == new_label and not t.get("labels"):
+            if t.get("label") == new_label:
                 continue
             t["label"] = new_label
-            t.pop("labels", None)
             changed = True
         if changed:
             changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
