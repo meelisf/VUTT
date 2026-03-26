@@ -11,6 +11,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
 import { getLangCode } from '../utils/getLangCode';
+import { isVuttId } from '../utils/qcodeUtils';
 import { FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 import { mergeFacetItems, FilterItem } from '../utils/facetUtils';
@@ -233,6 +234,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     if (!tagsData) return [];
 
     const raw = Object.entries(tagsData)
+      .filter(([tag]) => !isVuttId(tag))
       .map(([tag, count]) => ({
         value: tag,
         label: tagsIdMap?.[tag] || tag,
