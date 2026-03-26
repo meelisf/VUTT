@@ -7,6 +7,8 @@ import SearchableFilterList from './SearchableFilterList';
 import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText } from 'lucide-react';
 import { getLangCode } from '../../utils/getLangCode';
 import { mergeFacetItems } from '../../utils/facetUtils';
+import { isVuttId } from '../../utils/qcodeUtils';
+import { resolveEntityLabel } from '../../utils/labelUtils';
 
 interface WorkInfo {
     title: string;
@@ -50,6 +52,7 @@ export interface FacetsProps {
     availableWorks: AvailableWork[];
     vocabularies: Vocabularies | null;
     aliasMap: Record<string, string>;
+    tagLabels: Record<string, string>;
     loading: boolean;
 }
 
@@ -103,17 +106,12 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     const lang = getLangCode(i18n.language);
 
     const { enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, availablePersonTags = [] } = qCodeMaps;
-    const { availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks, vocabularies, aliasMap, loading } = facets;
+    const { availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks, vocabularies, aliasMap, tagLabels, loading } = facets;
     const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedPersonTag, personTagInput, showPersonSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
 
     // Q-kood → label: enrichedLabels (labels.json) primaarne, seejärel idToLabel map
-    const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) => {
-        const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
-        if (enrichedLabels?.[qCode]) {
-            return cap(enrichedLabels[qCode][lang] || enrichedLabels[qCode]['et'] || qCode);
-        }
-        return idToLabel?.[qCode] || qCode;
-    };
+    const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) =>
+        resolveEntityLabel(qCode, enrichedLabels || {}, lang, idToLabel);
 
     // Laiendab valiku massiivi et sisaldaks nii Q-koodi kui labeli variante —
     // vältib vilkumist kui selectedValues ja item.value pole veel sünkroonis
@@ -128,7 +126,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
     const hasActiveFilters = yearStart || yearEnd ||
         selectedScope !== 'all' || selectedWork || selectedTeoseTags.length > 0 ||
-        selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
+        selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor || selectedPersonTag;
 
     return (
         <aside className={`
@@ -242,11 +240,13 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                     >
                         <SearchableFilterList
                             items={mergeFacetItems(
-                                availableTeoseTags.map(({ tag, count }) => ({
-                                    value: tag,
-                                    label: enrichedLabels?.[tag] ? resolveLabel(tag) : (tagsIdMap?.[tag] || tag),
-                                    count
-                                })),
+                                availableTeoseTags
+                                    .filter(({ tag }) => !isVuttId(tag)) // Isikud on eraldi "Isik teemana" sektsioonis
+                                    .map(({ tag, count }) => ({
+                                        value: tag,
+                                        label: enrichedLabels?.[tag] ? resolveLabel(tag) : (tagsIdMap?.[tag] || tagLabels[tag] || tag),
+                                        count
+                                    })),
                                 tagsLabelToId,
                                 tagsIdMap
                             ).sort((a, b) => b.count - a.count)}

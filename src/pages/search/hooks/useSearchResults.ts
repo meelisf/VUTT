@@ -10,7 +10,7 @@ export interface SearchResultsState {
     error: string | null;
 }
 
-export function useSearchResults(urlParams: SearchUrlParams, lang: string): SearchResultsState {
+export function useSearchResults(urlParams: SearchUrlParams, lang: string, selectedCollection: string | null): SearchResultsState {
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -42,6 +42,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string): Sear
                     type: urlParams.types.length > 0 ? urlParams.types : undefined,
                     author: urlParams.author || undefined,
                     subjectPerson: urlParams.subjectPerson || undefined,
+                    collection: selectedCollection || undefined,
                     lang: getLangCode(lang),
                 });
                 if (!cancelled) setResults(data);
@@ -57,7 +58,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string): Sear
         urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
         urlParams.genres.join(','), urlParams.types.join(','),
-        urlParams.author, urlParams.subjectPerson, lang]);
+        urlParams.author, urlParams.subjectPerson, selectedCollection, lang]);
 
     return { results, loading, error };
 }

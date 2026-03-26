@@ -1,6 +1,6 @@
 // src/pages/search/hooks/useSearchFacets.ts
 import { useState, useEffect } from 'react';
-import { getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets } from '../../../services/searchService';
+import { getTeoseTagsFacets, getGenreFacets, getTypeFacets, getAuthorFacets, getTagsLabelMap } from '../../../services/searchService';
 import { getVocabularies, Vocabularies } from '../../../services/collectionService';
 import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
@@ -18,6 +18,7 @@ export interface FacetsState {
     availableAuthors: { value: string; count: number }[];
     vocabularies: Vocabularies | null;
     aliasMap: Record<string, string>;
+    tagLabels: Record<string, string>; // Q-kood → label (laetud tags_object-ist)
 }
 
 export function useSearchFacets(
@@ -32,6 +33,7 @@ export function useSearchFacets(
     const [availableAuthors, setAvailableAuthors] = useState<{ value: string; count: number }[]>([]);
     const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
     const [aliasMap, setAliasMap] = useState<Record<string, string>>({});
+    const [tagLabels, setTagLabels] = useState<Record<string, string>>({});
 
     // Alglaadimine: vocabularies + aliased + (kui pole aktiivset filtrit) facetid
     useEffect(() => {
@@ -49,12 +51,14 @@ export function useSearchFacets(
                 if (hasActiveContentFilters) return;
 
                 const facetLang = getLangCode(lang);
-                const [tags, genres, types, authors] = await Promise.all([
+                const [tags, genres, types, authors, labels] = await Promise.all([
                     getTeoseTagsFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
                     getGenreFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
                     getTypeFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getAuthorFacets(selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd)
+                    getAuthorFacets(selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd),
+                    getTagsLabelMap(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
                 ]);
+                setTagLabels(labels);
                 setAvailableTeoseTags(mergeSelectedIntoTags(tags, urlParams.teoseTags));
                 setAvailableGenres(mergeSelectedIntoFacets(genres, urlParams.genres));
                 setAvailableTypes(mergeSelectedIntoFacets(types, urlParams.types));
@@ -71,7 +75,6 @@ export function useSearchFacets(
     // Uuenda facets otsinguvastusest
     useEffect(() => {
         if (!results?.facetDistribution) return;
-        const facetLang = getLangCode(lang);
         const processFacets = (field: string) => {
             let dist = results.facetDistribution?.[field];
             if (!dist && field.includes('_')) dist = results.facetDistribution?.[field.split('_')[0]];
@@ -89,5 +92,5 @@ export function useSearchFacets(
         setAvailableAuthors(newAuthors);
     }, [results, lang, urlParams.teoseTags.join(','), urlParams.genres.join(','), urlParams.types.join(',')]);
 
-    return { availableTeoseTags, availableGenres, availableTypes, availableAuthors, vocabularies, aliasMap };
+    return { availableTeoseTags, availableGenres, availableTypes, availableAuthors, vocabularies, aliasMap, tagLabels };
 }

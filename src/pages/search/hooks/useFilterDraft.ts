@@ -2,6 +2,7 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SearchUrlParams } from './useSearchUrlParams';
+import { isVuttId } from '../../../utils/qcodeUtils';
 
 export interface FilterDraft {
     inputValue: string;
@@ -51,7 +52,12 @@ export interface FilterDraftActions {
 
 export function useFilterDraft(
     urlParams: SearchUrlParams,
-    qCodeMaps: { genreLabelToId: Record<string, string>; typeLabelToId: Record<string, string>; tagsLabelToId: Record<string, string> }
+    qCodeMaps: {
+        genreLabelToId: Record<string, string>;
+        typeLabelToId: Record<string, string>;
+        tagsLabelToId: Record<string, string>;
+        availablePersonTags?: { id: string; label: string }[];
+    }
 ): { draft: FilterDraft; actions: FilterDraftActions } {
     const [, setSearchParams] = useSearchParams();
 
@@ -85,10 +91,22 @@ export function useFilterDraft(
         setSelectedAuthor(urlParams.author);
         setAuthorInput(urlParams.author);
         setSelectedPersonTag(urlParams.subjectPerson);
-        setPersonTagInput(urlParams.subjectPerson);
+        // Kui vutt:P ID — jätame labeli lahendamise eraldi effect'ile (allpool)
+        if (!isVuttId(urlParams.subjectPerson)) {
+            setPersonTagInput(urlParams.subjectPerson);
+        }
     }, [urlParams.q, urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
-        urlParams.genres.join(','), urlParams.types.join(','), urlParams.author, urlParams.subjectPerson]);
+        urlParams.genres.join(','), urlParams.types.join(','),
+        urlParams.author, urlParams.subjectPerson]);
+
+    // Lahenda isiku ID → näidatav nimi kui availablePersonTags laadib (URL-ist avamine)
+    // Eraldi effect — ei mõjuta teiste väljade sünkroniseerimist
+    useEffect(() => {
+        if (!selectedPersonTag || !isVuttId(selectedPersonTag)) return;
+        const label = qCodeMaps.availablePersonTags?.find(p => p.id === selectedPersonTag)?.label;
+        if (label) setPersonTagInput(label);
+    }, [qCodeMaps.availablePersonTags, selectedPersonTag]);
 
     const { genreLabelToId, typeLabelToId, tagsLabelToId } = qCodeMaps;
 

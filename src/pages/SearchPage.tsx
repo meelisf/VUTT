@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getWorkMetadata } from '../services/workService';
@@ -9,6 +9,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import SearchFilters from './search/SearchFilters';
 import SearchResults from './search/SearchResults';
 import { getLangCode } from '../utils/getLangCode';
+import { resolveEntityLabel } from '../utils/labelUtils';
 import { useSearchUrlParams } from './search/hooks/useSearchUrlParams';
 import { useSearchResults } from './search/hooks/useSearchResults';
 import { useSearchFacets } from './search/hooks/useSearchFacets';
@@ -27,10 +28,21 @@ const SearchPage: React.FC = () => {
     const lang = i18n.language;
     const langCode = getLangCode(lang);
 
-    const { results, loading, error } = useSearchResults(urlParams, lang);
+    const { results, loading, error } = useSearchResults(urlParams, lang, selectedCollection);
     const facets = useSearchFacets(urlParams, lang, selectedCollection, results);
     const qCodeMaps = useQCodeMaps(results, lang, (location.state as any)?.pageTagsLabels);
-    const { draft, actions } = useFilterDraft(urlParams, qCodeMaps);
+
+    // Kollektsiooni järgi filtreeritud isikute nimekiri — kasutab availableTeoseTags faceti
+    // mis juba filtreerib kollektsiooni järgi tags_ids-i järgi (sisaldab ka vutt:P IDsid)
+    const filteredQCodeMaps = useMemo(() => {
+        if (!selectedCollection || facets.availableTeoseTags.length === 0) return qCodeMaps;
+        const collectionTagIds = new Set(facets.availableTeoseTags.map(t => t.tag));
+        const filteredPersons = qCodeMaps.availablePersonTags.filter(p => collectionTagIds.has(p.id));
+        if (filteredPersons.length === qCodeMaps.availablePersonTags.length) return qCodeMaps;
+        return { ...qCodeMaps, availablePersonTags: filteredPersons };
+    }, [qCodeMaps, selectedCollection, facets.availableTeoseTags]);
+
+    const { draft, actions } = useFilterDraft(urlParams, filteredQCodeMaps);
 
     // Salvesta otsingu URL sessionStorage'isse
     useEffect(() => {
@@ -82,12 +94,8 @@ const SearchPage: React.FC = () => {
         })()
         : [];
 
-    const resolveLabel = (qCode: string, fallbackMap?: Record<string, string>) => {
-        if (qCodeMaps.enrichedLabels[qCode]) {
-            return (s => s ? s[0].toUpperCase() + s.slice(1) : '')(qCodeMaps.enrichedLabels[qCode][langCode] || qCodeMaps.enrichedLabels[qCode]['et'] || qCode);
-        }
-        return fallbackMap?.[qCode] || qCode;
-    };
+    const resolveLabel = (qCode: string, fallbackMap?: Record<string, string>) =>
+        resolveEntityLabel(qCode, qCodeMaps.enrichedLabels, langCode, fallbackMap);
 
     return (
         <div className="h-full bg-gray-50 font-sans flex flex-col overflow-hidden">
@@ -131,7 +139,7 @@ const SearchPage: React.FC = () => {
                         </form>
 
                         {/* Aktiivsed filtrid otsinguriba all */}
-                        {(draft.selectedAuthor || draft.selectedWork || selectedCollection || urlParams.scope !== 'all' ||
+                        {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || urlParams.scope !== 'all' ||
                             urlParams.pageTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0 ||
                             urlParams.teoseTags.length > 0 || urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined) && (
                             <div className="flex flex-wrap items-center gap-1.5 mt-3">
@@ -285,6 +293,23 @@ const SearchPage: React.FC = () => {
                                         </button>
                                     </div>
                                 )}
+                                {/* Isik teemana */}
+                                {draft.selectedPersonTag && (
+                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-full text-xs font-medium border border-rose-200">
+                                        <User size={11} />
+                                        <span className="truncate max-w-xs">
+                                            {qCodeMaps.availablePersonTags?.find(p => p.id === draft.selectedPersonTag)?.label || draft.selectedPersonTag}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={actions.handlePersonTagClear}
+                                            className="ml-0.5 hover:bg-rose-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                )}
                                 {/* Kollektsioon */}
                                 {selectedCollection && (() => {
                                     const colorClasses = getCollectionColorClasses(collections[selectedCollection]);
@@ -313,7 +338,7 @@ const SearchPage: React.FC = () => {
                 <SearchFilters
                     draft={draft}
                     facets={{ ...facets, availableWorks, loading }}
-                    qCodeMaps={qCodeMaps}
+                    qCodeMaps={filteredQCodeMaps}
                     onScopeChange={actions.setSelectedScope}
                     onYearStartChange={actions.setYearStart}
                     onYearEndChange={actions.setYearEnd}

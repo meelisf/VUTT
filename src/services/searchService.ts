@@ -176,6 +176,45 @@ export const getTypeFacets = async (
   }
 };
 
+// Laeb tag labelid (Q-kood → label) collection esimeste lehekülgede tags_object-ist
+// Kasutatakse kui otsingutulemused puuduvad aga collection on valitud
+export const getTagsLabelMap = async (
+  collection?: string,
+  lang: string = 'et',
+  yearStart?: number,
+  yearEnd?: number
+): Promise<Record<string, string>> => {
+  checkMixedContent();
+  try {
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) filter.push(`collections_hierarchy = "${collection}"`);
+    if (yearStart) filter.push(`year >= ${yearStart}`);
+    if (yearEnd) filter.push(`year <= ${yearEnd}`);
+
+    const response = await index.search('', {
+      filter,
+      limit: 200,
+      attributesToRetrieve: ['tags_object'],
+    });
+
+    const map: Record<string, string> = {};
+    const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
+    for (const hit of response.hits) {
+      const tags = (hit as any).tags_object;
+      if (!Array.isArray(tags)) continue;
+      for (const tag of tags) {
+        if (!tag?.id) continue;
+        const rawLabel = tag.labels?.[lang] || tag.labels?.['et'] || tag.label;
+        if (rawLabel) map[tag.id] = cap(rawLabel);
+      }
+    }
+    return map;
+  } catch (error) {
+    console.error('getTagsLabelMap error:', error);
+    return {};
+  }
+};
+
 // Autorite facetid (author_names väljast)
 export const getAuthorFacets = async (
   collection?: string,
@@ -281,7 +320,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'series', 'series_title', 'ester_id', 'external_url',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
-      attributesToSearchOn: ['title', 'authors_text'], // Dashboard otsib pealkirjast ja autoritest
+      attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
       filter: filter,
       limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
