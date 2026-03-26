@@ -422,6 +422,9 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.author) {
     filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
   }
+  if (options.subjectPerson) {
+    filter.push(`tags_ids = "${options.subjectPerson}"`);
+  }
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
   const genreFacetField = 'genre_ids';

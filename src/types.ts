@@ -235,6 +235,7 @@ export interface ContentSearchOptions {
   collection?: string;    // V2: kollektsiooni filter (collections_hierarchy kaudu)
   lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
   author?: string;        // V2: autori filter (creators massiivist)
+  subjectPerson?: string; // VUTT isiku ID (vutt:Pxxxxxx) teema-filtrina (tags_ids kaudu)
   pageTags?: string[];    // Lehekülje märksõnad (AND loogika, page_tags_ids)
 }
 
