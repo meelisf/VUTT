@@ -4,6 +4,15 @@ import { ContentSearchResponse } from '../../../types';
 import { getEntityLabelsCache } from '../../../services/entityLabelsService';
 import { getLangCode } from '../../../utils/getLangCode';
 import { useSearchParams } from 'react-router-dom';
+import { isVuttId } from '../../../utils/qcodeUtils';
+
+/** Eraldab tagsIdMap-ist VUTT isikud ({id, label}[], sorditud label järgi). */
+export function filterPersonTags(tagsIdMap: Record<string, string>): { id: string; label: string }[] {
+    return Object.entries(tagsIdMap)
+        .filter(([id]) => isVuttId(id))
+        .map(([id, label]) => ({ id, label }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'et'));
+}
 
 export interface QCodeMaps {
     genreIdMap: Record<string, string>;
@@ -224,8 +233,11 @@ export function useQCodeMaps(
         }
     }, [tagsLabelToId, searchParams]);
 
+    const availablePersonTags = useMemo(() => filterPersonTags(tagsIdMap), [tagsIdMap]);
+
     return {
         genreIdMap, genreLabelToId, typeIdMap, typeLabelToId,
-        tagsIdMap, tagsLabelToId, pageTagsIdMap, knownPageTagsLabels, enrichedLabels
+        tagsIdMap, tagsLabelToId, pageTagsIdMap, knownPageTagsLabels, enrichedLabels,
+        availablePersonTags,
     };
 }
