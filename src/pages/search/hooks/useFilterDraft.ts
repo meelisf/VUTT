@@ -17,6 +17,9 @@ export interface FilterDraft {
     selectedAuthor: string;
     authorInput: string;
     showAuthorSuggestions: boolean;
+    selectedPersonTag: string;
+    personTagInput: string;
+    showPersonSuggestions: boolean;
     showFiltersMobile: boolean;
 }
 
@@ -35,11 +38,15 @@ export interface FilterDraftActions {
     setAuthorInput: (v: string) => void;
     setShowAuthorSuggestions: (v: boolean) => void;
     setShowFiltersMobile: (v: boolean) => void;
+    setPersonTagInput: (v: string) => void;
+    setShowPersonSuggestions: (v: boolean) => void;
     commit: (e?: FormEvent) => void;
     clearFilters: () => void;
     handleAuthorSelect: (author: string) => void;
     handleAuthorClear: () => void;
     handleWorkSelect: (id: string, info: { title: string; year?: string | number; author?: string } | null) => void;
+    handlePersonTagSelect: (personId: string, label: string) => void;
+    handlePersonTagClear: () => void;
 }
 
 export function useFilterDraft(
@@ -61,6 +68,9 @@ export function useFilterDraft(
     const [selectedAuthor, setSelectedAuthor] = useState(urlParams.author);
     const [authorInput, setAuthorInput] = useState(urlParams.author);
     const [showAuthorSuggestions, setShowAuthorSuggestions] = useState(false);
+    const [selectedPersonTag, setSelectedPersonTag] = useState(urlParams.subjectPerson);
+    const [personTagInput, setPersonTagInput] = useState(urlParams.subjectPerson);
+    const [showPersonSuggestions, setShowPersonSuggestions] = useState(false);
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
 
     // Sünkroniseeri lokaalset state-i kui URL muutub (nt tagasinupp)
@@ -74,9 +84,11 @@ export function useFilterDraft(
         setSelectedTypes(urlParams.types);
         setSelectedAuthor(urlParams.author);
         setAuthorInput(urlParams.author);
+        setSelectedPersonTag(urlParams.subjectPerson);
+        setPersonTagInput(urlParams.subjectPerson);
     }, [urlParams.q, urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
-        urlParams.genres.join(','), urlParams.types.join(','), urlParams.author]);
+        urlParams.genres.join(','), urlParams.types.join(','), urlParams.author, urlParams.subjectPerson]);
 
     const { genreLabelToId, typeLabelToId, tagsLabelToId } = qCodeMaps;
 
@@ -101,6 +113,7 @@ export function useFilterDraft(
                 if (selectedGenres.length > 0) prev.set('genre', selectedGenres.map(g => genreLabelToId[g] || g).join(',')); else prev.delete('genre');
                 if (selectedTypes.length > 0) prev.set('type', selectedTypes.map(t => typeLabelToId[t] || t).join(',')); else prev.delete('type');
                 if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
+                if (selectedPersonTag) prev.set('subjectPerson', selectedPersonTag); else prev.delete('subjectPerson');
             }
             return prev;
         });
@@ -113,8 +126,9 @@ export function useFilterDraft(
         setSelectedTeoseTags([]); setSelectedPageTags([]);
         setSelectedGenres([]); setSelectedTypes([]);
         setSelectedAuthor(''); setAuthorInput('');
+        setSelectedPersonTag(''); setPersonTagInput('');
         setSearchParams(prev => {
-            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
+            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author', 'subjectPerson'].forEach(k => prev.delete(k));
             prev.set('p', '1');
             return prev;
         });
@@ -132,6 +146,20 @@ export function useFilterDraft(
         setSearchParams(prev => { prev.delete('author'); prev.delete('q'); prev.set('p', '1'); return prev; });
     };
 
+    const handlePersonTagSelect = (personId: string, label: string) => {
+        setPersonTagInput(label);
+        setSelectedPersonTag(personId);
+        setShowPersonSuggestions(false);
+        setSearchParams(prev => { prev.set('subjectPerson', personId); prev.set('p', '1'); return prev; });
+    };
+
+    const handlePersonTagClear = () => {
+        setPersonTagInput('');
+        setSelectedPersonTag('');
+        setShowPersonSuggestions(false);
+        setSearchParams(prev => { prev.delete('subjectPerson'); prev.set('p', '1'); return prev; });
+    };
+
     const handleWorkSelect = (id: string, info: { title: string; year?: string | number; author?: string } | null) => {
         setSelectedWork(id);
         setSelectedWorkInfo(info);
@@ -141,14 +169,18 @@ export function useFilterDraft(
         draft: {
             inputValue, yearStart, yearEnd, selectedScope, selectedWork, selectedWorkInfo,
             selectedTeoseTags, selectedPageTags, selectedGenres, selectedTypes,
-            selectedAuthor, authorInput, showAuthorSuggestions, showFiltersMobile
+            selectedAuthor, authorInput, showAuthorSuggestions,
+            selectedPersonTag, personTagInput, showPersonSuggestions,
+            showFiltersMobile
         },
         actions: {
             setInputValue, setYearStart, setYearEnd, setSelectedScope,
             setSelectedWork, setSelectedWorkInfo, setSelectedTeoseTags,
             setSelectedPageTags, setSelectedGenres, setSelectedTypes,
             setSelectedAuthor, setAuthorInput, setShowAuthorSuggestions, setShowFiltersMobile,
-            commit, clearFilters, handleAuthorSelect, handleAuthorClear, handleWorkSelect
+            setPersonTagInput, setShowPersonSuggestions,
+            commit, clearFilters, handleAuthorSelect, handleAuthorClear, handleWorkSelect,
+            handlePersonTagSelect, handlePersonTagClear,
         }
     };
 }
