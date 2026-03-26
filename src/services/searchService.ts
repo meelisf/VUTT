@@ -5,7 +5,6 @@
 import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST } from '../config';
 import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
-import { isQCode } from '../utils/qcodeUtils';
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 
 // Interface for dashboard search options
@@ -47,7 +46,7 @@ export interface SearchWorksResult {
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTeoseTagsFacets = async (
   collection?: string,
-  lang: string = 'et',
+  _lang: string = 'et',
   yearStart?: number,
   yearEnd?: number
 ): Promise<{ tag: string; count: number }[]> => {
@@ -92,7 +91,7 @@ export const getTeoseTagsFacets = async (
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getGenreFacets = async (
   collection?: string,
-  lang: string = 'et',
+  _lang: string = 'et',
   yearStart?: number,
   yearEnd?: number
 ): Promise<{ value: string; count: number }[]> => {
@@ -136,7 +135,7 @@ export const getGenreFacets = async (
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTypeFacets = async (
   collection?: string,
-  lang: string = 'et',
+  _lang: string = 'et',
   yearStart?: number,
   yearEnd?: number
 ): Promise<{ value: string; count: number }[]> => {

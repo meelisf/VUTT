@@ -16,7 +16,6 @@ import { FacetDistribution } from '../services/searchService';
 import { getVocabularies, Vocabularies } from '../services/collectionService';
 import { mergeFacetItems, FilterItem } from '../utils/facetUtils';
 import { resolveFilterValue, resolveItemValue } from '../utils/filterNormalization';
-import { resolveFilterValue, resolveItemValue } from '../utils/filterNormalization';
 
 type WorkStatus = 'Toores' | 'Töös' | 'Valmis';
 

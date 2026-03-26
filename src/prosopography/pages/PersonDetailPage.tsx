@@ -22,14 +22,14 @@ function formatHistoricalDate(
   d: HistoricalDate | null | undefined,
   symbol: string,
   boundLabels: { before: string; after: string },
-  lang: string = 'et',
+  _lang: string = 'et',
 ): string {
   if (!d) return '';
   const year = d.date ? d.date.slice(0, 4) : null;
   if (!year) return '';
   const circa = d.is_circa ? '~' : '';
   const bound = d.bound === 'before' ? `${boundLabels.before} ` : d.bound === 'after' ? `${boundLabels.after} ` : '';
-  const placeLabel = d.place ? (d.place.labels?.[lang] || d.place.labels?.en || d.place.label || '') : '';
+  const placeLabel = d.place ? (d.place.label || '') : '';
   const place = placeLabel ? `, ${placeLabel}` : '';
   return `${symbol}${bound}${circa}${year}${place}`;
 }

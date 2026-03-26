@@ -17,7 +17,6 @@ import {
   Trash2,
   AlertTriangle,
   X,
-  RotateCcw,
   Info,
   ListTodo,
 } from 'lucide-react';
@@ -560,33 +559,6 @@ const Upload: React.FC = () => {
     setDragging(false);
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) handleFilesSelected(files);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Samm 3 — lehe kustutamine / taastamine
-  // ---------------------------------------------------------------------------
-  async function handleDeletePage(page: number, filename: string) {
-    if (!uploadId || !authToken) return;
-    setLocalDeleted((prev) => new Set(prev).add(page));
-    await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify({ filename }),
-    }).catch(() => {});
-  }
-
-  async function handleRestorePage(page: number, filename: string) {
-    if (!uploadId || !authToken) return;
-    setLocalDeleted((prev) => {
-      const s = new Set(prev);
-      s.delete(page);
-      return s;
-    });
-    await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/delete-page`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify({ filename, deleted: false }),
-    }).catch(() => {});
   }
 
   // ---------------------------------------------------------------------------

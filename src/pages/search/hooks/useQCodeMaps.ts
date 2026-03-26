@@ -22,7 +22,7 @@ export function filterPersonTags(tagsIdMap: Record<string, string>): { id: strin
 export function buildAvailablePersonTags(
     tagsIdMap: Record<string, string>,
     personTagsFromLoad: { id: string; label: string }[],
-    langCode: string
+    _langCode: string
 ): { id: string; label: string }[] {
     const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : '';
     const fromResults = filterPersonTags(tagsIdMap);
