@@ -22,13 +22,15 @@ function formatHistoricalDate(
   d: HistoricalDate | null | undefined,
   symbol: string,
   boundLabels: { before: string; after: string },
+  lang: string = 'et',
 ): string {
   if (!d) return '';
   const year = d.date ? d.date.slice(0, 4) : null;
   if (!year) return '';
   const circa = d.is_circa ? '~' : '';
   const bound = d.bound === 'before' ? `${boundLabels.before} ` : d.bound === 'after' ? `${boundLabels.after} ` : '';
-  const place = d.place?.label ? `, ${d.place.label}` : '';
+  const placeLabel = d.place ? (d.place.labels?.[lang] || d.place.labels?.en || d.place.label || '') : '';
+  const place = placeLabel ? `, ${placeLabel}` : '';
   return `${symbol}${bound}${circa}${year}${place}`;
 }
 
@@ -168,8 +170,9 @@ const PersonDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const backTo: string = (location.state as any)?.from ?? '/persons';
-  const { t } = useTranslation(['prosopography', 'common']);
+  const { t, i18n } = useTranslation(['prosopography', 'common']);
   const getLabel = useEntityLabel();
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
   const { user, authToken } = useUser();
   const { selectedCollection, collections } = useCollection();
 
@@ -264,8 +267,8 @@ const PersonDetailPage: React.FC = () => {
 
   // ── Andmed ───────────────────────────────────────────────
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
-  const birth = formatHistoricalDate(person.birth, '*', boundLabels);
-  const death = formatHistoricalDate(person.death, '†', boundLabels);
+  const birth = formatHistoricalDate(person.birth, '*', boundLabels, lang);
+  const death = formatHistoricalDate(person.death, '†', boundLabels, lang);
   const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort((a, b) => {
     const ya = workTitles[a.work_id]?.year ?? 9999;
     const yb = workTitles[b.work_id]?.year ?? 9999;
