@@ -12,6 +12,7 @@ export interface SearchUrlParams {
     genres: string[];
     types: string[];
     author: string;
+    subjectPerson: string;
 }
 
 export function useSearchUrlParams(): SearchUrlParams {
@@ -28,5 +29,6 @@ export function useSearchUrlParams(): SearchUrlParams {
         genres: searchParams.get('genre')?.split(',').filter(Boolean) || [],
         types: searchParams.get('type')?.split(',').filter(Boolean) || [],
         author: searchParams.get('author') || '',
+        subjectPerson: searchParams.get('subjectPerson') || '',
     };
 }
