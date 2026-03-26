@@ -333,6 +333,10 @@ const SearchPage: React.FC = () => {
                     onShowAuthorSuggestions={actions.setShowAuthorSuggestions}
                     onAuthorSelect={actions.handleAuthorSelect}
                     onAuthorClear={actions.handleAuthorClear}
+                    onPersonTagInputChange={actions.setPersonTagInput}
+                    onShowPersonSuggestions={actions.setShowPersonSuggestions}
+                    onPersonTagSelect={actions.handlePersonTagSelect}
+                    onPersonTagClear={actions.handlePersonTagClear}
                     onWorkSelect={actions.handleWorkSelect}
                     onSetMobileFilters={actions.setShowFiltersMobile}
                     onSearch={actions.commit}

@@ -16,7 +16,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string): Sear
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const hasActiveSearch = urlParams.q || urlParams.workId || urlParams.author ||
+        const hasActiveSearch = urlParams.q || urlParams.workId || urlParams.author || urlParams.subjectPerson ||
             urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined ||
             urlParams.scope !== 'all' || urlParams.teoseTags.length > 0 ||
             urlParams.pageTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0;
@@ -41,6 +41,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string): Sear
                     genre: urlParams.genres.length > 0 ? urlParams.genres : undefined,
                     type: urlParams.types.length > 0 ? urlParams.types : undefined,
                     author: urlParams.author || undefined,
+                    subjectPerson: urlParams.subjectPerson || undefined,
                     lang: getLangCode(lang),
                 });
                 if (!cancelled) setResults(data);
@@ -56,7 +57,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string): Sear
         urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
         urlParams.genres.join(','), urlParams.types.join(','),
-        urlParams.author, lang]);
+        urlParams.author, urlParams.subjectPerson, lang]);
 
     return { results, loading, error };
 }

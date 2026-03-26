@@ -30,6 +30,8 @@
     "searchTag": "Search tag...",
     "searchType": "Search type...",
     "searchWork": "Search work...",
+    "personSubject": "Person as subject",
+    "personSubjectPlaceholder": "Search person...",
     "removeAuthorFilter": "Remove author filter",
     "removeFilter": "Remove filter",
     "applyFilters": "Apply filters",

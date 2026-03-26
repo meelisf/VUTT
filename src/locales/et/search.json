@@ -30,6 +30,8 @@
     "searchTag": "Otsi märksõna...",
     "searchType": "Otsi tüüpi...",
     "searchWork": "Otsi teost...",
+    "personSubject": "Isik teemana",
+    "personSubjectPlaceholder": "Otsi isikut...",
     "removeAuthorFilter": "Eemalda autori filter",
     "removeFilter": "Eemalda filter",
     "applyFilters": "Rakenda filtrid",

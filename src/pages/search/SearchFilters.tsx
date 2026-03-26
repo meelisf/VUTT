@@ -36,6 +36,9 @@ export interface FilterDraftProps {
     selectedAuthor: string;
     authorInput: string;
     showAuthorSuggestions: boolean;
+    selectedPersonTag: string;
+    personTagInput: string;
+    showPersonSuggestions: boolean;
     showFiltersMobile: boolean;
 }
 
@@ -58,6 +61,7 @@ export interface QCodeMapsProps {
     typeLabelToId?: Record<string, string>;
     tagsIdMap?: Record<string, string>;
     tagsLabelToId?: Record<string, string>;
+    availablePersonTags?: { id: string; label: string }[];
 }
 
 export interface SearchFiltersProps {
@@ -75,6 +79,10 @@ export interface SearchFiltersProps {
     onShowAuthorSuggestions: (show: boolean) => void;
     onAuthorSelect: (author: string) => void;
     onAuthorClear: () => void;
+    onPersonTagInputChange: (value: string) => void;
+    onShowPersonSuggestions: (show: boolean) => void;
+    onPersonTagSelect: (id: string, label: string) => void;
+    onPersonTagClear: () => void;
     onWorkSelect: (id: string, info: WorkInfo | null) => void;
     onSetMobileFilters: (show: boolean) => void;
     onSearch: (e?: FormEvent) => void;
@@ -86,16 +94,17 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
     onScopeChange, onYearStartChange, onYearEndChange,
     onGenreToggle, onTypeToggle, onTagToggle,
     onAuthorInputChange, onShowAuthorSuggestions,
-    onAuthorSelect, onAuthorClear, onWorkSelect,
-    onSetMobileFilters, onSearch, onClearFilters
+    onAuthorSelect, onAuthorClear,
+    onPersonTagInputChange, onShowPersonSuggestions, onPersonTagSelect, onPersonTagClear,
+    onWorkSelect, onSetMobileFilters, onSearch, onClearFilters
 }) => {
     const { t, i18n } = useTranslation(['search', 'common']);
     const authorInputRef = useRef<HTMLInputElement>(null);
     const lang = getLangCode(i18n.language);
 
-    const { enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId } = qCodeMaps;
+    const { enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, availablePersonTags = [] } = qCodeMaps;
     const { availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks, vocabularies, aliasMap, loading } = facets;
-    const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
+    const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedPersonTag, personTagInput, showPersonSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
 
     // Q-kood → label: enrichedLabels (labels.json) primaarne, seejärel idToLabel map
     const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) => {
@@ -356,6 +365,66 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                                 className="mt-2 text-xs text-red-600 hover:text-red-700"
                             >
                                 {t('filters.removeAuthorFilter')}
+                            </button>
+                        )}
+                    </div>
+                </CollapsibleSection>
+
+                {/* Isik teemana */}
+                <CollapsibleSection
+                    title={t('filters.personSubject', 'Isik teemana')}
+                    icon={<User size={14} />}
+                    defaultOpen={!!selectedPersonTag}
+                    badge={selectedPersonTag ? 1 : undefined}
+                >
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={personTagInput}
+                            onChange={e => {
+                                onPersonTagInputChange(e.target.value);
+                                onShowPersonSuggestions(true);
+                            }}
+                            onFocus={() => onShowPersonSuggestions(true)}
+                            onBlur={() => setTimeout(() => onShowPersonSuggestions(false), 150)}
+                            onKeyDown={e => {
+                                if (e.key === 'Escape') onShowPersonSuggestions(false);
+                                if (e.key === 'Enter' && personTagInput.trim()) {
+                                    const match = availablePersonTags.find(p =>
+                                        p.label.toLowerCase() === personTagInput.toLowerCase()
+                                    );
+                                    if (match) onPersonTagSelect(match.id, match.label);
+                                }
+                            }}
+                            placeholder={t('filters.personSubjectPlaceholder', 'Otsi isikut...')}
+                            className="w-full text-sm border border-gray-300 rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
+                        {showPersonSuggestions && personTagInput.length >= 2 && (() => {
+                            const matches = availablePersonTags.filter(p =>
+                                p.label.toLowerCase().includes(personTagInput.toLowerCase())
+                            );
+                            if (matches.length === 0) return null;
+                            return (
+                                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-48 overflow-y-auto">
+                                    {matches.map(({ id, label }) => (
+                                        <button
+                                            key={id}
+                                            onMouseDown={() => onPersonTagSelect(id, label)}
+                                            className="w-full text-left px-3 py-1.5 text-sm hover:bg-primary-50 hover:text-primary-700"
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            );
+                        })()}
+                        {selectedPersonTag && (
+                            <button
+                                type="button"
+                                onClick={onPersonTagClear}
+                                className="mt-2 text-xs text-red-600 hover:text-red-700"
+                            >
+                                {t('filters.removeAuthorFilter', 'Eemalda filter')}
                             </button>
                         )}
                     </div>
