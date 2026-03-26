@@ -51,13 +51,14 @@ def _run(data_dir: Path, new_label: str = "Karl XII"):
 
 def test_creator_label_updated(tmp_path):
     meta_path = _write_meta(tmp_path / "teos1", {
-        "creators": [{"id": PERSON_ID, "label": "Schweden Karl XII", "name": "Schweden Karl XII"}],
+        "creators": [{"id": PERSON_ID, "label": "Schweden Karl XII", "name": "Schweden Karl XII", "labels": {"et": "Schweden Karl XII."}}],
         "tags": [],
     })
     _run(tmp_path)
     meta = _read_meta(meta_path)
     assert meta["creators"][0]["label"] == "Karl XII"
     assert meta["creators"][0]["name"] == "Karl XII"
+    assert "labels" not in meta["creators"][0]
 
 
 def test_creator_other_person_not_changed(tmp_path):
@@ -75,11 +76,12 @@ def test_creator_other_person_not_changed(tmp_path):
 def test_tag_label_updated(tmp_path):
     meta_path = _write_meta(tmp_path / "teos1", {
         "creators": [],
-        "tags": [{"id": PERSON_ID, "label": "Schweden Karl XII"}],
+        "tags": [{"id": PERSON_ID, "label": "Schweden Karl XII", "labels": {"et": "Schweden Karl XII."}}],
     })
     _run(tmp_path)
     meta = _read_meta(meta_path)
     assert meta["tags"][0]["label"] == "Karl XII"
+    assert "labels" not in meta["tags"][0]
 
 
 def test_tag_other_person_not_changed(tmp_path):
@@ -95,10 +97,22 @@ def test_tag_other_person_not_changed(tmp_path):
 def test_tag_already_correct_label_no_git_call(tmp_path):
     _write_meta(tmp_path / "teos1", {
         "creators": [],
-        "tags": [{"id": PERSON_ID, "label": "Karl XII"}],
+        "tags": [{"id": PERSON_ID, "label": "Karl XII"}],  # label õige, labels puudub → ei muuda
     })
     mock_git, _ = _run(tmp_path)
     mock_git.assert_not_called()
+
+
+def test_tag_correct_label_but_stale_labels_field_triggers_update(tmp_path):
+    # label õige AGA labels.et on vana → peab ikka uuendama (labels eemaldatakse)
+    meta_path = _write_meta(tmp_path / "teos1", {
+        "creators": [],
+        "tags": [{"id": PERSON_ID, "label": "Karl XII", "labels": {"et": "Schweden Karl XII."}}],
+    })
+    mock_git, _ = _run(tmp_path)
+    mock_git.assert_called_once()
+    meta = _read_meta(meta_path)
+    assert "labels" not in meta["tags"][0]
 
 
 # -- mõlemad korraga --
