@@ -10,7 +10,7 @@ import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
-import { getGenreFacets } from '../services/searchService';
+import { getGenreFacets, getGenreLabelMap } from '../services/searchService';
 
 interface StatusCount {
   name: string;
@@ -48,6 +48,7 @@ const Statistics: React.FC = () => {
 
   // Žanrifilter
   const [genres, setGenres] = useState<{ value: string; count: number }[]>([]);
+  const [genreLabelMap, setGenreLabelMap] = useState<Record<string, string>>({});
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   // Globaalne aasta vahemik — kogu projekt, laetakse üks kord
@@ -76,7 +77,7 @@ const Statistics: React.FC = () => {
       try {
         const filter: string[] = [];
         if (selectedCollection) filter.push(`collections_hierarchy = "${selectedCollection}"`);
-        if (selectedGenre) filter.push(`genre_${lang} = "${selectedGenre}"`);
+        if (selectedGenre) filter.push(`genre_ids = "${selectedGenre}"`);
 
         const statusResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
           method: 'POST',
@@ -122,8 +123,12 @@ const Statistics: React.FC = () => {
   // Žanride päring
   useEffect(() => {
     const fetchGenres = async () => {
-      const result = await getGenreFacets(selectedCollection || undefined, lang);
+      const [result, labelMap] = await Promise.all([
+        getGenreFacets(selectedCollection || undefined, lang),
+        getGenreLabelMap(selectedCollection || undefined, lang),
+      ]);
       setGenres(result);
+      setGenreLabelMap(labelMap);
       if (selectedGenre && !result.find(g => g.value === selectedGenre)) {
         setSelectedGenre(null);
       }
@@ -171,7 +176,7 @@ const Statistics: React.FC = () => {
         // Samm 2: andmed sama vahemiku jaoks (nüüd ka žanrifiltriga)
         const dataFilter = ['lehekylje_number = 1'];
         if (collectionFilter) dataFilter.push(collectionFilter);
-        if (selectedGenre) dataFilter.push(`genre_${lang} = "${selectedGenre}"`);
+        if (selectedGenre) dataFilter.push(`genre_ids = "${selectedGenre}"`);
 
         const dataResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
           method: 'POST',
@@ -367,7 +372,7 @@ const Statistics: React.FC = () => {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {g.value} <span className="opacity-60">({g.count})</span>
+                {genreLabelMap[g.value] || g.value} <span className="opacity-60">({g.count})</span>
               </button>
             ))}
           </div>
@@ -380,7 +385,7 @@ const Statistics: React.FC = () => {
               <BarChart3 size={20} className="text-gray-400" />
               {t('charts.worksByYear')}
               {selectedGenre && (
-                <span className="text-primary-600 font-normal text-base ml-1">— {selectedGenre}</span>
+                <span className="text-primary-600 font-normal text-base ml-1">— {genreLabelMap[selectedGenre] || selectedGenre}</span>
               )}
             </h2>
             {/* Täpne aasta sisestus */}
@@ -523,7 +528,7 @@ const Statistics: React.FC = () => {
               : t('charts.pageStatus')}
             {selectedGenre && (
               <span className="px-2.5 py-0.5 bg-primary-100 text-primary-700 text-sm font-medium rounded-full">
-                {selectedGenre}
+                {genreLabelMap[selectedGenre] || selectedGenre}
               </span>
             )}
           </h2>

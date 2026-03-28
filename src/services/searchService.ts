@@ -175,6 +175,41 @@ export const getTypeFacets = async (
   }
 };
 
+// Laeb žanri labelid (Q-kood → label) genre_object-ist
+export const getGenreLabelMap = async (
+  collection?: string,
+  lang: string = 'et',
+): Promise<Record<string, string>> => {
+  checkMixedContent();
+  try {
+    const filter: string[] = ['lehekylje_number = 1'];
+    if (collection) filter.push(`collections_hierarchy = "${collection}"`);
+
+    const response = await index.search('', {
+      filter,
+      limit: 200,
+      attributesToRetrieve: ['genre_object'],
+    });
+
+    const map: Record<string, string> = {};
+    const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
+    for (const hit of response.hits) {
+      const obj = (hit as any).genre_object;
+      if (!obj) continue;
+      const items = Array.isArray(obj) ? obj : [obj];
+      for (const item of items) {
+        if (!item?.id) continue;
+        const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
+        if (rawLabel) map[item.id] = cap(rawLabel);
+      }
+    }
+    return map;
+  } catch (error) {
+    console.error('getGenreLabelMap error:', error);
+    return {};
+  }
+};
+
 // Laeb tag labelid (Q-kood → label) collection esimeste lehekülgede tags_object-ist
 // Kasutatakse kui otsingutulemused puuduvad aga collection on valitud
 export const getTagsLabelMap = async (
