@@ -12,6 +12,7 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
+import { buildMetadataPayload } from '../utils/buildMetadataPayload';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -318,57 +319,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     setSaveStatus('idle');
 
     try {
-      // Puhasta märksõnad (eemalda tühjad stringid)
-      const tagsArray = metaForm.tags
-        .filter(t => {
-          if (typeof t === 'string') return t.trim() !== '';
-          return !!t.label;
-        })
-        .map(t => {
-          if (typeof t === 'string') return t.trim();
-          return t;
-        });
-
-      // ESTER ID puhastamine
-      let cleanEsterId = metaForm.ester_id.trim();
-      const esterMatch = cleanEsterId.match(/record=(b\d+)/);
-      if (esterMatch) {
-        cleanEsterId = esterMatch[1];
-      }
-
-      // Puhasta creators massiiv
-      const cleanCreators = metaForm.creators
-        .filter(c => c.name.trim() !== '')
-        .map(c => ({ 
-          name: c.name.trim(), 
-          role: c.role,
-          id: c.id,
-          source: c.source 
-        }));
-
-      // V2/V3 formaat
-      let payload: any = {
-        work_id: workId,
-        metadata: {
-          title: metaForm.title,
-          year: metaForm.year,
-          year_display: metaForm.year_display.trim() || null,
-          type: metaForm.type || null,
-          genre: metaForm.genre.length > 0 ? metaForm.genre : null,
-          creators: cleanCreators,
-          tags: tagsArray,
-          languages: metaForm.languages.length > 0 ? metaForm.languages : null,
-          location: metaForm.location,
-          publisher: metaForm.publisher,
-          ester_id: cleanEsterId || null,
-          external_url: metaForm.external_url.trim() || null,
-          collections: metaForm.collections
-        }
-      };
-
-      if (page.originaal_kataloog) {
-        payload.original_path = page.originaal_kataloog;
-      }
+      const payload = buildMetadataPayload(metaForm, workId, page.originaal_kataloog);
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/update-work-metadata`, {
         method: 'POST',
@@ -379,38 +330,23 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
       const data = await response.json();
       if (data.status === 'success') {
-        onSaveSuccess(
-          {
-            title: metaForm.title,
-            year: metaForm.year,
-            year_display: metaForm.year_display.trim() || null,
-            type: metaForm.type as LinkedEntity | null,
-            genre: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : null,
-            creators: cleanCreators,
-            tags: tagsArray as LinkedEntity[],
-            languages: metaForm.languages,
-            location: metaForm.location as LinkedEntity | null,
-            publisher: metaForm.publisher as LinkedEntity | null,
-            ester_id: cleanEsterId || undefined,
-            external_url: metaForm.external_url.trim() || undefined,
-            collections: metaForm.collections,
-          } as Partial<Page>,
-          {
-            title: metaForm.title,
-            year: metaForm.year,
-            year_display: metaForm.year_display.trim() || null,
-            type: metaForm.type as LinkedEntity | null,
-            genre: metaForm.genre.length > 0 ? metaForm.genre as LinkedEntity[] : null,
-            creators: cleanCreators,
-            tags: tagsArray as LinkedEntity[],
-            languages: metaForm.languages,
-            location: metaForm.location as LinkedEntity | null,
-            publisher: metaForm.publisher as LinkedEntity | null,
-            ester_id: cleanEsterId || undefined,
-            external_url: metaForm.external_url.trim() || undefined,
-            collections: metaForm.collections,
-          } as Partial<Work>
-        );
+        const { metadata: m } = payload;
+        const successData = {
+          title: m.title,
+          year: m.year,
+          year_display: m.year_display,
+          type: m.type as LinkedEntity | null,
+          genre: m.genre as LinkedEntity[] | null,
+          creators: m.creators,
+          tags: m.tags as LinkedEntity[],
+          languages: metaForm.languages,
+          location: m.location as LinkedEntity | null,
+          publisher: m.publisher as LinkedEntity | null,
+          ester_id: m.ester_id ?? undefined,
+          external_url: m.external_url ?? undefined,
+          collections: m.collections,
+        };
+        onSaveSuccess(successData as Partial<Page>, successData as Partial<Work>);
 
         setSaveStatus('success');
         setTimeout(() => {
