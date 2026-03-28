@@ -6,6 +6,7 @@ import { getLangCode } from '../../../utils/getLangCode';
 import { useSearchParams } from 'react-router-dom';
 import { isVuttId } from '../../../utils/qcodeUtils';
 import { FILE_API_URL } from '../../../config';
+import { buildIdMap, buildLabelToIdMap } from '../../../utils/buildObjectIdMap';
 
 /** Eraldab tagsIdMap-ist VUTT isikud ({id, label}[], sorditud label järgi). */
 export function filterPersonTags(tagsIdMap: Record<string, string>): { id: string; label: string }[] {
@@ -83,79 +84,25 @@ export function useQCodeMaps(
 
     const langCode = getLangCode(lang);
 
-    const genreIdMap = useMemo(() => {
-        const map: Record<string, string> = {};
-        if (!results?.hits) return map;
-        for (const hit of results.hits) {
-            const obj = (hit as any).genre_object ?? hit.genre;
-            if (!obj) continue;
-            const items = Array.isArray(obj) ? obj : [obj];
-            for (const item of items) {
-                if (!item?.labels) continue;
-                const currentLabel = cap((item.id && enrichedLabels[item.id]?.[langCode]) || item.labels[langCode] || item.labels['et'] || item.label);
-                if (item.id) map[item.id] = currentLabel;
-                for (const labelVal of Object.values(item.labels)) {
-                    if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
-                }
-                if (item.label) { map[item.label] = currentLabel; map[cap(item.label)] = currentLabel; }
-            }
-        }
-        return map;
-    }, [results, langCode, enrichedLabels]);
+    const genreIdMap = useMemo(
+        () => results?.hits ? buildIdMap(results.hits, 'genre_object', langCode, enrichedLabels) : {},
+        [results, langCode, enrichedLabels]
+    );
 
-    const genreLabelToId = useMemo(() => {
-        const map: Record<string, string> = {};
-        if (!results?.hits) return map;
-        for (const hit of results.hits) {
-            const obj = (hit as any).genre_object ?? hit.genre;
-            if (!obj) continue;
-            const items = Array.isArray(obj) ? obj : [obj];
-            for (const item of items) {
-                if (item?.id && item?.labels) {
-                    const rawLabel = item.labels[langCode] || item.labels['et'] || item.label;
-                    map[rawLabel] = item.id; map[cap(rawLabel)] = item.id;
-                }
-            }
-        }
-        return map;
-    }, [results, langCode]);
+    const genreLabelToId = useMemo(
+        () => results?.hits ? buildLabelToIdMap(results.hits, 'genre_object', langCode) : {},
+        [results, langCode]
+    );
 
-    const typeIdMap = useMemo(() => {
-        const map: Record<string, string> = {};
-        if (!results?.hits) return map;
-        for (const hit of results.hits) {
-            const obj = (hit as any).type_object ?? hit.type;
-            if (!obj) continue;
-            const items = Array.isArray(obj) ? obj : [obj];
-            for (const item of items) {
-                if (!item?.labels) continue;
-                const currentLabel = cap((item.id && enrichedLabels[item.id]?.[langCode]) || item.labels[langCode] || item.labels['et'] || item.label);
-                if (item.id) map[item.id] = currentLabel;
-                for (const labelVal of Object.values(item.labels)) {
-                    if (labelVal) { map[labelVal as string] = currentLabel; map[cap(labelVal as string)] = currentLabel; }
-                }
-                if (item.label) { map[item.label] = currentLabel; map[cap(item.label)] = currentLabel; }
-            }
-        }
-        return map;
-    }, [results, langCode, enrichedLabels]);
+    const typeIdMap = useMemo(
+        () => results?.hits ? buildIdMap(results.hits, 'type_object', langCode, enrichedLabels) : {},
+        [results, langCode, enrichedLabels]
+    );
 
-    const typeLabelToId = useMemo(() => {
-        const map: Record<string, string> = {};
-        if (!results?.hits) return map;
-        for (const hit of results.hits) {
-            const obj = (hit as any).type_object ?? hit.type;
-            if (!obj) continue;
-            const items = Array.isArray(obj) ? obj : [obj];
-            for (const item of items) {
-                if (item?.id && item?.labels) {
-                    const rawLabel = item.labels[langCode] || item.labels['et'] || item.label;
-                    map[rawLabel] = item.id; map[cap(rawLabel)] = item.id;
-                }
-            }
-        }
-        return map;
-    }, [results, langCode]);
+    const typeLabelToId = useMemo(
+        () => results?.hits ? buildLabelToIdMap(results.hits, 'type_object', langCode) : {},
+        [results, langCode]
+    );
 
     const tagsIdMap = useMemo(() => {
         const map: Record<string, string> = {};

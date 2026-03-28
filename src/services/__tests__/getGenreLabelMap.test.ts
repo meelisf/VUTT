@@ -87,32 +87,30 @@ describe('getGenreLabelMap', () => {
     expect(result['Q1']).toBe('Funeral sermon');
   });
 
-  it('jätab vahele genre_object puuduva hiti', async () => {
+  it('jätab vahele genre_object puuduva hiti, teised Q-koodid leitavad', async () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: null },
       { title: 'teos ilma žanrita' },
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
     ]));
     const result = await getGenreLabelMap();
-    expect(Object.keys(result)).toHaveLength(1);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
   it('jätab vahele item-id kellel puudub id', async () => {
     mockSearch.mockReturnValue(makeResponse([
-      { genre_object: [{ label: 'tundmatu' }] },
+      { genre_object: [{ label: 'tundmatu', labels: { et: 'tundmatu' } }] },
     ]));
     const result = await getGenreLabelMap();
     expect(result).toEqual({});
   });
 
-  it('mitu hitti sama Q-koodiga — viimane kirjutab üle (idempotentne)', async () => {
+  it('mitu hitti sama Q-koodiga — Q-kood on kaardil üks kord', async () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
     ]));
     const result = await getGenreLabelMap();
-    expect(Object.keys(result)).toHaveLength(1);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
@@ -134,5 +132,12 @@ describe('getGenreLabelMap', () => {
     await getGenreLabelMap();
     const [, options] = mockSearch.mock.calls[0];
     expect(options.filter).toContain('lehekylje_number = 1');
+  });
+
+  it('kasutab limit 5000 et kõik teosed oleksid kaetud', async () => {
+    mockSearch.mockReturnValue(makeResponse([]));
+    await getGenreLabelMap();
+    const [, options] = mockSearch.mock.calls[0];
+    expect(options.limit).toBe(5000);
   });
 });

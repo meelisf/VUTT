@@ -6,6 +6,7 @@ import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } f
 import { MEILI_HOST } from '../config';
 import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
+import { buildIdMap } from '../utils/buildObjectIdMap';
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
@@ -187,23 +188,11 @@ export const getGenreLabelMap = async (
 
     const response = await index.search('', {
       filter,
-      limit: 200,
+      limit: 5000,
       attributesToRetrieve: ['genre_object'],
     });
 
-    const map: Record<string, string> = {};
-    const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
-    for (const hit of response.hits) {
-      const obj = (hit as any).genre_object;
-      if (!obj) continue;
-      const items = Array.isArray(obj) ? obj : [obj];
-      for (const item of items) {
-        if (!item?.id) continue;
-        const rawLabel = item.labels?.[lang] || item.labels?.['et'] || item.label;
-        if (rawLabel) map[item.id] = cap(rawLabel);
-      }
-    }
-    return map;
+    return buildIdMap(response.hits, 'genre_object', lang);
   } catch (error) {
     console.error('getGenreLabelMap error:', error);
     return {};
