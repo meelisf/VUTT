@@ -210,6 +210,14 @@ A-l võib olla B-ga mitu seost erineva `type`-ga (nt "õpetaja" + "kolleeg"). Ku
 
 **Reegel:** diff baseerub `target_id`-de **hulkadel** (`set`), mitte ridade 1:1 võrdlusel. B vastasseos eemaldatakse ainult siis, kui A-l ei jäänud B-le **mitte ühtegi** `target_id` viidet.
 
+```python
+old_ids = {r["target_id"] for r in old_relations if r.get("target_id")}
+new_ids = {r["target_id"] for r in new_relations if r.get("target_id")}
+
+added = new_ids - old_ids    # B-dele, kellele lisati seos
+removed = old_ids - new_ids  # B-dele, kellelt eemaldati viimane seos
+```
+
 ### 2. Rikastatud automaatse seose kustutamine
 
 B logib sisse, näeb auto-seost (`reciprocal_auto: true`) ja täidab `type` välja ("õpilane"). Hiljem A kustutab oma seose B-ga. Spek ütleb: eemaldatakse read kus `reciprocal_auto: true` — see tähendab B kaotab käsitsi sisestatud `type` info.
