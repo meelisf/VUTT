@@ -18,10 +18,18 @@ Seose objekt (muutmata):
 { "name": "Johann Müller", "type": "õpetaja", "target_id": "vutt:Pabc123" }
 ```
 
-Vastastikune seos lisatakse tühi `type`-ga:
+Vastastikune seos lisatakse tühi `type`-ga ja `reciprocal_auto: true` markeriga:
 ```json
-{ "name": "Andreas Berg", "type": "", "target_id": "vutt:Pxyz789" }
+{ "name": "Andreas Berg", "type": "", "target_id": "vutt:Pxyz789", "reciprocal_auto": true }
 ```
+
+`reciprocal_auto: true` tähendab:
+- seos loodi automaatselt `sync-reciprocals` poolt, mitte kasutaja poolt käsitsi
+- UI saab seda vajadusel eristada (nt hall tekst, ikoon)
+- eemaldamisel (kui A kaardilt seos B-le eemaldatakse) eemaldatakse B kaardilt ainult read kus `reciprocal_auto: true && target_id == A.id` — käsitsi sisestatud seosed jäävad puutumata
+- tulevased migratsioonid ja audit on selgemad
+
+Kui kasutaja hiljem täidab automaatselt loodud seose `type` välja ja salvestab, jääb `reciprocal_auto: true` alles (päritolu ei muutu), aga seos on nüüd kasutaja poolt rikastatud.
 
 Vastastikune seos lisatakse ainult siis, kui `target_id` on olemas (lingitud isik). Käsitsi nimega seosed (ilma `target_id`-ta) ei käivita vastastikkust.
 
@@ -53,7 +61,7 @@ def sync_reciprocals(person_id: str, previous_relations: list, username: str) ->
    - Kui B-l on käsitsi-nimi rida mis vastab A nimele (ilma `target_id`-ta) → asendab lingitud seosega (c-variant)
    - Muul juhul lisab `{ name: A.label, type: '', target_id: A.id }`
 5. Iga eemaldatud `target_id` B kohta:
-   - Eemaldab B kaardilt read kus `target_id == A.id`
+   - Eemaldab B kaardilt read kus `target_id == A.id` **ja** `reciprocal_auto == true` — käsitsi lisatud seosed jäävad puutumata
 6. Uuendab B kaarte otse (`atomic_write_json`), ilma `updated_at` konfliktikontrollita (automaatne sync)
 
 ### Uus endpoint: `POST /prosopography/{person_id}/sync-reciprocals`
