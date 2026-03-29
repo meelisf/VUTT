@@ -104,7 +104,11 @@ Frontend-i muudatused on **minimaalsed** — sync toimub automaatselt PUT endpoi
 
 **UI märge relations listis**
 
-`PersonEditPage` relations `renderItem`-is kuvatakse lingitud seosele (`target_id` olemas) väike `↔` märge. Tooltip: "Vastastikune seos uuendatakse ka [nimi] kaardil automaatselt".
+`PersonEditPage` relations `renderItem`-is kuvatakse lingitud seosele (`target_id` olemas) väike `↔` märge.
+
+Kui seos on **äsja lisatud** (tühi `type`): tooltip "Automaatne vastasseos lisatakse [nimi] kaardile; täpsusta tüüp vajadusel käsitsi."
+
+Kui seos on **juba salvestatud** ja kannab `reciprocal_auto: true` märget: tooltip "Automaatne vastasseos; täpsusta tüüp vajadusel käsitsi."
 
 Ei ole vaja `initialRelationsRef`-i ega eraldi service kutseid.
 
