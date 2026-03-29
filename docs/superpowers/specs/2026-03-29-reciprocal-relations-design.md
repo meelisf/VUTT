@@ -71,6 +71,17 @@ def sync_reciprocals(
    - Eemaldab B kaardilt read kus `target_id == A.id` **ja** `reciprocal_auto == true` — käsitsi seosed jäävad puutumata
 5. Uuendab B kaarte otse (`atomic_write_json`), ilma `updated_at` konfliktikontrollita
 
+### Käitumisreeglid lühidalt
+
+| # | Reegel |
+|---|--------|
+| 1 | Sync arvestab ainult `target_id`-ga seoseid — lingimata read ignoreeritakse |
+| 2 | Diff võrdleb `target_id` **hulkasid**, mitte üksikuid ridu |
+| 3 | B-le lisatakse auto-seos ainult siis, kui B-l puudub igasugune seos A-ga (`target_id == A.id`) |
+| 4 | B-lt eemaldatakse ainult read kus `target_id == A.id` **ja** `reciprocal_auto == true` |
+| 5 | Sync ei muuda olemasolevaid ridu osaliselt (nt `type` välja) |
+| 6 | Sync ei käivitu rekursiivselt — B kaarte uuendatakse `atomic_write_json`-iga, mitte `update_person()` kaudu |
+
 ### Router PUT endpoint muudatus
 
 Eraldi endpointi **ei looda**. Sync toimub olemasoleva PUT `/prosopography/{person_id}` sees:
