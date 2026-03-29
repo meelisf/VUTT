@@ -185,6 +185,12 @@ PUT endpoint täidab toimingud järjestikku:
 
 Kui samm 2 ebaõnnestub (nt failikirjutusviga), jääb A salvestatuks aga B-d uuendamata. Süsteem **ei taga tugevat transaktsioonilist konsistentsi**.
 
+**Vea käsitlus `sync_reciprocals` ebaõnnestumisel:**
+- Viga logitakse serveris (`logger.error`)
+- API vastus jääb **200** — A salvestamine õnnestus, sync on järelprotsess
+- Klient ei saa veateadet (sync ebaõnnestumine ei blokeeri kasutajat)
+- Viga on nähtav serveri logides (`docker logs vutt-backend`)
+
 See on **teadlik kompromiss**:
 
 - **A kaart on primaarne** — kasutaja muudatus salvestatakse alati, isegi kui sync ebaõnnestub
