@@ -173,8 +173,26 @@ Wikidata sisaldab suhteliike (teacher Q37226, student Q48282, colleague Q3075502
 
 ---
 
+## Konsistentsimudel — teadlik kompromiss
+
+PUT endpoint täidab toimingud järjestikku:
+
+1. `update_person()` kirjutab A faili kettale
+2. `sync_reciprocals()` uuendab B kaarte
+
+Kui samm 2 ebaõnnestub (nt failikirjutusviga), jääb A salvestatuks aga B-d uuendamata. Süsteem **ei taga tugevat transaktsioonilist konsistentsi**.
+
+See on **teadlik kompromiss**:
+
+- **A kaart on primaarne** — kasutaja muudatus salvestatakse alati, isegi kui sync ebaõnnestub
+- **Vastastikune sync on järelprotsess** — best-effort, mitte garanteeritud
+- Ebaõnnestumine on erandlik (kohalik failisüsteem, mitte võrk), seega praktikas harv
+- Tulevikus saab lisada retry-loogika või async queue, kui vajadus tekib
+
+---
+
 ## Välistused
 
 - Seose `type` ei sünkroniseerita (vastastikune seos jääb tühja tüübiga — kasutaja täidab käsitsi)
-- Mitu samaaegset salvestamist ei ole käsitletud (edge case, `updated_at` kontroll puudub sync-is)
+- Mitu samaaegset salvestamist ei ole käsitletud (`updated_at` kontroll puudub sync-is B kaartidel)
 - Lingimata seosed (ainult nimi, pole `target_id`) ei käivita vastastikkust
