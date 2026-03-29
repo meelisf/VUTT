@@ -66,7 +66,6 @@ def sync_reciprocals(
 3. Iga lisatud `target_id` B kohta:
    - Loeb B kaardi
    - Kui B-l on juba rida kus `target_id == A.id` → ei muuda (idempotentne)
-   - Kui B-l on käsitsi-nimi rida mis vastab `a_label`-ile (ilma `target_id`-ta) → asendab lingitud seosega
    - Muul juhul lisab `{ "name": a_label, "type": "", "target_id": A.id, "reciprocal_auto": true }`
 4. Iga eemaldatud `target_id` B kohta:
    - Eemaldab B kaardilt read kus `target_id == A.id` **ja** `reciprocal_auto == true` — käsitsi seosed jäävad puutumata
