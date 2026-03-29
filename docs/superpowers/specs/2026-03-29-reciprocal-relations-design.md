@@ -43,38 +43,56 @@ Kogu loogika on selles failis. Ei lisata `ops.py`-sse ega `router.py`-sse inline
 
 **Põhifunktsioon:**
 ```python
-def sync_reciprocals(person_id: str, previous_relations: list, username: str) -> list[str]:
+def sync_reciprocals(
+    person_id: str,
+    old_relations: list,
+    new_relations: list,
+    a_label: str,
+    username: str,
+) -> list[str]:
     """
-    Võrdleb A eelmist ja praegust relations-nimekirja.
+    Võrdleb A vana ja uut relations-nimekirja (mõlemad server-side).
     Lisab/eemaldab vastastikuseid seoseid puudutatud B kaartidel.
     Tagastab uuendatud isikute ID-d.
     """
 ```
 
 **Loogika:**
-1. Loeb A praeguse seisu failist
-2. Leiab `target_id`-ga seosed mis **lisati** (olid `previous_relations`-s puudu)
-3. Leiab `target_id`-ga seosed mis **eemaldati** (olid `previous_relations`-s, praegu puudu)
-4. Iga lisatud `target_id` B kohta:
+1. Leiab `target_id`-ga seosed mis **lisati** (`old_relations`-s puudu, `new_relations`-s olemas)
+2. Leiab `target_id`-ga seosed mis **eemaldati** (`old_relations`-s olemas, `new_relations`-s puudu)
+3. Iga lisatud `target_id` B kohta:
    - Loeb B kaardi
-   - Kui B-l on juba rida kus `target_id == A.id` → ei muuda
-   - Kui B-l on käsitsi-nimi rida mis vastab A nimele (ilma `target_id`-ta) → asendab lingitud seosega (c-variant)
-   - Muul juhul lisab `{ name: A.label, type: '', target_id: A.id }`
-5. Iga eemaldatud `target_id` B kohta:
-   - Eemaldab B kaardilt read kus `target_id == A.id` **ja** `reciprocal_auto == true` — käsitsi lisatud seosed jäävad puutumata
-6. Uuendab B kaarte otse (`atomic_write_json`), ilma `updated_at` konfliktikontrollita (automaatne sync)
+   - Kui B-l on juba rida kus `target_id == A.id` → ei muuda (idempotentne)
+   - Kui B-l on käsitsi-nimi rida mis vastab `a_label`-ile (ilma `target_id`-ta) → asendab lingitud seosega
+   - Muul juhul lisab `{ "name": a_label, "type": "", "target_id": A.id, "reciprocal_auto": true }`
+4. Iga eemaldatud `target_id` B kohta:
+   - Eemaldab B kaardilt read kus `target_id == A.id` **ja** `reciprocal_auto == true` — käsitsi seosed jäävad puutumata
+5. Uuendab B kaarte otse (`atomic_write_json`), ilma `updated_at` konfliktikontrollita
 
-### Uus endpoint: `POST /prosopography/{person_id}/sync-reciprocals`
+### Router PUT endpoint muudatus
+
+Eraldi endpointi **ei looda**. Sync toimub olemasoleva PUT `/prosopography/{person_id}` sees:
 
 ```python
-# router.py-s, kutsub reciprocal_ops.sync_reciprocals()
-@router.post("/{person_id:path}/sync-reciprocals")
-async def prosopography_sync_reciprocals(person_id, request, user=Depends(_require_role("editor"))):
+@router.put("/{person_id:path}")
+async def prosopography_update(person_id, request, user=Depends(_require_role("editor"))):
     data = await _get_json(request)
-    previous_relations = data.get("previous_relations", [])
-    synced = sync_reciprocals(person_id, previous_relations, username=user["username"])
-    return {"synced": synced}
+    # Loe vana seis ENNE salvestust — server-side diff
+    old_person = get_person(person_id)
+    old_relations = (old_person or {}).get("relations", [])
+    # Salvesta uus seis
+    person = update_person(person_id, data, username=user["username"])
+    # Sync reciprocals server-side diffiga
+    a_label = (person.get("name") or {}).get("label", "")
+    sync_reciprocals(person_id, old_relations, person.get("relations", []), a_label, username=user["username"])
+    enrich_entity_labels_from_person_async(person)
+    return person
 ```
+
+**Miks see on parem kui eraldi endpoint `previous_relations`-iga:**
+- Server loeb vana seisu ise — ei sõltu kliendi mälupeeklist
+- Diff on range ja concurrency-safe (vana fail loetakse vahetult enne salvestust)
+- Frontend ei pea midagi lisaks tegema
 
 ---
 
@@ -82,46 +100,13 @@ async def prosopography_sync_reciprocals(person_id, request, user=Depends(_requi
 
 ### `PersonEditPage.tsx` muudatused
 
-**1. `initialRelations` ref**
+Frontend-i muudatused on **minimaalsed** — sync toimub automaatselt PUT endpointis.
 
-Kui draft laaditakse serverist, salvestatakse `relations` eraldi ref-i:
-```ts
-const initialRelationsRef = useRef<RelationDraft[]>([]);
-// laadimise callback-is:
-initialRelationsRef.current = [...loadedPerson.relations];
-```
+**UI märge relations listis**
 
-See ei muutu kui kasutaja drafti muudab — saadetakse sync-endpointile.
+`PersonEditPage` relations `renderItem`-is kuvatakse lingitud seosele (`target_id` olemas) väike `↔` märge. Tooltip: "Vastastikune seos uuendatakse ka [nimi] kaardil automaatselt".
 
-**2. UI märge relations listis**
-
-`ProsopoPersonPicker` komponendi kõrval (või `PersonEditPage` relations renderItem-is) kuvatakse lingitud seosele (`target_id` olemas) väike `↔` märge. Tooltip: "Vastastikune seos uuendatakse ka [nimi] kaardil".
-
-Kui kasutaja eemaldab seose millel oli `target_id` (võrreldes `initialRelationsRef`-iga), tooltip: "Vastastikune seos eemaldatakse ka [nimi] kaardilt".
-
-**3. Salvestamise järjekord `handleSave`-s**
-
-```ts
-// 1. Salvesta A (praegune loogika)
-await savePerson(id, draft);
-
-// 2. Sync vastastikused seosed
-await syncReciprocals(id, initialRelationsRef.current);
-
-// 3. Uuenda ref pärast edukat salvestamist
-initialRelationsRef.current = [...draft.relations];
-```
-
-Sync viga ei blokeeri A salvestamise edu — kuvatakse eraldi hoiatus.
-
-### `prosopographyService.ts` lisand
-
-```ts
-export async function syncReciprocals(personId: string, previousRelations: RelationDraft[], token: string): Promise<{ synced: string[] }> {
-  // POST /prosopography/{personId}/sync-reciprocals
-  // body: { previous_relations: previousRelations }
-}
-```
+Ei ole vaja `initialRelationsRef`-i ega eraldi service kutseid.
 
 ---
 
