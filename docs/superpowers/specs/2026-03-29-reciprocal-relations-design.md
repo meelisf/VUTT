@@ -119,10 +119,40 @@ export async function syncReciprocals(personId: string, previousRelations: Relat
 
 ## Tulevikuvaade
 
-`reciprocal_ops.py` loob sisuliselt kahepoolsete seoste graafi. Tulevikus on selle põhjal võimalik:
-- Seosegraafikute visualiseerimine (react-force-graph vms)
+### Seosegraaف ja seose allikate võrdsus
+
+Kõik seosed on graafi mõistes võrdse kaaluga — erinev on ainult päritolu. Kahte tüüpi seoseid:
+
+| Allikas | Näited | Salvestamine |
+|---|---|---|
+| **Käsitsi** | juhendaja, isa, vend, kolleeg | `person.relations[]` |
+| **Teosest tuletatud** | kaasautor, pühendaja, õnnitleja, eessõna autor | teoste `creators[]` metaandmed |
+
+Teosest tuletatud seosed kuvatakse `PersonDetailPage`-l eraldi read-only sektsioonina — neid ei kirjutata isiku `relations`-i, et vältida andmete duplikatsiooni ja käsitsi vigade tekkimist. See ei tähenda et need on "teisejärgulised" — mõlemad allikad on **võrdse tähtsusega**.
+
+Graafi mootori jaoks on mõlemad lihtsalt **servad** (edges):
+```
+(A) --[roll: "eessõna autor", allikas: "teos X"]--> (B)
+(A) --[roll: "juhendaja", allikas: "käsitsi"]--> (C)
+```
+
+Serva andmemudel tuleviku graafi jaoks:
+```json
+{
+  "source_id": "vutt:Pabc",
+  "target_id": "vutt:Pxyz",
+  "type": "juhendaja",
+  "type_id": "Q...",
+  "edge_source": "manual" | "work",
+  "work_id": "nanoid (kui edge_source=work)",
+  "work_role": "eessõna autor (kui edge_source=work)"
+}
+```
+
+`reciprocal_ops.py` loob praegu käsitsi seoste kahepoolsuse. Tulevikus lisandub:
+- Teostest tuletatud seoste kuvamine `PersonDetailPage`-l (read-only)
+- Graafikute visualiseerimine (react-force-graph vms)
 - Kauguse-põhine isikute otsimine ("näita kõiki kes on seotud X-ga 2 astme kaudu")
-- Seose tugevuse/tüübi statistika
 
 ### Seose tüüp Wikidatast
 
