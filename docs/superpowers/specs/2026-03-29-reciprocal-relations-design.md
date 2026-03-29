@@ -200,6 +200,34 @@ See on **teadlik kompromiss**:
 
 ---
 
+## Implementatsiooni servajuhud
+
+Järgmised stsenaariumid tuleb `reciprocal_ops.py` kirjutamisel läbi mõelda.
+
+### 1. Mitu seost sama isikuga
+
+A-l võib olla B-ga mitu seost erineva `type`-ga (nt "õpetaja" + "kolleeg"). Kui kasutaja eemaldab neist ühe, ei tohi B kaardilt vastasseos kaduda — A-l on B-le ikka ülejäänud viide.
+
+**Reegel:** diff baseerub `target_id`-de **hulkadel** (`set`), mitte ridade 1:1 võrdlusel. B vastasseos eemaldatakse ainult siis, kui A-l ei jäänud B-le **mitte ühtegi** `target_id` viidet.
+
+### 2. Rikastatud automaatse seose kustutamine
+
+B logib sisse, näeb auto-seost (`reciprocal_auto: true`) ja täidab `type` välja ("õpilane"). Hiljem A kustutab oma seose B-ga. Spek ütleb: eemaldatakse read kus `reciprocal_auto: true` — see tähendab B kaotab käsitsi sisestatud `type` info.
+
+**MVP raames aktsepteeritav kompromiss.** Tuleb märkida koodi kommentaarina. Tulevikus, kui `type` on Wikidata entiteet, võib kaaluda: "kui `reciprocal_auto: true` aga `type` pole tühi → muuda `reciprocal_auto: false` (konverteeri käsitsi seoseks) selle asemel et kustutada."
+
+### 3. Lõputu tsükli vältimine
+
+`sync_reciprocals` uuendab B kaarte otse `atomic_write_json`-iga, **mitte** `update_person()` kaudu. See on kriitiline — `update_person()` kutsub omakorda `sync_reciprocals`-i, mis tekitaks lõputu tsükli. Tuleb jälgida, et see eristus koodi jõuab.
+
+### 4. Nime muutumise kaskaad (stale cache)
+
+A muudab oma nime. B kaardil olev vastasseos kannab endiselt vana nime — `name` väli on denormaliseeritud koopia. Sync toimub ainult `relations` muutuste korral, mitte nime muutuse korral (selleks on eraldi `_propagate_name_to_works`-tüüpi loogika).
+
+MVP raames ei ole probleem, sest tuleviku UI peaks toetuma `target_id`-le ja tõmbama aktuaalse nime reaalajas. Teadmine lihtsalt: `name` võib B kaardil vananeda.
+
+---
+
 ## Välistused
 
 - Seose `type` ei sünkroniseerita (vastastikune seos jääb tühja tüübiga — kasutaja täidab käsitsi)
