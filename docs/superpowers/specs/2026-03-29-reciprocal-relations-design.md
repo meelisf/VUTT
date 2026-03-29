@@ -93,7 +93,7 @@ async def prosopography_update(person_id, request, user=Depends(_require_role("e
 
 **Miks see on parem kui eraldi endpoint `previous_relations`-iga:**
 - Server loeb vana seisu ise — ei sõltu kliendi mälupeeklist
-- Diff on range ja concurrency-safe (vana fail loetakse vahetult enne salvestust)
+- Diff tehakse server-side vahetult enne salvestust, mistõttu see on usaldusväärsem ega sõltu kliendi lokaalsest seisust (ei ole täielikult concurrency-safe — vt konsistentsimudel)
 - Frontend ei pea midagi lisaks tegema
 
 ---
@@ -108,9 +108,9 @@ Frontend-i muudatused on **minimaalsed** — sync toimub automaatselt PUT endpoi
 
 `PersonEditPage` relations `renderItem`-is kuvatakse lingitud seosele (`target_id` olemas) väike `↔` märge.
 
-Kui seos on **äsja lisatud** (tühi `type`): tooltip "Automaatne vastasseos lisatakse [nimi] kaardile; täpsusta tüüp vajadusel käsitsi."
+Kõigile lingitud seostele (`target_id` olemas): tooltip "Vastasseos uuendatakse automaatselt [nimi] kaardil salvestamisel."
 
-Kui seos on **juba salvestatud** ja kannab `reciprocal_auto: true` märget: tooltip "Automaatne vastasseos; täpsusta tüüp vajadusel käsitsi."
+Kui seos kannab `reciprocal_auto: true` märget (serverist laetud): tooltip "Automaatne vastasseos; täpsusta tüüp vajadusel käsitsi."
 
 Ei ole vaja `initialRelationsRef`-i ega eraldi service kutseid.
 
@@ -118,7 +118,7 @@ Ei ole vaja `initialRelationsRef`-i ega eraldi service kutseid.
 
 ## Tulevikuvaade
 
-### Seosegraaف ja seose allikate võrdsus
+### Seosegraaf ja seose allikate võrdsus
 
 Kõik seosed on graafi mõistes võrdse kaaluga — erinev on ainult päritolu. Kahte tüüpi seoseid:
 
