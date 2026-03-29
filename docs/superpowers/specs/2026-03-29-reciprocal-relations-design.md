@@ -11,14 +11,17 @@ Praegu saab `PersonEditPage`-l lisada seoseid (`relations`) teistele isikutele. 
 
 ---
 
-## Andmemudel
+## Andmemudel (MVP — praegune implementatsioon)
 
-Seose objekt (muutmata):
+> **Scope:** ainult väljad `name`, `type` (string), `target_id`, `reciprocal_auto`.
+> `type_id` ja `type_labels` **ei kuulu sellesse implementatsiooni** — vt tulevikuvaade.
+
+Käsitsi lisatud seos:
 ```json
 { "name": "Johann Müller", "type": "õpetaja", "target_id": "vutt:Pabc123" }
 ```
 
-Vastastikune seos lisatakse tühi `type`-ga ja `reciprocal_auto: true` markeriga:
+Automaatselt lisatud vastastikune seos:
 ```json
 { "name": "Andreas Berg", "type": "", "target_id": "vutt:Pxyz789", "reciprocal_auto": true }
 ```
@@ -155,6 +158,9 @@ Serva andmemudel tuleviku graafi jaoks:
 
 Praegu on `type` vabatekstiline string (nt `"õpetaja"`). Tulevikus peaks `type` saama `LinkedEntity`-ks:
 
+**See ei kuulu praegusesse implementatsiooni.**
+
+Tuleviku andmemudel (eraldi spec + migratsioon):
 ```json
 {
   "name": "Johann Müller",
@@ -165,11 +171,9 @@ Praegu on `type` vabatekstiline string (nt `"õpetaja"`). Tulevikus peaks `type`
 }
 ```
 
-Wikidata sisaldab suhteliike (teacher Q37226, student Q48282, colleague Q3075502 jne) koos tõlgetega. Kasutajaliides saaks kasutada `EntityPicker`-it (olemasolev komponent) tüübi valimiseks, mis annaks automaatselt tõlked ja standardiseeritud koodid.
+Wikidata sisaldab suhteliike (teacher Q37226, student Q48282, colleague Q3075502 jne). Kasutajaliides saaks kasutada `EntityPicker`-it (olemasolev komponent), mis annaks automaatselt tõlked ja standardiseeritud koodid.
 
-**Migratsioon:** kuna praegu on seoseid märgitud minimaalselt, ei ole vaja andmeid tagasiulatuvalt muuta. Uus struktuur on tagasiühilduv — `type_id` ja `type_labels` on valikulised väljad, vabatekstiline `type` jääb alles.
-
-**Praeguses implementatsioonis:** `type` jääb stringiks. `reciprocal_ops.py` ei tee tüübi põhjal mingeid otsuseid (ei otsi paare nt "teacher" ↔ "student") — vastastikune seos lisatakse alati tühja tüübiga. See disain ei takista tulevikus tüübi linkimist lisada.
+Struktuur on tagasiühilduv — `type_id` ja `type_labels` on valikulised lisaväljad, vabatekstiline `type` jääb alles. Migratsioon on kerge kuna praegu on seoseid märgitud minimaalselt.
 
 ---
 
