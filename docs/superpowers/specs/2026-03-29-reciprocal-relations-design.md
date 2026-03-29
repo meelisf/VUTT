@@ -124,6 +124,26 @@ export async function syncReciprocals(personId: string, previousRelations: Relat
 - Kauguse-põhine isikute otsimine ("näita kõiki kes on seotud X-ga 2 astme kaudu")
 - Seose tugevuse/tüübi statistika
 
+### Seose tüüp Wikidatast
+
+Praegu on `type` vabatekstiline string (nt `"õpetaja"`). Tulevikus peaks `type` saama `LinkedEntity`-ks:
+
+```json
+{
+  "name": "Johann Müller",
+  "type": "õpetaja",
+  "type_id": "Q37226",
+  "type_labels": { "et": "õpetaja", "en": "teacher", "de": "Lehrer", "la": "magister" },
+  "target_id": "vutt:Pabc123"
+}
+```
+
+Wikidata sisaldab suhteliike (teacher Q37226, student Q48282, colleague Q3075502 jne) koos tõlgetega. Kasutajaliides saaks kasutada `EntityPicker`-it (olemasolev komponent) tüübi valimiseks, mis annaks automaatselt tõlked ja standardiseeritud koodid.
+
+**Migratsioon:** kuna praegu on seoseid märgitud minimaalselt, ei ole vaja andmeid tagasiulatuvalt muuta. Uus struktuur on tagasiühilduv — `type_id` ja `type_labels` on valikulised väljad, vabatekstiline `type` jääb alles.
+
+**Praeguses implementatsioonis:** `type` jääb stringiks. `reciprocal_ops.py` ei tee tüübi põhjal mingeid otsuseid (ei otsi paare nt "teacher" ↔ "student") — vastastikune seos lisatakse alati tühja tüübiga. See disain ei takista tulevikus tüübi linkimist lisada.
+
 ---
 
 ## Välistused
