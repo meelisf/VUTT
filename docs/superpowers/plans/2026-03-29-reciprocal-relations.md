@@ -61,6 +61,7 @@ def _load_person(person_id: str) -> dict | None:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
+        logger.exception("Ei suutnud lugeda prosopograafia faili isiku %s jaoks", person_id)
         return None
 
 
@@ -74,7 +75,7 @@ def sync_reciprocals(
     raise NotImplementedError
 ```
 
-- [ ] **Samm 2: Kirjuta testifail kõigi 6 käitumisreegli jaoks**
+- [ ] **Samm 2: Kirjuta testifail käitumisreeglite ja peamiste servajuhtude jaoks**
 
 ```python
 # tests/test_reciprocal_ops.py
@@ -127,7 +128,7 @@ def _run(prosopo_dir: Path, old_relations: list, new_relations: list) -> list[st
 # ── Reegel 1+2: ainult target_id-ga seosed, hulga-põhine diff ──────────────
 
 def test_linked_relation_adds_reciprocal(tmp_path):
-    """Uue target_id lisamisel lisatakse B-le vastasseos."""
+    """Uue target_id lisamisel lisatakse B-le vastasseos; updated_by uuendatakse."""
     _write_person(tmp_path, B_ID, [])
     synced = _run(tmp_path, old_relations=[], new_relations=[{"name": "B", "type": "õpetaja", "target_id": B_ID}])
     b = _read_person(tmp_path, B_ID)
@@ -137,6 +138,8 @@ def test_linked_relation_adds_reciprocal(tmp_path):
     assert b["relations"][0]["type"] == ""
     assert b["relations"][0]["name"] == A_LABEL
     assert B_ID in synced
+    assert b["updated_by"] == "testuser"
+    assert b["updated_at"] != "2026-01-01T00:00:00+00:00"  # timestamp uuendati
 
 
 def test_unlinked_relation_ignored(tmp_path):
@@ -200,6 +203,22 @@ def test_multi_edge_partial_removal_keeps_reciprocal(tmp_path):
     _run(tmp_path, old_relations=old_rels, new_relations=new_rels)
     b = _read_person(tmp_path, B_ID)
     assert len(b["relations"]) == 1  # vastasseos jääb alles
+
+
+# ── Reegel 4 kombinatsioon: auto + käsitsi rida samal ajal ───────────────
+
+def test_removal_with_both_auto_and_manual_rows(tmp_path):
+    """B-l on korraga auto-rida JA käsitsi rida A-ga. A eemaldab seose.
+    Auto-rida kustutatakse, käsitsi rida jääb alles."""
+    _write_person(tmp_path, B_ID, [
+        {"name": A_LABEL, "type": "", "target_id": A_ID, "reciprocal_auto": True},
+        {"name": A_LABEL, "type": "sõber", "target_id": A_ID},  # käsitsi, ilma reciprocal_auto
+    ])
+    _run(tmp_path, old_relations=[{"name": "B", "type": "", "target_id": B_ID}], new_relations=[])
+    b = _read_person(tmp_path, B_ID)
+    assert len(b["relations"]) == 1
+    assert b["relations"][0]["type"] == "sõber"
+    assert "reciprocal_auto" not in b["relations"][0]
 
 
 # ── Servajuhud ─────────────────────────────────────────────────────────────
@@ -281,6 +300,7 @@ def _load_person(person_id: str) -> dict | None:
         with open(path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
+        logger.exception("Ei suutnud lugeda prosopograafia faili isiku %s jaoks", person_id)
         return None
 
 
@@ -311,6 +331,7 @@ def sync_reciprocals(
     removed = old_ids - new_ids  # B-dele, kellelt eemaldati viimane seos
 
     synced: list[str] = []
+    # Üks timestamp kogu sync-jooksu jaoks — kõik uuendatud B kaardid saavad sama ajamärgi
     now = datetime.now(timezone.utc).isoformat()
 
     for b_id in added:
@@ -362,7 +383,7 @@ def sync_reciprocals(
 cd /home/mf/LLM/VUTT && python -m pytest tests/test_reciprocal_ops.py -v
 ```
 
-Oodatav tulemus: kõik 9 testi `PASSED`.
+Oodatav tulemus: kõik 10 testi `PASSED`.
 
 - [ ] **Samm 3: Commit**
 
@@ -378,12 +399,15 @@ git commit -m "feat: lisa sync_reciprocals — vastastikuste seoste sünkronisee
 **Files:**
 - Modify: `server/prosopography/router.py`
 
-- [ ] **Samm 1: Lisa import reciprocal_ops-ist**
+- [ ] **Samm 1: Lisa impordid router.py algusesse**
 
 Faili `server/prosopography/router.py` alguses, olemasolevate `.ops` importide juurde:
 
 ```python
+from ..config import get_logger
 from .reciprocal_ops import sync_reciprocals
+
+logger = get_logger(__name__)
 ```
 
 - [ ] **Samm 2: Muuda PUT endpoint**
@@ -433,11 +457,8 @@ async def prosopography_update(
             a_label,
             username=user["username"],
         )
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error(
-            "sync_reciprocals ebaõnnestus isiku %s jaoks: %s", person_id, exc
-        )
+    except Exception:
+        logger.exception("sync_reciprocals ebaõnnestus isiku %s jaoks", person_id)
     enrich_entity_labels_from_person_async(person)
     return person
 ```
@@ -487,7 +508,11 @@ export interface RelationDraft {
 Failis `src/prosopography/pages/PersonEditPage.tsx`, rida 4, lisa `ArrowLeftRight` olemasolevasse lucide-react importi:
 
 ```typescript
-import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2, ExternalLink, ArrowLeftRight } from 'lucide-react';
+import {
+  ArrowLeft, Save, X, Loader2,
+  ImagePlus, Trash2, ExternalLink,
+  ArrowLeftRight,
+} from 'lucide-react';
 ```
 
 - [ ] **Samm 3: Lisa `↔` marker relations renderItem-isse**
@@ -509,8 +534,8 @@ renderItem={(item, onChange, onRemove) => (
       <span
         title={
           item.reciprocal_auto
-            ? t('form.reciprocalAutoTooltip', 'Automaatne vastasseos; täpsusta tüüp vajadusel käsitsi.')
-            : t('form.reciprocalTooltip', 'Vastasseos uuendatakse automaatselt salvestamisel.')
+            ? t('form.reciprocalAutoTooltip')
+            : t('form.reciprocalTooltip')
         }
         className="shrink-0 text-gray-400"
       >
@@ -562,4 +587,6 @@ git commit -m "feat: lisa vastastikuse seose UI marker PersonEditPage-l"
 
 - [ ] Käivita kõik testid: `python -m pytest tests/ -v`
 - [ ] Käivita build: `npm run build`
-- [ ] Kontrolli käsitsi: ava isiku edit leht, lisa seos teisele isikule, salvesta, ava teise isiku kaart — vastasseos peaks olema lisandunud `reciprocal_auto: true` märkusega ja `↔` ikooni peab nägema
+- [ ] **Lisamine:** ava isiku A edit leht, lisa seos isikule B, salvesta → ava B kaart → vastasseos peab olema lisandunud `reciprocal_auto: true` märkusega; `↔` ikoon peab olema nähtav A edit lehel B rea kõrval
+- [ ] **Eemaldamine:** ava A edit leht, eemalda seos B-le, salvesta → ava B kaart → auto-seos peab kadunud olema
+- [ ] **Käsitsi seose säilimine:** lisa B kaardile käsitsi seos A-le (täida `type`), seejärel ava A edit leht ja eemalda A-poolne seos B-le, salvesta → ava B kaart → käsitsi seos A-le peab jääma alles
