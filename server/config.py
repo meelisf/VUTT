@@ -71,26 +71,33 @@ def get_logger(name):
 DEFAULT_DIR = "data"
 BASE_DIR = os.getenv("VUTT_DATA_DIR", DEFAULT_DIR)
 
-# JSON failide asukohad (state/ kaustas projekti juurkataloogis)
+# JSON failide asukohad
 # NB: _PROJECT_ROOT on defineeritud ülal logimise sektsioonis
+
+# Runtime/tundlikud failid — projekti state/ kaustas (ei ole gitis)
 _STATE_DIR = os.path.join(_PROJECT_ROOT, "state")
 STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
-COLLECTIONS_FILE = os.path.join(_STATE_DIR, "collections.json")
-VOCABULARIES_FILE = os.path.join(_STATE_DIR, "vocabularies.json")
-PERSON_ALIASES_FILE = os.path.join(_STATE_DIR, "person_aliases.json")
-LABELS_FILE = os.path.join(_STATE_DIR, "labels.json")
 REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
-# Prosopograafia
+# Andmefailid — data/state/ kaustas (sisemises gitis)
+_DATA_STATE_DIR = os.path.join(BASE_DIR, "state")
+DATA_STATE_DIR = _DATA_STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
+COLLECTIONS_FILE = os.path.join(_DATA_STATE_DIR, "collections.json")
+VOCABULARIES_FILE = os.path.join(_DATA_STATE_DIR, "vocabularies.json")
+PERSON_ALIASES_FILE = os.path.join(_DATA_STATE_DIR, "person_aliases.json")
+LABELS_FILE = os.path.join(_DATA_STATE_DIR, "labels.json")
+PLACES_FILE = os.path.join(_DATA_STATE_DIR, "places.json")
+PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_STATE_DIR, "prosopography_index.json")
+PERSON_TO_WORKS_FILE = os.path.join(_DATA_STATE_DIR, "person_to_works.json")
+
+# Prosopograafia isikukaardid
 PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")
 
 # Album Academicum referentsandmed
 AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")
-PROSOPOGRAPHY_INDEX_FILE = os.path.join(_STATE_DIR, "prosopography_index.json")
-PERSON_TO_WORKS_FILE = os.path.join(_STATE_DIR, "person_to_works.json")
 
 # =========================================================
 # SERVERI SEADED
