@@ -70,11 +70,10 @@ i18n
     ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload', 'prosopography', 'settings'],
 
     detection: {
-      order: ['localStorage'],
+      order: ['localStorage', 'navigator'],
       lookupLocalStorage: 'vutt_language',
       caches: ['localStorage'],
     },
-    lng: localStorage.getItem('vutt_language') || 'et', // Vaikimisi eesti keel
 
     interpolation: {
       escapeValue: false, // React juba escapib
