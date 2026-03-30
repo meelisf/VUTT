@@ -14,7 +14,7 @@ Veebirakendus TÜ varauusaegsete akadeemiliste tekstide transkriptsioonide vaata
 - Struktureeritud metaandmed lingitud andmetena (Wikidata, VIAF, Album Academicum)
 - Isikute register (prosopograafia) koos nimevastete ja viidete sünkroonimisega
 - Git-põhine versiooniajalugu — originaal-OCR alati taastatav
-- Rollipõhine töövoog: contributor muudatused lähevad ülevaatusele, editor salvestab otse
+- Rollipõhine ligipääs: editor saab muuta, admin haldab kasutajaid ja andmeid
 - Admin: üleslaadimise viisard (PDF/JPG → OCR server → import), kasutajahaldus, statistika
 
 ## Arhitektuur
@@ -164,8 +164,7 @@ rsync -avz dist/ vutt:~/VUTT/dist/
 
 | Roll | Õigused |
 |------|---------|
-| `contributor` | Muudatused lähevad ülevaatusele |
-| `editor` | Otse salvestamine, staatuse muutmine |
+| `editor` | Teksti toimetamine, staatuse muutmine |
 | `admin` | Kasutajahaldus, versiooni taastamine, üleslaadimise viisard |
 
 ## Tehnoloogiad
