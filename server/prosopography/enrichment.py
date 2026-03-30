@@ -116,7 +116,7 @@ WHERE {{
               ?deathNode wikibase:timePrecision ?deathPrec. }}
   OPTIONAL {{ wd:{qid} wdt:P19 ?birthPlace. BIND(?birthPlace AS ?birthPlaceQ) }}
   OPTIONAL {{ wd:{qid} wdt:P20 ?deathPlace. BIND(?deathPlace AS ?deathPlaceQ) }}
-  OPTIONAL {{ wd:{qid} skos:altLabel ?altLabel. FILTER(LANG(?altLabel) IN ("et","en","de","la")) }}
+  OPTIONAL {{ wd:{qid} skos:altLabel ?altLabel. FILTER(LANG(?altLabel) IN ("et","en","de","la","mul")) }}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "et,en". }}
 }}
 GROUP BY ?gender ?birthDate ?birthPrec ?deathDate ?deathPrec
