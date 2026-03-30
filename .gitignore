@@ -29,6 +29,8 @@ meilisearch
 state/
 !state/*.example
 !state/*.json.example
+# Kureeritud referentsandmed — kuuluvad reposse
+!state/places.json
 
 # Documentation archive (old/completed plans)
 docs/_archive/
