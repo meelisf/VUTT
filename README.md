@@ -1,39 +1,41 @@
-# VUTT – Varauusaegsete Tekstide Töölaud
+# VUTT – Workbench for Early Modern Texts
 
-Veebirakendus TÜ varauusaegsete akadeemiliste tekstide transkriptsioonide vaatamiseks ja toimetamiseks. Kuvab skaneeritud pilti ja OCR-teksti kõrvuti; teksti saab parandada, annoteerida ja otsida.
+A web application for viewing and editing transcriptions of early modern academic texts from the University of Tartu collections. Displays scanned page images alongside OCR text; transcriptions can be corrected, annotated, and searched.
 
 <img alt="VUTT screenshot" src="docs/screenshot.png" />
 
-**Kasutusel:** [vutt.utlib.ut.ee](https://vutt.utlib.ut.ee)
+**Live instance:** [vutt.utlib.ut.ee](https://vutt.utlib.ut.ee)
 
-## Funktsioonid
+> [Eestikeelne README](README.et.md)
 
-- Teoste sirvimine kollektsioonide, staatuse ja liitfiltritega (autor, aasta, žanr, märksõnad, asukoht)
-- Täistekstotsing läbi kõigi transkriptsioonide (Meilisearch)
-- OCR-teksti toimetamine originaalpildi kõrval (CodeMirror 6, VUTT markup)
-- Struktureeritud metaandmed lingitud andmetena (Wikidata, VIAF, Album Academicum)
-- Isikute register (prosopograafia) koos nimevastete ja viidete sünkroonimisega
-- Git-põhine versiooniajalugu — originaal-OCR alati taastatav
-- Rollipõhine ligipääs: editor saab muuta, admin haldab kasutajaid ja andmeid
-- Admin: üleslaadimise viisard (PDF/JPG → OCR server → import), kasutajahaldus, statistika
+## Features
 
-## Arhitektuur
+- Browse works by collection, status, and combined filters (author, year, genre, tags, location)
+- Full-text search across all transcriptions (Meilisearch)
+- Side-by-side OCR editing with the original scan (CodeMirror 6, VUTT markup)
+- Structured metadata as linked data (Wikidata, VIAF, Album Academicum)
+- Persons register (prosopography) with name variant resolution and cross-reference sync
+- Git-based version history — original OCR always restorable
+- Role-based access: editors can transcribe, admins manage users and data
+- Admin tools: upload wizard (PDF/JPG → OCR server → import), user management, statistics
+
+## Architecture
 
 ```
 Frontend (React 19 + Vite + TypeScript + Tailwind CSS)
-    ↓ Nginx (hostis, /etc/nginx/sites-available/vutt)
-├── Meilisearch (127.0.0.1:7700) – otsing ja metaandmed
-├── Image Server   (127.0.0.1:8001) – skaneeritud .jpg pildid
-└── File Server / FastAPI (127.0.0.1:8002) – salvestamine, autentimine, Git, upload
+    ↓ Nginx (host, /etc/nginx/sites-available/vutt)
+├── Meilisearch (127.0.0.1:7700) – search and metadata
+├── Image Server   (127.0.0.1:8001) – scanned .jpg images
+└── File Server / FastAPI (127.0.0.1:8002) – saving, auth, Git, uploads
     ↓
-Failisüsteem: data/{teos-kaust}/{leht}.txt + .jpg + .json + _metadata.json
+Filesystem: data/{work-folder}/{page}.txt + .jpg + .json + _metadata.json
 ```
 
-Backend ja Meilisearch jooksevad Dockeris (`docker-compose.yml`). Nginx jookseb hostis ja proxy-b kõik kolm porti.
+Backend and Meilisearch run in Docker (`docker-compose.yml`). Nginx runs on the host and proxies all three ports.
 
-## Installimine
+## Installation
 
-### Eeltingimused
+### Prerequisites
 
 - Node.js 20+, npm
 - Python 3.9+
@@ -41,69 +43,69 @@ Backend ja Meilisearch jooksevad Dockeris (`docker-compose.yml`). Nginx jookseb 
 - Git
 - Nginx (host)
 
-### 1. Kloonimmine ja konfiguratsioon
+### 1. Clone and configure
 
 ```bash
 git clone <repo> VUTT && cd VUTT
 cp state/users.json.example state/users.json
 ```
 
-Kopeeri või loo `state/collections.json` (näide ei ole gitis — vt struktuuri allpool).
+Copy or create `state/collections.json` (not tracked in git — see structure below).
 
 ### 2. Backend (.env)
 
-Loo `.env` faili projekti juures:
+Create a `.env` file in the project root:
 
 ```env
-MEILI_MASTER_KEY=vaheta_see_ära
-UPLOAD_ENABLED=false          # true kui OCR server konfigureeritud
-OCR_SERVER_HOST=              # OCR serveri IP (kui UPLOAD_ENABLED=true)
+MEILI_MASTER_KEY=change_this
+UPLOAD_ENABLED=false          # true if OCR server is configured
+OCR_SERVER_HOST=              # OCR server IP (if UPLOAD_ENABLED=true)
 OCR_SERVER_USER=
 OCR_SERVER_PATH=
-UMAMI_DB_PASSWORD=vaheta_see_ära
-UMAMI_APP_SECRET=vaheta_see_ära
+UMAMI_DB_PASSWORD=change_this
+UMAMI_APP_SECRET=change_this
 ```
 
-Käivita:
+Start services:
 
 ```bash
 docker compose up -d
 ```
 
-### 3. Andmete indekseerimine
+### 3. Index data
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python scripts/1-1_consolidate_data.py   # Loeb data/ → JSON
-.venv/bin/python scripts/2-1_upload_to_meili.py    # Laeb Meilisearchi
+.venv/bin/python scripts/1-1_consolidate_data.py   # Reads data/ → JSON
+.venv/bin/python scripts/2-1_upload_to_meili.py    # Uploads to Meilisearch
 ```
 
 ### 4. Frontend
 
 ```bash
 npm install
-npm run build             # Toodangule
-# või arenduseks:
+npm run build             # Production build
+# or for development:
 npm run dev               # http://localhost:5173
 ```
 
 ### 5. Nginx
 
-Seadista Nginx proxima kolm porti ning serveeri `dist/` staatilisi faile. Kõik `/api/*` päringud → `127.0.0.1:8002`, `/images/*` → `8001`, Meilisearch otsing → `7700` (ainult lugemisõigusega API võtmega).
+Configure Nginx to proxy the three ports and serve `dist/` as static files. All `/api/*` requests → `127.0.0.1:8002`, `/images/*` → `8001`, Meilisearch search → `7700` (read-only API key only).
 
-### 6. Esimene kasutaja
+### 6. First user
 
-Registreeru `/register` lehel — esimene kasutaja saab admin-rolli automaatselt (või lisa käsitsi `state/users.json`-i).
+Register at `/register` — the first account automatically receives admin role (or add manually to `state/users.json`).
 
-## Lokaalne arendus (ainult frontend)
+## Local development (frontend only)
 
 ```bash
 npm install && npm run dev
 ```
 
-Frontend suhtleb tootmisserveri API-ga, kui `VITE_API_URL` on seadistatud. Lokaalse backendiInstance jaoks käivita `docker compose up -d` ja seadista `.env.local`.
+The frontend can connect to a production API server if `VITE_API_URL` is set. For a local backend, run `docker compose up -d` and configure `.env.local`.
 
-## Testid
+## Tests
 
 ```bash
 python3 -m venv .venv
@@ -111,26 +113,26 @@ python3 -m venv .venv
 .venv/bin/pytest -q
 ```
 
-## Andmete struktuur
+## Data structure
 
 ```
 data/
 └── 1692-6-disputatio-de-aliquo/
-    ├── _metadata.json      # Teose metaandmed (id, pealkiri, aasta, autorid, žanr jne)
+    ├── _metadata.json      # Work metadata (id, title, year, authors, genre, etc.)
     ├── scan_001.jpg
-    ├── scan_001.txt        # VUTT markup transkriptsioon
-    ├── scan_001.json       # Lehekülje metaandmed ja sequence
+    ├── scan_001.txt        # VUTT markup transcription
+    ├── scan_001.json       # Page metadata and sequence
     └── ...
 ```
 
-Metaandmete väljanimed lingitud andmete jaoks kasutavad LinkedEntity formaati:
+Linked data fields use the LinkedEntity format:
 ```json
 { "label": "Tartu", "id": "Q3258", "source": "wikidata", "labels": {"et": "Tartu", "en": "Tartu"} }
 ```
 
-Toetatud väljanimed: `genre`, `type`, `location`, `publisher`, `tags`, `creators[]`
+Supported fields: `genre`, `type`, `location`, `publisher`, `tags`, `creators[]`
 
-## Kollektsioonid (`state/collections.json`)
+## Collections (`state/collections.json`)
 
 ```json
 {
@@ -142,9 +144,9 @@ Toetatud väljanimed: `genre`, `type`, `location`, `publisher`, `tags`, `creator
 }
 ```
 
-Värvid: Tailwind värvnimed (`red`, `amber`, `teal`, `violet` jne). Fail ei ole gitis — kopeeri käsitsi.
+Colors: Tailwind color names (`red`, `amber`, `teal`, `violet`, etc.). File is not tracked in git — copy manually.
 
-## Deploy (tootmisserver)
+## Deploy (production server)
 
 ```bash
 # Backend
@@ -153,24 +155,24 @@ cd ~/VUTT && git pull
 docker compose build --no-cache backend && docker compose up -d backend
 
 # Frontend
-npm run build                        # lokaalses masinas
+npm run build                        # on local machine
 rsync -avz dist/ vutt:~/VUTT/dist/
 
-# Andmed uuendada (kui data/ muutus)
+# Re-index data (if data/ changed)
 ./scripts/server_seed_data.sh
 ```
 
-## Rollid
+## Roles
 
-| Roll | Õigused |
-|------|---------|
-| `editor` | Teksti toimetamine, staatuse muutmine |
-| `admin` | Kasutajahaldus, versiooni taastamine, üleslaadimise viisard |
+| Role | Permissions |
+|------|-------------|
+| `editor` | Edit transcriptions, change status |
+| `admin` | User management, version restore, upload wizard |
 
-## Tehnoloogiad
+## Tech stack
 
 React 19 · TypeScript · Vite · Tailwind CSS · CodeMirror 6 · Meilisearch · FastAPI · Python 3.9 · Git · Recharts · react-i18next (et/en)
 
-## Litsents
+## License
 
 MIT
