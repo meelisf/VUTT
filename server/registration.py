@@ -185,8 +185,44 @@ def _validate_and_consume_token(token):
         return dict(token_obj), None
 
 
+def _unconsume_token(token):
+    """Märgib tokeni tagasi kasutamata (kasutatakse rollback'iks kui kasutaja salvestamine ebaõnnestub)."""
+    with tokens_lock:
+        if not os.path.exists(INVITE_TOKENS_FILE):
+            return
+        with open(INVITE_TOKENS_FILE, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        for t in data["tokens"]:
+            if t["token"] == token:
+                t["used"] = False
+                t.pop("used_at", None)
+                atomic_write_json(INVITE_TOKENS_FILE, data)
+                logger.warning(f"Invite token taastatud (kasutaja salvestamine ebaõnnestus): {token[:8]}…")
+                return
+
+
+MIN_PASSWORD_LENGTH = 12
+MIN_UNIQUE_CHARS = 4
+
+
+def validate_password_strength(password):
+    """Kontrollib parooli tugevust. Tagastab veateate stringina või None kui OK."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return f"Parool peab olema vähemalt {MIN_PASSWORD_LENGTH} tähemärki pikk"
+    if len(set(password)) < MIN_UNIQUE_CHARS:
+        return "Parool on liiga lihtne (vähemalt 4 erinevat tähemärki nõutud)"
+    if password == password[0] * len(password):
+        return "Parool on liiga lihtne (korduvad tähemärgid)"
+    return None
+
+
 def create_user_from_invite(token, password):
     """Loob kasutaja invite tokeni põhjal."""
+    # Serveripoolne paroolipoliitika
+    pw_error = validate_password_strength(password)
+    if pw_error:
+        return None, pw_error
+
     # Atomaarne validate + consume — kaitseb race condition'i eest
     token_data, error = _validate_and_consume_token(token)
     if error:
@@ -221,8 +257,14 @@ def create_user_from_invite(token, password):
     }
 
     # Salvesta users.json (atomic write + lock)
-    with users_lock:
-        atomic_write_json(USERS_FILE, users)
+    # NB: token on juba tarbitud — kui salvestamine ebaõnnestub, taastame tokeni
+    try:
+        with users_lock:
+            atomic_write_json(USERS_FILE, users)
+    except Exception as e:
+        _unconsume_token(token)
+        logger.error(f"Kasutaja salvestamine ebaõnnestus ({username}): {e}")
+        return None, "Kasutaja loomine ebaõnnestus, palun proovi uuesti"
 
     logger.info(f"Loodud uus kasutaja: {username} ({name})")
     return {"username": username, "name": name, "role": "editor"}, None

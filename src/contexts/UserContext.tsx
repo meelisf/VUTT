@@ -193,6 +193,14 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [applySettings]);
 
   const logout = useCallback(() => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      // Tühista sessioon serveris (best-effort, ei blokeeri)
+      fetch(`${FILE_API_URL}/logout`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).catch(() => {});
+    }
     setUser(null);
     setAuthToken(null);
     setUserSettings({});
