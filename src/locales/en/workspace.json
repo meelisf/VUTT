@@ -150,7 +150,8 @@
       "editor": "Editor",
       "aui": "Author of preface/afterword",
       "subject": "Subject of",
-      "publisher": "Publisher"
+      "publisher": "Publisher",
+      "mentioned": "Mentioned"
     },
     "addCreator": "Add person",
     "removeCreator": "Remove",

@@ -150,7 +150,8 @@
       "editor": "Toimetaja",
       "aui": "Eessõna/järelsõna autor",
       "subject": "Tema kohta",
-      "publisher": "Trükkal"
+      "publisher": "Trükkal",
+      "mentioned": "Mainitud"
     },
     "addCreator": "Lisa isik",
     "removeCreator": "Eemalda",
