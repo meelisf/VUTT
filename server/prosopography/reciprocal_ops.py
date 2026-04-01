@@ -7,6 +7,7 @@ Kasutab atomic_write_json otse — EI kasuta update_person() — vältimaks lõp
 import json
 import os
 from datetime import datetime, timezone
+from typing import Optional
 
 from ..config import PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
@@ -20,7 +21,7 @@ def _id_to_path(person_id: str) -> str:
     return os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
 
 
-def _load_person(person_id: str) -> dict | None:
+def _load_person(person_id: str) -> Optional[dict]:
     path = _id_to_path(person_id)
     if not os.path.exists(path):
         return None
