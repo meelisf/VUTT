@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
@@ -649,6 +649,18 @@ const PersonEditPage: React.FC = () => {
                   placeholder={t('form.relationPlaceholder')}
                   className={`w-36 ${inputCls} shrink-0`}
                 />
+                {item.target_id && (
+                  <span
+                    title={
+                      item.reciprocal_auto
+                        ? t('form.reciprocalAutoTooltip')
+                        : t('form.reciprocalTooltip')
+                    }
+                    className="shrink-0 text-gray-400"
+                  >
+                    <ArrowLeftRight size={13} />
+                  </span>
+                )}
                 <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
                   <X size={14} />
                 </button>

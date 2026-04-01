@@ -94,6 +94,8 @@
     "sources": "Allikad",
     "sourcePlaceholder": "Allikaviide — arhiivifond, trükis, veebiaadress…",
     "sourceNote": "Märkus — nt «suri 15. jaanuar 1642 Tallinnas»",
+    "reciprocalTooltip": "Vastasseos uuendatakse automaatselt salvestamisel.",
+    "reciprocalAutoTooltip": "Automaatne vastasseos; täpsusta tüüp vajadusel käsitsi.",
     "noItems": "Kirjeid pole. Klõpsa \"Lisa\" lisamiseks.",
     "add": "Lisa",
     "photoError": {

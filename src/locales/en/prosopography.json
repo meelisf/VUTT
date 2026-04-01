@@ -94,6 +94,8 @@
     "sources": "Sources",
     "sourcePlaceholder": "Source reference — archive fund, publication, URL…",
     "sourceNote": "Note — e.g. «died 15 January 1642 in Tallinn»",
+    "reciprocalTooltip": "Reciprocal relation will be updated automatically on save.",
+    "reciprocalAutoTooltip": "Auto-generated reciprocal relation; fill in the type manually if needed.",
     "noItems": "No entries. Click \"Add\" to add.",
     "add": "Add",
     "photoError": {

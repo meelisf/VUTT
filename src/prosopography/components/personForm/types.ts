@@ -22,7 +22,7 @@ export interface EducationDraft {
 }
 
 export interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }
-export interface RelationDraft { name: string; type: string; target_id?: string | null }
+export interface RelationDraft { name: string; type: string; target_id?: string | null; reciprocal_auto?: boolean }
 export interface SourceDraft { text: string; note: string }
 
 export interface FormDraft {
