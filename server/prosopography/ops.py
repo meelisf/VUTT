@@ -927,6 +927,26 @@ def rebuild_indices():
                 if pid.startswith("vutt:P"):
                     ptw.setdefault(pid, []).append({"work_id": work_id, "role": "publisher"})
 
+            # page_tags isikud ('mentioned' roll)
+            try:
+                for page_fname in os.listdir(entry.path):
+                    if not page_fname.endswith('.json') or page_fname == '_metadata.json':
+                        continue
+                    page_fpath = os.path.join(entry.path, page_fname)
+                    try:
+                        with open(page_fpath, 'r', encoding='utf-8') as pf:
+                            page_data = json.load(pf)
+                        source = page_data.get('meta_content', page_data)
+                        for tag in source.get('page_tags', []):
+                            if isinstance(tag, dict):
+                                pid = tag.get('id') or ''
+                                if pid.startswith('vutt:P'):
+                                    ptw.setdefault(pid, []).append({'work_id': work_id, 'role': 'mentioned'})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
     # Kirjuta person_to_works
     with _works_lock:
         atomic_write_json(PERSON_TO_WORKS_FILE, ptw)

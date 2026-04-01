@@ -276,3 +276,56 @@ def test_update_page_person_mentions(tmp_path, monkeypatch):
 
     # Teise teose kirje peab säilima
     assert data["vutt:Pccc"] == [{"work_id": "other_work", "role": "mentioned"}]
+
+
+def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
+    """
+    rebuild_indices() peab page_tags vutt:P isikuid lisama person_to_works
+    rolliga 'mentioned'.
+    """
+    import server.prosopography.ops as prosopo_ops
+
+    # Teoste kataloog
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    # Teos1: leht kus on isik vutt:Pxxx
+    teos1 = data_dir / "teos1"
+    teos1.mkdir()
+    (teos1 / "_metadata.json").write_text(json.dumps({
+        "id": "workAAA",
+        "creators": [],
+        "tags": [],
+        "publisher": None,
+    }), encoding="utf-8")
+    (teos1 / "leht1.json").write_text(json.dumps({
+        "page_tags": [
+            {"id": "vutt:Pxxx", "label": "Test Isik", "entity_type": "person"},
+        ]
+    }), encoding="utf-8")
+
+    # Prosopograafia kaust (tühi — testis pole isikukaarte vaja)
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+
+    ptw_file = tmp_path / "person_to_works.json"
+    index_file = tmp_path / "prosopography_index.json"
+    aliases_file = tmp_path / "person_aliases.json"
+
+    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_INDEX_FILE", str(index_file))
+    monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(aliases_file))
+    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+
+    # rebuild_indices kasutab `from ..config import BASE_DIR` funktsiooni sees
+    import server.config as config_mod
+    monkeypatch.setattr(config_mod, "BASE_DIR", str(data_dir))
+
+    prosopo_ops.rebuild_indices()
+
+    data = json.loads(ptw_file.read_text(encoding="utf-8"))
+
+    assert "vutt:Pxxx" in data, f"vutt:Pxxx peaks olema ptw-s, sain: {list(data.keys())}"
+    roles = {e["role"] for e in data["vutt:Pxxx"]}
+    assert "mentioned" in roles, f"'mentioned' roll peaks olema: {data['vutt:Pxxx']}"
+    assert data["vutt:Pxxx"][0]["work_id"] == "workAAA"
