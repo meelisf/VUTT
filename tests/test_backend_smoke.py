@@ -329,3 +329,33 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     roles = {e["role"] for e in data["vutt:Pxxx"]}
     assert "mentioned" in roles, f"'mentioned' roll peaks olema: {data['vutt:Pxxx']}"
     assert data["vutt:Pxxx"][0]["work_id"] == "workAAA"
+
+
+def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, tmp_path):
+    """
+    POST /save peab käivitama update_page_person_mentions background task-i
+    kui meta_content sisaldab work_id välja.
+    """
+    import server.main as main_mod
+
+    # Mock sõltuvused mis vajavad git/filesystem/meilisearch
+    monkeypatch.setattr(main_mod, "save_with_git", lambda *a, **kw: {"commit_hash": "abc12345"})
+    monkeypatch.setattr(main_mod, "sync_work_to_meilisearch_async", lambda *a: None)
+    monkeypatch.setattr(main_mod, "BASE_DIR", str(tmp_path))
+
+    calls = []
+    # update_page_person_mentions imporditakse main.py-sse Task 4 implementatsioonis
+    monkeypatch.setattr(main_mod, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir)))
+
+    token = login("editor", "editorpass")
+    response = client.post("/save", headers={"Authorization": f"Bearer {token}"}, json={
+        "original_path": "teos1",
+        "file_name": "leht1.txt",
+        "text_content": "uus tekst",
+        "meta_content": {"work_id": "workAAA", "page_tags": []},
+    })
+
+    assert response.status_code == 200
+    assert len(calls) == 1, f"update_page_person_mentions peaks olema kutsutud 1 kord, sain: {calls}"
+    assert calls[0][0] == "workAAA"
+    assert "teos1" in calls[0][1]

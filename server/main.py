@@ -44,6 +44,7 @@ from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pa
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
+from .prosopography.ops import update_page_person_mentions
 from .metadata_ops import save_work_metadata, ALLOWED_METADATA_FIELDS
 
 @asynccontextmanager
@@ -641,6 +642,10 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
     git_result = save_with_git(txt_path, text, user['username'], additional_files=additional if additional else None)
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    work_id = (data.get('meta_content') or {}).get('work_id')
+    if work_id:
+        work_dir = os.path.join(BASE_DIR, catalog)
+        background_tasks.add_task(update_page_person_mentions, work_id, work_dir)
     return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
 
 @app.post("/update-work-metadata")
