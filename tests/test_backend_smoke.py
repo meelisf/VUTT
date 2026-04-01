@@ -303,6 +303,12 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
             {"id": "vutt:Pxxx", "label": "Test Isik", "entity_type": "person"},
         ]
     }), encoding="utf-8")
+    # Leht 2: sama isik kui leht1 — ei tohi duplikaate tekitada
+    (teos1 / "leht2.json").write_text(json.dumps({
+        "page_tags": [
+            {"id": "vutt:Pxxx", "label": "Test Isik", "entity_type": "person"},
+        ]
+    }), encoding="utf-8")
 
     # Prosopograafia kaust (tühi — testis pole isikukaarte vaja)
     prosopo_dir = tmp_path / "prosopography"
@@ -329,6 +335,9 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     roles = {e["role"] for e in data["vutt:Pxxx"]}
     assert "mentioned" in roles, f"'mentioned' roll peaks olema: {data['vutt:Pxxx']}"
     assert data["vutt:Pxxx"][0]["work_id"] == "workAAA"
+    # Sama isik mitmel lehel — ainult üks 'mentioned' kirje teose kohta
+    mentioned_entries = [e for e in data["vutt:Pxxx"] if e["role"] == "mentioned"]
+    assert len(mentioned_entries) == 1, f"Peaks olema täpselt 1 'mentioned' kirje, sain: {mentioned_entries}"
 
 
 def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, tmp_path):

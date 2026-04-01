@@ -873,7 +873,7 @@ def rebuild_indices():
     Taastab kõik kolm read-modeli nullist:
       1. prosopography_index.json
       2. person_aliases.json
-      3. person_to_works.json (teoste _metadata.json põhjal)
+      3. person_to_works.json (teoste _metadata.json ja leheküljefailide põhjal)
     """
     from ..config import BASE_DIR
 
@@ -927,7 +927,8 @@ def rebuild_indices():
                 if pid.startswith("vutt:P"):
                     ptw.setdefault(pid, []).append({"work_id": work_id, "role": "publisher"})
 
-            # page_tags isikud ('mentioned' roll)
+            # page_tags isikud ('mentioned' roll) — set tagab duplikaatide vältimise
+            mentioned_ids: set[str] = set()
             try:
                 for page_fname in os.listdir(entry.path):
                     if not page_fname.endswith('.json') or page_fname == '_metadata.json':
@@ -941,11 +942,13 @@ def rebuild_indices():
                             if isinstance(tag, dict):
                                 pid = tag.get('id') or ''
                                 if pid.startswith('vutt:P'):
-                                    ptw.setdefault(pid, []).append({'work_id': work_id, 'role': 'mentioned'})
+                                    mentioned_ids.add(pid)
                     except Exception:
                         pass
             except Exception:
                 pass
+            for pid in mentioned_ids:
+                ptw.setdefault(pid, []).append({'work_id': work_id, 'role': 'mentioned'})
 
     # Kirjuta person_to_works
     with _works_lock:
