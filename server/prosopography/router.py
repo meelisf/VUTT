@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
 
 from ..auth import require_token
+from ..config import get_logger
 from ..entity_labels_ops import enrich_entity_labels_from_person_async
 from .ops import (
     get_person,
@@ -24,6 +25,9 @@ from .ops import (
     delete_person_image,
     bulk_update_occupation,
 )
+from .reciprocal_ops import sync_reciprocals
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -362,8 +366,12 @@ async def prosopography_update(
     """
     Uuendab isiku kirjet.
     Nõuab updated_at välja — kui ei klapi → 409 Conflict.
+    Pärast salvestust sünkroniseerib vastastikused seosed (best-effort).
     """
     data = await _get_json(request)
+    # Loe vana seis ENNE salvestust — server-side diff vastastikuste seoste jaoks
+    old_person = get_person(person_id)
+    old_relations = (old_person or {}).get("relations", [])
     try:
         person = update_person(person_id, data, username=user["username"])
     except KeyError:
@@ -381,6 +389,18 @@ async def prosopography_update(
                 },
             )
         raise HTTPException(status_code=400, detail=msg)
+    # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
+    try:
+        a_label = (person.get("name") or {}).get("label", "")
+        sync_reciprocals(
+            person_id,
+            old_relations,
+            person.get("relations", []),
+            a_label,
+            username=user["username"],
+        )
+    except Exception:
+        logger.exception("sync_reciprocals ebaõnnestus isiku %s jaoks", person_id)
     enrich_entity_labels_from_person_async(person)
     return person
 
