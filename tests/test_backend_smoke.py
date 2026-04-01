@@ -1,4 +1,6 @@
+import importlib
 import json
+import unittest.mock
 
 
 def test_login_and_verify_token_roundtrip(client, login):
@@ -146,9 +148,6 @@ def test_admin_upload_thumb_serves_file_with_legacy_query_token(client, login, m
     assert response.content == thumb_bytes
 
 
-import importlib
-import sys
-import unittest.mock
 from pathlib import Path
 
 
