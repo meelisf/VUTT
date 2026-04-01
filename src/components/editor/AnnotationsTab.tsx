@@ -201,7 +201,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             <Link
                               to={`/persons/${creator.id}`}
                               className="font-medium hover:text-primary-600 transition-colors"
-                              title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                              title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
                             >
                               {creator.name}
                             </Link>
@@ -295,14 +295,14 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                               <Link
                                 to={`/persons/${pubId}`}
                                 className="text-gray-400 hover:text-primary-600 transition-colors shrink-0"
-                                title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                                title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
                               >
                                 <IdCard size={14} />
                               </Link>
                               <Link
                                 to={`/persons/${pubId}`}
                                 className="truncate hover:text-primary-600 transition-colors"
-                                title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                                title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
                               >
                                 {getLabel(work.publisher, lang)}
                               </Link>
@@ -475,7 +475,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     key={idx}
                     to={`/persons/${prosopoId}`}
                     className="inline-flex items-center gap-1.5 bg-primary-50 border border-primary-200 rounded-full px-2.5 py-1 text-sm text-primary-700 hover:bg-primary-100 transition-colors"
-                    title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                    title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
                   >
                     <User size={12} className="opacity-60" />
                     {label}
@@ -541,7 +541,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   <Link
                     to={`/persons/${tagId}`}
                     className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 hover:text-primary-600 transition-colors"
-                    title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                    title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
                   >
                     <User size={12} className="opacity-60" />
                     {label}
@@ -600,7 +600,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             <EntityPicker
               type="topic"
               showPersonToggle={true}
-              token={authToken}
+              token={authToken ?? undefined}
               value={null}
               onChange={(val) => {
                 if (val) {
