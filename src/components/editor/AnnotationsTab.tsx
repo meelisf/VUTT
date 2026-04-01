@@ -533,7 +533,31 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           {page_tags.map((tag, idx) => {
             const label = getLabel(tag, lang);
             const tagId = typeof tag !== 'string' ? (tag as any).id : null;
-            
+            const isPersonTag = tagId?.startsWith('vutt:P');
+
+            if (isPersonTag) {
+              return (
+                <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-200 text-sm text-primary-700 overflow-hidden">
+                  <Link
+                    to={`/persons/${tagId}`}
+                    className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 hover:text-primary-600 transition-colors"
+                    title={t('workCard.viewPerson', 'Vaata isiku lehte')}
+                  >
+                    <User size={12} className="opacity-60" />
+                    {label}
+                  </Link>
+                  {!readOnly && (
+                    <button
+                      onClick={() => removeTag(label)}
+                      className="pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 border-l border-primary-100"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </span>
+              );
+            }
+
             return (
               <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group overflow-hidden">
                 <button
@@ -546,7 +570,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   {label}
                   <Search size={12} className="opacity-0 group-hover:opacity-50" />
                 </button>
-                
+
                 {getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined) && (
                   <a
                     href={getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined)!}
@@ -560,8 +584,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 )}
 
                 {!readOnly && (
-                  <button 
-                    onClick={() => removeTag(label)} 
+                  <button
+                    onClick={() => removeTag(label)}
                     className={`pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 ${tagId ? 'border-l border-primary-100' : ''}`}
                   >
                     <X size={14} />
@@ -575,6 +599,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           <div className="relative">
             <EntityPicker
               type="topic"
+              showPersonToggle={true}
+              token={authToken}
               value={null}
               onChange={(val) => {
                 if (val) {
