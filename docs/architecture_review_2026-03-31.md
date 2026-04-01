@@ -26,21 +26,19 @@ Suurim arhitektuuriline risk ei ole toorfailide arv, vaid tuletatud indeksite ho
 
 ## Mis tuleks praegu ära teha
 
-1. Ühtlustada dokumentatsioon ja runtime-andmete asukohad.
+1. ~~Ühtlustada dokumentatsioon ja runtime-andmete asukohad.~~ **TEHTUD (2026-04-01)**
 
-Praegu on koodis osa jagatud andmefaile `data/state/` all, samal ajal README ja deploy-juhised viitavad mitmes kohas `state/`-le. See on backup’i, deploy ja taastamise risk.
+   - CLAUDE.md uuendatud: `state/` vs `data/state/` jaotus dokumenteeritud, valed viited parandatud
+   - `scripts/sync_labels.py` ja `enrich_labels.py` kirjutasid `state/labels.json`-i — parandatud `VUTT_DATA_DIR` kaudu
+   - Serveril stale duplikaadid liigutatud `state/vana/`-sse
 
-2. Teha `person_to_works.json` uuendamine odavamaks.
+2. Teha `person_to_works.json` uuendamine odavamaks. **JÄLGIDA**
 
-Praegu on see kõige tõenäolisem koht, mis hakkab ajas halvasti skaleeruma, sest fail loetakse sisse, sellest eemaldatakse kirjeid lineaarse skänniga ja see kirjutatakse tervikuna välja.
+Praegu on see kõige tõenäolisem koht, mis hakkab ajas halvasti skaleeruma, sest fail loetakse sisse, sellest eemaldatakse kirjeid lineaarse skänniga ja see kirjutatakse tervikuna välja. Praegune maht (572 isikut, 2804 viidet, ~200KB) on triviaalselt kiire — optimeerimist vajab alles ~3000+ isiku juures.
 
-3. Vähendada täisskänne kohtades, kus neid tehakse sageli.
+3. Vähendada täisskänne kohtades, kus neid tehakse sageli. **TEHTUD (2026-04-01)**
 
-Eelkõige:
-
-- suggestionite ehitus
-- kollektsioonidega seotud admin-operatsioonid
-- muud abifunktsioonid, mis käivad läbi kogu `data/`
+`_build_suggestions()` (`server/cache.py`) leheküljefailide skannimine (~20 000 faili iga 5 min) asendati ühe Meilisearchi facets-päringuga (`page_tags_suggest_et/en` väli). Metadata-taseme skannimine (1300 `_metadata.json`) jäi alles — see on kiire ja annab suurema osa suggestions-i väärtusest. Teised skännid (prosopo rebuild, reindex) on admin-toimingud, ei sagestu.
 
 4. Hoida canonical source ja derivaadid rangelt lahus.
 
