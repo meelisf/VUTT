@@ -5,9 +5,10 @@ Eraldatud file_server.py-st.
 import json
 import os
 import threading
+import urllib.request
 from datetime import datetime
 
-from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE
+from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE, MEILI_URL, MEILI_KEY, INDEX_NAME
 from .people_ops import load_people_data
 from .utils import get_label, get_id, get_primary_labels, get_labels_by_lang
 from .meilisearch_ops import load_labels_store
@@ -194,16 +195,25 @@ def _build_suggestions(preferred_lang):
                                 for item in g: add_item(genres, item, 'genres')
                             else: add_item(genres, g, 'genres')
                 except Exception: pass
-            try:
-                for page_file in os.scandir(entry.path):
-                    if page_file.name.endswith('.json') and page_file.name != '_metadata.json':
-                        try:
-                            with open(page_file.path, 'r', encoding='utf-8') as f:
-                                page_data = json.load(f)
-                                source = page_data.get('meta_content', page_data)
-                                for pt in source.get('page_tags', source.get('tags', [])): add_item(tags, pt, 'tags')
-                        except Exception: pass
-            except Exception: pass
+
+    # page_tags Meilisearchist (asendab leheküljefailide skänni)
+    try:
+        facet_field = f"page_tags_suggest_{preferred_lang}"
+        url = f"{MEILI_URL}/indexes/{INDEX_NAME}/search"
+        body = json.dumps({"q": "", "limit": 0, "facets": [facet_field]}).encode('utf-8')
+        req = urllib.request.Request(url, data=body, method='POST')
+        req.add_header('Content-Type', 'application/json')
+        req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.loads(resp.read())
+        facet_dist = result.get('facetDistribution', {}).get(facet_field, {})
+        for entry_str in facet_dist:
+            label, _, id_code = entry_str.partition('|||')
+            label = label.strip()
+            if label:
+                add_item(tags, {'label': label, 'id': id_code or None}, 'tags')
+    except Exception as e:
+        print(f"SUGGESTIONS: page_tags Meilisearchist ebaõnnestus: {e}")
 
     for p in ['Tartu', 'Pärnu']:
         if p.lower() not in places: places[p.lower()] = {'label': p, 'id': None}

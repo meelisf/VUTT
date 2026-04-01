@@ -144,3 +144,72 @@ def test_admin_upload_thumb_serves_file_with_legacy_query_token(client, login, m
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/jpeg"
     assert response.content == thumb_bytes
+
+
+import importlib
+import sys
+import unittest.mock
+from pathlib import Path
+
+
+def test_build_suggestions_uses_meili_for_page_tags(tmp_path, monkeypatch):
+    """
+    _build_suggestions() peab page_tags võtma Meilisearchist,
+    mitte lehekülje .json failidest.
+    """
+    # Seadista ajutine data kaust ühe teosega
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(
+        json.dumps({
+            "id": "abc123",
+            "title": "Testeos",
+            "tags": [{"label": "Jutlus", "id": "Q861911", "labels": {"et": "Jutlus"}}],
+            "creators": [],
+            "genre": None,
+            "type": None,
+            "location": None,
+            "publisher": None,
+        }),
+        encoding="utf-8",
+    )
+    # Lehekülg millel on page_tag — EI tohi suggestions-i jõuda (failid ei loeta enam)
+    (work_dir / "leht1.json").write_text(
+        json.dumps({"page_tags": [{"label": "Vanatestament", "id": "Q1", "labels": {"et": "Vanatestament"}}]}),
+        encoding="utf-8",
+    )
+
+    # Meilisearchi vastus: ainult "Teoloogia" page_tag
+    fake_meili_response = json.dumps({
+        "facetDistribution": {
+            "page_tags_suggest_et": {
+                "Teoloogia|||Q34178": 3,
+            }
+        }
+    }).encode()
+
+    cache_mod = importlib.import_module("server.cache")
+    config_mod = importlib.import_module("server.config")
+
+    monkeypatch.setattr(config_mod, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(cache_mod, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(cache_mod, "MEILI_URL", "http://localhost:7700")
+    monkeypatch.setattr(cache_mod, "MEILI_KEY", "testkey")
+    monkeypatch.setattr(cache_mod, "INDEX_NAME", "teosed")
+
+    mock_resp = unittest.mock.MagicMock()
+    mock_resp.read.return_value = fake_meili_response
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = unittest.mock.MagicMock(return_value=False)
+
+    with unittest.mock.patch("urllib.request.urlopen", return_value=mock_resp):
+        result = cache_mod._build_suggestions("et")
+
+    tag_labels = [t["label"] for t in result["tags"]]
+
+    # page_tags Meilisearchist peavad olema
+    assert "Teoloogia" in tag_labels, f"Teoloogia peaks olema tags-is, sain: {tag_labels}"
+    # Metadata-taseme tägid peavad olema
+    assert "Jutlus" in tag_labels, f"Jutlus peaks olema tags-is, sain: {tag_labels}"
+    # Lehekülje .json faili tag EI tohi olla (faili ei loeta enam)
+    assert "Vanatestament" not in tag_labels, f"Vanatestament ei tohi olla tags-is (failid ei loeta), sain: {tag_labels}"
