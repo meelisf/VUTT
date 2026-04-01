@@ -46,6 +46,36 @@ Filesystem: data/{work-folder}/{page}.txt + .jpg + .json + _metadata.json
 - `work_id` (nanoid) - used everywhere: routing, filters, API
 - `slug` (folder name) - only in filesystem
 
+## Andmeasukohad
+
+Kaks eraldi kausta serveril, mõlemad mountitud Dockerisse:
+
+| Kaust (serveril) | Docker mount | Mis seal on | Git | Lokaalselt |
+|-----------------|-------------|-------------|-----|------------|
+| `~/VUTT/state/` | `./state:/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `prosopography/` isikukaardid | Ei | Ei (ainult serveril) |
+| `~/VUTT/data/` | `./data:/data` | Teosed, leheküljed, `data/state/` konfiguratsioon | Sisemises gitis (`data/` oma git) | Ei |
+
+**`data/state/` sisaldab** (backend loeb/kirjutab siia Dockerist):
+
+| Fail | Sisu |
+|------|------|
+| `collections.json` | Kollektsioonide hierarhia ja värvid |
+| `vocabularies.json` | Taksonoomia sõnavarad |
+| `places.json` | Kohtade register |
+| `labels.json` | Q-kood → label register (kanooniline) |
+| `person_aliases.json` | Isikute nimevariantide register |
+| `prosopography_index.json` | Tuletatud prosopograafia indeks |
+| `person_to_works.json` | Tuletatud isiku→teosed indeks |
+
+**Oluline:** lokaalne masin ei peegelda `data/` ega `state/` sisu. Kõik need failid elavad ainult serveril.
+
+Konfiguratsioonifaili serverist alla tõmbamiseks:
+```bash
+scp vutt:~/VUTT/data/state/collections.json ./data-state-backup/
+```
+
+`data/state/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta: `os.getenv("VUTT_DATA_DIR", "data")`.
+
 ## Data Layers
 
 ```
@@ -75,7 +105,8 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 | `server/meilisearch_ops.py` | Meilisearch sync, ThreadPoolExecutor |
 | `server/cache.py` | Collections/people/suggestions cache (TTL 5 min) |
 | `server/upload_ops.py` | Upload wizard, OCR server integratsioon |
-| `state/` | users.json, collections.json, vocabularies.json |
+| `state/` | Runtime andmed (ei ole gitis): `users.json`, `pending_registrations.json`, `invite_tokens.json`, `prosopography/` |
+| `data/state/` | Konfiguratsioon (sisemises gitis): `collections.json`, `vocabularies.json`, `places.json`, `labels.json`, `person_aliases.json`, `prosopography_index.json`, `person_to_works.json` |
 
 ## Linked Data (Wikidata)
 
@@ -92,7 +123,7 @@ Links: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123` - no
 
 Hierarchical collections with configurable colors. State managed via `CollectionContext`.
 
-**Config:** `state/collections.json` (not in git, copy manually via scp)
+**Config:** `data/state/collections.json` (sisemises gitis serveril, koopia lokaalsel arenduses scp-ga)
 
 ```json
 {
@@ -119,12 +150,12 @@ Collection displayed in: Dashboard cards, Workspace info panel, SearchPage resul
 
 To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius*), the system uses a central register.
 
-**File:** `state/people.json` (not in git, persistent storage)
+**File:** `data/state/person_aliases.json` (sisemises gitis serveril)
 
 **Workflow:**
 1. Admin saves metadata with a Wikidata/GND ID.
 2. Server (`people_ops.py`) automatically fetches aliases in background (only for `et`, `en`, `de`, `la`).
-3. Aliases are saved to `state/people.json` under all associated IDs (cross-referencing).
+3. Aliases are saved to `data/state/person_aliases.json` under all associated IDs (cross-referencing).
 4. Meilisearch indexer (`meilisearch_ops.py`) reads this file and adds aliases to `authors_text` field.
 
 **Search:**
@@ -228,7 +259,7 @@ Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
 
 **Cache'imine** (`server/cache.py`)
 - `users.json` - laetakse stardil, uuendatakse ainult muudatuste korral (`auth.py`)
-- `collections.json`, `vocabularies.json`, `people.json` - cache TTL 5 min
+- `collections.json`, `vocabularies.json`, `person_aliases.json` - cache TTL 5 min
 - Suggestions cache TTL 5 min
 
 **Automaatne puhastus (daemon threads)**

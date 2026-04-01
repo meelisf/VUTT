@@ -22,8 +22,8 @@ import urllib.parse
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SCRIPT_DIR)
 
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-LABELS_FILE = os.path.join(PROJECT_ROOT, "state", "labels.json")
+DATA_DIR = os.getenv("VUTT_DATA_DIR", os.path.join(PROJECT_ROOT, "data"))
+LABELS_FILE = os.path.join(DATA_DIR, "state", "labels.json")
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 WIKIDATA_LANGS = ["et", "en", "la", "de"]

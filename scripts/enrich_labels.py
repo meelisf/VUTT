@@ -15,7 +15,7 @@ import json
 import argparse
 
 BASE_DIR = os.getenv("VUTT_DATA_DIR", "data")
-LABELS_FILE = os.path.join("state", "labels.json")
+LABELS_FILE = os.path.join(BASE_DIR, "state", "labels.json")
 
 # Metaandmete väljade nimed mis sisaldavad LinkedEntity objekte.
 # Isikute (creators) ja trükkalite (publisher) nimesid ei rikastata —
