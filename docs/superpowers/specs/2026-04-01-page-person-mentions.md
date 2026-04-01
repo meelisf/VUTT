@@ -21,6 +21,20 @@ Lisa uus roll `"mentioned"` (et: "Mainitud") `person_to_works.json`-i. Üks isik
 
 ## Muutused
 
+### 0. Backend — `_build_suggestions()` filter (`server/cache.py`)
+
+`page_tags_suggest_et/en` Meilisearchi väljad sisaldavad kõiki page_tags kirjeid, sealhulgas `vutt:P` isikuid (formaadis `"Michael Dau|||vutt:Ptbc4f4"`). Need ei tohi ilmuda teema-soovituste autocompletion-is — isikuid valitakse eksplitsiitselt isiku-picki kaudu.
+
+Meilisearchi facet parsimises lisa filter:
+
+```python
+for entry_str in facet_dist:
+    label, _, id_code = entry_str.partition('|||')
+    label = label.strip()
+    if label and not id_code.startswith('vutt:P'):  # isikud välja
+        add_item(tags, {'label': label, 'id': id_code or None}, 'tags')
+```
+
 ### 1. Backend — uus funktsioon `update_page_person_mentions`
 
 **Fail:** `server/prosopography/ops.py`
