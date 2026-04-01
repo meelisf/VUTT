@@ -210,7 +210,7 @@ def _build_suggestions(preferred_lang):
         for entry_str in facet_dist:
             label, _, id_code = entry_str.partition('|||')
             label = label.strip()
-            if label:
+            if label and not id_code.startswith('vutt:P'):
                 add_item(tags, {'label': label, 'id': id_code or None}, 'tags')
     except Exception as e:
         print(f"SUGGESTIONS: page_tags Meilisearchist ebaõnnestus: {e}")

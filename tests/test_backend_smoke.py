@@ -183,6 +183,7 @@ def test_build_suggestions_uses_meili_for_page_tags(tmp_path, monkeypatch):
         "facetDistribution": {
             "page_tags_suggest_et": {
                 "Teoloogia|||Q34178": 3,
+                "Michael Dau|||vutt:Ptbc4f4": 2,
             }
         }
     }).encode()
@@ -212,3 +213,5 @@ def test_build_suggestions_uses_meili_for_page_tags(tmp_path, monkeypatch):
     assert "Jutlus" in tag_labels, f"Jutlus peaks olema tags-is, sain: {tag_labels}"
     # Lehekülje .json faili tag EI tohi olla (faili ei loeta enam)
     assert "Vanatestament" not in tag_labels, f"Vanatestament ei tohi olla tags-is (failid ei loeta), sain: {tag_labels}"
+    # vutt:P isikud EI tohi soovitustes olla
+    assert "Michael Dau" not in tag_labels, f"Michael Dau ei tohi olla tags-is (vutt:P filter), sain: {tag_labels}"
