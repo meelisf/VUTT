@@ -215,3 +215,64 @@ def test_build_suggestions_uses_meili_for_page_tags(tmp_path, monkeypatch):
     assert "Vanatestament" not in tag_labels, f"Vanatestament ei tohi olla tags-is (failid ei loeta), sain: {tag_labels}"
     # vutt:P isikud EI tohi soovitustes olla
     assert "Michael Dau" not in tag_labels, f"Michael Dau ei tohi olla tags-is (vutt:P filter), sain: {tag_labels}"
+
+
+def test_update_page_person_mentions(tmp_path, monkeypatch):
+    """
+    update_page_person_mentions() loeb teose leheküljefailidest vutt:P tägid
+    ja uuendab person_to_works.json 'mentioned' rolliga.
+    Olemasolevad 'subject'/'creator' rollid jäävad puutumata.
+    """
+    import server.prosopography.ops as prosopo_ops
+
+    work_id = "work123"
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+
+    # Leht 1: kaks isikut
+    (work_dir / "leht1.json").write_text(json.dumps({
+        "page_tags": [
+            {"id": "vutt:Paaa", "label": "Isik A", "entity_type": "person"},
+            {"id": "Q99999", "label": "Mitte-isik", "entity_type": "topic"},
+        ]
+    }), encoding="utf-8")
+
+    # Leht 2: teine isik
+    (work_dir / "leht2.json").write_text(json.dumps({
+        "meta_content": {
+            "page_tags": [
+                {"id": "vutt:Pbbb", "label": "Isik B", "entity_type": "person"},
+            ]
+        }
+    }), encoding="utf-8")
+
+    # _metadata.json peab eksisteerima aga ei loe siin
+    (work_dir / "_metadata.json").write_text(json.dumps({"id": work_id}), encoding="utf-8")
+
+    # Eelnevad kirjed: Isik A on juba 'subject' rollis — see peab säilima
+    ptw_file = tmp_path / "person_to_works.json"
+    ptw_file.write_text(json.dumps({
+        "vutt:Paaa": [{"work_id": work_id, "role": "subject"}],
+        "vutt:Pccc": [{"work_id": "other_work", "role": "mentioned"}],
+    }), encoding="utf-8")
+
+    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+
+    prosopo_ops.update_page_person_mentions(work_id, str(work_dir))
+
+    data = json.loads(ptw_file.read_text(encoding="utf-8"))
+
+    # Isik A: peab olema nii 'subject' (vana) kui 'mentioned' (uus)
+    roles_a = {e["role"] for e in data["vutt:Paaa"]}
+    assert "subject" in roles_a, f"subject peab säilima: {data['vutt:Paaa']}"
+    assert "mentioned" in roles_a, f"mentioned peab lisanduma: {data['vutt:Paaa']}"
+
+    # Isik B: ainult 'mentioned'
+    assert "vutt:Pbbb" in data
+    assert data["vutt:Pbbb"] == [{"work_id": work_id, "role": "mentioned"}]
+
+    # Q-kood ei tohi olla lisatud
+    assert "Q99999" not in data
+
+    # Teise teose kirje peab säilima
+    assert data["vutt:Pccc"] == [{"work_id": "other_work", "role": "mentioned"}]

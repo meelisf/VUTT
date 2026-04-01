@@ -822,6 +822,48 @@ def update_person_to_works(
         atomic_write_json(PERSON_TO_WORKS_FILE, data)
 
 
+def update_page_person_mentions(work_id: str, work_dir: str):
+    """Uuendab person_to_works 'mentioned' rolle antud teose lehekülje page_tags põhjal."""
+    if not work_id:
+        return
+
+    person_ids: set[str] = set()
+    try:
+        for fname in os.listdir(work_dir):
+            if not fname.endswith('.json') or fname == '_metadata.json':
+                continue
+            fpath = os.path.join(work_dir, fname)
+            try:
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    page = json.load(f)
+                source = page.get('meta_content', page)
+                for tag in source.get('page_tags', []):
+                    if isinstance(tag, dict):
+                        pid = tag.get('id') or ''
+                        if pid.startswith('vutt:P'):
+                            person_ids.add(pid)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"update_page_person_mentions viga: {e}")
+        return
+
+    with _works_lock:
+        data = _load_person_to_works()
+        # Eemalda ainult 'mentioned' viited sellele teosele
+        for pid_entries in data.values():
+            pid_entries[:] = [
+                e for e in pid_entries
+                if not (e.get('work_id') == work_id and e.get('role') == 'mentioned')
+            ]
+        # Lisa uued
+        for pid in person_ids:
+            if pid not in data:
+                data[pid] = []
+            data[pid].append({'work_id': work_id, 'role': 'mentioned'})
+        atomic_write_json(PERSON_TO_WORKS_FILE, data)
+
+
 # =========================================================
 # INDEKSITE TAASTAMINE
 # =========================================================
