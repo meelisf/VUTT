@@ -74,7 +74,16 @@ Konfiguratsioonifaili serverist alla tõmbamiseks:
 scp vutt:~/VUTT/data/state/collections.json ./data-state-backup/
 ```
 
-`data/state/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta: `os.getenv("VUTT_DATA_DIR", "data")`.
+`data/state/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta:
+```python
+DATA_ROOT_DIR = os.getenv("VUTT_DATA_DIR", "data")
+STATE_DIR = os.path.join(DATA_ROOT_DIR, "state")   # ← ÕIGE
+# MIS MITTE: os.path.join(os.path.dirname(__file__), "../state")  # vale — Dockeris /app/state (runtime), mitte /data/state (konfig)
+```
+
+**Kriitilised teed Dockeris:**
+- `/data/state/` — konfiguratsioon (`collections.json`, `person_aliases.json` jne) ← `VUTT_DATA_DIR/state`
+- `/app/state/` — runtime (`users.json`, sessioonid, prosopograafia kaardid) ← MITTE konfiguratsioon
 
 ## Data Layers
 
