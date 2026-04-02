@@ -440,7 +440,7 @@ def list_persons(
 ) -> dict:
     """
     Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
-    Otsing q= töötab label + sort_name vastu (väiketähelistena).
+    Otsing q= töötab label + sort_name + aliases (sh Wikidata/GND) vastu.
     """
     index = _load_index()
     results = [
@@ -453,11 +453,13 @@ def list_persons(
         results = [e for e in results if e.get("id") in id_set]
     if q:
         q_lower = q.lower()
+        aliases_data = _load_person_aliases()
         results = [
             e for e in results
             if q_lower in (e.get("label") or "").lower()
             or q_lower in (e.get("sort_name") or "").lower()
             or any(q_lower in a.lower() for a in (e.get("aliases") or []))
+            or any(q_lower in a.lower() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
         ]
     if gender:
         results = [e for e in results if e.get("gender") == gender]
