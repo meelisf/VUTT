@@ -1,5 +1,6 @@
 import type { ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft } from './types';
+import { isQCode } from '../../../utils/qcodeUtils';
 
 // Rakendab fetch_and_diff auto_filled väljad olemasolevale draftile
 export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: FormDraft): FormDraft {
@@ -137,7 +138,14 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       year_to: e.year_to ? String(e.year_to) : '',
     })),
     tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
-    relations: (p.relations ?? []).map((r: any) => ({ name: r.name ?? '', type: r.type ?? '', target_id: r.target_id ?? null })),
+    relations: (p.relations ?? []).map((r: any) => ({
+      name: r.name ?? '',
+      type: r.type ?? '',
+      type_id: r.type_id ?? null,
+      type_labels: r.type_labels ?? null,
+      target_id: r.target_id ?? null,
+      reciprocal_auto: r.reciprocal_auto ?? undefined,
+    })),
     sources: (p.sources ?? []).map((s: any) => ({ text: s.text ?? String(s), note: s.note ?? '' })),
     biography: p.biography ?? '',
     notes: p.notes ?? '',
@@ -249,7 +257,10 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
     relations: draft.relations.filter(r => r.name.trim() || r.target_id).map(r => ({
       name: r.name.trim(),
       ...(r.type.trim() ? { type: r.type.trim() } : {}),
+      ...(r.type_id && isQCode(r.type_id) ? { type_id: r.type_id } : {}),
+      ...(r.type_labels ? { type_labels: r.type_labels } : {}),
       ...(r.target_id ? { target_id: r.target_id } : {}),
+      ...(r.reciprocal_auto !== undefined ? { reciprocal_auto: r.reciprocal_auto } : {}),
     })),
     sources: draft.sources.filter(s => s.text.trim()).map(s => ({
       text: s.text.trim(),
