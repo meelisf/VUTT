@@ -24,7 +24,7 @@ from tqdm import tqdm
 # --- SEADISTUS ---
 DATA_ROOT_DIR = os.getenv('VUTT_DATA_DIR', 'data')
 OUTPUT_FILE = 'output/meilisearch_data_per_page.jsonl'
-STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'state')
+STATE_DIR = os.path.join(DATA_ROOT_DIR, 'state')
 COLLECTIONS_FILE = os.path.join(STATE_DIR, 'collections.json')
 PEOPLE_FILE = os.path.join(STATE_DIR, 'person_aliases.json')
 # --- LÕPP ---
