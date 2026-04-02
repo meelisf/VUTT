@@ -90,7 +90,7 @@
     "period": "Periood",
     "relationsAndNotes": "Seosed ja märkmed",
     "relationPlaceholder": "tema roll (isa, abikaasa…)",
-    "relationTypeHint": "Kirjeldab, kuidas teine isik on sinuga seotud (nt 'isa' = tema on sinu isa)",
+    "relationTypeHint": "Kirjeldab, kuidas teine isik on muudetava isikuga seotud (nt 'isa' = tema on muudetava isiku isa)",
     "sourcesAndBibliography": "Allikad ja bibliograafia",
     "sources": "Allikad",
     "sourcePlaceholder": "Allikaviide — arhiivifond, trükis, veebiaadress…",

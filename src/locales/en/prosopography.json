@@ -90,7 +90,7 @@
     "period": "Period",
     "relationsAndNotes": "Relations and notes",
     "relationPlaceholder": "their role (father, spouse…)",
-    "relationTypeHint": "Describes how the other person is related to you (e.g. 'father' = they are your father)",
+    "relationTypeHint": "Describes how the other person is related to the person being edited (e.g. 'father' = they are their father)",
     "sourcesAndBibliography": "Sources and bibliography",
     "sources": "Sources",
     "sourcePlaceholder": "Source reference — archive fund, publication, URL…",
