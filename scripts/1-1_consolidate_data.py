@@ -577,6 +577,7 @@ def create_meilisearch_data_per_page():
                     for t in page_meta.get('tags', [])
                 ],
                 'page_tags_object': page_meta.get('tags', []),
+                'has_annotations': bool(page_meta.get('tags') or page_meta['comments']),
                 'comments': page_meta['comments'],
                 'status': page_meta['status'],
                 'history': page_meta['history'],
