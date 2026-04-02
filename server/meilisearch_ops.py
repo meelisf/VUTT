@@ -474,6 +474,7 @@ def sync_work_to_meilisearch(dir_name):
                 for t in page_tags_data
             ],
             "page_tags_object": page_tags_data,
+            "has_annotations": bool(page_tags_data or page_meta['comments']),
             "comments": page_meta['comments'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),

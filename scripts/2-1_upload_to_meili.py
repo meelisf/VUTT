@@ -89,6 +89,7 @@ def main():
             'page_tags_ids',
             'page_tags_suggest_et',
             'page_tags_suggest_en',
+            'has_annotations',
             'status',
             'teose_staatus',
             'tags',
