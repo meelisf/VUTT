@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
@@ -677,7 +677,17 @@ const PersonEditPage: React.FC = () => {
                 </div>
                 {item.name && item.type && (
                   <p className="text-xs text-gray-400 italic mt-0.5 pl-1">
-                    {t('form.relationSentence', { other: item.name, self: draft.name_label || '…', type: item.type })}
+                    {t('form.relationSentence', {
+                      other: item.target_id
+                        ? '\x00LINK\x00'
+                        : item.name,
+                      self: draft.name_label || '…',
+                      type: item.type,
+                    }).split('\x00LINK\x00').flatMap((part, i, arr) =>
+                      i < arr.length - 1
+                        ? [part, <Link key="l" to={`/persons/${encodeURIComponent(item.target_id!)}`} className="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">{item.name}</Link>]
+                        : [part]
+                    )}
                   </p>
                 )}
               </div>
