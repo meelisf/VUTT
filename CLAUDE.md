@@ -81,9 +81,9 @@ STATE_DIR = os.path.join(DATA_ROOT_DIR, "state")   # ← ÕIGE
 # MIS MITTE: os.path.join(os.path.dirname(__file__), "../state")  # vale — Dockeris /app/state (runtime), mitte /data/state (konfig)
 ```
 
-**Kriitilised teed Dockeris:**
-- `/data/state/` — konfiguratsioon (`collections.json`, `person_aliases.json` jne) ← `VUTT_DATA_DIR/state`
-- `/app/state/` — runtime (`users.json`, sessioonid, prosopograafia kaardid) ← MITTE konfiguratsioon
+**Kriitilised teed:**
+- `data/state/` (hostil) = `/data/state/` (Dockeris) — konfiguratsioon (`collections.json` jne) ← `VUTT_DATA_DIR/state`
+- `state/` (hostil) = `/app/state/` (Dockeris) — runtime (`users.json`, sessioonid) ← MITTE konfiguratsioon
 
 ## Data Layers
 
