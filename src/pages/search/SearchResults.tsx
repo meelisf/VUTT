@@ -122,6 +122,12 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         const hasHighlightedTags = formattedTags?.some((tag: string) => tag.includes('<em'));
         const highlightedComments = hit._formatted?.comments?.filter(c => c.text.includes('<em'));
 
+        // Tühja query puhul annotation scope's näitame kõiki annotatsioonid ilma highlight-filtrita
+        const isAnnotationBrowse = scopeParam === 'annotation' && !queryParam;
+        const rawTags: string[] = isAnnotationBrowse ? ((hit as any)[tagsField] || hit.page_tags || []) : [];
+        const showRawTags = isAnnotationBrowse && !hasHighlightedTags && rawTags.length > 0;
+        const showRawComments = isAnnotationBrowse && (!highlightedComments || highlightedComments.length === 0);
+
         return (
             <div key={hit.id} className={`p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
                 <div className="flex items-center gap-3 mb-2">
@@ -145,25 +151,36 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                 dangerouslySetInnerHTML={{ __html: snippet.replace(/\n/g, '<br>') }}
                             />
                         )}
-                        {hasHighlightedTags && (
+                        {(hasHighlightedTags || showRawTags) && (
                             <div className="flex flex-wrap gap-2 mt-2">
-                                {formattedTags?.filter((tag: string) => tag.includes('<em')).map((tagHtml: string, idx: number) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full">
-                                        <Tag size={10} />
-                                        <span dangerouslySetInnerHTML={{ __html: tagHtml }} />
-                                    </span>
-                                ))}
+                                {showRawTags
+                                    ? rawTags.map((tag: string, idx: number) => (
+                                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full">
+                                            <Tag size={10} />
+                                            <span>{tag}</span>
+                                        </span>
+                                    ))
+                                    : formattedTags?.filter((tag: string) => tag.includes('<em')).map((tagHtml: string, idx: number) => (
+                                        <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full">
+                                            <Tag size={10} />
+                                            <span dangerouslySetInnerHTML={{ __html: tagHtml }} />
+                                        </span>
+                                    ))
+                                }
                             </div>
                         )}
-                        {highlightedComments && highlightedComments.length > 0 && (
+                        {((highlightedComments && highlightedComments.length > 0) || showRawComments) && (
                             <div className="space-y-2 mt-2">
-                                {highlightedComments.map((comment, idx) => (
+                                {(showRawComments ? hit.comments : highlightedComments)?.map((comment, idx) => (
                                     <div key={idx} className="bg-yellow-50 border border-yellow-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-yellow-800">
                                             <MessageSquare size={12} />
                                             <span>{t('results.comment', { author: comment.author })}</span>
                                         </div>
-                                        <div dangerouslySetInnerHTML={{ __html: comment.text }} />
+                                        {showRawComments
+                                            ? <div>{comment.text}</div>
+                                            : <div dangerouslySetInnerHTML={{ __html: comment.text }} />
+                                        }
                                     </div>
                                 ))}
                             </div>
