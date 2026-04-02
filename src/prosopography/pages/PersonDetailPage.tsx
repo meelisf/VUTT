@@ -123,10 +123,24 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   if (person.relations?.length > 0) {
     rows.push({
       label: t('relations', 'Seosed'),
-      value: person.relations.map((r: any) => {
-        const typeLabel = r.type_labels?.[lang] ?? r.type_labels?.en ?? r.type ?? '';
-        return `${r.name ?? r.target_id}${typeLabel ? ` (${typeLabel})` : ''}`;
-      }).join(', '),
+      value: (
+        <span>
+          {person.relations.map((r: any, i: number) => {
+            const typeLabel = r.type_labels?.[lang] ?? r.type_labels?.en ?? r.type ?? '';
+            const displayName = r.name ?? r.target_id;
+            return (
+              <span key={i}>
+                {i > 0 && ', '}
+                {r.target_id
+                  ? <Link to={`/persons/${encodeURIComponent(r.target_id)}`} className="underline hover:text-gray-700">{displayName}</Link>
+                  : displayName
+                }
+                {typeLabel ? ` (${typeLabel})` : ''}
+              </span>
+            );
+          })}
+        </span>
+      ),
     });
   }
   if (person.notes) {
