@@ -91,6 +91,7 @@
     "relationsAndNotes": "Relations and notes",
     "relationPlaceholder": "their role (father, spouse…)",
     "relationTypeHint": "Describes how the other person is related to the person being edited (e.g. 'father' = they are their father)",
+    "relationSentence": "{{other}} is {{self}}'s {{type}}",
     "sourcesAndBibliography": "Sources and bibliography",
     "sources": "Sources",
     "sourcePlaceholder": "Source reference — archive fund, publication, URL…",

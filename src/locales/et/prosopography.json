@@ -91,6 +91,7 @@
     "relationsAndNotes": "Seosed ja märkmed",
     "relationPlaceholder": "tema roll (isa, abikaasa…)",
     "relationTypeHint": "Kirjeldab, kuidas teine isik on muudetava isikuga seotud (nt 'isa' = tema on muudetava isiku isa)",
+    "relationSentence": "{{other}} on {{self}} {{type}}",
     "sourcesAndBibliography": "Allikad ja bibliograafia",
     "sources": "Allikad",
     "sourcePlaceholder": "Allikaviide — arhiivifond, trükis, veebiaadress…",

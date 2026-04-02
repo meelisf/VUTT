@@ -640,39 +640,46 @@ const PersonEditPage: React.FC = () => {
             label={t('relations', 'Seosed')}
             items={draft.relations}
             renderItem={(item, onChange, onRemove) => (
-              <div className="flex items-center gap-2">
-                <ProsopoPersonPicker value={item} onChange={onChange} token={token} currentId={id} />
-                <div className="w-44 shrink-0" title={t('form.relationTypeHint')}>
-                  <EntityPicker
-                    type="topic"
-                    value={item.type_id
-                      ? { id: item.type_id, label: item.type, labels: item.type_labels ?? {}, source: 'wikidata' as const }
-                      : item.type || null
-                    }
-                    onChange={entity => onChange({
-                      ...item,
-                      type: entity?.label ?? '',
-                      type_id: (entity?.id && !entity.id.startsWith('local-')) ? entity.id : null,
-                      type_labels: entity?.labels ?? null,
-                    })}
-                    placeholder={t('form.relationPlaceholder')}
-                  />
+              <div>
+                <div className="flex items-center gap-2">
+                  <ProsopoPersonPicker value={item} onChange={onChange} token={token} currentId={id} />
+                  <div className="w-44 shrink-0" title={t('form.relationTypeHint')}>
+                    <EntityPicker
+                      type="topic"
+                      value={item.type_id
+                        ? { id: item.type_id, label: item.type, labels: item.type_labels ?? {}, source: 'wikidata' as const }
+                        : item.type || null
+                      }
+                      onChange={entity => onChange({
+                        ...item,
+                        type: entity?.label ?? '',
+                        type_id: (entity?.id && !entity.id.startsWith('local-')) ? entity.id : null,
+                        type_labels: entity?.labels ?? null,
+                      })}
+                      placeholder={t('form.relationPlaceholder')}
+                    />
+                  </div>
+                  {item.target_id && (
+                    <span
+                      title={
+                        item.reciprocal_auto
+                          ? t('form.reciprocalAutoTooltip')
+                          : t('form.reciprocalTooltip')
+                      }
+                      className="shrink-0 text-gray-400"
+                    >
+                      <ArrowLeftRight size={13} />
+                    </span>
+                  )}
+                  <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
+                    <X size={14} />
+                  </button>
                 </div>
-                {item.target_id && (
-                  <span
-                    title={
-                      item.reciprocal_auto
-                        ? t('form.reciprocalAutoTooltip')
-                        : t('form.reciprocalTooltip')
-                    }
-                    className="shrink-0 text-gray-400"
-                  >
-                    <ArrowLeftRight size={13} />
-                  </span>
+                {item.name && item.type && (
+                  <p className="text-xs text-gray-400 italic mt-0.5 pl-1">
+                    {t('form.relationSentence', { other: item.name, self: draft.name_label || '…', type: item.type })}
+                  </p>
                 )}
-                <button onClick={onRemove} className="text-gray-400 hover:text-red-500 transition-colors p-1 shrink-0">
-                  <X size={14} />
-                </button>
               </div>
             )}
             onAdd={() => set({ relations: [...draft.relations, { name: '', type: '', target_id: null }] })}
