@@ -642,13 +642,22 @@ const PersonEditPage: React.FC = () => {
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
                 <ProsopoPersonPicker value={item} onChange={onChange} token={token} currentId={id} />
-                <input
-                  type="text"
-                  value={item.type}
-                  onChange={e => onChange({ ...item, type: e.target.value })}
-                  placeholder={t('form.relationPlaceholder')}
-                  className={`w-36 ${inputCls} shrink-0`}
-                />
+                <div className="w-44 shrink-0">
+                  <EntityPicker
+                    type="topic"
+                    value={item.type_id
+                      ? { id: item.type_id, label: item.type, labels: item.type_labels ?? {}, source: 'wikidata' as const }
+                      : item.type || null
+                    }
+                    onChange={entity => onChange({
+                      ...item,
+                      type: entity?.label ?? '',
+                      type_id: (entity?.id && entity.id !== entity.label) ? entity.id : null,
+                      type_labels: entity?.labels ?? null,
+                    })}
+                    placeholder={t('form.relationPlaceholder')}
+                  />
+                </div>
                 {item.target_id && (
                   <span
                     title={
