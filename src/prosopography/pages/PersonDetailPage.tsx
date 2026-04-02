@@ -80,7 +80,8 @@ const useEntityLabel = () => {
 };
 
 const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => {
-  const { t } = useTranslation(['prosopography', 'common']);
+  const { t, i18n } = useTranslation(['prosopography', 'common']);
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
   const getLabel = useEntityLabel();
   const [open, setOpen] = useState(false);
 
@@ -122,7 +123,10 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   if (person.relations?.length > 0) {
     rows.push({
       label: t('relations', 'Seosed'),
-      value: person.relations.map((r: any) => `${r.name ?? r.target_id}${r.type ? ` (${r.type})` : ''}`).join(', '),
+      value: person.relations.map((r: any) => {
+        const typeLabel = r.type_labels?.[lang] ?? r.type_labels?.en ?? r.type ?? '';
+        return `${r.name ?? r.target_id}${typeLabel ? ` (${typeLabel})` : ''}`;
+      }).join(', '),
     });
   }
   if (person.notes) {
