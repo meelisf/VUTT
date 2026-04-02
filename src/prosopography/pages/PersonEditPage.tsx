@@ -642,7 +642,7 @@ const PersonEditPage: React.FC = () => {
             renderItem={(item, onChange, onRemove) => (
               <div className="flex items-center gap-2">
                 <ProsopoPersonPicker value={item} onChange={onChange} token={token} currentId={id} />
-                <div className="w-44 shrink-0">
+                <div className="w-44 shrink-0" title={t('form.relationTypeHint')}>
                   <EntityPicker
                     type="topic"
                     value={item.type_id
