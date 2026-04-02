@@ -652,7 +652,7 @@ const PersonEditPage: React.FC = () => {
                     onChange={entity => onChange({
                       ...item,
                       type: entity?.label ?? '',
-                      type_id: (entity?.id && entity.id !== entity.label) ? entity.id : null,
+                      type_id: (entity?.id && !entity.id.startsWith('local-')) ? entity.id : null,
                       type_labels: entity?.labels ?? null,
                     })}
                     placeholder={t('form.relationPlaceholder')}
