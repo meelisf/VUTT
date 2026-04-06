@@ -20,6 +20,7 @@ from ..config import (
     PERSON_ALIASES_FILE,
 )
 from ..utils import generate_nanoid, atomic_write_json
+from .work_relations_ops import update_works_creators_index, build_works_creators_index
 
 # Jagatud indeksite kirjutuslukkud
 _index_lock = threading.Lock()
@@ -823,6 +824,12 @@ def update_person_to_works(
 
         atomic_write_json(PERSON_TO_WORKS_FILE, data)
 
+    # Uuenda works_creators_index (background-ühilduv, ei nõua locks)
+    try:
+        update_works_creators_index(work_id, creators, title="", year=None)
+    except Exception:
+        logger.exception("update_works_creators_index viga teose %s jaoks", work_id)
+
 
 def update_page_person_mentions(work_id: str, work_dir: str):
     """Uuendab person_to_works 'mentioned' rolle antud teose lehekülje page_tags põhjal."""
@@ -955,6 +962,12 @@ def rebuild_indices():
     # Kirjuta person_to_works
     with _works_lock:
         atomic_write_json(PERSON_TO_WORKS_FILE, ptw)
+
+    # Ehita works_creators_index
+    try:
+        build_works_creators_index()
+    except Exception:
+        logger.exception("build_works_creators_index viga rebuild_indices sees")
 
     # Ehita index entries
     entries = []
