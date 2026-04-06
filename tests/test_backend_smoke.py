@@ -28,7 +28,7 @@ def test_user_chars_roundtrip_with_bearer_token(client, login, backend_env):
     fetch_response = client.get("/user-chars", headers=headers)
 
     assert save_response.status_code == 200
-    assert save_response.json() == {"status": "success"}
+    assert save_response.json()["status"] == "success"
     assert fetch_response.status_code == 200
     assert fetch_response.json() == {
         "status": "success",
@@ -36,7 +36,7 @@ def test_user_chars_roundtrip_with_bearer_token(client, login, backend_env):
         "is_custom": True,
     }
 
-    saved_file = backend_env["user_chars_dir"] / "editor.json"
+    saved_file = backend_env["collections_file"].parent / "user_settings" / "editor.json"
     assert json.loads(saved_file.read_text(encoding="utf-8")) == {"characters": ["þ", "æ"]}
 
 
@@ -51,11 +51,11 @@ def test_invite_set_password_consumes_token_once(client, backend_env):
 
     first_response = client.post(
         "/invite/set-password",
-        json={"token": invite["token"], "password": "secret123"},
+        json={"token": invite["token"], "password": "secret123456"},
     )
     second_response = client.post(
         "/invite/set-password",
-        json={"token": invite["token"], "password": "another-secret"},
+        json={"token": invite["token"], "password": "another-secret456"},
     )
 
     assert first_response.status_code == 200
