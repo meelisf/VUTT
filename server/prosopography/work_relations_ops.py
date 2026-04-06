@@ -93,5 +93,90 @@ def update_works_creators_index(
         atomic_write_json(WORKS_CREATORS_INDEX_FILE, index)
 
 
+def _load_person_to_works() -> dict:
+    if os.path.exists(PERSON_TO_WORKS_FILE):
+        try:
+            with open(PERSON_TO_WORKS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _load_creators_index() -> dict:
+    if os.path.exists(WORKS_CREATORS_INDEX_FILE):
+        try:
+            with open(WORKS_CREATORS_INDEX_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _load_person_name_map() -> dict:
+    """Tagastab { person_id: label } kaardi prosopography_index.json-st."""
+    if os.path.exists(PROSOPOGRAPHY_INDEX_FILE):
+        try:
+            with open(PROSOPOGRAPHY_INDEX_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return {e["id"]: e.get("label", e["id"]) for e in data.get("entries", [])}
+        except Exception:
+            pass
+    return {}
+
+
 def get_work_relations(person_id: str, limit: int = 10, offset: int = 0) -> list:
-    raise NotImplementedError
+    """
+    Tagastab isikud, kellega person_id jagab teoseid creators[] kaudu.
+    Sorteeritud shared_works_count järgi kahanevalt.
+    """
+    ptw = _load_person_to_works()
+    creators_index = _load_creators_index()
+    name_map = _load_person_name_map()
+
+    a_work_ids = {w["work_id"] for w in ptw.get(person_id, [])}
+
+    # b_id → { work_id → (a_roles, b_roles, title, year) }
+    shared: dict = {}
+
+    for work_id in a_work_ids:
+        work_entry = creators_index.get(work_id)
+        if not work_entry:
+            continue
+        work_creators = work_entry.get("creators", [])
+        a_entry = next((e for e in work_creators if e["person_id"] == person_id), None)
+        if a_entry is None:
+            continue
+        a_roles = a_entry["roles"]
+        for entry in work_creators:
+            b_id = entry["person_id"]
+            if b_id == person_id or not b_id.startswith("vutt:P"):
+                continue
+            shared.setdefault(b_id, {})[work_id] = (
+                a_roles,
+                entry["roles"],
+                work_entry.get("title", ""),
+                work_entry.get("year"),
+            )
+
+    results = []
+    for b_id, works in shared.items():
+        work_list = [
+            {
+                "work_id": wid,
+                "work_title": title,
+                "work_year": year,
+                "a_roles": a_roles,
+                "b_roles": b_roles,
+            }
+            for wid, (a_roles, b_roles, title, year) in works.items()
+        ]
+        results.append({
+            "person_id": b_id,
+            "person_name": name_map.get(b_id, b_id),
+            "shared_works_count": len(works),
+            "shared_works": work_list,
+        })
+
+    results.sort(key=lambda x: x["shared_works_count"], reverse=True)
+    return results[offset: offset + limit]
