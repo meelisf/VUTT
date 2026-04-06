@@ -44,7 +44,7 @@ from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pa
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
-from .prosopography.ops import update_page_person_mentions
+from .prosopography.ops import update_page_person_mentions, rebuild_indices
 from .metadata_ops import save_work_metadata, ALLOWED_METADATA_FIELDS
 
 @asynccontextmanager
@@ -52,6 +52,7 @@ async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
     build_work_id_cache()
     run_git_fsck()
+    threading.Thread(target=rebuild_indices, daemon=True).start()
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=people_refresh_loop, daemon=True).start()
     yield
