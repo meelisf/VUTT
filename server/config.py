@@ -82,17 +82,20 @@ PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.jso
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
 REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
-# Andmefailid — data/state/ kaustas (sisemises gitis)
-_DATA_STATE_DIR = os.path.join(BASE_DIR, "state")
-DATA_STATE_DIR = _DATA_STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
-COLLECTIONS_FILE = os.path.join(_DATA_STATE_DIR, "collections.json")
-VOCABULARIES_FILE = os.path.join(_DATA_STATE_DIR, "vocabularies.json")
-PERSON_ALIASES_FILE = os.path.join(_DATA_STATE_DIR, "person_aliases.json")
-LABELS_FILE = os.path.join(_DATA_STATE_DIR, "labels.json")
-PLACES_FILE = os.path.join(_DATA_STATE_DIR, "places.json")
-PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_STATE_DIR, "prosopography_index.json")
-PERSON_TO_WORKS_FILE = os.path.join(_DATA_STATE_DIR, "person_to_works.json")
-WORKS_CREATORS_INDEX_FILE = os.path.join(_DATA_STATE_DIR, "works_creators_index.json")
+# Konfiguratsioonifailid — data/config/ kaustas (sisemises gitis)
+_DATA_CONFIG_DIR = os.path.join(BASE_DIR, "config")
+DATA_CONFIG_DIR = _DATA_CONFIG_DIR  # Ekspordi kasutamiseks teistes moodulites
+COLLECTIONS_FILE = os.path.join(_DATA_CONFIG_DIR, "collections.json")
+VOCABULARIES_FILE = os.path.join(_DATA_CONFIG_DIR, "vocabularies.json")
+PERSON_ALIASES_FILE = os.path.join(_DATA_CONFIG_DIR, "person_aliases.json")
+LABELS_FILE = os.path.join(_DATA_CONFIG_DIR, "labels.json")
+PLACES_FILE = os.path.join(_DATA_CONFIG_DIR, "places.json")
+PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "prosopography_index.json")
+PERSON_TO_WORKS_FILE = os.path.join(_DATA_CONFIG_DIR, "person_to_works.json")
+WORKS_CREATORS_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "works_creators_index.json")
+
+# Kasutaja runtime seaded — state/user_settings/ kaustas (ei ole gitis)
+USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")
 
 # Prosopograafia isikukaardid
 PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")
