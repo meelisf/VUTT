@@ -13,6 +13,7 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
 import { index } from '../../services/meiliService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
+import WorkRelationsCard from '../components/WorkRelationsCard';
 
 // =========================================================
 // Abifunktsioonid
@@ -501,6 +502,9 @@ const PersonDetailPage: React.FC = () => {
             )}
           </div>
         )}
+
+        {/* ── Seosed teoste kaudu ── */}
+        {id && <WorkRelationsCard personId={id} />}
 
         {/* ── Struktureeritud info (klapitav) ── */}
         <StructuredInfoCard person={person} />
