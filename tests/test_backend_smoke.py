@@ -36,7 +36,7 @@ def test_user_chars_roundtrip_with_bearer_token(client, login, backend_env):
         "is_custom": True,
     }
 
-    saved_file = backend_env["collections_file"].parent / "user_settings" / "editor.json"
+    saved_file = backend_env["user_settings_dir"] / "editor.json"
     assert json.loads(saved_file.read_text(encoding="utf-8")) == {"characters": ["þ", "æ"]}
 
 

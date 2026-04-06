@@ -21,8 +21,8 @@ def _sha256(value: str) -> str:
 def backend_env(tmp_path, monkeypatch):
     state_dir = tmp_path / "state"
     state_dir.mkdir()
-    user_chars_dir = state_dir / "user_chars"
-    user_chars_dir.mkdir()
+    user_settings_dir = state_dir / "user_settings"
+    user_settings_dir.mkdir()
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir()
 
@@ -84,6 +84,7 @@ def backend_env(tmp_path, monkeypatch):
     monkeypatch.setattr(registration, "INVITE_TOKENS_FILE", str(invite_tokens_file))
 
     monkeypatch.setattr(main, "COLLECTIONS_FILE", str(collections_file))
+    monkeypatch.setattr(main, "USER_SETTINGS_DIR", str(user_settings_dir))
     monkeypatch.setattr(main, "UPLOADS_DIR", str(uploads_dir))
     monkeypatch.setattr(main, "invalidate_cache", lambda: None)
 
@@ -109,7 +110,7 @@ def backend_env(tmp_path, monkeypatch):
             "users_file": users_file,
             "invite_tokens_file": invite_tokens_file,
             "collections_file": collections_file,
-            "user_chars_dir": user_chars_dir,
+            "user_settings_dir": user_settings_dir,
             "uploads_dir": uploads_dir,
             "upload_ops": upload_ops,
         }
