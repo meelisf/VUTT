@@ -92,6 +92,7 @@ LABELS_FILE = os.path.join(_DATA_STATE_DIR, "labels.json")
 PLACES_FILE = os.path.join(_DATA_STATE_DIR, "places.json")
 PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_STATE_DIR, "prosopography_index.json")
 PERSON_TO_WORKS_FILE = os.path.join(_DATA_STATE_DIR, "person_to_works.json")
+WORKS_CREATORS_INDEX_FILE = os.path.join(_DATA_STATE_DIR, "works_creators_index.json")
 
 # Prosopograafia isikukaardid
 PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")
