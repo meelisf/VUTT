@@ -217,3 +217,30 @@ export async function mergePersons(
   }
   return resp.json();
 }
+
+export interface WorkRelationWork {
+  work_id: string;
+  work_title: string;
+  work_year: number | null;
+  a_roles: string[];
+  b_roles: string[];
+}
+
+export interface WorkRelation {
+  person_id: string;
+  person_name: string;
+  shared_works_count: number;
+  shared_works: WorkRelationWork[];
+}
+
+export async function fetchWorkRelations(
+  personId: string,
+  params?: { limit?: number; offset?: number },
+): Promise<WorkRelation[]> {
+  const url = new URL(`${BASE}/work-relations/${personId}`, window.location.origin);
+  if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
+  if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
+  const resp = await fetchWithTimeout(url.toString(), { timeout: 10000 });
+  if (!resp.ok) throw new Error(`fetchWorkRelations: ${resp.status}`);
+  return resp.json();
+}
