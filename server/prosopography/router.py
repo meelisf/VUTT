@@ -26,6 +26,7 @@ from .ops import (
     bulk_update_occupation,
 )
 from .reciprocal_ops import sync_reciprocals
+from .work_relations_ops import get_work_relations
 
 logger = get_logger(__name__)
 
@@ -336,6 +337,16 @@ async def prosopography_merge(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
+
+
+@router.get("/work-relations/{person_id:path}")
+async def prosopography_work_relations(
+    person_id: str,
+    limit: int = 10,
+    offset: int = 0,
+):
+    """Teostest tuletatud isiku-isiku seosed. Avalik endpoint."""
+    return get_work_relations(person_id, limit=limit, offset=offset)
 
 
 @router.get("/{person_id:path}")
