@@ -1,7 +1,7 @@
 """
 Teostest tuletatud isiku-isiku seosed.
 
-Indeks: data/state/works_creators_index.json
+Indeks: data/config/works_creators_index.json
   { work_id: { "title": str, "year": int|None, "creators": [{ "person_id": str, "roles": [str] }] } }
 
 Kutsumiskohad:
