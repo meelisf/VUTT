@@ -129,61 +129,8 @@ Ei ole vaja `initialRelationsRef`-i ega eraldi service kutseid.
 
 ## Tulevikuvaade
 
-### Seosegraaf ja seose allikate võrdsus
-
-Kõik seosed on graafi mõistes võrdse kaaluga — erinev on ainult päritolu. Kahte tüüpi seoseid:
-
-| Allikas | Näited | Salvestamine |
-|---|---|---|
-| **Käsitsi** | juhendaja, isa, vend, kolleeg | `person.relations[]` |
-| **Teosest tuletatud** | kaasautor, pühendaja, õnnitleja, eessõna autor | teoste `creators[]` metaandmed |
-
-Teosest tuletatud seosed kuvatakse `PersonDetailPage`-l eraldi read-only sektsioonina — neid ei kirjutata isiku `relations`-i, et vältida andmete duplikatsiooni ja käsitsi vigade tekkimist. See ei tähenda et need on "teisejärgulised" — mõlemad allikad on **võrdse tähtsusega**.
-
-Graafi mootori jaoks on mõlemad lihtsalt **servad** (edges):
-```
-(A) --[roll: "eessõna autor", allikas: "teos X"]--> (B)
-(A) --[roll: "juhendaja", allikas: "käsitsi"]--> (C)
-```
-
-Serva andmemudel tuleviku graafi jaoks:
-```json
-{
-  "source_id": "vutt:Pabc",
-  "target_id": "vutt:Pxyz",
-  "type": "juhendaja",
-  "type_id": "Q...",
-  "edge_source": "manual" | "work",
-  "work_id": "nanoid (kui edge_source=work)",
-  "work_role": "eessõna autor (kui edge_source=work)"
-}
-```
-
-`reciprocal_ops.py` loob praegu käsitsi seoste kahepoolsuse. Tulevikus lisandub:
-- Teostest tuletatud seoste kuvamine `PersonDetailPage`-l (read-only)
-- Graafikute visualiseerimine (react-force-graph vms)
-- Kauguse-põhine isikute otsimine ("näita kõiki kes on seotud X-ga 2 astme kaudu")
-
-### Seose tüüp Wikidatast
-
-Praegu on `type` vabatekstiline string (nt `"õpetaja"`). Tulevikus peaks `type` saama `LinkedEntity`-ks:
-
-**See ei kuulu praegusesse implementatsiooni.**
-
-Tuleviku andmemudel (eraldi spec + migratsioon):
-```json
-{
-  "name": "Johann Müller",
-  "type": "õpetaja",
-  "type_id": "Q37226",
-  "type_labels": { "et": "õpetaja", "en": "teacher", "de": "Lehrer", "la": "magister" },
-  "target_id": "vutt:Pabc123"
-}
-```
-
-Wikidata sisaldab suhteliike (teacher Q37226, student Q48282, colleague Q3075502 jne). Kasutajaliides saaks kasutada `EntityPicker`-it (olemasolev komponent), mis annaks automaatselt tõlked ja standardiseeritud koodid.
-
-Struktuur on tagasiühilduv — `type_id` ja `type_labels` on valikulised lisaväljad, vabatekstiline `type` jääb alles. Migratsioon on kerge kuna praegu on seoseid märgitud minimaalselt.
+Tuleviku ideed on eraldatud omaette spekki:
+- `specs/2026-03-29-person-relations-future.md` — seose tüüp Wikidatast, seosegraaf, teostest tuletatud seosed, visualiseerimine
 
 ---
 
