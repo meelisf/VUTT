@@ -287,7 +287,8 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     let changed = false;
     const resolved = selectedTags.map(tag => {
       if (tagValues.has(tag)) return tag;
-      if (tagsIdMap[tag]) { changed = true; return tagsIdMap[tag]; }
+      const mapped = tagsIdMap[tag];
+      if (mapped && mapped !== tag) { changed = true; return mapped; }
       return tag;
     });
     return changed ? resolved : selectedTags;
