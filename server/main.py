@@ -10,7 +10,7 @@ from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, get_logger
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, get_logger
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
 
 logger = get_logger(__name__)
@@ -1218,7 +1218,7 @@ async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
 
 def _get_user_settings_path(username: str) -> str:
     """Tagastab kasutaja seadete faili tee."""
-    return os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_settings', f"{username}.json")
+    return os.path.join(USER_SETTINGS_DIR, f"{username}.json")
 
 def _load_user_settings(username: str) -> dict:
     """Laeb kasutaja seaded failist."""
@@ -1230,8 +1230,7 @@ def _load_user_settings(username: str) -> dict:
 
 def _save_user_settings(username: str, settings: dict):
     """Salvestab kasutaja seaded faili."""
-    dir_path = os.path.join(os.path.dirname(COLLECTIONS_FILE), 'user_settings')
-    os.makedirs(dir_path, exist_ok=True)
+    os.makedirs(USER_SETTINGS_DIR, exist_ok=True)
     path = _get_user_settings_path(username)
     atomic_write_json(path, settings)
 
