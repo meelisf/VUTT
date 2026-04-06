@@ -52,10 +52,10 @@ Kaks eraldi kausta serveril, mõlemad mountitud Dockerisse:
 
 | Kaust (serveril) | Docker mount | Mis seal on | Git | Lokaalselt |
 |-----------------|-------------|-------------|-----|------------|
-| `~/VUTT/state/` | `./state:/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `prosopography/` isikukaardid | Ei | Ei (ainult serveril) |
-| `~/VUTT/data/` | `./data:/data` | Teosed, leheküljed, `data/state/` konfiguratsioon | Sisemises gitis (`data/` oma git) | Ei |
+| `~/VUTT/state/` | `./state:/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `prosopography/` isikukaardid, `user_settings/` | Ei | Ei (ainult serveril) |
+| `~/VUTT/data/` | `./data:/data` | Teosed, leheküljed, `data/config/` konfiguratsioon | Sisemises gitis (`data/` oma git) | Ei |
 
-**`data/state/` sisaldab** (backend loeb/kirjutab siia Dockerist):
+**`data/config/` sisaldab** (backend loeb/kirjutab siia Dockerist):
 
 | Fail | Sisu |
 |------|------|
@@ -71,19 +71,19 @@ Kaks eraldi kausta serveril, mõlemad mountitud Dockerisse:
 
 Konfiguratsioonifaili serverist alla tõmbamiseks:
 ```bash
-scp vutt:~/VUTT/data/state/collections.json ./data-state-backup/
+scp vutt:~/VUTT/data/config/collections.json ./data-config-backup/
 ```
 
-`data/state/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta:
+`data/config/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta:
 ```python
 DATA_ROOT_DIR = os.getenv("VUTT_DATA_DIR", "data")
-STATE_DIR = os.path.join(DATA_ROOT_DIR, "state")   # ← ÕIGE
-# MIS MITTE: os.path.join(os.path.dirname(__file__), "../state")  # vale — Dockeris /app/state (runtime), mitte /data/state (konfig)
+CONFIG_DIR = os.path.join(DATA_ROOT_DIR, "config")   # ← ÕIGE
+# MIS MITTE: os.path.join(os.path.dirname(__file__), "../state")  # vale — Dockeris /app/state (runtime), mitte /data/config (konfig)
 ```
 
 **Kriitilised teed:**
-- `data/state/` (hostil) = `/data/state/` (Dockeris) — konfiguratsioon (`collections.json` jne) ← `VUTT_DATA_DIR/state`
-- `state/` (hostil) = `/app/state/` (Dockeris) — runtime (`users.json`, sessioonid) ← MITTE konfiguratsioon
+- `data/config/` (hostil) = `/data/config/` (Dockeris) — konfiguratsioon (`collections.json` jne) ← `VUTT_DATA_DIR/config`
+- `state/` (hostil) = `/app/state/` (Dockeris) — runtime (`users.json`, sessioonid, `user_settings/`) ← MITTE konfiguratsioon
 
 ## Data Layers
 
@@ -114,8 +114,8 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 | `server/meilisearch_ops.py` | Meilisearch sync, ThreadPoolExecutor |
 | `server/cache.py` | Collections/people/suggestions cache (TTL 5 min) |
 | `server/upload_ops.py` | Upload wizard, OCR server integratsioon |
-| `state/` | Runtime andmed (ei ole gitis): `users.json`, `pending_registrations.json`, `invite_tokens.json`, `prosopography/` |
-| `data/state/` | Konfiguratsioon (sisemises gitis): `collections.json`, `vocabularies.json`, `places.json`, `labels.json`, `person_aliases.json`, `prosopography_index.json`, `person_to_works.json` |
+| `state/` | Runtime andmed (ei ole gitis): `users.json`, `pending_registrations.json`, `invite_tokens.json`, `prosopography/`, `user_settings/` |
+| `data/config/` | Konfiguratsioon (sisemises gitis): `collections.json`, `vocabularies.json`, `places.json`, `labels.json`, `person_aliases.json`, `prosopography_index.json`, `person_to_works.json` |
 
 ## Linked Data (Wikidata)
 
@@ -132,7 +132,7 @@ Links: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123` - no
 
 Hierarchical collections with configurable colors. State managed via `CollectionContext`.
 
-**Config:** `data/state/collections.json` (sisemises gitis serveril, koopia lokaalsel arenduses scp-ga)
+**Config:** `data/config/collections.json` (sisemises gitis serveril, koopia lokaalsel arenduses scp-ga)
 
 ```json
 {
@@ -159,12 +159,12 @@ Collection displayed in: Dashboard cards, Workspace info panel, SearchPage resul
 
 To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius*), the system uses a central register.
 
-**File:** `data/state/person_aliases.json` (sisemises gitis serveril)
+**File:** `data/config/person_aliases.json` (sisemises gitis serveril)
 
 **Workflow:**
 1. Admin saves metadata with a Wikidata/GND ID.
 2. Server (`people_ops.py`) automatically fetches aliases in background (only for `et`, `en`, `de`, `la`).
-3. Aliases are saved to `data/state/person_aliases.json` under all associated IDs (cross-referencing).
+3. Aliases are saved to `data/config/person_aliases.json` under all associated IDs (cross-referencing).
 4. Meilisearch indexer (`meilisearch_ops.py`) reads this file and adds aliases to `authors_text` field.
 
 **Search:**
