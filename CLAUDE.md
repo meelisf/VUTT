@@ -66,6 +66,7 @@ Kaks eraldi kausta serveril, mõlemad mountitud Dockerisse:
 | `person_aliases.json` | Isikute nimevariantide register |
 | `prosopography_index.json` | Tuletatud prosopograafia indeks |
 | `person_to_works.json` | Tuletatud isiku→teosed indeks |
+| `works_creators_index.json` | Tuletatud teoste loojate indeks (teostest tuletatud isiku-isiku seosed) |
 
 **Oluline:** lokaalne masin ei peegelda `data/` ega `state/` sisu. Kõik need failid elavad ainult serveril.
 
@@ -270,6 +271,13 @@ Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
 - `users.json` - laetakse stardil, uuendatakse ainult muudatuste korral (`auth.py`)
 - `collections.json`, `vocabularies.json`, `person_aliases.json` - cache TTL 5 min
 - Suggestions cache TTL 5 min
+
+**Meilisearch keep-warm** (`meilisearch_ops.py`)
+- `_keepwarm_loop`: iga 2h sync-ib ühe teose Meilisearchi
+- Väldib ~60s cold-start viivitust esimesel indekseerimistehingul pärast pikka pausi
+- Põhjus: `prefixSearch: "indexingTime"` skannib kogu sõnavara FST-i igal updateil —
+  esimesel kord pärast pikka pausi on B-puu LMDB-s külm (vt `MEILI_KEEPWARM_INTERVAL`)
+- `prefixSearch: "disabled"` EI SOBI — "risin" ei leia "Risingh" (2 editi > typo piir)
 
 **Automaatne puhastus (daemon threads)**
 - Aegunud sessioonid - iga 5 min (`auth.py`)
