@@ -136,3 +136,39 @@ def test_no_changes_means_no_git_call(tmp_path):
     })
     mock_git, _ = _run(tmp_path)
     mock_git.assert_not_called()
+
+
+# -- publisher --
+
+def test_publisher_label_updated(tmp_path):
+    meta_path = _write_meta(tmp_path / "teos1", {
+        "creators": [],
+        "tags": [],
+        "publisher": {"id": PERSON_ID, "label": "Vana Trükkal", "source": "local"},
+    })
+    _run(tmp_path)
+    meta = _read_meta(meta_path)
+    assert meta["publisher"]["label"] == "Karl XII"
+
+
+def test_publisher_other_person_not_changed(tmp_path):
+    meta_path = _write_meta(tmp_path / "teos1", {
+        "creators": [],
+        "tags": [],
+        "publisher": {"id": OTHER_ID, "label": "Keegi teine", "source": "local"},
+    })
+    _run(tmp_path)
+    meta = _read_meta(meta_path)
+    assert meta["publisher"]["label"] == "Keegi teine"
+
+
+def test_publisher_and_creator_both_updated(tmp_path):
+    meta_path = _write_meta(tmp_path / "teos1", {
+        "creators": [{"id": PERSON_ID, "label": "Vana Nimi", "name": "Vana Nimi"}],
+        "tags": [],
+        "publisher": {"id": PERSON_ID, "label": "Vana Nimi", "source": "local"},
+    })
+    _run(tmp_path)
+    meta = _read_meta(meta_path)
+    assert meta["creators"][0]["label"] == "Karl XII"
+    assert meta["publisher"]["label"] == "Karl XII"

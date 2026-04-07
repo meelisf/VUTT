@@ -198,7 +198,7 @@ def get_collection_hierarchy(collections, collection_ids):
     return result
 
 
-def wait_for_task(task_uid, timeout=30):
+def wait_for_task(task_uid, timeout=120):
     """Ootab Meilisearchi taski lõppu.
 
     Args:
@@ -644,6 +644,34 @@ def sync_work_to_meilisearch_async(dir_name):
     Pool piirab samaagsete päringute arvu (max 10).
     """
     _meilisearch_executor.submit(_sync_work_task, dir_name)
+
+
+MEILI_KEEPWARM_INTERVAL = 7200  # 2 tundi sekundites
+
+
+def _keepwarm_loop():
+    """Taustalõim, mis käivitab iga 2h väikese Meilisearch sync-i.
+
+    Hoiab Meilisearchi eesliitetabeli (prefixSearch: indexingTime) sooja,
+    et vältida ~60s viivitust esimesel indekseerimistehingul pärast pikka pausi.
+    """
+    time.sleep(MEILI_KEEPWARM_INTERVAL)  # Esmakordne käivitus 2h pärast starti
+    while True:
+        try:
+            if not os.path.exists(BASE_DIR):
+                time.sleep(MEILI_KEEPWARM_INTERVAL)
+                continue
+            # Leia esimene teos kataloogist
+            for entry in os.scandir(BASE_DIR):
+                if entry.is_dir() and not entry.name.startswith('.'):
+                    meta_path = os.path.join(entry.path, '_metadata.json')
+                    if os.path.exists(meta_path):
+                        logger.info("Meilisearch keep-warm sync...")
+                        sync_work_to_meilisearch(entry.name)
+                        break
+        except Exception as e:
+            logger.error(f"Keep-warm viga: {e}")
+        time.sleep(MEILI_KEEPWARM_INTERVAL)
 
 
 def metadata_watcher_loop():

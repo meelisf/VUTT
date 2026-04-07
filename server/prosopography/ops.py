@@ -371,6 +371,11 @@ def _propagate_name_to_works(person_id: str, new_label: str, username: str) -> N
                 continue
             t["label"] = new_label
             changed = True
+        pub = meta.get("publisher")
+        if isinstance(pub, dict) and pub.get("id") == person_id:
+            if pub.get("label") != new_label:
+                pub["label"] = new_label
+                changed = True
         if changed:
             changed_files.append((meta_path, json.dumps(meta, ensure_ascii=False, indent=2)))
 
