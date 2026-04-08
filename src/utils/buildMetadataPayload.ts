@@ -1,4 +1,4 @@
-import { Creator, CreatorRole } from '../types';
+import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 
 export interface MetadataFormData {
@@ -15,6 +15,7 @@ export interface MetadataFormData {
   ester_id: string;
   external_url: string;
   collections: string[];
+  archive_refs: ArchiveRef[];
 }
 
 export interface CleanedCreator {
@@ -40,6 +41,7 @@ export interface MetadataPayload {
     ester_id: string | null;
     external_url: string | null;
     collections: string[];
+    archive_refs: ArchiveRef[] | null;
   };
   original_path?: string;
 }
@@ -67,6 +69,19 @@ export function cleanCreators(creators: Creator[]): CleanedCreator[] {
     .map(c => ({ name: c.name.trim(), role: c.role, id: c.id, source: c.source }));
 }
 
+// Puhastab archive_refs massiivi: eemaldab tühjad kirjed, trimmib stringid
+export function cleanArchiveRefs(refs: ArchiveRef[]): ArchiveRef[] | null {
+  const clean = refs
+    .filter(r => r.archive_id.trim() || r.reference.trim())
+    .map(r => {
+      const out: ArchiveRef = { archive_id: r.archive_id.trim(), reference: r.reference.trim() };
+      const url = (r.url ?? '').trim();
+      if (url) out.url = url;
+      return out;
+    });
+  return clean.length > 0 ? clean : null;
+}
+
 // Ehitab /update-work-metadata payload-i MetadataForm andmetest
 export function buildMetadataPayload(
   form: MetadataFormData,
@@ -89,6 +104,7 @@ export function buildMetadataPayload(
       ester_id: cleanEsterId(form.ester_id),
       external_url: form.external_url.trim() || null,
       collections: form.collections,
+      archive_refs: cleanArchiveRefs(form.archive_refs),
     },
   };
 

@@ -53,7 +53,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
         'work_id', 'id', 'title', 'year', 'year_display', 'location', 'location_object', 'publisher', 'publisher_object', 'publisher_id',
         'type', 'type_object', 'genre', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags', 'tags_object', 'languages',
-        'series', 'series_title', 'ester_id', 'external_url',
+        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
         // Filtrite/sortimise väljad
         'originaal_kataloog', 'year',
         'lehekylje_pilt', 'teose_lehekylgede_arv'
@@ -94,9 +94,10 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
       series: hit.series,
       series_title: hit.series_title,
 
-      // Välised lingid
+      // Välised lingid ja arhiiviviited
       ester_id: hit.ester_id,
       external_url: hit.external_url,
+      archive_refs: hit.archive_refs || null,
 
       // Lehekülje info
       page_count: hit.teose_lehekylgede_arv || 0,

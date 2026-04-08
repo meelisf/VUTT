@@ -56,6 +56,13 @@ export interface Series {
   number?: string;
 }
 
+// Arhiiviviide
+export interface ArchiveRef {
+  archive_id: string;
+  reference: string;
+  url?: string;
+}
+
 // Seos teiste teostega
 export interface Relation {
   id: string;
@@ -120,9 +127,10 @@ export interface Work {
   series_title?: string;
   relations?: Relation[];
 
-  // Välised lingid
+  // Välised lingid ja arhiiviviited
   ester_id?: string;
   external_url?: string;
+  archive_refs?: ArchiveRef[] | null;
 
   // Lehekülje info (esimese lehe andmed)
   page_count: number;

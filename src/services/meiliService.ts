@@ -98,6 +98,7 @@ export const normalizeWork = (hit: any): Work => {
     relations: hit.relations,
     ester_id: hit.ester_id,
     external_url: hit.external_url,
+    archive_refs: hit.archive_refs || null,
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
     thumbnail_url: getThumbUrl(workId),
     work_status: hit.work_status || hit.teose_staatus,
@@ -138,7 +139,8 @@ export const normalizePage = (hit: any): Page => {
     creators: hit.creators,
     languages: hit.languages,
     ester_id: hit.ester_id,
-    external_url: hit.external_url
+    external_url: hit.external_url,
+    archive_refs: hit.archive_refs || null,
   };
 };
 

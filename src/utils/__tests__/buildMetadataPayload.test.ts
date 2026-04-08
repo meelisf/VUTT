@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { cleanEsterId, cleanTags, cleanCreators, buildMetadataPayload } from '../buildMetadataPayload';
+import { cleanEsterId, cleanTags, cleanCreators, buildMetadataPayload, cleanArchiveRefs } from '../buildMetadataPayload';
 import type { MetadataFormData } from '../buildMetadataPayload';
+import type { ArchiveRef } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 
 // ---------------------------------------------------------------------------
@@ -135,6 +136,7 @@ const baseForm = (): MetadataFormData => ({
   ester_id: '',
   external_url: '',
   collections: [],
+  archive_refs: [],
 });
 
 describe('buildMetadataPayload', () => {
@@ -231,5 +233,87 @@ describe('buildMetadataPayload', () => {
     const e: LinkedEntity = { id: 'Q1261026', label: 'väitekiri', source: 'wikidata' };
     const form = { ...baseForm(), type: e };
     expect(buildMetadataPayload(form, 'x').metadata.type).toEqual(e);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// cleanArchiveRefs
+// ---------------------------------------------------------------------------
+describe('cleanArchiveRefs', () => {
+  it('tühi massiiv → null', () => {
+    expect(cleanArchiveRefs([])).toBeNull();
+  });
+
+  it('kirje archive_id ja reference-ga → säilitatakse', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3, l. 4' }];
+    expect(cleanArchiveRefs(refs)).toEqual([{ archive_id: 'EAA', reference: '1.2.3, l. 4' }]);
+  });
+
+  it('url olemas → jääb alles', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3', url: 'https://example.com' }];
+    expect(cleanArchiveRefs(refs)).toEqual([{ archive_id: 'EAA', reference: '1.2.3', url: 'https://example.com' }]);
+  });
+
+  it('tühi url → jäetakse välja', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3', url: '   ' }];
+    const result = cleanArchiveRefs(refs);
+    expect(result).toEqual([{ archive_id: 'EAA', reference: '1.2.3' }]);
+    expect(result![0]).not.toHaveProperty('url');
+  });
+
+  it('trimmib archive_id, reference ja url whitespace', () => {
+    const refs: ArchiveRef[] = [{ archive_id: '  EAA  ', reference: '  1.2.3  ', url: '  https://example.com  ' }];
+    expect(cleanArchiveRefs(refs)).toEqual([{ archive_id: 'EAA', reference: '1.2.3', url: 'https://example.com' }]);
+  });
+
+  it('kirje ilma archive_id ja reference-ta → filtreeritakse välja', () => {
+    const refs: ArchiveRef[] = [
+      { archive_id: '', reference: '' },
+      { archive_id: 'EAA', reference: '1.2.3' },
+    ];
+    expect(cleanArchiveRefs(refs)).toEqual([{ archive_id: 'EAA', reference: '1.2.3' }]);
+  });
+
+  it('ainult tühjad kirjed → null', () => {
+    const refs: ArchiveRef[] = [{ archive_id: '', reference: '' }];
+    expect(cleanArchiveRefs(refs)).toBeNull();
+  });
+
+  it('mitu kirjet → kõik säilitatakse', () => {
+    const refs: ArchiveRef[] = [
+      { archive_id: 'EAA', reference: '1.2.3' },
+      { archive_id: 'TÜR', reference: 'Ms. 123' },
+    ];
+    expect(cleanArchiveRefs(refs)).toEqual(refs);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildMetadataPayload — archive_refs
+// ---------------------------------------------------------------------------
+describe('buildMetadataPayload — archive_refs', () => {
+  it('tühi archive_refs massiiv → null payload-is', () => {
+    expect(buildMetadataPayload(baseForm(), 'x').metadata.archive_refs).toBeNull();
+  });
+
+  it('archive_refs kirjetega → säilitatakse', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'EAA', reference: '1.2.3, l. 4', url: 'https://example.com' }];
+    const form = { ...baseForm(), archive_refs: refs };
+    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual(refs);
+  });
+
+  it('kirje ilma url-ita → säilitatakse (url puudub)', () => {
+    const refs: ArchiveRef[] = [{ archive_id: 'TÜR', reference: 'Ms. 123' }];
+    const form = { ...baseForm(), archive_refs: refs };
+    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual([{ archive_id: 'TÜR', reference: 'Ms. 123' }]);
+  });
+
+  it('filtreerib tühjad kirjed ja trimmib', () => {
+    const refs: ArchiveRef[] = [
+      { archive_id: '', reference: '' },
+      { archive_id: '  EAA  ', reference: '  1.2.3  ' },
+    ];
+    const form = { ...baseForm(), archive_refs: refs };
+    expect(buildMetadataPayload(form, 'x').metadata.archive_refs).toEqual([{ archive_id: 'EAA', reference: '1.2.3' }]);
   });
 });
