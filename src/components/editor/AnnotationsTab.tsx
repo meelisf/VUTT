@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
-import { Work, Page, Annotation } from '../../types';
+import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
@@ -54,6 +54,15 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
   const isAdmin = user?.role === 'admin';
   
+  // Arhiivide register (nimed kuvamiseks)
+  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
+  useEffect(() => {
+    fetchWithTimeout(`${FILE_API_URL}/config/archives`)
+      .then(r => r.json())
+      .then(d => { if (d.archives) setArchives(d.archives); })
+      .catch(() => {});
+  }, []);
+
   // Sõnavara soovitused lehekülje märksõnadele (serverist)
   const [tagSuggestions, setTagSuggestions] = useState<{ label: string; id: string | null }[]>([]);
   // Meilisearchi märksõnad (kõik olemasolevad, koos ID-dega)
@@ -417,6 +426,34 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             );
                           })}
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Arhiiviviited */}
+            {work.archive_refs && work.archive_refs.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-2">{t('info.archiveRefs', 'Arhiiviviited')}</p>
+                <div className="space-y-1.5">
+                  {work.archive_refs.map((ref: ArchiveRef, idx: number) => {
+                    const archiveName = archives[ref.archive_id]?.name;
+                    const archiveUrl = archives[ref.archive_id]?.url;
+                    const isValidUrl = (url: string) => /^https?:\/\//.test(url);
+                    return (
+                      <div key={idx} className="text-sm text-gray-700">
+                        <span className="font-medium text-gray-800">
+                          {ref.archive_id}
+                          {archiveName && <span className="font-normal text-gray-500"> — {archiveName}</span>}
+                        </span>
+                        {ref.reference && <span className="ml-1">{ref.reference}</span>}
+                        {ref.url && isValidUrl(ref.url) ? (
+                          <a href={ref.url} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary-600 hover:text-primary-800" title={ref.url}>↗</a>
+                        ) : archiveUrl && isValidUrl(archiveUrl) ? (
+                          <a href={archiveUrl} target="_blank" rel="noopener noreferrer" className="ml-1 text-gray-400 hover:text-gray-600" title={archiveUrl}>↗</a>
+                        ) : null}
                       </div>
                     );
                   })}
