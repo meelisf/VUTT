@@ -8,7 +8,7 @@ import threading
 import urllib.request
 from datetime import datetime
 
-from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE, MEILI_URL, MEILI_KEY, INDEX_NAME
+from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE, ARCHIVES_FILE, MEILI_URL, MEILI_KEY, INDEX_NAME
 from .people_ops import load_people_data
 from .utils import get_label, get_id, get_primary_labels, get_labels_by_lang
 from .meilisearch_ops import load_labels_store
@@ -69,6 +69,7 @@ def invalidate_cache():
     global _suggestions_cache, _suggestions_cache_at
     global _people_aliases_cache, _people_aliases_cache_at
     global _people_register_cache, _people_register_cache_at
+    global _archives_cache, _archives_cache_at
     with _cache_lock:
         _collections_cache = None
         _vocabularies_cache = None
@@ -79,6 +80,8 @@ def invalidate_cache():
         _people_aliases_cache_at = None
         _people_register_cache = None
         _people_register_cache_at = None
+        _archives_cache = None
+        _archives_cache_at = None
 
 # =========================================================
 # CACHE: People aliases ja register
@@ -232,3 +235,25 @@ def get_cached_suggestions(lang):
         _suggestions_cache[lang] = result
         if _suggestions_cache_at is None: _suggestions_cache_at = datetime.now()
         return result
+
+# =========================================================
+# CACHE: Archives
+# =========================================================
+_archives_cache = None
+_archives_cache_at = None
+ARCHIVES_CACHE_TTL = 300
+
+def get_cached_archives():
+    global _archives_cache, _archives_cache_at
+    with _cache_lock:
+        if _archives_cache is None or _archives_cache_at is None or \
+           (datetime.now() - _archives_cache_at).total_seconds() > ARCHIVES_CACHE_TTL:
+            _archives_cache = {}
+            if os.path.exists(ARCHIVES_FILE):
+                try:
+                    with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+                        _archives_cache = json.load(f)
+                except Exception as e:
+                    print(f"Archives cache laadimine ebaõnnestus: {e}")
+            _archives_cache_at = datetime.now()
+        return _archives_cache

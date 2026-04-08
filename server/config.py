@@ -93,6 +93,7 @@ PLACES_FILE = os.path.join(_DATA_CONFIG_DIR, "places.json")
 PROSOPOGRAPHY_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "prosopography_index.json")
 PERSON_TO_WORKS_FILE = os.path.join(_DATA_CONFIG_DIR, "person_to_works.json")
 WORKS_CREATORS_INDEX_FILE = os.path.join(_DATA_CONFIG_DIR, "works_creators_index.json")
+ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 
 # Kasutaja runtime seaded — state/user_settings/ kaustas (ei ole gitis)
 USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")

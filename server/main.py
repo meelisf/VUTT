@@ -38,7 +38,8 @@ from .reocr_ops import (
 )
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
-    get_cached_people_register, get_cached_suggestions, invalidate_cache
+    get_cached_people_register, get_cached_suggestions, invalidate_cache,
+    get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
 from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
@@ -1019,6 +1020,9 @@ async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role
 
 @app.get("/collections")
 async def collections(): return {"status": "success", "collections": get_cached_collections()}
+
+@app.get("/config/archives")
+async def get_archives(): return {"status": "success", "archives": get_cached_archives()}
 
 @app.put("/admin/collections/{collection_id}")
 async def admin_update_collection(collection_id: str, request: Request, user=Depends(require_role("admin"))):

@@ -16,8 +16,31 @@ from .prosopography.ops import update_person_to_works, ensure_prosopo_stubs
 ALLOWED_METADATA_FIELDS = {
     "title", "year", "year_display", "location", "publisher", "creators", "tags",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
-    "series", "relations",
+    "series", "relations", "archive_refs",
 }
+
+
+def clean_archive_refs(value):
+    """
+    Sanitiseerib archive_refs välja.
+    Tagastab puhastatud massiivi või None kui tühi/vigane.
+    """
+    if not isinstance(value, list):
+        return None
+    result = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        archive_id = str(item.get('archive_id', '') or '').strip()
+        reference = str(item.get('reference', '') or '').strip()
+        if not archive_id and not reference:
+            continue
+        clean = {'archive_id': archive_id, 'reference': reference}
+        url = str(item.get('url', '') or '').strip()
+        if url:
+            clean['url'] = url
+        result.append(clean)
+    return result if result else None
 
 # Vanad v1 väljad mis eemaldatakse kui leitakse
 _V1_FIELDS = ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]
@@ -49,6 +72,10 @@ def save_work_metadata(
 
     Tagastab uuendatud meta dict-i.
     """
+    # Sanitiseeri archive_refs enne salvestamist (None = tühi, eemaldatakse meta-st)
+    if 'archive_refs' in updates:
+        updates['archive_refs'] = clean_archive_refs(updates['archive_refs'])
+
     # Loo prosopo stub kaardid Wikidata Q-koodiga creators/tags/publisher jaoks
     if any(k in updates for k in ("creators", "tags", "publisher")):
         updates = ensure_prosopo_stubs(updates, username)
