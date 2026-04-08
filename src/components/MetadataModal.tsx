@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Edit3, X, Save, Plus, Trash2, Library, ChevronDown, ExternalLink, UserRound } from 'lucide-react';
 import { getVocabularies, Vocabularies, Collections, buildCollectionTree, CollectionTreeNode } from '../services/collectionService';
-import { Creator, CreatorRole, Page, Work } from '../types';
+import { Creator, CreatorRole, Page, Work, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -39,6 +39,7 @@ interface MetadataForm {
   ester_id: string;
   external_url: string;
   collections: string[];
+  archive_refs: ArchiveRef[];
 }
 
 interface SuggestionItem {
@@ -149,6 +150,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const lang = getLangCode(i18n.language);
 
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
+  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [metaForm, setMetaForm] = useState<MetadataForm>({
     title: '',
     year: 0,
@@ -162,7 +164,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     languages: [],
     ester_id: '',
     external_url: '',
-    collections: []
+    collections: [],
+    archive_refs: [],
   });
   const [suggestions, setSuggestions] = useState<{
     authors: SuggestionItem[];
@@ -208,12 +211,20 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       languages: work?.languages || page.languages || [],
       ester_id: work?.ester_id || page.ester_id || '',
       external_url: work?.external_url || page.external_url || '',
-      collections: work?.collections || page.collections || []
+      collections: work?.collections || page.collections || [],
+      archive_refs: work?.archive_refs || [],
     });
 
     // Lae sõnavara
     const vocabs = await getVocabularies();
     setVocabularies(vocabs);
+
+    // Lae arhiivide register
+    try {
+      const archivesResp = await fetchWithTimeout(`${FILE_API_URL}/config/archives`);
+      const archivesData = await archivesResp.json();
+      if (archivesData.archives) setArchives(archivesData.archives);
+    } catch { /* kasuta tühja loendit kui ei õnnestu */ }
 
     // Lae soovitused ja isikute register paralleelselt
     fetchSuggestions();
@@ -306,7 +317,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           languages: m.languages || [],
           ester_id: m.ester_id || '',
           external_url: m.external_url || '',
-          collections: Array.isArray(m.collections) ? m.collections : []
+          collections: Array.isArray(m.collections) ? m.collections : [],
+          archive_refs: Array.isArray(m.archive_refs) ? m.archive_refs : [],
         });
       }
     } catch (e) {
@@ -702,7 +714,54 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             </div>
           </div>
 
-          {/* Grupp 4: Välised lingid */}
+          {/* Grupp 4: Arhiiviviited */}
+          <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
+            <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.archiveRefs', 'Arhiiviviited')}</h4>
+            <div className="space-y-2">
+              {metaForm.archive_refs.map((ref, idx) => (
+                <div key={idx} className="flex gap-2 items-start">
+                  <select
+                    className="border border-gray-300 rounded px-2 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-28 shrink-0"
+                    value={ref.archive_id}
+                    onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: e.target.value } : r) })}
+                  >
+                    <option value="">— Arhiiv —</option>
+                    {Object.entries(archives).map(([id, info]) => (
+                      <option key={id} value={id}>{id} — {info.name}</option>
+                    ))}
+                  </select>
+                  <div className="flex-1 space-y-1">
+                    <textarea
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
+                      rows={2}
+                      placeholder={t('metadata.archiveRefPlaceholder', 'Viide (nt fond, nimistu, säilik, lehed)')}
+                      value={ref.reference}
+                      onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, reference: e.target.value } : r) })}
+                    />
+                    <input
+                      className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                      placeholder={t('metadata.archiveRefUrl', 'URL (valikuline)')}
+                      value={ref.url || ''}
+                      onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, url: e.target.value } : r) })}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.filter((_, i) => i !== idx) })}
+                    className="text-gray-400 hover:text-red-500 mt-1 shrink-0 text-lg leading-none"
+                    title={t('common:buttons.remove', 'Eemalda')}
+                  >×</button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setMetaForm({ ...metaForm, archive_refs: [...metaForm.archive_refs, { archive_id: '', reference: '', url: '' }] })}
+                className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
+              >+ {t('metadata.addArchiveRef', 'Lisa arhiiviviide')}</button>
+            </div>
+          </div>
+
+          {/* Grupp 5: Välised lingid */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
             <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.externalLinks', 'Välised lingid')}</h4>
             <div className="grid grid-cols-2 gap-3">
