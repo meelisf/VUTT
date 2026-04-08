@@ -33,7 +33,7 @@ import time
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
-from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE, get_logger
+from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE, ARCHIVES_FILE, get_logger
 from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,
@@ -293,6 +293,15 @@ def sync_work_to_meilisearch(dir_name):
     if not metadata:
         metadata = generate_default_metadata(dir_name)
 
+    # Lae arhiivide register (arhiivi nimed otsinguteksti jaoks)
+    _archives = {}
+    if os.path.exists(ARCHIVES_FILE):
+        try:
+            with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+                _archives = json.load(f)
+        except Exception:
+            pass
+
     # Metaandmed (v3 formaat: LinkedEntity objektid)
     work_id = metadata.get('id')  # Nanoid (püsiv lühikood)
     slug = metadata.get('slug', sanitize_id(dir_name))
@@ -332,6 +341,7 @@ def sync_work_to_meilisearch(dir_name):
 
     ester_id = metadata.get('ester_id')
     external_url = metadata.get('external_url')
+    archive_refs = metadata.get('archive_refs') or []
     location = metadata.get('location')
     publisher = metadata.get('publisher')
     work_type = metadata.get('type')
@@ -526,6 +536,24 @@ def sync_work_to_meilisearch(dir_name):
             doc['ester_id'] = ester_id
         if external_url:
             doc['external_url'] = external_url
+
+        if archive_refs:
+            doc['archive_refs'] = archive_refs
+            # Denormaliseeritud otsingutekst: kood + arhiivi täisnimi + viide
+            parts = []
+            for ref in archive_refs:
+                if not isinstance(ref, dict):
+                    continue
+                archive_id = ref.get('archive_id', '')
+                if archive_id:
+                    parts.append(archive_id)
+                    archive_name = _archives.get(archive_id, {}).get('name', '')
+                    if archive_name:
+                        parts.append(archive_name)
+                if ref.get('reference'):
+                    parts.append(ref['reference'])
+            if parts:
+                doc['archive_refs_text'] = ' '.join(parts)
 
         documents.append(doc)
 

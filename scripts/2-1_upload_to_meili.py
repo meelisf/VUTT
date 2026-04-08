@@ -55,7 +55,8 @@ def main():
             'page_tags',
             'page_tags_et',
             'page_tags_en',
-            'comments.text'
+            'comments.text',
+            'archive_refs_text',
         ],
         'filterableAttributes': [
             'work_id',
