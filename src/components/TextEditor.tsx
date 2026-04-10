@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
+import type { TextAnnotation } from '../types';
+import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
 import { Save, Loader2, ChevronRight, X, Settings2, Superscript, SeparatorHorizontal } from 'lucide-react';
@@ -69,12 +71,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [isDirty, setIsDirty] = useState(false);
   const [status, setStatus] = useState(page.status);
   const [comments, setComments] = useState<Annotation[]>(page.comments);
+  const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>(page.text_annotations || []);
   const [page_tags, setPageTags] = useState<(string | LinkedEntity)[]>(page.page_tags || []);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
+
+  const [annDialogOpen, setAnnDialogOpen] = useState(false);
+  const [annDialogComment, setAnnDialogComment] = useState('');
+  const [annDialogError, setAnnDialogError] = useState('');
+  const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
   // Salvestamata muudatuste jälgimine
   const [savedState, setSavedState] = useState({
@@ -206,6 +214,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   useEffect(() => {
     setStatus(page.status);
     setComments(page.comments);
+    setTextAnnotations(page.text_annotations || []);
     setPageTags(page.page_tags || []);
     setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags });
     setIsDirty(false);
@@ -267,7 +276,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setIsSaving(true);
 
     const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags };
+    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: textAnnotations };
 
     try {
       await onSave(updatedPage);
@@ -505,7 +514,95 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
+  const insertAnnotation = useCallback((comment: string) => {
+    const view = viewRef.current;
+    if (!view || !pendingAnnSelection || readOnly) return;
+    const annId = nextAnnId(textAnnotations);
+    const { from, to, text } = pendingAnnSelection;
+    const openTag = `<ann${annId}>`;
+    const closeTag = `</ann${annId}>`;
+
+    view.dispatch({
+      changes: { from, to, insert: openTag + text + closeTag },
+      annotations: [Transaction.userEvent.of('input.format')],
+    });
+
+    const newAnnotation: TextAnnotation = {
+      id: annId,
+      comment,
+      author: user?.name || 'Anonüümne',
+      created_at: new Date().toISOString(),
+    };
+    const updated = [...textAnnotations, newAnnotation];
+    setTextAnnotations(updated);
+    setPendingAnnSelection(null);
+    setAnnDialogOpen(false);
+    setAnnDialogComment('');
+    setAnnDialogError('');
+  }, [pendingAnnSelection, textAnnotations, user, readOnly]);
+
+  const removeAnnotationFromEditor = useCallback((annId: number) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const text = view.state.doc.toString();
+    const openTag = `<ann${annId}>`;
+    const closeTag = `</ann${annId}>`;
+    const openIdx = text.indexOf(openTag);
+    const closeIdx = text.indexOf(closeTag);
+    if (openIdx === -1 || closeIdx === -1) return;
+    // Eemalda sulgev täg enne avavat (positsioonid ei nihku)
+    const changes = [
+      { from: closeIdx, to: closeIdx + closeTag.length, insert: '' },
+      { from: openIdx, to: openIdx + openTag.length, insert: '' },
+    ].sort((a, b) => b.from - a.from);
+    view.dispatch({ changes, annotations: [Transaction.userEvent.of('input.format')] });
+  }, []);
+
+  const handleDeleteAndSaveTextAnnotation = useCallback(async (annId: number) => {
+    // removeAnnotationFromEditor dispatch on CM6-s sünkroonne —
+    // pärast seda on viewRef.current.state.doc juba uuendatud (tägid eemaldatud).
+    removeAnnotationFromEditor(annId);
+    const updated = textAnnotations.filter(a => a.id !== annId);
+    setTextAnnotations(updated);
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
+    // Loe tekst PÄRAST dispatch'i — CM6 on juba tägid eemaldanud
+    const text = viewRef.current?.state.doc.toString() ?? '';
+    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: updated };
+    try {
+      await onSave(updatedPage);
+      setSavedState({ status, comments, page_tags });
+      setIsDirty(false);
+    } catch (e: any) {
+      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [textAnnotations, removeAnnotationFromEditor, page, status, comments, page_tags, onSave]);
+
+  const handleSaveTextAnnotations = useCallback(async (updatedTextAnnotations: TextAnnotation[]) => {
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
+    setIsSaving(true);
+    const text = viewRef.current?.state.doc.toString() ?? '';
+    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: updatedTextAnnotations };
+    try {
+      await onSave(updatedPage);
+      setTextAnnotations(updatedTextAnnotations);
+      setSavedState({ status, comments, page_tags });
+      setIsDirty(false);
+    } catch (e: any) {
+      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [page, status, comments, page_tags, onSave]);
+
   return (
+    <>
     <div className="flex flex-col h-full bg-paper font-sans">
 
       {/* 1. GLOBAL HEADER */}
@@ -585,6 +682,33 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const view = viewRef.current;
+                          if (!view) return;
+                          const { from, to } = view.state.selection.main;
+                          if (from === to) return;
+                          const docText = view.state.doc.toString();
+                          if (containsAnnTag(docText, from, to)) {
+                            setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
+                            setAnnDialogOpen(true);
+                            setPendingAnnSelection(null);
+                            return;
+                          }
+                          const text = docText.slice(from, to);
+                          setPendingAnnSelection({ from, to, text });
+                          setAnnDialogComment('');
+                          setAnnDialogError('');
+                          setAnnDialogOpen(true);
+                        }}
+                        className="px-2 h-7 flex items-center justify-center rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200"
+                        title={t('editor.tooltips.annotate', 'Märgi ja kommenteeri (vali tekst enne)')}
+                      >
+                        ✎ Ann
+                      </button>
+                    )}
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title={t('editor.tooltips.cleanMarkup')}>{t('editor.tooltips.cleanMarkupButton')}</button>
@@ -806,6 +930,63 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         )}
       </div>
     </div>
+
+    {annDialogOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+        <div className="bg-white rounded-lg shadow-xl p-5 w-96 max-w-full">
+          <h3 className="font-bold text-gray-800 mb-1">{t('editor.annotateTitle', 'Lisa kommentaar')}</h3>
+          {annDialogError ? (
+            <p className="text-sm text-red-600 mb-3">{annDialogError}</p>
+          ) : pendingAnnSelection ? (
+            <p className="text-xs text-gray-500 mb-3 italic truncate">„{pendingAnnSelection.text}"</p>
+          ) : null}
+          {!annDialogError && (
+            <>
+              <textarea
+                autoFocus
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
+                rows={3}
+                placeholder={t('editor.annotateCommentPlaceholder', 'Kommentaar...')}
+                value={annDialogComment}
+                onChange={e => setAnnDialogComment(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && annDialogComment.trim()) {
+                    insertAnnotation(annDialogComment.trim());
+                  }
+                  if (e.key === 'Escape') {
+                    setAnnDialogOpen(false);
+                    setPendingAnnSelection(null);
+                  }
+                }}
+              />
+              <div className="flex justify-end gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => { setAnnDialogOpen(false); setPendingAnnSelection(null); }}
+                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                >{t('common:buttons.cancel', 'Tühista')}</button>
+                <button
+                  type="button"
+                  disabled={!annDialogComment.trim()}
+                  onClick={() => { if (annDialogComment.trim()) insertAnnotation(annDialogComment.trim()); }}
+                  className="px-3 py-1.5 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded disabled:opacity-50"
+                >{t('common:buttons.save', 'Salvesta')}</button>
+              </div>
+            </>
+          )}
+          {annDialogError && (
+            <div className="flex justify-end mt-3">
+              <button
+                type="button"
+                onClick={() => { setAnnDialogOpen(false); setAnnDialogError(''); }}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+              >{t('common:buttons.close', 'Sulge')}</button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
