@@ -459,7 +459,7 @@ def create_meilisearch_data_per_page():
     # Kogu andmed teose kaupa
     works_data = {}
 
-    SKIP_DIRS = {'prosopography'}
+    SKIP_DIRS = {'prosopography', 'config'}
     doc_dirs = sorted([d for d in os.listdir(DATA_ROOT_DIR)
                        if os.path.isdir(os.path.join(DATA_ROOT_DIR, d)) and not d.startswith('.') and d not in SKIP_DIRS])
 
@@ -644,18 +644,14 @@ def create_meilisearch_data_per_page():
             if doc_metadata.get('relations'):
                 meili_doc['relations'] = doc_metadata['relations']
 
-            # Arhiiviviited
+            # Arhiiviviited (alati lisatud, et Meilisearch registreeriks välja)
             archive_refs = doc_metadata.get('archive_refs') or []
             if archive_refs:
                 meili_doc['archive_refs'] = archive_refs
-                archive_refs_text = build_archive_refs_text(archive_refs, archives)
-                if archive_refs_text:
-                    meili_doc['archive_refs_text'] = archive_refs_text
+            meili_doc['archive_refs_text'] = build_archive_refs_text(archive_refs, archives) or ''
 
-            # Tekst-annotatsioonid
-            text_anns_text = build_text_annotations_text(page_meta['text_annotations'])
-            if text_anns_text is not None:
-                meili_doc['text_annotations_text'] = text_anns_text
+            # Tekst-annotatsioonid (alati lisatud, et Meilisearch registreeriks välja)
+            meili_doc['text_annotations_text'] = build_text_annotations_text(page_meta['text_annotations']) or ''
 
             # V3 bibliograafia (täisobjektid dünaamilise UI jaoks)
             meili_doc['location'] = doc_metadata.get('location')
