@@ -27,6 +27,7 @@ OUTPUT_FILE = 'output/meilisearch_data_per_page.jsonl'
 CONFIG_DIR = os.path.join(DATA_ROOT_DIR, 'config')
 COLLECTIONS_FILE = os.path.join(CONFIG_DIR, 'collections.json')
 PEOPLE_FILE = os.path.join(CONFIG_DIR, 'person_aliases.json')
+ARCHIVES_FILE = os.path.join(CONFIG_DIR, 'archives.json')
 # --- LÕPP ---
 
 
@@ -98,6 +99,48 @@ def load_people_aliases():
         except:
             pass
     return {}
+
+
+def load_archives():
+    """Laeb arhiivide registri JSON failist."""
+    if os.path.exists(ARCHIVES_FILE):
+        try:
+            with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+
+def build_archive_refs_text(archive_refs, archives):
+    """Koostab otsitava teksti arhiiviviidetest."""
+    if not archive_refs:
+        return None
+    parts = []
+    for ref in archive_refs:
+        if not isinstance(ref, dict):
+            continue
+        archive_id = ref.get('archive_id', '')
+        if archive_id:
+            parts.append(archive_id)
+            archive_name = archives.get(archive_id, {}).get('name', '')
+            if archive_name:
+                parts.append(archive_name)
+        if ref.get('reference'):
+            parts.append(ref['reference'])
+    return ' '.join(parts) if parts else None
+
+
+def build_text_annotations_text(text_annotations):
+    """Koostab otsitava teksti tekst-annotatsioonide kommentaaridest."""
+    if not text_annotations:
+        return None
+    parts = [
+        a['comment']
+        for a in text_annotations
+        if isinstance(a, dict) and a.get('comment')
+    ]
+    return ' '.join(parts) if parts else None
 
 
 def get_creator_aliases(creators, people_data):
@@ -317,6 +360,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'languages': ['lat'],
         'ester_id': None,
         'external_url': None,
+        'archive_refs': [],
     }
 
     teose_id = sanitize_id(dir_name)
@@ -370,6 +414,7 @@ def get_work_metadata(doc_path, dir_name, collections):
                 result['languages'] = meta.get('languages', ['lat'])
                 result['ester_id'] = meta.get('ester_id')
                 result['external_url'] = meta.get('external_url')
+                result['archive_refs'] = meta.get('archive_refs') or []
 
                 # Seeria (kui on)
                 if meta.get('series'):
@@ -408,7 +453,8 @@ def create_meilisearch_data_per_page():
     # Laeme kollektsioonid hierarhia jaoks
     collections = load_collections()
     people_data = load_people_aliases()
-    print(f"Laetud {len(collections)} kollektsiooni ja {len(people_data)} isiku andmed")
+    archives = load_archives()
+    print(f"Laetud {len(collections)} kollektsiooni, {len(people_data)} isiku andmed, {len(archives)} arhiivi")
 
     # Kogu andmed teose kaupa
     works_data = {}
@@ -479,6 +525,7 @@ def create_meilisearch_data_per_page():
             page_meta = {
                 'tags': [],
                 'comments': [],
+                'text_annotations': [],
                 'status': 'Toores',
                 'history': []
             }
@@ -490,6 +537,7 @@ def create_meilisearch_data_per_page():
                         source = file_json.get('meta_content', file_json)
                         page_meta['tags'] = source.get('page_tags', source.get('tags', []))
                         page_meta['comments'] = source.get('comments', [])
+                        page_meta['text_annotations'] = source.get('text_annotations', [])
                         page_meta['status'] = source.get('status', 'Toores')
                         page_meta['history'] = source.get('history', [])
 
@@ -577,8 +625,9 @@ def create_meilisearch_data_per_page():
                     for t in page_meta.get('tags', [])
                 ],
                 'page_tags_object': page_meta.get('tags', []),
-                'has_annotations': bool(page_meta.get('tags') or page_meta['comments']),
+                'has_annotations': bool(page_meta.get('tags') or page_meta['comments'] or page_meta['text_annotations']),
                 'comments': page_meta['comments'],
+                'text_annotations': page_meta['text_annotations'],
                 'status': page_meta['status'],
                 'history': page_meta['history'],
                 'last_modified': last_mod,
@@ -594,6 +643,19 @@ def create_meilisearch_data_per_page():
                 meili_doc['series_title'] = doc_metadata.get('series_title', '')
             if doc_metadata.get('relations'):
                 meili_doc['relations'] = doc_metadata['relations']
+
+            # Arhiiviviited
+            archive_refs = doc_metadata.get('archive_refs') or []
+            if archive_refs:
+                meili_doc['archive_refs'] = archive_refs
+                archive_refs_text = build_archive_refs_text(archive_refs, archives)
+                if archive_refs_text:
+                    meili_doc['archive_refs_text'] = archive_refs_text
+
+            # Tekst-annotatsioonid
+            text_anns_text = build_text_annotations_text(page_meta['text_annotations'])
+            if text_anns_text is not None:
+                meili_doc['text_annotations_text'] = text_anns_text
 
             # V3 bibliograafia (täisobjektid dünaamilise UI jaoks)
             meili_doc['location'] = doc_metadata.get('location')
