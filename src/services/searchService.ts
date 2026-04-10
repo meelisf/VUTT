@@ -496,7 +496,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
   else if (options.scope === 'annotation') {
-    attributesToSearchOn = [tagsField, 'comments.text'];
+    attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
     // Tühi query matchib kõiki dokumente — filtreeri ainult annotatsioonidega leheküljed
     if (!query) filter.push('has_annotations = true');
   }
@@ -717,7 +717,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
   let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
   else if (options.scope === 'annotation') {
-    attributesToSearchOn = [tagsField, 'comments.text'];
+    attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
     if (!query) filter.push('has_annotations = true');
   }
 
