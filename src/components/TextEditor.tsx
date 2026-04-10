@@ -21,14 +21,7 @@ import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { createVuttSearchPanel } from './editor/VuttSearchPanel';
 import { TagPair, findContainer, findInnerPairs } from './editor/wrapTagUtils';
-
-// Erimärgi tüüp
-interface SpecialCharacter {
-  row?: number;
-  character: string;
-  name?: string;
-  keyboard_code?: number | null;
-}
+import { useSpecialChars, SpecialCharacter } from './editor/useSpecialChars';
 
 interface TextEditorProps {
   page: Page;
@@ -50,6 +43,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
+  const {
+    specialCharacters,
+    isCustomChars,
+    showCharPanel,
+    setShowCharPanel,
+    showCharEditor,
+    setShowCharEditor,
+    setSpecialCharacters,
+    setIsCustomChars,
+  } = useSpecialChars(authToken);
   const [activeTab, setActiveTab] = useState<TabType>('edit');
   const hasAppliedDefaultTab = useRef(false);
 
@@ -83,11 +86,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     : null;
   const didCheckStoredJobRef = useRef(false);
 
-  // Erimärkide state
-  const [specialCharacters, setSpecialCharacters] = useState<SpecialCharacter[]>([]);
-  const [isCustomChars, setIsCustomChars] = useState(false);
-  const [showCharPanel, setShowCharPanel] = useState(true);
-  const [showCharEditor, setShowCharEditor] = useState(false);
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
 
@@ -246,34 +244,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   useEffect(() => {
     onUnsavedChanges?.(hasUnsavedChanges);
   }, [hasUnsavedChanges, onUnsavedChanges]);
-
-  // Laadime erimärgid
-  useEffect(() => {
-    const loadSpecialCharacters = async () => {
-      try {
-        if (authToken) {
-          const response = await fetchWithTimeout(`${FILE_API_URL}/user-chars`, { headers: getAuthHeaders(authToken), timeout: 5000 });
-          if (response.ok) {
-            const data = await response.json();
-            if (data.is_custom) {
-              setSpecialCharacters(data.characters || []);
-              setIsCustomChars(true);
-              return;
-            }
-          }
-        }
-        const response = await fetchWithTimeout('/special_characters.json', { timeout: 5000 });
-        if (response.ok) {
-          const data = await response.json();
-          setSpecialCharacters(data.characters || []);
-          setIsCustomChars(false);
-        }
-      } catch (e) {
-        console.warn('Erimärkide laadimine ebaõnnestus:', e);
-      }
-    };
-    loadSpecialCharacters();
-  }, [authToken]);
 
   // Laadime transkribeerimise juhendi
   useEffect(() => {
