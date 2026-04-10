@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -507,7 +507,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-800 hover:underline"
                   title="Muuda teose metaandmeid"
                 >
-                  <SquarePen size={16} />
+                  <FileSliders size={16} />
                   {t('metadata.editMetadata')}
                 </button>
               )}
