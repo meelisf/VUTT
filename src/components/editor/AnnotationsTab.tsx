@@ -4,6 +4,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
+import type { TextAnnotation } from '../../types';
+import { extractHighlightedText } from '../../utils/annUtils';
 import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
@@ -28,6 +30,10 @@ interface AnnotationsTabProps {
   authToken: string | null;
   onOpenMetaModal?: () => void;
   lang: string;
+  textAnnotations: TextAnnotation[];
+  textContent: string;
+  onSaveTextAnnotations: (updated: TextAnnotation[]) => Promise<void>;
+  onDeleteTextAnnotation: (annId: number) => Promise<void>;
 }
 
 const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
@@ -42,12 +48,18 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   user,
   authToken,
   onOpenMetaModal,
-  lang
+  lang,
+  textAnnotations,
+  textContent,
+  onSaveTextAnnotations,
+  onDeleteTextAnnotation,
 }) => {
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
   const { collections } = useCollection();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
+  const [editingAnnId, setEditingAnnId] = useState<number | null>(null);
+  const [editingAnnText, setEditingAnnText] = useState('');
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -564,6 +576,84 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       <ExternalLink size={10} />
                     </a>
                   )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tekst-annotatsioonid */}
+      {textAnnotations.length > 0 && (
+        <div className="bg-white p-5 rounded-lg border border-yellow-200 shadow-sm mb-6">
+          <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
+            <span className="text-yellow-500 text-base">✎</span>
+            <h4 className="font-bold">{t('annotations.textAnnotations', 'Tekst-annotatsioonid')}</h4>
+          </div>
+          <div className="space-y-3">
+            {textAnnotations.map(ann => {
+              const highlightedText = extractHighlightedText(textContent, ann.id);
+              return (
+                <div key={ann.id} className="border border-yellow-100 rounded p-3 bg-yellow-50/50">
+                  {highlightedText ? (
+                    <p className="text-xs text-gray-500 italic mb-1.5 line-clamp-2">„{highlightedText}"</p>
+                  ) : (
+                    <p className="text-xs text-amber-600 italic mb-1.5">
+                      {t('annotations.anchorMissing', 'Seotud tekstilõiku ei leitud')}
+                    </p>
+                  )}
+                  {editingAnnId === ann.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        autoFocus
+                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
+                        rows={2}
+                        value={editingAnnText}
+                        onChange={e => setEditingAnnText(e.target.value)}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const updated = textAnnotations.map(a =>
+                              a.id === ann.id ? { ...a, comment: editingAnnText } : a
+                            );
+                            await onSaveTextAnnotations(updated);
+                            setEditingAnnId(null);
+                          }}
+                          className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded"
+                        >{t('common:buttons.save', 'Salvesta')}</button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAnnId(null)}
+                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
+                        >{t('common:buttons.cancel', 'Tühista')}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2">
+                      <p className="text-sm text-gray-800 flex-1">{ann.comment}</p>
+                      {!readOnly && (
+                        <div className="flex gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => { setEditingAnnId(ann.id); setEditingAnnText(ann.comment); }}
+                            className="text-gray-400 hover:text-gray-700 text-xs px-1"
+                            title={t('common:buttons.edit', 'Muuda')}
+                          >✎</button>
+                          <button
+                            type="button"
+                            onClick={() => onDeleteTextAnnotation(ann.id)}
+                            className="text-gray-400 hover:text-red-500 text-xs px-1"
+                            title={t('common:buttons.remove', 'Kustuta')}
+                          >×</button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-400 mt-1">
+                    {ann.author} · {new Date(ann.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               );
             })}
