@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, PenLine } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -587,7 +587,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       {textAnnotations.length > 0 && (
         <div className="bg-white p-5 rounded-lg border border-yellow-200 shadow-sm mb-6">
           <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-            <PenLine size={16} className="text-yellow-500" />
+            <SquarePen size={16} className="text-yellow-500" />
             <h4 className="font-bold">{t('annotations.textAnnotations', 'Tekst-annotatsioonid')}</h4>
           </div>
           <div className="space-y-3">

@@ -11,7 +11,7 @@ import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
-    Bookmark, FolderOpen, PenLine
+    Bookmark, FolderOpen, SquarePen
 } from 'lucide-react';
 
 interface WorkInfo {
@@ -191,7 +191,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                 {hit.text_annotations!.map((ann, idx) => (
                                     <div key={idx} className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-amber-800">
-                                            <PenLine size={12} />
+                                            <SquarePen size={12} />
                                             <span>{t('results.textAnnotation', { author: ann.author })}</span>
                                         </div>
                                         <div>{ann.comment}</div>
