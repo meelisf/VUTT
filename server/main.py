@@ -18,7 +18,7 @@ from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to
 from .metadata_handler import build_meta_html
 from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
-from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff
+from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
