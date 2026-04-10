@@ -40,6 +40,7 @@ interface TagDef {
   cls?: string;
   selfClose?: boolean;
   useWidget?: boolean;
+  withId?: boolean;  // lisab data-ann-id atribuudi numbrilise sufiksi järgi
 }
 
 const VUTT_TAGS: TagDef[] = [
@@ -50,6 +51,7 @@ const VUTT_TAGS: TagDef[] = [
   { tag: 'hi', cls: 'vutt-highlight' },
   { tag: 'fn', useWidget: true },
   { tag: 'pb', selfClose: true },
+  { tag: 'ann', cls: 'vutt-ann', withId: true },
 ];
 
 export interface TagRange {
@@ -117,7 +119,7 @@ function buildMarkup(text: string): MarkupSets {
 
   const tagRegex = /<(\/?[a-z]+)(\d*)(\/?)>/g;
   let m;
-  const stack: { tag: string; from: number; openEnd: number }[] = [];
+  const stack: { tag: string; from: number; openEnd: number; num: string }[] = [];
 
   while ((m = tagRegex.exec(text)) !== null) {
     const fullTag = m[0];
@@ -150,10 +152,13 @@ function buildMarkup(text: string): MarkupSets {
 
         // Sisu stiilmark (vutt-italic jne) — võib replace-idega kattuda
         if (tagDef.cls && open.openEnd < from) {
+          const attrs = tagDef.withId && open.num
+            ? { 'data-ann-id': open.num }
+            : undefined;
           decoRanges.push({
             from: open.openEnd,
             to: from,
-            deco: Decoration.mark({ class: tagDef.cls }),
+            deco: Decoration.mark({ class: tagDef.cls, attributes: attrs }),
             isReplace: false,
           });
         }
@@ -177,7 +182,7 @@ function buildMarkup(text: string): MarkupSets {
         decoRanges.push({ from, to, deco: hiddenTagMark, isReplace: false });
         atomicRanges.push({ from, to });
         tagRanges.push({ from, to });
-        stack.push({ tag: cleanTagName, from, openEnd: to });
+        stack.push({ tag: cleanTagName, from, openEnd: to, num: m[2] });
       }
     }
   }

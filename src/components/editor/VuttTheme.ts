@@ -62,6 +62,12 @@ export const vuttTheme = EditorView.theme({
   '.vutt-hidden-tag': {
     display: 'none',
   },
+  '.vutt-ann': {
+    backgroundColor: '#fef9c3',
+    borderBottom: '2px solid #eab308',
+    borderRadius: '2px',
+    cursor: 'help',
+  },
   // Otsingupaneel — block-layout et <br> töötaks, kõik read eraldi
   '.cm-search': {
     padding: '5px 8px 6px',
