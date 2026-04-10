@@ -150,6 +150,16 @@ export interface Annotation {
   created_at: string;
 }
 
+// Tekst-annotatsioon (highlight + kommentaar)
+// MVP: <annN> inline-ankur, text_annotations on kommentaari source of truth.
+// Annotatsioonid ei tohi kattuda ega pesastuda — insert-loogika kontrollib seda.
+export interface TextAnnotation {
+  id: number;           // <ann{id}> tägi numbriline sufiks, kasvav integer
+  comment: string;      // Toimetaja kommentaar
+  author: string;       // Kasutajanimi
+  created_at: string;   // ISO 8601 timestamp
+}
+
 export interface HistoryEntry {
   id: string;
   user: string;
@@ -175,6 +185,7 @@ export interface Page {
   image_url: string;
   status: PageStatus;
   comments: Annotation[];
+  text_annotations: TextAnnotation[];
   page_tags: (string | LinkedEntity)[];      // Changed from tags
   history: HistoryEntry[];
 

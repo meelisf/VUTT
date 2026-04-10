@@ -23,6 +23,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
       status: page.status,
       page_tags: page.page_tags, // Use explicit naming for page-level tags
       comments: page.comments,
+      text_annotations: page.text_annotations,
       history: page.history,
       work_id: page.work_id,
       updated_at: new Date().toISOString()
@@ -58,6 +59,19 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
     if (result.warning) {
       console.warn("Git commit hoiatus:", result.warning);
     }
+
+    // Konsistentsikontroll: logi hoiatus kui ann-ID-d tekstis ja text_annotations massiiv ei klapi
+    if (page.text_annotations && page.text_annotations.length > 0) {
+      const { findAnnIdsInText } = await import('../utils/annUtils');
+      const textIds = new Set(findAnnIdsInText(page.text_content || ''));
+      const metaIds = new Set(page.text_annotations.map(a => a.id));
+      const onlyInText = [...textIds].filter(id => !metaIds.has(id));
+      const onlyInMeta = [...metaIds].filter(id => !textIds.has(id));
+      if (onlyInText.length > 0 || onlyInMeta.length > 0) {
+        console.warn('[annUtils] Konsistentsiprobleem:', { onlyInText, onlyInMeta });
+      }
+    }
+
     return true;
   } catch (e: any) {
     // Lase 401 vead läbi — Workspace käsitleb neid
@@ -99,6 +113,7 @@ export const getPage = async (workId: string, pageNum: number): Promise<Page | n
         typeof t === 'string' ? t.toLowerCase() : t
       ))),
       history: hit.history || [],
+      text_annotations: hit.text_annotations || [],
 
       // Teose andmed
       title: hit.title,
