@@ -56,6 +56,7 @@
     "openWorkspace": "Open workspace →",
     "openWorkspaceTitle": "Open workspace",
     "comment": "Comment ({{author}})",
+    "textAnnotation": "Text annotation ({{author}})",
     "searchAuthorWorks": "Search this author's works",
     "searchYearWorks": "Search works from this year",
     "loadingResults": "Loading results...",

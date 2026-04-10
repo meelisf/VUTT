@@ -56,6 +56,7 @@
     "openWorkspace": "Ava töölaud →",
     "openWorkspaceTitle": "Ava töölaud",
     "comment": "Kommentaar ({{author}})",
+    "textAnnotation": "Tekst-annotatsioon ({{author}})",
     "searchAuthorWorks": "Otsi selle autori teoseid",
     "searchYearWorks": "Otsi selle aasta teoseid",
     "loadingResults": "Laadin tulemusi...",

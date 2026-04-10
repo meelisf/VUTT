@@ -284,6 +284,7 @@ export interface ContentSearchHit {
   page_tags?: (string | LinkedEntity)[]; // Per-page tags
 
   comments?: Annotation[];
+  text_annotations?: TextAnnotation[];
 
   _formatted?: {
     lehekylje_tekst: string;
