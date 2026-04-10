@@ -252,8 +252,12 @@
       "footnote": "Footnote",
       "pageBreak": "Page break",
       "cleanMarkup": "Remove markup from selection",
-      "cleanMarkupButton": "Clean"
+      "cleanMarkupButton": "Clean",
+      "annotate": "Highlight and comment (select text first)"
     },
+    "annotateTitle": "Add comment",
+    "annotateCommentPlaceholder": "Comment...",
+    "annotateOverlapError": "Selection contains an existing annotation — choose non-overlapping text",
     "reocr": {
       "button": "Re-transcribe page",
       "hint": "Send the page image to the OCR server and replace the text with a new automatic transcription.",
@@ -267,5 +271,9 @@
       "deleteFile": "Delete OCR result",
       "deleteConfirm": "Are you sure? The OCR result will be permanently deleted."
     }
+  },
+  "annotations": {
+    "textAnnotations": "Text annotations",
+    "anchorMissing": "Linked text span not found"
   }
 }

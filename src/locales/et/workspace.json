@@ -252,8 +252,12 @@
       "footnote": "Joonealune märkus",
       "pageBreak": "Lehekülje vahetus",
       "cleanMarkup": "Puhasta valik märgendusest",
-      "cleanMarkupButton": "Puhasta"
+      "cleanMarkupButton": "Puhasta",
+      "annotate": "Märgi ja kommenteeri (vali tekst enne)"
     },
+    "annotateTitle": "Lisa kommentaar",
+    "annotateCommentPlaceholder": "Kommentaar...",
+    "annotateOverlapError": "Valitud tekst sisaldab juba annotatsiooni — vali kattumatult",
     "reocr": {
       "button": "Tee uus transkriptsioon",
       "hint": "Saada lehekülje pilt OCR serverisse ja asenda tekst uue automaatse transkriptsiooniga.",
@@ -267,5 +271,9 @@
       "deleteFile": "Kustuta OCR tulemus",
       "deleteConfirm": "Kas oled kindel? OCR tulemus kustutatakse jäädavalt."
     }
+  },
+  "annotations": {
+    "textAnnotations": "Tekst-annotatsioonid",
+    "anchorMissing": "Seotud tekstilõiku ei leitud"
   }
 }
