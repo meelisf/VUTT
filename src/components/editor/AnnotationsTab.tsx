@@ -475,6 +475,18 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   {t('info.viewInEster')}
                 </a>
               )}
+              {work.external_url && /^https?:\/\//.test(work.external_url) && (
+                <a
+                  href={work.external_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
+                  title={work.external_url}
+                >
+                  <ExternalLink size={16} />
+                  {t('info.viewExternal')}
+                </a>
+              )}
 
 
               {onOpenMetaModal && (

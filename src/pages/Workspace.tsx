@@ -358,6 +358,8 @@ const Workspace: React.FC = () => {
     if (place) params.set('rft.place', place);
     if (printer) params.set('rft.pub', printer);
     if (languages.length > 0) params.set('rft.language', languages.join(', '));
+    const extUrl = work?.external_url || page.external_url;
+    if (extUrl && /^https?:\/\//.test(extUrl)) params.set('rft_id', extUrl);
 
     return params.toString();
   };
