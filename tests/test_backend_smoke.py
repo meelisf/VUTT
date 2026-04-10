@@ -368,3 +368,37 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
     assert len(calls) == 1, f"update_page_person_mentions peaks olema kutsutud 1 kord, sain: {calls}"
     assert calls[0][0] == "workAAA"
     assert "teos1" in calls[0][1]
+
+
+# ============================================================
+# has_annotations regressioonitestid
+# ============================================================
+
+def _make_page_doc(page_tags=None, comments=None, text_annotations=None):
+    """Abifunktsioon minimaalne Meilisearch dokument testimiseks."""
+    return {
+        "has_annotations": bool(
+            (page_tags or []) or (comments or []) or (text_annotations or [])
+        ),
+        "comments": comments or [],
+        "page_tags_object": page_tags or [],
+        "text_annotations": text_annotations or [],
+    }
+
+
+def test_has_annotations_true_when_comments():
+    """has_annotations peab olema True kui on kommentaarid."""
+    doc = _make_page_doc(comments=[{"id": "c1", "text": "Huvitav", "author": "a", "created_at": "2026-01-01"}])
+    assert doc["has_annotations"] is True
+
+
+def test_has_annotations_true_when_page_tags():
+    """has_annotations peab olema True kui on page_tags."""
+    doc = _make_page_doc(page_tags=[{"label": "Teoloogia", "id": "Q34178"}])
+    assert doc["has_annotations"] is True
+
+
+def test_has_annotations_false_when_both_empty():
+    """has_annotations peab olema False kui pole kommentaare ega tage ega text_annotations."""
+    doc = _make_page_doc()
+    assert doc["has_annotations"] is False
