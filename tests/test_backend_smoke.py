@@ -402,3 +402,34 @@ def test_has_annotations_false_when_both_empty():
     """has_annotations peab olema False kui pole kommentaare ega tage ega text_annotations."""
     doc = _make_page_doc()
     assert doc["has_annotations"] is False
+
+
+# ============================================================
+# text_annotations Meilisearch indekseerimise testid
+# ============================================================
+
+def test_build_text_annotations_text_joined():
+    """build_text_annotations_text peab liitma kõigi annotatsioonide kommentaarid."""
+    from server.meilisearch_ops import build_text_annotations_text
+    anns = [
+        {"id": 1, "comment": "Viide Cicero kirjale", "author": "u", "created_at": "2026-01-01"},
+        {"id": 2, "comment": "Kreekakeelne tsitaat", "author": "u", "created_at": "2026-01-01"},
+    ]
+    result = build_text_annotations_text(anns)
+    assert result is not None
+    assert "Viide Cicero kirjale" in result
+    assert "Kreekakeelne tsitaat" in result
+
+
+def test_build_text_annotations_text_empty():
+    """Tühi massiiv → None (väli jäetakse dokumendist välja)."""
+    from server.meilisearch_ops import build_text_annotations_text
+    assert build_text_annotations_text([]) is None
+
+
+def test_has_annotations_true_when_text_annotations():
+    """has_annotations peab olema True kui on text_annotations."""
+    doc = _make_page_doc(text_annotations=[
+        {"id": 1, "comment": "Huvitav koht", "author": "u", "created_at": "2026-01-01"}
+    ])
+    assert doc["has_annotations"] is True

@@ -80,6 +80,22 @@ def clean_text_for_search(text):
 
     return text
 
+
+def build_text_annotations_text(text_annotations):
+    """Koostab otsitava teksti text_annotations kommentaaridest.
+
+    Tagastab None kui annotatsioonid puuduvad (väli jäetakse dokumendist välja).
+    """
+    if not text_annotations:
+        return None
+    parts = [
+        a["comment"]
+        for a in text_annotations
+        if isinstance(a, dict) and a.get("comment")
+    ]
+    return " ".join(parts) if parts else None
+
+
 def load_people_aliases():
     """Laeb inimeste aliased JSON failist."""
     if os.path.exists(PEOPLE_FILE):
@@ -404,6 +420,7 @@ def sync_work_to_meilisearch(dir_name):
             'status': 'Toores',
             'tags': [],
             'comments': [],
+            'text_annotations': [],
             'history': []
         }
         if os.path.exists(json_path):
@@ -416,6 +433,7 @@ def sync_work_to_meilisearch(dir_name):
                     # Eelistame uut nime 'page_tags'
                     page_meta['tags'] = source.get('page_tags', source.get('tags', []))
                     page_meta['comments'] = source.get('comments', [])
+                    page_meta['text_annotations'] = source.get('text_annotations', [])
                     page_meta['history'] = source.get('history', [])
                     # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
                     if not page_text and 'text_content' in p_data:
@@ -484,8 +502,9 @@ def sync_work_to_meilisearch(dir_name):
                 for t in page_tags_data
             ],
             "page_tags_object": page_tags_data,
-            "has_annotations": bool(page_tags_data or page_meta['comments']),
+            "has_annotations": bool(page_tags_data or page_meta['comments'] or page_meta['text_annotations']),
             "comments": page_meta['comments'],
+            "text_annotations": page_meta['text_annotations'],
             "history": page_meta['history'],
             "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
             "tags": get_primary_labels(tags),
@@ -554,6 +573,11 @@ def sync_work_to_meilisearch(dir_name):
                     parts.append(ref['reference'])
             if parts:
                 doc['archive_refs_text'] = ' '.join(parts)
+
+        text_anns = page_meta.get('text_annotations') or []
+        ann_text = build_text_annotations_text(text_anns)
+        if ann_text is not None:
+            doc['text_annotations_text'] = ann_text
 
         documents.append(doc)
 
