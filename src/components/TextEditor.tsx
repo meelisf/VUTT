@@ -81,6 +81,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const [annDialogOpen, setAnnDialogOpen] = useState(false);
   const [annDialogComment, setAnnDialogComment] = useState('');
+  const [annTooltip, setAnnTooltip] = useState<{ comment: string; x: number; y: number } | null>(null);
+  const annTooltipAnnotationsRef = useRef(textAnnotations);
+  useEffect(() => { annTooltipAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
   const [annDialogError, setAnnDialogError] = useState('');
   const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
@@ -514,6 +517,35 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
+  useEffect(() => {
+    const container = editorContainerRef.current;
+    if (!container) return;
+
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = (e.target as Element).closest('[data-ann-id]') as HTMLElement | null;
+      if (!target) return;
+      const annId = parseInt(target.getAttribute('data-ann-id') || '', 10);
+      if (isNaN(annId)) return;
+      const ann = annTooltipAnnotationsRef.current.find(a => a.id === annId);
+      if (!ann) return;
+      const rect = target.getBoundingClientRect();
+      setAnnTooltip({ comment: ann.comment, x: rect.left + rect.width / 2, y: rect.top });
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      const related = e.relatedTarget as Element | null;
+      if (related?.closest('[data-ann-id]')) return;
+      setAnnTooltip(null);
+    };
+
+    container.addEventListener('mouseover', handleMouseOver);
+    container.addEventListener('mouseout', handleMouseOut);
+    return () => {
+      container.removeEventListener('mouseover', handleMouseOver);
+      container.removeEventListener('mouseout', handleMouseOut);
+    };
+  }, []); // mount kord — annTooltipAnnotationsRef hoiab annotations ajakohasena
+
   const insertAnnotation = useCallback((comment: string) => {
     const view = viewRef.current;
     if (!view || !pendingAnnSelection || readOnly) return;
@@ -904,6 +936,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             authToken={authToken}
             onOpenMetaModal={onOpenMetaModal}
             lang={lang}
+            textAnnotations={textAnnotations}
+            textContent={viewRef.current?.state.doc.toString() ?? page.text_content}
+            onSaveTextAnnotations={handleSaveTextAnnotations}
+            onDeleteTextAnnotation={handleDeleteAndSaveTextAnnotation}
           />
         )}
 
@@ -930,6 +966,15 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         )}
       </div>
     </div>
+
+    {annTooltip && (
+      <div
+        className="fixed z-40 bg-gray-900 text-white text-xs rounded px-2 py-1.5 max-w-xs shadow-lg pointer-events-none"
+        style={{ left: annTooltip.x, top: annTooltip.y - 36, transform: 'translateX(-50%)' }}
+      >
+        {annTooltip.comment}
+      </div>
+    )}
 
     {annDialogOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
