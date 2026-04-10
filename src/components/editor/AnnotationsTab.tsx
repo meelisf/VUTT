@@ -507,7 +507,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-800 hover:underline"
                   title="Muuda teose metaandmeid"
                 >
-                  <Edit3 size={16} />
+                  <SquarePen size={16} />
                   {t('metadata.editMetadata')}
                 </button>
               )}
@@ -594,26 +594,32 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             {textAnnotations.map(ann => {
               const highlightedText = extractHighlightedText(textContent, ann.id);
               return (
-                <div key={ann.id} className="border border-yellow-100 rounded p-3 bg-yellow-50/50">
-                  {highlightedText ? (
-                    <p className="text-xs text-gray-500 italic mb-1.5 line-clamp-2">„{highlightedText}"</p>
-                  ) : (
-                    <p className="text-xs text-amber-600 italic mb-1.5">
-                      {t('annotations.anchorMissing', 'Seotud tekstilõiku ei leitud')}
-                    </p>
-                  )}
+                <div key={ann.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative group">
                   {editingAnnId === ann.id ? (
                     <div className="space-y-2">
+                      {highlightedText && (
+                        <p className="text-xs text-gray-500 italic line-clamp-2">„{highlightedText}"</p>
+                      )}
                       <textarea
                         autoFocus
-                        className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
-                        rows={2}
+                        className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
+                        rows={3}
                         value={editingAnnText}
                         onChange={e => setEditingAnnText(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Escape') setEditingAnnId(null); }}
                       />
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 justify-end">
                         <button
                           type="button"
+                          onClick={() => setEditingAnnId(null)}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                        >
+                          <X size={12} />
+                          {t('info.cancelEdit')}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!editingAnnText.trim()}
                           onClick={async () => {
                             const updated = textAnnotations.map(a =>
                               a.id === ann.id ? { ...a, comment: editingAnnText } : a
@@ -621,39 +627,49 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                             await onSaveTextAnnotations(updated);
                             setEditingAnnId(null);
                           }}
-                          className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded"
-                        >{t('common:buttons.save', 'Salvesta')}</button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingAnnId(null)}
-                          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-                        >{t('common:buttons.cancel', 'Tühista')}</button>
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                        >
+                          <Check size={12} />
+                          {t('info.saveEdit')}
+                        </button>
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-start gap-2">
-                      <p className="text-sm text-gray-800 flex-1">{ann.comment}</p>
+                    <>
+                      {highlightedText ? (
+                        <p className="text-xs text-gray-500 italic mb-1.5 line-clamp-2">„{highlightedText}"</p>
+                      ) : (
+                        <p className="text-xs text-amber-600 italic mb-1.5">
+                          {t('annotations.anchorMissing', 'Seotud tekstilõiku ei leitud')}
+                        </p>
+                      )}
+                      <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5">{ann.comment}</p>
+                      <div className="flex justify-between items-center text-xs text-gray-500">
+                        <span className="font-semibold text-primary-700">{ann.author}</span>
+                        <span>{new Date(ann.created_at).toLocaleString('et-EE')}</span>
+                      </div>
                       {!readOnly && (
-                        <div className="flex gap-1 shrink-0">
+                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             type="button"
                             onClick={() => { setEditingAnnId(ann.id); setEditingAnnText(ann.comment); }}
-                            className="text-gray-400 hover:text-gray-700 text-xs px-1"
-                            title={t('common:buttons.edit', 'Muuda')}
-                          >✎</button>
+                            className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                            title={t('info.editComment')}
+                          >
+                            <Edit3 size={14} />
+                          </button>
                           <button
                             type="button"
                             onClick={() => onDeleteTextAnnotation(ann.id)}
-                            className="text-gray-400 hover:text-red-500 text-xs px-1"
-                            title={t('common:buttons.remove', 'Kustuta')}
-                          >×</button>
+                            className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
+                            title={t('info.deleteComment')}
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       )}
-                    </div>
+                    </>
                   )}
-                  <p className="text-xs text-gray-400 mt-1">
-                    {ann.author} · {new Date(ann.created_at).toLocaleDateString()}
-                  </p>
                 </div>
               );
             })}
