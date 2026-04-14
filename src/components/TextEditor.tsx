@@ -714,36 +714,39 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
-                    {!readOnly && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const view = viewRef.current;
-                          if (!view) return;
-                          const { from, to } = view.state.selection.main;
-                          if (from === to) return;
-                          const docText = view.state.doc.toString();
-                          if (containsAnnTag(docText, from, to)) {
-                            setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
-                            setAnnDialogOpen(true);
-                            setPendingAnnSelection(null);
-                            return;
-                          }
-                          const text = docText.slice(from, to);
-                          setPendingAnnSelection({ from, to, text });
-                          setAnnDialogComment('');
-                          setAnnDialogError('');
-                          setAnnDialogOpen(true);
-                        }}
-                        className="px-2 h-7 flex items-center justify-center rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200"
-                        title={t('editor.tooltips.annotate', 'Märgi ja kommenteeri (vali tekst enne)')}
-                      >
-                        ✎ Ann
-                      </button>
-                    )}
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
                     <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title={t('editor.tooltips.cleanMarkup')}>{t('editor.tooltips.cleanMarkupButton')}</button>
+                    {!readOnly && (
+                      <>
+                        <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const view = viewRef.current;
+                            if (!view) return;
+                            const { from, to } = view.state.selection.main;
+                            if (from === to) return;
+                            const docText = view.state.doc.toString();
+                            if (containsAnnTag(docText, from, to)) {
+                              setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
+                              setAnnDialogOpen(true);
+                              setPendingAnnSelection(null);
+                              return;
+                            }
+                            const text = docText.slice(from, to);
+                            setPendingAnnSelection({ from, to, text });
+                            setAnnDialogComment('');
+                            setAnnDialogError('');
+                            setAnnDialogOpen(true);
+                          }}
+                          className="px-2 h-7 flex items-center justify-center rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200"
+                          title={t('editor.tooltips.annotate', 'Märgi ja kommenteeri (vali tekst enne)')}
+                        >
+                          ✎ Ann
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
