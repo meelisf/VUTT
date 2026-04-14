@@ -183,10 +183,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   // Drag-to-move
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
-    dragOffset.current = { x: e.clientX - (dragPos?.x ?? 0), y: e.clientY - (dragPos?.y ?? 0) };
+    const rect = modalRef.current?.getBoundingClientRect();
+    const currentX = rect ? rect.left : (dragPos?.x ?? 0);
+    const currentY = rect ? rect.top : (dragPos?.y ?? 0);
+    dragOffset.current = { x: e.clientX - currentX, y: e.clientY - currentY };
     const onMove = (ev: MouseEvent) => {
       if (!dragOffset.current) return;
       setDragPos({ x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y });
@@ -404,6 +408,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
       <div
+        ref={modalRef}
         className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
         style={dragPos
           ? { position: 'fixed', left: dragPos.x, top: dragPos.y, transform: 'none', margin: 0 }
