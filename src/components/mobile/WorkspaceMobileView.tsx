@@ -29,7 +29,7 @@ interface WorkspaceMobileViewProps {
   onInputPageChange: (value: string) => void;
   onPageInputSubmit: () => void;
   // Grid view props
-  gridPages: { pageNum: number; imageUrl: string }[];
+  gridPages: { pageNum: number; imageUrl: string; hasAnnotations: boolean }[];
   gridLoading: boolean;
   onOpenGrid: () => void;
   onSelectPage: (pageNum: number) => void;
@@ -124,7 +124,10 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                         loading="lazy"
                         className="w-full h-full object-contain"
                       />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center">
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] py-0.5 text-center flex items-center justify-center gap-1">
+                        {p.hasAnnotations && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />
+                        )}
                         {p.pageNum}
                       </div>
                     </button>

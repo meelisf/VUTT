@@ -119,13 +119,13 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 export const getWorkPageImages = async (
   workId: string,
   pageCount: number
-): Promise<{ pageNum: number; imageUrl: string }[]> => {
+): Promise<{ pageNum: number; imageUrl: string; hasAnnotations: boolean }[]> => {
   checkMixedContent();
   const limit = Math.min(Math.ceil(pageCount * 1.1) + 10, 1000);
   try {
     const response = await index.search('', {
       filter: [`work_id = "${workId}"`],
-      attributesToRetrieve: ['lehekylje_number', 'lehekylje_pilt'],
+      attributesToRetrieve: ['lehekylje_number', 'lehekylje_pilt', 'has_annotations'],
       limit,
     });
     const hits = response.hits as any[];
@@ -133,6 +133,7 @@ export const getWorkPageImages = async (
     return hits.map(hit => ({
       pageNum: hit.lehekylje_number,
       imageUrl: getPageThumbUrl(workId, hit.lehekylje_pilt || ''),
+      hasAnnotations: !!hit.has_annotations,
     }));
   } catch (e) {
     console.error('getWorkPageImages error:', e);

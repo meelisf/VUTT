@@ -63,7 +63,7 @@ const Workspace: React.FC = () => {
 
   // Thumbnail grid-vaate olek
   const [isGridView, setIsGridView] = useState(false);
-  const [gridPages, setGridPages] = useState<{ pageNum: number; imageUrl: string }[]>([]);
+  const [gridPages, setGridPages] = useState<{ pageNum: number; imageUrl: string; hasAnnotations: boolean }[]>([]);
   const [gridLoading, setGridLoading] = useState(false);
   const [gridCols, setGridCols] = useState(5); // min 3, max 10 (vt ThumbnailGrid)
 

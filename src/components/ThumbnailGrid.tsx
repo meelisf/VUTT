@@ -5,6 +5,7 @@ import type { Work } from '../types';
 interface PageThumbnail {
   pageNum: number;
   imageUrl: string;
+  hasAnnotations?: boolean;
 }
 
 interface ThumbnailGridProps {
@@ -169,7 +170,10 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
                       className="absolute inset-0 w-full h-full object-contain sepia-[0.2]"
                     />
                   )}
-                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white/70 text-xs text-center py-0.5 leading-tight">
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white/70 text-xs text-center py-0.5 leading-tight flex items-center justify-center gap-1">
+                    {page.hasAnnotations && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 shrink-0" />
+                    )}
                     {page.pageNum}
                   </div>
                 </div>
