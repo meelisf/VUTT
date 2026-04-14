@@ -180,10 +180,31 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Drag-to-move
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const dragOffset = useRef<{ x: number; y: number } | null>(null);
+
+  const handleDragStart = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+    dragOffset.current = { x: e.clientX - (dragPos?.x ?? 0), y: e.clientY - (dragPos?.y ?? 0) };
+    const onMove = (ev: MouseEvent) => {
+      if (!dragOffset.current) return;
+      setDragPos({ x: ev.clientX - dragOffset.current.x, y: ev.clientY - dragOffset.current.y });
+    };
+    const onUp = () => {
+      dragOffset.current = null;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
   // Lae andmed kui modal avatakse
   useEffect(() => {
     if (isOpen) {
       loadData();
+      setDragPos(null);
     }
   }, [isOpen]);
 
@@ -381,9 +402,19 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0">
+    <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
+      <div
+        className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        style={dragPos
+          ? { position: 'fixed', left: dragPos.x, top: dragPos.y, transform: 'none', margin: 0 }
+          : { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', margin: 0 }
+        }
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50 shrink-0 cursor-grab active:cursor-grabbing select-none"
+          onMouseDown={handleDragStart}
+        >
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             <Edit3 size={18} className="text-amber-600" />
             {t('metadata.title')}
