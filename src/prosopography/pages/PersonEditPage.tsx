@@ -51,6 +51,8 @@ const PersonEditPage: React.FC = () => {
 
   // labels.json kohalikud soovitused topic-tüüpi EntityPickeritele
   const [entityLabels, setEntityLabels] = useState<{ label: string; id: string }[]>([]);
+  // Seose tüüpide soovitused kõigist kaartidest
+  const [relationTypeSuggestions, setRelationTypeSuggestions] = useState<{ label: string; id: string | null }[]>([]);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
@@ -75,6 +77,16 @@ const PersonEditPage: React.FC = () => {
           .filter(([, v]) => v.et || v.en)
           .map(([id, v]) => ({ id, label: v.et || v.en! }));
         setEntityLabels(items);
+      })
+      .catch(() => {});
+    fetchWithTimeout(`${FILE_API_URL}/prosopography/relation-type-suggestions`)
+      .then(r => r.json())
+      .then((data: { label: string; id: string | null; labels?: Record<string, string> | null }[]) => {
+        const items = data.map(d => ({
+          label: (d.labels?.[lang] || d.labels?.['et'] || d.labels?.['en'] || d.label),
+          id: d.id ?? null,
+        }));
+        setRelationTypeSuggestions(items);
       })
       .catch(() => {});
   }, []);
@@ -657,6 +669,8 @@ const PersonEditPage: React.FC = () => {
                         type_labels: entity?.labels ?? null,
                       })}
                       placeholder={t('form.relationPlaceholder')}
+                      lang={lang}
+                      localSuggestions={relationTypeSuggestions}
                     />
                   </div>
                   {item.target_id && (

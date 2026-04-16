@@ -499,6 +499,31 @@ def list_persons(
     }
 
 
+def get_relation_type_suggestions() -> list:
+    """
+    Kogub kõigist isikukaartidest unikaalsed seose tüübid.
+    Tagastab [{label, id, labels}] listi, dedup Q-koodi alusel.
+    """
+    seen: dict[str, dict] = {}
+    pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
+    for path in _glob.glob(pattern):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                person = json.load(f)
+        except Exception:
+            continue
+        for rel in person.get("relations", []):
+            type_label = (rel.get("type") or "").strip()
+            type_id = rel.get("type_id") or None
+            type_labels = rel.get("type_labels") or None
+            if not type_label:
+                continue
+            key = type_id or f"manual:{type_label.lower()}"
+            if key not in seen:
+                seen[key] = {"label": type_label, "id": type_id, "labels": type_labels}
+    return sorted(seen.values(), key=lambda x: (x["label"] or "").lower())
+
+
 def get_person_facets(
     q: Optional[str] = None,
     gender: Optional[str] = None,

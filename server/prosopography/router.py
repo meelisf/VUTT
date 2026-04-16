@@ -16,6 +16,7 @@ from .ops import (
     update_person,
     list_persons,
     get_person_facets,
+    get_relation_type_suggestions,
     add_identifier,
     apply_enrichment,
     merge_person,
@@ -337,6 +338,12 @@ async def prosopography_merge(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return result
+
+
+@router.get("/relation-type-suggestions")
+async def prosopography_relation_type_suggestions():
+    """Tagastab kõigis kaartides kasutatud unikaalsed seose tüübid. Avalik endpoint."""
+    return get_relation_type_suggestions()
 
 
 @router.get("/work-relations/{person_id:path}")

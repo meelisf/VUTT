@@ -190,7 +190,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         // Person-režiimis: ainult Wikidata/GND/VIAF, lokaalset ei lisa
         const currentId = ++externalSearchIdRef.current;
         setIsExternalLoading(true);
-        const promises: Promise<any>[] = [searchWikidata(inputValue), searchGnd(inputValue), searchViaf(inputValue)];
+        const promises: Promise<any>[] = [searchWikidata(inputValue, lang), searchGnd(inputValue), searchViaf(inputValue)];
         const results = await Promise.allSettled(promises);
         if (externalSearchIdRef.current !== currentId) return;
 
@@ -295,7 +295,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
 
         const allLocalIds = new Set([...alreadyAddedIds, ...localIds, ...registerMatches.map(m => m.id)]);
 
-        const externalPromises: Promise<any>[] = [searchWikidata(inputValue)];
+        const externalPromises: Promise<any>[] = [searchWikidata(inputValue, lang)];
         if (type === 'person' || type === 'printer') {
           externalPromises.push(searchGnd(inputValue));
           externalPromises.push(searchViaf(inputValue));
