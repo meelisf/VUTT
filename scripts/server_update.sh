@@ -5,12 +5,21 @@
 
 set -e  # Peata skript vea korral
 
+NO_CACHE=""
+for arg in "$@"; do
+  if [ "$arg" = "--no-cache" ]; then
+    NO_CACHE="--no-cache"
+  fi
+done
+
 echo "🔄 [1/4] Uuendan koodi Gitist..."
 git pull
 
 echo "🐳 [2/4] Ehitan ja taaskäivitan Docker konteinerid (sh. Python serverid)..."
-# Docker kasutab vahemälu (layer caching), et kiirendada ehitamist.
-docker compose build backend
+if [ -n "$NO_CACHE" ]; then
+  echo "   (--no-cache: ehitab nullist, ignoreerib vahemälu)"
+fi
+docker compose build $NO_CACHE backend
 docker compose up -d --remove-orphans
 
 echo "⏳ [3/4] Ootan teenuste käivitumist (5s)..."
