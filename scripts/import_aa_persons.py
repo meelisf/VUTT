@@ -228,7 +228,13 @@ def create_new(aa_entry: dict, place_key, places: dict, existing_ids: set) -> di
     ))
 
     label_parts = [p for p in [first_canonical, fam_canonical] if p]
-    label = " ".join(label_parts)
+    # Kui perekonnanimeta isikul on full-nimi pikem (nt patronüüm "Achatius Georgii"),
+    # kasuta full-nime — see sisaldab patronüümi mida eraldi väljadel pole
+    full = (name.get("full") or "").strip()
+    if not fam_canonical and full and full != first_canonical:
+        label = full
+    else:
+        label = " ".join(label_parts)
 
     birth_year = year_from_date((aa_person.get("birth") or {}).get("date"))
     death_year = year_from_date((aa_person.get("death") or {}).get("date"))
