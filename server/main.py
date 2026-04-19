@@ -51,6 +51,13 @@ from .metadata_ops import save_work_metadata, ALLOWED_METADATA_FIELDS
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print(f"VUTT FastAPI käivitus.")
+    from .prosopography.places_ops import validate_places_config
+    try:
+        validate_places_config()
+        logger.info("places.json + origin_groups.json valideeritud")
+    except ValueError as e:
+        logger.error("places.json konfiguratsiooniviga: %s", e)
+        raise SystemExit(1)
     build_work_id_cache()
     run_git_fsck()
     threading.Thread(target=rebuild_indices, daemon=True).start()
