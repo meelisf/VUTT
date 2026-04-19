@@ -147,8 +147,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         groups_cfg = _load_origin_groups()
         origin_group_labels = groups_cfg.get(origin_group, {}).get("labels")
 
-    # birth/death_year — võtame täisarvuna kui date olemas
-    def _extract_year(date_obj: dict):
+    # birth/death_year + sort_date (ISO string, lexicographic = kronoloogiline)
+    def _extract_year(date_obj: dict) -> Optional[int]:
         date_str = date_obj.get("date") or ""
         if date_str and len(date_str) >= 4:
             try:
@@ -157,12 +157,18 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
                 pass
         return None
 
+    def _extract_date(date_obj: dict) -> Optional[str]:
+        date_str = (date_obj.get("date") or "").strip()
+        return date_str if len(date_str) >= 4 else None
+
     return {
         "id": person["id"],
         "label": label,
         "sort_name": sort_name,
         "birth_year": _extract_year(birth),
+        "birth_date": _extract_date(birth),
         "death_year": _extract_year(death),
+        "death_date": _extract_date(death),
         "gender": person.get("gender"),
         "status_id": status_obj.get("id"),
         "status_label": status_obj.get("label"),
@@ -577,11 +583,11 @@ def list_persons(
         results = [e for e in results if (e.get("imm_year") or 0) <= imm_year_to]
 
     if sort_by == "birth_year":
-        results.sort(key=lambda e: (e.get("birth_year") is None, e.get("birth_year") or 0))
+        results.sort(key=lambda e: (e.get("birth_date") is None, e.get("birth_date") or ""))
     elif sort_by == "death_year":
-        results.sort(key=lambda e: (e.get("death_year") is None, e.get("death_year") or 0))
+        results.sort(key=lambda e: (e.get("death_date") is None, e.get("death_date") or ""))
     elif sort_by == "imm_year":
-        results.sort(key=lambda e: (e.get("imm_year") is None, e.get("imm_year") or 0))
+        results.sort(key=lambda e: (e.get("imm_date") is None, e.get("imm_date") or ""))
     else:
         results.sort(key=lambda e: (e.get("sort_name") or "").lower())
     total = len(results)
