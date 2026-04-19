@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
@@ -32,6 +32,7 @@ const PersonsPage: React.FC = () => {
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
   const immYearFrom = searchParams.get('imm_year_from') ?? '';
   const immYearTo = searchParams.get('imm_year_to') ?? '';
+  const sortBy = searchParams.get('sort_by') ?? 'alpha';
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
@@ -63,6 +64,7 @@ const PersonsPage: React.FC = () => {
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
   const setImmYearFrom = (v: string)  => setFilterParam('imm_year_from', v);
   const setImmYearTo = (v: string)    => setFilterParam('imm_year_to', v);
+  const setSortBy = (v: string)       => setFilterParam('sort_by', v === 'alpha' ? '' : v);
 
   const setOffset = (v: number) =>
     setSearchParams(p => { const n = new URLSearchParams(p); v > 0 ? n.set('offset', String(v)) : n.delete('offset'); return n; }, { replace: true });
@@ -94,6 +96,7 @@ const PersonsPage: React.FC = () => {
       gender: gender || undefined,
       imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
       imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
+      sort_by: sortBy !== 'alpha' ? sortBy : undefined,
       limit: LIMIT,
       offset,
     }, token)
@@ -104,7 +107,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, originGroup, institution, source, gender, offset, token, t]);
+  }, [query, originGroup, institution, source, gender, immYearFrom, immYearTo, sortBy, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
@@ -223,6 +226,21 @@ const PersonsPage: React.FC = () => {
                   <X size={14} />
                 </button>
               )}
+            </div>
+
+            {/* Sortimine */}
+            <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shrink-0">
+              <ArrowDownAZ size={15} className="text-gray-400 shrink-0" />
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 focus:outline-none cursor-pointer"
+              >
+                <option value="alpha">{t('sortAlpha', 'A–Z')}</option>
+                <option value="birth_year">{t('sortBirthYear', 'Sünniaasta')}</option>
+                <option value="death_year">{t('sortDeathYear', 'Surmaaasta')}</option>
+                <option value="imm_year">{t('sortImmYear', 'Immatrikuleerumine')}</option>
+              </select>
             </div>
 
             {/* Admin: liitmise select-mood */}

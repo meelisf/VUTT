@@ -511,6 +511,7 @@ def list_persons(
     verification_level: Optional[str] = None,
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
+    sort_by: Optional[str] = None,
     ids: Optional[list] = None,
     limit: int = 48,
     offset: int = 0,
@@ -572,7 +573,14 @@ def list_persons(
     if imm_year_to is not None:
         results = [e for e in results if (e.get("imm_year") or 0) <= imm_year_to]
 
-    results.sort(key=lambda e: (e.get("sort_name") or "").lower())
+    if sort_by == "birth_year":
+        results.sort(key=lambda e: (e.get("birth_year") is None, e.get("birth_year") or 0))
+    elif sort_by == "death_year":
+        results.sort(key=lambda e: (e.get("death_year") is None, e.get("death_year") or 0))
+    elif sort_by == "imm_year":
+        results.sort(key=lambda e: (e.get("imm_year") is None, e.get("imm_year") or 0))
+    else:
+        results.sort(key=lambda e: (e.get("sort_name") or "").lower())
     total = len(results)
     return {
         "results": results[offset:offset + limit],

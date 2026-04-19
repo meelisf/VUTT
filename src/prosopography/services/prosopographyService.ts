@@ -15,6 +15,7 @@ export async function listPersons(params?: {
   verification_level?: string;
   imm_year_from?: number;
   imm_year_to?: number;
+  sort_by?: string;
   ids?: string[];
   limit?: number;
   offset?: number;
@@ -41,6 +42,7 @@ export async function listPersons(params?: {
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
   if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
+  if (params?.sort_by) url.searchParams.set('sort_by', params.sort_by);
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
   if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
   if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
