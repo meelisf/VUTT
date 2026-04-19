@@ -19,6 +19,7 @@ import TagsList from '../components/personForm/TagsList';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
 import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
+import PlacePicker from '../components/personForm/PlacePicker';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -480,6 +481,17 @@ const PersonEditPage: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* ── Päritolukoht ── */}
+        <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
+          <PlacePicker
+            value={draft.origin_place || null}
+            onChange={key => set({ origin_place: key ?? '' })}
+            token={token}
+            canEdit={!!canEdit}
+            lang={lang}
+          />
         </div>
 
         {/* ── Elulugu ── */}

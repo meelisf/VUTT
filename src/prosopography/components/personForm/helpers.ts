@@ -104,10 +104,6 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
       place: p.birth?.place?.label
         ? { label: p.birth.place.label, id: p.birth.place.id ?? null, labels: null, source: 'wikidata' as const }
-        : p.origin?.city
-        ? { label: p.origin.city, id: p.origin.city_id ?? null, labels: p.origin.city_labels ?? null, source: 'wikidata' as const }
-        : p.origin?.region
-        ? { label: p.origin.region, id: p.origin.region_id ?? null, labels: p.origin.region_labels ?? null, source: 'wikidata' as const }
         : null,
     },
     death: {
@@ -153,6 +149,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     gnd_id: ident('gnd'),
     viaf_id: ident('viaf'),
     aa_id: ident('album_academicum'),
+    origin_place: p.origin?.place ?? '',
   };
 }
 
@@ -219,12 +216,7 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
       ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,
     origin: {
-      city: draft.birth?.place?.label ?? null,
-      city_id: draft.birth?.place?.id ?? null,
-      city_labels: draft.birth?.place?.labels ?? null,
-      region: original?.origin?.region ?? null,
-      region_id: original?.origin?.region_id ?? null,
-      region_labels: original?.origin?.region_labels ?? null,
+      place: draft.origin_place || null,
       geonames_id: original?.origin?.geonames_id ?? null,
       coordinates: original?.origin?.coordinates ?? null,
     },

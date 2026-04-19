@@ -96,10 +96,10 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
         : t('filterFemale', 'Naissoost'),
     });
   }
-  if (person.origin?.city || person.origin?.region) {
+  if (person.origin?.place) {
     rows.push({
       label: t('origin', 'Päritolu'),
-      value: [person.origin.city, person.origin.region].filter(Boolean).join(', '),
+      value: person.origin.place,
     });
   }
   if (person.confession) {

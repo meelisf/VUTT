@@ -56,6 +56,7 @@ export interface FormDraft {
   gnd_id: string;
   viaf_id: string;
   aa_id: string;
+  origin_place: string;
 }
 
 export const emptyDraft = (): FormDraft => ({
@@ -82,4 +83,5 @@ export const emptyDraft = (): FormDraft => ({
   gnd_id: '',
   viaf_id: '',
   aa_id: '',
+  origin_place: '',
 });
