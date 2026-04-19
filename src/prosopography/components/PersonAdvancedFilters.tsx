@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Briefcase, ChevronDown, ChevronRight, Search, Venus, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, MapPin, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
-interface OccupationFacetItem {
+interface FacetItem {
   value: string;
   label: string;
   count: number;
@@ -13,7 +13,7 @@ interface OccupationFacetItem {
 interface FilterSectionProps {
   title: string;
   icon: React.ReactNode;
-  items: OccupationFacetItem[];
+  items: FacetItem[];
   selectedValue: string;
   onSelect: (value: string) => void;
   searchPlaceholder: string;
@@ -22,10 +22,10 @@ interface FilterSectionProps {
 
 interface PersonAdvancedFiltersProps {
   gender: GenderFilter;
-  occupation: string;
-  occupations: OccupationFacetItem[];
+  originGroup: string;
+  originGroups: FacetItem[];
   onGenderChange: (v: GenderFilter) => void;
-  onOccupationChange: (v: string) => void;
+  onOriginGroupChange: (v: string) => void;
   onClearAll: () => void;
 }
 
@@ -99,22 +99,20 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
   gender,
-  occupation,
-  occupations,
+  originGroup,
+  originGroups,
   onGenderChange,
-  onOccupationChange,
+  onOriginGroupChange,
   onClearAll,
 }) => {
   const { t } = useTranslation('prosopography');
-  const hasActive = !!(occupation || gender);
-  const activeCount = [occupation, gender].filter(Boolean).length;
+  const hasActive = !!(originGroup || gender);
+  const activeCount = [originGroup, gender].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (hasActive && !isExpanded) setIsExpanded(true);
   }, [hasActive, isExpanded]);
-
-  const clearAll = onClearAll;
 
   return (
     <div className="bg-white/50 rounded-lg border border-gray-200">
@@ -136,12 +134,12 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
       {isExpanded && (
         <div className="px-4 pb-4 space-y-3">
           <FilterSection
-            title={t('filterOccupationAll', 'Amet')}
-            icon={<Briefcase size={13} />}
-            items={occupations}
-            selectedValue={occupation}
-            onSelect={onOccupationChange}
-            searchPlaceholder={t('filterOccupationSearch', 'Otsi ametit…')}
+            title={t('originGroup', 'Päritolu')}
+            icon={<MapPin size={13} />}
+            items={originGroups}
+            selectedValue={originGroup}
+            onSelect={onOriginGroupChange}
+            searchPlaceholder={t('filterOriginSearch', 'Otsi piirkonda…')}
             emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
           />
 
@@ -168,10 +166,10 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           {hasActive && (
             <div className="pt-2 border-t border-gray-100 space-y-2">
               <div className="flex flex-wrap gap-1.5">
-                {occupation && (
+                {originGroup && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {occupation}
-                    <button onClick={() => onOccupationChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
+                    {originGroup}
+                    <button onClick={() => onOriginGroupChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
                       <X size={11} />
                     </button>
                   </span>
@@ -186,7 +184,7 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                 )}
               </div>
               <button
-                onClick={clearAll}
+                onClick={onClearAll}
                 className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
               >
                 {t('clearAllFilters', 'Tühjenda kõik filtrid')}

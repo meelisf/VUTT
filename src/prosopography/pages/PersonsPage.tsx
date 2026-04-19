@@ -28,10 +28,10 @@ const PersonsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const query  = searchParams.get('q') ?? '';
-  const occupation = searchParams.get('occupation') ?? '';
+  const originGroup = searchParams.get('origin_group') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
-  const [occupationFacets, setOccupationFacets] = useState<{ value: string; label: string; count: number }[]>([]);
+  const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
   const [inputValue, setInputValue] = useState(query);
@@ -54,7 +54,7 @@ const PersonsPage: React.FC = () => {
     }, { replace: true });
 
   const setQuery  = (v: string)       => setFilterParam('q', v);
-  const setOccupation = (v: string)   => setFilterParam('occupation', v);
+  const setOriginGroup = (v: string)  => setFilterParam('origin_group', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
 
   const resetOffset = () =>
@@ -123,7 +123,7 @@ const PersonsPage: React.FC = () => {
     const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     listPersons({
       q: query || undefined,
-      occupation: occupation || undefined,
+      origin_group: originGroup || undefined,
       gender: gender || undefined,
       ids: idsParam,
       limit: LIMIT,
@@ -136,7 +136,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, occupation, gender, offset, token, collectionPersonIds, collectionLoading, t]);
+  }, [query, originGroup, gender, offset, token, collectionPersonIds, collectionLoading, t]);
 
   const fetchFacets = useCallback(() => {
     if (collectionLoading) return;
@@ -147,13 +147,14 @@ const PersonsPage: React.FC = () => {
       ids: idsParam,
     }, token)
       .then(data => {
-        setOccupationFacets((data.occupations || []).map(item => ({
-          value: item.id || item.label,
-          label: item.labels?.[i18n.language] || item.labels?.et || item.labels?.en || item.label || item.id || '',
+        const lang = i18n.language?.slice(0, 2) ?? 'et';
+        setOriginGroupFacets((data.origin_groups || []).map(item => ({
+          value: item.value,
+          label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.value,
           count: item.count,
         })));
       })
-      .catch(() => setOccupationFacets([]));
+      .catch(() => setOriginGroupFacets([]));
   }, [query, gender, token, collectionPersonIds, collectionLoading, i18n.language]);
 
   useEffect(() => {
@@ -164,7 +165,7 @@ const PersonsPage: React.FC = () => {
     fetchFacets();
   }, [fetchFacets]);
 
-  const hasActiveFilters = !!(occupation || gender);
+  const hasActiveFilters = !!(originGroup || gender);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -209,7 +210,7 @@ const PersonsPage: React.FC = () => {
     const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     const all = await listPersons({
       q: query || undefined,
-      occupation: occupation || undefined,
+      origin_group: originGroup || undefined,
       gender: gender || undefined,
       ids: idsParam,
       limit: 5000,
@@ -299,14 +300,14 @@ const PersonsPage: React.FC = () => {
 
           {/* Täpsemad filtrid */}
           <PersonAdvancedFilters
-            occupation={occupation}
+            originGroup={originGroup}
             gender={gender}
-            occupations={occupationFacets}
-            onOccupationChange={setOccupation}
+            originGroups={originGroupFacets}
+            onOriginGroupChange={setOriginGroup}
             onGenderChange={setGender}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
-              n.delete('occupation');
+              n.delete('origin_group');
               n.delete('gender');
               n.delete('offset');
               return n;
