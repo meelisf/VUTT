@@ -1,0 +1,279 @@
+"""
+Koharegister (places.json) ja päritolugrupid (origin_groups.json).
+Cache, abifunktsioonid, propagatsioon.
+"""
+import json
+import time
+import threading
+from typing import Optional
+
+from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, get_logger
+from ..utils import atomic_write_json
+
+logger = get_logger(__name__)
+
+# ── Lubatud kohatüübid ─────────────────────────────────────────────────────
+ALLOWED_PLACE_TYPES = [
+    "city", "village", "parish", "county",
+    "province", "territory", "historical_region",
+]
+
+MAX_PLACE_PARENT_STEPS = 5
+
+# ── Moodulitaseme cache ────────────────────────────────────────────────────
+_places_cache: Optional[dict] = None
+_places_cache_time: float = 0.0
+_groups_cache: Optional[dict] = None
+_groups_cache_time: float = 0.0
+_CACHE_TTL = 300.0  # 5 min
+_cache_lock = threading.Lock()
+
+
+def _load_places_cache(force_reload: bool = False) -> dict:
+    global _places_cache, _places_cache_time
+    now = time.monotonic()
+    with _cache_lock:
+        if _places_cache is not None and not force_reload and (now - _places_cache_time) < _CACHE_TTL:
+            return _places_cache
+        try:
+            with open(PLACES_FILE, "r", encoding="utf-8") as f:
+                _places_cache = json.load(f)
+            _places_cache_time = now
+        except FileNotFoundError:
+            _places_cache = {}
+        return _places_cache
+
+
+def _load_origin_groups(force_reload: bool = False) -> dict:
+    global _groups_cache, _groups_cache_time
+    now = time.monotonic()
+    with _cache_lock:
+        if _groups_cache is not None and not force_reload and (now - _groups_cache_time) < _CACHE_TTL:
+            return _groups_cache
+        try:
+            with open(ORIGIN_GROUPS_FILE, "r", encoding="utf-8") as f:
+                _groups_cache = json.load(f)
+            _groups_cache_time = now
+        except FileNotFoundError:
+            _groups_cache = {}
+        return _groups_cache
+
+
+# ── Valideerimine ──────────────────────────────────────────────────────────
+
+def validate_places_config() -> None:
+    """
+    Käivitatakse serveri stardimisel.
+    Tõstab ValueError kui konfiguratsioon on vigane.
+    """
+    try:
+        with open(PLACES_FILE, "r", encoding="utf-8") as f:
+            places = json.load(f)
+    except FileNotFoundError:
+        return  # places.json puudub — OK (server käivitub ilma)
+
+    try:
+        with open(ORIGIN_GROUPS_FILE, "r", encoding="utf-8") as f:
+            groups = json.load(f)
+    except FileNotFoundError:
+        groups = {}
+
+    known_groups = set(groups.keys())
+    known_keys = set(places.keys())
+
+    for key, entry in places.items():
+        group = entry.get("group")
+        if group and group not in known_groups:
+            raise ValueError(
+                f"places.json kirje '{key}': group='{group}' ei ole origin_groups.json-s"
+            )
+        parent_key = entry.get("parent_key")
+        if parent_key and parent_key not in known_keys:
+            raise ValueError(
+                f"places.json kirje '{key}': parent_key='{parent_key}' ei leitud places.json-s"
+            )
+
+    # Ringviidete kontroll
+    for start_key in places:
+        seen = set()
+        current = start_key
+        for _ in range(len(places) + 1):
+            if current is None:
+                break
+            if current in seen:
+                raise ValueError(
+                    f"places.json: ringviide parent-ahelas, algab '{start_key}'"
+                )
+            seen.add(current)
+            current = places.get(current, {}).get("parent_key")
+
+
+# ── Abifunktsioonid ────────────────────────────────────────────────────────
+
+def _walk_to_group(key: Optional[str], places: dict) -> Optional[str]:
+    """Järgib parent_key ahelat kuni grupini, max MAX_PLACE_PARENT_STEPS sammu."""
+    current = key
+    steps = 0
+    seen: set = set()
+
+    while current and steps < MAX_PLACE_PARENT_STEPS:
+        if current in seen:
+            return None
+        seen.add(current)
+        entry = places.get(current)
+        if not entry:
+            return None
+        if entry.get("group"):
+            return entry["group"]
+        current = entry.get("parent_key")
+        steps += 1
+
+    return None
+
+
+def _resolve_origin_group(
+    place_id: Optional[str],
+    place_key: Optional[str],
+) -> Optional[str]:
+    """Tuletab päritolugrupi Q-koodi või places.json võtme kaudu."""
+    places = _load_places_cache()
+
+    if place_id:
+        for key, entry in places.items():
+            if entry.get("id") == place_id:
+                result = _walk_to_group(key, places)
+                if result:
+                    return result
+
+    if place_key:
+        return _walk_to_group(place_key, places)
+
+    return None
+
+
+def _get_parent_place(key: Optional[str]) -> Optional[dict]:
+    """Tagastab lähima parent-kirje kuvamiseks (nt 'Riga · Liivimaa')."""
+    if not key:
+        return None
+    places = _load_places_cache()
+    entry = places.get(key) or {}
+    parent_key = entry.get("parent_key")
+    if not parent_key:
+        return None
+    parent = places.get(parent_key) or {}
+    return {
+        "key": parent_key,
+        "id": parent.get("id"),
+        "labels": parent.get("labels"),
+        "type": parent.get("type"),
+    }
+
+
+def _get_place_labels(key: Optional[str]) -> Optional[dict]:
+    if not key:
+        return None
+    return _load_places_cache().get(key, {}).get("labels")
+
+
+def _enrich_origin_from_places(origin: dict) -> dict:
+    """
+    Täidab origin['place_id'] ja origin['place_labels'] places.json-st.
+    Tõstab ValueError kui place võti ei ole registris.
+    """
+    place_key = origin.get("place")
+    if not place_key:
+        return origin
+    places = _load_places_cache()
+    entry = places.get(place_key)
+    if not entry:
+        raise ValueError(f"Unknown origin place: {place_key!r}")
+    origin = dict(origin)
+    origin["place_id"] = entry.get("id")
+    origin["place_labels"] = entry.get("labels")
+    return origin
+
+
+# ── Propagatsioon ──────────────────────────────────────────────────────────
+
+def _collect_descendants(place_key: str, places: dict, max_depth: int = MAX_PLACE_PARENT_STEPS) -> set:
+    """Kogub kõik koha järeltulijad (keys millel on parent_key = place_key, transitiivselt)."""
+    result = set()
+    queue = [place_key]
+    depth = 0
+    while queue and depth <= max_depth:
+        next_queue = []
+        for key, entry in places.items():
+            if entry.get("parent_key") in queue and key not in result:
+                result.add(key)
+                next_queue.append(key)
+        queue = next_queue
+        depth += 1
+    return result
+
+
+async def _propagate_place_change(place_key: str) -> None:
+    """
+    Pärast places.json muutmist uuendab kõik mõjutatud isikute indeksikirjed.
+    Käivitatakse background task-ina.
+    """
+    from .ops import _load_index, _index_entry_from_person, get_person
+    from ..config import PROSOPOGRAPHY_INDEX_FILE
+
+    places = _load_places_cache(force_reload=True)
+    affected = _collect_descendants(place_key, places)
+    affected.add(place_key)
+
+    index = _load_index()
+    changed = False
+    for entry in index.get("entries", []):
+        if entry.get("origin_place") not in affected:
+            continue
+        person = get_person(entry["id"])
+        if not person:
+            continue
+        new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
+        entry.update(new_entry)
+        changed = True
+
+    if changed:
+        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
+        logger.info("_propagate_place_change: uuendas indeksi place_key=%s", place_key)
+
+
+# ── Endpoint loogika ───────────────────────────────────────────────────────
+
+def get_places() -> dict:
+    """Tagastab kõik places.json kirjed. Kasutab cache't."""
+    return _load_places_cache()
+
+
+def get_places_meta() -> dict:
+    """Tagastab origin_groups.json sisu + lubatud type väärtused."""
+    groups = _load_origin_groups()
+    return {
+        "groups": groups,
+        "allowed_types": ALLOWED_PLACE_TYPES,
+    }
+
+
+def put_place(key: str, data: dict) -> dict:
+    """
+    Lisab või uuendab koha places.json-s.
+    Valideerib type enum-i vastu.
+    Tagastab uuendatud kirje.
+    """
+    place_type = data.get("type")
+    if place_type and place_type not in ALLOWED_PLACE_TYPES:
+        raise ValueError(
+            f"Tundmatu kohatüüp: '{place_type}'. Lubatud: {', '.join(ALLOWED_PLACE_TYPES)}"
+        )
+
+    places = _load_places_cache(force_reload=True)
+    entry = places.get(key, {})
+    for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes"):
+        if field in data:
+            entry[field] = data[field]
+    places[key] = entry
+    atomic_write_json(PLACES_FILE, places)
+    _load_places_cache(force_reload=True)
+    return entry
