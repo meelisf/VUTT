@@ -108,7 +108,7 @@ def aa_education_entries(aa_entry: dict) -> list:
 
 def edu_key(e: dict) -> tuple:
     """Unikaalne võti duplikaatide kontrollimiseks."""
-    return (e.get("institution", "").lower(), e.get("date_start"), e.get("type", "").lower())
+    return (e.get("institution", "").lower(), e.get("date_start"), (e.get("type") or "").lower())
 
 
 def gen_vutt_id(existing_ids: set) -> str:
