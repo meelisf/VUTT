@@ -57,6 +57,20 @@ function resolveLabel(labels: Record<string, string> | null | undefined, lang: s
   return labels[lang] ?? labels['et'] ?? labels['en'] ?? Object.values(labels)[0] ?? null;
 }
 
+function formatImmLabel(dateStr: string, lang: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y) return `AA ${dateStr}`;
+  try {
+    const date = new Date(y, (m || 1) - 1, d || 1);
+    const opts: Intl.DateTimeFormatOptions = d
+      ? { day: 'numeric', month: 'long', year: 'numeric' }
+      : { month: 'long', year: 'numeric' };
+    return `AA ${date.toLocaleDateString(lang === 'et' ? 'et-EE' : 'en-GB', opts)}`;
+  } catch {
+    return `AA ${y}`;
+  }
+}
+
 const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode }> = ({
   person, lifespan,
 }) => {
@@ -76,9 +90,9 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
       ) : (
         <Initials name={person.label} />
       )}
-      {person.imm_year && (
-        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-          AA {person.imm_year}
+      {person.imm_date && (
+        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+          {formatImmLabel(person.imm_date, i18n.language?.slice(0, 2) ?? 'et')}
         </span>
       )}
     </div>

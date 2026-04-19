@@ -41,6 +41,7 @@ export interface ProsopoIndexEntry {
   // Album Academicum
   aa_number: number | null;
   imm_year: number | null;
+  imm_date: string | null;
   // Päritolu (uued väljad)
   origin_place: string | null;
   origin_place_id: string | null;

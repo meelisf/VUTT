@@ -121,6 +121,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         except ValueError:
             pass
     imm_year: Optional[int] = None
+    imm_date: Optional[str] = None
     for edu in (person.get("education") or []):
         if (edu.get("source") == "album_academicum" or
                 (edu.get("institution") == "Academia Gustaviana" and
@@ -129,6 +130,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
             if len(date_str) >= 4:
                 try:
                     imm_year = int(date_str[:4])
+                    imm_date = date_str
                     break
                 except ValueError:
                     pass
@@ -170,6 +172,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "has_aa": "album_academicum" in schemes,
         "aa_number": aa_number,
         "imm_year": imm_year,
+        "imm_date": imm_date,
         "record_status": person.get("record_status", "draft"),
         "verification_level": person.get("verification_level", "draft"),
         "work_count": work_count,
