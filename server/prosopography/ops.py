@@ -471,6 +471,7 @@ def list_persons(
     q: Optional[str] = None,
     gender: Optional[str] = None,
     occupation: Optional[str] = None,
+    origin_group: Optional[str] = None,
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
@@ -513,6 +514,8 @@ def list_persons(
                 for item in _entry_occupations(e)
             )
         ]
+    if origin_group:
+        results = [e for e in results if e.get("origin_group") == origin_group]
     if status_id:
         results = [e for e in results if e.get("status_id") == status_id]
     if verification_level:
@@ -565,7 +568,8 @@ def get_person_facets(
 ) -> dict:
     """
     Tagastab persons-listingu jaoks facetid.
-    Praegu toetab ametite loendit koos sagedustega.
+    origin_groups: päritolugruppide loend sagedustega (asendab occupations).
+    occupations: jääb tagasiühilduvuseks (tühi nimekiri).
     """
     filtered = list_persons(
         q=q,
@@ -575,30 +579,32 @@ def get_person_facets(
         offset=0,
     )["results"]
 
-    occupation_counts: dict[str, dict] = {}
+    groups_config = _load_origin_groups()
+
+    group_counts: dict = {}
     for entry in filtered:
-        for occupation in _entry_occupations(entry):
-            occ_id = occupation.get("id")
-            occ_label = occupation.get("label") or ""
-            if not occ_id and not occ_label:
-                continue
-            key = occ_id or f"label:{occ_label.lower()}"
-            existing = occupation_counts.get(key)
-            if existing:
-                existing["count"] += 1
-            else:
-                occupation_counts[key] = {
-                    "id": occ_id,
-                    "label": occ_label,
-                    "labels": occupation.get("labels"),
-                    "count": 1,
-                }
+        grp = entry.get("origin_group")
+        if grp:
+            group_counts[grp] = group_counts.get(grp, 0) + 1
+
+    origin_groups = []
+    for grp_key, count in group_counts.items():
+        grp_config = groups_config.get(grp_key, {})
+        labels = grp_config.get("labels", {})
+        origin_groups.append({
+            "value": grp_key,
+            "labels": labels,
+            "label_et": labels.get("et", grp_key),
+            "label_en": labels.get("en", grp_key),
+            "sort_order": grp_config.get("sort_order", 999),
+            "count": count,
+        })
+
+    origin_groups.sort(key=lambda x: (-x["count"], x.get("sort_order", 999)))
 
     return {
-        "occupations": sorted(
-            occupation_counts.values(),
-            key=lambda item: (-item["count"], (item["label"] or "").lower()),
-        ),
+        "origin_groups": origin_groups,
+        "occupations": [],  # tagasiühilduvus
     }
 
 
