@@ -194,5 +194,12 @@
     "modeAddHint": "Adds the occupation to those who do not already have it.",
     "modeReplaceHint": "Removes all existing occupations and replaces with the selected one.",
     "apply": "Apply"
-  }
+  },
+  "originGroup": "Origin",
+  "originPlace": "Origin place",
+  "filterByOrigin": "Filter by origin",
+  "filterOriginSearch": "Search region…",
+  "noQCode": "No Q-code — won't appear on map",
+  "addPlace": "Add new place",
+  "placeGroup": "Group: {{group}}"
 }

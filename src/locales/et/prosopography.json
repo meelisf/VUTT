@@ -194,5 +194,12 @@
     "modeAddHint": "Lisab ameti neile, kellel seda veel pole.",
     "modeReplaceHint": "Eemaldab kõik olemasolevad ametid ja asendab valitud ametiga.",
     "apply": "Rakenda"
-  }
+  },
+  "originGroup": "Päritolu",
+  "originPlace": "Päritolukoht",
+  "filterByOrigin": "Filtreeri päritolu järgi",
+  "filterOriginSearch": "Otsi piirkonda…",
+  "noQCode": "Q-kood puudub — kaardil ei kuvata",
+  "addPlace": "Lisa uus koht",
+  "placeGroup": "Grupp: {{group}}"
 }
