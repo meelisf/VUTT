@@ -1,6 +1,7 @@
 """
 Migreerib isikufailide origin.city/region → origin.place.
-Käivita PÄRAST dry-run analüüsi ja places.json täiendamist.
+Lisab automaatselt places.json-i puuduvad kohad, kasutades
+isikukaartidel olevaid city_id/city_labels Wikidata andmeid.
 """
 import glob, json, os, sys
 from datetime import datetime, timezone
@@ -10,17 +11,54 @@ STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 PROSOPO_DIR = os.path.join(STATE_DIR, "prosopography")
 PLACES_FILE = os.path.join(DATA_ROOT, "config", "places.json")
 
+
 def load_places():
     with open(PLACES_FILE) as f:
         return json.load(f)
 
-def migrate_person(person: dict, places: dict, dry_run: bool) -> tuple:
+
+def save_places(places: dict, dry_run: bool):
+    if dry_run:
+        return
+    tmp = PLACES_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(places, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, PLACES_FILE)
+
+
+def collect_missing_places(person_files: list, places: dict) -> dict:
+    """Kogub isikukaartidelt puuduvad city/region kohad koos Wikidata andmetega."""
+    missing = {}
+    for fpath in person_files:
+        try:
+            with open(fpath) as f:
+                person = json.load(f)
+        except Exception:
+            continue
+        if person.get("record_status") == "tombstone":
+            continue
+        origin = person.get("origin") or {}
+        if origin.get("place") is not None:
+            continue
+        for field, id_field, labels_field in [
+            ("city", "city_id", "city_labels"),
+            ("region", "region_id", "region_labels"),
+        ]:
+            name = origin.get(field)
+            if name and name not in places and name not in missing:
+                missing[name] = {
+                    "id": origin.get(id_field),
+                    "labels": origin.get(labels_field) or {field: name},
+                }
+    return missing
+
+
+def migrate_person(person: dict, places: dict) -> tuple:
     """Tagastab (changed, log_msg)."""
     origin = person.get("origin") or {}
     city = origin.get("city")
     region = origin.get("region")
 
-    # Kui origin.place on juba olemas, ei muuda
     if origin.get("place") is not None:
         return False, "place juba olemas, vahele jäetud"
 
@@ -39,7 +77,6 @@ def migrate_person(person: dict, places: dict, dry_run: bool) -> tuple:
     if new_place is None:
         return False, "pole city ega region — vahele jäetud"
 
-    # Ehita uus origin
     entry = places[new_place]
     new_origin = {
         "place": new_place,
@@ -51,17 +88,36 @@ def migrate_person(person: dict, places: dict, dry_run: bool) -> tuple:
     person["origin"] = new_origin
     return True, f"city={city!r} region={region!r} → place={new_place!r}"
 
+
 def main():
     dry_run = "--dry-run" in sys.argv
     if dry_run:
-        print("DRY-RUN režiim — faile ei kirjutata")
+        print("DRY-RUN režiim — faile ei kirjutata\n")
 
     places = load_places()
+    person_files = sorted(glob.glob(os.path.join(PROSOPO_DIR, "*.json")))
+
+    # 1. Lisa automaatselt puuduvad kohad places.json-i
+    missing = collect_missing_places(person_files, places)
+    if missing:
+        print(f"Lisatakse {len(missing)} puuduvat kohta places.json-i:")
+        for name, entry in sorted(missing.items()):
+            qcode = entry.get("id") or "Q-kood puudub"
+            print(f"  + {name!r} ({qcode})")
+            if not dry_run:
+                places[name] = entry
+        if not dry_run:
+            save_places(places, dry_run)
+        print()
+    else:
+        print("Kõik kohad on juba places.json-is.\n")
+
+    # 2. Migreerib isikukaardid
     updated = 0
     skipped = 0
     errors = 0
 
-    for fpath in sorted(glob.glob(os.path.join(PROSOPO_DIR, "*.json"))):
+    for fpath in person_files:
         try:
             with open(fpath) as f:
                 person = json.load(f)
@@ -73,7 +129,7 @@ def main():
         if person.get("record_status") == "tombstone":
             continue
 
-        changed, msg = migrate_person(person, places, dry_run)
+        changed, msg = migrate_person(person, places)
         pid = person.get("id", os.path.basename(fpath))
 
         if changed:
@@ -92,6 +148,7 @@ def main():
     if not dry_run and updated > 0:
         print("\nPärast migratsiooni käivita serveril rebuild_indices:")
         print("  POST /prosopography/admin/rebuild-indices")
+
 
 if __name__ == "__main__":
     main()
