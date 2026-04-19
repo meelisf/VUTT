@@ -29,9 +29,12 @@ const PersonsPage: React.FC = () => {
 
   const query  = searchParams.get('q') ?? '';
   const originGroup = searchParams.get('origin_group') ?? '';
+  const institution = searchParams.get('institution') ?? '';
+  const source = searchParams.get('source') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
+  const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
   const [inputValue, setInputValue] = useState(query);
@@ -55,6 +58,8 @@ const PersonsPage: React.FC = () => {
 
   const setQuery  = (v: string)       => setFilterParam('q', v);
   const setOriginGroup = (v: string)  => setFilterParam('origin_group', v);
+  const setInstitution = (v: string)  => setFilterParam('institution', v);
+  const setSource = (v: string)       => setFilterParam('source', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
 
   const resetOffset = () =>
@@ -124,6 +129,8 @@ const PersonsPage: React.FC = () => {
     listPersons({
       q: query || undefined,
       origin_group: originGroup || undefined,
+      institution: institution || undefined,
+      source: source || undefined,
       gender: gender || undefined,
       ids: idsParam,
       limit: LIMIT,
@@ -136,7 +143,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, originGroup, gender, offset, token, collectionPersonIds, collectionLoading, t]);
+  }, [query, originGroup, institution, source, gender, offset, token, collectionPersonIds, collectionLoading, t]);
 
   const fetchFacets = useCallback(() => {
     if (collectionLoading) return;
@@ -153,8 +160,9 @@ const PersonsPage: React.FC = () => {
           label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.value,
           count: item.count,
         })));
+        setInstitutionFacets(data.institutions || []);
       })
-      .catch(() => setOriginGroupFacets([]));
+      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); });
   }, [query, gender, token, collectionPersonIds, collectionLoading, i18n.language]);
 
   useEffect(() => {
@@ -165,7 +173,7 @@ const PersonsPage: React.FC = () => {
     fetchFacets();
   }, [fetchFacets]);
 
-  const hasActiveFilters = !!(originGroup || gender);
+  const hasActiveFilters = !!(originGroup || institution || source || gender);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -301,13 +309,20 @@ const PersonsPage: React.FC = () => {
           {/* Täpsemad filtrid */}
           <PersonAdvancedFilters
             originGroup={originGroup}
+            institution={institution}
+            source={source}
             gender={gender}
             originGroups={originGroupFacets}
+            institutions={institutionFacets}
             onOriginGroupChange={setOriginGroup}
+            onInstitutionChange={setInstitution}
+            onSourceChange={setSource}
             onGenderChange={setGender}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
               n.delete('origin_group');
+              n.delete('institution');
+              n.delete('source');
               n.delete('gender');
               n.delete('offset');
               return n;

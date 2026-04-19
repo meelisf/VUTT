@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, MapPin, Search, Venus, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Database, MapPin, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
 interface FacetItem {
   value: string;
   label: string;
+  count: number;
+}
+
+interface InstitutionItem {
+  value: string;
   count: number;
 }
 
@@ -23,20 +28,19 @@ interface FilterSectionProps {
 interface PersonAdvancedFiltersProps {
   gender: GenderFilter;
   originGroup: string;
+  institution: string;
+  source: string;
   originGroups: FacetItem[];
+  institutions: InstitutionItem[];
   onGenderChange: (v: GenderFilter) => void;
   onOriginGroupChange: (v: string) => void;
+  onInstitutionChange: (v: string) => void;
+  onSourceChange: (v: string) => void;
   onClearAll: () => void;
 }
 
 const FilterSection: React.FC<FilterSectionProps> = ({
-  title,
-  icon,
-  items,
-  selectedValue,
-  onSelect,
-  searchPlaceholder,
-  emptyLabel,
+  title, icon, items, selectedValue, onSelect, searchPlaceholder, emptyLabel,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const showSearch = items.length > 8;
@@ -53,7 +57,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
         <span className="text-primary-600">{icon}</span>
         {title}
       </h4>
-
       {showSearch && (
         <div className="relative mb-1.5">
           <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
@@ -68,7 +71,6 @@ const FilterSection: React.FC<FilterSectionProps> = ({
           />
         </div>
       )}
-
       <div className="max-h-32 overflow-y-auto custom-scrollbar pr-1">
         <div className="flex flex-wrap gap-2">
           {filteredItems.length === 0 ? (
@@ -81,9 +83,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
                   key={value}
                   onClick={() => onSelect(isSelected ? '' : value)}
                   className={`px-3 py-1 rounded-full text-sm font-medium transition-colors text-left ${
-                    isSelected
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    isSelected ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
                   {label} <span className="opacity-60 text-xs">({count})</span>
@@ -98,21 +98,25 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender,
-  originGroup,
-  originGroups,
-  onGenderChange,
-  onOriginGroupChange,
+  gender, originGroup, institution, source,
+  originGroups, institutions,
+  onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
   onClearAll,
 }) => {
   const { t } = useTranslation('prosopography');
-  const hasActive = !!(originGroup || gender);
-  const activeCount = [originGroup, gender].filter(Boolean).length;
+  const hasActive = !!(originGroup || institution || source || gender);
+  const activeCount = [originGroup, institution, source, gender].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     if (hasActive && !isExpanded) setIsExpanded(true);
   }, [hasActive, isExpanded]);
+
+  const institutionFacetItems: FacetItem[] = institutions.map(i => ({
+    value: i.value,
+    label: i.value,
+    count: i.count,
+  }));
 
   return (
     <div className="bg-white/50 rounded-lg border border-gray-200">
@@ -143,6 +147,36 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
             emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
           />
 
+          <FilterSection
+            title={t('filterInstitutionAll', 'Haridusasutus')}
+            icon={<BookOpen size={13} />}
+            items={institutionFacetItems}
+            selectedValue={institution}
+            onSelect={onInstitutionChange}
+            searchPlaceholder={t('filterInstitutionSearch', 'Otsi asutust…')}
+            emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
+          />
+
+          <div>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <Database size={13} className="text-primary-600" />
+              {t('filterSourceAll', 'Allikas')}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              {[['aa', t('filterSourceAA', 'Album Academicum')]].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => onSourceChange(source === val ? '' : val)}
+                  className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                    source === val ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Venus size={13} className="text-primary-600" />
@@ -168,25 +202,30 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
               <div className="flex flex-wrap gap-1.5">
                 {originGroup && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {originGroup}
-                    <button onClick={() => onOriginGroupChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
-                      <X size={11} />
-                    </button>
+                    {originGroups.find(g => g.value === originGroup)?.label ?? originGroup}
+                    <button onClick={() => onOriginGroupChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                  </span>
+                )}
+                {institution && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    {institution}
+                    <button onClick={() => onInstitutionChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                  </span>
+                )}
+                {source && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    {source === 'aa' ? t('filterSourceAA', 'Album Academicum') : source}
+                    <button onClick={() => onSourceChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
                 {gender && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
                     {gender === 'M' ? t('filterMale', 'Meessoost') : t('filterFemale', 'Naissoost')}
-                    <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5">
-                      <X size={11} />
-                    </button>
+                    <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
               </div>
-              <button
-                onClick={onClearAll}
-                className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
-              >
+              <button onClick={onClearAll} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
                 {t('clearAllFilters', 'Tühjenda kõik filtrid')}
               </button>
             </div>

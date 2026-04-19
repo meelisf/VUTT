@@ -9,6 +9,7 @@ export async function listPersons(params?: {
   gender?: string;
   occupation?: string;
   origin_group?: string;
+  institution?: string;
   status_id?: string;
   source?: string;
   verification_level?: string;
@@ -32,6 +33,7 @@ export async function listPersons(params?: {
   if (params?.gender) url.searchParams.set('gender', params.gender);
   if (params?.occupation) url.searchParams.set('occupation', params.occupation);
   if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
+  if (params?.institution) url.searchParams.set('institution', params.institution);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
@@ -53,6 +55,7 @@ export async function getPersonFacets(params?: {
   ids?: string[];
 }, token?: string): Promise<{
   origin_groups: { value: string; labels: Record<string, string>; label_et: string; label_en: string; count: number }[];
+  institutions: { value: string; count: number }[];
   occupations: any[];
 }> {
   if (params?.ids?.length) {

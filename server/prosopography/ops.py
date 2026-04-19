@@ -103,6 +103,12 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     aliases = name_obj.get("aliases") or []
     occupations = _extract_occupation_entries(person)
 
+    # Haridusasutused
+    education_institutions = list(dict.fromkeys(
+        e["institution"] for e in (person.get("education") or [])
+        if e.get("institution")
+    ))
+
     # Päritolukoht
     origin = person.get("origin") or {}
     place_key = origin.get("place") or None
@@ -146,6 +152,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "aliases": aliases,
         "occupations": occupations,
         # Päritolu (uued väljad)
+        "education_institutions": education_institutions,
         "origin_place": place_key,
         "origin_place_id": place_id,
         "origin_place_labels": origin_place_labels,
@@ -472,6 +479,7 @@ def list_persons(
     gender: Optional[str] = None,
     occupation: Optional[str] = None,
     origin_group: Optional[str] = None,
+    institution: Optional[str] = None,
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
@@ -516,6 +524,12 @@ def list_persons(
         ]
     if origin_group:
         results = [e for e in results if e.get("origin_group") == origin_group]
+    if institution:
+        inst_lower = institution.strip().lower()
+        results = [
+            e for e in results
+            if any(inst_lower in (i or "").lower() for i in (e.get("education_institutions") or []))
+        ]
     if status_id:
         results = [e for e in results if e.get("status_id") == status_id]
     if verification_level:
@@ -602,8 +616,22 @@ def get_person_facets(
 
     origin_groups.sort(key=lambda x: (-x["count"], x.get("sort_order", 999)))
 
+    # Haridusasutuste facet
+    inst_counts: dict = {}
+    for entry in filtered:
+        for inst in (entry.get("education_institutions") or []):
+            if inst:
+                inst_counts[inst] = inst_counts.get(inst, 0) + 1
+
+    institutions = [
+        {"value": inst, "count": count}
+        for inst, count in inst_counts.items()
+    ]
+    institutions.sort(key=lambda x: (-x["count"], x["value"].lower()))
+
     return {
         "origin_groups": origin_groups,
+        "institutions": institutions,
         "occupations": [],  # tagasiühilduvus
     }
 
