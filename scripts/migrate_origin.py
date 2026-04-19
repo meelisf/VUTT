@@ -26,8 +26,15 @@ def save_places(places: dict, dry_run: bool):
     os.replace(tmp, PLACES_FILE)
 
 
+def _qcode_to_key(places: dict) -> dict:
+    """Ehitab Q-kood → olemasolev võti kaardi duplikaatide tuvastamiseks."""
+    return {v["id"]: k for k, v in places.items() if v.get("id")}
+
+
 def collect_missing_places(person_files: list, places: dict) -> dict:
-    """Kogub isikukaartidelt puuduvad city/region kohad koos Wikidata andmetega."""
+    """Kogub isikukaartidelt puuduvad city/region kohad koos Wikidata andmetega.
+    Kui Q-kood on juba olemas teise võtme all, kasutab olemasolevat."""
+    qcode_map = _qcode_to_key(places)
     missing = {}
     for fpath in person_files:
         try:
@@ -45,6 +52,10 @@ def collect_missing_places(person_files: list, places: dict) -> dict:
             ("region", "region_id", "region_labels"),
         ]:
             name = origin.get(field)
+            qid = origin.get(id_field)
+            # Kui Q-kood on juba olemas teise võtmega, ära lisa duplikaati
+            if name and qid and qid in qcode_map and name not in places:
+                continue
             if name and name not in places and name not in missing:
                 missing[name] = {
                     "id": origin.get(id_field),
@@ -53,7 +64,7 @@ def collect_missing_places(person_files: list, places: dict) -> dict:
     return missing
 
 
-def migrate_person(person: dict, places: dict) -> tuple:
+def migrate_person(person: dict, places: dict, qcode_map: dict = None) -> tuple:
     """Tagastab (changed, log_msg)."""
     origin = person.get("origin") or {}
     city = origin.get("city")
@@ -62,16 +73,26 @@ def migrate_person(person: dict, places: dict) -> tuple:
     if origin.get("place") is not None:
         return False, "place juba olemas, vahele jäetud"
 
+    if qcode_map is None:
+        qcode_map = _qcode_to_key(places)
+
+    def resolve_key(name, id_field):
+        """Leiab kanooniline võti: eelistab Q-koodi järgi olemasolevat."""
+        qid = origin.get(id_field)
+        if qid and qid in qcode_map:
+            return qcode_map[qid]
+        if name in places:
+            return name
+        return None
+
     new_place = None
     if city:
-        if city in places:
-            new_place = city
-        else:
+        new_place = resolve_key(city, "city_id")
+        if new_place is None:
             return False, f"UNMAPPED city={city!r} — vahele jäetud"
     elif region:
-        if region in places:
-            new_place = region
-        else:
+        new_place = resolve_key(region, "region_id")
+        if new_place is None:
             return False, f"UNMAPPED region={region!r} — vahele jäetud"
 
     if new_place is None:
@@ -116,6 +137,7 @@ def main():
     updated = 0
     skipped = 0
     errors = 0
+    qcode_map = _qcode_to_key(places)
 
     for fpath in person_files:
         try:
@@ -129,7 +151,7 @@ def main():
         if person.get("record_status") == "tombstone":
             continue
 
-        changed, msg = migrate_person(person, places)
+        changed, msg = migrate_person(person, places, qcode_map)
         pid = person.get("id", os.path.basename(fpath))
 
         if changed:
