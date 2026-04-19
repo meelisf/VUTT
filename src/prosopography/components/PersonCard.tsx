@@ -52,10 +52,15 @@ const Initials: React.FC<{ name: string }> = ({ name }) => {
 };
 
 // Kaardi sisu — kasutatakse nii Link- kui select-režiimis
+function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string | null {
+  if (!labels) return null;
+  return labels[lang] ?? labels['et'] ?? labels['en'] ?? Object.values(labels)[0] ?? null;
+}
+
 const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode }> = ({
   person, lifespan,
 }) => {
-  const { t } = useTranslation(['prosopography']);
+  const { t, i18n } = useTranslation(['prosopography']);
   return (
   <>
     {/* Foto ala — nagu WorkCard h-40 thumbnail */}
@@ -82,6 +87,24 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
       <div className="mt-1 space-y-1.5 flex-1">
         {/* Eluaastad */}
         <p className="text-sm text-gray-500">{lifespan}</p>
+
+        {/* Päritolukoht */}
+        {(() => {
+          const lang = i18n.language?.slice(0, 2) ?? 'et';
+          const placeLabel = resolveLabel(person.origin_place_labels, lang) ?? person.origin_place;
+          const parentLabel = resolveLabel(person.origin_parent?.labels, lang) ?? person.origin_parent?.key;
+          if (placeLabel && parentLabel && placeLabel !== parentLabel) {
+            return <p className="text-xs text-gray-400">{placeLabel} · {parentLabel}</p>;
+          }
+          if (placeLabel) {
+            return <p className="text-xs text-gray-400">{placeLabel}</p>;
+          }
+          if (person.origin_group) {
+            const groupLabel = resolveLabel(person.origin_group_labels, lang) ?? person.origin_group;
+            return <p className="text-xs text-gray-400">{groupLabel}</p>;
+          }
+          return null;
+        })()}
 
         {/* Seisus */}
         {person.status_label && (
