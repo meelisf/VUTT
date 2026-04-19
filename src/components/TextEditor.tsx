@@ -11,9 +11,8 @@ import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { vuttTheme } from './editor/VuttTheme';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
-import { FILE_API_URL } from '../config';
 import { ErrorBanner } from './ErrorBanner';
 
 // CM6 impordid
@@ -22,9 +21,9 @@ import { EditorState, EditorSelection, Compartment, Transaction } from '@codemir
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { createVuttSearchPanel } from './editor/VuttSearchPanel';
-import { TagPair, findContainer, findInnerPairs } from './editor/wrapTagUtils';
-import { useSpecialChars, SpecialCharacter } from './editor/useSpecialChars';
-import { useReOcr, ReocrStatus } from './editor/useReOcr';
+import { findContainer, findInnerPairs } from './editor/wrapTagUtils';
+import { useSpecialChars } from './editor/useSpecialChars';
+import { useReOcr } from './editor/useReOcr';
 
 interface TextEditorProps {
   page: Page;

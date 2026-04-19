@@ -124,6 +124,7 @@ export const normalizePage = (hit: any): Page => {
     image_url: getFullImageUrl(hit.lehekylje_pilt || ''),
     status: (hit.status as PageStatus) || PageStatus.RAW,
     comments: hit.comments || [],
+    text_annotations: hit.text_annotations || [],
     page_tags: hit.page_tags || hit.tags || [],
     history: hit.history || [],
     // Denormaliseeritud teose andmed

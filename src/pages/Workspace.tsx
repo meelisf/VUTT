@@ -23,7 +23,7 @@ import { ErrorBanner } from '../components/ErrorBanner';
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
-  const { collections } = useCollection();
+  const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -284,6 +284,10 @@ const Workspace: React.FC = () => {
 
   // Navigeerimine otsingusse (selle teose piires)
   const handleNavigateToSearch = () => {
+    const workCollection = work?.collections_hierarchy?.[0] ?? work?.collections?.[0] ?? null;
+    if (workCollection && workCollection !== selectedCollection) {
+      setSelectedCollection(workCollection);
+    }
     if (hasUnsavedChanges) {
       setPendingNavigation(() => () => navigate(`/search?work=${workId}`));
       return;

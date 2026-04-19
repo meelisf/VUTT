@@ -209,6 +209,7 @@ export interface Page {
   series_title?: string;
   ester_id?: string;
   external_url?: string;
+  archive_refs?: ArchiveRef[] | null;
 
   // =========================================================
   // ⛔ V1 VÄLJAD - ÄRA KASUTA UUES KOODIS!
