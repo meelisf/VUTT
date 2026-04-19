@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
@@ -10,8 +10,6 @@ import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAd
 import { getPersonFacets, listPersons, mergePersons, bulkUpdateOccupation } from '../services/prosopographyService';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { useUser } from '../../contexts/UserContext';
-import { useCollection } from '../../contexts/CollectionContext';
-import { index } from '../../services/meiliService';
 import type { ProsopoIndexEntry } from '../types';
 
 const LIMIT = 48;
@@ -62,48 +60,8 @@ const PersonsPage: React.FC = () => {
   const setSource = (v: string)       => setFilterParam('source', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
 
-  const resetOffset = () =>
-    setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
-
   const setOffset = (v: number) =>
     setSearchParams(p => { const n = new URLSearchParams(p); v > 0 ? n.set('offset', String(v)) : n.delete('offset'); return n; }, { replace: true });
-
-  // Kollektsiooni filter — headerist
-  const { selectedCollection } = useCollection();
-  const [collectionPersonIds, setCollectionPersonIds] = useState<Set<string> | null>(null);
-  const [collectionLoading, setCollectionLoading] = useState(false);
-  const prevSelectedCollectionRef = useRef<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    const prev = prevSelectedCollectionRef.current;
-    if (prev !== undefined && prev !== selectedCollection) {
-      resetOffset();
-    }
-    prevSelectedCollectionRef.current = selectedCollection;
-  }, [selectedCollection]);
-
-  useEffect(() => {
-    if (!selectedCollection) { setCollectionPersonIds(null); return; }
-    setCollectionLoading(true);
-    index.search('', {
-      filter: [`collections_hierarchy = "${selectedCollection}"`, 'lehekylje_number = 1'],
-      attributesToRetrieve: ['creators', 'tags_object', 'tags', 'publisher_object'],
-      limit: 5000,
-    }).then(res => {
-      const ids = new Set<string>();
-      for (const hit of res.hits) {
-        for (const c of (hit.creators ?? [])) {
-          if (typeof c.id === 'string' && c.id.startsWith('vutt:P')) ids.add(c.id);
-        }
-        for (const tag of ((hit as any).tags_object ?? hit.tags ?? [])) {
-          if (typeof tag.id === 'string' && tag.id.startsWith('vutt:P')) ids.add(tag.id);
-        }
-        const pub = (hit as any).publisher_object;
-        if (pub && typeof pub.id === 'string' && pub.id.startsWith('vutt:P')) ids.add(pub.id);
-      }
-      setCollectionPersonIds(ids);
-    }).finally(() => setCollectionLoading(false));
-  }, [selectedCollection]);
 
   // Liitmise select-mood (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
@@ -123,16 +81,13 @@ const PersonsPage: React.FC = () => {
 
   // Serveripäring — käivitatakse filtri/offset muutusel
   const fetchPersons = useCallback(() => {
-    if (collectionLoading) return;
     setLoading(true);
-    const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     listPersons({
       q: query || undefined,
       origin_group: originGroup || undefined,
       institution: institution || undefined,
       source: source || undefined,
       gender: gender || undefined,
-      ids: idsParam,
       limit: LIMIT,
       offset,
     }, token)
@@ -143,15 +98,12 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, originGroup, institution, source, gender, offset, token, collectionPersonIds, collectionLoading, t]);
+  }, [query, originGroup, institution, source, gender, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
-    if (collectionLoading) return;
-    const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     getPersonFacets({
       q: query || undefined,
       gender: gender || undefined,
-      ids: idsParam,
     }, token)
       .then(data => {
         const lang = i18n.language?.slice(0, 2) ?? 'et';
@@ -163,7 +115,7 @@ const PersonsPage: React.FC = () => {
         setInstitutionFacets(data.institutions || []);
       })
       .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); });
-  }, [query, gender, token, collectionPersonIds, collectionLoading, i18n.language]);
+  }, [query, gender, token, i18n.language]);
 
   useEffect(() => {
     fetchPersons();
@@ -215,12 +167,12 @@ const PersonsPage: React.FC = () => {
   const handleBulkOccupation = async (occ: LinkedEntity, mode: 'add' | 'replace') => {
     setBulkOccupationLoading(true);
     // Laadi kõik filtreeritud isikud (mitte ainult lehekülje)
-    const idsParam = collectionPersonIds ? Array.from(collectionPersonIds) : undefined;
     const all = await listPersons({
       q: query || undefined,
       origin_group: originGroup || undefined,
+      institution: institution || undefined,
+      source: source || undefined,
       gender: gender || undefined,
-      ids: idsParam,
       limit: 5000,
       offset: 0,
     }, token);
@@ -355,7 +307,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Arv */}
-        {!(loading || collectionLoading) && !error && (
+        {!(loading || false) && !error && (
           <p className="text-xs text-gray-400 mb-4">
             {offset === 0 && total <= LIMIT
               ? t('totalCount', '{{count}} isikut', { count: total })
@@ -364,7 +316,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Sisu */}
-        {(loading || collectionLoading) && (
+        {(loading || false) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
@@ -376,7 +328,7 @@ const PersonsPage: React.FC = () => {
           <div className="text-center py-16 text-red-600 text-sm">{error}</div>
         )}
 
-        {!(loading || collectionLoading) && !error && persons.length === 0 && (
+        {!(loading || false) && !error && persons.length === 0 && (
           <div className="text-center py-16 text-gray-400 text-sm">
             {query || hasActiveFilters
               ? t('noResults', 'Otsingule vastavaid isikuid ei leitud.')
@@ -384,7 +336,7 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {!(loading || collectionLoading) && !error && persons.length > 0 && (
+        {!(loading || false) && !error && persons.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {persons.map(person => (
               <PersonCard
@@ -399,7 +351,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Paginatsioon */}
-        {!(loading || collectionLoading) && totalPages > 1 && (
+        {!(loading || false) && totalPages > 1 && (
           <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200">
             <button
               onClick={() => setOffset(offset - LIMIT)}

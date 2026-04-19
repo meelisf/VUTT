@@ -310,7 +310,7 @@ def create_new(aa_entry: dict, place_key, places: dict, existing_ids: set) -> di
 
 def save_person(person: dict, fpath: str = None):
     if fpath is None:
-        fpath = os.path.join(PROSOPO_DIR, person["id"].replace("vutt:", "") + ".json")
+        fpath = os.path.join(PROSOPO_DIR, person["id"].removeprefix("vutt:P") + ".json")
     tmp = fpath + ".tmp"
     with open(tmp, "w") as f:
         json.dump(person, f, ensure_ascii=False, indent=2)
