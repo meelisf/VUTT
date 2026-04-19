@@ -21,6 +21,13 @@ from ..config import (
 )
 from ..utils import generate_nanoid, atomic_write_json
 from .work_relations_ops import update_works_creators_index, build_works_creators_index
+from .places_ops import (
+    _resolve_origin_group,
+    _get_parent_place,
+    _get_place_labels,
+    _enrich_origin_from_places,
+    _load_origin_groups,
+)
 
 # Jagatud indeksite kirjutuslukkud
 _index_lock = threading.Lock()
@@ -96,6 +103,18 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     aliases = name_obj.get("aliases") or []
     occupations = _extract_occupation_entries(person)
 
+    # Päritolukoht
+    origin = person.get("origin") or {}
+    place_key = origin.get("place") or None
+    place_id = origin.get("place_id") or None
+    origin_group = _resolve_origin_group(place_id, place_key)
+    origin_parent = _get_parent_place(place_key)
+    origin_place_labels = _get_place_labels(place_key)
+    origin_group_labels: Optional[dict] = None
+    if origin_group:
+        groups_cfg = _load_origin_groups()
+        origin_group_labels = groups_cfg.get(origin_group, {}).get("labels")
+
     # birth/death_year — võtame täisarvuna kui date olemas
     def _extract_year(date_obj: dict):
         date_str = date_obj.get("date") or ""
@@ -126,6 +145,13 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "image_url": person.get("image_url"),
         "aliases": aliases,
         "occupations": occupations,
+        # Päritolu (uued väljad)
+        "origin_place": place_key,
+        "origin_place_id": place_id,
+        "origin_place_labels": origin_place_labels,
+        "origin_parent": origin_parent,
+        "origin_group": origin_group,
+        "origin_group_labels": origin_group_labels,
     }
 
 
@@ -298,7 +324,7 @@ def create_person(data: dict, username: str) -> dict:
         "gender": data.get("gender"),
         "birth": _make_date_obj(data.get("birth_year")),
         "death": _make_date_obj(data.get("death_year")),
-        "origin": {"city": None, "region": None, "geonames_id": None, "coordinates": None},
+        "origin": {"place": None, "place_id": None, "place_labels": None, "geonames_id": None, "coordinates": None},
         "status": None,
         "confession": None,
         "occupations": [],
@@ -421,6 +447,14 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     person.update(data)
     person["updated_at"] = now
     person["updated_by"] = username
+
+    # Normaliseeri päritolukoht places.json-st
+    origin = person.get("origin") or {}
+    if origin.get("place"):
+        try:
+            person["origin"] = _enrich_origin_from_places(origin)
+        except ValueError as e:
+            raise ValueError(str(e))
 
     atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
