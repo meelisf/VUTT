@@ -1,5 +1,22 @@
 // Prosopograafia tüübid — eraldiseisvad src/types.ts-ist
 
+export interface PlaceEntry {
+  id: string | null;
+  group?: string | null;
+  parent_key?: string | null;
+  labels: Record<string, string>;
+  historical_names?: string[];
+  type?: string;
+  notes?: string;
+}
+
+export interface OriginParent {
+  key: string;
+  id: string | null;
+  labels: Record<string, string> | null;
+  type?: string | null;
+}
+
 export interface ProsopoIndexEntry {
   id: string;               // vutt:Pxxx
   label: string;            // kanooniline nimi
@@ -20,6 +37,13 @@ export interface ProsopoIndexEntry {
   image_url: string | null;
   aliases: string[];
   occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
+  // Päritolu (uued väljad)
+  origin_place: string | null;
+  origin_place_id: string | null;
+  origin_place_labels: Record<string, string> | null;
+  origin_parent: OriginParent | null;
+  origin_group: string | null;
+  origin_group_labels: Record<string, string> | null;
 }
 
 export interface HistoricalDate {
@@ -62,9 +86,11 @@ export interface ProsopoRecord {
   birth: HistoricalDate;
   death: HistoricalDate;
   origin: {
-    city: string | null; city_id?: string | null; city_labels?: Record<string,string> | null;
-    region: string | null; region_id?: string | null; region_labels?: Record<string,string> | null;
-    geonames_id: string | null; coordinates: string | null;
+    place: string | null;
+    place_id?: string | null;
+    place_labels?: Record<string, string> | null;
+    geonames_id: string | null;
+    coordinates: string | null;
   };
   floruit?: { year_from?: number | null; year_to?: number | null } | null;
   status: { id: string; label: string } | null;

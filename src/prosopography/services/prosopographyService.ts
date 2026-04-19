@@ -1,6 +1,6 @@
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
-import type { ProsopoIndexEntry, ProsopoRecord } from '../types';
+import type { ProsopoIndexEntry, ProsopoRecord, PlaceEntry } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
 
@@ -8,6 +8,7 @@ export async function listPersons(params?: {
   q?: string;
   gender?: string;
   occupation?: string;
+  origin_group?: string;
   status_id?: string;
   source?: string;
   verification_level?: string;
@@ -30,6 +31,7 @@ export async function listPersons(params?: {
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
   if (params?.occupation) url.searchParams.set('occupation', params.occupation);
+  if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
@@ -49,7 +51,10 @@ export async function getPersonFacets(params?: {
   q?: string;
   gender?: string;
   ids?: string[];
-}, token?: string): Promise<{ occupations: { id: string | null; label: string; labels?: Record<string, string> | null; count: number }[] }> {
+}, token?: string): Promise<{
+  origin_groups: { value: string; labels: Record<string, string>; label_et: string; label_en: string; count: number }[];
+  occupations: any[];
+}> {
   if (params?.ids?.length) {
     const resp = await fetchWithTimeout(`${BASE}/facets`, {
       method: 'POST',
@@ -242,5 +247,34 @@ export async function fetchWorkRelations(
   if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
   const resp = await fetchWithTimeout(url.toString(), { timeout: 10000 });
   if (!resp.ok) throw new Error(`fetchWorkRelations: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchPlaces(): Promise<Record<string, PlaceEntry>> {
+  const resp = await fetchWithTimeout(`${BASE}/places`, { timeout: 10000 });
+  if (!resp.ok) throw new Error(`fetchPlaces: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchPlacesMeta(): Promise<{
+  groups: Record<string, { labels: Record<string, string>; sort_order: number }>;
+  allowed_types: string[];
+}> {
+  const resp = await fetchWithTimeout(`${BASE}/places/meta`, { timeout: 10000 });
+  if (!resp.ok) throw new Error(`fetchPlacesMeta: ${resp.status}`);
+  return resp.json();
+}
+
+export async function addPlace(key: string, data: Partial<PlaceEntry>, token: string): Promise<{ key: string; entry: PlaceEntry }> {
+  const resp = await fetchWithTimeout(`${BASE}/admin/places/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify(data),
+    timeout: 10000,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `addPlace: ${resp.status}`);
+  }
   return resp.json();
 }
