@@ -30,6 +30,8 @@ const PersonsPage: React.FC = () => {
   const institution = searchParams.get('institution') ?? '';
   const source = searchParams.get('source') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
+  const immYearFrom = searchParams.get('imm_year_from') ?? '';
+  const immYearTo = searchParams.get('imm_year_to') ?? '';
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
@@ -59,6 +61,8 @@ const PersonsPage: React.FC = () => {
   const setInstitution = (v: string)  => setFilterParam('institution', v);
   const setSource = (v: string)       => setFilterParam('source', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
+  const setImmYearFrom = (v: string)  => setFilterParam('imm_year_from', v);
+  const setImmYearTo = (v: string)    => setFilterParam('imm_year_to', v);
 
   const setOffset = (v: number) =>
     setSearchParams(p => { const n = new URLSearchParams(p); v > 0 ? n.set('offset', String(v)) : n.delete('offset'); return n; }, { replace: true });
@@ -88,6 +92,8 @@ const PersonsPage: React.FC = () => {
       institution: institution || undefined,
       source: source || undefined,
       gender: gender || undefined,
+      imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
+      imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
       limit: LIMIT,
       offset,
     }, token)
@@ -125,7 +131,7 @@ const PersonsPage: React.FC = () => {
     fetchFacets();
   }, [fetchFacets]);
 
-  const hasActiveFilters = !!(originGroup || institution || source || gender);
+  const hasActiveFilters = !!(originGroup || institution || source || gender || immYearFrom || immYearTo);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
 
@@ -264,19 +270,19 @@ const PersonsPage: React.FC = () => {
             institution={institution}
             source={source}
             gender={gender}
+            immYearFrom={immYearFrom}
+            immYearTo={immYearTo}
             originGroups={originGroupFacets}
             institutions={institutionFacets}
             onOriginGroupChange={setOriginGroup}
             onInstitutionChange={setInstitution}
             onSourceChange={setSource}
             onGenderChange={setGender}
+            onImmYearFromChange={setImmYearFrom}
+            onImmYearToChange={setImmYearTo}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
-              n.delete('origin_group');
-              n.delete('institution');
-              n.delete('source');
-              n.delete('gender');
-              n.delete('offset');
+              ['origin_group', 'institution', 'source', 'gender', 'imm_year_from', 'imm_year_to', 'offset'].forEach(k => n.delete(k));
               return n;
             }, { replace: true })}
           />

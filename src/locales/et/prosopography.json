@@ -31,6 +31,7 @@
   "filterNoMatches": "Ei leitud vasteid",
   "filterMale": "Meessoost",
   "filterFemale": "Naissoost",
+  "filterImmYear": "Immatrikuleerimise aasta",
   "filterInstitutionAll": "Haridusasutus",
   "filterInstitutionSearch": "Otsi asutust…",
   "filterSourceAll": "Allikas",

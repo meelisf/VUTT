@@ -38,6 +38,9 @@ export interface ProsopoIndexEntry {
   aliases: string[];
   occupations?: { id: string | null; label: string; labels?: Record<string, string> | null }[];
   education_institutions: string[];
+  // Album Academicum
+  aa_number: number | null;
+  imm_year: number | null;
   // Päritolu (uued väljad)
   origin_place: string | null;
   origin_place_id: string | null;

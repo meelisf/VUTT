@@ -76,6 +76,11 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
       ) : (
         <Initials name={person.label} />
       )}
+      {person.imm_year && (
+        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          AA {person.imm_year}
+        </span>
+      )}
     </div>
 
     <div className="p-4 flex-1 flex flex-col">

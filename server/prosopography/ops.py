@@ -109,6 +109,30 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         if e.get("institution")
     ))
 
+    # AA kirje number ja immatrikuleerimise aasta
+    aa_id_str = next(
+        (i["id"] for i in identifiers if i.get("scheme") == "album_academicum"),
+        None,
+    )
+    aa_number: Optional[int] = None
+    if aa_id_str:
+        try:
+            aa_number = int(aa_id_str.removeprefix("AA:"))
+        except ValueError:
+            pass
+    imm_year: Optional[int] = None
+    for edu in (person.get("education") or []):
+        if (edu.get("source") == "album_academicum" or
+                (edu.get("institution") == "Academia Gustaviana" and
+                 "imm" in (edu.get("type") or "").lower())):
+            date_str = edu.get("date_start") or ""
+            if len(date_str) >= 4:
+                try:
+                    imm_year = int(date_str[:4])
+                    break
+                except ValueError:
+                    pass
+
     # Päritolukoht
     origin = person.get("origin") or {}
     place_key = origin.get("place") or None
@@ -144,6 +168,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "has_wikidata": "wikidata" in schemes,
         "has_gnd": "gnd" in schemes,
         "has_aa": "album_academicum" in schemes,
+        "aa_number": aa_number,
+        "imm_year": imm_year,
         "record_status": person.get("record_status", "draft"),
         "verification_level": person.get("verification_level", "draft"),
         "work_count": work_count,
@@ -483,6 +509,8 @@ def list_persons(
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
+    imm_year_from: Optional[int] = None,
+    imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
     limit: int = 48,
     offset: int = 0,
@@ -539,6 +567,10 @@ def list_persons(
         field = source_map.get(source)
         if field:
             results = [e for e in results if e.get(field)]
+    if imm_year_from is not None:
+        results = [e for e in results if (e.get("imm_year") or 0) >= imm_year_from]
+    if imm_year_to is not None:
+        results = [e for e in results if (e.get("imm_year") or 0) <= imm_year_to]
 
     results.sort(key=lambda e: (e.get("sort_name") or "").lower())
     total = len(results)

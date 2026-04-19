@@ -31,6 +31,7 @@
   "filterNoMatches": "No matches found",
   "filterMale": "Male",
   "filterFemale": "Female",
+  "filterImmYear": "Year of matriculation",
   "filterInstitutionAll": "Institution",
   "filterInstitutionSearch": "Search institution…",
   "filterSourceAll": "Source",

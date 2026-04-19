@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ChevronDown, ChevronRight, Database, MapPin, Search, Venus, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Database, GraduationCap, MapPin, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
@@ -30,12 +30,16 @@ interface PersonAdvancedFiltersProps {
   originGroup: string;
   institution: string;
   source: string;
+  immYearFrom: string;
+  immYearTo: string;
   originGroups: FacetItem[];
   institutions: InstitutionItem[];
   onGenderChange: (v: GenderFilter) => void;
   onOriginGroupChange: (v: string) => void;
   onInstitutionChange: (v: string) => void;
   onSourceChange: (v: string) => void;
+  onImmYearFromChange: (v: string) => void;
+  onImmYearToChange: (v: string) => void;
   onClearAll: () => void;
 }
 
@@ -98,14 +102,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, originGroup, institution, source,
+  gender, originGroup, institution, source, immYearFrom, immYearTo,
   originGroups, institutions,
   onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
+  onImmYearFromChange, onImmYearToChange,
   onClearAll,
 }) => {
   const { t } = useTranslation('prosopography');
-  const hasActive = !!(originGroup || institution || source || gender);
-  const activeCount = [originGroup, institution, source, gender].filter(Boolean).length;
+  const hasImmYear = !!(immYearFrom || immYearTo);
+  const hasActive = !!(originGroup || institution || source || gender || hasImmYear);
+  const activeCount = [originGroup, institution, source, gender, hasImmYear ? '1' : ''].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -178,6 +184,34 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           </div>
 
           <div>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+              <GraduationCap size={13} className="text-primary-600" />
+              {t('filterImmYear', 'Immatrikuleerimise aasta')}
+            </h4>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={immYearFrom}
+                onChange={e => onImmYearFromChange(e.target.value)}
+                placeholder="1632"
+                min={1632}
+                max={1710}
+                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
+              />
+              <span className="text-xs text-gray-400">–</span>
+              <input
+                type="number"
+                value={immYearTo}
+                onChange={e => onImmYearToChange(e.target.value)}
+                placeholder="1710"
+                min={1632}
+                max={1710}
+                className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
+              />
+            </div>
+          </div>
+
+          <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
               <Venus size={13} className="text-primary-600" />
               {t('filterGenderAll', 'Sugu')}
@@ -222,6 +256,12 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
                     {gender === 'M' ? t('filterMale', 'Meessoost') : t('filterFemale', 'Naissoost')}
                     <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                  </span>
+                )}
+                {hasImmYear && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    AA {immYearFrom || '…'}–{immYearTo || '…'}
+                    <button onClick={() => { onImmYearFromChange(''); onImmYearToChange(''); }} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
               </div>
