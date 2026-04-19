@@ -3,7 +3,7 @@ Prosopograafia FastAPI router.
 Registreeritakse main.py-s: app.include_router(router, prefix="/prosopography")
 """
 import json
-from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
 
 from ..auth import require_token
@@ -28,6 +28,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
+from .places_ops import get_places, get_places_meta, put_place, _propagate_place_change
 
 logger = get_logger(__name__)
 
@@ -97,6 +98,7 @@ async def prosopography_list(
     q: str = None,
     gender: str = None,
     occupation: str = None,
+    origin_group: str = None,
     status_id: str = None,
     source: str = None,
     verification_level: str = None,
@@ -111,6 +113,7 @@ async def prosopography_list(
         q=q,
         gender=gender,
         occupation=occupation,
+        origin_group=origin_group,
         status_id=status_id,
         source=source,
         verification_level=verification_level,
@@ -131,6 +134,7 @@ async def prosopography_query(request: Request):
         q=data.get("q"),
         gender=data.get("gender"),
         occupation=data.get("occupation"),
+        origin_group=data.get("origin_group"),
         status_id=data.get("status_id"),
         source=data.get("source"),
         verification_level=data.get("verification_level"),
@@ -354,6 +358,44 @@ async def prosopography_work_relations(
 ):
     """Teostest tuletatud isiku-isiku seosed. Avalik endpoint."""
     return get_work_relations(person_id, limit=limit, offset=offset)
+
+
+# ── Places register ────────────────────────────────────────────────────────
+
+@router.get("/places")
+async def places_list():
+    """Tagastab kõik places.json kirjed. Avalik — töötab kõigil rollidel."""
+    return get_places()
+
+
+@router.get("/places/meta")
+async def places_meta():
+    """Tagastab origin_groups.json sisu + lubatud type väärtused. Avalik."""
+    return get_places_meta()
+
+
+@router.put("/admin/places/{key}")
+async def places_put(
+    key: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(_require_role("editor")),
+):
+    """
+    Lisab/uuendab koha places.json-s.
+    Nõuab editor rolli.
+    Pärast salvestust käivitab sihtotstarbelise propagatsiooni background task-ina.
+    Body: {id?, labels?, parent_key?, group?, type?, historical_names?, notes?}
+    """
+    data = await _get_json(request)
+    try:
+        entry = put_place(key, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    background_tasks.add_task(_propagate_place_change, key)
+
+    return {"key": key, "entry": entry}
 
 
 @router.get("/{person_id:path}")
