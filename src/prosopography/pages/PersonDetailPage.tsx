@@ -35,6 +35,22 @@ function formatHistoricalDate(
   return `${symbol}${bound}${circa}${year}${place}`;
 }
 
+function formatImmDate(dateStr: string | null | undefined, lang: string): string {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y) return '';
+  if (!m) return String(y);
+  try {
+    const date = new Date(y, m - 1, d || 1);
+    const opts: Intl.DateTimeFormatOptions = d
+      ? { day: 'numeric', month: 'long', year: 'numeric' }
+      : { month: 'long', year: 'numeric' };
+    return date.toLocaleDateString(lang === 'et' ? 'et-EE' : 'en-GB', opts);
+  } catch {
+    return dateStr;
+  }
+}
+
 function getExternalUrl(scheme: string, id: string): string | null {
   if (scheme === 'wikidata')        return `https://www.wikidata.org/wiki/${id}`;
   if (scheme === 'gnd')             return `https://d-nb.info/gnd/${id}`;
@@ -365,6 +381,35 @@ const PersonDetailPage: React.FC = () => {
                 )}
               </div>
             )}
+
+            {/* Immatrikuleerumine (AG) */}
+            {(() => {
+              const immEdu = (person.education ?? []).find(e =>
+                e.source === 'album_academicum' ||
+                (e.institution === 'Academia Gustaviana' && (e.type ?? '').toLowerCase().includes('imm'))
+              );
+              const aaId = (person.identifiers ?? []).find(i => i.scheme === 'album_academicum')?.id;
+              if (!immEdu && !aaId) return null;
+              const dateLabel = immEdu?.date_start ? formatImmDate(immEdu.date_start, lang) : null;
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
+                      {t('immatriculation', 'Immatrikuleerumine')}
+                    </span>
+                    <p className="text-gray-900">{dateLabel ?? '—'}</p>
+                  </div>
+                  {aaId && (
+                    <div>
+                      <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
+                        Album Academicum
+                      </span>
+                      <p className="text-gray-900 font-mono text-sm">{aaId}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Seisus + konfessioon */}
             {(person.status || person.confession) && (
