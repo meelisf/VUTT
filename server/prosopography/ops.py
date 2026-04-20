@@ -1196,13 +1196,74 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
 
     now = datetime.now(timezone.utc).isoformat()
 
-    # 0. Tõsta source identifikaatorid target'ile (skeemid, mis target'il puuduvad)
+    # 0. Tõsta source andmed target'ile (kui targetil puuduvad)
+    target_changed = False
+
+    # Identifikaatorid: tõsta puuduvad skeemid üle
     src_idents = source.get("identifiers") or []
     tgt_idents = target.get("identifiers") or []
     tgt_schemes = {i.get("scheme") for i in tgt_idents}
     added_idents = [i for i in src_idents if i.get("scheme") not in tgt_schemes]
     if added_idents:
         target["identifiers"] = tgt_idents + added_idents
+        target_changed = True
+
+    # Haridustee: lisa source kirjed, mida targetil pole (institution+date combo järgi)
+    src_edu = source.get("education") or []
+    tgt_edu = target.get("education") or []
+    if src_edu:
+        def _edu_key(e):
+            inst = (e.get("institution") or {}).get("id") or (e.get("institution") or {}).get("label") or ""
+            date = (e.get("date_from") or {}).get("date") or ""
+            return (inst, date)
+        tgt_edu_keys = {_edu_key(e) for e in tgt_edu}
+        added_edu = [e for e in src_edu if _edu_key(e) not in tgt_edu_keys]
+        if added_edu:
+            target["education"] = tgt_edu + added_edu
+            target_changed = True
+
+    # Sünni/surma kuupäev: täida tühjad väljad
+    for field in ("birth", "death"):
+        src_val = source.get(field)
+        tgt_val = target.get(field)
+        src_date = (src_val or {}).get("date") if isinstance(src_val, dict) else None
+        tgt_date = (tgt_val or {}).get("date") if isinstance(tgt_val, dict) else None
+        if src_date and not tgt_date:
+            target[field] = src_val
+            target_changed = True
+
+    # Päritolu: täida tühi väli
+    src_origin = source.get("origin") or {}
+    tgt_origin = target.get("origin") or {}
+    if src_origin.get("place") and not tgt_origin.get("place"):
+        target["origin"] = src_origin
+        target_changed = True
+
+    # Ametid: lisa puuduvad (id või label järgi)
+    src_occs = source.get("occupations") or []
+    tgt_occs = target.get("occupations") or []
+    if src_occs:
+        def _occ_key(o):
+            return (o.get("id") or "").strip() or (o.get("label") or "").strip().lower()
+        tgt_occ_keys = {_occ_key(o) for o in tgt_occs if _occ_key(o)}
+        added_occs = [o for o in src_occs if _occ_key(o) not in tgt_occ_keys]
+        if added_occs:
+            target["occupations"] = tgt_occs + added_occs
+            target_changed = True
+
+    # Elulugu: täida tühi väli
+    if source.get("biography") and not target.get("biography"):
+        target["biography"] = source["biography"]
+        target_changed = True
+
+    # Märkmed: ühenda
+    src_notes = (source.get("notes") or "").strip()
+    tgt_notes = (target.get("notes") or "").strip()
+    if src_notes and src_notes not in tgt_notes:
+        target["notes"] = (tgt_notes + "\n\n" + src_notes).strip() if tgt_notes else src_notes
+        target_changed = True
+
+    if target_changed:
         target["updated_at"] = now
         target["updated_by"] = username
         atomic_write_json(_id_to_path(target_id), target)
