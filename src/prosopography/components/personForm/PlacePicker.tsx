@@ -447,30 +447,12 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             <select value={group} onChange={e => setGroup(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
               <option value="">—</option>
-              {(() => {
-                const all = Object.entries(meta?.groups ?? {}) as [string, any][];
-                const sorted = [...all].sort((a, b) => (a[1].sort_order ?? 50) - (b[1].sort_order ?? 50));
-                const children: Record<string, [string, any][]> = {};
-                const topLevel: [string, any][] = [];
-                for (const entry of sorted) {
-                  const parent = entry[1].parent;
-                  if (parent) (children[parent] ??= []).push(entry);
-                  else topLevel.push(entry);
-                }
-                return topLevel.map(([k, v]) => {
-                  const kids = children[k];
-                  const label = v.labels?.et ?? k;
-                  if (kids?.length) return (
-                    <optgroup key={k} label={label}>
-                      <option value={k}>{label} (üldine)</option>
-                      {kids.map(([ck, cv]) => (
-                        <option key={ck} value={ck}>{cv.labels?.et ?? ck}</option>
-                      ))}
-                    </optgroup>
-                  );
-                  return <option key={k} value={k}>{label}</option>;
-                });
-              })()}
+              {Object.entries(meta?.groups ?? {})
+                .filter(([, v]: any) => !v.parent)
+                .sort((a: any, b: any) => (a[1].sort_order ?? 50) - (b[1].sort_order ?? 50))
+                .map(([k, v]: any) => (
+                  <option key={k} value={k}>{v.labels?.et ?? k}</option>
+                ))}
             </select>
           </div>
         </div>
