@@ -1222,7 +1222,11 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     tgt_edu = target.get("education") or []
     if src_edu:
         def _edu_key(e):
-            inst = (e.get("institution") or {}).get("id") or (e.get("institution") or {}).get("label") or ""
+            raw = e.get("institution") or ""
+            if isinstance(raw, dict):
+                inst = raw.get("id") or raw.get("label") or ""
+            else:
+                inst = str(raw)
             date = (e.get("date_from") or {}).get("date") or ""
             return (inst, date)
         tgt_edu_keys = {_edu_key(e) for e in tgt_edu}
