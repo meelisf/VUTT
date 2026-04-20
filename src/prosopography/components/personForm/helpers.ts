@@ -182,14 +182,15 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
 }
 
 export function buildDatePayload(d: DateDraft): any {
-  if (!d.year) return null;
-  const y = d.year.padStart(4, '0');
+  const hasData = !!(d.year || d.place || d.circa || d.bound || d.calendar);
+  if (!hasData) return null;
+  const y = d.year ? d.year.padStart(4, '0') : null;
   const m = d.month ? d.month.padStart(2, '0') : '01';
   const day = d.day ? d.day.padStart(2, '0') : '01';
-  const precision = d.day && d.month ? 'day' : d.month ? 'month' : 'year';
+  const precision = d.day && d.month ? 'day' : d.month ? 'month' : d.year ? 'year' : null;
   return {
     original_text: null,
-    date: `${y}-${m}-${day}`,
+    date: y ? `${y}-${m}-${day}` : null,
     date_to: null,
     bound: d.bound || null,
     precision,
