@@ -35,10 +35,21 @@ interface AddPlaceModalProps {
   token: string;
 }
 
-const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAdd, onClose, token }) => {
+interface WdPreview {
+  q: string;
+  proposedKey: string;
+  labels: Record<string, string>;
+  type: string;
+}
+
+const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: initialPlaces, onAdd, onClose, token }) => {
   const { t, i18n } = useTranslation('prosopography');
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const wdTimer = useRef<ReturnType<typeof setTimeout>>();
+  const parentWdTimer = useRef<ReturnType<typeof setTimeout>>();
+
+  // Lokaalne places — kasvab kui lisatakse ülempiirkond
+  const [places, setPlaces] = useState(initialPlaces);
 
   // Wikidata otsing (põhikoht)
   const [wdQuery, setWdQuery] = useState(query);
@@ -48,10 +59,20 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
   const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
   const [wdLoading, setWdLoading] = useState(false);
 
-  // Parent key otsing (ülempiirkond)
+  // Parent — registriotsing
   const [parentQuery, setParentQuery] = useState('');
   const [parentDropOpen, setParentDropOpen] = useState(false);
   const [parentKey, setParentKey] = useState('');
+
+  // Parent — Wikidata otsing + lisamine
+  const [parentWdOpen, setParentWdOpen] = useState(false);
+  const [parentWdQuery, setParentWdQuery] = useState('');
+  const [parentWdResults, setParentWdResults] = useState<{ q: string; label: string; description: string; aliases: string[] }[]>([]);
+  const [parentWdSearching, setParentWdSearching] = useState(false);
+  const [parentWdPreview, setParentWdPreview] = useState<WdPreview | null>(null);
+  const [parentWdLoading, setParentWdLoading] = useState(false);
+  const [parentWdAdding, setParentWdAdding] = useState(false);
+  const [parentWdError, setParentWdError] = useState<string | null>(null);
 
   // Vorm
   const [labels, setLabels] = useState<Record<string, string>>({});
@@ -63,6 +84,13 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
   const [error, setError] = useState<string | null>(null);
 
   const wdLang = lang === 'et' ? 'en' : lang;
+
+  const resolveLabel = (lbls: Record<string, string> | undefined | null) => {
+    if (!lbls) return '';
+    return lbls[lang] ?? lbls.et ?? lbls.en ?? Object.values(lbls)[0] ?? '';
+  };
+
+  // ── Põhikoha Wikidata otsing ─────────────────────────────────────────────
 
   const triggerWdSearch = (v: string) => {
     clearTimeout(wdTimer.current);
@@ -104,11 +132,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
     }
   };
 
-  // Ülempiirkonna otsing üle olemasolevate places
-  const resolveLabel = (lbls: Record<string, string> | undefined | null) => {
-    if (!lbls) return '';
-    return lbls[lang] ?? lbls.et ?? lbls.en ?? Object.values(lbls)[0] ?? '';
-  };
+  // ── Ülempiirkonna registriotsing ─────────────────────────────────────────
 
   const filteredParents = useMemo(() => {
     const q = parentQuery.toLowerCase();
@@ -116,8 +140,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
     return Object.entries(places)
       .filter(([k, e]) => {
         const inLabels = Object.values(e.labels ?? {}).some(l => l.toLowerCase().includes(q));
-        const inKey = k.toLowerCase().includes(q);
-        return inLabels || inKey;
+        return inLabels || k.toLowerCase().includes(q);
       })
       .slice(0, 10);
   }, [parentQuery, places]);
@@ -126,18 +149,79 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
     setParentKey(key);
     setParentQuery(resolveLabel(places[key]?.labels) || key);
     setParentDropOpen(false);
+    setParentWdOpen(false);
+    setParentWdPreview(null);
   };
 
   const handleP131Click = (p: { label_en: string; label_sv: string }) => {
     const label = p.label_sv || p.label_en;
     setParentQuery(label);
     setParentDropOpen(true);
-    // Kui täpne vaste olemas, vali kohe
+    setParentWdOpen(false);
     const exact = Object.entries(places).find(([, e]) =>
       Object.values(e.labels ?? {}).some(l => l.toLowerCase() === label.toLowerCase())
     );
-    if (exact) selectParent(exact[0]);
+    if (exact) { selectParent(exact[0]); return; }
+    // Ei leitud registrist — ava automaatselt Wikidata otsing
+    setParentWdOpen(true);
+    setParentWdQuery(label);
+    setParentWdResults([]);
+    setParentWdPreview(null);
+    setParentWdSearching(true);
+    searchWikidataPlaces(label, wdLang).then(r => { setParentWdResults(r); setParentWdSearching(false); });
   };
+
+  // ── Ülempiirkonna Wikidata otsing ─────────────────────────────────────────
+
+  const triggerParentWdSearch = (v: string) => {
+    clearTimeout(parentWdTimer.current);
+    setParentWdPreview(null);
+    if (!v.trim()) { setParentWdResults([]); return; }
+    setParentWdSearching(true);
+    parentWdTimer.current = setTimeout(async () => {
+      const results = await searchWikidataPlaces(v.trim(), wdLang);
+      setParentWdResults(results);
+      setParentWdSearching(false);
+    }, 350);
+  };
+
+  const handleSelectParentWd = async (item: { q: string; label: string }) => {
+    setParentWdResults([]);
+    setParentWdQuery(item.label);
+    setParentWdLoading(true);
+    setParentWdError(null);
+    try {
+      const wd = await fetchPlaceWikidata(item.q);
+      const lbls = Object.keys(wd.labels ?? {}).length > 0 ? wd.labels : { et: item.label, en: item.label };
+      const proposedKey = (lbls.et || lbls.en || item.label).replace(/\s+/g, '_');
+      setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '' });
+    } catch {
+      setParentWdError('Wikidata päring ebaõnnestus');
+    } finally {
+      setParentWdLoading(false);
+    }
+  };
+
+  const handleAddParentFromWd = async () => {
+    if (!parentWdPreview) return;
+    setParentWdAdding(true);
+    setParentWdError(null);
+    try {
+      const result = await addPlace(parentWdPreview.proposedKey, {
+        labels: parentWdPreview.labels,
+        id: parentWdPreview.q,
+        type: parentWdPreview.type || undefined,
+      }, token);
+      setPlaces(prev => ({ ...prev, [result.key]: result.entry }));
+      selectParent(result.key);
+    } catch (e: any) {
+      setParentWdError(e.message ?? 'Lisamine ebaõnnestus');
+    } finally {
+      setParentWdAdding(false);
+    }
+  };
+
+  // ── Salvestamine ─────────────────────────────────────────────────────────
 
   const handleSave = async () => {
     if (!name.trim()) { setError(t('form.nameRequired')); return; }
@@ -170,7 +254,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
         </div>
         {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
 
-        {/* Wikidata otsing */}
+        {/* Põhikoha Wikidata otsing */}
         <div className="mb-4">
           <label className="block text-xs text-gray-500 mb-1">Otsi Wikidatast</label>
           <div className="flex gap-2">
@@ -183,20 +267,16 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
               autoFocus
               className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
             />
-            <button
-              type="button"
-              disabled={wdSearching || !wdQuery.trim()}
+            <button type="button" disabled={wdSearching || !wdQuery.trim()}
               onClick={() => { clearTimeout(wdTimer.current); setWdSearching(true); searchWikidataPlaces(wdQuery.trim(), wdLang).then(r => { setWdResults(r); setWdSearching(false); }); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
-            >
+              className="flex items-center gap-1 px-2.5 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50">
               {wdSearching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
             </button>
           </div>
           {wdResults.length > 0 && (
             <div className="mt-1 border border-gray-200 rounded-lg shadow-sm max-h-48 overflow-y-auto bg-white">
               {wdResults.map(r => (
-                <button key={r.q} type="button"
-                  onClick={() => handleSelectWdResult(r)}
+                <button key={r.q} type="button" onClick={() => handleSelectWdResult(r)}
                   className="w-full text-left px-3 py-2 hover:bg-primary-50 border-b border-gray-50 last:border-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-medium text-gray-900">{r.label}</span>
@@ -255,35 +335,110 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places, onAd
           </div>
           {!qCode.trim() && <p className="text-xs text-amber-600">{t('noQCode')}</p>}
 
-          {/* Ülempiirkond — otsib olemasolevaid kohti */}
-          <div className="relative">
+          {/* Ülempiirkond */}
+          <div>
             <label className="block text-xs text-gray-500 mb-1">Ülempiirkond (valikuline)</label>
-            <input
-              type="text"
-              value={parentQuery}
-              onChange={e => { setParentQuery(e.target.value); setParentKey(''); setParentDropOpen(true); }}
-              onFocus={() => setParentDropOpen(true)}
-              onBlur={() => setTimeout(() => setParentDropOpen(false), 150)}
-              placeholder="Otsi olemasolevat piirkonda…"
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
-            />
-            {parentKey && (
-              <span className="absolute right-2 top-6 text-xs font-mono text-gray-400">{parentKey}</span>
+
+            {/* Registriotsing */}
+            <div className="relative">
+              <input
+                type="text"
+                value={parentKey ? `${parentQuery} (${parentKey})` : parentQuery}
+                onChange={e => {
+                  const v = e.target.value;
+                  setParentQuery(v);
+                  setParentKey('');
+                  setParentDropOpen(true);
+                  setParentWdPreview(null);
+                }}
+                onFocus={() => { if (!parentKey) setParentDropOpen(true); }}
+                onBlur={() => setTimeout(() => setParentDropOpen(false), 150)}
+                placeholder="Otsi olemasolevat piirkonda…"
+                readOnly={!!parentKey}
+                className={`w-full px-2 py-1.5 text-sm border rounded focus:ring-1 focus:ring-primary-500 outline-none ${parentKey ? 'border-green-300 bg-green-50 text-green-800' : 'border-gray-300'}`}
+              />
+              {parentKey && (
+                <button type="button" onClick={() => { setParentKey(''); setParentQuery(''); setParentWdPreview(null); }}
+                  className="absolute right-2 top-1.5 text-gray-400 hover:text-gray-600">
+                  <X size={13} />
+                </button>
+              )}
+              {parentDropOpen && !parentKey && filteredParents.length > 0 && (
+                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
+                  {filteredParents.map(([k, e]) => (
+                    <button key={k} type="button" onMouseDown={() => selectParent(k)}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-primary-50 border-b border-gray-50 last:border-0 flex items-baseline gap-2">
+                      <span className="font-medium">{resolveLabel(e.labels)}</span>
+                      {e.type && <span className="text-xs text-gray-400">({e.type})</span>}
+                      <span className="ml-auto text-xs font-mono text-gray-300">{k}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Wikidata otsingulüliti */}
+            {!parentKey && (
+              <button type="button"
+                onClick={() => { setParentWdOpen(v => !v); setParentWdResults([]); setParentWdPreview(null); setParentWdError(null); }}
+                className="mt-1.5 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                <Search size={11} />
+                {parentWdOpen ? 'Peida Wikidata otsing' : 'Otsi Wikidatast'}
+              </button>
             )}
-            {parentDropOpen && filteredParents.length > 0 && (
-              <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                {filteredParents.map(([k, e]) => (
-                  <button key={k} type="button" onMouseDown={() => selectParent(k)}
-                    className="w-full text-left px-3 py-1.5 text-sm hover:bg-primary-50 border-b border-gray-50 last:border-0 flex items-baseline gap-2">
-                    <span className="font-medium">{resolveLabel(e.labels)}</span>
-                    {e.type && <span className="text-xs text-gray-400">({e.type})</span>}
-                    <span className="ml-auto text-xs font-mono text-gray-300">{k}</span>
+
+            {/* Ülempiirkonna Wikidata otsing */}
+            {parentWdOpen && !parentKey && (
+              <div className="mt-2 bg-blue-50 border border-blue-200 rounded p-2.5 space-y-2">
+                <div className="flex gap-2">
+                  <input type="text" value={parentWdQuery}
+                    onChange={e => { setParentWdQuery(e.target.value); triggerParentWdSearch(e.target.value); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); triggerParentWdSearch(parentWdQuery); } }}
+                    placeholder="nt Gästrikland, Livonia…"
+                    className="flex-1 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
+                  />
+                  <button type="button" disabled={parentWdSearching || !parentWdQuery.trim()}
+                    onClick={() => { clearTimeout(parentWdTimer.current); setParentWdSearching(true); searchWikidataPlaces(parentWdQuery.trim(), wdLang).then(r => { setParentWdResults(r); setParentWdSearching(false); }); }}
+                    className="flex items-center px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+                    {parentWdSearching ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
                   </button>
-                ))}
+                </div>
+                {parentWdResults.length > 0 && (
+                  <div className="border border-blue-200 rounded bg-white max-h-36 overflow-y-auto">
+                    {parentWdResults.map(r => (
+                      <button key={r.q} type="button" onClick={() => handleSelectParentWd(r)}
+                        className="w-full text-left px-2.5 py-1.5 hover:bg-blue-50 border-b border-gray-50 last:border-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm font-medium text-gray-900">{r.label}</span>
+                          <span className="text-xs font-mono text-gray-400">{r.q}</span>
+                        </div>
+                        {r.description && <p className="text-xs text-gray-500">{r.description}</p>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {parentWdLoading && <p className="text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Laen…</p>}
+                {parentWdPreview && !parentWdLoading && (
+                  <div className="bg-white border border-blue-300 rounded p-2 space-y-1">
+                    <div className="text-xs text-gray-600 space-y-0.5">
+                      {Object.entries(parentWdPreview.labels).map(([l, lbl]) => (
+                        <div key={l}><span className="font-mono text-gray-400 w-5 inline-block">{l}</span> {lbl}</div>
+                      ))}
+                      <div className="text-gray-400 mt-0.5">
+                        võti: <span className="font-mono">{parentWdPreview.proposedKey}</span>
+                        {parentWdPreview.type && <span className="ml-2">tüüp: {parentWdPreview.type}</span>}
+                      </div>
+                    </div>
+                    {parentWdError && <p className="text-xs text-red-600">{parentWdError}</p>}
+                    <button type="button" onClick={handleAddParentFromWd} disabled={parentWdAdding}
+                      className="w-full px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1">
+                      {parentWdAdding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+                      Lisa ülempiirkond registrisse
+                    </button>
+                  </div>
+                )}
+                {parentWdError && !parentWdPreview && <p className="text-xs text-red-600">{parentWdError}</p>}
               </div>
-            )}
-            {parentDropOpen && parentQuery && filteredParents.length === 0 && (
-              <p className="mt-1 text-xs text-gray-400 italic">Ei leitud — lisa ülempiirkond esmalt eraldi</p>
             )}
           </div>
 
@@ -341,8 +496,7 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
       .filter(([k, e]) => {
         const inLabels = Object.values(e.labels ?? {}).some(l => l.toLowerCase().includes(q));
         const inHistorical = (e.historical_names ?? []).some((n: string) => n.toLowerCase().includes(q));
-        const inKey = k.toLowerCase().includes(q);
-        return inLabels || inHistorical || inKey;
+        return inLabels || inHistorical || k.toLowerCase().includes(q);
       })
       .slice(0, 12);
   }, [query, places]);
@@ -360,12 +514,11 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
 
   const resolvedGroup = (() => {
     if (!selectedEntry) return null;
-    const entry = selectedEntry;
-    if (entry.group) {
-      const g = meta?.groups[entry.group];
-      return g?.labels ? resolveLabel(g.labels) : entry.group;
+    if (selectedEntry.group) {
+      const g = meta?.groups[selectedEntry.group];
+      return g?.labels ? resolveLabel(g.labels) : selectedEntry.group;
     }
-    const pk = entry.parent_key;
+    const pk = selectedEntry.parent_key;
     if (pk) {
       const parentEntry = places[pk];
       if (parentEntry?.group) {
@@ -405,19 +558,15 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
       )}
 
       {resolvedGroup && value && (
-        <p className="mt-0.5 text-xs text-gray-400">
-          {t('placeGroup', { group: resolvedGroup })}
-        </p>
+        <p className="mt-0.5 text-xs text-gray-400">{t('placeGroup', { group: resolvedGroup })}</p>
       )}
 
       {showDropdown && query && (
         <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
           {filtered.map(([key, entry]) => (
-            <button
-              key={key}
+            <button key={key}
               className="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-primary-50 border-b border-gray-50 last:border-0"
-              onMouseDown={() => handleSelect(key)}
-            >
+              onMouseDown={() => handleSelect(key)}>
               <span className="font-medium">{resolveLabel(entry.labels)}</span>
               {entry.type && <span className="ml-1.5 text-xs text-gray-400">({entry.type})</span>}
             </button>
@@ -425,8 +574,7 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
           {canEdit && (
             <button
               className="w-full text-left px-3 py-2 text-sm text-primary-600 hover:bg-primary-50 flex items-center gap-1.5 border-t border-gray-100"
-              onMouseDown={() => { setShowDropdown(false); setShowAddModal(true); }}
-            >
+              onMouseDown={() => { setShowDropdown(false); setShowAddModal(true); }}>
               <Plus size={13} />
               {t('addPlace')}
             </button>
