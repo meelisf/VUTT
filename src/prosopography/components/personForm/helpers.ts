@@ -1,6 +1,24 @@
 import type { ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft } from './types';
+import { emptyDateDraft } from './types';
 import { isQCode } from '../../../utils/qcodeUtils';
+
+function isoStringToDraft(iso: string): DateDraft {
+  const [y, m, d] = iso.split('-').map(Number);
+  return { ...emptyDateDraft(), year: y ? String(y) : '', month: m ? String(m) : '', day: d ? String(d) : '' };
+}
+
+function historicalDateToDraft(h: any): DateDraft {
+  return {
+    year: h.date ? h.date.slice(0, 4) : '',
+    month: h.date && h.precision !== 'year' ? String(parseInt(h.date.slice(5, 7))) : '',
+    day: h.date && h.precision === 'day' ? String(parseInt(h.date.slice(8, 10))) : '',
+    circa: h.is_circa ?? false,
+    bound: h.bound ?? '',
+    calendar: h.calendar ?? '',
+    place: h.place?.label ? { label: h.place.label, id: h.place.id ?? null, labels: null, source: 'wikidata' as const } : null,
+  };
+}
 
 // Rakendab fetch_and_diff auto_filled väljad olemasolevale draftile
 export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: FormDraft): FormDraft {
@@ -124,14 +142,24 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     occupations: (p.occupations ?? []).map((o: any) => ({
       label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
       institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
-      year_from: o.year_from ? String(o.year_from) : (o.year ? String(o.year) : ''),
-      year_to: o.year_to ? String(o.year_to) : '',
+      date_from: o.date_from ? historicalDateToDraft(o.date_from)
+        : (o.year_from ? { ...emptyDateDraft(), year: String(o.year_from) }
+        : (o.year ? { ...emptyDateDraft(), year: String(o.year) } : emptyDateDraft())),
+      date_to: o.date_to ? historicalDateToDraft(o.date_to)
+        : (o.year_to ? { ...emptyDateDraft(), year: String(o.year_to) } : emptyDateDraft()),
     })),
     education: (p.education ?? []).map((e: any) => ({
       institution: e.institution ?? e.label ?? String(e),
       institution_id: e.institution_id ?? null, institution_labels: e.institution_labels ?? undefined,
-      year_from: e.year_from ? String(e.year_from) : (e.year ? String(e.year) : ''),
-      year_to: e.year_to ? String(e.year_to) : '',
+      date_from: e.date_from ? historicalDateToDraft(e.date_from)
+        : (e.date_start ? isoStringToDraft(e.date_start)
+        : (e.year_from ? { ...emptyDateDraft(), year: String(e.year_from) }
+        : (e.year ? { ...emptyDateDraft(), year: String(e.year) } : emptyDateDraft()))),
+      date_to: e.date_to ? historicalDateToDraft(e.date_to)
+        : (e.date_end ? isoStringToDraft(e.date_end)
+        : (e.year_to ? { ...emptyDateDraft(), year: String(e.year_to) } : emptyDateDraft())),
+      edu_type: e.type ?? undefined,
+      source: e.source ?? undefined,
     })),
     tags: (p.tags ?? []).map((t: any) => ({ label: t.label ?? String(t), id: t.id ?? null, labels: t.labels ?? undefined })),
     relations: (p.relations ?? []).map((r: any) => ({
@@ -231,15 +259,17 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
       ...(o.institution?.trim() ? { institution: o.institution.trim() } : {}),
       ...(o.institution_id ? { institution_id: o.institution_id } : {}),
       ...(o.institution_labels ? { institution_labels: o.institution_labels } : {}),
-      ...(o.year_from?.trim() ? { year_from: parseInt(o.year_from) } : {}),
-      ...(o.year_to?.trim() ? { year_to: parseInt(o.year_to) } : {}),
+      ...(o.date_from?.year?.trim() ? { date_from: buildDatePayload(o.date_from) } : {}),
+      ...(o.date_to?.year?.trim() ? { date_to: buildDatePayload(o.date_to) } : {}),
     })),
     education: draft.education.filter(e => e.institution.trim()).map(e => ({
       institution: e.institution.trim(),
       ...(e.institution_id ? { institution_id: e.institution_id } : {}),
       ...(e.institution_labels ? { institution_labels: e.institution_labels } : {}),
-      ...(e.year_from?.trim() ? { year_from: parseInt(e.year_from) } : {}),
-      ...(e.year_to?.trim() ? { year_to: parseInt(e.year_to) } : {}),
+      ...(e.date_from?.year?.trim() ? { date_from: buildDatePayload(e.date_from) } : {}),
+      ...(e.date_to?.year?.trim() ? { date_to: buildDatePayload(e.date_to) } : {}),
+      ...(e.edu_type ? { type: e.edu_type } : {}),
+      ...(e.source ? { source: e.source } : {}),
     })),
     tags: draft.tags.filter(t => t.label.trim()).map(t => ({
       label: t.label.trim(),

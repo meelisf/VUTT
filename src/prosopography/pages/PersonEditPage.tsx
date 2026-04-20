@@ -10,7 +10,7 @@ import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonI
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
 
-import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft } from '../components/personForm/types';
+import { type FormDraft, type OccupationDraft, type EducationDraft, emptyDraft, emptyDateDraft } from '../components/personForm/types';
 import { recordToDraft, draftToPayload } from '../components/personForm/helpers';
 import DateField from '../components/personForm/DateField';
 import AliasesList from '../components/personForm/AliasesList';
@@ -606,15 +606,23 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-xs text-gray-400 shrink-0">{t('form.period')}</span>
-                  <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
-                  <span className="text-gray-400">–</span>
-                  <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
+                <div className="grid grid-cols-2 gap-2">
+                  <DateField
+                    label={t('form.from')}
+                    value={item.date_from ?? emptyDateDraft()}
+                    onChange={v => onChange({ ...item, date_from: v })}
+                    showPlace={false}
+                  />
+                  <DateField
+                    label={t('form.to')}
+                    value={item.date_to ?? emptyDateDraft()}
+                    onChange={v => onChange({ ...item, date_to: v })}
+                    showPlace={false}
+                  />
                 </div>
               </div>
             )}
-            onAdd={() => set({ occupations: [...draft.occupations, { label: '' }] })}
+            onAdd={() => set({ occupations: [...draft.occupations, { label: '', date_from: emptyDateDraft(), date_to: emptyDateDraft() }] })}
             onChange={items => set({ occupations: items })}
           />
 
@@ -639,15 +647,23 @@ const PersonEditPage: React.FC = () => {
                     <X size={14} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 shrink-0">{t('form.period')}</span>
-                  <input type="number" min={1000} max={1900} value={item.year_from ?? ''} onChange={e => onChange({ ...item, year_from: e.target.value })} placeholder="alates" className={`w-20 ${inputCls}`} />
-                  <span className="text-gray-400">–</span>
-                  <input type="number" min={1000} max={1900} value={item.year_to ?? ''} onChange={e => onChange({ ...item, year_to: e.target.value })} placeholder="kuni" className={`w-20 ${inputCls}`} />
+                <div className="grid grid-cols-2 gap-2">
+                  <DateField
+                    label={t('form.from')}
+                    value={item.date_from ?? emptyDateDraft()}
+                    onChange={v => onChange({ ...item, date_from: v })}
+                    showPlace={false}
+                  />
+                  <DateField
+                    label={t('form.to')}
+                    value={item.date_to ?? emptyDateDraft()}
+                    onChange={v => onChange({ ...item, date_to: v })}
+                    showPlace={false}
+                  />
                 </div>
               </div>
             )}
-            onAdd={() => set({ education: [...draft.education, { institution: '' }] })}
+            onAdd={() => set({ education: [...draft.education, { institution: '', date_from: emptyDateDraft(), date_to: emptyDateDraft() }] })}
             onChange={items => set({ education: items })}
           />
 

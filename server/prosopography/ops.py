@@ -124,9 +124,11 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     imm_date: Optional[str] = None
     for edu in (person.get("education") or []):
         if (edu.get("source") == "album_academicum" or
-                (edu.get("institution") == "Academia Gustaviana" and
-                 "imm" in (edu.get("type") or "").lower())):
-            date_str = edu.get("date_start") or ""
+                (edu.get("institution") == "Academia Gustaviana" and (
+                    "imm" in (edu.get("type") or "").lower() or
+                    edu.get("date_from") or edu.get("date_start")
+                ))):
+            date_str = edu.get("date_start") or (edu.get("date_from") or {}).get("date") or ""
             if len(date_str) >= 4:
                 try:
                     imm_year = int(date_str[:4])

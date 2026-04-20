@@ -386,11 +386,16 @@ const PersonDetailPage: React.FC = () => {
             {(() => {
               const immEdu = (person.education ?? []).find(e =>
                 e.source === 'album_academicum' ||
-                (e.institution === 'Academia Gustaviana' && (e.type ?? '').toLowerCase().includes('imm'))
+                (e.institution === 'Academia Gustaviana' && (
+                  (e.type ?? '').toLowerCase().includes('imm') ||
+                  e.date_from || e.date_start
+                ))
               );
               const aaId = (person.identifiers ?? []).find(i => i.scheme === 'album_academicum')?.id;
               if (!immEdu && !aaId) return null;
-              const dateLabel = immEdu?.date_start ? formatImmDate(immEdu.date_start, lang) : null;
+              const dateLabel = immEdu?.date_from?.date
+                ? formatImmDate(immEdu.date_from.date, lang)
+                : (immEdu?.date_start ? formatImmDate(immEdu.date_start, lang) : null);
               return (
                 <div className="grid grid-cols-2 gap-4">
                   <div>

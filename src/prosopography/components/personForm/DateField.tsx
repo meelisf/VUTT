@@ -10,11 +10,12 @@ const DateField: React.FC<{
   onChange: (v: DateDraft) => void;
   lang?: string;
   localSuggestions?: { label: string; id: string }[];
-}> = ({ label, value, onChange, lang = 'et', localSuggestions }) => {
+  showPlace?: boolean;
+}> = ({ label, value, onChange, lang = 'et', localSuggestions, showPlace = true }) => {
   const { t } = useTranslation(['prosopography']);
   const set = (patch: Partial<DateDraft>) => onChange({ ...value, ...patch });
 
-  const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || value.place);
+  const hasDetail = !!(value.month || value.day || value.circa || value.bound || value.calendar || (showPlace && value.place));
   const [open, setOpen] = useState(hasDetail);
   // Ava automaatselt kui rikastamine lisab koha/täpsuse väljalt
   useEffect(() => { if (hasDetail) setOpen(true); }, [hasDetail]);
@@ -107,15 +108,17 @@ const DateField: React.FC<{
               <option value="julian">{t('dateField.julian')}</option>
               <option value="gregorian">{t('dateField.gregorian')}</option>
             </select>
-            <EntityPicker
-              label=""
-              placeholder={t('dateField.place')}
-              type="place"
-              value={value.place}
-              onChange={v => set({ place: v })}
-              lang={lang}
-              localSuggestions={localSuggestions}
-            />
+            {showPlace && (
+              <EntityPicker
+                label=""
+                placeholder={t('dateField.place')}
+                type="place"
+                value={value.place}
+                onChange={v => set({ place: v })}
+                lang={lang}
+                localSuggestions={localSuggestions}
+              />
+            )}
           </div>
         </div>
       )}

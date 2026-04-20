@@ -10,15 +10,18 @@ export interface DateDraft {
   place: LinkedEntity | null;
 }
 
+export const emptyDateDraft = (): DateDraft => ({ year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null });
+
 export interface OccupationDraft {
   label: string; id?: string | null; labels?: Record<string, string>;
   institution?: string; institution_id?: string | null; institution_labels?: Record<string, string>;
-  year_from?: string; year_to?: string;
+  date_from?: DateDraft; date_to?: DateDraft;
 }
 
 export interface EducationDraft {
   institution: string; institution_id?: string | null; institution_labels?: Record<string, string>;
-  year_from?: string; year_to?: string;
+  date_from?: DateDraft; date_to?: DateDraft;
+  edu_type?: string; source?: string;
 }
 
 export interface TagDraft { label: string; id?: string | null; labels?: Record<string, string> }
