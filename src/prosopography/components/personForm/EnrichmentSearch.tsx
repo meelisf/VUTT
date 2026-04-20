@@ -52,7 +52,8 @@ const EnrichmentSearch: React.FC<Props> = ({ draft, token, onEnrich }) => {
     if (af['name.aliases']?.length) fields.push(t('enrich.fieldsBrief.nameAliases'));
     if (af['_linked_wikidata']) fields.push('Wikidata link');
     if (af['_linked_gnd']) fields.push('GND link');
-    if (af['_aa_education']?.length) fields.push(t('enrich.fieldsBrief.education', 'Haridustee'));
+    if (af['_aa_education']?.length) fields.push(t('enrich.fieldsBrief.education'));
+    if (af['_aa_origin']) fields.push(t('enrich.fieldsBrief.origin'));
     return fields;
   };
 

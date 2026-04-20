@@ -34,6 +34,7 @@ const FIELD_I18N: Record<string, string> = {
   _linked_wikidata: 'linkedWikidata',
   _linked_gnd: 'linkedGnd',
   _aa_education: 'education',
+  _aa_origin: 'origin',
 };
 
 type DiffResult = {
@@ -83,10 +84,18 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
     return i18nKey ? t(`enrich.fieldLabels.${i18nKey}`) : key;
   };
 
+  const formatEduEntry = (e: any): string => {
+    const date = e.date_from?.date ? ` (${e.edu_type ? e.edu_type + ' ' : ''}${e.date_from.date.slice(0, 10)})` : (e.edu_type ? ` (${e.edu_type})` : '');
+    return `${e.institution ?? '?'}${date}`;
+  };
+
   const formatVal = (val: any): string => {
     if (val === null || val === undefined) return '—';
     if (Array.isArray(val)) {
-      return val.map(v => (typeof v === 'object' ? v.label ?? JSON.stringify(v) : String(v))).join(', ');
+      return val.map(v => {
+        if (typeof v === 'object' && v !== null && 'institution' in v) return formatEduEntry(v);
+        return typeof v === 'object' ? (v.label ?? JSON.stringify(v)) : String(v);
+      }).join('; ');
     }
     if (typeof val === 'object') return val.label ?? JSON.stringify(val);
     if (val === 'M') return t('enrich.fieldLabels.genderM');

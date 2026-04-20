@@ -513,12 +513,12 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
     except Exception:
         pass
 
-    # Sünnikoht päritolu järgi (kui sünnikoht puudub)
+    # Päritolupiirkond → origin_place (mitte sünnikoht)
     try:
         origin = entry.get("person", {}).get("origin") or {}
         region = origin.get("standardized_region") or origin.get("region")
         if region:
-            result["birth.place"] = {"id": None, "label": region}
+            result["_aa_origin"] = region
     except Exception:
         pass
 

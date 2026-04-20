@@ -179,7 +179,9 @@
       "linkedWikidata": "Wikidata link",
       "linkedGnd": "GND link",
       "genderM": "Male",
-      "genderF": "Female"
+      "genderF": "Female",
+      "education": "Education",
+      "origin": "Place of origin"
     },
     "fieldsBrief": {
       "gender": "gender",
@@ -190,7 +192,9 @@
       "occupations": "occupations",
       "confession": "confession",
       "status": "status",
-      "nameAliases": "name variants"
+      "nameAliases": "name variants",
+      "education": "education",
+      "origin": "place of origin"
     }
   },
   "loadMore": "Load more",

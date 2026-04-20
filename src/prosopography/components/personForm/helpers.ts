@@ -100,6 +100,11 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     patch.biography = autoFilled['biography'];
   }
 
+  // Päritolukoht AA-st
+  if (autoFilled['_aa_origin'] && !draft.origin_place) {
+    patch.origin_place = autoFilled['_aa_origin'];
+  }
+
   // Haridustee AA-st: lisa puuduvad kirjed (institution järgi dedup)
   if (autoFilled['_aa_education']?.length) {
     const existingInst = new Set(draft.education.map((e: any) => (e.institution || '').toLowerCase()));

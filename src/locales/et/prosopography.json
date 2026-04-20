@@ -179,7 +179,9 @@
       "linkedWikidata": "Wikidata link",
       "linkedGnd": "GND link",
       "genderM": "Meessoost",
-      "genderF": "Naissoost"
+      "genderF": "Naissoost",
+      "education": "Haridustee",
+      "origin": "Päritolukoht"
     },
     "fieldsBrief": {
       "gender": "sugu",
@@ -190,7 +192,9 @@
       "occupations": "ametid",
       "confession": "konfessioon",
       "status": "seisus",
-      "nameAliases": "nimevariandid"
+      "nameAliases": "nimevariandid",
+      "education": "haridustee",
+      "origin": "päritolukoht"
     }
   },
   "loadMore": "Lae veel",
