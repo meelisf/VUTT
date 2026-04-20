@@ -1,5 +1,5 @@
 import type { ProsopoRecord } from '../../types';
-import type { FormDraft, DateDraft } from './types';
+import type { FormDraft, DateDraft, EducationDraft } from './types';
 import { emptyDateDraft } from './types';
 import { isQCode } from '../../../utils/qcodeUtils';
 
@@ -98,6 +98,31 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   // Biograafia (AA raw_text) — ainult kui tühi
   if (autoFilled['biography'] && !draft.biography.trim()) {
     patch.biography = autoFilled['biography'];
+  }
+
+  // Haridustee AA-st: lisa puuduvad kirjed (institution järgi dedup)
+  if (autoFilled['_aa_education']?.length) {
+    const existingInst = new Set(draft.education.map((e: any) => (e.institution || '').toLowerCase()));
+    const newEntries: EducationDraft[] = (autoFilled['_aa_education'] as any[])
+      .filter(e => !existingInst.has((e.institution || '').toLowerCase()))
+      .map(e => ({
+        institution: e.institution,
+        institution_id: null,
+        edu_type: e.edu_type ?? '',
+        source: e.source ?? 'album_academicum',
+        date_from: e.date_from ? {
+          year: e.date_from.date?.slice(0, 4) ?? '',
+          month: e.date_from.precision !== 'year' ? String(parseInt(e.date_from.date?.slice(5, 7) ?? '0')) : '',
+          day: e.date_from.precision === 'day' ? String(parseInt(e.date_from.date?.slice(8, 10) ?? '0')) : '',
+          circa: false,
+          bound: '',
+          calendar: '' as any,
+          place: null,
+        } : undefined,
+      }));
+    if (newEntries.length > 0) {
+      patch.education = [...draft.education, ...newEntries];
+    }
   }
 
   return { ...draft, ...patch };

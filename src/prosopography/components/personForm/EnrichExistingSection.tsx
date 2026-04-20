@@ -33,6 +33,7 @@ const FIELD_I18N: Record<string, string> = {
   biography: 'biography',
   _linked_wikidata: 'linkedWikidata',
   _linked_gnd: 'linkedGnd',
+  _aa_education: 'education',
 };
 
 type DiffResult = {

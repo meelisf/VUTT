@@ -530,4 +530,31 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
     except Exception:
         pass
 
+    # Haridustee: immatrikuleerumine AA-sse + teised ülikoolid
+    try:
+        edu_entries = []
+        entry_date = entry.get("entry_date")
+        if entry_date:
+            prec = "day" if len(entry_date) >= 10 else ("month" if len(entry_date) >= 7 else "year")
+            edu_entries.append({
+                "institution": "Academia Gustaviana",
+                "edu_type": "imm.",
+                "date_from": {"date": entry_date[:10], "precision": prec},
+                "source": "album_academicum",
+            })
+        for s in (entry.get("studies") or []):
+            inst = s.get("institution")
+            date_str = s.get("date")
+            if not inst:
+                continue
+            entry_obj: dict = {"institution": inst, "edu_type": s.get("type") or "imm.", "source": "album_academicum"}
+            if date_str:
+                prec = "day" if len(date_str) >= 10 else ("month" if len(date_str) >= 7 else "year")
+                entry_obj["date_from"] = {"date": date_str[:10], "precision": prec}
+            edu_entries.append(entry_obj)
+        if edu_entries:
+            result["_aa_education"] = edu_entries
+    except Exception:
+        pass
+
     return result
