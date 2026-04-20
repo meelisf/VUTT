@@ -116,16 +116,29 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClo
         {/* Wikidata otsing */}
         <div className="mb-4">
           <label className="block text-xs text-gray-500 mb-1">Otsi Wikidatast</label>
-          <div className="relative">
+          <div className="flex gap-2">
             <input
               type="text"
               value={wdQuery}
               onChange={e => handleWdQueryChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleWdQueryChange(wdQuery); } }}
               placeholder="nt Gävle, Riga, Westphalia…"
               autoFocus
-              className="w-full px-2 py-1.5 pr-7 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
+              className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
             />
-            {wdSearching && <Loader2 size={13} className="absolute right-2 top-2 animate-spin text-gray-400" />}
+            <button
+              type="button"
+              disabled={wdSearching || !wdQuery.trim()}
+              onClick={() => {
+                clearTimeout(searchTimer.current);
+                if (!wdQuery.trim()) return;
+                setWdSearching(true);
+                searchPlacesWikidata(wdQuery.trim(), lang === 'et' ? 'en' : lang).then(r => { setWdResults(r); setWdSearching(false); });
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-sm bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-50"
+            >
+              {wdSearching ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+            </button>
           </div>
           {wdResults.length > 0 && (
             <div className="mt-1 border border-gray-200 rounded-lg shadow-sm max-h-56 overflow-y-auto bg-white">
