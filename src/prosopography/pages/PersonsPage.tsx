@@ -1,14 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Briefcase } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
-import BulkOccupationModal from '../components/BulkOccupationModal';
 import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
-import { getPersonFacets, listPersons, mergePersons, bulkUpdateOccupation } from '../services/prosopographyService';
-import type { LinkedEntity } from '../../types/LinkedEntity';
+import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoIndexEntry } from '../types';
 
@@ -76,8 +74,6 @@ const PersonsPage: React.FC = () => {
   const [mergeError, setMergeError] = useState<string | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
 
-  const [showBulkOccupation, setShowBulkOccupation] = useState(false);
-  const [bulkOccupationLoading, setBulkOccupationLoading] = useState(false);
 
   const isAdmin = user?.role === 'admin';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -173,25 +169,6 @@ const PersonsPage: React.FC = () => {
     }
   };
 
-  const handleBulkOccupation = async (occ: LinkedEntity, mode: 'add' | 'replace') => {
-    setBulkOccupationLoading(true);
-    // Laadi kõik filtreeritud isikud (mitte ainult lehekülje)
-    const all = await listPersons({
-      q: query || undefined,
-      origin_group: originGroup || undefined,
-      institution: institution || undefined,
-      source: source || undefined,
-      gender: gender || undefined,
-      limit: 5000,
-      offset: 0,
-    }, token);
-    const ids = all.results.map(p => p.id);
-    await bulkUpdateOccupation(occ, mode, ids, token);
-    setBulkOccupationLoading(false);
-    setShowBulkOccupation(false);
-    fetchPersons();
-    fetchFacets();
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -259,18 +236,6 @@ const PersonsPage: React.FC = () => {
               </button>
             )}
 
-            {canEdit && !selectMode && total > 0 && (
-              <button
-                onClick={() => setShowBulkOccupation(true)}
-                disabled={bulkOccupationLoading}
-                className="flex items-center gap-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50"
-                title={t('bulkOccupation.title', 'Määra amet')}
-              >
-                <Briefcase size={15} />
-                {t('bulkOccupation.title', 'Määra amet')}
-                {total > 0 && <span className="text-xs text-gray-400">({total})</span>}
-              </button>
-            )}
             {canEdit && !selectMode && (
               <Link
                 to="/persons/new"
@@ -399,15 +364,6 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
       </main>
-
-      {/* Merge modal */}
-      {showBulkOccupation && (
-        <BulkOccupationModal
-          personCount={total}
-          onClose={() => setShowBulkOccupation(false)}
-          onApply={handleBulkOccupation}
-        />
-      )}
 
       {showMergeModal && selectedPersons.length === 2 && (
         <MergePersonsModal
