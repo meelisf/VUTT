@@ -190,22 +190,20 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
             </h4>
             <div className="flex items-center gap-2">
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={immYearFrom}
-                onChange={e => onImmYearFromChange(e.target.value)}
+                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onImmYearFromChange(v); }}
                 placeholder="1632"
-                min={1632}
-                max={1710}
                 className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
               />
               <span className="text-xs text-gray-400">–</span>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={immYearTo}
-                onChange={e => onImmYearToChange(e.target.value)}
+                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onImmYearToChange(v); }}
                 placeholder="1710"
-                min={1632}
-                max={1710}
                 className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
               />
             </div>
