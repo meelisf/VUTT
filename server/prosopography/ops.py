@@ -122,13 +122,15 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
             pass
     imm_year: Optional[int] = None
     imm_date: Optional[str] = None
+    _AG_NAMES = {"Academia Gustaviana", "Academia Gustavo-Carolina"}
+
+    def _extract_date(edu: dict) -> str:
+        return (edu.get("date_from") or {}).get("date") or edu.get("date_start") or ""
+
+    # Prioriteet 1: Academia Gustaviana / Gustavo-Carolina kirje (= Tartu immatrikuleerumine)
     for edu in (person.get("education") or []):
-        if (edu.get("source") == "album_academicum" or
-                (edu.get("institution") == "Academia Gustaviana" and (
-                    "imm" in (edu.get("type") or "").lower() or
-                    edu.get("date_from") or edu.get("date_start")
-                ))):
-            date_str = edu.get("date_start") or (edu.get("date_from") or {}).get("date") or ""
+        if edu.get("institution") in _AG_NAMES:
+            date_str = _extract_date(edu)
             if len(date_str) >= 4:
                 try:
                     imm_year = int(date_str[:4])
@@ -136,6 +138,19 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
                     break
                 except ValueError:
                     pass
+
+    # Prioriteet 2: muu album_academicum kirje millel on kuupäev (fallback)
+    if imm_year is None:
+        for edu in (person.get("education") or []):
+            if edu.get("source") == "album_academicum":
+                date_str = _extract_date(edu)
+                if len(date_str) >= 4:
+                    try:
+                        imm_year = int(date_str[:4])
+                        imm_date = date_str
+                        break
+                    except ValueError:
+                        pass
 
     # Päritolukoht
     origin = person.get("origin") or {}

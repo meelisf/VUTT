@@ -384,13 +384,10 @@ const PersonDetailPage: React.FC = () => {
 
             {/* Immatrikuleerumine (AG) */}
             {(() => {
-              const immEdu = (person.education ?? []).find(e =>
-                e.source === 'album_academicum' ||
-                (e.institution === 'Academia Gustaviana' && (
-                  (e.type ?? '').toLowerCase().includes('imm') ||
-                  e.date_from || e.date_start
-                ))
-              );
+              const agNames = new Set(['Academia Gustaviana', 'Academia Gustavo-Carolina']);
+              const immEdu =
+                (person.education ?? []).find(e => agNames.has(e.institution)) ??
+                (person.education ?? []).find(e => e.source === 'album_academicum' && (e.date_from || e.date_start));
               const aaId = (person.identifiers ?? []).find(i => i.scheme === 'album_academicum')?.id;
               if (!immEdu && !aaId) return null;
               const dateLabel = immEdu?.date_from?.date
