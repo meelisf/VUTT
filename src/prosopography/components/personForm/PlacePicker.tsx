@@ -1,7 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapPin, Plus, X, Loader2, Search } from 'lucide-react';
-import { fetchPlaces, fetchPlacesMeta, addPlace, fetchPlaceWikidata, searchPlacesWikidata } from '../../services/prosopographyService';
+import { fetchPlaces, fetchPlacesMeta, addPlace, fetchPlaceWikidata } from '../../services/prosopographyService';
+import { fetchWithTimeout } from '../../../utils/fetchWithTimeout';
+
+async function searchPlacesWikidata(q: string, lang: string): Promise<{ q: string; label: string; description: string; aliases: string[] }[]> {
+  if (!q.trim()) return [];
+  const params = new URLSearchParams({ action: 'wbsearchentities', search: q, language: lang, format: 'json', type: 'item', limit: '10', origin: '*' });
+  try {
+    const resp = await fetchWithTimeout(`https://www.wikidata.org/w/api.php?${params}`, { timeout: 10000 });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return (data.search ?? []).map((item: any) => ({ q: item.id, label: item.label ?? '', description: item.description ?? '', aliases: item.aliases ?? [] }));
+  } catch { return []; }
+}
 import type { PlaceEntry } from '../../types';
 
 const SHOWN_TYPES = ['city', 'village', 'parish', 'county', 'province', 'territory', 'historical_region'];
