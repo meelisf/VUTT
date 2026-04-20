@@ -81,12 +81,15 @@ for fpath in sorted(meta_files):
 print(f"\nKokku: {len(changed_files)} faili {'muudetaks' if DRY_RUN else 'muudetud'}.")
 
 if not DRY_RUN and changed_files:
-    print("Git commit...")
+    # data/ on omas gitis (VUTT peamine repo ignoreerib data/ kausta)
+    print("Git commit (data/ sisemises gitis)...")
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     msg = f"scripts: dereference {PERSON_ID} teostest ({len(changed_files)} faili) [{now}]"
+    # Relative paths data/ repo jaoks
+    rel_files = [os.path.relpath(f, DATA_DIR) for f in changed_files]
     try:
-        subprocess.run(["git", "-C", BASE_DIR, "add"] + changed_files, check=True)
-        subprocess.run(["git", "-C", BASE_DIR, "commit", "-m", msg], check=True)
+        subprocess.run(["git", "-C", DATA_DIR, "add"] + rel_files, check=True)
+        subprocess.run(["git", "-C", DATA_DIR, "commit", "-m", msg], check=True)
         print("Git commit OK.")
     except subprocess.CalledProcessError as e:
         print(f"Git viga: {e}")
