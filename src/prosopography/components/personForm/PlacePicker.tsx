@@ -45,8 +45,8 @@ interface WdPreview {
 const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: initialPlaces, onAdd, onClose, token }) => {
   const { t, i18n } = useTranslation('prosopography');
   const lang = i18n.language?.slice(0, 2) ?? 'et';
-  const wdTimer = useRef<ReturnType<typeof setTimeout>>();
-  const parentWdTimer = useRef<ReturnType<typeof setTimeout>>();
+  const wdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const parentWdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Lokaalne places — kasvab kui lisatakse ülempiirkond
   const [places, setPlaces] = useState(initialPlaces);
@@ -447,9 +447,30 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             <select value={group} onChange={e => setGroup(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
               <option value="">—</option>
-              {Object.entries(meta?.groups ?? {}).map(([k, v]: any) => (
-                <option key={k} value={k}>{v.labels?.et ?? k}</option>
-              ))}
+              {(() => {
+                const all = Object.entries(meta?.groups ?? {}) as [string, any][];
+                const sorted = [...all].sort((a, b) => (a[1].sort_order ?? 50) - (b[1].sort_order ?? 50));
+                const children: Record<string, [string, any][]> = {};
+                const topLevel: [string, any][] = [];
+                for (const entry of sorted) {
+                  const parent = entry[1].parent;
+                  if (parent) (children[parent] ??= []).push(entry);
+                  else topLevel.push(entry);
+                }
+                return topLevel.map(([k, v]) => {
+                  const kids = children[k];
+                  const label = v.labels?.et ?? k;
+                  if (kids?.length) return (
+                    <optgroup key={k} label={label}>
+                      <option value={k}>{label} (üldine)</option>
+                      {kids.map(([ck, cv]) => (
+                        <option key={ck} value={ck}>{cv.labels?.et ?? ck}</option>
+                      ))}
+                    </optgroup>
+                  );
+                  return <option key={k} value={k}>{label}</option>;
+                });
+              })()}
             </select>
           </div>
         </div>
