@@ -99,7 +99,16 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     name_obj = person.get("name") or {}
     label = name_obj.get("label") or person.get("id", "")
     family_name = name_obj.get("family_name") or ""
-    sort_name = family_name or label
+    if family_name:
+        sort_name = family_name
+    else:
+        # Kui family_name puudub (nt patronüümiline nimi "Achatius Georgii"),
+        # kasuta viimast sõna labelis (v.a qualifier "vanem"/"noorem")
+        qualifier = (name_obj.get("qualifier") or "").strip().lower()
+        words = label.split()
+        if qualifier and words and words[-1].lower() == qualifier:
+            words = words[:-1]
+        sort_name = words[-1] if len(words) > 1 else label
     aliases = name_obj.get("aliases") or []
     occupations = _extract_occupation_entries(person)
 
