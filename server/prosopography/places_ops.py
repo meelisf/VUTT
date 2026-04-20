@@ -301,6 +301,39 @@ _WD_TYPE_MAP = {
 }
 
 
+def search_places_wikidata(query: str, lang: str = "en", limit: int = 10) -> list:
+    """
+    Otsib Wikidatast kohti nime järgi (wbsearchentities API).
+    Tagastab [{q, label, description, aliases}].
+    """
+    if not query.strip():
+        return []
+    url = "https://www.wikidata.org/w/api.php?" + urllib.parse.urlencode({
+        "action": "wbsearchentities",
+        "search": query,
+        "language": lang,
+        "type": "item",
+        "format": "json",
+        "limit": limit,
+        "props": "url",
+    })
+    try:
+        req = urllib.request.Request(url, headers=_WD_HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        results = []
+        for item in data.get("search", []):
+            results.append({
+                "q": item.get("id", ""),
+                "label": item.get("label", ""),
+                "description": item.get("description", ""),
+                "aliases": item.get("aliases", []),
+            })
+        return results
+    except Exception:
+        return []
+
+
 def fetch_place_wikidata(qid: str) -> Optional[dict]:
     """
     Pärib Wikidatast koha andmed: labelid, tüüp, ajaloolised ülempiirkonnad (P131).

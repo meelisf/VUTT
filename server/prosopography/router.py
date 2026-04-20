@@ -29,7 +29,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, fetch_place_wikidata, _propagate_place_change
+from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change
 
 logger = get_logger(__name__)
 
@@ -397,6 +397,12 @@ async def prosopography_work_relations(
 
 
 # ── Places register ────────────────────────────────────────────────────────
+
+@router.get("/places/wikidata-search")
+async def places_wikidata_search(q: str = "", lang: str = "en"):
+    """Otsib Wikidatast kohti nime järgi. Avalik."""
+    return search_places_wikidata(q.strip(), lang=lang)
+
 
 @router.get("/places/wikidata/{qid}")
 async def places_wikidata_fetch(qid: str):

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MapPin, Plus, X, Loader2, Search } from 'lucide-react';
-import { fetchPlaces, fetchPlacesMeta, addPlace, fetchPlaceWikidata } from '../../services/prosopographyService';
+import { fetchPlaces, fetchPlacesMeta, addPlace, fetchPlaceWikidata, searchPlacesWikidata } from '../../services/prosopographyService';
 import type { PlaceEntry } from '../../types';
 
 const SHOWN_TYPES = ['city', 'village', 'parish', 'county', 'province', 'territory', 'historical_region'];
@@ -23,33 +23,60 @@ interface AddPlaceModalProps {
 }
 
 const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClose, token }) => {
-  const { t } = useTranslation('prosopography');
+  const { t, i18n } = useTranslation('prosopography');
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
+
+  // Wikidata otsing
+  const [wdQuery, setWdQuery] = useState(query);
+  const [wdResults, setWdResults] = useState<{ q: string; label: string; description: string; aliases: string[] }[]>([]);
+  const [wdSearching, setWdSearching] = useState(false);
+  const [wdSelected, setWdSelected] = useState<{ q: string; label: string } | null>(null);
+  const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
+  const [wdLoading, setWdLoading] = useState(false);
+
+  // Vorm
+  const [labels, setLabels] = useState<Record<string, string>>({});
   const [name, setName] = useState(query);
-  const [labels, setLabels] = useState<Record<string, string>>({ et: query, en: query });
   const [placeType, setPlaceType] = useState('');
   const [qCode, setQCode] = useState('');
   const [parentKey, setParentKey] = useState('');
   const [group, setGroup] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [wdLoading, setWdLoading] = useState(false);
-  const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
 
-  const handleFetchWikidata = async () => {
-    const qid = qCode.trim();
-    if (!qid.match(/^Q\d+$/)) { setError('Sisesta korrektne Q-kood (nt Q25748)'); return; }
+  const searchTimer = React.useRef<ReturnType<typeof setTimeout>>();
+
+  const handleWdQueryChange = (v: string) => {
+    setWdQuery(v);
+    setWdSelected(null);
+    clearTimeout(searchTimer.current);
+    if (!v.trim()) { setWdResults([]); return; }
+    searchTimer.current = setTimeout(async () => {
+      setWdSearching(true);
+      const results = await searchPlacesWikidata(v.trim(), lang === 'et' ? 'en' : lang);
+      setWdResults(results);
+      setWdSearching(false);
+    }, 350);
+  };
+
+  const handleSelectWdResult = async (item: { q: string; label: string }) => {
+    setWdSelected(item);
+    setWdResults([]);
+    setWdQuery(item.label);
+    setQCode(item.q);
     setWdLoading(true);
-    setError(null);
     try {
-      const wd = await fetchPlaceWikidata(qid);
+      const wd = await fetchPlaceWikidata(item.q);
       if (wd.labels && Object.keys(wd.labels).length > 0) {
         setLabels(wd.labels);
-        setName(wd.labels.et || wd.labels.en || wd.labels.sv || name);
+        setName(wd.labels.et || wd.labels.en || wd.labels.sv || item.label);
+      } else {
+        setName(item.label);
       }
       if (wd.type) setPlaceType(wd.type);
       setWdParents(wd.parents ?? []);
-    } catch (e: any) {
-      setError('Wikidata päring ebaõnnestus: ' + (e.message ?? ''));
+    } catch {
+      setName(item.label);
     } finally {
       setWdLoading(false);
     }
@@ -79,64 +106,96 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-sm mx-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-lg shadow-xl p-5 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-gray-900">{t('addPlace')}</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
         </div>
         {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
-        <div className="space-y-3">
+
+        {/* Wikidata otsing */}
+        <div className="mb-4">
+          <label className="block text-xs text-gray-500 mb-1">Otsi Wikidatast</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={wdQuery}
+              onChange={e => handleWdQueryChange(e.target.value)}
+              placeholder="nt Gävle, Riga, Westphalia…"
+              autoFocus
+              className="w-full px-2 py-1.5 pr-7 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
+            />
+            {wdSearching && <Loader2 size={13} className="absolute right-2 top-2 animate-spin text-gray-400" />}
+          </div>
+          {wdResults.length > 0 && (
+            <div className="mt-1 border border-gray-200 rounded-lg shadow-sm max-h-56 overflow-y-auto bg-white">
+              {wdResults.map(r => (
+                <button key={r.q} type="button"
+                  onClick={() => handleSelectWdResult(r)}
+                  className="w-full text-left px-3 py-2 hover:bg-primary-50 border-b border-gray-50 last:border-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium text-gray-900">{r.label}</span>
+                    <span className="text-xs font-mono text-gray-400">{r.q}</span>
+                  </div>
+                  {r.description && <p className="text-xs text-gray-500 mt-0.5">{r.description}</p>}
+                  {r.aliases?.length > 0 && (
+                    <p className="text-xs text-gray-400 mt-0.5 italic">{r.aliases.slice(0, 4).join(', ')}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          {wdSelected && wdLoading && (
+            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Laen detailid…</p>
+          )}
+          {wdSelected && !wdLoading && wdParents.length > 0 && (
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 mb-1">Ülempiirkond (P131) — klõps täidab parent_key:</p>
+              {wdParents.map(p => (
+                <button key={p.q} type="button" onClick={() => setParentKey(p.label_sv || p.label_en)}
+                  className="mr-1 mb-1 px-2 py-0.5 text-xs border border-blue-200 text-blue-700 rounded hover:bg-blue-50">
+                  {p.label_sv || p.label_en} <span className="text-gray-400">({p.q})</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-100 pt-3 space-y-3">
+          {/* Eelvaade laetud labelitest */}
+          {Object.keys(labels).length > 0 && (
+            <div className="bg-gray-50 rounded p-2 text-xs text-gray-600 space-y-0.5">
+              {Object.entries(labels).map(([l, lbl]) => (
+                <div key={l}><span className="font-mono text-gray-400 w-5 inline-block">{l}</span> {lbl}</div>
+              ))}
+            </div>
+          )}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">{t('form.nameLabel')} *</label>
+            <label className="block text-xs text-gray-500 mb-1">Nimi registris (key) *</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none" />
           </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Tüüp</label>
-            <select value={placeType} onChange={e => setPlaceType(e.target.value)}
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
-              <option value="">—</option>
-              {(meta?.allowed_types ?? []).map(tp => <option key={tp} value={tp}>{tp}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Wikidata Q-kood (valikuline)</label>
-            <div className="flex gap-1.5">
-              <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
-                placeholder="Q25748"
-                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
-              <button type="button" onClick={handleFetchWikidata} disabled={wdLoading || !qCode.trim().match(/^Q\d+$/)}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap"
-                title="Päri andmed Wikidatast">
-                {wdLoading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
-                WD
-              </button>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs text-gray-500 mb-1">Tüüp</label>
+              <select value={placeType} onChange={e => setPlaceType(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
+                <option value="">—</option>
+                {(meta?.allowed_types ?? []).map(tp => <option key={tp} value={tp}>{tp}</option>)}
+              </select>
             </div>
-            {!qCode.trim() && <p className="mt-1 text-xs text-amber-600">{t('noQCode')}</p>}
-            {Object.keys(labels).length > 0 && qCode.trim() && (
-              <div className="mt-1.5 text-xs text-gray-500 space-y-0.5">
-                {Object.entries(labels).map(([lang, lbl]) => (
-                  <div key={lang}><span className="font-mono text-gray-400">{lang}:</span> {lbl}</div>
-                ))}
-              </div>
-            )}
-            {wdParents.length > 0 && (
-              <div className="mt-2">
-                <p className="text-xs text-gray-500 mb-1">P131 ülempiirkond — vali parent_key aluseks:</p>
-                {wdParents.map(p => (
-                  <button key={p.q} type="button"
-                    onClick={() => setParentKey(p.label_sv || p.label_en)}
-                    className="mr-1 mb-1 px-2 py-0.5 text-xs border border-blue-200 text-blue-700 rounded hover:bg-blue-50">
-                    {p.label_sv || p.label_en} ({p.q})
-                  </button>
-                ))}
-              </div>
-            )}
+            <div className="w-32">
+              <label className="block text-xs text-gray-500 mb-1">Q-kood</label>
+              <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
+                placeholder="Q12345"
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
+            </div>
           </div>
+          {!qCode.trim() && <p className="text-xs text-amber-600">{t('noQCode')}</p>}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Ülem-koht (parent_key, valikuline)</label>
+            <label className="block text-xs text-gray-500 mb-1">Parent key (valikuline)</label>
             <input type="text" value={parentKey} onChange={e => setParentKey(e.target.value)}
-              placeholder="Livland"
+              placeholder="nt Gaestrikland"
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
           </div>
           <div>
@@ -150,10 +209,9 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClo
             </select>
           </div>
         </div>
+
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">
-            Tühista
-          </button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">Tühista</button>
           <button onClick={handleSave} disabled={saving}
             className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-60">
             {saving ? '…' : 'Lisa'}

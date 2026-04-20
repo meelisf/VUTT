@@ -288,6 +288,12 @@ export async function fetchPlacesMeta(): Promise<{
   return resp.json();
 }
 
+export async function searchPlacesWikidata(q: string, lang = 'en'): Promise<{ q: string; label: string; description: string; aliases: string[] }[]> {
+  const resp = await fetchWithTimeout(`${BASE}/places/wikidata-search?q=${encodeURIComponent(q)}&lang=${lang}`, { timeout: 10000 });
+  if (!resp.ok) return [];
+  return resp.json();
+}
+
 export async function fetchPlaceWikidata(qid: string): Promise<{
   labels: Record<string, string>;
   type: string | null;
