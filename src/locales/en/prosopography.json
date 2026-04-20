@@ -209,5 +209,13 @@
   "filterOriginSearch": "Search region…",
   "noQCode": "No Q-code — won't appear on map",
   "addPlace": "Add new place",
-  "placeGroup": "Group: {{group}}"
+  "placeGroup": "Group: {{group}}",
+  "deleteConfirmWord": "delete",
+  "deleteSection": {
+    "title": "Delete person",
+    "button": "Delete person",
+    "warning": "This action is irreversible. The person card will be permanently deleted. Deletion is blocked if the person has references in works or relations in other person cards.",
+    "placeholder": "Type \"{{word}}\" to confirm",
+    "confirm": "Delete permanently"
+  }
 }

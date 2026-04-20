@@ -209,5 +209,13 @@
   "filterOriginSearch": "Otsi piirkonda…",
   "noQCode": "Q-kood puudub — kaardil ei kuvata",
   "addPlace": "Lisa uus koht",
-  "placeGroup": "Grupp: {{group}}"
+  "placeGroup": "Grupp: {{group}}",
+  "deleteConfirmWord": "kustutan",
+  "deleteSection": {
+    "title": "Kustutamine",
+    "button": "Kustuta isik",
+    "warning": "See toiming on pöördumatu. Isikukaart kustutatakse jäädavalt. Kustutamine blokeeritakse kui isikul on teostes viiteid või seoseid teistes isikukaartides.",
+    "placeholder": "Kirjuta \"{{word}}\" kinnitamiseks",
+    "confirm": "Kustuta jäädavalt"
+  }
 }

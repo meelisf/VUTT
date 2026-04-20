@@ -6,7 +6,7 @@ import Header from '../../components/Header';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage } from '../services/prosopographyService';
+import { getPerson, createPerson, updatePerson, uploadPersonImage, deletePersonImage, deletePerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoRecord } from '../types';
 
@@ -64,6 +64,26 @@ const PersonEditPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
+  const isAdmin = user?.role === 'admin';
+
+  // Kustutamine
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDelete = async () => {
+    if (!id || deleteInput !== t('deleteConfirmWord')) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deletePerson(id, token);
+      navigate('/persons', { replace: true });
+    } catch (e) {
+      setDeleteError((e as Error).message);
+      setDeleting(false);
+    }
+  };
 
   // Suuna mitteeditor kasutaja tagasi
   useEffect(() => {
@@ -802,6 +822,51 @@ const PersonEditPage: React.FC = () => {
             {saving ? t('form.saving') : t('form.save')}
           </button>
         </div>
+
+        {/* Kustutamine — ainult admin, olemasolevate isikute puhul */}
+        {isAdmin && !isNew && (
+          <div className="border border-red-200 rounded-lg p-4 space-y-3">
+            <p className="text-sm font-medium text-red-700">{t('deleteSection.title')}</p>
+            {!deleteOpen ? (
+              <button
+                onClick={() => { setDeleteOpen(true); setDeleteInput(''); setDeleteError(null); }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={14} />
+                {t('deleteSection.button')}
+              </button>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-red-800">{t('deleteSection.warning')}</p>
+                <input
+                  type="text"
+                  value={deleteInput}
+                  onChange={e => setDeleteInput(e.target.value)}
+                  placeholder={t('deleteSection.placeholder', { word: t('deleteConfirmWord') })}
+                  className="w-full px-3 py-2 text-sm border border-red-200 rounded focus:outline-none focus:ring-2 focus:ring-red-500 bg-white"
+                  autoFocus
+                />
+                {deleteError && <p className="text-sm text-red-600 font-medium">{deleteError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDelete}
+                    disabled={deleting || deleteInput !== t('deleteConfirmWord')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {t('deleteSection.confirm')}
+                  </button>
+                  <button
+                    onClick={() => { setDeleteOpen(false); setDeleteError(null); }}
+                    className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
+                  >
+                    {t('common:actions.cancel')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
       </div>
     </div>

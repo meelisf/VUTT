@@ -20,6 +20,7 @@ from .ops import (
     add_identifier,
     apply_enrichment,
     merge_person,
+    delete_person,
     rebuild_indices,
     upload_person_image,
     get_person_image_path,
@@ -353,6 +354,29 @@ async def prosopography_merge(
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {e}")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    return result
+
+
+@router.delete("/{person_id:path}/delete")
+async def prosopography_delete_person(
+    person_id: str,
+    request: Request,
+    user=Depends(_require_role("admin")),
+):
+    """Kustutab isikukaardi jäädavalt (admin only). Blokeerib kui teostes/relations viited."""
+    try:
+        result = delete_person(person_id, username=user["username"])
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
+    except ValueError as e:
+        msg = str(e)
+        if msg.startswith("WORK_REFS:"):
+            count = msg.split(":")[1]
+            raise HTTPException(status_code=409, detail=f"Isikul on {count} teose viitet. Eemalda viited enne kustutamist.")
+        if msg.startswith("RELATION_REFS:"):
+            count = msg.split(":")[1]
+            raise HTTPException(status_code=409, detail=f"Isikul on {count} seost teistes isikukaartides. Eemalda seosed enne kustutamist.")
+        raise HTTPException(status_code=400, detail=msg)
     return result
 
 

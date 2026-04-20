@@ -213,6 +213,20 @@ export async function bulkUpdateOccupation(
   return resp.json();
 }
 
+export async function deletePerson(personId: string, token: string): Promise<{ deleted: string }> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/delete`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(token),
+    timeout: 15000,
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || `deletePerson: ${resp.status}`);
+  }
+  return resp.json();
+}
+
 export async function mergePersons(
   sourceId: string,
   targetId: string,

@@ -1361,6 +1361,77 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     return get_person(target_id)
 
 
+def delete_person(person_id: str, username: str) -> dict:
+    """
+    Kustutab isikukaardi jäädavalt.
+    Blokeerib kui isikul on viited teostes (creators/tags/publisher) või
+    teiste isikute relations.
+    Tagastab {"deleted": person_id, "work_refs": 0, "relation_refs": 0}.
+    """
+    person = get_person(person_id)
+    if person is None:
+        raise KeyError(person_id)
+    if person.get("record_status") == "tombstone":
+        raise ValueError(f"Isik on tombstone, kasuta merge: {person_id}")
+
+    from ..config import BASE_DIR as _DATA_DIR
+
+    # Kontrolli teose viiteid
+    ptw = _load_person_to_works()
+    work_refs = len(set(w["work_id"] for w in ptw.get(person_id, [])))
+    if work_refs > 0:
+        raise ValueError(f"WORK_REFS:{work_refs}")
+
+    # Kontrolli teiste isikute relations viiteid
+    relation_refs = 0
+    for fpath in _glob.glob(os.path.join(PROSOPOGRAPHY_DIR, "*.json")):
+        if PERSON_IMAGES_DIR_NAME in fpath:
+            continue
+        try:
+            p = json.load(open(fpath, encoding="utf-8"))
+        except Exception:
+            continue
+        if p.get("id") == person_id:
+            continue
+        if p.get("record_status") == "tombstone":
+            continue
+        for rel in p.get("relations", []):
+            if rel.get("target_id") == person_id:
+                relation_refs += 1
+    if relation_refs > 0:
+        raise ValueError(f"RELATION_REFS:{relation_refs}")
+
+    # Kustuta fail
+    path = _id_to_path(person_id)
+    if os.path.exists(path):
+        os.remove(path)
+
+    # Eemalda indeksist ja aliasestest
+    with _index_lock:
+        index = _load_index()
+        index["entries"] = [e for e in index["entries"] if e["id"] != person_id]
+        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
+
+    _remove_aliases_entry(person_id)
+
+    return {"deleted": person_id, "work_refs": 0, "relation_refs": 0}
+
+
+def _remove_aliases_entry(person_id: str):
+    """Eemaldab person_aliases.json-st kõik viited person_id-le."""
+    from ..config import DATA_CONFIG_DIR
+    aliases_file = os.path.join(DATA_CONFIG_DIR, "person_aliases.json")
+    if not os.path.exists(aliases_file):
+        return
+    try:
+        data = json.load(open(aliases_file, encoding="utf-8"))
+    except Exception:
+        return
+    if person_id in data:
+        del data[person_id]
+        atomic_write_json(aliases_file, data)
+
+
 def bulk_update_occupation(
     occupation: dict,
     mode: str,
