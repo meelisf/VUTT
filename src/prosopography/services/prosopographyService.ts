@@ -288,6 +288,16 @@ export async function fetchPlacesMeta(): Promise<{
   return resp.json();
 }
 
+export async function fetchPlaceWikidata(qid: string): Promise<{
+  labels: Record<string, string>;
+  type: string | null;
+  parents: { q: string; label_en: string; label_sv: string }[];
+}> {
+  const resp = await fetchWithTimeout(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, { timeout: 15000 });
+  if (!resp.ok) throw new Error(`fetchPlaceWikidata: ${resp.status}`);
+  return resp.json();
+}
+
 export async function addPlace(key: string, data: Partial<PlaceEntry>, token: string): Promise<{ key: string; entry: PlaceEntry }> {
   const resp = await fetchWithTimeout(`${BASE}/admin/places/${encodeURIComponent(key)}`, {
     method: 'PUT',

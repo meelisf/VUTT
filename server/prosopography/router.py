@@ -29,7 +29,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, _propagate_place_change
+from .places_ops import get_places, get_places_meta, put_place, fetch_place_wikidata, _propagate_place_change
 
 logger = get_logger(__name__)
 
@@ -397,6 +397,15 @@ async def prosopography_work_relations(
 
 
 # ── Places register ────────────────────────────────────────────────────────
+
+@router.get("/places/wikidata/{qid}")
+async def places_wikidata_fetch(qid: str):
+    """Pärib Wikidatast koha andmed (labelid, tüüp, P131 ülempiirkonnad). Avalik."""
+    result = fetch_place_wikidata(qid)
+    if result is None:
+        raise HTTPException(status_code=400, detail=f"Vigane Q-kood: {qid}")
+    return result
+
 
 @router.get("/places")
 async def places_list():

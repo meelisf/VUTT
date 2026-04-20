@@ -5,6 +5,8 @@ Cache, abifunktsioonid, propagatsioon.
 import json
 import time
 import threading
+import urllib.request
+import urllib.parse
 from typing import Optional
 
 from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, get_logger
@@ -277,3 +279,104 @@ def put_place(key: str, data: dict) -> dict:
     atomic_write_json(PLACES_FILE, places)
     _load_places_cache(force_reload=True)
     return entry
+
+
+# ── Wikidata rikastamine ───────────────────────────────────────────────────
+
+_WD_HEADERS = {
+    "User-Agent": "VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)"
+}
+
+# Wikidata P31 (instance of) Q-koodid → meie tüübid
+_WD_TYPE_MAP = {
+    "Q515": "city", "Q3957": "city", "Q5119": "city", "Q1549591": "city",
+    "Q1093829": "city", "Q19953632": "city", "Q7930989": "city",
+    "Q532": "village", "Q5084": "village", "Q123705": "village",
+    "Q15284": "village", "Q1357964": "parish", "Q102496": "parish",
+    "Q48091": "province", "Q13220204": "province",
+    "Q10864048": "county", "Q28575": "county",
+    "Q3028596": "historical_region", "Q82794": "historical_region",
+    "Q153654": "historical_region", "Q188509": "historical_region",
+    "Q1763527": "historical_region", "Q182832": "historical_region",
+}
+
+
+def fetch_place_wikidata(qid: str) -> Optional[dict]:
+    """
+    Pärib Wikidatast koha andmed: labelid, tüüp, ajaloolised ülempiirkonnad (P131).
+    Tagastab:
+      labels: {et, en, de, la, sv}
+      type: meie tüüp või None
+      parents: [{q, label_en, label_sv}] — P131 alusel
+    """
+    if not qid.startswith("Q") or not qid[1:].isdigit():
+        return None
+
+    sparql = f"""
+SELECT ?label_et ?label_en ?label_de ?label_la ?label_sv
+       ?typeQ (SAMPLE(?typeLabel) AS ?typeLabel)
+       ?parentQ (SAMPLE(?parentLabel_en) AS ?parentLabel_en)
+                (SAMPLE(?parentLabel_sv) AS ?parentLabel_sv)
+WHERE {{
+  OPTIONAL {{ wd:{qid} rdfs:label ?label_et. FILTER(LANG(?label_et)="et") }}
+  OPTIONAL {{ wd:{qid} rdfs:label ?label_en. FILTER(LANG(?label_en)="en") }}
+  OPTIONAL {{ wd:{qid} rdfs:label ?label_de. FILTER(LANG(?label_de)="de") }}
+  OPTIONAL {{ wd:{qid} rdfs:label ?label_la. FILTER(LANG(?label_la)="la") }}
+  OPTIONAL {{ wd:{qid} rdfs:label ?label_sv. FILTER(LANG(?label_sv)="sv") }}
+  OPTIONAL {{
+    wd:{qid} wdt:P31 ?typeQ.
+    ?typeQ rdfs:label ?typeLabel. FILTER(LANG(?typeLabel)="en")
+  }}
+  OPTIONAL {{
+    wd:{qid} wdt:P131 ?parentQ.
+    ?parentQ rdfs:label ?parentLabel_en. FILTER(LANG(?parentLabel_en)="en")
+    OPTIONAL {{ ?parentQ rdfs:label ?parentLabel_sv. FILTER(LANG(?parentLabel_sv)="sv") }}
+  }}
+}}
+GROUP BY ?label_et ?label_en ?label_de ?label_la ?label_sv ?typeQ ?parentQ
+LIMIT 20
+"""
+    url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({
+        "query": sparql, "format": "json"
+    })
+    try:
+        req = urllib.request.Request(url, headers=_WD_HEADERS)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        bindings = data.get("results", {}).get("bindings", [])
+    except Exception:
+        return None
+
+    if not bindings:
+        return {}
+
+    b0 = bindings[0]
+    labels: dict = {}
+    for lang in ("et", "en", "de", "la", "sv"):
+        v = (b0.get(f"label_{lang}") or {}).get("value")
+        if v:
+            labels[lang] = v
+
+    # Tüüp — esimene tuntud P31
+    place_type = None
+    seen_types: set = set()
+    for b in bindings:
+        tq = (b.get("typeQ") or {}).get("value", "").split("/")[-1]
+        if tq and tq not in seen_types:
+            seen_types.add(tq)
+            if tq in _WD_TYPE_MAP:
+                place_type = _WD_TYPE_MAP[tq]
+                break
+
+    # Ülempiirkonnad (P131) — unikaalsed
+    seen_parents: set = set()
+    parents = []
+    for b in bindings:
+        pq = (b.get("parentQ") or {}).get("value", "").split("/")[-1]
+        if pq and pq not in seen_parents:
+            seen_parents.add(pq)
+            label_en = (b.get("parentLabel_en") or {}).get("value", "")
+            label_sv = (b.get("parentLabel_sv") or {}).get("value", "")
+            parents.append({"q": pq, "label_en": label_en, "label_sv": label_sv or label_en})
+
+    return {"labels": labels, "type": place_type, "parents": parents}

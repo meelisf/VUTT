@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { MapPin, Plus, X } from 'lucide-react';
-import { fetchPlaces, fetchPlacesMeta, addPlace } from '../../services/prosopographyService';
+import { MapPin, Plus, X, Loader2, Search } from 'lucide-react';
+import { fetchPlaces, fetchPlacesMeta, addPlace, fetchPlaceWikidata } from '../../services/prosopographyService';
 import type { PlaceEntry } from '../../types';
 
 const SHOWN_TYPES = ['city', 'village', 'parish', 'county', 'province', 'territory', 'historical_region'];
@@ -25,21 +25,45 @@ interface AddPlaceModalProps {
 const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClose, token }) => {
   const { t } = useTranslation('prosopography');
   const [name, setName] = useState(query);
+  const [labels, setLabels] = useState<Record<string, string>>({ et: query, en: query });
   const [placeType, setPlaceType] = useState('');
   const [qCode, setQCode] = useState('');
   const [parentKey, setParentKey] = useState('');
   const [group, setGroup] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wdLoading, setWdLoading] = useState(false);
+  const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
+
+  const handleFetchWikidata = async () => {
+    const qid = qCode.trim();
+    if (!qid.match(/^Q\d+$/)) { setError('Sisesta korrektne Q-kood (nt Q25748)'); return; }
+    setWdLoading(true);
+    setError(null);
+    try {
+      const wd = await fetchPlaceWikidata(qid);
+      if (wd.labels && Object.keys(wd.labels).length > 0) {
+        setLabels(wd.labels);
+        setName(wd.labels.et || wd.labels.en || wd.labels.sv || name);
+      }
+      if (wd.type) setPlaceType(wd.type);
+      setWdParents(wd.parents ?? []);
+    } catch (e: any) {
+      setError('Wikidata päring ebaõnnestus: ' + (e.message ?? ''));
+    } finally {
+      setWdLoading(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) { setError(t('form.nameRequired')); return; }
     const key = name.trim().replace(/\s+/g, '_');
+    const finalLabels = Object.keys(labels).length > 0 ? labels : { et: name.trim(), en: name.trim() };
     setSaving(true);
     setError(null);
     try {
       const result = await addPlace(key, {
-        labels: { et: name.trim(), en: name.trim() },
+        labels: finalLabels,
         id: qCode.trim() || null,
         type: placeType || undefined,
         parent_key: parentKey.trim() || undefined,
@@ -77,11 +101,36 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, onAdd, onClo
           </div>
           <div>
             <label className="block text-xs text-gray-500 mb-1">Wikidata Q-kood (valikuline)</label>
-            <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
-              placeholder="Q12345"
-              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
-            {!qCode.trim() && (
-              <p className="mt-1 text-xs text-amber-600">{t('noQCode')}</p>
+            <div className="flex gap-1.5">
+              <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
+                placeholder="Q25748"
+                className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
+              <button type="button" onClick={handleFetchWikidata} disabled={wdLoading || !qCode.trim().match(/^Q\d+$/)}
+                className="flex items-center gap-1 px-2 py-1.5 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 transition-colors whitespace-nowrap"
+                title="Päri andmed Wikidatast">
+                {wdLoading ? <Loader2 size={12} className="animate-spin" /> : <Search size={12} />}
+                WD
+              </button>
+            </div>
+            {!qCode.trim() && <p className="mt-1 text-xs text-amber-600">{t('noQCode')}</p>}
+            {Object.keys(labels).length > 0 && qCode.trim() && (
+              <div className="mt-1.5 text-xs text-gray-500 space-y-0.5">
+                {Object.entries(labels).map(([lang, lbl]) => (
+                  <div key={lang}><span className="font-mono text-gray-400">{lang}:</span> {lbl}</div>
+                ))}
+              </div>
+            )}
+            {wdParents.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 mb-1">P131 ülempiirkond — vali parent_key aluseks:</p>
+                {wdParents.map(p => (
+                  <button key={p.q} type="button"
+                    onClick={() => setParentKey(p.label_sv || p.label_en)}
+                    className="mr-1 mb-1 px-2 py-0.5 text-xs border border-blue-200 text-blue-700 rounded hover:bg-blue-50">
+                    {p.label_sv || p.label_en} ({p.q})
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div>
