@@ -173,10 +173,15 @@ def find_aa_candidates(candidate: dict, aa_persons: list) -> list:
     Nõuab vähemalt ühe ≥5-tähemärgise tokeni esinemist label või sort_name väljal.
     Tagastab vastelisti, järjestatud imm_year ASC (None viimasena).
     """
-    tokens = extract_name_variants(candidate.get("label", ""))
+    label = candidate.get("label", "")
+    tokens = extract_name_variants(label)
     long_tokens = [t for t in tokens if len(t) >= 5]
     if not long_tokens:
         return []
+
+    # Perekonnanime tokenid (enne koma) saavad 3× kaalu
+    surname_part = label.split(",")[0] if "," in label else label
+    surname_long = {t for t in extract_name_variants(surname_part) if len(t) >= 5}
 
     matches = []
     for aa in aa_persons:
@@ -186,8 +191,8 @@ def find_aa_candidates(candidate: dict, aa_persons: list) -> list:
         )
         matching = [tok for tok in long_tokens if tok in search_text]
         if matching:
-            # Spetsiifilisus: kattuvate tokenite pikkuste summa (rohkem/pikemad = parem)
-            score = sum(len(t) for t in matching)
+            # Perekonnanime kattuvus = 3×, eesnime kattuvus = 1×
+            score = sum(len(t) * (3 if t in surname_long else 1) for t in matching)
             matches.append((aa, score))
 
     # Järjesta: suurim skoor esmalt, siis imm_year ASC
