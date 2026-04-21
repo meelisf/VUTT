@@ -211,9 +211,17 @@ def load_progress(progress_path: str) -> dict:
     if os.path.exists(progress_path):
         try:
             with open(progress_path, encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+                data = json.load(f)
+            if isinstance(data.get("done"), list) and isinstance(data.get("skipped"), list):
+                return data
+            raise ValueError("vale skeem")
+        except Exception as exc:
+            bak = progress_path + ".bak"
+            print(f"! Progressifail on rikutud ({exc}), alustan nullist. Varukoopia: {bak}", file=sys.stderr)
+            try:
+                os.rename(progress_path, bak)
+            except OSError:
+                pass
     return {"done": [], "skipped": []}
 
 
@@ -255,7 +263,8 @@ def _do_merge_and_enrich(source_id: str, target_id: str, dry_run: bool = False) 
         )
         if not aa_id:
             print("  ! Target'il puudub AA identifikaator pärast merge'i")
-            return True  # Merge õnnestus, rikastus ebaõnnestus — jätka
+            # Merge õnnestus — isik on done; rikastust ei saa teha
+            return True
 
         diff = fetch_and_diff("album_academicum", aa_id, person)
         auto_filled = diff.get("auto_filled", {})
@@ -269,6 +278,7 @@ def _do_merge_and_enrich(source_id: str, target_id: str, dry_run: bool = False) 
         print(f"  ✓ AA rikastus rakendatud ({len(filled_fields)} välja: {', '.join(filled_fields[:5])}{'...' if len(filled_fields) > 5 else ''})")
     except Exception as e:
         print(f"  ! AA rikastuse viga: {e}")
+        # Merge juba toimus — isik on done; rikastus vajab käsitsi kontrolli
 
     return True
 
@@ -310,18 +320,20 @@ def main() -> None:
         print(f"\n[{i}/{total}] {label}  ({wc} teos{'t' if wc != 1 else ''})")
 
         matches = find_aa_candidates(candidate, aa_persons)
+        top_matches = matches[:5]
 
         if not matches:
             print("  (0 vastet — jätan vahele)")
             skipped_ids.add(cid)
-            progress["skipped"] = list(skipped_ids)
-            save_progress(progress_path, progress)
+            progress["skipped"] = sorted(skipped_ids)
+            if not args.dry_run:
+                save_progress(progress_path, progress)
             continue
 
-        for j, m in enumerate(matches[:5], 1):
+        for j, m in enumerate(top_matches, 1):
             print(f"    {j}) {_format_candidate_display(m)}")
 
-        choices = [str(j) for j in range(1, len(matches[:5]) + 1)]
+        choices = [str(j) for j in range(1, len(top_matches) + 1)]
         prompt = f"  Vali [{'/'.join(choices)}/s(ki)/q(uit)]: "
 
         try:
@@ -336,19 +348,21 @@ def main() -> None:
 
         if choice in ("s", "skip", ""):
             skipped_ids.add(cid)
-            progress["skipped"] = list(skipped_ids)
-            save_progress(progress_path, progress)
+            progress["skipped"] = sorted(skipped_ids)
+            if not args.dry_run:
+                save_progress(progress_path, progress)
             print("  Vahele jäetud.")
             continue
 
         if choice not in choices:
             print(f"  Tundmatu valik '{choice}' — jätan vahele.")
             skipped_ids.add(cid)
-            progress["skipped"] = list(skipped_ids)
-            save_progress(progress_path, progress)
+            progress["skipped"] = sorted(skipped_ids)
+            if not args.dry_run:
+                save_progress(progress_path, progress)
             continue
 
-        selected = matches[int(choice) - 1]
+        selected = top_matches[int(choice) - 1]
         source_id = cid
         target_id = selected["id"]
 
@@ -364,17 +378,19 @@ def main() -> None:
         if confirm not in ("y", "yes", "j", "jah"):
             print("  Tühistatud.")
             skipped_ids.add(cid)
-            progress["skipped"] = list(skipped_ids)
-            save_progress(progress_path, progress)
+            progress["skipped"] = sorted(skipped_ids)
+            if not args.dry_run:
+                save_progress(progress_path, progress)
             continue
 
         success = _do_merge_and_enrich(source_id, target_id, dry_run=args.dry_run)
         if success:
             done_ids.add(cid)
-            progress["done"] = list(done_ids)
+            progress["done"] = sorted(done_ids)
             skipped_ids.discard(cid)
-            progress["skipped"] = list(skipped_ids)
-            save_progress(progress_path, progress)
+            progress["skipped"] = sorted(skipped_ids)
+            if not args.dry_run:
+                save_progress(progress_path, progress)
 
     remaining_after = len(candidates) - len(done_ids) - len(skipped_ids)
     print(f"\nValmis. Tehtud: {len(done_ids)}  |  Vahele jäetud: {len(skipped_ids)}  |  Järel: {remaining_after}")
