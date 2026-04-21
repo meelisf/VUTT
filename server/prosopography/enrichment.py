@@ -557,4 +557,16 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
     except Exception:
         pass
 
+    # Seisus: aadel (noble_status "Nob." jms → Q134737)
+    try:
+        noble_status = name_obj.get("noble_status")
+        if noble_status:
+            result["status"] = {
+                "id": "Q134737",
+                "label": "Aadel",
+                "labels": {"et": "Aadel", "de": "Adel", "en": "nobility", "la": "Nobilitas"},
+            }
+    except Exception:
+        pass
+
     return result
