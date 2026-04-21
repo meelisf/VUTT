@@ -699,31 +699,102 @@ def sync_work_to_meilisearch_async(dir_name):
 
 
 MEILI_KEEPWARM_INTERVAL = 7200  # 2 tundi sekundites
+MEILI_SEARCH_KEEPWARM_INTERVAL = int(os.getenv("MEILI_SEARCH_KEEPWARM_INTERVAL", "1800"))
+DEFAULT_DASHBOARD_COLLECTION = os.getenv("VUTT_DEFAULT_COLLECTION", "universitas-dorpatensis-1")
+
+
+def _meili_search(body, timeout=30):
+    """Käivitab ühe Meilisearch search päringu warm-up'i jaoks."""
+    url = f"{MEILI_URL}/indexes/{INDEX_NAME}/search"
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+    )
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {MEILI_KEY}")
+    with urllib.request.urlopen(req, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _dashboard_search_warmup_body(collection_id=None):
+    """Sama kujuga päring nagu dashboardi esmane riiulivaade."""
+    filters = ["lehekylje_number = 1"]
+    if collection_id:
+        filters.append(f'collections_hierarchy = "{collection_id}"')
+
+    return {
+        "q": "",
+        "attributesToRetrieve": [
+            "id", "work_id", "title", "year", "year_display", "publisher_id",
+            "type_object", "genre_object", "collections", "collections_hierarchy",
+            "creators", "authors_text", "tags_object", "languages",
+            "series", "series_title", "ester_id", "external_url",
+            "last_modified", "teose_lehekylgede_arv", "teose_staatus",
+        ],
+        "attributesToSearchOn": ["title", "authors_text", "tags_search"],
+        "filter": filters,
+        "limit": 5000,
+        "facets": ["genre_ids", "type_ids", "tags_ids", "teose_staatus"],
+        "distinct": "work_id",
+        "sort": ["year:asc"],
+    }
+
+
+def _warm_dashboard_searches():
+    """Soojendab dashboardi kallid otsingu/facet päringud.
+
+    Teeme nii vaikimisi kollektsiooni kui ka kogu indeksi päringu. Esimene katab
+    tavakasutaja riiuli, teine katab juhu, kus kollektsioon ei ole veel
+    kontekstis või kasutaja sirvib kõiki teoseid.
+    """
+    warmups = [("all", None)]
+    collections = load_collections()
+    if DEFAULT_DASHBOARD_COLLECTION and DEFAULT_DASHBOARD_COLLECTION in collections:
+        warmups.insert(0, (DEFAULT_DASHBOARD_COLLECTION, DEFAULT_DASHBOARD_COLLECTION))
+
+    for label, collection_id in warmups:
+        start = time.time()
+        result = _meili_search(_dashboard_search_warmup_body(collection_id))
+        elapsed = time.time() - start
+        logger.info(
+            "Dashboard search warm-up valmis (%s): %.2fs, Meili %sms, hits=%s",
+            label,
+            elapsed,
+            result.get("processingTimeMs"),
+            result.get("estimatedTotalHits"),
+        )
 
 
 def _keepwarm_loop():
-    """Taustalõim, mis käivitab iga 2h väikese Meilisearch sync-i.
+    """Taustalõim, mis hoiab Meilisearchi otsingu- ja sync-rajad soojad.
 
     Hoiab Meilisearchi eesliitetabeli (prefixSearch: indexingTime) sooja,
     et vältida ~60s viivitust esimesel indekseerimistehingul pärast pikka pausi.
     """
-    time.sleep(MEILI_KEEPWARM_INTERVAL)  # Esmakordne käivitus 2h pärast starti
+    last_sync_warmup = time.time()
     while True:
         try:
+            _warm_dashboard_searches()
+
             if not os.path.exists(BASE_DIR):
-                time.sleep(MEILI_KEEPWARM_INTERVAL)
+                time.sleep(MEILI_SEARCH_KEEPWARM_INTERVAL)
                 continue
-            # Leia esimene teos kataloogist
-            for entry in os.scandir(BASE_DIR):
-                if entry.is_dir() and not entry.name.startswith('.'):
-                    meta_path = os.path.join(entry.path, '_metadata.json')
-                    if os.path.exists(meta_path):
-                        logger.info("Meilisearch keep-warm sync...")
-                        sync_work_to_meilisearch(entry.name)
-                        break
+
+            now = time.time()
+            if now - last_sync_warmup >= MEILI_KEEPWARM_INTERVAL:
+                # Leia esimene teos kataloogist
+                for entry in os.scandir(BASE_DIR):
+                    if entry.is_dir() and not entry.name.startswith('.'):
+                        meta_path = os.path.join(entry.path, '_metadata.json')
+                        if os.path.exists(meta_path):
+                            logger.info("Meilisearch keep-warm sync...")
+                            sync_work_to_meilisearch(entry.name)
+                            last_sync_warmup = now
+                            break
         except Exception as e:
             logger.error(f"Keep-warm viga: {e}")
-        time.sleep(MEILI_KEEPWARM_INTERVAL)
+        time.sleep(MEILI_SEARCH_KEEPWARM_INTERVAL)
 
 
 def metadata_watcher_loop():
