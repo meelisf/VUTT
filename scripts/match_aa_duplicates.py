@@ -184,12 +184,15 @@ def find_aa_candidates(candidate: dict, aa_persons: list) -> list:
             (aa.get("label") or "").lower() + " " +
             (aa.get("sort_name") or "").lower()
         )
-        if any(tok in search_text for tok in long_tokens):
-            matches.append(aa)
+        matching = [tok for tok in long_tokens if tok in search_text]
+        if matching:
+            # Spetsiifilisus: pikim kattuvate tokenite maksimaalne pikkus
+            max_len = max(len(t) for t in matching)
+            matches.append((aa, max_len))
 
-    # Järjesta imm_year ASC, None viimasena
-    matches.sort(key=lambda x: (x.get("imm_year") is None, x.get("imm_year") or 9999))
-    return matches
+    # Järjesta: pikim kattuvus esmalt (spetsiifilisem), siis imm_year ASC
+    matches.sort(key=lambda x: (-x[1], x[0].get("imm_year") is None, x[0].get("imm_year") or 9999))
+    return [aa for aa, _ in matches]
 
 
 def _format_candidate_display(c: dict) -> str:
