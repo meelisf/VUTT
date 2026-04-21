@@ -320,7 +320,16 @@ def main() -> None:
         label = candidate.get("label", cid)
         wc = candidate.get("work_count") or 0
 
-        print(f"\n[{i}/{total}] {label}  ({wc} teos{'t' if wc != 1 else ''})")
+        date_parts = []
+        bd = (candidate.get("birth_date") or "")[:4]
+        dd = (candidate.get("death_date") or "")[:4]
+        if bd:
+            date_parts.append(f"*{bd}")
+        if dd:
+            date_parts.append(f"†{dd}")
+        date_str = ("  " + "  ".join(date_parts)) if date_parts else ""
+
+        print(f"\n[{i}/{total}] {label}  ({wc} teos{'t' if wc != 1 else ''}){date_str}")
 
         matches = find_aa_candidates(candidate, aa_persons)
         top_matches = matches[:5]
