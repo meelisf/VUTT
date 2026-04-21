@@ -13,6 +13,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -40,7 +41,7 @@ def _load_aa_noble_ids() -> set:
     return noble
 
 
-def _get_aa_entry_num(person: dict) -> int | None:
+def _get_aa_entry_num(person: dict) -> Optional[int]:
     for ident in person.get("identifiers") or []:
         if ident.get("scheme") == "album_academicum":
             raw = str(ident.get("id", "")).replace("AA:", "").strip()
