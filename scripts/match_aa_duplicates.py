@@ -117,6 +117,10 @@ def apply_aa_to_person(person: dict, auto_filled: dict) -> dict:
     if auto_filled.get("biography") and not (p.get("biography") or "").strip():
         p["biography"] = auto_filled["biography"]
 
+    # Seisus (aadel) — ainult kui tühi
+    if auto_filled.get("status") and not p.get("status"):
+        p["status"] = auto_filled["status"]
+
     # _aa_origin jäetakse vahele — AA päritolu on saksakeelne tekst (nt "Schweden")
     # mis ei kattu places.json võtmetega; kasutaja saab käsitsi seada UI-s
 
