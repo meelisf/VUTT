@@ -205,3 +205,180 @@ def _format_candidate_display(c: dict) -> str:
     if wc:
         parts.append(f"{wc} teos")
     return "  —  ".join(parts)
+
+
+def load_progress(progress_path: str) -> dict:
+    if os.path.exists(progress_path):
+        try:
+            with open(progress_path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"done": [], "skipped": []}
+
+
+def save_progress(progress_path: str, progress: dict) -> None:
+    tmp = progress_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(progress, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, progress_path)
+
+
+def _do_merge_and_enrich(source_id: str, target_id: str, dry_run: bool = False) -> bool:
+    """
+    Merge source → target, seejärel rakenda AA rikastus target'ile.
+    Tagastab True edukal läbiviimisel.
+    """
+    from server.prosopography.ops import merge_person, get_person, update_person
+    from server.prosopography.enrichment import fetch_and_diff
+
+    if dry_run:
+        print(f"  [DRY RUN] merge_person({source_id!r}, {target_id!r})")
+        print(f"  [DRY RUN] AA rikastus + update_person({target_id!r})")
+        return True
+
+    # 1. Merge
+    try:
+        merge_person(source_id, target_id, username="match_aa_script")
+        print("  ✓ Liidetud")
+    except Exception as e:
+        print(f"  ! Merge viga: {e}")
+        return False
+
+    # 2. AA rikastus
+    try:
+        person = get_person(target_id)
+        aa_id = next(
+            (i["id"] for i in (person.get("identifiers") or [])
+             if i.get("scheme") == "album_academicum"),
+            None,
+        )
+        if not aa_id:
+            print("  ! Target'il puudub AA identifikaator pärast merge'i")
+            return True  # Merge õnnestus, rikastus ebaõnnestus — jätka
+
+        diff = fetch_and_diff("album_academicum", aa_id, person)
+        auto_filled = diff.get("auto_filled", {})
+        if not auto_filled:
+            print("  ✓ AA rikastus: uusi välju pole")
+            return True
+
+        updated = apply_aa_to_person(person, auto_filled)
+        update_person(target_id, updated, username="match_aa_script")
+        filled_fields = list(auto_filled.keys())
+        print(f"  ✓ AA rikastus rakendatud ({len(filled_fields)} välja: {', '.join(filled_fields[:5])}{'...' if len(filled_fields) > 5 else ''})")
+    except Exception as e:
+        print(f"  ! AA rikastuse viga: {e}")
+
+    return True
+
+
+def main() -> None:
+    import argparse
+    parser = argparse.ArgumentParser(description="AA duplikaatide sobitaja")
+    parser.add_argument("--dry-run", action="store_true", help="Ära kirjuta — kuva ainult soovitused")
+    args = parser.parse_args()
+
+    project_root = _BASE_DIR
+    index_path = os.path.join(project_root, "data", "config", "prosopography_index.json")
+    progress_path = os.path.join(project_root, "state", "match_aa_progress.json")
+
+    if not os.path.exists(index_path):
+        print(f"! Indeksit ei leitud: {index_path}")
+        print("  Käivita serveril: cd ~/VUTT && .venv/bin/python3 scripts/match_aa_duplicates.py")
+        sys.exit(1)
+
+    print("Laen indeksit...")
+    candidates, aa_persons = load_index_and_split(index_path)
+    progress = load_progress(progress_path)
+    done_ids = set(progress.get("done", []))
+    skipped_ids = set(progress.get("skipped", []))
+
+    remaining = [c for c in candidates if c["id"] not in done_ids and c["id"] not in skipped_ids]
+    total = len(candidates)
+    done_count = len(done_ids)
+
+    print(f"Kandidaate: {total}  |  Tehtud: {done_count}  |  Järel: {len(remaining)}")
+    if args.dry_run:
+        print("[DRY RUN režiim — midagi ei kirjutata]\n")
+
+    for i, candidate in enumerate(remaining, start=done_count + 1):
+        cid = candidate["id"]
+        label = candidate.get("label", cid)
+        wc = candidate.get("work_count") or 0
+
+        print(f"\n[{i}/{total}] {label}  ({wc} teos{'t' if wc != 1 else ''})")
+
+        matches = find_aa_candidates(candidate, aa_persons)
+
+        if not matches:
+            print("  (0 vastet — jätan vahele)")
+            skipped_ids.add(cid)
+            progress["skipped"] = list(skipped_ids)
+            save_progress(progress_path, progress)
+            continue
+
+        for j, m in enumerate(matches[:5], 1):
+            print(f"    {j}) {_format_candidate_display(m)}")
+
+        choices = [str(j) for j in range(1, len(matches[:5]) + 1)]
+        prompt = f"  Vali [{'/'.join(choices)}/s(ki)/q(uit)]: "
+
+        try:
+            choice = input(prompt).strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nKatkestatud.")
+            break
+
+        if choice == "q":
+            print("Lõpetan.")
+            break
+
+        if choice in ("s", "skip", ""):
+            skipped_ids.add(cid)
+            progress["skipped"] = list(skipped_ids)
+            save_progress(progress_path, progress)
+            print("  Vahele jäetud.")
+            continue
+
+        if choice not in choices:
+            print(f"  Tundmatu valik '{choice}' — jätan vahele.")
+            skipped_ids.add(cid)
+            progress["skipped"] = list(skipped_ids)
+            save_progress(progress_path, progress)
+            continue
+
+        selected = matches[int(choice) - 1]
+        source_id = cid
+        target_id = selected["id"]
+
+        print(f"\n  Source (tombstone): {source_id}  ({label})")
+        print(f"  Target (säilib):    {target_id}  ({selected.get('label')})")
+
+        try:
+            confirm = input("  Merge + AA rikastus? [y/n]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            print("\nKatkestatud.")
+            break
+
+        if confirm not in ("y", "yes", "j", "jah"):
+            print("  Tühistatud.")
+            skipped_ids.add(cid)
+            progress["skipped"] = list(skipped_ids)
+            save_progress(progress_path, progress)
+            continue
+
+        success = _do_merge_and_enrich(source_id, target_id, dry_run=args.dry_run)
+        if success:
+            done_ids.add(cid)
+            progress["done"] = list(done_ids)
+            skipped_ids.discard(cid)
+            progress["skipped"] = list(skipped_ids)
+            save_progress(progress_path, progress)
+
+    remaining_after = len(candidates) - len(done_ids) - len(skipped_ids)
+    print(f"\nValmis. Tehtud: {len(done_ids)}  |  Vahele jäetud: {len(skipped_ids)}  |  Järel: {remaining_after}")
+
+
+if __name__ == "__main__":
+    main()
