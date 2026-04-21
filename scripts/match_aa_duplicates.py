@@ -148,3 +148,60 @@ def apply_aa_to_person(person: dict, auto_filled: dict) -> dict:
             p["education"] = existing_edu + new_entries
 
     return p
+
+
+def load_index_and_split(index_path: str) -> tuple:
+    """
+    Laeb prosopography_index.json, jagab kaheks:
+      candidates — sulunimega, has_aa=False, record_status!=tombstone
+      aa_persons  — has_aa=True, record_status!=tombstone
+    """
+    with open(index_path, encoding="utf-8") as f:
+        index = json.load(f)
+    entries = [e for e in index.get("entries", []) if e.get("record_status") != "tombstone"]
+    candidates = [
+        e for e in entries
+        if not e.get("has_aa") and re.search(r'\([^)]+\)', e.get("label", ""))
+    ]
+    aa_persons = [e for e in entries if e.get("has_aa")]
+    return candidates, aa_persons
+
+
+def find_aa_candidates(candidate: dict, aa_persons: list) -> list:
+    """
+    Otsib AA-koodiga vasteid candidate nimevariantide põhjal.
+    Nõuab vähemalt ühe ≥5-tähemärgise tokeni esinemist label või sort_name väljal.
+    Tagastab vastelisti, järjestatud imm_year ASC (None viimasena).
+    """
+    tokens = extract_name_variants(candidate.get("label", ""))
+    long_tokens = [t for t in tokens if len(t) >= 5]
+    if not long_tokens:
+        return []
+
+    matches = []
+    for aa in aa_persons:
+        search_text = (
+            (aa.get("label") or "").lower() + " " +
+            (aa.get("sort_name") or "").lower()
+        )
+        if any(tok in search_text for tok in long_tokens):
+            matches.append(aa)
+
+    # Järjesta imm_year ASC, None viimasena
+    matches.sort(key=lambda x: (x.get("imm_year") is None, x.get("imm_year") or 9999))
+    return matches
+
+
+def _format_candidate_display(c: dict) -> str:
+    """Kuvab AA vastet ühel real: 'Andreas Limasius  —  AA:1390  —  imm. 1632'"""
+    parts = [c.get("label", c.get("id", "?"))]
+    aa_num = c.get("aa_number")
+    if aa_num:
+        parts.append(f"AA:{aa_num}")
+    imm = c.get("imm_year")
+    if imm:
+        parts.append(f"imm. {imm}")
+    wc = c.get("work_count") or 0
+    if wc:
+        parts.append(f"{wc} teos")
+    return "  —  ".join(parts)
