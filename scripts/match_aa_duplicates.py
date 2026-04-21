@@ -373,12 +373,12 @@ def main() -> None:
         print(f"  Target (säilib):    {target_id}  ({selected.get('label')})")
 
         try:
-            confirm = input("  Merge + AA rikastus? [y/n]: ").strip().lower()
+            confirm = input("  Merge + AA rikastus? [Y/n]: ").strip().lower()
         except (KeyboardInterrupt, EOFError):
             print("\nKatkestatud.")
             break
 
-        if confirm not in ("y", "yes", "j", "jah"):
+        if confirm not in ("y", "yes", "j", "jah", ""):
             print("  Tühistatud.")
             skipped_ids.add(cid)
             progress["skipped"] = sorted(skipped_ids)
