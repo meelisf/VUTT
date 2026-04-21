@@ -6,7 +6,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.match_aa_duplicates import extract_name_variants
+from scripts.match_aa_duplicates import extract_name_variants, apply_aa_to_person
 
 
 def test_full_word_in_parens():
@@ -53,3 +53,94 @@ def test_no_parens():
     tokens = set(result)
     assert "johannes" in tokens
     assert "limasius" in tokens
+
+
+# ── apply_aa_to_person testid ─────────────────────────────────────────────
+
+def test_apply_biography_only_if_empty():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": ""}
+    result = apply_aa_to_person(person, {"biography": "Sündis 1610..."})
+    assert result["biography"] == "Sündis 1610..."
+
+
+def test_apply_biography_not_overwritten():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": "Olemasolev bio"}
+    result = apply_aa_to_person(person, {"biography": "Uus bio"})
+    assert result["biography"] == "Olemasolev bio"
+
+
+def test_apply_birth_date():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}}
+    result = apply_aa_to_person(person, {"birth.date": "1610-03-15", "birth.precision": "day"})
+    assert result["birth"]["date"] == "1610-03-15"
+    assert result["birth"]["precision"] == "day"
+    assert result["birth"]["is_circa"] is False
+
+
+def test_apply_birth_year_precision():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}}
+    result = apply_aa_to_person(person, {"birth.date": "1610", "birth.precision": "year"})
+    assert result["birth"]["date"] == "1610-01-01"
+    assert result["birth"]["precision"] == "year"
+
+
+def test_apply_education_dedup():
+    person = {
+        "id": "vutt:Pt1",
+        "name": {"label": "Test"},
+        "education": [
+            {"institution": "Academia Gustaviana", "type": "imm.",
+             "date_from": {"date": "1632-05-10", "precision": "day"}}
+        ],
+    }
+    auto_filled = {
+        "_aa_education": [
+            {"institution": "Academia Gustaviana", "edu_type": "imm.",
+             "date_from": {"date": "1632-05-10", "precision": "day"}, "source": "album_academicum"},
+            {"institution": "Universität Rostock", "edu_type": "imm.",
+             "date_from": {"date": "1628-01-01", "precision": "year"}, "source": "album_academicum"},
+        ]
+    }
+    result = apply_aa_to_person(person, auto_filled)
+    insts = [e["institution"] for e in result["education"]]
+    assert len(insts) == 2
+    assert "Academia Gustaviana" in insts
+    assert "Universität Rostock" in insts
+
+
+def test_apply_education_type_key():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "education": []}
+    auto_filled = {
+        "_aa_education": [
+            {"institution": "Academia Gustaviana", "edu_type": "imm.",
+             "date_from": {"date": "1632-05-10", "precision": "day"}, "source": "album_academicum"}
+        ]
+    }
+    result = apply_aa_to_person(person, auto_filled)
+    edu = result["education"][0]
+    assert edu.get("type") == "imm."
+    assert "edu_type" not in edu
+
+
+def test_apply_origin_only_if_empty():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": None}}
+    result = apply_aa_to_person(person, {"_aa_origin": "Liivimaa"})
+    assert result["origin"]["place"] == "Liivimaa"
+
+
+def test_apply_origin_not_overwritten():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": "Eestimaa"}}
+    result = apply_aa_to_person(person, {"_aa_origin": "Liivimaa"})
+    assert result["origin"]["place"] == "Eestimaa"
+
+
+def test_apply_name_aliases():
+    person = {"id": "vutt:Pt1", "name": {"label": "Andreas Limasius", "aliases": []}}
+    result = apply_aa_to_person(person, {"name.aliases": ["Limacius", "Limazius"]})
+    assert result["name"]["aliases"] == ["Limacius", "Limazius"]
+
+
+def test_apply_does_not_mutate_input():
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": ""}
+    apply_aa_to_person(person, {"biography": "Uus bio"})
+    assert person["biography"] == ""
