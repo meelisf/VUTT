@@ -522,8 +522,9 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
         try:
             person["origin"] = _enrich_origin_from_places(origin)
         except ValueError:
-            # Tundmatu koht places.json-s — salvesta ilma rikastuseta (place jääb tekstina)
-            logger.warning("Tundmatu päritolukoht: %r — salvestatakse ilma rikastuseta", origin.get("place"))
+            # Tundmatu koht places.json-s — tühjenda place, salvesta muud väljad
+            logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
+            person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
 
     atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
