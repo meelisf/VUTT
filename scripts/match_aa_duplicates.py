@@ -117,7 +117,7 @@ def apply_aa_to_person(person: dict, auto_filled: dict) -> dict:
     if auto_filled.get("biography") and not (p.get("biography") or "").strip():
         p["biography"] = auto_filled["biography"]
 
-    # Päritolukoht — ainult kui tühi
+    # Päritolukoht — ainult kui tühi (_aa_origin on string, mitte {id,label} dict)
     if auto_filled.get("_aa_origin"):
         origin = p.setdefault("origin", {})
         if not origin.get("place"):

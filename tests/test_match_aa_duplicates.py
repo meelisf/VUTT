@@ -140,6 +140,14 @@ def test_apply_name_aliases():
     assert result["name"]["aliases"] == ["Limacius", "Limazius"]
 
 
+def test_apply_name_aliases_overwrites_existing():
+    # Nimevariandid kirjutatakse üle — AA on kanooniline allikas (sama loogika kui UI-s)
+    person = {"id": "vutt:Pt1", "name": {"label": "Andreas Limasius", "aliases": ["OldAlias"]}}
+    result = apply_aa_to_person(person, {"name.aliases": ["Limacius", "Limazius"]})
+    assert result["name"]["aliases"] == ["Limacius", "Limazius"]
+    assert "OldAlias" not in result["name"]["aliases"]
+
+
 def test_apply_does_not_mutate_input():
     person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "biography": ""}
     apply_aa_to_person(person, {"biography": "Uus bio"})
