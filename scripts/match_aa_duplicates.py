@@ -229,13 +229,13 @@ def _do_merge_and_enrich(source_id: str, target_id: str, dry_run: bool = False) 
     Merge source → target, seejärel rakenda AA rikastus target'ile.
     Tagastab True edukal läbiviimisel.
     """
-    from server.prosopography.ops import merge_person, get_person, update_person
-    from server.prosopography.enrichment import fetch_and_diff
-
     if dry_run:
         print(f"  [DRY RUN] merge_person({source_id!r}, {target_id!r})")
         print(f"  [DRY RUN] AA rikastus + update_person({target_id!r})")
         return True
+
+    from server.prosopography.ops import merge_person, get_person, update_person
+    from server.prosopography.enrichment import fetch_and_diff
 
     # 1. Merge
     try:
