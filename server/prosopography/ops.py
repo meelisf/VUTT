@@ -521,8 +521,9 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     if origin.get("place"):
         try:
             person["origin"] = _enrich_origin_from_places(origin)
-        except ValueError as e:
-            raise ValueError(str(e))
+        except ValueError:
+            # Tundmatu koht places.json-s — salvesta ilma rikastuseta (place jääb tekstina)
+            logger.warning("Tundmatu päritolukoht: %r — salvestatakse ilma rikastuseta", origin.get("place"))
 
     atomic_write_json(_id_to_path(person_id), person)
     _update_index_entry(person)
