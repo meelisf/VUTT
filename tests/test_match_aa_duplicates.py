@@ -122,10 +122,11 @@ def test_apply_education_type_key():
     assert "edu_type" not in edu
 
 
-def test_apply_origin_only_if_empty():
+def test_apply_origin_skipped():
+    # _aa_origin jäetakse vahele (saksakeelne tekst ei sobi places.json-ga)
     person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": None}}
     result = apply_aa_to_person(person, {"_aa_origin": "Liivimaa"})
-    assert result["origin"]["place"] == {"label": "Liivimaa", "id": None, "source": None, "labels": {}}
+    assert result["origin"]["place"] is None
 
 
 def test_apply_origin_not_overwritten():

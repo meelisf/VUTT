@@ -117,16 +117,8 @@ def apply_aa_to_person(person: dict, auto_filled: dict) -> dict:
     if auto_filled.get("biography") and not (p.get("biography") or "").strip():
         p["biography"] = auto_filled["biography"]
 
-    # Päritolukoht — ainult kui tühi (_aa_origin on string → ehita label-only LinkedEntity)
-    if auto_filled.get("_aa_origin"):
-        origin = p.setdefault("origin", {})
-        if not origin.get("place"):
-            origin["place"] = {
-                "label": auto_filled["_aa_origin"],
-                "id": None,
-                "source": None,
-                "labels": {},
-            }
+    # _aa_origin jäetakse vahele — AA päritolu on saksakeelne tekst (nt "Schweden")
+    # mis ei kattu places.json võtmetega; kasutaja saab käsitsi seada UI-s
 
     # Haridustee — dedup institution nime järgi (case-insensitive)
     if auto_filled.get("_aa_education"):
