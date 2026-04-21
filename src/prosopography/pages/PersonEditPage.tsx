@@ -20,6 +20,7 @@ import { CollapsibleSection, DynamicList } from '../components/personForm/Collap
 import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
 import PlacePicker from '../components/personForm/PlacePicker';
+import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -53,7 +54,7 @@ const PersonEditPage: React.FC = () => {
   // labels.json kohalikud soovitused topic-tüüpi EntityPickeritele
   const [entityLabels, setEntityLabels] = useState<{ label: string; id: string }[]>([]);
   // Seose tüüpide soovitused kõigist kaartidest
-  const [relationTypeSuggestions, setRelationTypeSuggestions] = useState<{ label: string; id: string | null }[]>([]);
+  const [relationTypeSuggestions, setRelationTypeSuggestions] = useState<{ label: string; id: string | null; labels?: Record<string, string> | null }[]>([]);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
@@ -106,6 +107,7 @@ const PersonEditPage: React.FC = () => {
         const items = data.map(d => ({
           label: (d.labels?.[lang] || d.labels?.['et'] || d.labels?.['en'] || d.label),
           id: d.id ?? null,
+          labels: d.labels ?? null,
         }));
         setRelationTypeSuggestions(items);
       })
@@ -743,8 +745,8 @@ const PersonEditPage: React.FC = () => {
                       other: item.target_id
                         ? '\x00LINK\x00'
                         : item.name,
-                      self: draft.name_label || '…',
-                      type: item.type,
+                      self: formatRelationOwnerName(draft.name_label || '…', lang),
+                      type: formatRelationTypeLabel(item.type, item.type_labels, lang),
                     }).split('\x00LINK\x00').flatMap((part, i, arr) =>
                       i < arr.length - 1
                         ? [part, <Link key="l" to={`/persons/${encodeURIComponent(item.target_id!)}`} className="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">{item.name}</Link>]

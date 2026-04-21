@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 
 interface PersonCardProps {
@@ -93,6 +94,11 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
       {person.imm_date && (
         <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
           {formatImmLabel(person.imm_date, i18n.language?.slice(0, 2) ?? 'et')}
+        </span>
+      )}
+      {person.status_id === 'Q134737' && (
+        <span className="absolute top-2 right-2 p-1 rounded-full bg-amber-100/90 text-amber-600 border border-amber-200/80" title={t('nobility', 'Aadel')}>
+          <ShieldPlus size={14} />
         </span>
       )}
     </div>

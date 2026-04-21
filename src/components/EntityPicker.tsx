@@ -13,6 +13,7 @@ import type { ProsopoIndexEntry } from '../prosopography/types';
 interface SuggestionItem {
   label: string;
   id: string | null;
+  labels?: Record<string, string> | null;
 }
 
 // Normaliseerib "Perenimi, Eesnimi" → "Eesnimi Perenimi" (GND/VIAF formaat)
@@ -55,6 +56,7 @@ type Suggestion = WikidataSearchResult & {
   isRegister?: boolean;
   isAlreadyAdded?: boolean;
   displayLabel?: string; // Kuvatav nimi dropdownis (võib erineda salvestatavast label-ist)
+  labels?: Record<string, string> | null;
 };
 
 // Tagastab tulemuse välise lingi (Wikidata, GND, VIAF)
@@ -249,6 +251,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           .map(s => ({
             id: s.id || ('local-' + s.label),
             label: s.label,
+            labels: s.labels,
             description: s.id ? `${localDbText} (${linkedText}: ${s.id})` : `${localDbText} (${unlinkedText})`,
             url: '',
             isLocal: true
@@ -389,9 +392,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       entity = { id: result.id.startsWith('local-') ? null : result.id, label: result.label, source: 'manual', labels: { et: result.label } };
     } else {
       // Wikidata Q-kood — fetch kõik keeled
-      let multilingualLabels: Record<string, string> = { et: result.label };
+      let multilingualLabels: Record<string, string> = result.labels ? { ...result.labels } : { et: result.label };
       try {
-        multilingualLabels = await getEntityLabels(result.id);
+        multilingualLabels = { ...multilingualLabels, ...(await getEntityLabels(result.id)) };
       } catch (e) {
         console.warn("Ei saanud silte Wikidatast", e);
       }

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ChevronDown, ChevronRight, Database, GraduationCap, MapPin, Search, Venus, X } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Crown, Database, GraduationCap, MapPin, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
@@ -32,6 +32,7 @@ interface PersonAdvancedFiltersProps {
   source: string;
   immYearFrom: string;
   immYearTo: string;
+  statusId: string;
   originGroups: FacetItem[];
   institutions: InstitutionItem[];
   onGenderChange: (v: GenderFilter) => void;
@@ -40,6 +41,7 @@ interface PersonAdvancedFiltersProps {
   onSourceChange: (v: string) => void;
   onImmYearFromChange: (v: string) => void;
   onImmYearToChange: (v: string) => void;
+  onStatusIdChange: (v: string) => void;
   onClearAll: () => void;
 }
 
@@ -102,16 +104,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, originGroup, institution, source, immYearFrom, immYearTo,
+  gender, originGroup, institution, source, immYearFrom, immYearTo, statusId,
   originGroups, institutions,
   onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
-  onImmYearFromChange, onImmYearToChange,
+  onImmYearFromChange, onImmYearToChange, onStatusIdChange,
   onClearAll,
 }) => {
   const { t } = useTranslation('prosopography');
   const hasImmYear = !!(immYearFrom || immYearTo);
-  const hasActive = !!(originGroup || institution || source || gender || hasImmYear);
-  const activeCount = [originGroup, institution, source, gender, hasImmYear ? '1' : ''].filter(Boolean).length;
+  const hasActive = !!(originGroup || institution || source || gender || hasImmYear || statusId);
+  const activeCount = [originGroup, institution, source, gender, hasImmYear ? '1' : '', statusId].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -229,6 +231,23 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
             </div>
           </div>
 
+          <div>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+              <Crown size={13} className="text-primary-600" />
+              {t('filterStatus', 'Seisus')}
+            </h4>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => onStatusIdChange(statusId === 'Q134737' ? '' : 'Q134737')}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                  statusId === 'Q134737' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {t('filterAadel', 'Aadel')}
+              </button>
+            </div>
+          </div>
+
           {hasActive && (
             <div className="pt-2 border-t border-gray-100 space-y-2">
               <div className="flex flex-wrap gap-1.5">
@@ -260,6 +279,12 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
                     AA {immYearFrom || '…'}–{immYearTo || '…'}
                     <button onClick={() => { onImmYearFromChange(''); onImmYearToChange(''); }} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                  </span>
+                )}
+                {statusId === 'Q134737' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    {t('filterAadel', 'Aadel')}
+                    <button onClick={() => onStatusIdChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
               </div>
