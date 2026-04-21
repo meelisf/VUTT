@@ -125,13 +125,14 @@ def test_apply_education_type_key():
 def test_apply_origin_only_if_empty():
     person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": None}}
     result = apply_aa_to_person(person, {"_aa_origin": "Liivimaa"})
-    assert result["origin"]["place"] == "Liivimaa"
+    assert result["origin"]["place"] == {"label": "Liivimaa", "id": None, "source": None, "labels": {}}
 
 
 def test_apply_origin_not_overwritten():
-    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": "Eestimaa"}}
+    existing = {"label": "Eestimaa", "id": None, "source": None, "labels": {}}
+    person = {"id": "vutt:Pt1", "name": {"label": "Test"}, "origin": {"place": existing}}
     result = apply_aa_to_person(person, {"_aa_origin": "Liivimaa"})
-    assert result["origin"]["place"] == "Eestimaa"
+    assert result["origin"]["place"]["label"] == "Eestimaa"
 
 
 def test_apply_name_aliases():
