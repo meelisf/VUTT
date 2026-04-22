@@ -35,6 +35,7 @@ interface PersonAdvancedFiltersProps {
   statusId: string;
   originGroups: FacetItem[];
   institutions: InstitutionItem[];
+  seisused: { id: string; label: { et: string; en: string } }[];
   onGenderChange: (v: GenderFilter) => void;
   onOriginGroupChange: (v: string) => void;
   onInstitutionChange: (v: string) => void;
@@ -105,12 +106,12 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
   gender, originGroup, institution, source, immYearFrom, immYearTo, statusId,
-  originGroups, institutions,
+  originGroups, institutions, seisused,
   onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
   onImmYearFromChange, onImmYearToChange, onStatusIdChange,
   onClearAll,
 }) => {
-  const { t } = useTranslation('prosopography');
+  const { t, i18n } = useTranslation('prosopography');
   const hasImmYear = !!(immYearFrom || immYearTo);
   const hasActive = !!(originGroup || institution || source || gender || hasImmYear || statusId);
   const activeCount = [originGroup, institution, source, gender, hasImmYear ? '1' : '', statusId].filter(Boolean).length;
@@ -237,14 +238,20 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
               {t('filterStatus', 'Seisus')}
             </h4>
             <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => onStatusIdChange(statusId === 'Q134737' ? '' : 'Q134737')}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  statusId === 'Q134737' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {t('filterAadel', 'Aadel')}
-              </button>
+              {seisused.map(item => {
+                const label = i18n.language?.startsWith('en') ? item.label.en : item.label.et;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onStatusIdChange(statusId === item.id ? '' : item.id)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                      statusId === item.id ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -281,9 +288,12 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                     <button onClick={() => { onImmYearFromChange(''); onImmYearToChange(''); }} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
-                {statusId === 'Q134737' && (
+                {statusId && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    {t('filterAadel', 'Aadel')}
+                    {(() => {
+                      const item = seisused.find(s => s.id === statusId);
+                      return item ? (i18n.language?.startsWith('en') ? item.label.en : item.label.et) : statusId;
+                    })()}
                     <button onClick={() => onStatusIdChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}

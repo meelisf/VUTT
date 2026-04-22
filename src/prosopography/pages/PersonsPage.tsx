@@ -7,6 +7,7 @@ import PersonCard from '../components/PersonCard';
 import MergePersonsModal from '../components/MergePersonsModal';
 import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
+import { getVocabularies } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import type { ProsopoIndexEntry } from '../types';
 
@@ -35,6 +36,7 @@ const PersonsPage: React.FC = () => {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
+  const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
   const [inputValue, setInputValue] = useState(query);
@@ -132,6 +134,10 @@ const PersonsPage: React.FC = () => {
   useEffect(() => {
     fetchFacets();
   }, [fetchFacets]);
+
+  useEffect(() => {
+    getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
+  }, []);
 
   const hasActiveFilters = !!(originGroup || institution || source || gender || immYearFrom || immYearTo);
   const totalPages = Math.ceil(total / LIMIT);
@@ -261,6 +267,7 @@ const PersonsPage: React.FC = () => {
             statusId={statusId}
             originGroups={originGroupFacets}
             institutions={institutionFacets}
+            seisused={seisused}
             onOriginGroupChange={setOriginGroup}
             onInstitutionChange={setInstitution}
             onSourceChange={setSource}
