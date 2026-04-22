@@ -96,7 +96,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
           {formatImmLabel(person.imm_date, i18n.language?.slice(0, 2) ?? 'et')}
         </span>
       )}
-      {person.status_id === 'Q134737' && (
+      {(person.status_ids ?? []).includes('Q134737') && (
         <span className="absolute top-2 right-2 p-1 rounded-full bg-amber-100/90 text-amber-600 border border-amber-200/80" title={t('nobility', 'Aadel')}>
           <ShieldPlus size={14} />
         </span>
@@ -132,8 +132,8 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
         })()}
 
         {/* Seisus */}
-        {person.status_label && (
-          <p className="text-sm text-gray-600">{person.status_label}</p>
+        {(person.status_labels ?? []).length > 0 && (
+          <p className="text-sm text-gray-600">{(person.status_labels ?? []).join(', ')}</p>
         )}
 
         {/* Biograafia snippet */}

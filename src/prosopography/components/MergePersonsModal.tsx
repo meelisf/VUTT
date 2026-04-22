@@ -34,7 +34,7 @@ const PersonSummary: React.FC<{ person: ProsopoIndexEntry; label: string; highli
       </p>
       <h3 className="text-base font-bold text-gray-900 leading-tight mb-1">{person.label}</h3>
       <p className="text-sm text-gray-500 mb-2">{lifespanNode}</p>
-      {person.status_label && <p className="text-xs text-gray-600">{person.status_label}</p>}
+      {(person.status_labels ?? []).length > 0 && <p className="text-xs text-gray-600">{(person.status_labels ?? []).join(', ')}</p>}
       <div className="mt-3 flex items-center gap-1 flex-wrap">
         {person.has_wikidata && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">WD</span>}
         {person.has_gnd     && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white border border-primary-200 text-primary-700">GND</span>}
