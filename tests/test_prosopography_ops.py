@@ -130,3 +130,36 @@ def test_list_persons_status_id_filter(tmp_path, monkeypatch):
     assert "p1" in ids
     assert "p2" not in ids
     assert "p3" not in ids
+
+
+def test_migrate_has_both_status_and_statuses(tmp_path):
+    """Kui mõlemad võtmed olemas — status eemaldatakse, statuses jääb puutumata."""
+    person = {
+        "id": "p5",
+        "statuses": [{"id": "Q134737", "label": "Aadel"}],
+        "status": {"id": "Q2259532", "label": "Vaimulik"},
+    }
+    results = _run_migrate(tmp_path, [person])
+    assert results[0].get("statuses") == [{"id": "Q134737", "label": "Aadel"}]
+    assert "status" not in results[0]
+
+
+def test_migrate_idempotent(tmp_path):
+    """Kaks järjestikust jooksu — teine ei muuda midagi."""
+    person = {"id": "p6", "status": {"id": "Q134737", "label": "Aadel"}}
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    (prosopo_dir / "p6.json").write_text(json.dumps(person, ensure_ascii=False), encoding="utf-8")
+
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "migrate_script2",
+        PROJECT_ROOT / "scripts" / "migrate_status_to_statuses.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    first = mod.migrate(str(prosopo_dir))
+    second = mod.migrate(str(prosopo_dir))
+    assert first == 1
+    assert second == 0

@@ -397,7 +397,7 @@ def create_person(data: dict, username: str) -> dict:
         "birth": _make_date_obj(data.get("birth_year")),
         "death": _make_date_obj(data.get("death_year")),
         "origin": {"place": None, "place_id": None, "place_labels": None, "geonames_id": None, "coordinates": None},
-        "status": None,
+        "statuses": [],
         "confession": None,
         "occupations": [],
         "education": [],

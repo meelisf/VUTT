@@ -2,8 +2,16 @@
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
+
+
+def _atomic_write(fpath: Path, data: dict) -> None:
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    tmp = fpath.with_suffix(".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    os.replace(tmp, fpath)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -34,7 +42,7 @@ def migrate(prosopo_dir: Optional[str] = None) -> int:
             # Eemalda vana status väli kui see on jäänud
             if "status" in data:
                 del data["status"]
-                fpath.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                _atomic_write(fpath, data)
                 changed += 1
             continue
 
@@ -45,7 +53,7 @@ def migrate(prosopo_dir: Optional[str] = None) -> int:
         else:
             data["statuses"] = []
 
-        fpath.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _atomic_write(fpath, data)
         changed += 1
 
     print(f"Migreerisin {changed} faili.")
