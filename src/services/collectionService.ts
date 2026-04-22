@@ -68,12 +68,18 @@ export interface VocabularyItem {
   en: string;
 }
 
+export interface VocabularySeisusItem {
+  id: string;
+  label: { et: string; en: string };
+}
+
 export interface Vocabularies {
   types: { [id: string]: VocabularyItem };
   genres: { [id: string]: VocabularyItem };
   roles: { [id: string]: VocabularyItem };
   languages: { [id: string]: VocabularyItem };
   relation_types: { [id: string]: VocabularyItem };
+  seisused?: VocabularySeisusItem[];
 }
 
 // =========================================================

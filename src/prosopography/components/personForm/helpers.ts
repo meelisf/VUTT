@@ -79,9 +79,8 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   }
 
   // Seisus
-  if (autoFilled['status'] && !draft.status) {
-    const s = autoFilled['status'];
-    patch.status = { label: s.label, id: s.id ?? null, labels: null, source: 'wikidata' };
+  if (autoFilled['status']?.id && !(draft.statuses ?? []).includes(autoFilled['status'].id)) {
+    patch.statuses = [...(draft.statuses ?? []), autoFilled['status'].id];
   }
 
   // Ametid — uus vorming (_occupations massiiv), GND tagasiühilduvus (_occupation_label)
@@ -167,7 +166,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     },
     floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
     floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
-    status: p.status ? { label: p.status.label, id: p.status.id, labels: (p.status as any).labels ?? null, source: 'wikidata' } : null,
+    statuses: (p.statuses ?? []).map(s => s.id).filter(Boolean) as string[],
     confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
     occupations: (p.occupations ?? []).map((o: any) => ({
       label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
@@ -268,9 +267,7 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
     gender: (draft.gender || null) as 'M' | 'F' | null,
     birth: buildDatePayload(draft.birth) ?? (original?.birth ?? null as any),
     death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
-    status: draft.status
-      ? { id: draft.status.id || draft.status.label, label: draft.status.label, ...(draft.status.labels ? { labels: draft.status.labels } : {}) }
-      : null,
+    statuses: (draft.statuses ?? []).map(qId => ({ id: qId, label: qId })),
     confession: draft.confession
       ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,

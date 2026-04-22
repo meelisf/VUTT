@@ -46,7 +46,7 @@ export interface FormDraft {
   death: DateDraft;
   floruit_from: string;
   floruit_to: string;
-  status: LinkedEntity | null;
+  statuses: string[];  // Q-koodide massiiv
   confession: LinkedEntity | null;
   occupations: OccupationDraft[];
   education: EducationDraft[];
@@ -73,7 +73,7 @@ export const emptyDraft = (): FormDraft => ({
   death: { year: '', month: '', day: '', circa: false, bound: '', calendar: '', place: null },
   floruit_from: '',
   floruit_to: '',
-  status: null,
+  statuses: [],
   confession: null,
   occupations: [],
   education: [],

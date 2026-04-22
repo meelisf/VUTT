@@ -24,8 +24,8 @@ export interface ProsopoIndexEntry {
   birth_year: number | null;
   death_year: number | null;
   gender: 'M' | 'F' | null;
-  status_id: string | null;
-  status_label: string | null;
+  status_ids: string[];
+  status_labels: string[];
   confession_id: string | null;
   has_wikidata: boolean;
   has_gnd: boolean;
@@ -98,7 +98,7 @@ export interface ProsopoRecord {
     coordinates: string | null;
   };
   floruit?: { year_from?: number | null; year_to?: number | null } | null;
-  status: { id: string; label: string } | null;
+  statuses: { id: string; label: string }[];
   confession: { id: string; label: string } | null;
   occupations: any[];
   education: any[];
