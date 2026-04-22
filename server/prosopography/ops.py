@@ -94,7 +94,11 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     death = person.get("death") or {}
     identifiers = person.get("identifiers") or []
     schemes = {i.get("scheme") for i in identifiers}
-    status_obj = person.get("status") or {}
+    # Toetab nii statuses[] kui legacy status {}
+    _statuses_list = person.get("statuses")
+    if _statuses_list is None:
+        _legacy = person.get("status") or {}
+        _statuses_list = [{"id": _legacy["id"], "label": _legacy.get("label", "")}] if _legacy.get("id") else []
     confession_obj = person.get("confession") or {}
     name_obj = person.get("name") or {}
     label = name_obj.get("label") or person.get("id", "")
@@ -196,8 +200,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "death_year": _extract_year(death),
         "death_date": _extract_date(death),
         "gender": person.get("gender"),
-        "status_id": status_obj.get("id"),
-        "status_label": status_obj.get("label"),
+        "status_ids": [s["id"] for s in _statuses_list if s.get("id")],
+        "status_labels": [s.get("label", "") for s in _statuses_list if s.get("id")],
         "confession_id": confession_obj.get("id"),
         "has_wikidata": "wikidata" in schemes,
         "has_gnd": "gnd" in schemes,
@@ -597,7 +601,7 @@ def list_persons(
             if any(inst_lower in (i or "").lower() for i in (e.get("education_institutions") or []))
         ]
     if status_id:
-        results = [e for e in results if e.get("status_id") == status_id]
+        results = [e for e in results if status_id in (e.get("status_ids") or [])]
     if verification_level:
         results = [e for e in results if e.get("verification_level") == verification_level]
     if source:
