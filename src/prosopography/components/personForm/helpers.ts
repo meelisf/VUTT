@@ -2,6 +2,7 @@ import type { ProsopoRecord } from '../../types';
 import type { FormDraft, DateDraft, EducationDraft } from './types';
 import { emptyDateDraft } from './types';
 import { isQCode } from '../../../utils/qcodeUtils';
+import type { VocabularySeisusItem } from '../../../services/collectionService';
 
 function isoStringToDraft(iso: string): DateDraft {
   const [y, m, d] = iso.split('-').map(Number);
@@ -230,7 +231,11 @@ export function buildDatePayload(d: DateDraft): any {
   };
 }
 
-export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Partial<ProsopoRecord> {
+export function draftToPayload(
+  draft: FormDraft,
+  original?: ProsopoRecord,
+  seisusedVocab: VocabularySeisusItem[] = [],
+): Partial<ProsopoRecord> {
   // Identifikaatorid — säilita olemasolevad, uuenda/lisa muudetud
   const existing = original?.identifiers ?? [];
   const schemes: { scheme: string; key: keyof FormDraft }[] = [
@@ -267,7 +272,10 @@ export function draftToPayload(draft: FormDraft, original?: ProsopoRecord): Part
     gender: (draft.gender || null) as 'M' | 'F' | null,
     birth: buildDatePayload(draft.birth) ?? (original?.birth ?? null as any),
     death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
-    statuses: (draft.statuses ?? []).map(qId => ({ id: qId, label: qId })),
+    statuses: (draft.statuses ?? []).map(qId => {
+      const vocabItem = seisusedVocab.find(s => s.id === qId);
+      return { id: qId, label: vocabItem?.label?.et ?? qId };
+    }),
     confession: draft.confession
       ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
       : null,

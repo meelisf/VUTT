@@ -21,6 +21,8 @@ import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
 import PlacePicker from '../components/personForm/PlacePicker';
 import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
+import { getVocabularies } from '../../services/collectionService';
+import type { VocabularySeisusItem } from '../../services/collectionService';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +57,8 @@ const PersonEditPage: React.FC = () => {
   const [entityLabels, setEntityLabels] = useState<{ label: string; id: string }[]>([]);
   // Seose tüüpide soovitused kõigist kaartidest
   const [relationTypeSuggestions, setRelationTypeSuggestions] = useState<{ label: string; id: string | null; labels?: Record<string, string> | null }[]>([]);
+  // Seisuste sõnavara
+  const [seisused, setSeisused] = useState<VocabularySeisusItem[]>([]);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
@@ -112,6 +116,10 @@ const PersonEditPage: React.FC = () => {
         setRelationTypeSuggestions(items);
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -180,11 +188,11 @@ const PersonEditPage: React.FC = () => {
           },
           token,
         );
-        const payload = draftToPayload(draft, created);
+        const payload = draftToPayload(draft, created, seisused);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
         navigate(`/persons/${encodeURIComponent(created.id)}`);
       } else {
-        const payload = draftToPayload(draft, original ?? undefined);
+        const payload = draftToPayload(draft, original ?? undefined, seisused);
         await updatePerson(id!, payload, token);
         navigate(`/persons/${encodeURIComponent(id!)}`);
       }
@@ -459,15 +467,40 @@ const PersonEditPage: React.FC = () => {
 
           {/* Seisus + konfessioon */}
           <div className="grid grid-cols-2 gap-3">
-            <EntityPicker
-              label={t('status', 'Seisus')}
-              placeholder="aadlik, vaimulik…"
-              type="topic"
-              value={draft.status}
-              onChange={v => set({ status: v })}
-              lang={lang}
-              localSuggestions={entityLabels}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('statuses', 'Seisus')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {seisused.map(item => {
+                  const label = i18n.language?.startsWith('en') ? item.label.en : item.label.et;
+                  const checked = (draft.statuses ?? []).includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() =>
+                        set({
+                          statuses: checked
+                            ? (draft.statuses ?? []).filter(id => id !== item.id)
+                            : [...(draft.statuses ?? []), item.id],
+                        })
+                      }
+                      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                        checked
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-primary-400'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                {seisused.length === 0 && (
+                  <span className="text-xs text-gray-400 italic">{t('loadingVocab', 'Laadin…')}</span>
+                )}
+              </div>
+            </div>
             <EntityPicker
               label={t('confession', 'Konfessioon')}
               placeholder="luterlik, katoliiklik…"
