@@ -414,14 +414,16 @@ const PersonDetailPage: React.FC = () => {
             })()}
 
             {/* Seisus + konfessioon */}
-            {(person.status || person.confession) && (
+            {((person.statuses?.length ?? 0) > 0 || person.confession) && (
               <div className="grid grid-cols-2 gap-4">
-                {person.status && (
+                {(person.statuses?.length ?? 0) > 0 && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
-                      {t('status', 'Seisus')}
+                      {t('statuses', 'Seisused')}
                     </span>
-                    <p className="text-gray-900">{getLabel(person.status)}</p>
+                    <p className="text-gray-900">
+                      {(person.statuses ?? []).map(s => getLabel(s) || s.label).filter(Boolean).join(', ')}
+                    </p>
                   </div>
                 )}
                 {person.confession && (
