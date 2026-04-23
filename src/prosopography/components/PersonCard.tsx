@@ -79,7 +79,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
   return (
   <>
     {/* Foto ala — nagu WorkCard h-40 thumbnail */}
-    <div className="h-40 bg-gray-100 relative overflow-hidden">
+    <div className={`h-40 relative overflow-hidden ${!person.image_url && (person.tags ?? []).length > 0 ? 'bg-blue-50 flex flex-wrap content-start gap-1.5 p-3' : 'bg-gray-100'}`}>
       {person.image_url ? (
         <img
           src={person.image_url}
@@ -88,6 +88,16 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
           style={{ objectPosition: 'center 15%' }}
         />
+      ) : (person.tags ?? []).length > 0 ? (
+        (person.tags ?? []).map((tag, i) => {
+          const lang = i18n.language?.slice(0, 2) ?? 'et';
+          const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
+          return (
+            <span key={i} className="text-[10px] px-1.5 py-0.5 bg-white/80 text-blue-700 border border-blue-200 rounded leading-tight">
+              {label}
+            </span>
+          );
+        })
       ) : (
         <Initials name={person.label} />
       )}
@@ -147,20 +157,6 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
           </p>
         )}
 
-        {/* Märksõnad */}
-        {(person.tags ?? []).length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {(person.tags ?? []).map((tag, i) => {
-              const lang = i18n.language?.slice(0, 2) ?? 'et';
-              const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
-              return (
-                <span key={i} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded">
-                  {label}
-                </span>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* Alumine rida — nagu WorkCard */}
