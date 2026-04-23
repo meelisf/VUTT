@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
 import Header from '../../components/Header';
-import { getPerson } from '../services/prosopographyService';
+import { getPerson, updatePerson } from '../services/prosopographyService';
+import EntityPicker from '../../components/EntityPicker';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
@@ -226,6 +227,7 @@ const PersonDetailPage: React.FC = () => {
   const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; collections: string[] }>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
+  const [tagsSaving, setTagsSaving] = useState(false);
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
@@ -482,27 +484,63 @@ const PersonDetailPage: React.FC = () => {
           </div> {/* flex gap-4 */}
 
           {/* ── Märksõnad ── */}
-          {(person.tags ?? []).length > 0 && (
+          {(canEdit || (person.tags ?? []).length > 0) && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">
                 {t('tags', 'Märksõnad')}
+                {tagsSaving && <span className="ml-2 text-gray-400 normal-case font-normal">…</span>}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {(person.tags ?? []).map((tag: any, i: number) => {
                   const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
                   const url = tag.id && isQCode(tag.id) ? `https://www.wikidata.org/wiki/${tag.id}` : null;
-                  return url ? (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200 transition-colors">
-                      {label}<ExternalLink size={9} className="text-gray-400" />
-                    </a>
-                  ) : (
-                    <span key={i} className="inline-flex items-center text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded">
-                      {label}
+                  return (
+                    <span key={i} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded">
+                      {url ? (
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          className="hover:text-primary-700 transition-colors">
+                          {label}
+                        </a>
+                      ) : label}
+                      {canEdit && (
+                        <button
+                          onClick={async () => {
+                            const newTags = (person.tags ?? []).filter((_: any, j: number) => j !== i);
+                            setPerson({ ...person, tags: newTags });
+                            setTagsSaving(true);
+                            try { await updatePerson(person.id, { tags: newTags, updated_at: person.updated_at } as any, token); }
+                            catch { setPerson({ ...person }); }
+                            finally { setTagsSaving(false); }
+                          }}
+                          className="text-gray-400 hover:text-red-500 transition-colors ml-0.5"
+                        >
+                          <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                        </button>
+                      )}
                     </span>
                   );
                 })}
               </div>
+              {canEdit && (
+                <div className="mt-2">
+                  <EntityPicker
+                    placeholder={t('tagsList.add', 'Lisa märksõna…')}
+                    type="topic"
+                    value={null}
+                    onChange={async v => {
+                      if (!v?.label?.trim()) return;
+                      const newTag = { label: v.label, ...(v.id ? { id: v.id } : {}), ...(v.labels ? { labels: v.labels } : {}) };
+                      const newTags = [...(person.tags ?? []), newTag];
+                      setPerson({ ...person, tags: newTags });
+                      setTagsSaving(true);
+                      try { await updatePerson(person.id, { tags: newTags, updated_at: person.updated_at } as any, token); }
+                      catch { setPerson({ ...person }); }
+                      finally { setTagsSaving(false); }
+                    }}
+                    lang={lang}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
