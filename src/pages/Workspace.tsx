@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate, useBlocker } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -77,30 +78,12 @@ const Workspace: React.FC = () => {
     setInputPage(pageNum || '1');
   }, [pageNum]);
 
-  // Browser level prevent-unload (refresh, close, external links)
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = ''; // Trigger browser prompt
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
   // skipBlockerRef: tõese väärtuse korral ignoreerib blocker hasUnsavedChanges kontrolli
   // (kasutatakse "Salvesta ja lahku" ajal — navigeerimiseks pärast salvestamist)
   const skipBlockerRef = useRef(false);
 
-  // React Router level blocker (internal navigation, back button)
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      !skipBlockerRef.current && hasUnsavedChanges && currentLocation.pathname !== nextLocation.pathname
-  );
-
-  // Kontrolli kas blocker on aktiivne (kasutatakse modaali kuvamiseks)
-  const isBlockerActive = blocker.state === "blocked";
+  const { isBlocked, blockedLocation, proceed, reset } = useUnsavedChangesGuard(hasUnsavedChanges, skipBlockerRef);
+  const isBlockerActive = isBlocked;
 
   const handlePageInputSubmit = () => {
     if (!workId) return;
@@ -297,8 +280,8 @@ const Workspace: React.FC = () => {
 
   // Kinnitusdialoogi käsitlejad
   const handleConfirmLeave = () => {
-    if (isBlockerActive) {
-      blocker.proceed();
+    if (isBlocked) {
+      proceed();
     } else if (pendingNavigation) {
       pendingNavigation();
       setPendingNavigation(null);
@@ -306,10 +289,10 @@ const Workspace: React.FC = () => {
   };
 
   const handleSaveAndLeave = async () => {
-    const blockedLocation = blocker.state === 'blocked' ? blocker.location : null;
+    const pendingLoc = blockedLocation;
     const navCallback = pendingNavigation;
 
-    if (blocker.state === 'blocked') blocker.reset();
+    if (isBlocked) reset();
     setPendingNavigation(null);
 
     if (editorSaveRef.current) {
@@ -318,8 +301,8 @@ const Workspace: React.FC = () => {
 
     // Blocker bypass: navigeerimisel ei pea hasUnsavedChanges kontrollima
     skipBlockerRef.current = true;
-    if (blockedLocation) {
-      navigate(blockedLocation.pathname + blockedLocation.search + blockedLocation.hash);
+    if (pendingLoc) {
+      navigate(pendingLoc.pathname + pendingLoc.search + pendingLoc.hash);
     } else if (navCallback) {
       navCallback();
     }

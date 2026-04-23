@@ -23,6 +23,8 @@ import PlacePicker from '../components/personForm/PlacePicker';
 import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/estonianName';
 import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -61,6 +63,8 @@ const PersonEditPage: React.FC = () => {
   const [seisused, setSeisused] = useState<VocabularySeisusItem[]>([]);
   // Konfessioonide sõnavara
   const [konfessioonid, setKonfessioonid] = useState<VocabularySeisusItem[]>([]);
+  // Salvestamata muudatuste jälgimine
+  const [isDirty, setIsDirty] = useState(false);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
@@ -176,7 +180,9 @@ const PersonEditPage: React.FC = () => {
     }
   };
 
-  const set = (patch: Partial<FormDraft>) => setDraft(d => ({ ...d, ...patch }));
+  const set = (patch: Partial<FormDraft>) => { setIsDirty(true); setDraft(d => ({ ...d, ...patch })); };
+
+  const { isBlocked, proceed, reset } = useUnsavedChangesGuard(isDirty);
 
   const handleSave = async () => {
     if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return; }
@@ -935,6 +941,17 @@ const PersonEditPage: React.FC = () => {
 
       </div>
     </div>
+
+    <ConfirmModal
+      isOpen={isBlocked}
+      title={t('common:unsavedChanges.title')}
+      message={t('common:unsavedChanges.message')}
+      confirmText={t('common:unsavedChanges.leave')}
+      cancelText={t('common:unsavedChanges.stay')}
+      onConfirm={proceed}
+      onCancel={reset}
+      variant="warning"
+    />
   );
 };
 

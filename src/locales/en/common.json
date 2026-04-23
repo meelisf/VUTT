@@ -155,5 +155,11 @@
     "home": "Go to Home",
     "search": "Search Works",
     "back": "Go Back"
+  },
+  "unsavedChanges": {
+    "title": "Unsaved Changes",
+    "message": "You have unsaved changes. Are you sure you want to leave?",
+    "leave": "Leave without saving",
+    "stay": "Stay"
   }
 }

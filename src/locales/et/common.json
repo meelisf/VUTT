@@ -155,5 +155,11 @@
     "home": "Avalehele",
     "search": "Otsi teoseid",
     "back": "Tagasi"
+  },
+  "unsavedChanges": {
+    "title": "Salvestamata muudatused",
+    "message": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
+    "leave": "Lahku ilma salvestamata",
+    "stay": "Jää"
   }
 }
