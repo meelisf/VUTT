@@ -80,6 +80,7 @@ export interface Vocabularies {
   languages: { [id: string]: VocabularyItem };
   relation_types: { [id: string]: VocabularyItem };
   seisused?: VocabularySeisusItem[];
+  konfessioonid?: VocabularySeisusItem[];
 }
 
 // =========================================================

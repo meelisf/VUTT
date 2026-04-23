@@ -47,7 +47,7 @@ export interface FormDraft {
   floruit_from: string;
   floruit_to: string;
   statuses: string[];  // Q-koodide massiiv
-  confession: LinkedEntity | null;
+  confessions: string[];  // Q-koodide massiiv
   occupations: OccupationDraft[];
   education: EducationDraft[];
   tags: TagDraft[];
@@ -74,7 +74,7 @@ export const emptyDraft = (): FormDraft => ({
   floruit_from: '',
   floruit_to: '',
   statuses: [],
-  confession: null,
+  confessions: [],
   occupations: [],
   education: [],
   tags: [],

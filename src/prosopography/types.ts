@@ -26,7 +26,7 @@ export interface ProsopoIndexEntry {
   gender: 'M' | 'F' | null;
   status_ids: string[];
   status_labels: string[];
-  confession_id: string | null;
+  confession_ids: string[];
   has_wikidata: boolean;
   has_gnd: boolean;
   has_aa: boolean;
@@ -100,7 +100,7 @@ export interface ProsopoRecord {
   };
   floruit?: { year_from?: number | null; year_to?: number | null } | null;
   statuses: { id: string; label: string }[];
-  confession: { id: string; label: string } | null;
+  confessions: { id: string; label: string }[];
   occupations: any[];
   education: any[];
   burial: any | null;

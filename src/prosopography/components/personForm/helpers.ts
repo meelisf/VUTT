@@ -73,10 +73,9 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     patch.death = { ...(patch.death ?? draft.death), place: { label: dp.label, id: dp.id ?? null, labels: dp.labels ?? null, source: 'wikidata' as const } };
   }
 
-  // Konfessioon
-  if (autoFilled['confession'] && !draft.confession) {
-    const c = autoFilled['confession'];
-    patch.confession = { label: c.label, id: c.id ?? null, labels: null, source: 'wikidata' };
+  // Konfessioon — lisa auto-täidetud Q-kood massiivi kui veel puudub
+  if (autoFilled['confession']?.id && !(draft.confessions ?? []).includes(autoFilled['confession'].id)) {
+    patch.confessions = [...(draft.confessions ?? []), autoFilled['confession'].id];
   }
 
   // Seisus
@@ -168,7 +167,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
     floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
     statuses: (p.statuses ?? []).map(s => s.id).filter(Boolean) as string[],
-    confession: p.confession ? { label: p.confession.label, id: p.confession.id, labels: (p.confession as any).labels ?? null, source: 'wikidata' } : null,
+    confessions: (p.confessions ?? []).map(c => c.id).filter(Boolean) as string[],
     occupations: (p.occupations ?? []).map((o: any) => ({
       label: o.label ?? String(o), id: o.id ?? null, labels: o.labels ?? undefined,
       institution: o.institution ?? '', institution_id: o.institution_id ?? null, institution_labels: o.institution_labels ?? undefined,
@@ -235,6 +234,7 @@ export function draftToPayload(
   draft: FormDraft,
   original?: ProsopoRecord,
   seisusedVocab: VocabularySeisusItem[] = [],
+  konfessioonidVocab: VocabularySeisusItem[] = [],
 ): Partial<ProsopoRecord> {
   // Identifikaatorid — säilita olemasolevad, uuenda/lisa muudetud
   const existing = original?.identifiers ?? [];
@@ -276,9 +276,10 @@ export function draftToPayload(
       const vocabItem = seisusedVocab.find(s => s.id === qId);
       return { id: qId, label: vocabItem?.label?.et ?? qId };
     }),
-    confession: draft.confession
-      ? { id: draft.confession.id || draft.confession.label, label: draft.confession.label, ...(draft.confession.labels ? { labels: draft.confession.labels } : {}) }
-      : null,
+    confessions: (draft.confessions ?? []).map(qId => {
+      const vocabItem = konfessioonidVocab.find(k => k.id === qId);
+      return { id: qId, label: vocabItem?.label?.et ?? qId };
+    }),
     origin: {
       place: draft.origin_place || null,
       geonames_id: original?.origin?.geonames_id ?? null,
