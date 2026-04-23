@@ -49,6 +49,7 @@ export interface ProsopoIndexEntry {
   origin_parent: OriginParent | null;
   origin_group: string | null;
   origin_group_labels: Record<string, string> | null;
+  tags: { label: string; id?: string | null; labels?: Record<string, string> }[];
 }
 
 export interface HistoricalDate {

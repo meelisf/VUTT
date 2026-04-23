@@ -146,6 +146,21 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
             „{person.biography_snippet}…"
           </p>
         )}
+
+        {/* Märksõnad */}
+        {(person.tags ?? []).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {(person.tags ?? []).map((tag, i) => {
+              const lang = i18n.language?.slice(0, 2) ?? 'et';
+              const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
+              return (
+                <span key={i} className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 border border-gray-200 rounded">
+                  {label}
+                </span>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Alumine rida — nagu WorkCard */}

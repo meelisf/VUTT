@@ -224,6 +224,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "origin_parent": origin_parent,
         "origin_group": origin_group,
         "origin_group_labels": origin_group_labels,
+        "tags": person.get("tags") or [],
     }
 
 
