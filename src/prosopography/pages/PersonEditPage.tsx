@@ -253,6 +253,7 @@ const PersonEditPage: React.FC = () => {
   const inputCls = "px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none";
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       <Header />
 
@@ -952,6 +953,7 @@ const PersonEditPage: React.FC = () => {
       onCancel={reset}
       variant="warning"
     />
+    </>
   );
 };
 
