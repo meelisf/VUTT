@@ -131,8 +131,11 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
         : person.origin.place,
     });
   }
-  if (person.confession) {
-    rows.push({ label: t('confession', 'Konfessioon'), value: getLabel(person.confession) });
+  if ((person.confessions?.length ?? 0) > 0) {
+    rows.push({
+      label: t('confession', 'Konfessioon'),
+      value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
+    });
   }
   const aliases = person.name.aliases ?? [];
   if (aliases.length > 0) {
@@ -425,7 +428,7 @@ const PersonDetailPage: React.FC = () => {
             })()}
 
             {/* Seisus + konfessioon */}
-            {((person.statuses?.length ?? 0) > 0 || person.confession) && (
+            {((person.statuses?.length ?? 0) > 0 || (person.confessions?.length ?? 0) > 0) && (
               <div className="grid grid-cols-2 gap-4">
                 {(person.statuses?.length ?? 0) > 0 && (
                   <div>
@@ -437,12 +440,14 @@ const PersonDetailPage: React.FC = () => {
                     </p>
                   </div>
                 )}
-                {person.confession && (
+                {(person.confessions?.length ?? 0) > 0 && (
                   <div>
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
                       {t('confession', 'Konfessioon')}
                     </span>
-                    <p className="text-gray-900">{getLabel(person.confession)}</p>
+                    <p className="text-gray-900">
+                      {(person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', ')}
+                    </p>
                   </div>
                 )}
               </div>
