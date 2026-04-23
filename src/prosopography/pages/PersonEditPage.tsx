@@ -59,6 +59,8 @@ const PersonEditPage: React.FC = () => {
   const [relationTypeSuggestions, setRelationTypeSuggestions] = useState<{ label: string; id: string | null; labels?: Record<string, string> | null }[]>([]);
   // Seisuste sõnavara
   const [seisused, setSeisused] = useState<VocabularySeisusItem[]>([]);
+  // Konfessioonide sõnavara
+  const [konfessioonid, setKonfessioonid] = useState<VocabularySeisusItem[]>([]);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
 
   // Profiilipilt
@@ -119,7 +121,10 @@ const PersonEditPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
+    getVocabularies().then(v => {
+      if (v.seisused) setSeisused(v.seisused);
+      if (v.konfessioonid) setKonfessioonid(v.konfessioonid);
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -188,11 +193,11 @@ const PersonEditPage: React.FC = () => {
           },
           token,
         );
-        const payload = draftToPayload(draft, created, seisused);
+        const payload = draftToPayload(draft, created, seisused, konfessioonid);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
         navigate(`/persons/${encodeURIComponent(created.id)}`);
       } else {
-        const payload = draftToPayload(draft, original ?? undefined, seisused);
+        const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
         await updatePerson(id!, payload, token);
         navigate(`/persons/${encodeURIComponent(id!)}`);
       }
@@ -501,15 +506,40 @@ const PersonEditPage: React.FC = () => {
                 )}
               </div>
             </div>
-            <EntityPicker
-              label={t('confession', 'Konfessioon')}
-              placeholder="luterlik, katoliiklik…"
-              type="topic"
-              value={draft.confession}
-              onChange={v => set({ confession: v })}
-              lang={lang}
-              localSuggestions={entityLabels}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {t('confession', 'Konfessioon')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {konfessioonid.map(item => {
+                  const label = i18n.language?.startsWith('en') ? item.label.en : item.label.et;
+                  const checked = (draft.confessions ?? []).includes(item.id);
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() =>
+                        set({
+                          confessions: checked
+                            ? (draft.confessions ?? []).filter(id => id !== item.id)
+                            : [...(draft.confessions ?? []), item.id],
+                        })
+                      }
+                      className={`px-3 py-1 rounded-full text-sm font-medium border transition-colors ${
+                        checked
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-primary-400'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+                {konfessioonid.length === 0 && (
+                  <span className="text-xs text-gray-400 italic">{t('loadingVocab', 'Laadin…')}</span>
+                )}
+              </div>
+            </div>
           </div>
 
 
