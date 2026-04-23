@@ -182,7 +182,8 @@ const PersonEditPage: React.FC = () => {
 
   const set = (patch: Partial<FormDraft>) => { setIsDirty(true); setDraft(d => ({ ...d, ...patch })); };
 
-  const { isBlocked, proceed, reset } = useUnsavedChangesGuard(isDirty);
+  const skipGuardRef = useRef(false);
+  const { isBlocked, proceed, reset } = useUnsavedChangesGuard(isDirty, skipGuardRef);
 
   const handleSave = async () => {
     if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return; }
@@ -201,10 +202,12 @@ const PersonEditPage: React.FC = () => {
         );
         const payload = draftToPayload(draft, created, seisused, konfessioonid);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
+        skipGuardRef.current = true;
         navigate(`/persons/${encodeURIComponent(created.id)}`);
       } else {
         const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
         await updatePerson(id!, payload, token);
+        skipGuardRef.current = true;
         navigate(`/persons/${encodeURIComponent(id!)}`);
       }
     } catch (e: any) {
