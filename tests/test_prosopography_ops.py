@@ -163,3 +163,201 @@ def test_migrate_idempotent(tmp_path):
     second = mod.migrate(str(prosopo_dir))
     assert first == 1
     assert second == 0
+
+
+# ---- confession → confessions migratsioon ----
+
+def _run_migrate_confession(tmp_path, persons: list) -> list:
+    prosopo_dir = tmp_path / "prosopography_conf"
+    prosopo_dir.mkdir()
+    for p in persons:
+        (prosopo_dir / f"{p['id']}.json").write_text(
+            json.dumps(p, ensure_ascii=False), encoding="utf-8"
+        )
+    spec = importlib.util.spec_from_file_location(
+        "migrate_confession_script",
+        PROJECT_ROOT / "scripts" / "migrate_confession_to_confessions.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.migrate(str(prosopo_dir))
+    return [
+        json.loads((prosopo_dir / f"{p['id']}.json").read_text(encoding="utf-8"))
+        for p in persons
+    ]
+
+
+def test_migrate_confession_single(tmp_path):
+    person = {"id": "c1", "confession": {"id": "Q75809", "label": "Luterlane"}}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == [{"id": "Q75809", "label": "Luterlane"}]
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_null(tmp_path):
+    person = {"id": "c2", "confession": None}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == []
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_already_has_confessions(tmp_path):
+    person = {"id": "c3", "confessions": [{"id": "Q75809", "label": "Luterlane"}]}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == [{"id": "Q75809", "label": "Luterlane"}]
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_missing_key(tmp_path):
+    person = {"id": "c4", "name": {"label": "Test"}}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == []
+
+
+def test_migrate_confession_idempotent(tmp_path):
+    person = {"id": "c5", "confession": {"id": "Q1841", "label": "Katoliiklane"}}
+    prosopo_dir = tmp_path / "prosopography_idem"
+    prosopo_dir.mkdir()
+    (prosopo_dir / "c5.json").write_text(json.dumps(person, ensure_ascii=False), encoding="utf-8")
+    spec = importlib.util.spec_from_file_location(
+        "migrate_conf_idem",
+        PROJECT_ROOT / "scripts" / "migrate_confession_to_confessions.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    first = mod.migrate(str(prosopo_dir))
+    second = mod.migrate(str(prosopo_dir))
+    assert first == 1
+    assert second == 0
+
+
+# ---- confession_ids indeksi testid ----
+
+def test_index_entry_confession_ids():
+    person = {
+        "id": "ci1",
+        "name": {"label": "Test"},
+        "confessions": [
+            {"id": "Q75809", "label": "Luterlane"},
+            {"id": "Q1841", "label": "Katoliiklane"},
+        ],
+    }
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == ["Q75809", "Q1841"]
+    assert "confession_id" not in entry
+
+
+def test_index_entry_empty_confessions():
+    person = {"id": "ci2", "name": {"label": "Empty"}, "confessions": []}
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == []
+
+
+def test_index_entry_confession_legacy_fallback():
+    """Kui confessions puudub (vana formaat), kasuta legacy confession välja."""
+    person = {
+        "id": "ci3",
+        "name": {"label": "Legacy"},
+        "confession": {"id": "Q75809", "label": "Luterlane"},
+    }
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == ["Q75809"]
+
+
+# ---- confession → confessions migratsioon ----
+
+def _run_migrate_confession(tmp_path, persons: list) -> list:
+    prosopo_dir = tmp_path / "prosopography_conf"
+    prosopo_dir.mkdir()
+    for p in persons:
+        (prosopo_dir / f"{p['id']}.json").write_text(
+            json.dumps(p, ensure_ascii=False), encoding="utf-8"
+        )
+    spec = importlib.util.spec_from_file_location(
+        "migrate_confession_script",
+        PROJECT_ROOT / "scripts" / "migrate_confession_to_confessions.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.migrate(str(prosopo_dir))
+    return [
+        json.loads((prosopo_dir / f"{p['id']}.json").read_text(encoding="utf-8"))
+        for p in persons
+    ]
+
+
+def test_migrate_confession_single(tmp_path):
+    person = {"id": "c1", "confession": {"id": "Q75809", "label": "Luterlane"}}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == [{"id": "Q75809", "label": "Luterlane"}]
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_null(tmp_path):
+    person = {"id": "c2", "confession": None}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == []
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_already_has_confessions(tmp_path):
+    person = {"id": "c3", "confessions": [{"id": "Q75809", "label": "Luterlane"}]}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == [{"id": "Q75809", "label": "Luterlane"}]
+    assert "confession" not in results[0]
+
+
+def test_migrate_confession_missing_key(tmp_path):
+    person = {"id": "c4", "name": {"label": "Test"}}
+    results = _run_migrate_confession(tmp_path, [person])
+    assert results[0].get("confessions") == []
+
+
+def test_migrate_confession_idempotent(tmp_path):
+    person = {"id": "c5", "confession": {"id": "Q1841", "label": "Katoliiklane"}}
+    prosopo_dir = tmp_path / "prosopography_idem"
+    prosopo_dir.mkdir()
+    (prosopo_dir / "c5.json").write_text(json.dumps(person, ensure_ascii=False), encoding="utf-8")
+    spec = importlib.util.spec_from_file_location(
+        "migrate_conf_idem",
+        PROJECT_ROOT / "scripts" / "migrate_confession_to_confessions.py",
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    first = mod.migrate(str(prosopo_dir))
+    second = mod.migrate(str(prosopo_dir))
+    assert first == 1
+    assert second == 0
+
+
+# ---- confession_ids indeksi testid ----
+
+def test_index_entry_confession_ids():
+    person = {
+        "id": "ci1",
+        "name": {"label": "Test"},
+        "confessions": [
+            {"id": "Q75809", "label": "Luterlane"},
+            {"id": "Q1841", "label": "Katoliiklane"},
+        ],
+    }
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == ["Q75809", "Q1841"]
+    assert "confession_id" not in entry
+
+
+def test_index_entry_empty_confessions():
+    person = {"id": "ci2", "name": {"label": "Empty"}, "confessions": []}
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == []
+
+
+def test_index_entry_confession_legacy_fallback():
+    """Kui confessions puudub (vana formaat), kasuta legacy confession välja."""
+    person = {
+        "id": "ci3",
+        "name": {"label": "Legacy"},
+        "confession": {"id": "Q75809", "label": "Luterlane"},
+    }
+    entry = _build_entry(person)
+    assert entry["confession_ids"] == ["Q75809"]

@@ -99,7 +99,11 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     if _statuses_list is None:
         _legacy = person.get("status") or {}
         _statuses_list = [{"id": _legacy["id"], "label": _legacy.get("label", "")}] if _legacy.get("id") else []
-    confession_obj = person.get("confession") or {}
+    _confessions_list = person.get("confessions")
+    if _confessions_list is None:
+        # legacy fallback
+        _conf_legacy = person.get("confession") or {}
+        _confessions_list = [{"id": _conf_legacy["id"], "label": _conf_legacy.get("label", "")}] if _conf_legacy.get("id") else []
     name_obj = person.get("name") or {}
     label = name_obj.get("label") or person.get("id", "")
     family_name = name_obj.get("family_name") or ""
@@ -202,7 +206,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "gender": person.get("gender"),
         "status_ids": [s["id"] for s in _statuses_list if s.get("id")],
         "status_labels": [s.get("label", "") for s in _statuses_list if s.get("id")],
-        "confession_id": confession_obj.get("id"),
+        "confession_ids": [c["id"] for c in _confessions_list if c.get("id")],
         "has_wikidata": "wikidata" in schemes,
         "has_gnd": "gnd" in schemes,
         "has_aa": "album_academicum" in schemes,
