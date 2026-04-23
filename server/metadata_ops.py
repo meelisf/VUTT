@@ -108,6 +108,8 @@ def save_work_metadata(
             meta.get("creators", []),
             meta.get("tags") or [],
             meta.get("publisher"),
+            meta.get("title") or "",
+            meta.get("year"),
         )
         if background_tasks is not None:
             background_tasks.add_task(update_person_to_works, *ptw_args)

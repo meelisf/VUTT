@@ -1082,6 +1082,8 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
             metadata.get("creators", []),
             metadata.get("tags") or [],
             metadata.get("publisher"),
+            metadata.get("title") or "",
+            metadata.get("year"),
         )
     except Exception as e:
         logger.warning(f"import {upload_id}: person_to_works viga: {e}")

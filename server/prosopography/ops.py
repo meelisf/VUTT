@@ -963,6 +963,8 @@ def update_person_to_works(
     creators: list,
     tags: list,
     publisher=None,
+    title: str = "",
+    year: Optional[int] = None,
 ):
     """
     Uuendab person_to_works.json pöördindeksit ühe teose salvestamisel.
@@ -1006,7 +1008,7 @@ def update_person_to_works(
 
     # Uuenda works_creators_index (background-ühilduv, ei nõua locks)
     try:
-        update_works_creators_index(work_id, creators, title="", year=None)
+        update_works_creators_index(work_id, creators, title=title, year=year)
     except Exception:
         logger.exception("update_works_creators_index viga teose %s jaoks", work_id)
 
