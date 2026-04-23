@@ -59,7 +59,7 @@ export interface HistoricalDate {
   precision: 'day' | 'month' | 'year' | null;
   calendar: 'julian' | 'gregorian' | null;
   is_circa: boolean;
-  place?: { id: string | null; label: string } | null;
+  place?: { id: string | null; label: string; labels?: Record<string, string> | null } | null;
   notes: string | null;
 }
 

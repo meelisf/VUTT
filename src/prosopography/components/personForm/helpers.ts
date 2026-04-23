@@ -17,7 +17,7 @@ function historicalDateToDraft(h: any): DateDraft {
     circa: h.is_circa ?? false,
     bound: h.bound ?? '',
     calendar: h.calendar ?? '',
-    place: h.place?.label ? { label: h.place.label, id: h.place.id ?? null, labels: null, source: 'wikidata' as const } : null,
+    place: h.place?.label ? { label: h.place.label, id: h.place.id ?? null, labels: h.place.labels ?? null, source: 'wikidata' as const } : null,
   };
 }
 
@@ -51,7 +51,7 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   // Sünnikoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['birth.place']?.label && !draft.birth.place) {
     const bp = autoFilled['birth.place'];
-    patch.birth = { ...(patch.birth ?? draft.birth), place: { label: bp.label, id: bp.id ?? null, labels: null, source: 'wikidata' as const } };
+    patch.birth = { ...(patch.birth ?? draft.birth), place: { label: bp.label, id: bp.id ?? null, labels: bp.labels ?? null, source: 'wikidata' as const } };
   }
 
   // Surmaaeg
@@ -70,7 +70,7 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
   // Surmakoht — rakenda sõltumata sellest kas kuupäev on olemas
   if (autoFilled['death.place']?.label && !draft.death.place) {
     const dp = autoFilled['death.place'];
-    patch.death = { ...(patch.death ?? draft.death), place: { label: dp.label, id: dp.id ?? null, labels: null, source: 'wikidata' as const } };
+    patch.death = { ...(patch.death ?? draft.death), place: { label: dp.label, id: dp.id ?? null, labels: dp.labels ?? null, source: 'wikidata' as const } };
   }
 
   // Konfessioon
@@ -151,7 +151,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       bound: p.birth?.bound ?? '',
       calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
       place: p.birth?.place?.label
-        ? { label: p.birth.place.label, id: p.birth.place.id ?? null, labels: null, source: 'wikidata' as const }
+        ? { label: p.birth.place.label, id: p.birth.place.id ?? null, labels: (p.birth.place as any).labels ?? null, source: 'wikidata' as const }
         : null,
     },
     death: {
@@ -162,7 +162,7 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
       bound: p.death?.bound ?? '',
       calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
       place: p.death?.place?.label
-        ? { label: p.death.place.label, id: p.death.place.id ?? null, labels: null, source: 'wikidata' as const }
+        ? { label: p.death.place.label, id: p.death.place.id ?? null, labels: (p.death.place as any).labels ?? null, source: 'wikidata' as const }
         : null,
     },
     floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
@@ -226,7 +226,7 @@ export function buildDatePayload(d: DateDraft): any {
     precision,
     calendar: d.calendar || null,
     is_circa: d.circa,
-    place: d.place?.label ? { id: d.place.id ?? null, label: d.place.label } : null,
+    place: d.place?.label ? { id: d.place.id ?? null, label: d.place.label, labels: d.place.labels ?? null } : null,
     notes: null,
   };
 }

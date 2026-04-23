@@ -116,7 +116,11 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
         {/* Päritolukoht */}
         {(() => {
           const lang = i18n.language?.slice(0, 2) ?? 'et';
-          const placeLabel = resolveLabel(person.origin_place_labels, lang) ?? person.origin_place;
+          const historical = person.origin_place;
+          const modern = resolveLabel(person.origin_place_labels, lang);
+          const placeLabel = historical
+            ? (modern && modern !== historical ? `${historical} (${modern})` : historical)
+            : (modern ?? null);
           const parentLabel = resolveLabel(person.origin_parent?.labels, lang) ?? person.origin_parent?.key;
           if (placeLabel && parentLabel && placeLabel !== parentLabel) {
             return <p className="text-xs text-gray-400">{placeLabel} · {parentLabel}</p>;

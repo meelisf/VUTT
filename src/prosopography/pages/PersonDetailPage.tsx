@@ -23,15 +23,21 @@ function formatHistoricalDate(
   d: HistoricalDate | null | undefined,
   symbol: string,
   boundLabels: { before: string; after: string },
-  _lang: string = 'et',
+  lang: string = 'et',
 ): string {
   if (!d) return '';
   const year = d.date ? d.date.slice(0, 4) : null;
   if (!year) return '';
   const circa = d.is_circa ? '~' : '';
   const bound = d.bound === 'before' ? `${boundLabels.before} ` : d.bound === 'after' ? `${boundLabels.after} ` : '';
-  const placeLabel = d.place ? (d.place.label || '') : '';
-  const place = placeLabel ? `, ${placeLabel}` : '';
+  const historical = d.place?.label || '';
+  const modern = d.place?.labels
+    ? (d.place.labels[lang] ?? d.place.labels['et'] ?? d.place.labels['en'] ?? Object.values(d.place.labels)[0] ?? '')
+    : '';
+  const placeStr = historical
+    ? (modern && modern !== historical ? `${historical} (${modern})` : historical)
+    : '';
+  const place = placeStr ? `, ${placeStr}` : '';
   return `${symbol}${bound}${circa}${year}${place}`;
 }
 
@@ -113,9 +119,14 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
     });
   }
   if (person.origin?.place) {
+    const modernOrigin = person.origin.place_labels
+      ? (person.origin.place_labels[lang] ?? person.origin.place_labels['et'] ?? person.origin.place_labels['en'] ?? Object.values(person.origin.place_labels)[0] ?? '')
+      : '';
     rows.push({
       label: t('origin', 'Päritolu'),
-      value: person.origin.place,
+      value: modernOrigin && modernOrigin !== person.origin.place
+        ? `${person.origin.place} (${modernOrigin})`
+        : person.origin.place,
     });
   }
   if (person.confession) {
