@@ -4,8 +4,9 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users,
+  BookOpen, User, BookMarked, Users, StickyNote,
 } from 'lucide-react';
+import { isQCode } from '../../utils/qcodeUtils';
 import Header from '../../components/Header';
 import { getPerson } from '../services/prosopographyService';
 import { useUser } from '../../contexts/UserContext';
@@ -106,7 +107,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const getLabel = useEntityLabel();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const rows: { label: string; value: React.ReactNode }[] = [];
 
@@ -170,9 +171,6 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
         </span>
       ),
     });
-  }
-  if (person.notes) {
-    rows.push({ label: t('notes', 'Märkmed'), value: person.notes });
   }
 
   if (rows.length === 0) return null;
@@ -482,6 +480,31 @@ const PersonDetailPage: React.FC = () => {
             )}
             </div> {/* flex-1 */}
           </div> {/* flex gap-4 */}
+
+          {/* ── Märksõnad ── */}
+          {(person.tags ?? []).length > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <span className="text-gray-500 block text-xs uppercase tracking-wide mb-2">
+                {t('tags', 'Märksõnad')}
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {(person.tags ?? []).map((tag: any, i: number) => {
+                  const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
+                  const url = tag.id && isQCode(tag.id) ? `https://www.wikidata.org/wiki/${tag.id}` : null;
+                  return url ? (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded hover:bg-gray-200 transition-colors">
+                      {label}<ExternalLink size={9} className="text-gray-400" />
+                    </a>
+                  ) : (
+                    <span key={i} className="inline-flex items-center text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded">
+                      {label}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Elulugu ── */}
@@ -568,6 +591,14 @@ const PersonDetailPage: React.FC = () => {
 
         {/* ── Struktureeritud info (klapitav) ── */}
         <StructuredInfoCard person={person} />
+
+        {/* ── Märkmed ── */}
+        {person.notes && (
+          <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
+            <CardHeader icon={<StickyNote size={18} />} title={t('notes', 'Märkmed')} />
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{person.notes}</p>
+          </div>
+        )}
 
       </div>
     </div>
