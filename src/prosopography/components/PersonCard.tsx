@@ -79,7 +79,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
   return (
   <>
     {/* Foto ala — nagu WorkCard h-40 thumbnail */}
-    <div className={`h-40 relative overflow-hidden ${!person.image_url && (person.tags ?? []).length > 0 ? 'bg-blue-50 flex flex-wrap content-start gap-1.5 p-3' : 'bg-gray-100'}`}>
+    <div className="h-40 bg-gray-100 relative overflow-hidden">
       {person.image_url ? (
         <img
           src={person.image_url}
@@ -88,28 +88,36 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
           className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
           style={{ objectPosition: 'center 15%' }}
         />
-      ) : (person.tags ?? []).length > 0 ? (
-        (person.tags ?? []).map((tag, i) => {
-          const lang = i18n.language?.slice(0, 2) ?? 'et';
-          const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
-          return (
-            <span key={i} className="text-[10px] px-1.5 py-0.5 bg-white/80 text-blue-700 border border-blue-200 rounded leading-tight">
-              {label}
-            </span>
-          );
-        })
       ) : (
         <Initials name={person.label} />
-      )}
-      {person.imm_date && (
-        <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
-          {formatImmLabel(person.imm_date, i18n.language?.slice(0, 2) ?? 'et')}
-        </span>
       )}
       {(person.status_ids ?? []).includes('Q134737') && (
         <span className="absolute top-2 right-2 p-1 rounded-full bg-amber-100/90 text-amber-600 border border-amber-200/80" title={t('nobility', 'Aadel')}>
           <ShieldPlus size={14} />
         </span>
+      )}
+      {/* Immatrikuleerumine + tagid — alumine vasak nurk */}
+      {(person.imm_date || (person.tags ?? []).length > 0) && (
+        <div className="absolute bottom-2 left-2 flex flex-col gap-1 max-w-[calc(100%-1rem)]">
+          {person.imm_date && (
+            <span className="self-start px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+              {formatImmLabel(person.imm_date, i18n.language?.slice(0, 2) ?? 'et')}
+            </span>
+          )}
+          {(person.tags ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {(person.tags ?? []).map((tag, i) => {
+                const lang = i18n.language?.slice(0, 2) ?? 'et';
+                const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
+                return (
+                  <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100/90 text-blue-700 border border-blue-200">
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
       )}
     </div>
 
