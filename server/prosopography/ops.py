@@ -569,6 +569,50 @@ def list_persons(
     Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
     Otsing q= töötab label + sort_name + aliases (sh Wikidata/GND) vastu.
     """
+    results = _filter_index_entries(
+        q=q,
+        gender=gender,
+        occupation=occupation,
+        origin_group=origin_group,
+        institution=institution,
+        status_id=status_id,
+        source=source,
+        verification_level=verification_level,
+        imm_year_from=imm_year_from,
+        imm_year_to=imm_year_to,
+        ids=ids,
+    )
+
+    if sort_by == "birth_year":
+        results.sort(key=lambda e: (e.get("birth_date") is None, e.get("birth_date") or ""))
+    elif sort_by == "death_year":
+        results.sort(key=lambda e: (e.get("death_date") is None, e.get("death_date") or ""))
+    elif sort_by == "imm_year":
+        results.sort(key=lambda e: (e.get("imm_date") is None, e.get("imm_date") or ""))
+    else:
+        results.sort(key=lambda e: (e.get("sort_name") or "").lower())
+    total = len(results)
+    return {
+        "results": results[offset:offset + limit],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+def _filter_index_entries(
+    q: Optional[str] = None,
+    gender: Optional[str] = None,
+    occupation: Optional[str] = None,
+    origin_group: Optional[str] = None,
+    institution: Optional[str] = None,
+    status_id: Optional[str] = None,
+    source: Optional[str] = None,
+    verification_level: Optional[str] = None,
+    imm_year_from: Optional[int] = None,
+    imm_year_to: Optional[int] = None,
+    ids: Optional[list] = None,
+) -> list[dict]:
     index = _load_index()
     results = [
         e for e in index.get("entries", [])
@@ -622,20 +666,83 @@ def list_persons(
     if imm_year_to is not None:
         results = [e for e in results if (e.get("imm_year") or 0) <= imm_year_to]
 
-    if sort_by == "birth_year":
-        results.sort(key=lambda e: (e.get("birth_date") is None, e.get("birth_date") or ""))
-    elif sort_by == "death_year":
-        results.sort(key=lambda e: (e.get("death_date") is None, e.get("death_date") or ""))
-    elif sort_by == "imm_year":
-        results.sort(key=lambda e: (e.get("imm_date") is None, e.get("imm_date") or ""))
-    else:
-        results.sort(key=lambda e: (e.get("sort_name") or "").lower())
-    total = len(results)
+    return results
+
+
+def get_person_map_markers(
+    q: Optional[str] = None,
+    gender: Optional[str] = None,
+    occupation: Optional[str] = None,
+    origin_group: Optional[str] = None,
+    institution: Optional[str] = None,
+    status_id: Optional[str] = None,
+    source: Optional[str] = None,
+    verification_level: Optional[str] = None,
+    imm_year_from: Optional[int] = None,
+    imm_year_to: Optional[int] = None,
+    ids: Optional[list] = None,
+) -> dict:
+    """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
+    entries = _filter_index_entries(
+        q=q,
+        gender=gender,
+        occupation=occupation,
+        origin_group=origin_group,
+        institution=institution,
+        status_id=status_id,
+        source=source,
+        verification_level=verification_level,
+        imm_year_from=imm_year_from,
+        imm_year_to=imm_year_to,
+        ids=ids,
+    )
+
+    markers_by_place: dict[str, dict] = {}
+    without_coordinates = 0
+
+    for entry in entries:
+        coordinates = entry.get("origin_coordinates")
+        if not isinstance(coordinates, dict):
+            without_coordinates += 1
+            continue
+        lat = coordinates.get("lat")
+        lon = coordinates.get("lon")
+        if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+            without_coordinates += 1
+            continue
+
+        place_key = entry.get("origin_place") or entry.get("origin_place_id") or "unknown"
+        marker = markers_by_place.setdefault(place_key, {
+            "place_key": entry.get("origin_place"),
+            "place_id": entry.get("origin_place_id"),
+            "place_labels": entry.get("origin_place_labels"),
+            "parent": entry.get("origin_parent"),
+            "origin_group": entry.get("origin_group"),
+            "origin_group_labels": entry.get("origin_group_labels"),
+            "coordinates": coordinates,
+            "count": 0,
+            "persons": [],
+        })
+        marker["count"] += 1
+        marker["persons"].append({
+            "id": entry.get("id"),
+            "label": entry.get("label"),
+            "birth_year": entry.get("birth_year"),
+            "death_year": entry.get("death_year"),
+            "imm_year": entry.get("imm_year"),
+            "image_url": entry.get("image_url"),
+            "work_count": entry.get("work_count", 0),
+        })
+
+    markers = sorted(
+        markers_by_place.values(),
+        key=lambda m: (-m["count"], (m.get("place_key") or "").lower()),
+    )
     return {
-        "results": results[offset:offset + limit],
-        "total": total,
-        "offset": offset,
-        "limit": limit,
+        "markers": markers,
+        "total_persons": len(entries),
+        "mapped_persons": sum(m["count"] for m in markers),
+        "without_coordinates": without_coordinates,
     }
 
 

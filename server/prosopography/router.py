@@ -15,6 +15,7 @@ from .ops import (
     create_person,
     update_person,
     list_persons,
+    get_person_map_markers,
     get_person_facets,
     get_relation_type_suggestions,
     add_identifier,
@@ -154,6 +155,39 @@ async def prosopography_query(request: Request):
         ids=data.get("ids"),
         limit=data.get("limit", 48),
         offset=data.get("offset", 0),
+    )
+
+
+@router.get("/map")
+async def prosopography_map(
+    request: Request,
+    q: str = None,
+    gender: str = None,
+    occupation: str = None,
+    origin_group: str = None,
+    institution: str = None,
+    status_id: str = None,
+    source: str = None,
+    verification_level: str = None,
+    imm_year_from: int = None,
+    imm_year_to: int = None,
+    ids: str = None,
+    user=Depends(_optional_user),
+):
+    """Tagastab koordinaadiga isikud päritolukoha järgi grupeeritud markeritena."""
+    id_list = [i for i in ids.split(",") if i] if ids else None
+    return get_person_map_markers(
+        q=q,
+        gender=gender,
+        occupation=occupation,
+        origin_group=origin_group,
+        institution=institution,
+        status_id=status_id,
+        source=source,
+        verification_level=verification_level,
+        imm_year_from=imm_year_from,
+        imm_year_to=imm_year_to,
+        ids=id_list,
     )
 
 

@@ -150,6 +150,99 @@ def test_list_persons_status_id_filter(tmp_path, monkeypatch):
     assert "p3" not in ids
 
 
+def test_get_person_map_markers_groups_by_origin_place(monkeypatch):
+    ops = importlib.import_module("server.prosopography.ops")
+
+    fake_index = {
+        "entries": [
+            {
+                "id": "p1",
+                "label": "A",
+                "sort_name": "A",
+                "record_status": "draft",
+                "origin_place": "Riga",
+                "origin_place_id": "Q1773",
+                "origin_place_labels": {"et": "Riia"},
+                "origin_coordinates": {"lat": 56.9475, "lon": 24.1069, "source": "wikidata"},
+                "birth_year": 1600,
+                "death_year": None,
+                "work_count": 2,
+            },
+            {
+                "id": "p2",
+                "label": "B",
+                "sort_name": "B",
+                "record_status": "draft",
+                "origin_place": "Riga",
+                "origin_place_id": "Q1773",
+                "origin_place_labels": {"et": "Riia"},
+                "origin_coordinates": {"lat": 56.9475, "lon": 24.1069, "source": "wikidata"},
+                "birth_year": None,
+                "death_year": 1700,
+                "work_count": 0,
+            },
+            {
+                "id": "p3",
+                "label": "C",
+                "sort_name": "C",
+                "record_status": "draft",
+                "origin_place": "Unknown",
+                "origin_coordinates": None,
+            },
+        ]
+    }
+    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
+    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+
+    result = ops.get_person_map_markers()
+
+    assert result["total_persons"] == 3
+    assert result["mapped_persons"] == 2
+    assert result["without_coordinates"] == 1
+    assert len(result["markers"]) == 1
+    marker = result["markers"][0]
+    assert marker["place_key"] == "Riga"
+    assert marker["count"] == 2
+    assert [p["id"] for p in marker["persons"]] == ["p1", "p2"]
+
+
+def test_get_person_map_markers_applies_filters(monkeypatch):
+    ops = importlib.import_module("server.prosopography.ops")
+
+    fake_index = {
+        "entries": [
+            {
+                "id": "p1",
+                "label": "Riga Person",
+                "sort_name": "Riga",
+                "record_status": "draft",
+                "origin_group": "Liivimaa",
+                "origin_place": "Riga",
+                "origin_coordinates": {"lat": 56.9475, "lon": 24.1069},
+            },
+            {
+                "id": "p2",
+                "label": "Reval Person",
+                "sort_name": "Reval",
+                "record_status": "draft",
+                "origin_group": "Eestimaa",
+                "origin_place": "Reval",
+                "origin_coordinates": {"lat": 59.437, "lon": 24.7536},
+            },
+        ]
+    }
+    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
+    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+
+    result = ops.get_person_map_markers(origin_group="Liivimaa")
+
+    assert result["total_persons"] == 1
+    assert result["mapped_persons"] == 1
+    assert result["markers"][0]["place_key"] == "Riga"
+
+
 def test_migrate_has_both_status_and_statuses(tmp_path):
     """Kui mõlemad võtmed olemas — status eemaldatakse, statuses jääb puutumata."""
     person = {
