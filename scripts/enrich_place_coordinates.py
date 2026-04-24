@@ -8,7 +8,7 @@ Kirjutamiseks:
     python3 scripts/enrich_place_coordinates.py --apply
 
 Config:
-    VUTT_DATA_DIR=/data  -> /data/config/places.json
+    VUTT_DATA_DIR=/path/to/data  -> /path/to/data/config/places.json
 """
 import argparse
 import json
@@ -19,7 +19,8 @@ import urllib.parse
 import urllib.request
 
 
-DATA_DIR = os.getenv("VUTT_DATA_DIR", "/data") + "/config"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(os.getenv("VUTT_DATA_DIR", os.path.join(REPO_ROOT, "data")), "config")
 PLACES_FILE = os.path.join(DATA_DIR, "places.json")
 
 WD_HEADERS = {
