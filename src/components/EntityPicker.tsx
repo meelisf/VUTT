@@ -126,7 +126,9 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         enrichedIdsRef.current.add(value.id);
         getEntityLabels(value.id).then(multilingualLabels => {
           if (Object.keys(multilingualLabels).length > 0) {
-            onChange({ ...value, labels: { ...(value.labels || {}), ...multilingualLabels } });
+            // Uuenda ainult display-labeli, ära kutsu onChange — see põhjustaks vale "dirty" flag
+            const enriched = { ...value, labels: { ...(value.labels || {}), ...multilingualLabels } };
+            setInputValue(getLabel(enriched, lang));
           }
         }).catch(() => {});
       }
