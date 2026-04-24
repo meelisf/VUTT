@@ -25,6 +25,7 @@ from .places_ops import (
     _resolve_origin_group,
     _get_parent_place,
     _get_place_labels,
+    _get_place_coordinates,
     _enrich_origin_from_places,
     _load_origin_groups,
 )
@@ -176,6 +177,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     origin_group = _resolve_origin_group(place_id, place_key)
     origin_parent = _get_parent_place(place_key)
     origin_place_labels = _get_place_labels(place_key)
+    origin_coordinates = _get_place_coordinates(place_key)
     origin_group_labels: Optional[dict] = None
     if origin_group:
         groups_cfg = _load_origin_groups()
@@ -225,6 +227,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "origin_place": place_key,
         "origin_place_id": place_id,
         "origin_place_labels": origin_place_labels,
+        "origin_coordinates": origin_coordinates,
         "origin_parent": origin_parent,
         "origin_group": origin_group,
         "origin_group_labels": origin_group_labels,

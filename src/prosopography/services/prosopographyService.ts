@@ -297,6 +297,7 @@ export async function searchPlacesWikidata(q: string, lang = 'en'): Promise<{ q:
 export async function fetchPlaceWikidata(qid: string): Promise<{
   labels: Record<string, string>;
   type: string | null;
+  coordinates: { lat: number; lon: number; source?: string; wikidata_property?: string; geonames_id?: string } | null;
   parents: { q: string; label_en: string; label_sv: string }[];
 }> {
   const resp = await fetchWithTimeout(`${BASE}/places/wikidata/${encodeURIComponent(qid)}`, { timeout: 15000 });

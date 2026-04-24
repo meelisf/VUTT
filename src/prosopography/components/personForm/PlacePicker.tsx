@@ -40,6 +40,7 @@ interface WdPreview {
   proposedKey: string;
   labels: Record<string, string>;
   type: string;
+  coordinates?: PlaceEntry['coordinates'];
 }
 
 const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: initialPlaces, onAdd, onClose, token }) => {
@@ -57,6 +58,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
   const [wdSearching, setWdSearching] = useState(false);
   const [wdSelected, setWdSelected] = useState<{ q: string; label: string } | null>(null);
   const [wdParents, setWdParents] = useState<{ q: string; label_en: string; label_sv: string }[]>([]);
+  const [wdCoordinates, setWdCoordinates] = useState<PlaceEntry['coordinates'] | null>(null);
   const [wdLoading, setWdLoading] = useState(false);
 
   // Parent — registriotsing
@@ -114,6 +116,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
     setWdResults([]);
     setWdQuery(item.label);
     setQCode(item.q);
+    setWdCoordinates(null);
     setWdLoading(true);
     try {
       const wd = await fetchPlaceWikidata(item.q);
@@ -124,6 +127,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
         setName(item.label);
       }
       if (wd.type) setPlaceType(wd.type);
+      setWdCoordinates(wd.coordinates ?? null);
       setWdParents(wd.parents ?? []);
     } catch {
       setName(item.label);
@@ -194,7 +198,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
       const wd = await fetchPlaceWikidata(item.q);
       const lbls = Object.keys(wd.labels ?? {}).length > 0 ? wd.labels : { et: item.label, en: item.label };
       const proposedKey = (lbls.et || lbls.en || item.label).replace(/\s+/g, '_');
-      setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '' });
+      setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '', coordinates: wd.coordinates ?? null });
     } catch {
       setParentWdError('Wikidata päring ebaõnnestus');
     } finally {
@@ -211,6 +215,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
         labels: parentWdPreview.labels,
         id: parentWdPreview.q,
         type: parentWdPreview.type || undefined,
+        coordinates: parentWdPreview.coordinates ?? undefined,
       }, token);
       setPlaces(prev => ({ ...prev, [result.key]: result.entry }));
       selectParent(result.key);
@@ -236,6 +241,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
         type: placeType || undefined,
         parent_key: parentKey.trim() || undefined,
         group: group || undefined,
+        coordinates: wdCoordinates ?? undefined,
       }, token);
       onAdd(result.key, result.entry);
     } catch (e: any) {
@@ -290,6 +296,11 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
           )}
           {wdSelected && wdLoading && (
             <p className="mt-1 text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Laen detailid…</p>
+          )}
+          {wdSelected && !wdLoading && wdCoordinates && (
+            <p className="mt-1 text-xs text-green-700">
+              Koordinaadid Wikidatast: {wdCoordinates.lat.toFixed(5)}, {wdCoordinates.lon.toFixed(5)}
+            </p>
           )}
           {wdSelected && !wdLoading && wdParents.length > 0 && (
             <div className="mt-2">

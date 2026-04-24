@@ -17,6 +17,7 @@ SAMPLE_PLACES = {
         "parent_key": "Livland",
         "labels": {"et": "Riia", "en": "Riga", "de": "Riga", "la": "Riga"},
         "type": "city",
+        "coordinates": {"lat": 56.9475, "lon": 24.1069, "source": "wikidata", "wikidata_property": "P625", "geonames_id": "456172"},
     },
     "Livland": {
         "id": "Q1757",
@@ -191,6 +192,27 @@ def test_get_parent_place_none_key():
         assert _get_parent_place(None) is None
 
 
+# ── _get_place_coordinates ─────────────────────────────────────────────────
+
+def test_get_place_coordinates_normalizes_numeric_values():
+    with _patch_places():
+        from server.prosopography.places_ops import _get_place_coordinates
+        assert _get_place_coordinates("Riga") == {
+            "lat": 56.9475,
+            "lon": 24.1069,
+            "source": "wikidata",
+            "wikidata_property": "P625",
+            "geonames_id": "456172",
+        }
+
+
+def test_get_place_coordinates_returns_none_for_missing_or_invalid():
+    with _patch_places():
+        from server.prosopography.places_ops import _get_place_coordinates
+        assert _get_place_coordinates("Dorpat") is None
+        assert _get_place_coordinates(None) is None
+
+
 # ── _enrich_origin_from_places ─────────────────────────────────────────────
 
 def test_enrich_fills_id_and_labels():
@@ -282,3 +304,58 @@ def test_get_places_meta_returns_groups_and_types():
         assert "allowed_types" in meta
         assert "city" in meta["allowed_types"]
         assert "Liivimaa" in meta["groups"]
+
+
+# ── Wikidata koordinaadid ──────────────────────────────────────────────────
+
+def test_parse_wikidata_point():
+    from server.prosopography.places_ops import _parse_wikidata_point
+    assert _parse_wikidata_point("Point(24.1069 56.9475)") == {
+        "lat": 56.9475,
+        "lon": 24.1069,
+        "source": "wikidata",
+        "wikidata_property": "P625",
+    }
+
+
+def test_parse_wikidata_point_rejects_invalid():
+    from server.prosopography.places_ops import _parse_wikidata_point
+    assert _parse_wikidata_point("") is None
+    assert _parse_wikidata_point("Point(200 95)") is None
+    assert _parse_wikidata_point("not a point") is None
+
+
+def test_put_place_accepts_coordinates(tmp_path):
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    places_file.write_text(json.dumps({}))
+    groups_file.write_text(json.dumps({}))
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+    ):
+        from server.prosopography.places_ops import put_place
+        entry = put_place("Riga", {
+            "id": "Q1773",
+            "labels": {"en": "Riga"},
+            "coordinates": {"lat": 56.9475, "lon": 24.1069},
+        })
+        assert entry["coordinates"] == {"lat": 56.9475, "lon": 24.1069}
+
+
+def test_put_place_rejects_invalid_coordinates(tmp_path):
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    places_file.write_text(json.dumps({}))
+    groups_file.write_text(json.dumps({}))
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+    ):
+        from server.prosopography.places_ops import put_place
+        with pytest.raises(ValueError, match="coordinates"):
+            put_place("Bad", {"coordinates": {"lat": "56", "lon": 24}})

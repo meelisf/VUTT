@@ -5,9 +5,18 @@ export interface PlaceEntry {
   group?: string | null;
   parent_key?: string | null;
   labels: Record<string, string>;
+  coordinates?: PlaceCoordinates | null;
   historical_names?: string[];
   type?: string;
   notes?: string;
+}
+
+export interface PlaceCoordinates {
+  lat: number;
+  lon: number;
+  source?: string;
+  wikidata_property?: string;
+  geonames_id?: string;
 }
 
 export interface OriginParent {
@@ -46,6 +55,7 @@ export interface ProsopoIndexEntry {
   origin_place: string | null;
   origin_place_id: string | null;
   origin_place_labels: Record<string, string> | null;
+  origin_coordinates: PlaceCoordinates | null;
   origin_parent: OriginParent | null;
   origin_group: string | null;
   origin_group_labels: Record<string, string> | null;

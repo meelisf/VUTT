@@ -3,6 +3,7 @@ Koharegister (places.json) ja päritolugrupid (origin_groups.json).
 Cache, abifunktsioonid, propagatsioon.
 """
 import json
+import re
 import time
 import threading
 import urllib.request
@@ -177,6 +178,24 @@ def _get_place_labels(key: Optional[str]) -> Optional[dict]:
     return _load_places_cache().get(key, {}).get("labels")
 
 
+def _get_place_coordinates(key: Optional[str]) -> Optional[dict]:
+    if not key:
+        return None
+    coordinates = _load_places_cache().get(key, {}).get("coordinates")
+    if not isinstance(coordinates, dict):
+        return None
+    lat = coordinates.get("lat")
+    lon = coordinates.get("lon")
+    if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+        return None
+    result = {"lat": float(lat), "lon": float(lon)}
+    for field in ("source", "wikidata_property", "geonames_id"):
+        value = coordinates.get(field)
+        if isinstance(value, str) and value:
+            result[field] = value
+    return result
+
+
 def _enrich_origin_from_places(origin: dict) -> dict:
     """
     Täidab origin['place_id'] ja origin['place_labels'] places.json-st.
@@ -272,7 +291,17 @@ def put_place(key: str, data: dict) -> dict:
 
     places = _load_places_cache(force_reload=True)
     entry = places.get(key, {})
-    for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes"):
+    if "coordinates" in data:
+        coordinates = data.get("coordinates")
+        if coordinates is not None:
+            lat = coordinates.get("lat") if isinstance(coordinates, dict) else None
+            lon = coordinates.get("lon") if isinstance(coordinates, dict) else None
+            if not isinstance(lat, (int, float)) or not isinstance(lon, (int, float)):
+                raise ValueError("coordinates peab olema kujul {lat: number, lon: number}")
+            if not (-90 <= float(lat) <= 90 and -180 <= float(lon) <= 180):
+                raise ValueError("coordinates väärtused on väljaspool lubatud vahemikku")
+
+    for field in ("id", "labels", "parent_key", "group", "type", "historical_names", "notes", "coordinates"):
         if field in data:
             entry[field] = data[field]
     places[key] = entry
@@ -299,6 +328,25 @@ _WD_TYPE_MAP = {
     "Q153654": "historical_region", "Q188509": "historical_region",
     "Q1763527": "historical_region", "Q182832": "historical_region",
 }
+
+
+def _parse_wikidata_point(value: str) -> Optional[dict]:
+    """Teisendab Wikidata literal'i 'Point(lon lat)' koordinaatide dictiks."""
+    if not value:
+        return None
+    match = re.match(r"^Point\(([-0-9.]+)\s+([-0-9.]+)\)$", value.strip())
+    if not match:
+        return None
+    lon = float(match.group(1))
+    lat = float(match.group(2))
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    return {
+        "lat": lat,
+        "lon": lon,
+        "source": "wikidata",
+        "wikidata_property": "P625",
+    }
 
 
 def search_places_wikidata(query: str, lang: str = "en", limit: int = 10) -> list:
@@ -336,10 +384,11 @@ def search_places_wikidata(query: str, lang: str = "en", limit: int = 10) -> lis
 
 def fetch_place_wikidata(qid: str) -> Optional[dict]:
     """
-    Pärib Wikidatast koha andmed: labelid, tüüp, ajaloolised ülempiirkonnad (P131).
+    Pärib Wikidatast koha andmed: labelid, tüüp, koordinaadid (P625), ülempiirkonnad (P131).
     Tagastab:
       labels: {et, en, de, la, sv}
       type: meie tüüp või None
+      coordinates: {lat, lon, source, wikidata_property} või None
       parents: [{q, label_en, label_sv}] — P131 alusel
     """
     if not qid.startswith("Q") or not qid[1:].isdigit():
@@ -347,6 +396,7 @@ def fetch_place_wikidata(qid: str) -> Optional[dict]:
 
     sparql = f"""
 SELECT ?label_et ?label_en ?label_de ?label_la ?label_sv
+       ?coord
        ?typeQ (SAMPLE(?typeLabel) AS ?typeLabel)
        ?parentQ (SAMPLE(?parentLabel_en) AS ?parentLabel_en)
                 (SAMPLE(?parentLabel_sv) AS ?parentLabel_sv)
@@ -356,6 +406,7 @@ WHERE {{
   OPTIONAL {{ wd:{qid} rdfs:label ?label_de. FILTER(LANG(?label_de)="de") }}
   OPTIONAL {{ wd:{qid} rdfs:label ?label_la. FILTER(LANG(?label_la)="la") }}
   OPTIONAL {{ wd:{qid} rdfs:label ?label_sv. FILTER(LANG(?label_sv)="sv") }}
+  OPTIONAL {{ wd:{qid} wdt:P625 ?coord. }}
   OPTIONAL {{
     wd:{qid} wdt:P31 ?typeQ.
     ?typeQ rdfs:label ?typeLabel. FILTER(LANG(?typeLabel)="en")
@@ -366,7 +417,7 @@ WHERE {{
     OPTIONAL {{ ?parentQ rdfs:label ?parentLabel_sv. FILTER(LANG(?parentLabel_sv)="sv") }}
   }}
 }}
-GROUP BY ?label_et ?label_en ?label_de ?label_la ?label_sv ?typeQ ?parentQ
+GROUP BY ?label_et ?label_en ?label_de ?label_la ?label_sv ?coord ?typeQ ?parentQ
 LIMIT 20
 """
     url = "https://query.wikidata.org/sparql?" + urllib.parse.urlencode({
@@ -390,6 +441,8 @@ LIMIT 20
         if v:
             labels[lang] = v
 
+    coordinates = _parse_wikidata_point((b0.get("coord") or {}).get("value", ""))
+
     # Tüüp — esimene tuntud P31
     place_type = None
     seen_types: set = set()
@@ -412,4 +465,4 @@ LIMIT 20
             label_sv = (b.get("parentLabel_sv") or {}).get("value", "")
             parents.append({"q": pq, "label_en": label_en, "label_sv": label_sv or label_en})
 
-    return {"labels": labels, "type": place_type, "parents": parents}
+    return {"labels": labels, "type": place_type, "coordinates": coordinates, "parents": parents}

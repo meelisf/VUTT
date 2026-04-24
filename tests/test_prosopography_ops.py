@@ -70,6 +70,7 @@ def _build_entry(person: dict) -> dict:
     with mock.patch.object(ops, "_resolve_origin_group", return_value=None), \
          mock.patch.object(ops, "_get_parent_place", return_value=None), \
          mock.patch.object(ops, "_get_place_labels", return_value=None), \
+         mock.patch.object(ops, "_get_place_coordinates", return_value=None), \
          mock.patch.object(ops, "_load_origin_groups", return_value={}):
         return ops._index_entry_from_person(person)
 
@@ -106,6 +107,23 @@ def test_index_entry_legacy_status_fallback():
     entry = _build_entry(person)
     assert entry["status_ids"] == ["Q134737"]
     assert entry["status_labels"] == ["Aadel"]
+
+
+def test_index_entry_includes_origin_coordinates():
+    ops = importlib.import_module("server.prosopography.ops")
+    person = {
+        "id": "p8",
+        "name": {"label": "Geo Person"},
+        "origin": {"place": "Riga", "place_id": "Q1773"},
+    }
+    coords = {"lat": 56.9475, "lon": 24.1069, "source": "wikidata", "wikidata_property": "P625"}
+    with mock.patch.object(ops, "_resolve_origin_group", return_value="Liivimaa"), \
+         mock.patch.object(ops, "_get_parent_place", return_value=None), \
+         mock.patch.object(ops, "_get_place_labels", return_value={"et": "Riia"}), \
+         mock.patch.object(ops, "_get_place_coordinates", return_value=coords), \
+         mock.patch.object(ops, "_load_origin_groups", return_value={"Liivimaa": {"labels": {"et": "Liivimaa"}}}):
+        entry = ops._index_entry_from_person(person)
+    assert entry["origin_coordinates"] == coords
 
 
 # ---- list_persons filter test ----
