@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Map, List } from 'lucide-react';
 import Header from '../../components/Header';
 import PersonCard from '../components/PersonCard';
+import PersonsMap from '../components/PersonsMap';
 import MergePersonsModal from '../components/MergePersonsModal';
 import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
@@ -33,6 +34,8 @@ const PersonsPage: React.FC = () => {
   const immYearTo = searchParams.get('imm_year_to') ?? '';
   const statusId = searchParams.get('status_id') ?? '';
   const sortBy = searchParams.get('sort_by') ?? 'alpha';
+  const view = searchParams.get('view') === 'map' ? 'map' : 'list';
+  const focusPlace = searchParams.get('focus_place') ?? '';
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
@@ -67,6 +70,14 @@ const PersonsPage: React.FC = () => {
   const setImmYearTo = (v: string)    => setFilterParam('imm_year_to', v);
   const setStatusId = (v: string)     => setFilterParam('status_id', v);
   const setSortBy = (v: string)       => setFilterParam('sort_by', v === 'alpha' ? '' : v);
+  const setView = (v: 'list' | 'map') =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      v === 'map' ? n.set('view', 'map') : n.delete('view');
+      if (v === 'list') n.delete('focus_place');
+      n.delete('offset');
+      return n;
+    }, { replace: true });
 
   const setOffset = (v: number) =>
     setSearchParams(p => { const n = new URLSearchParams(p); v > 0 ? n.set('offset', String(v)) : n.delete('offset'); return n; }, { replace: true });
@@ -87,6 +98,10 @@ const PersonsPage: React.FC = () => {
 
   // Serveripäring — käivitatakse filtri/offset muutusel
   const fetchPersons = useCallback(() => {
+    if (view === 'map') {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     listPersons({
       q: query || undefined,
@@ -108,7 +123,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [query, originGroup, institution, source, gender, immYearFrom, immYearTo, statusId, sortBy, offset, token, t]);
+  }, [view, query, originGroup, institution, source, gender, immYearFrom, immYearTo, statusId, sortBy, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
@@ -142,6 +157,16 @@ const PersonsPage: React.FC = () => {
   const hasActiveFilters = !!(originGroup || institution || source || gender || immYearFrom || immYearTo);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
+  const mapFilters = {
+    q: query || undefined,
+    origin_group: originGroup || undefined,
+    institution: institution || undefined,
+    source: source || undefined,
+    gender: gender || undefined,
+    imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
+    imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
+    status_id: statusId || undefined,
+  };
 
   // Select-mood helpers
   const exitSelectMode = () => {
@@ -215,6 +240,7 @@ const PersonsPage: React.FC = () => {
             </div>
 
             {/* Sortimine */}
+            {view === 'list' && (
             <div className="flex items-center gap-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shrink-0">
               <ArrowDownAZ size={15} className="text-gray-400 shrink-0" />
               <select
@@ -227,6 +253,26 @@ const PersonsPage: React.FC = () => {
                 <option value="death_year">{t('sortDeathYear', 'Surmaaasta')}</option>
                 <option value="imm_year">{t('sortImmYear', 'Immatrikuleerumine')}</option>
               </select>
+            </div>
+            )}
+
+            <div className="flex items-center rounded-lg border border-gray-200 bg-white p-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setView('list')}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${view === 'list' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <List size={15} />
+                {t('listView', 'Nimekiri')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('map')}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${view === 'map' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+              >
+                <Map size={15} />
+                {t('map.view', 'Kaart')}
+              </button>
             </div>
 
             {/* Admin: liitmise select-mood */}
@@ -308,7 +354,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Arv */}
-        {!(loading || false) && !error && (
+        {view === 'list' && !(loading || false) && !error && (
           <p className="text-xs text-gray-400 mb-4">
             {offset === 0 && total <= LIMIT
               ? t('totalCount', '{{count}} isikut', { count: total })
@@ -317,7 +363,7 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Sisu */}
-        {(loading || false) && (
+        {view === 'list' && (loading || false) && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="h-64 bg-white border border-gray-200 rounded-lg animate-pulse" />
@@ -325,11 +371,11 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {error && (
+        {view === 'list' && error && (
           <div className="text-center py-16 text-red-600 text-sm">{error}</div>
         )}
 
-        {!(loading || false) && !error && persons.length === 0 && (
+        {view === 'list' && !(loading || false) && !error && persons.length === 0 && (
           <div className="text-center py-16 text-gray-400 text-sm">
             {query || hasActiveFilters
               ? t('noResults', 'Otsingule vastavaid isikuid ei leitud.')
@@ -337,7 +383,7 @@ const PersonsPage: React.FC = () => {
           </div>
         )}
 
-        {!(loading || false) && !error && persons.length > 0 && (
+        {view === 'list' && !(loading || false) && !error && persons.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {persons.map(person => (
               <PersonCard
@@ -352,7 +398,15 @@ const PersonsPage: React.FC = () => {
         )}
 
         {/* Paginatsioon */}
-        {!(loading || false) && totalPages > 1 && (
+        {view === 'map' && (
+          <PersonsMap
+            filters={mapFilters}
+            token={token}
+            focusPlace={focusPlace || undefined}
+          />
+        )}
+
+        {view === 'list' && !(loading || false) && totalPages > 1 && (
           <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200">
             <button
               onClick={() => setOffset(offset - LIMIT)}

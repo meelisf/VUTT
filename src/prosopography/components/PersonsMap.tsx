@@ -1,0 +1,179 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { LatLngBoundsExpression, divIcon } from 'leaflet';
+import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { Loader2, MapPin, Users } from 'lucide-react';
+import { fetchPersonMapMarkers } from '../services/prosopographyService';
+import type { ProsopoMapMarker, ProsopoMapResponse } from '../types';
+
+interface PersonsMapProps {
+  filters: {
+    q?: string;
+    gender?: string;
+    origin_group?: string;
+    institution?: string;
+    status_id?: string;
+    source?: string;
+    imm_year_from?: number;
+    imm_year_to?: number;
+  };
+  token?: string;
+  focusPlace?: string;
+}
+
+function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string | null {
+  if (!labels) return null;
+  return labels[lang] ?? labels.et ?? labels.en ?? Object.values(labels)[0] ?? null;
+}
+
+function markerIcon(count: number, focused: boolean) {
+  const size = count >= 20 ? 42 : count >= 10 ? 36 : count >= 3 ? 31 : 26;
+  return divIcon({
+    className: '',
+    html: `<div class="${focused ? 'vutt-map-marker vutt-map-marker-focused' : 'vutt-map-marker'}" style="width:${size}px;height:${size}px">${count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
+
+const FitMapToMarkers: React.FC<{ markers: ProsopoMapMarker[]; focusPlace?: string }> = ({ markers, focusPlace }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (markers.length === 0) return;
+    const focused = focusPlace
+      ? markers.find(marker => marker.place_key === focusPlace || marker.place_id === focusPlace)
+      : null;
+    if (focused) {
+      map.setView([focused.coordinates.lat, focused.coordinates.lon], 8, { animate: false });
+      return;
+    }
+    const bounds = markers.map(marker => [marker.coordinates.lat, marker.coordinates.lon]) as LatLngBoundsExpression;
+    map.fitBounds(bounds, { padding: [28, 28], maxZoom: 8, animate: false });
+  }, [focusPlace, map, markers]);
+
+  return null;
+};
+
+const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) => {
+  const { t, i18n } = useTranslation(['prosopography', 'common']);
+  const lang = i18n.language?.slice(0, 2) ?? 'et';
+  const [data, setData] = useState<ProsopoMapResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const filterKey = JSON.stringify(filters);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchPersonMapMarkers(filters, token)
+      .then(result => {
+        setData(result);
+        setError(null);
+      })
+      .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
+      .finally(() => setLoading(false));
+  }, [filterKey, filters, token, t]);
+
+  const focusedMarker = useMemo(() => {
+    if (!focusPlace || !data) return null;
+    return data.markers.find(marker => marker.place_key === focusPlace || marker.place_id === focusPlace) ?? null;
+  }, [data, focusPlace]);
+
+  if (loading) {
+    return (
+      <div className="h-[640px] bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-400">
+        <Loader2 className="w-6 h-6 animate-spin mr-2" />
+        {t('loading', 'Laadin…')}
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div className="text-center py-16 text-red-600 text-sm">{error}</div>;
+  }
+
+  if (!data || data.markers.length === 0) {
+    return (
+      <div className="h-[420px] bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-400 text-sm">
+        {t('map.noMarkers', 'Kaardile kantavaid päritolukohti ei leitud.')}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1">
+          <MapPin size={13} className="text-primary-600" />
+          {t('map.markerCount', '{{count}} kohta', { count: data.markers.length })}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <Users size={13} className="text-primary-600" />
+          {t('map.mappedCount', '{{mapped}} / {{total}} isikut kaardil', { mapped: data.mapped_persons, total: data.total_persons })}
+        </span>
+        {data.without_coordinates > 0 && (
+          <span>{t('map.withoutCoordinates', '{{count}} isikul puudub koordinaat', { count: data.without_coordinates })}</span>
+        )}
+        {focusedMarker && (
+          <span className="ml-auto rounded-full bg-primary-50 border border-primary-200 px-2 py-1 text-primary-700">
+            {resolveLabel(focusedMarker.place_labels, lang) ?? focusedMarker.place_key}
+          </span>
+        )}
+      </div>
+
+      <div className="h-[640px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <MapContainer
+          center={[57.5, 24.5]}
+          zoom={5}
+          scrollWheelZoom
+          className="h-full w-full"
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <FitMapToMarkers markers={data.markers} focusPlace={focusPlace} />
+          {data.markers.map(marker => {
+            const placeLabel = resolveLabel(marker.place_labels, lang) ?? marker.place_key ?? marker.place_id ?? '';
+            const parentLabel = resolveLabel(marker.parent?.labels, lang) ?? marker.parent?.key;
+            const focused = !!focusPlace && (marker.place_key === focusPlace || marker.place_id === focusPlace);
+            return (
+              <Marker
+                key={marker.place_key ?? marker.place_id ?? `${marker.coordinates.lat},${marker.coordinates.lon}`}
+                position={[marker.coordinates.lat, marker.coordinates.lon]}
+                icon={markerIcon(marker.count, focused)}
+              >
+                <Popup>
+                  <div className="min-w-56 max-w-72">
+                    <div className="mb-2">
+                      <h3 className="font-semibold text-gray-900">{placeLabel}</h3>
+                      {parentLabel && parentLabel !== placeLabel && <p className="text-xs text-gray-500">{parentLabel}</p>}
+                      <p className="text-xs text-gray-400">{marker.count} {t('persons', 'isikut')}</p>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
+                      {marker.persons.map(person => (
+                        <Link key={person.id} to={`/persons/${encodeURIComponent(person.id)}`} className="block rounded px-2 py-1 text-sm text-primary-700 hover:bg-primary-50">
+                          {person.label}
+                          {(person.birth_year || person.death_year) && (
+                            <span className="ml-1 text-xs text-gray-400">
+                              {person.birth_year ?? '?'}-{person.death_year ?? '?'}
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MapContainer>
+      </div>
+    </div>
+  );
+};
+
+export default PersonsMap;

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ShieldPlus } from 'lucide-react';
+import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 
 interface PersonCardProps {
@@ -72,8 +72,8 @@ function formatImmLabel(dateStr: string, lang: string): string {
   }
 }
 
-const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode }> = ({
-  person, lifespan,
+const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode; onOriginClick?: () => void }> = ({
+  person, lifespan, onOriginClick,
 }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   return (
@@ -140,6 +140,22 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
             ? (modern && modern !== historical ? `${historical} (${modern})` : historical)
             : (modern ?? null);
           const parentLabel = resolveLabel(person.origin_parent?.labels, lang) ?? person.origin_parent?.key;
+          const content = placeLabel && parentLabel && placeLabel !== parentLabel
+            ? `${placeLabel} · ${parentLabel}`
+            : placeLabel;
+          if (content && person.origin_coordinates && onOriginClick) {
+            return (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onOriginClick(); }}
+                className="inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-900 hover:underline text-left"
+                title={t('map.openPlace', 'Näita kaardil')}
+              >
+                <MapPin size={12} />
+                {content}
+              </button>
+            );
+          }
           if (placeLabel && parentLabel && placeLabel !== parentLabel) {
             return <p className="text-xs text-gray-400">{placeLabel} · {parentLabel}</p>;
           }
@@ -194,6 +210,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
 const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect }) => {
   const { t } = useTranslation(['prosopography']);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const lifespanNode = (() => {
     const sym = 'text-primary-500';
@@ -233,14 +250,29 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
     );
   }
 
+  const openPerson = () => {
+    navigate(`/persons/${person.id}`, { state: { from: location.pathname + location.search } });
+  };
+
+  const openOriginMap = () => {
+    if (!person.origin_place) return;
+    const params = new URLSearchParams(location.search);
+    params.set('view', 'map');
+    params.set('focus_place', person.origin_place);
+    params.delete('offset');
+    navigate(`/persons?${params.toString()}`);
+  };
+
   return (
-    <Link
-      to={`/persons/${person.id}`}
-      state={{ from: location.pathname + location.search }}
-      className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden"
+    <div
+      role="link"
+      tabIndex={0}
+      onClick={openPerson}
+      onKeyDown={e => e.key === 'Enter' && openPerson()}
+      className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden cursor-pointer"
     >
-      <CardInner person={person} lifespan={lifespanNode} />
-    </Link>
+      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} />
+    </div>
   );
 };
 

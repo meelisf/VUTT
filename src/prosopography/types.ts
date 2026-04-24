@@ -62,6 +62,35 @@ export interface ProsopoIndexEntry {
   tags: { label: string; id?: string | null; labels?: Record<string, string> }[];
 }
 
+export interface ProsopoMapPerson {
+  id: string;
+  label: string;
+  birth_year: number | null;
+  death_year: number | null;
+  imm_year: number | null;
+  image_url: string | null;
+  work_count: number;
+}
+
+export interface ProsopoMapMarker {
+  place_key: string | null;
+  place_id: string | null;
+  place_labels: Record<string, string> | null;
+  parent: OriginParent | null;
+  origin_group: string | null;
+  origin_group_labels: Record<string, string> | null;
+  coordinates: PlaceCoordinates;
+  count: number;
+  persons: ProsopoMapPerson[];
+}
+
+export interface ProsopoMapResponse {
+  markers: ProsopoMapMarker[];
+  total_persons: number;
+  mapped_persons: number;
+  without_coordinates: number;
+}
+
 export interface HistoricalDate {
   original_text: string | null;
   date: string | null;
