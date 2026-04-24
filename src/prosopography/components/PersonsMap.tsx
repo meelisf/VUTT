@@ -38,6 +38,41 @@ function markerIcon(count: number, focused: boolean) {
   });
 }
 
+type DisplayMarker = ProsopoMapMarker & {
+  displayCoordinates: { lat: number; lon: number };
+  hasCoordinateOverlap: boolean;
+};
+
+function coordinateKey(marker: ProsopoMapMarker): string {
+  return `${marker.coordinates.lat.toFixed(6)},${marker.coordinates.lon.toFixed(6)}`;
+}
+
+function spreadOverlappingMarkers(markers: ProsopoMapMarker[]): DisplayMarker[] {
+  const groups = new Map<string, ProsopoMapMarker[]>();
+  for (const marker of markers) {
+    const key = coordinateKey(marker);
+    groups.set(key, [...(groups.get(key) ?? []), marker]);
+  }
+
+  return markers.map(marker => {
+    const group = groups.get(coordinateKey(marker)) ?? [marker];
+    if (group.length <= 1) {
+      return { ...marker, displayCoordinates: marker.coordinates, hasCoordinateOverlap: false };
+    }
+    const index = group.indexOf(marker);
+    const angle = (Math.PI * 2 * index) / group.length;
+    const radius = 0.04 + Math.min(group.length, 8) * 0.003;
+    return {
+      ...marker,
+      displayCoordinates: {
+        lat: marker.coordinates.lat + Math.sin(angle) * radius,
+        lon: marker.coordinates.lon + Math.cos(angle) * radius,
+      },
+      hasCoordinateOverlap: true,
+    };
+  });
+}
+
 const FitMapToMarkers: React.FC<{ markers: ProsopoMapMarker[]; focusPlace?: string }> = ({ markers, focusPlace }) => {
   const map = useMap();
 
@@ -81,6 +116,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
     if (!focusPlace || !data) return null;
     return data.markers.find(marker => marker.place_key === focusPlace || marker.place_id === focusPlace) ?? null;
   }, [data, focusPlace]);
+  const displayMarkers = useMemo(() => data ? spreadOverlappingMarkers(data.markers) : [], [data]);
 
   if (loading) {
     return (
@@ -136,14 +172,14 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <FitMapToMarkers markers={data.markers} focusPlace={focusPlace} />
-          {data.markers.map(marker => {
+          {displayMarkers.map(marker => {
             const placeLabel = resolveLabel(marker.place_labels, lang) ?? marker.place_key ?? marker.place_id ?? '';
             const parentLabel = resolveLabel(marker.parent?.labels, lang) ?? marker.parent?.key;
             const focused = !!focusPlace && (marker.place_key === focusPlace || marker.place_id === focusPlace);
             return (
               <Marker
                 key={marker.place_key ?? marker.place_id ?? `${marker.coordinates.lat},${marker.coordinates.lon}`}
-                position={[marker.coordinates.lat, marker.coordinates.lon]}
+                position={[marker.displayCoordinates.lat, marker.displayCoordinates.lon]}
                 icon={markerIcon(marker.count, focused)}
               >
                 <Popup>
@@ -152,6 +188,11 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
                       <h3 className="font-semibold text-gray-900">{placeLabel}</h3>
                       {parentLabel && parentLabel !== placeLabel && <p className="text-xs text-gray-500">{parentLabel}</p>}
                       <p className="text-xs text-gray-400">{marker.count} {t('persons', 'isikut')}</p>
+                      {marker.hasCoordinateOverlap && (
+                        <p className="text-[11px] text-amber-700">
+                          {t('map.shiftedMarker', 'Marker on kattuvuse vältimiseks veidi nihutatud.')}
+                        </p>
+                      )}
                     </div>
                     <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
                       {marker.persons.map(person => (
