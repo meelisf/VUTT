@@ -900,7 +900,7 @@ const PersonEditPage: React.FC = () => {
 
         {/* Kustutamine — ainult admin, olemasolevate isikute puhul */}
         {isAdmin && !isNew && (
-          <div className="border border-red-200 rounded-lg p-4 space-y-3">
+          <div className="mt-8 border border-red-200 rounded-lg p-4 space-y-3">
             <p className="text-sm font-medium text-red-700">{t('deleteSection.title')}</p>
             {!deleteOpen ? (
               <button
