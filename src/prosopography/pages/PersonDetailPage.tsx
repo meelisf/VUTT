@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users, StickyNote,
+  BookOpen, User, BookMarked, Users, StickyNote, Map,
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
 import Header from '../../components/Header';
@@ -328,6 +328,7 @@ const PersonDetailPage: React.FC = () => {
   const uniqueRoles = [...new Set(works.map(w => w.role))];
   const filteredWorks = selectedRole ? works.filter(w => w.role === selectedRole) : works;
   const displayedWorks = filteredWorks.slice(0, visibleCount);
+  const relationMapUrl = `/persons?view=map&related_to=${encodeURIComponent(person.id)}`;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -349,16 +350,27 @@ const PersonDetailPage: React.FC = () => {
           <CardHeader
             icon={<User size={18} />}
             title={person.name.label}
-            action={canEdit ? (
-              <Link
-                to={`/persons/${id}/edit`}
-                state={{ from: backTo }}
-                className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
-              >
-                <Edit3 size={12} />
-                {t('edit', 'Muuda')}
-              </Link>
-            ) : undefined}
+            action={(
+              <div className="flex items-center gap-2">
+                <Link
+                  to={relationMapUrl}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
+                >
+                  <Map size={12} />
+                  {t('map.showRelations', 'Seoste kaart')}
+                </Link>
+                {canEdit && (
+                  <Link
+                    to={`/persons/${id}/edit`}
+                    state={{ from: backTo }}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-200 transition-colors"
+                  >
+                    <Edit3 size={12} />
+                    {t('edit', 'Muuda')}
+                  </Link>
+                )}
+              </div>
+            )}
           />
 
           <div className="flex gap-4">

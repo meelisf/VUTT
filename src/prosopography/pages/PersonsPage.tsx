@@ -36,6 +36,7 @@ const PersonsPage: React.FC = () => {
   const sortBy = searchParams.get('sort_by') ?? 'alpha';
   const view = searchParams.get('view') === 'map' ? 'map' : 'list';
   const focusPlace = searchParams.get('focus_place') ?? '';
+  const relatedTo = searchParams.get('related_to') ?? '';
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
@@ -74,7 +75,10 @@ const PersonsPage: React.FC = () => {
     setSearchParams(p => {
       const n = new URLSearchParams(p);
       v === 'map' ? n.set('view', 'map') : n.delete('view');
-      if (v === 'list') n.delete('focus_place');
+      if (v === 'list') {
+        n.delete('focus_place');
+        n.delete('related_to');
+      }
       n.delete('offset');
       return n;
     }, { replace: true });
@@ -166,6 +170,7 @@ const PersonsPage: React.FC = () => {
     imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
     imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
     status_id: statusId || undefined,
+    related_to: relatedTo || undefined,
   };
 
   // Select-mood helpers

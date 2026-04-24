@@ -20,7 +20,7 @@ from ..config import (
     PERSON_ALIASES_FILE,
 )
 from ..utils import generate_nanoid, atomic_write_json
-from .work_relations_ops import update_works_creators_index, build_works_creators_index
+from .work_relations_ops import update_works_creators_index, build_works_creators_index, get_work_relations
 from .places_ops import (
     _resolve_origin_group,
     _get_parent_place,
@@ -681,8 +681,13 @@ def get_person_map_markers(
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
+    related_to: Optional[str] = None,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
+    if related_to:
+        network_ids = get_person_relation_network_ids(related_to)
+        ids = list(dict.fromkeys([*(ids or []), *network_ids])) if ids else network_ids
+
     entries = _filter_index_entries(
         q=q,
         gender=gender,
@@ -744,6 +749,52 @@ def get_person_map_markers(
         "mapped_persons": sum(m["count"] for m in markers),
         "without_coordinates": without_coordinates,
     }
+
+
+def _structured_relation_ids(person: Optional[dict]) -> list[str]:
+    if not person:
+        return []
+    result: list[str] = []
+    for relation in person.get("relations") or []:
+        target_id = relation.get("target_id") if isinstance(relation, dict) else None
+        if isinstance(target_id, str) and target_id.startswith("vutt:P"):
+            result.append(target_id)
+    return result
+
+
+def get_person_relation_network_ids(person_id: str, work_limit: int = 500) -> list[str]:
+    """
+    Tagastab isiku kaardivõrgustiku ID-d: isik ise, struktureeritud seosed
+    mõlemas suunas ning teoste kaudu tuletatud seotud isikud.
+    """
+    ids: list[str] = []
+
+    def add(pid: Optional[str]) -> None:
+        if isinstance(pid, str) and pid.startswith("vutt:P") and pid not in ids:
+            ids.append(pid)
+
+    add(person_id)
+    person = get_person(person_id)
+    for target_id in _structured_relation_ids(person):
+        add(target_id)
+
+    pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
+    for path in _glob.glob(pattern):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                other = json.load(f)
+        except Exception:
+            continue
+        other_id = other.get("id")
+        if other_id == person_id or other.get("record_status") == "tombstone":
+            continue
+        if person_id in _structured_relation_ids(other):
+            add(other_id)
+
+    for relation in get_work_relations(person_id, limit=work_limit, offset=0):
+        add(relation.get("person_id"))
+
+    return ids
 
 
 def get_relation_type_suggestions() -> list:

@@ -172,6 +172,7 @@ async def prosopography_map(
     imm_year_from: int = None,
     imm_year_to: int = None,
     ids: str = None,
+    related_to: str = None,
     user=Depends(_optional_user),
 ):
     """Tagastab koordinaadiga isikud päritolukoha järgi grupeeritud markeritena."""
@@ -188,6 +189,7 @@ async def prosopography_map(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=id_list,
+        related_to=related_to,
     )
 
 

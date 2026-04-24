@@ -67,6 +67,7 @@ export async function fetchPersonMapMarkers(params?: {
   imm_year_from?: number;
   imm_year_to?: number;
   ids?: string[];
+  related_to?: string;
 }, token?: string): Promise<ProsopoMapResponse> {
   const url = new URL(`${BASE}/map`, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
@@ -80,6 +81,7 @@ export async function fetchPersonMapMarkers(params?: {
   if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
+  if (params?.related_to) url.searchParams.set('related_to', params.related_to);
 
   const resp = await fetchWithTimeout(url.toString(), {
     headers: getAuthHeaders(token),
