@@ -463,8 +463,10 @@ async def places_meta():
 
 @router.post("/admin/places/refresh-labels")
 def places_refresh_labels(user=Depends(_require_role("admin"))):
-    """Värskendab kõik places.json kohade labelid Wikidatast (admin)."""
+    """Värskendab kõik places.json kohade labelid Wikidatast + taastab indeksid (admin)."""
     count = refresh_all_place_labels()
+    import threading
+    threading.Thread(target=rebuild_indices, daemon=True).start()
     return {"updated": count}
 
 
