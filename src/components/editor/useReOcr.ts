@@ -22,6 +22,17 @@ interface UseReOcrReturn {
   deleteOcrFile: () => Promise<void>;
 }
 
+const parseJsonResponse = async (response: Response): Promise<any> => {
+  const text = await response.text();
+  if (!text.trim()) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    const preview = text.replace(/\s+/g, ' ').slice(0, 180);
+    throw new Error(`Server ei tagastanud JSON vastust (${response.status}). ${preview}`);
+  }
+};
+
 export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps): UseReOcrReturn {
   const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
   const [reocrText, setReocrText] = useState<string | null>(null);
@@ -57,7 +68,7 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
             { headers: getAuthHeaders(authToken), timeout: 10000 }
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
-          const pd = await pr.json();
+          const pd = await parseJsonResponse(pr);
           if (pd.status === 'done') {
             setReocrStatus('done');
             setReocrText(pd.text ?? '');
@@ -86,7 +97,7 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
           { headers: getAuthHeaders(authToken), timeout: 5000 }
         );
         if (res.ok) {
-          const data = await res.json();
+          const data = await parseJsonResponse(res);
           setReocrStatus('done');
           setReocrText(data.text ?? '');
           if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
@@ -105,7 +116,7 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
           `${FILE_API_URL}/admin/reocr/${savedJobId}/status`,
           { headers: getAuthHeaders(authToken), timeout: 10000 }
         );
-        const pd = await pr.json();
+        const pd = await parseJsonResponse(pr);
         if (pd.status === 'done') {
           setReocrStatus('done');
           setReocrText(pd.text ?? '');
@@ -139,10 +150,10 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
         timeout: 30000,
       });
       if (!res.ok) {
-        const d = await res.json();
+        const d = await parseJsonResponse(res);
         throw new Error(d.detail || 'Re-OCR alustamine ebaõnnestus');
       }
-      const { job_id } = await res.json();
+      const { job_id } = await parseJsonResponse(res);
       if (reocrStorageKey) localStorage.setItem(reocrStorageKey, job_id);
       setReocrStatus('processing');
 
@@ -153,7 +164,7 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
             { headers: getAuthHeaders(authToken), timeout: 10000 }
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
-          const pd = await pr.json();
+          const pd = await parseJsonResponse(pr);
           if (pd.status === 'done') {
             setReocrStatus('done');
             setReocrText(pd.text ?? '');

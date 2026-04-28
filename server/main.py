@@ -697,7 +697,7 @@ def _append_notification(username: str, notification: dict):
         _save_notifications(username, notifications[:200])
 
 
-def _find_username_by_display_name(display_name: str | None) -> str | None:
+def _find_username_by_display_name(display_name):
     if not display_name:
         return None
     for account in get_all_users():
