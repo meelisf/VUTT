@@ -103,6 +103,8 @@
     "sent": "Notification sent ({{count}})",
     "empty": "No notifications.",
     "markRead": "Mark read",
+    "reply": "Reply",
+    "replyingTo": "Replying to notification",
     "viewAll": "All notifications",
     "loadError": "Failed to load notifications.",
     "sendError": "Failed to send notification.",

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { Bell, Check, ChevronLeft, Loader2, Send } from 'lucide-react';
+import { Bell, Check, ChevronLeft, Loader2, Reply, Send } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
@@ -100,6 +100,7 @@ const Notifications: React.FC = () => {
   const [link, setLink] = useState('');
   const [recipientFilter, setRecipientFilter] = useState('');
   const [linkError, setLinkError] = useState('');
+  const [replyingTo, setReplyingTo] = useState<UserNotification | null>(null);
   const [sending, setSending] = useState(false);
 
   const canSend = user?.role === 'editor' || user?.role === 'admin';
@@ -200,6 +201,7 @@ const Notifications: React.FC = () => {
       setBody('');
       setLink('');
       setLinkError('');
+      setReplyingTo(null);
       setSendSuccess(t('notifications.sent', { count }));
     } catch (e) {
       setSendError(e instanceof Error ? e.message : t('notifications.sendError'));
@@ -212,6 +214,28 @@ const Notifications: React.FC = () => {
     const normalized = normalizeInternalLink(value);
     setLink(normalized.link);
     setLinkError(normalized.error ? t('notifications.internalLinkOnly') : '');
+  };
+
+  const startReply = async (notification: UserNotification) => {
+    const actor = notification.actor_username || '';
+    if (!actor) return;
+    if (authToken && !notification.read_at) {
+      await markNotificationRead(authToken, notification.id).catch(() => {});
+      setNotifications(items => items.map(item => (
+        item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
+      )));
+    }
+    setRecipientMode('single');
+    setRecipientUsername(actor);
+    setRecipientFilter('');
+    setTitle(notification.title?.startsWith('Re: ') ? notification.title : `Re: ${notification.title || ''}`.trim());
+    setBody('');
+    setLink(notificationLink(notification));
+    setLinkError('');
+    setReplyingTo(notification);
+    setSendError(null);
+    setSendSuccess(null);
+    setActiveTab('send');
   };
 
   return (
@@ -306,14 +330,27 @@ const Notifications: React.FC = () => {
                             {target ? ` · ${target}` : ''}
                           </p>
                         </button>
-                        {!isSentNotification(notification) && !notification.read_at && (
-                          <button
-                            onClick={() => markRead(notification)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-white"
-                          >
-                            <Check size={14} />
-                            {t('notifications.markRead')}
-                          </button>
+                        {!isSentNotification(notification) && (
+                          <div className="flex shrink-0 flex-col sm:flex-row gap-2">
+                            {notification.actor_username && (
+                              <button
+                                onClick={() => startReply(notification)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-white"
+                              >
+                                <Reply size={14} />
+                                {t('notifications.reply')}
+                              </button>
+                            )}
+                            {!notification.read_at && (
+                              <button
+                                onClick={() => markRead(notification)}
+                                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-white"
+                              >
+                                <Check size={14} />
+                                {t('notifications.markRead')}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </article>
@@ -327,6 +364,22 @@ const Notifications: React.FC = () => {
         {activeTab === 'send' && canSend && (
           <section className="max-w-2xl">
             <form onSubmit={handleSend} className="bg-white border border-gray-200 rounded-lg p-5 space-y-4">
+              {replyingTo && (
+                <div className="flex items-start justify-between gap-3 p-3 bg-primary-50 border border-primary-200 rounded-md">
+                  <div>
+                    <p className="text-sm font-medium text-primary-900">{t('notifications.replyingTo')}</p>
+                    <p className="text-xs text-primary-700 mt-1">{notificationTitle(replyingTo, t('notifications.commentReplyFallback'))}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyingTo(null)}
+                    className="text-xs font-medium text-primary-700 hover:text-primary-900"
+                  >
+                    {t('buttons.cancel')}
+                  </button>
+                </div>
+              )}
+
               {canSendAll && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipientMode')}</label>
