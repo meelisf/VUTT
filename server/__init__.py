@@ -53,7 +53,7 @@ from .meilisearch_ops import (
 # Inimeste/autorite andmed
 from .people_ops import (
     load_people_data, save_people_data, process_creators_metadata, update_person_async,
-    refresh_all_people, refresh_all_people_safe, people_refresh_loop, get_refresh_status
+    refresh_all_people, refresh_all_people_safe, get_refresh_status
 )
 
 # Abifunktsioonid
