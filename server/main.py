@@ -703,8 +703,8 @@ def _create_notification(
     title: str,
     body: str = "",
     link: str = "",
-    actor: dict | None = None,
-    metadata: dict | None = None,
+    actor=None,
+    metadata=None,
 ):
     now = datetime.now().isoformat()
     notification = {
