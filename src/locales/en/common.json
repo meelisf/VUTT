@@ -83,7 +83,7 @@
   },
   "notifications": {
     "title": "Notifications",
-    "inbox": "Inbox",
+    "inbox": "Messages",
     "sendTab": "Send",
     "receivedBadge": "Received",
     "sentBadge": "Sent",

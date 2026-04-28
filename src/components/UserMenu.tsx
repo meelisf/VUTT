@@ -36,10 +36,11 @@ const UserMenu: React.FC = () => {
 
   if (!user) return null;
 
-  const unreadCount = notifications.filter(n => !n.read_at).length;
+  const isSentNotification = (notification: UserNotification) => notification.type === 'sent_notification';
+  const unreadCount = notifications.filter(n => !isSentNotification(n) && !n.read_at).length;
 
   const openNotification = async (notification: UserNotification) => {
-    if (authToken && !notification.read_at) {
+    if (authToken && !isSentNotification(notification) && !notification.read_at) {
       await markNotificationRead(authToken, notification.id).catch(() => {});
       setNotifications(items => items.map(item => (
         item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
@@ -98,8 +99,8 @@ const UserMenu: React.FC = () => {
                         className="w-full text-left px-1 py-2 rounded hover:bg-gray-100"
                       >
                         <div className="flex items-start gap-2">
-                          {!notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
-                          <div className={!notification.read_at ? '' : 'ml-4'}>
+                          {!isSentNotification(notification) && !notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
+                          <div className={!isSentNotification(notification) && !notification.read_at ? '' : 'ml-4'}>
                             <p className="text-xs text-gray-800">
                               {notification.title || t('common:notifications.commentReply', { name: notification.actor_name })}
                             </p>

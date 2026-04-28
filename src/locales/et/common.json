@@ -83,7 +83,7 @@
   },
   "notifications": {
     "title": "Teavitused",
-    "inbox": "Saabunud",
+    "inbox": "Sõnumid",
     "sendTab": "Saada",
     "receivedBadge": "Saabunud",
     "sentBadge": "Saadetud",
