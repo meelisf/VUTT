@@ -77,12 +77,31 @@
   },
   "nav": {
     "review": "Muudatused",
+    "notifications": "Teavitused",
     "admin": "Admin",
     "settings": "Seaded"
   },
   "notifications": {
     "title": "Teavitused",
-    "commentReply": "{{name}} vastas sinu kommentaarile"
+    "inbox": "Saabunud",
+    "sendTab": "Saada",
+    "recipientMode": "Saajad",
+    "singleRecipient": "Üks kasutaja",
+    "allRecipients": "Kõik kasutajad",
+    "recipient": "Saaja",
+    "messageTitle": "Pealkiri",
+    "body": "Sõnum",
+    "link": "Link",
+    "sendAction": "Saada teavitus",
+    "sent": "Teavitus saadetud ({{count}})",
+    "empty": "Teavitusi ei ole.",
+    "markRead": "Märgi loetuks",
+    "viewAll": "Kõik teavitused",
+    "loadError": "Teavituste laadimine ebaõnnestus.",
+    "sendError": "Teavituse saatmine ebaõnnestus.",
+    "recipientsLoadError": "Saajate laadimine ebaõnnestus.",
+    "commentReply": "{{name}} vastas sinu kommentaarile",
+    "commentReplyFallback": "vastas sinu kommentaarile"
   },
   "form": {
     "clearSearch": "Tühjenda otsing"

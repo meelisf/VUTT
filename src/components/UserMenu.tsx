@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, History, Shield, LogOut, ChevronDown } from 'lucide-react';
+import { Settings, History, Shield, LogOut, ChevronDown, Bell } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
 import { getNotifications, markNotificationRead } from '../services/notificationService';
@@ -46,7 +46,13 @@ const UserMenu: React.FC = () => {
       )));
     }
     setShowMenu(false);
-    navigate(`/work/${notification.work_id}/${notification.page_number}?comment=${notification.comment_id}`);
+    if (notification.link) {
+      navigate(notification.link);
+    } else if (notification.work_id && notification.page_number) {
+      navigate(`/work/${notification.work_id}/${notification.page_number}?comment=${notification.comment_id || ''}`);
+    } else {
+      navigate('/notifications');
+    }
   };
 
   return (
@@ -95,19 +101,35 @@ const UserMenu: React.FC = () => {
                           {!notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
                           <div className={!notification.read_at ? '' : 'ml-4'}>
                             <p className="text-xs text-gray-800">
-                              {t('common:notifications.commentReply', { name: notification.actor_name })}
+                              {notification.title || t('common:notifications.commentReply', { name: notification.actor_name })}
                             </p>
                             <p className="text-xs text-gray-500 truncate max-w-64">
-                              {notification.text_preview}
+                              {notification.body || notification.text_preview}
                             </p>
                           </div>
                         </div>
                       </button>
                     ))}
                   </div>
+                  <Link
+                    to="/notifications"
+                    onClick={() => setShowMenu(false)}
+                    className="mt-1 block text-xs font-medium text-primary-700 hover:text-primary-800"
+                  >
+                    {t('common:notifications.viewAll')}
+                  </Link>
                 </div>
               </>
             )}
+
+            <Link
+              to="/notifications"
+              onClick={() => setShowMenu(false)}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              <Bell size={16} />
+              {t('common:nav.notifications')}
+            </Link>
 
             <Link
               to="/settings"

@@ -162,15 +162,19 @@ export interface AnnotationReply {
 
 export interface UserNotification {
   id: string;
-  type: 'comment_reply';
+  type: 'comment_reply' | 'review_request' | 'system' | string;
   recipient_username: string;
-  actor_username: string;
-  actor_name: string;
-  work_id: string;
-  page_number: number;
-  comment_id: string;
-  reply_id: string;
-  text_preview: string;
+  actor_username?: string;
+  actor_name?: string;
+  title?: string;
+  body?: string;
+  link?: string;
+  metadata?: Record<string, unknown>;
+  work_id?: string;
+  page_number?: number;
+  comment_id?: string;
+  reply_id?: string;
+  text_preview?: string;
   created_at: string;
   read_at?: string | null;
 }

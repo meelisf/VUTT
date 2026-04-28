@@ -697,6 +697,33 @@ def _append_notification(username: str, notification: dict):
         _save_notifications(username, notifications[:200])
 
 
+def _create_notification(
+    recipient_username: str,
+    notification_type: str,
+    title: str,
+    body: str = "",
+    link: str = "",
+    actor: dict | None = None,
+    metadata: dict | None = None,
+):
+    now = datetime.now().isoformat()
+    notification = {
+        "id": uuid.uuid4().hex,
+        "type": notification_type,
+        "recipient_username": recipient_username,
+        "title": title,
+        "body": body,
+        "link": link,
+        "actor_username": actor.get("username") if actor else "",
+        "actor_name": (actor.get("name") or actor.get("username")) if actor else "",
+        "metadata": metadata or {},
+        "created_at": now,
+        "read_at": None,
+    }
+    _append_notification(recipient_username, notification)
+    return notification
+
+
 def _find_username_by_display_name(display_name):
     if not display_name:
         return None
@@ -770,21 +797,21 @@ async def reply_to_page_comment(request: Request, background_tasks: BackgroundTa
 
     recipient = target_comment.get('author_username') or _find_username_by_display_name(target_comment.get('author'))
     if recipient and recipient != user['username']:
-        notification = {
-            "id": uuid.uuid4().hex,
-            "type": "comment_reply",
-            "recipient_username": recipient,
-            "actor_username": user['username'],
-            "actor_name": user.get('name') or user['username'],
-            "work_id": work_id or meta_content.get('work_id', ''),
-            "page_number": page_number,
-            "comment_id": comment_id,
-            "reply_id": reply["id"],
-            "text_preview": reply_text[:180],
-            "created_at": now,
-            "read_at": None,
-        }
-        _append_notification(recipient, notification)
+        _create_notification(
+            recipient,
+            "comment_reply",
+            f"{user.get('name') or user['username']} vastas sinu kommentaarile",
+            reply_text[:180],
+            f"/work/{work_id or meta_content.get('work_id', '')}/{page_number}?comment={comment_id}",
+            actor=user,
+            metadata={
+                "work_id": work_id or meta_content.get('work_id', ''),
+                "page_number": page_number,
+                "comment_id": comment_id,
+                "reply_id": reply["id"],
+                "text_preview": reply_text[:180],
+            },
+        )
 
     return {
         "status": "success",
@@ -802,6 +829,71 @@ async def get_notifications(request: Request, user=Depends(get_user)):
     if unread_only:
         notifications = [n for n in notifications if not n.get('read_at')]
     return {"status": "success", "notifications": notifications}
+
+
+@app.get("/notification-recipients")
+async def get_notification_recipients(user=Depends(require_role("editor"))):
+    users = [
+        {
+            "username": account.get("username"),
+            "name": account.get("name") or account.get("username"),
+            "role": account.get("role", "contributor"),
+        }
+        for account in get_all_users()
+        if account.get("username")
+    ]
+    users.sort(key=lambda account: (account.get("name") or account.get("username") or "").lower())
+    return {"status": "success", "users": users}
+
+
+@app.post("/notifications/send")
+async def send_notification(request: Request, user=Depends(require_role("editor"))):
+    data = await get_json_data(request)
+    recipient_mode = str(data.get("recipient_mode") or "single")
+    recipient_username = str(data.get("recipient_username") or "").strip()
+    title = unicodedata.normalize("NFC", str(data.get("title") or "").strip())
+    body = unicodedata.normalize("NFC", str(data.get("body") or "").strip())
+    link = str(data.get("link") or "").strip()
+
+    if not title:
+        raise HTTPException(status_code=400, detail="Pealkiri on kohustuslik")
+    if len(title) > 160:
+        raise HTTPException(status_code=400, detail="Pealkiri on liiga pikk")
+    if len(body) > 2000:
+        raise HTTPException(status_code=400, detail="Sõnum on liiga pikk")
+    if link and not link.startswith("/"):
+        raise HTTPException(status_code=400, detail="Link peab olema rakenduse-sisene")
+
+    users_by_username = {
+        account.get("username"): account
+        for account in get_all_users()
+        if account.get("username")
+    }
+
+    if recipient_mode == "all":
+        if user.get("role") != "admin":
+            raise HTTPException(status_code=403, detail="Kõigile teavitamine on lubatud ainult administraatorile")
+        recipients = sorted(users_by_username.keys())
+        notification_type = "system"
+    else:
+        if not recipient_username or recipient_username not in users_by_username:
+            raise HTTPException(status_code=400, detail="Saajat ei leitud")
+        recipients = [recipient_username]
+        notification_type = "review_request"
+
+    created = [
+        _create_notification(
+            recipient,
+            notification_type,
+            title,
+            body,
+            link,
+            actor=user,
+            metadata={"sent_by_role": user.get("role", "")},
+        )
+        for recipient in recipients
+    ]
+    return {"status": "success", "created": len(created)}
 
 
 @app.post("/notifications/{notification_id}/read")

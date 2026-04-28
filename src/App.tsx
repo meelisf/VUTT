@@ -27,6 +27,7 @@ const SetPassword = lazyRetry(() => import('./pages/SetPassword'));
 const Admin = lazyRetry(() => import('./pages/Admin'));
 const Upload = lazyRetry(() => import('./pages/Upload'));
 const Review = lazyRetry(() => import('./pages/Review'));
+const Notifications = lazyRetry(() => import('./pages/Notifications'));
 const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
 const NotFound = lazyRetry(() => import('./pages/NotFound'));
 const Settings = lazyRetry(() => import('./pages/Settings'));
@@ -120,6 +121,11 @@ const router = createBrowserRouter([
   {
     path: "/review",
     element: <Lazy><Review /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/notifications",
+    element: <Lazy><Notifications /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {
