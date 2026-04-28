@@ -46,6 +46,25 @@ const notificationLink = (notification: UserNotification) => {
   return '';
 };
 
+const normalizeInternalLink = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return { link: '', error: '' };
+
+  if (trimmed.startsWith('/')) {
+    return { link: trimmed, error: '' };
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (url.origin === window.location.origin) {
+      return { link: `${url.pathname}${url.search}${url.hash}`, error: '' };
+    }
+    return { link: trimmed, error: 'external' };
+  } catch {
+    return { link: trimmed, error: 'relative' };
+  }
+};
+
 const Notifications: React.FC = () => {
   const { t } = useTranslation(['common']);
   const { user, authToken, isLoading } = useUser();
@@ -63,11 +82,22 @@ const Notifications: React.FC = () => {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [link, setLink] = useState('');
+  const [recipientFilter, setRecipientFilter] = useState('');
+  const [linkError, setLinkError] = useState('');
   const [sending, setSending] = useState(false);
 
   const canSend = user?.role === 'editor' || user?.role === 'admin';
   const canSendAll = user?.role === 'admin';
   const unreadCount = useMemo(() => notifications.filter(item => !item.read_at).length, [notifications]);
+  const filteredRecipients = useMemo(() => {
+    const query = recipientFilter.trim().toLowerCase();
+    if (!query) return recipients;
+    return recipients.filter(recipient => (
+      recipient.name.toLowerCase().includes(query)
+      || recipient.username.toLowerCase().includes(query)
+      || recipient.role.toLowerCase().includes(query)
+    ));
+  }, [recipients, recipientFilter]);
 
   useEffect(() => {
     if (!authToken || !user) return;
@@ -91,6 +121,14 @@ const Notifications: React.FC = () => {
       .catch(() => setSendError(t('notifications.recipientsLoadError')))
       .finally(() => setRecipientsLoading(false));
   }, [authToken, canSend, user?.username, t]);
+
+  useEffect(() => {
+    if (recipientMode !== 'single') return;
+    if (filteredRecipients.length === 0) return;
+    if (!filteredRecipients.some(recipient => recipient.username === recipientUsername)) {
+      setRecipientUsername(filteredRecipients[0].username);
+    }
+  }, [filteredRecipients, recipientMode, recipientUsername]);
 
   if (isLoading) {
     return (
@@ -127,6 +165,12 @@ const Notifications: React.FC = () => {
     setSending(true);
     setSendError(null);
     setSendSuccess(null);
+    const normalized = normalizeInternalLink(link);
+    if (normalized.error) {
+      setLinkError(t('notifications.internalLinkOnly'));
+      setSending(false);
+      return;
+    }
 
     try {
       const count = await sendNotification(authToken, {
@@ -134,17 +178,24 @@ const Notifications: React.FC = () => {
         recipient_username: recipientMode === 'single' ? recipientUsername : undefined,
         title: title.trim(),
         body: body.trim(),
-        link: link.trim() || undefined,
+        link: normalized.link || undefined,
       });
       setTitle('');
       setBody('');
       setLink('');
+      setLinkError('');
       setSendSuccess(t('notifications.sent', { count }));
     } catch (e) {
       setSendError(e instanceof Error ? e.message : t('notifications.sendError'));
     } finally {
       setSending(false);
     }
+  };
+
+  const handleLinkChange = (value: string) => {
+    const normalized = normalizeInternalLink(value);
+    setLink(normalized.link);
+    setLinkError(normalized.error ? t('notifications.internalLinkOnly') : '');
   };
 
   return (
@@ -272,8 +323,15 @@ const Notifications: React.FC = () => {
               )}
 
               {recipientMode === 'single' && (
-                <div>
+                <div className="space-y-2">
                   <label htmlFor="notification-recipient" className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipient')}</label>
+                  <input
+                    id="notification-recipient-filter"
+                    value={recipientFilter}
+                    onChange={(event) => setRecipientFilter(event.target.value)}
+                    placeholder={t('notifications.recipientFilter')}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
                   <select
                     id="notification-recipient"
                     value={recipientUsername}
@@ -281,12 +339,15 @@ const Notifications: React.FC = () => {
                     disabled={recipientsLoading}
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
                   >
-                    {recipients.map(recipient => (
+                    {filteredRecipients.map(recipient => (
                       <option key={recipient.username} value={recipient.username}>
                         {recipient.name} ({recipient.username}) · {t(`roles.${recipient.role}`)}
                       </option>
                     ))}
                   </select>
+                  {filteredRecipients.length === 0 && (
+                    <p className="text-xs text-gray-500">{t('notifications.noRecipients')}</p>
+                  )}
                 </div>
               )}
 
@@ -319,10 +380,18 @@ const Notifications: React.FC = () => {
                 <input
                   id="notification-link"
                   value={link}
-                  onChange={(event) => setLink(event.target.value)}
+                  onChange={(event) => handleLinkChange(event.target.value)}
                   placeholder="/work/..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                    linkError ? 'border-red-300' : 'border-gray-300'
+                  }`}
                 />
+                {link && !linkError && (
+                  <p className="mt-1 text-xs text-gray-500">{t('notifications.linkNormalized', { link })}</p>
+                )}
+                {linkError && (
+                  <p className="mt-1 text-xs text-red-600">{linkError}</p>
+                )}
               </div>
 
               {sendError && <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">{sendError}</div>}
@@ -330,7 +399,7 @@ const Notifications: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={sending || !title.trim() || (recipientMode === 'single' && !recipientUsername)}
+                disabled={sending || Boolean(linkError) || !title.trim() || (recipientMode === 'single' && !recipientUsername)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
