@@ -842,7 +842,10 @@ async def get_notification_recipients(user=Depends(require_role("editor"))):
         for account in get_all_users()
         if account.get("username")
     ]
-    users.sort(key=lambda account: (account.get("name") or account.get("username") or "").lower())
+    users.sort(key=lambda account: (
+        0 if account.get("username") == "meelis" else 1,
+        (account.get("name") or account.get("username") or "").lower(),
+    ))
     return {"status": "success", "users": users}
 
 

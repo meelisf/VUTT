@@ -62,6 +62,14 @@ const sentRecipientsLabel = (notification: UserNotification, allLabel: string) =
   return '';
 };
 
+const sortRecipients = (items: NotificationRecipient[]) => {
+  return [...items].sort((a, b) => {
+    if (a.username === 'meelis') return -1;
+    if (b.username === 'meelis') return 1;
+    return (a.name || a.username).localeCompare(b.name || b.username, 'et');
+  });
+};
+
 const normalizeInternalLink = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return { link: '', error: '' };
@@ -108,8 +116,9 @@ const Notifications: React.FC = () => {
   const unreadCount = useMemo(() => notifications.filter(item => !isSentNotification(item) && !item.read_at).length, [notifications]);
   const filteredRecipients = useMemo(() => {
     const query = recipientFilter.trim().toLowerCase();
-    if (!query) return recipients;
-    return recipients.filter(recipient => (
+    const source = sortRecipients(recipients);
+    if (!query) return source;
+    return source.filter(recipient => (
       recipient.name.toLowerCase().includes(query)
       || recipient.username.toLowerCase().includes(query)
       || recipient.role.toLowerCase().includes(query)
@@ -131,9 +140,10 @@ const Notifications: React.FC = () => {
     setRecipientsLoading(true);
     getNotificationRecipients(authToken)
       .then(items => {
-        setRecipients(items);
-        const firstOther = items.find(item => item.username !== user?.username) || items[0];
-        if (firstOther) setRecipientUsername(firstOther.username);
+        const sorted = sortRecipients(items);
+        setRecipients(sorted);
+        const defaultRecipient = sorted.find(item => item.username === 'meelis') || sorted[0];
+        if (defaultRecipient) setRecipientUsername(defaultRecipient.username);
       })
       .catch(() => setSendError(t('notifications.recipientsLoadError')))
       .finally(() => setRecipientsLoading(false));
