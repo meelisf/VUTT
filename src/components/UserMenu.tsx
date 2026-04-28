@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, History, Shield, LogOut, ChevronDown, Bell } from 'lucide-react';
+import { Settings, History, Shield, LogOut, ChevronDown } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
 import { getNotifications, markNotificationRead } from '../services/notificationService';
@@ -59,17 +59,14 @@ const UserMenu: React.FC = () => {
           <p className="text-sm font-medium text-gray-900">{user.name}</p>
           <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
         </div>
-        <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-xs">
+        <div className="relative h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-xs">
           {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-        </div>
-        <span className="relative">
-          <Bell size={16} className={unreadCount > 0 ? 'text-primary-700' : 'text-gray-400'} />
           {unreadCount > 0 && (
-            <span className="absolute -right-1.5 -top-1.5 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+            <span className="absolute -right-1.5 -top-1.5 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold border border-white">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
-        </span>
+        </div>
         <ChevronDown size={14} className={`text-gray-400 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
       </button>
 
