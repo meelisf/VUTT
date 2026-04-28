@@ -80,6 +80,10 @@
     "admin": "Admin",
     "settings": "Settings"
   },
+  "notifications": {
+    "title": "Notifications",
+    "commentReply": "{{name}} replied to your comment"
+  },
   "form": {
     "clearSearch": "Clear search"
   },

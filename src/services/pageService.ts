@@ -2,7 +2,7 @@
  * Lehekülje operatsioonid: lugemine, salvestamine, ootel muudatused
  */
 
-import { Page, PageStatus } from '../types';
+import { Annotation, Page, PageStatus } from '../types';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { index, checkMixedContent } from './meiliService';
@@ -165,4 +165,36 @@ export const savePage = async (
     console.error("Save Page Error:", error);
     throw error;
   }
+};
+
+export const replyToComment = async (
+  page: Page,
+  commentId: string,
+  text: string,
+  authToken?: string
+): Promise<Annotation[]> => {
+  const imageFilename = page.image_url.split('/').pop() || '';
+  const textFilename = imageFilename.replace(/\.[^/.]+$/, "") + ".txt";
+
+  const response = await fetchWithTimeout(`${FILE_API_URL}/page-comments/reply`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+    body: JSON.stringify({
+      original_path: page.original_path || page.originaal_kataloog,
+      file_name: textFilename,
+      work_id: page.work_id,
+      page_number: page.page_number,
+      comment_id: commentId,
+      text,
+    }),
+    timeout: 30000
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.message || `Reply failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.comments || [];
 };

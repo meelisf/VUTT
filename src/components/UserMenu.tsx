@@ -1,15 +1,53 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, History, Shield, LogOut, ChevronDown } from 'lucide-react';
+import { Settings, History, Shield, LogOut, ChevronDown, Bell } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
+import { UserNotification } from '../types';
+import { getNotifications, markNotificationRead } from '../services/notificationService';
 
 const UserMenu: React.FC = () => {
   const { t } = useTranslation(['common', 'auth']);
-  const { user, logout } = useUser();
+  const { user, authToken, logout } = useUser();
+  const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
+  const [notifications, setNotifications] = useState<UserNotification[]>([]);
+
+  useEffect(() => {
+    if (!user || !authToken) return;
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const items = await getNotifications(authToken);
+        if (!cancelled) setNotifications(items);
+      } catch {
+        if (!cancelled) setNotifications([]);
+      }
+    };
+
+    load();
+    const id = window.setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [user, authToken]);
 
   if (!user) return null;
+
+  const unreadCount = notifications.filter(n => !n.read_at).length;
+
+  const openNotification = async (notification: UserNotification) => {
+    if (authToken && !notification.read_at) {
+      await markNotificationRead(authToken, notification.id).catch(() => {});
+      setNotifications(items => items.map(item => (
+        item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
+      )));
+    }
+    setShowMenu(false);
+    navigate(`/work/${notification.work_id}/${notification.page_number}?comment=${notification.comment_id}`);
+  };
 
   return (
     <div className="relative">
@@ -24,6 +62,14 @@ const UserMenu: React.FC = () => {
         <div className="h-8 w-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-bold border-2 border-primary-200 text-xs">
           {user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
         </div>
+        <span className="relative">
+          <Bell size={16} className={unreadCount > 0 ? 'text-primary-700' : 'text-gray-400'} />
+          {unreadCount > 0 && (
+            <span className="absolute -right-1.5 -top-1.5 min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </span>
         <ChevronDown size={14} className={`text-gray-400 transition-transform ${showMenu ? 'rotate-180' : ''}`} />
       </button>
 
@@ -36,6 +82,35 @@ const UserMenu: React.FC = () => {
               <p className="font-medium text-gray-900 text-sm">{user.name}</p>
               <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
             </div>
+
+            {notifications.length > 0 && (
+              <>
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <p className="text-xs font-semibold uppercase text-gray-500 mb-1">{t('common:notifications.title')}</p>
+                  <div className="max-h-56 overflow-y-auto -mx-1">
+                    {notifications.slice(0, 5).map(notification => (
+                      <button
+                        key={notification.id}
+                        onClick={() => openNotification(notification)}
+                        className="w-full text-left px-1 py-2 rounded hover:bg-gray-100"
+                      >
+                        <div className="flex items-start gap-2">
+                          {!notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
+                          <div className={!notification.read_at ? '' : 'ml-4'}>
+                            <p className="text-xs text-gray-800">
+                              {t('common:notifications.commentReply', { name: notification.actor_name })}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate max-w-64">
+                              {notification.text_preview}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
 
             <Link
               to="/settings"

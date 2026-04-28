@@ -14,6 +14,7 @@ import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
+import { replyToComment } from '../services/pageService';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
@@ -115,9 +116,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     // page_tags: string[] shallow compare
     if (page_tags.length !== savedState.page_tags.length) return true;
     if (page_tags.some((t, i) => t !== savedState.page_tags[i])) return true;
-    // comments: Annotation[] shallow compare (id + text)
+    // comments: Annotation[] shallow compare (id + text + replies)
     if (comments.length !== savedState.comments.length) return true;
-    if (comments.some((c, i) => c.id !== savedState.comments[i]?.id || c.text !== savedState.comments[i]?.text)) return true;
+    if (comments.some((c, i) => {
+      const saved = savedState.comments[i];
+      return c.id !== saved?.id || c.text !== saved?.text || JSON.stringify(c.replies || []) !== JSON.stringify(saved.replies || []);
+    })) return true;
     return false;
   }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments]);
 
@@ -312,6 +316,15 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setIsSaving(false);
     }
   }, [page, status, page_tags, onSave]);
+
+  const handleReplyToComment = useCallback(async (commentId: string, replyText: string) => {
+    if (!authToken) {
+      throw new Error(t('saveError.tokenMissing'));
+    }
+    const updatedComments = await replyToComment(page, commentId, replyText, authToken);
+    setComments(updatedComments);
+    setSavedState({ status, comments: updatedComments, page_tags });
+  }, [authToken, page, status, page_tags, t]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
@@ -933,6 +946,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             comments={comments}
             setComments={setComments}
             onSaveAnnotations={handleSaveAnnotations}
+            onReplyToComment={handleReplyToComment}
             readOnly={readOnly || false}
             user={user}
             authToken={authToken}
@@ -953,13 +967,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             authToken={authToken}
             handleReOcr={handleReOcr}
             reocrStatus={reocrStatus}
-            onRestore={(content) => {
+            onRestore={(content, restoredTextAnnotations) => {
               const view = viewRef.current;
               if (view) {
                 view.dispatch({
                   changes: { from: 0, to: view.state.doc.length, insert: content },
                 });
                 setIsDirty(true);
+              }
+              if (Array.isArray(restoredTextAnnotations)) {
+                setTextAnnotations(restoredTextAnnotations);
               }
               setActiveTab('edit');
             }}

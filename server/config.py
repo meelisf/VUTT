@@ -98,6 +98,7 @@ ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 
 # Kasutaja runtime seaded — state/user_settings/ kaustas (ei ole gitis)
 USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")
+NOTIFICATIONS_DIR = os.path.join(_STATE_DIR, "notifications")
 
 # Prosopograafia isikukaardid
 PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")

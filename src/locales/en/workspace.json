@@ -201,6 +201,9 @@
     "deleteCommentConfirm": "Are you sure you want to delete this note?",
     "deleteComment": "Delete note",
     "editComment": "Edit note",
+    "replyToComment": "Reply",
+    "replyPlaceholder": "Write a reply...",
+    "sendReply": "Send reply",
     "saveEdit": "Save",
     "cancelEdit": "Cancel"
   },

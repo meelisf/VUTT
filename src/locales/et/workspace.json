@@ -201,6 +201,9 @@
     "deleteCommentConfirm": "Kas oled kindel, et soovid selle märkme kustutada?",
     "deleteComment": "Kustuta märge",
     "editComment": "Muuda märget",
+    "replyToComment": "Vasta",
+    "replyPlaceholder": "Kirjuta vastus...",
+    "sendReply": "Saada vastus",
     "saveEdit": "Salvesta",
     "cancelEdit": "Tühista"
   },

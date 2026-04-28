@@ -3,6 +3,8 @@ import json
 import shutil
 import threading
 import unicodedata
+import uuid
+import re
 from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Depends, status, BackgroundTasks, UploadFile
@@ -10,7 +12,7 @@ from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, get_logger
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
 
 logger = get_logger(__name__)
@@ -658,6 +660,162 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         background_tasks.add_task(update_page_person_mentions, work_id, work_dir)
     return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
 
+
+_notifications_lock = threading.RLock()
+
+
+def _safe_username(username: str) -> str:
+    """Piira teavituste failinimi lihtsa kasutajanime kujule."""
+    return os.path.basename(username or "").strip()
+
+
+def _get_notifications_path(username: str) -> str:
+    safe = _safe_username(username)
+    if not safe:
+        raise HTTPException(status_code=400, detail="Vigane kasutajanimi")
+    return os.path.join(NOTIFICATIONS_DIR, f"{safe}.json")
+
+
+def _load_notifications(username: str) -> list:
+    path = _get_notifications_path(username)
+    if not os.path.exists(path):
+        return []
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    return data if isinstance(data, list) else []
+
+
+def _save_notifications(username: str, notifications: list):
+    os.makedirs(NOTIFICATIONS_DIR, exist_ok=True)
+    atomic_write_json(_get_notifications_path(username), notifications)
+
+
+def _append_notification(username: str, notification: dict):
+    with _notifications_lock:
+        notifications = _load_notifications(username)
+        notifications.insert(0, notification)
+        _save_notifications(username, notifications[:200])
+
+
+def _find_username_by_display_name(display_name: str | None) -> str | None:
+    if not display_name:
+        return None
+    for account in get_all_users():
+        if account.get("username") == display_name or account.get("name") == display_name:
+            return account.get("username")
+    return None
+
+
+@app.post("/page-comments/reply")
+async def reply_to_page_comment(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+    """Lisab lehekülje kommentaarile vastuse ja loob kommentaari autorile teavituse."""
+    data = await get_json_data(request)
+    catalog = os.path.basename(data.get('original_path', ''))
+    filename = os.path.basename(data.get('file_name', ''))
+    comment_id = str(data.get('comment_id', '')).strip()
+    reply_text = unicodedata.normalize('NFC', str(data.get('text', '')).strip())
+    work_id = str(data.get('work_id', '')).strip()
+    page_number = int(data.get('page_number') or 0)
+
+    if not catalog or not filename or not comment_id or not reply_text:
+        raise HTTPException(status_code=400, detail="Puudulikud vastuse andmed")
+
+    txt_path = os.path.join(BASE_DIR, catalog, filename)
+    json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
+    if not os.path.exists(txt_path) or not os.path.exists(json_path):
+        raise HTTPException(status_code=404, detail="Lehekülje fail puudub")
+
+    with open(json_path, 'r', encoding='utf-8') as f:
+        meta_content = json.load(f)
+
+    comments = meta_content.get('comments')
+    if not isinstance(comments, list):
+        comments = []
+        meta_content['comments'] = comments
+
+    target_comment = None
+    for comment in comments:
+        if isinstance(comment, dict) and str(comment.get('id')) == comment_id:
+            target_comment = comment
+            break
+    if target_comment is None:
+        raise HTTPException(status_code=404, detail="Kommentaari ei leitud")
+
+    now = datetime.now().isoformat()
+    reply = {
+        "id": uuid.uuid4().hex,
+        "text": reply_text,
+        "author": user.get('name') or user['username'],
+        "author_username": user['username'],
+        "created_at": now,
+    }
+    replies = target_comment.get('replies')
+    if not isinstance(replies, list):
+        replies = []
+        target_comment['replies'] = replies
+    replies.append(reply)
+    meta_content['updated_at'] = now
+
+    with open(txt_path, 'r', encoding='utf-8') as f:
+        text_content = f.read()
+
+    git_result = save_with_git(
+        txt_path,
+        text_content,
+        user['username'],
+        message=f"Vasta kommentaarile: {os.path.relpath(json_path, BASE_DIR)}",
+        additional_files=[(json_path, json.dumps(meta_content, indent=2, ensure_ascii=False))]
+    )
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+
+    recipient = target_comment.get('author_username') or _find_username_by_display_name(target_comment.get('author'))
+    if recipient and recipient != user['username']:
+        notification = {
+            "id": uuid.uuid4().hex,
+            "type": "comment_reply",
+            "recipient_username": recipient,
+            "actor_username": user['username'],
+            "actor_name": user.get('name') or user['username'],
+            "work_id": work_id or meta_content.get('work_id', ''),
+            "page_number": page_number,
+            "comment_id": comment_id,
+            "reply_id": reply["id"],
+            "text_preview": reply_text[:180],
+            "created_at": now,
+            "read_at": None,
+        }
+        _append_notification(recipient, notification)
+
+    return {
+        "status": "success",
+        "comments": comments,
+        "reply": reply,
+        "commit_hash": git_result.get("commit_hash", "")[:8],
+    }
+
+
+@app.get("/notifications")
+async def get_notifications(request: Request, user=Depends(get_user)):
+    unread_only = request.query_params.get('unread') == 'true'
+    with _notifications_lock:
+        notifications = _load_notifications(user['username'])
+    if unread_only:
+        notifications = [n for n in notifications if not n.get('read_at')]
+    return {"status": "success", "notifications": notifications}
+
+
+@app.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user=Depends(get_user)):
+    with _notifications_lock:
+        notifications = _load_notifications(user['username'])
+        now = datetime.now().isoformat()
+        for notification in notifications:
+            if notification.get('id') == notification_id:
+                notification['read_at'] = notification.get('read_at') or now
+                break
+        _save_notifications(user['username'], notifications)
+    return {"status": "success"}
+
 @app.post("/update-work-metadata")
 async def update_work_metadata(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
@@ -725,9 +883,42 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
     path = os.path.join(BASE_DIR, catalog, filename)
     content = get_file_at_commit(os.path.join(catalog, filename), data.get('commit_hash'))
     if content is None: raise HTTPException(status_code=400, detail="Ei leitud")
-    save_with_git(path, content, user['username'], message=f"Restore: {data.get('commit_hash')[:8]}")
+
+    additional = None
+    restored_text_annotations = None
+    json_filename = os.path.splitext(filename)[0] + ".json"
+    json_path = os.path.join(BASE_DIR, catalog, json_filename)
+    restored_json = get_file_at_commit(os.path.join(catalog, json_filename), data.get('commit_hash'))
+    if os.path.exists(json_path):
+        with open(json_path, 'r', encoding='utf-8') as f:
+            current_meta = json.load(f)
+        if restored_json is not None:
+            try:
+                restored_meta = json.loads(restored_json)
+                restored_text_annotations = restored_meta.get('text_annotations', [])
+            except json.JSONDecodeError:
+                restored_text_annotations = None
+        elif not re.search(r"<ann\d+>", content):
+            restored_text_annotations = []
+
+        if restored_text_annotations is not None:
+            current_meta['text_annotations'] = restored_text_annotations
+            current_meta['updated_at'] = datetime.now().isoformat()
+            additional = [(json_path, json.dumps(current_meta, indent=2, ensure_ascii=False))]
+
+    save_with_git(
+        path,
+        content,
+        user['username'],
+        message=f"Restore: {data.get('commit_hash')[:8]}",
+        additional_files=additional,
+    )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
-    return {"status": "success", "restored_content": content}
+    return {
+        "status": "success",
+        "restored_content": content,
+        "restored_text_annotations": restored_text_annotations,
+    }
 
 @app.post("/works/bulk-collection")
 async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):

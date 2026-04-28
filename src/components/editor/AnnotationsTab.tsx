@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders } from 'lucide-react';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -25,6 +25,7 @@ interface AnnotationsTabProps {
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
   onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
+  onReplyToComment?: (commentId: string, replyText: string) => Promise<void>;
   readOnly: boolean;
   user: any;
   authToken: string | null;
@@ -44,6 +45,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   comments,
   setComments,
   onSaveAnnotations,
+  onReplyToComment,
   readOnly,
   user,
   authToken,
@@ -56,6 +58,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 }) => {
   const { t } = useTranslation(['workspace', 'common', 'dashboard']);
   const navigate = useNavigate();
+  const location = useLocation();
   const { collections } = useCollection();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState<number | null>(null);
@@ -63,6 +66,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
+  const [replyingToCommentId, setReplyingToCommentId] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [replyError, setReplyError] = useState<string | null>(null);
+  const [savingReplyId, setSavingReplyId] = useState<string | null>(null);
+  const highlightedCommentId = new URLSearchParams(location.search).get('comment');
 
   const isAdmin = user?.role === 'admin';
   
@@ -100,6 +108,12 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     };
     fetchTags();
   }, [authToken, lang]);
+
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+    const el = document.getElementById(`comment-${highlightedCommentId}`);
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [highlightedCommentId, comments]);
 
   // Lae kõik olemasolevad märksõnad Meilisearchist
   useEffect(() => {
@@ -147,16 +161,19 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     setPageTags(page_tags.filter(t => getLabel(t, lang).toLowerCase() !== tagToRemove.toLowerCase()));
   };
 
-  const addComment = () => {
+  const addComment = async () => {
     if (!newComment.trim()) return;
     const comment: Annotation = {
       id: Date.now().toString(),
       text: newComment,
       author: user?.name || 'Anonüümne',
+      author_username: user?.username,
       created_at: new Date().toISOString()
     };
-    setComments([...comments, comment]);
+    const updated = [...comments, comment];
+    setComments(updated);
     setNewComment('');
+    if (onSaveAnnotations) await onSaveAnnotations(updated);
   };
 
   const removeComment = (commentId: string) => {
@@ -176,6 +193,21 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     setEditingCommentId(null);
     setEditingText('');
     if (onSaveAnnotations) await onSaveAnnotations(updated);
+  };
+
+  const saveReply = async (commentId: string) => {
+    if (!replyText.trim() || !onReplyToComment) return;
+    setReplyError(null);
+    setSavingReplyId(commentId);
+    try {
+      await onReplyToComment(commentId, replyText.trim());
+      setReplyText('');
+      setReplyingToCommentId(null);
+    } catch (e: any) {
+      setReplyError(e.message || t('common:errors.unknownError'));
+    } finally {
+      setSavingReplyId(null);
+    }
   };
 
   return (
@@ -789,7 +821,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             </div>
           )}
           {comments.map(comment => (
-            <div key={comment.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 relative group">
+            <div
+              id={`comment-${comment.id}`}
+              key={comment.id}
+              className={`bg-gray-50 p-3 rounded-lg border relative group ${
+                highlightedCommentId === comment.id ? 'border-primary-300 ring-2 ring-primary-100' : 'border-gray-100'
+              }`}
+            >
               {editingCommentId === comment.id ? (
                 <div className="space-y-2">
                   <textarea
@@ -827,8 +865,71 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     <span className="font-semibold text-primary-700">{comment.author}</span>
                     <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
                   </div>
+                  {(comment.replies || []).length > 0 && (
+                    <div className="mt-3 space-y-2 border-l-2 border-primary-100 pl-3">
+                      {(comment.replies || []).map(reply => (
+                        <div key={reply.id} className="bg-white border border-gray-100 rounded-md px-3 py-2">
+                          <p className="text-gray-800 text-sm mb-1 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
+                          <div className="flex justify-between items-center text-xs text-gray-500">
+                            <span className="font-semibold text-primary-700">{reply.author}</span>
+                            <span>{new Date(reply.created_at).toLocaleString('et-EE')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {replyingToCommentId === comment.id && (
+                    <div className="mt-3 space-y-2">
+                      <textarea
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder={t('info.replyPlaceholder')}
+                        className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
+                        rows={3}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setReplyingToCommentId(null);
+                            setReplyText('');
+                            setReplyError(null);
+                          }
+                        }}
+                      />
+                      {replyError && <p className="text-xs text-red-600">{replyError}</p>}
+                      <div className="flex gap-2 justify-end">
+                        <button
+                          onClick={() => { setReplyingToCommentId(null); setReplyText(''); setReplyError(null); }}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+                        >
+                          <X size={12} />
+                          {t('info.cancelEdit')}
+                        </button>
+                        <button
+                          onClick={() => saveReply(comment.id)}
+                          disabled={!replyText.trim() || savingReplyId === comment.id}
+                          className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+                        >
+                          <Send size={12} />
+                          {t('info.sendReply')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {!readOnly && (
                     <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {onReplyToComment && (
+                        <button
+                          onClick={() => {
+                            setReplyingToCommentId(comment.id);
+                            setReplyText('');
+                            setReplyError(null);
+                          }}
+                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                          title={t('info.replyToComment')}
+                        >
+                          <Reply size={14} />
+                        </button>
+                      )}
                       {isAdmin && (
                         <button
                           onClick={() => startEditComment(comment)}

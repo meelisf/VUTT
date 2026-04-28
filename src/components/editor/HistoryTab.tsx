@@ -18,6 +18,7 @@ import {
   Check
 } from 'lucide-react';
 import { Page, Work } from '../../types';
+import type { TextAnnotation } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 // FILE_API_URL kasutatakse git-history ja git-restore päringutes
@@ -46,7 +47,7 @@ interface HistoryTabProps {
   work?: Work;
   user: any;
   authToken: string | null;
-  onRestore: (content: string) => void;
+  onRestore: (content: string, textAnnotations?: TextAnnotation[] | null) => void;
   readOnly: boolean;
   handleReOcr?: () => void;
   reocrStatus?: string;
@@ -326,7 +327,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
 
       const data = await response.json();
       if (data.status === 'success' && data.restored_content !== undefined) {
-        onRestore(data.restored_content);
+        onRestore(data.restored_content, data.restored_text_annotations);
         alert(`${t('history.restoreSuccess', { date: entry.formatted_date, author: entry.author })}\n\n${t('history.saveReminder')}`);
         loadGitHistory();
       } else {

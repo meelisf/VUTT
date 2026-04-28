@@ -147,7 +147,32 @@ export interface Annotation {
   id: string;
   text: string;
   author: string;
+  author_username?: string;
   created_at: string;
+  replies?: AnnotationReply[];
+}
+
+export interface AnnotationReply {
+  id: string;
+  text: string;
+  author: string;
+  author_username: string;
+  created_at: string;
+}
+
+export interface UserNotification {
+  id: string;
+  type: 'comment_reply';
+  recipient_username: string;
+  actor_username: string;
+  actor_name: string;
+  work_id: string;
+  page_number: number;
+  comment_id: string;
+  reply_id: string;
+  text_preview: string;
+  created_at: string;
+  read_at?: string | null;
 }
 
 // Tekst-annotatsioon (highlight + kommentaar)

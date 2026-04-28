@@ -80,6 +80,10 @@
     "admin": "Admin",
     "settings": "Seaded"
   },
+  "notifications": {
+    "title": "Teavitused",
+    "commentReply": "{{name}} vastas sinu kommentaarile"
+  },
   "form": {
     "clearSearch": "Tühjenda otsing"
   },
