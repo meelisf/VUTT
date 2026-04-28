@@ -462,7 +462,7 @@ async def places_meta():
 
 
 @router.post("/admin/places/refresh-labels")
-async def places_refresh_labels(user=Depends(_require_role("admin"))):
+def places_refresh_labels(user=Depends(_require_role("admin"))):
     """Värskendab kõik places.json kohade labelid Wikidatast (admin)."""
     count = refresh_all_place_labels()
     return {"updated": count}
