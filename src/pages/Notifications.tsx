@@ -46,6 +46,22 @@ const notificationLink = (notification: UserNotification) => {
   return '';
 };
 
+const isSentNotification = (notification: UserNotification) => notification.type === 'sent_notification';
+
+const sentRecipientsLabel = (notification: UserNotification, allLabel: string) => {
+  const metadata = notification.metadata || {};
+  const mode = metadata.recipient_mode;
+  const names = metadata.recipient_names;
+  const count = metadata.delivered_count;
+  if (mode === 'all') {
+    return typeof count === 'number' ? `${allLabel} (${count})` : allLabel;
+  }
+  if (Array.isArray(names) && names.length > 0) {
+    return names.filter(item => typeof item === 'string').join(', ');
+  }
+  return '';
+};
+
 const normalizeInternalLink = (value: string) => {
   const trimmed = value.trim();
   if (!trimmed) return { link: '', error: '' };
@@ -88,7 +104,7 @@ const Notifications: React.FC = () => {
 
   const canSend = user?.role === 'editor' || user?.role === 'admin';
   const canSendAll = user?.role === 'admin';
-  const unreadCount = useMemo(() => notifications.filter(item => !item.read_at).length, [notifications]);
+  const unreadCount = useMemo(() => notifications.filter(item => !isSentNotification(item) && !item.read_at).length, [notifications]);
   const filteredRecipients = useMemo(() => {
     const query = recipientFilter.trim().toLowerCase();
     if (!query) return recipients;
@@ -141,7 +157,7 @@ const Notifications: React.FC = () => {
   if (!user) return <Navigate to="/" replace />;
 
   const openNotification = async (notification: UserNotification) => {
-    if (authToken && !notification.read_at) {
+    if (authToken && !isSentNotification(notification) && !notification.read_at) {
       await markNotificationRead(authToken, notification.id).catch(() => {});
       setNotifications(items => items.map(item => (
         item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
@@ -256,7 +272,9 @@ const Notifications: React.FC = () => {
                     <article
                       key={notification.id}
                       className={`bg-white border rounded-lg p-4 ${
-                        notification.read_at ? 'border-gray-200' : 'border-primary-200 bg-primary-50'
+                        isSentNotification(notification)
+                          ? 'border-gray-200'
+                          : notification.read_at ? 'border-gray-200' : 'border-primary-200 bg-primary-50'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
@@ -265,7 +283,14 @@ const Notifications: React.FC = () => {
                           className="min-w-0 flex-1 text-left"
                         >
                           <div className="flex items-center gap-2 mb-1">
-                            {!notification.read_at && <span className="h-2 w-2 rounded-full bg-red-600 shrink-0" />}
+                            {!isSentNotification(notification) && !notification.read_at && <span className="h-2 w-2 rounded-full bg-red-600 shrink-0" />}
+                            <span className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                              isSentNotification(notification)
+                                ? 'bg-gray-100 text-gray-600'
+                                : 'bg-primary-100 text-primary-700'
+                            }`}>
+                              {isSentNotification(notification) ? t('notifications.sentBadge') : t('notifications.receivedBadge')}
+                            </span>
                             <h2 className="text-sm font-semibold text-gray-900">
                               {notificationTitle(notification, t('notifications.commentReplyFallback'))}
                             </h2>
@@ -275,11 +300,13 @@ const Notifications: React.FC = () => {
                           )}
                           <p className="text-xs text-gray-500 mt-2">
                             {formatDate(notification.created_at)}
-                            {notification.actor_name ? ` · ${notification.actor_name}` : ''}
+                            {isSentNotification(notification)
+                              ? ` · ${t('notifications.to')} ${sentRecipientsLabel(notification, t('notifications.allRecipients'))}`
+                              : notification.actor_name ? ` · ${notification.actor_name}` : ''}
                             {target ? ` · ${target}` : ''}
                           </p>
                         </button>
-                        {!notification.read_at && (
+                        {!isSentNotification(notification) && !notification.read_at && (
                           <button
                             onClick={() => markRead(notification)}
                             className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-white"

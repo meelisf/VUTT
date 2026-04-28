@@ -893,6 +893,27 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
         )
         for recipient in recipients
     ]
+    recipient_names = [
+        users_by_username[recipient].get("name") or recipient
+        for recipient in recipients
+        if recipient in users_by_username
+    ]
+    if user.get("username"):
+        _create_notification(
+            user["username"],
+            "sent_notification",
+            title,
+            body,
+            link,
+            actor=user,
+            metadata={
+                "sent_by_role": user.get("role", ""),
+                "recipient_mode": recipient_mode,
+                "recipient_usernames": recipients,
+                "recipient_names": recipient_names,
+                "delivered_count": len(created),
+            },
+        )
     return {"status": "success", "created": len(created)}
 
 
