@@ -30,7 +30,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change
+from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels
 
 logger = get_logger(__name__)
 
@@ -459,6 +459,13 @@ async def places_list():
 async def places_meta():
     """Tagastab origin_groups.json sisu + lubatud type väärtused. Avalik."""
     return get_places_meta()
+
+
+@router.post("/admin/places/refresh-labels")
+async def places_refresh_labels(user=Depends(_require_role("admin"))):
+    """Värskendab kõik places.json kohade labelid Wikidatast (admin)."""
+    count = refresh_all_place_labels()
+    return {"updated": count}
 
 
 @router.put("/admin/places/{key}")

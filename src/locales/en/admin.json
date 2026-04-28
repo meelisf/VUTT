@@ -114,6 +114,17 @@
     "settings": "Settings",
     "workflow": "Workflow"
   },
+  "maintenance": {
+    "title": "Maintenance",
+    "refreshPlaceLabels": "Refresh place labels from Wikidata",
+    "refreshPlaceLabelsDesc": "Updates names for all places in places.json directly from Wikidata.",
+    "refreshPlaceLabelsDone": "Updated {{count}} place labels",
+    "refreshEntityLabels": "Refresh entity labels from Wikidata",
+    "refreshEntityLabelsDesc": "Updates genre, type and tag names in labels.json.",
+    "refreshEntityLabelsDone": "Updated {{count}} entries",
+    "refreshing": "Fetching from Wikidata…",
+    "refreshError": "Refresh failed"
+  },
   "trash": {
     "tab": "Trash",
     "title": "Deleted works",

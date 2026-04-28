@@ -18,7 +18,7 @@ from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, gen
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch
 from .metadata_handler import build_meta_html
-from .people_ops import people_refresh_loop, process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
+from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user
@@ -65,7 +65,6 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=rebuild_indices, daemon=True).start()
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
-    threading.Thread(target=people_refresh_loop, daemon=True).start()
     yield
     print("VUTT FastAPI sulgemine.")
 

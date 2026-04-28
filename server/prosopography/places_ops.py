@@ -466,3 +466,21 @@ LIMIT 20
             parents.append({"q": pq, "label_en": label_en, "label_sv": label_sv or label_en})
 
     return {"labels": labels, "type": place_type, "coordinates": coordinates, "parents": parents}
+
+
+def refresh_all_place_labels() -> int:
+    """Värskendab kõik places.json kirjed Wikidatast mis omavad Q-koodi."""
+    places = _load_places_cache(force_reload=True)
+    updated = 0
+    for key, entry in list(places.items()):
+        qid = entry.get("id")
+        if not qid or not isinstance(qid, str) or not qid.startswith("Q"):
+            continue
+        result = fetch_place_wikidata(qid)
+        if result and result.get("labels"):
+            places[key] = {**entry, "labels": result["labels"]}
+            updated += 1
+    if updated:
+        atomic_write_json(PLACES_FILE, places)
+        _load_places_cache(force_reload=True)
+    return updated

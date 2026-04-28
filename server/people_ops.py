@@ -314,17 +314,3 @@ def refresh_all_people_safe():
         _refresh_running.release()
 
 
-PEOPLE_REFRESH_INTERVAL = 86400  # 24h
-PEOPLE_REFRESH_INITIAL_DELAY = 300  # 5 min pärast starti
-
-
-def people_refresh_loop():
-    """Daemon loop: uuendab people.json aliased iga 24h."""
-    time.sleep(PEOPLE_REFRESH_INITIAL_DELAY)
-    logger.info("PEOPLE REFRESH: Taustalõim käivitunud")
-    while True:
-        try:
-            refresh_all_people_safe()
-        except Exception as e:
-            logger.error(f"PEOPLE REFRESH LOOP: Viga: {e}")
-        time.sleep(PEOPLE_REFRESH_INTERVAL)

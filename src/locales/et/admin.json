@@ -114,6 +114,17 @@
     "settings": "Seadistus",
     "workflow": "Töövoog"
   },
+  "maintenance": {
+    "title": "Hooldus",
+    "refreshPlaceLabels": "Värskenda kohade labelid Wikidatast",
+    "refreshPlaceLabelsDesc": "Uuendab places.json kõigi kohade nimed otse Wikidatast.",
+    "refreshPlaceLabelsDone": "Uuendatud {{count}} koha labelid",
+    "refreshEntityLabels": "Värskenda entity labelid Wikidatast",
+    "refreshEntityLabelsDesc": "Uuendab labels.json žanride, tüüpide ja märksõnade nimed.",
+    "refreshEntityLabelsDone": "Uuendatud {{count}} kirjet",
+    "refreshing": "Pärin Wikidatast…",
+    "refreshError": "Viga värskendamisel"
+  },
   "trash": {
     "tab": "Prügikast",
     "title": "Kustutatud teosed",
