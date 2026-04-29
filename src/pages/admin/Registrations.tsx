@@ -112,6 +112,7 @@ const Registrations: React.FC = () => {
           invite_token: data.invite_token,
           expires_at: data.expires_at,
           email: data.email,
+          username: data.username,
           name: data.name
         });
         await loadRegistrations();
@@ -210,6 +211,11 @@ const Registrations: React.FC = () => {
                 <p className="text-sm text-green-700 mt-1">
                   {inviteResult.name} ({inviteResult.email})
                 </p>
+                {inviteResult.username && (
+                  <p className="text-sm text-green-800 mt-1">
+                    {t('users.username')}: <span className="font-semibold">{inviteResult.username}</span>
+                  </p>
+                )}
                 <div className="mt-3 flex items-center gap-2">
                   <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
                     {window.location.origin}{inviteResult.invite_url}
