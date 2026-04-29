@@ -139,7 +139,7 @@ ALLOWED_ORIGINS = [
 # (max_requests, window_seconds)
 RATE_LIMITS = {
     '/login': (5, 60),              # 5 katset minutis
-    '/register': (3, 3600),         # 3 taotlust tunnis
+    '/register': (6, 3600),         # 6 taotlust tunnis
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
 }
