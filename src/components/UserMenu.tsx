@@ -37,7 +37,8 @@ const UserMenu: React.FC = () => {
   if (!user) return null;
 
   const isSentNotification = (notification: UserNotification) => notification.type === 'sent_notification';
-  const unreadCount = notifications.filter(n => !isSentNotification(n) && !n.read_at).length;
+  const receivedNotifications = notifications.filter(n => !isSentNotification(n));
+  const unreadCount = receivedNotifications.filter(n => !n.read_at).length;
 
   const openNotification = async (notification: UserNotification) => {
     if (authToken && !isSentNotification(notification) && !notification.read_at) {
@@ -87,20 +88,20 @@ const UserMenu: React.FC = () => {
               <p className="text-xs text-gray-500">{t(`common:roles.${user.role}`)}</p>
             </div>
 
-            {notifications.length > 0 && (
+            {receivedNotifications.length > 0 && (
               <>
                 <div className="px-3 py-2 border-b border-gray-100">
                   <p className="text-xs font-semibold uppercase text-gray-500 mb-1">{t('common:notifications.title')}</p>
                   <div className="max-h-56 overflow-y-auto -mx-1">
-                    {notifications.slice(0, 5).map(notification => (
+                    {receivedNotifications.slice(0, 5).map(notification => (
                       <button
                         key={notification.id}
                         onClick={() => openNotification(notification)}
                         className="w-full text-left px-1 py-2 rounded hover:bg-gray-100"
                       >
                         <div className="flex items-start gap-2">
-                          {!isSentNotification(notification) && !notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
-                          <div className={!isSentNotification(notification) && !notification.read_at ? '' : 'ml-4'}>
+                          {!notification.read_at && <span className="mt-1.5 h-2 w-2 rounded-full bg-red-600 shrink-0" />}
+                          <div className={!notification.read_at ? '' : 'ml-4'}>
                             <p className="text-xs text-gray-800">
                               {notification.title || t('common:notifications.commentReply', { name: notification.actor_name })}
                             </p>
