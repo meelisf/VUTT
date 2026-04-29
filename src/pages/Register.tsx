@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { deriveUsernameFromEmail } from '../utils/username';
 
 const Register: React.FC = () => {
   const { t } = useTranslation(['register', 'common']);
@@ -21,6 +22,7 @@ const Register: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const usernamePreview = useMemo(() => deriveUsernameFromEmail(formData.email), [formData.email]);
 
   const validateForm = (): string | null => {
     if (!formData.name.trim()) {
@@ -181,6 +183,15 @@ const Register: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-colors"
                 disabled={isSubmitting}
               />
+              {usernamePreview && (
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                  <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                  <span>
+                    {t('form.usernamePreview')}{' '}
+                    <strong className="font-semibold text-green-900">{usernamePreview}</strong>
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Asutus */}

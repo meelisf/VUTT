@@ -162,7 +162,7 @@ async def register(request: Request):
 @app.get("/invite/{token}")
 async def check_invite(token: str):
     token_data, error = validate_invite_token(token)
-    if token_data: return {"status": "success", "valid": True, "email": token_data["email"], "name": token_data["name"], "expires_at": token_data["expires_at"]}
+    if token_data: return {"status": "success", "valid": True, "email": token_data["email"], "username": token_data.get("username"), "name": token_data["name"], "expires_at": token_data["expires_at"]}
     return {"status": "error", "valid": False, "message": error}
 
 @app.post("/invite/set-password")
@@ -196,6 +196,7 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
         "invite_url": f"/set-password?token={token_data['token']}",
         "expires_at": token_data['expires_at'],
         "email": token_data['email'],
+        "username": token_data['username'],
         "name": token_data['name'],
     }
 

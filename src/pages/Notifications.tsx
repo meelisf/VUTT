@@ -332,13 +332,25 @@ const Notifications: React.FC = () => {
                           {notificationBody(notification) && (
                             <p className="text-sm text-gray-600 whitespace-pre-wrap">{notificationBody(notification)}</p>
                           )}
-                          <p className="text-xs text-gray-500 mt-2">
-                            {formatDate(notification.created_at)}
-                            {isSentNotification(notification)
-                              ? ` · ${t('notifications.to')} ${sentRecipientsLabel(notification, t('notifications.allRecipients'))}`
-                              : notification.actor_name ? ` · ${notification.actor_name}` : ''}
-                            {target ? ` · ${target}` : ''}
-                          </p>
+                          {isSentNotification(notification) ? (
+                            <p className="text-xs text-gray-500 mt-2">
+                              {formatDate(notification.created_at)}
+                              {` · ${t('notifications.to')} ${sentRecipientsLabel(notification, t('notifications.allRecipients'))}`}
+                              {target ? ` · ${target}` : ''}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-500 mt-2">
+                              {notification.actor_name && (
+                                <>
+                                  <span>{t('notifications.from')} </span>
+                                  <span className="font-medium text-gray-800">{notification.actor_name}</span>
+                                  <span> · </span>
+                                </>
+                              )}
+                              {formatDate(notification.created_at)}
+                              {target ? ` · ${target}` : ''}
+                            </p>
+                          )}
                         </button>
                         {!isSentNotification(notification) && (
                           <div className="flex shrink-0 flex-col sm:flex-row gap-2">

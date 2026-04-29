@@ -8,6 +8,7 @@
     "namePlaceholder": "Your full name",
     "email": "Email address",
     "emailPlaceholder": "name@example.com",
+    "usernamePreview": "Your username will be",
     "affiliation": "Affiliation (optional)",
     "affiliationPlaceholder": "University, library, etc.",
     "motivation": "How do you plan to use the workbench?",
@@ -36,6 +37,7 @@
     "password": "Password",
     "passwordConfirm": "Confirm password",
     "passwordHint": "Minimum 12 characters. Tip: use a passphrase like 'mycatloveseatingfish'",
+    "usernamePreview": "Your username is",
     "submit": "Save password",
     "success": "Password set! You can now log in.",
     "errors": {

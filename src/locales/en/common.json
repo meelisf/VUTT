@@ -87,6 +87,7 @@
     "sendTab": "Send",
     "receivedBadge": "Received",
     "sentBadge": "Sent",
+    "from": "From:",
     "to": "to",
     "recipientMode": "Recipients",
     "singleRecipient": "One user",

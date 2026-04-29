@@ -18,6 +18,7 @@ import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { deriveUsernameFromEmail } from '../../utils/username';
 
 interface Registration {
   id: string;
@@ -36,6 +37,7 @@ interface InviteResult {
   invite_token: string;
   expires_at: string;
   email: string;
+  username?: string;
   name: string;
 }
 
@@ -222,10 +224,12 @@ const Registrations: React.FC = () => {
                   <a
                     href={(() => {
                       const fullUrl = `${window.location.origin}${inviteResult.invite_url}`;
+                      const username = inviteResult.username || deriveUsernameFromEmail(inviteResult.email);
                       const subject = encodeURIComponent('VUTT – konto aktiveerimise link');
                       const body = encodeURIComponent(
                         `Tere ${inviteResult.name},\n\n` +
                         `Teie juurdepääsutaotlus VUTT platvormile on kinnitatud.\n\n` +
+                        `Teie kasutajanimi on: ${username}\n\n` +
                         `Palun seadistage oma parool alloleva lingi kaudu (link kehtib 48 tundi):\n` +
                         `${fullUrl}\n\n` +
                         `Lugupidamisega,\nVUTT meeskonna nimel`

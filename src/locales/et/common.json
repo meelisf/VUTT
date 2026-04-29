@@ -87,6 +87,7 @@
     "sendTab": "Saada",
     "receivedBadge": "Saabunud",
     "sentBadge": "Saadetud",
+    "from": "Saatja:",
     "to": "saajale",
     "recipientMode": "Saajad",
     "singleRecipient": "Üks kasutaja",

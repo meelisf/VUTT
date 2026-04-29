@@ -9,6 +9,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 interface TokenInfo {
   valid: boolean;
   email: string;
+  username?: string;
   name: string;
   expires_at: string;
 }
@@ -49,6 +50,7 @@ const SetPassword: React.FC = () => {
           setTokenInfo({
             valid: true,
             email: data.email,
+            username: data.username,
             name: data.name,
             expires_at: data.expires_at
           });
@@ -215,9 +217,20 @@ const SetPassword: React.FC = () => {
             <h1 className="text-2xl font-bold text-gray-900">{t('setPassword.title')}</h1>
             <p className="text-gray-500 mt-1">{t('setPassword.subtitle')}</p>
             {tokenInfo && (
-              <p className="text-sm text-primary-600 mt-2">
-                Tere tulemast, {tokenInfo.name}!
-              </p>
+              <div className="mt-2 space-y-2">
+                <p className="text-sm text-primary-600">
+                  Tere tulemast, {tokenInfo.name}!
+                </p>
+                {tokenInfo.username && (
+                  <div className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                    <span>
+                      {t('setPassword.usernamePreview')}{' '}
+                      <strong className="font-semibold text-green-900">{tokenInfo.username}</strong>
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

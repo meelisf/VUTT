@@ -8,6 +8,7 @@
     "namePlaceholder": "Sinu täisnimi",
     "email": "E-posti aadress",
     "emailPlaceholder": "nimi@näide.ee",
+    "usernamePreview": "Sinu kasutajanimi on",
     "affiliation": "Asutus (valikuline)",
     "affiliationPlaceholder": "Ülikool, raamatukogu vms",
     "motivation": "Kuidas plaanid töölauda kasutada?",
@@ -36,6 +37,7 @@
     "password": "Parool",
     "passwordConfirm": "Kinnita parool",
     "passwordHint": "Vähemalt 12 tähemärki. Soovitus: kasuta paroolifraasi, nt 'minukassarmastabkala'",
+    "usernamePreview": "Sinu kasutajanimi on",
     "submit": "Salvesta parool",
     "success": "Parool seadistatud! Võid nüüd sisse logida.",
     "errors": {

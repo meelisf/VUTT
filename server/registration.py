@@ -113,16 +113,50 @@ def save_invite_tokens(data):
         atomic_write_json(INVITE_TOKENS_FILE, data)
 
 
+def _base_username_from_email(email):
+    username = email.split('@')[0].lower()
+    return re.sub(r'[^a-z0-9]', '', username)
+
+
+def _next_available_username(email, tokens_data=None):
+    username = _base_username_from_email(email)
+    users = load_users()
+    taken = set(users.keys())
+
+    if tokens_data:
+        now = datetime.now()
+        for token in tokens_data.get("tokens", []):
+            token_username = token.get("username")
+            if not token_username or token.get("used"):
+                continue
+            try:
+                if datetime.fromisoformat(token.get("expires_at", "")) < now:
+                    continue
+            except ValueError:
+                continue
+            taken.add(token_username)
+
+    base_username = username
+    counter = 1
+    while username in taken:
+        username = f"{base_username}{counter}"
+        counter += 1
+
+    return username
+
+
 def create_invite_token(email, name, created_by):
     """Loob uue invite tokeni (kehtiv 48h)."""
     data = load_invite_tokens()
 
     token = str(uuid.uuid4())
     expires_at = datetime.now() + timedelta(hours=48)
+    username = _next_available_username(email, data)
 
     token_data = {
         "token": token,
         "email": email.lower(),
+        "username": username,
         "name": name,
         "created_at": datetime.now().isoformat(),
         "expires_at": expires_at.isoformat(),
@@ -231,11 +265,10 @@ def create_user_from_invite(token, password):
     email = token_data["email"]
     name = token_data["name"]
 
-    # Genereeri kasutajanimi emaili põhjal
-    username = email.split('@')[0].lower()
-    username = re.sub(r'[^a-z0-9]', '', username)
+    # Kasuta kutse loomisel arvutatud kasutajanime; vanade tokenite puhul tuleta e-posti põhjal.
+    username = token_data.get("username") or _base_username_from_email(email)
 
-    # Kontrolli, kas kasutajanimi on juba olemas
+    # Kontrolli, kas kasutajanimi on vahepeal kasutusse läinud
     users = load_users()
     base_username = username
     counter = 1
