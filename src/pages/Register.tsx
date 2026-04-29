@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { UserPlus, Loader2, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -22,7 +22,38 @@ const Register: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const usernamePreview = useMemo(() => deriveUsernameFromEmail(formData.email), [formData.email]);
+  const fallbackUsernamePreview = useMemo(() => deriveUsernameFromEmail(formData.email), [formData.email]);
+  const [serverUsernamePreview, setServerUsernamePreview] = useState('');
+  const usernamePreview = serverUsernamePreview || fallbackUsernamePreview;
+
+  useEffect(() => {
+    const email = formData.email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setServerUsernamePreview('');
+      return;
+    }
+
+    let cancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetchWithTimeout(`${FILE_API_URL}/register/username-preview?email=${encodeURIComponent(email)}`, {
+          timeout: 5000
+        });
+        const data = await response.json();
+        if (!cancelled && data.status === 'success') {
+          setServerUsernamePreview(data.username || '');
+        }
+      } catch {
+        if (!cancelled) setServerUsernamePreview('');
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [formData.email]);
 
   const validateForm = (): string | null => {
     if (!formData.name.trim()) {
@@ -73,12 +104,12 @@ const Register: React.FC = () => {
         })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
-      if (data.status === 'success') {
+      if (response.ok && data.status === 'success') {
         setSubmitStatus('success');
       } else {
-        setErrorMessage(data.message || t('errors.submitFailed'));
+        setErrorMessage(data.detail || data.message || t('errors.submitFailed'));
         setSubmitStatus('error');
       }
     } catch (error) {

@@ -26,7 +26,7 @@ from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
     update_registration_status, create_invite_token, validate_invite_token,
-    create_user_from_invite
+    create_user_from_invite, suggest_username_for_email
 )
 from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload, update_upload_meta,
@@ -157,7 +157,14 @@ async def register(request: Request):
     if data.get('website'): return {"status": "success"}
     registration, error = add_registration(data.get('name', ''), data.get('email', ''), data.get('affiliation'), data.get('motivation', ''), gdpr_consent=bool(data.get('gdpr_consent')))
     if not registration: raise HTTPException(status_code=400, detail=error)
-    return {"status": "success", "id": registration["id"]}
+    return {"status": "success", "id": registration["id"], "username": registration.get("username")}
+
+@app.get("/register/username-preview")
+async def register_username_preview(email: str = ""):
+    email = email.strip().lower()
+    if not email or "@" not in email:
+        return {"status": "success", "username": ""}
+    return {"status": "success", "username": suggest_username_for_email(email)}
 
 @app.get("/invite/{token}")
 async def check_invite(token: str):
@@ -189,7 +196,7 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
     reg = get_registration_by_id(data.get('registration_id'))
     if not reg or reg["status"] != "pending": raise HTTPException(status_code=400, detail="Vigane taotlus")
     update_registration_status(reg["id"], "approved", user["username"])
-    token_data = create_invite_token(reg["email"], reg["name"], user["username"])
+    token_data = create_invite_token(reg["email"], reg["name"], user["username"], username=reg.get("username"))
     return {
         "status": "success",
         "invite_token": token_data['token'],

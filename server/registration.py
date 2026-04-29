@@ -56,6 +56,7 @@ def add_registration(name, email, affiliation, motivation, gdpr_consent=False):
         "id": str(uuid.uuid4()),
         "name": name,
         "email": email.lower(),
+        "username": suggest_username_for_email(email),
         "affiliation": affiliation,
         "motivation": motivation,
         "gdpr_consent_at": datetime.now().isoformat() if gdpr_consent else None,
@@ -145,13 +146,45 @@ def _next_available_username(email, tokens_data=None):
     return username
 
 
-def create_invite_token(email, name, created_by):
+def suggest_username_for_email(email):
+    """Tagastab e-posti põhjal järgmise vaba kasutajanime."""
+    tokens_data = load_invite_tokens()
+    pending_data = load_pending_registrations()
+    users = load_users()
+    taken = set(users.keys())
+
+    for reg in pending_data.get("registrations", []):
+        if reg.get("status") == "pending" and reg.get("username"):
+            taken.add(reg["username"])
+
+    now = datetime.now()
+    for token in tokens_data.get("tokens", []):
+        token_username = token.get("username")
+        if not token_username or token.get("used"):
+            continue
+        try:
+            if datetime.fromisoformat(token.get("expires_at", "")) < now:
+                continue
+        except ValueError:
+            continue
+        taken.add(token_username)
+
+    username = _base_username_from_email(email)
+    base_username = username
+    counter = 1
+    while username in taken:
+        username = f"{base_username}{counter}"
+        counter += 1
+    return username
+
+
+def create_invite_token(email, name, created_by, username=None):
     """Loob uue invite tokeni (kehtiv 48h)."""
     data = load_invite_tokens()
 
     token = str(uuid.uuid4())
     expires_at = datetime.now() + timedelta(hours=48)
-    username = _next_available_username(email, data)
+    username = username or _next_available_username(email, data)
 
     token_data = {
         "token": token,
