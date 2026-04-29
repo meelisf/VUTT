@@ -119,8 +119,8 @@ def _base_username_from_email(email):
     return re.sub(r'[^a-z0-9]', '', username)
 
 
-def _next_available_username(email, tokens_data=None):
-    username = _base_username_from_email(email)
+def _next_available_username(email, tokens_data=None, preferred_username=None):
+    username = preferred_username or _base_username_from_email(email)
     users = load_users()
     taken = set(users.keys())
 
@@ -184,7 +184,7 @@ def create_invite_token(email, name, created_by, username=None):
 
     token = str(uuid.uuid4())
     expires_at = datetime.now() + timedelta(hours=48)
-    username = username or _next_available_username(email, data)
+    username = _next_available_username(email, data, preferred_username=username)
 
     token_data = {
         "token": token,
