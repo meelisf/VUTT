@@ -106,6 +106,7 @@
     "collections": "Collections",
     "changes": "Changes",
     "trash": "Trash",
+    "maintenance": "Maintenance",
     "pending": "{{count}} pending"
   },
   "groups": {
@@ -116,6 +117,7 @@
   },
   "maintenance": {
     "title": "Maintenance",
+    "refresh": "Refresh",
     "refreshPlaceLabels": "Refresh place labels from Wikidata",
     "refreshPlaceLabelsDesc": "Updates names for all places in places.json directly from Wikidata.",
     "refreshPlaceLabelsDone": "Updated {{count}} place labels",

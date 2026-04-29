@@ -38,6 +38,7 @@ const AdminRegistrations = lazyRetry(() => import('./pages/admin/Registrations')
 const AdminUsers = lazyRetry(() => import('./pages/admin/Users'));
 const AdminTrash = lazyRetry(() => import('./pages/admin/Trash'));
 const AdminCollections = lazyRetry(() => import('./pages/admin/Collections'));
+const AdminMaintenance = lazyRetry(() => import('./pages/admin/Maintenance'));
 
 // Suspense fallback laadimise ajaks
 const PageLoader = () => (
@@ -111,6 +112,11 @@ const router = createBrowserRouter([
   {
     path: "/admin/collections",
     element: <Lazy><AdminCollections /></Lazy>,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: "/admin/maintenance",
+    element: <Lazy><AdminMaintenance /></Lazy>,
     errorElement: <RouteErrorBoundary />,
   },
   {

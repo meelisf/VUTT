@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserPlus, Users, Upload, Library, History, Trash2, RefreshCw } from 'lucide-react';
+import { UserPlus, Users, Upload, Library, History, Trash2, Wrench } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -24,12 +24,6 @@ const Admin: React.FC = () => {
   const navigate = useNavigate();
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [uploadCount, setUploadCount] = useState<number | null>(null);
-
-  type ActionState = 'idle' | 'running' | 'done' | 'error';
-  const [placeLabelsState, setPlaceLabelsState] = useState<ActionState>('idle');
-  const [placeLabelsCount, setPlaceLabelsCount] = useState<number | null>(null);
-  const [entityLabelsState, setEntityLabelsState] = useState<ActionState>('idle');
-  const [entityLabelsCount, setEntityLabelsCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -61,44 +55,6 @@ const Admin: React.FC = () => {
       })
       .catch(() => {});
   }, [authToken]);
-
-  const handleRefreshPlaceLabels = async () => {
-    if (!authToken) return;
-    setPlaceLabelsState('running');
-    setPlaceLabelsCount(null);
-    try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/prosopography/admin/places/refresh-labels`, {
-        method: 'POST',
-        headers: getAuthHeaders(authToken),
-        timeout: 120000,
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
-      setPlaceLabelsCount(data.updated ?? 0);
-      setPlaceLabelsState('done');
-    } catch {
-      setPlaceLabelsState('error');
-    }
-  };
-
-  const handleRefreshEntityLabels = async () => {
-    if (!authToken) return;
-    setEntityLabelsState('running');
-    setEntityLabelsCount(null);
-    try {
-      const resp = await fetchWithTimeout(`${FILE_API_URL}/admin/refresh-entity-labels`, {
-        method: 'POST',
-        headers: getAuthHeaders(authToken),
-        timeout: 120000,
-      });
-      if (!resp.ok) throw new Error(String(resp.status));
-      const data = await resp.json();
-      setEntityLabelsCount(data.updated ?? 0);
-      setEntityLabelsState('done');
-    } catch {
-      setEntityLabelsState('error');
-    }
-  };
 
   if (!user || user.role !== 'admin') return null;
 
@@ -143,6 +99,12 @@ const Admin: React.FC = () => {
       group: t('admin:groups.content'),
       href: '/admin/trash',
     },
+    {
+      key: 'maintenance',
+      icon: <Wrench size={18} className="text-gray-500" />,
+      group: t('admin:groups.settings'),
+      href: '/admin/maintenance',
+    },
   ];
 
   return (
@@ -174,56 +136,6 @@ const Admin: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-8">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-            {t('admin:maintenance.title')}
-          </h2>
-          <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-            {([
-              {
-                key: 'placeLabels',
-                label: t('admin:maintenance.refreshPlaceLabels'),
-                desc: t('admin:maintenance.refreshPlaceLabelsDesc'),
-                state: placeLabelsState,
-                count: placeLabelsCount,
-                doneKey: 'refreshPlaceLabelsDone',
-                onClick: handleRefreshPlaceLabels,
-              },
-              {
-                key: 'entityLabels',
-                label: t('admin:maintenance.refreshEntityLabels'),
-                desc: t('admin:maintenance.refreshEntityLabelsDesc'),
-                state: entityLabelsState,
-                count: entityLabelsCount,
-                doneKey: 'refreshEntityLabelsDone',
-                onClick: handleRefreshEntityLabels,
-              },
-            ] as const).map(({ key, label, desc, state, count, doneKey, onClick }) => (
-              <div key={key} className="flex items-center justify-between px-4 py-3 gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-900">{label}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{desc}</p>
-                  {state === 'done' && count !== null && (
-                    <p className="text-xs text-green-700 mt-1">
-                      {t(`admin:maintenance.${doneKey}`, { count })}
-                    </p>
-                  )}
-                  {state === 'error' && (
-                    <p className="text-xs text-red-600 mt-1">{t('admin:maintenance.refreshError')}</p>
-                  )}
-                </div>
-                <button
-                  onClick={onClick}
-                  disabled={state === 'running'}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 text-gray-700"
-                >
-                  <RefreshCw size={12} className={state === 'running' ? 'animate-spin' : ''} />
-                  {state === 'running' ? t('admin:maintenance.refreshing') : label}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
