@@ -59,6 +59,16 @@ function formatImmDate(dateStr: string | null | undefined, lang: string): string
   }
 }
 
+function getEducationDate(education: any): string {
+  return education?.date_from?.date ?? education?.date_start ?? '';
+}
+
+function earliestDatedEducation(entries: any[]): any | null {
+  return entries
+    .filter(e => getEducationDate(e).slice(0, 4).match(/^\d{4}$/))
+    .sort((a, b) => getEducationDate(a).localeCompare(getEducationDate(b)))[0] ?? null;
+}
+
 function getExternalUrl(scheme: string, id: string): string | null {
   if (scheme === 'wikidata')        return `https://www.wikidata.org/wiki/${id}`;
   if (scheme === 'gnd')             return `https://d-nb.info/gnd/${id}`;
@@ -412,13 +422,11 @@ const PersonDetailPage: React.FC = () => {
             {(() => {
               const agNames = new Set(['Academia Gustaviana', 'Academia Gustavo-Carolina']);
               const immEdu =
-                (person.education ?? []).find(e => agNames.has(e.institution)) ??
-                (person.education ?? []).find(e => e.source === 'album_academicum' && (e.date_from || e.date_start));
+                earliestDatedEducation((person.education ?? []).filter(e => agNames.has(e.institution))) ??
+                earliestDatedEducation((person.education ?? []).filter(e => e.source === 'album_academicum'));
               const aaId = (person.identifiers ?? []).find(i => i.scheme === 'album_academicum')?.id;
               if (!immEdu && !aaId) return null;
-              const dateLabel = immEdu?.date_from?.date
-                ? formatImmDate(immEdu.date_from.date, lang)
-                : (immEdu?.date_start ? formatImmDate(immEdu.date_start, lang) : null);
+              const dateLabel = immEdu ? formatImmDate(getEducationDate(immEdu), lang) : null;
               return (
                 <div className="grid grid-cols-2 gap-4">
                   <div>

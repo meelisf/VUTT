@@ -145,30 +145,35 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     def _extract_date(edu: dict) -> str:
         return (edu.get("date_from") or {}).get("date") or edu.get("date_start") or ""
 
-    # Prioriteet 1: Academia Gustaviana / Gustavo-Carolina kirje (= Tartu immatrikuleerumine)
-    for edu in (person.get("education") or []):
-        if edu.get("institution") in _AG_NAMES:
+    def _earliest_dated_education(entries: list[dict]) -> tuple[Optional[int], Optional[str]]:
+        dated_entries: list[tuple[str, int]] = []
+        for edu in entries:
             date_str = _extract_date(edu)
             if len(date_str) >= 4:
                 try:
-                    imm_year = int(date_str[:4])
-                    imm_date = date_str
-                    break
+                    year = int(date_str[:4])
                 except ValueError:
-                    pass
+                    continue
+                dated_entries.append((date_str, year))
+        if not dated_entries:
+            return None, None
+        date_str, year = min(dated_entries, key=lambda item: item[0])
+        return year, date_str
+
+    # Prioriteet 1: Academia Gustaviana / Gustavo-Carolina kirje (= Tartu immatrikuleerumine)
+    ag_entries = [
+        edu for edu in (person.get("education") or [])
+        if edu.get("institution") in _AG_NAMES
+    ]
+    imm_year, imm_date = _earliest_dated_education(ag_entries)
 
     # Prioriteet 2: muu album_academicum kirje millel on kuupäev (fallback)
     if imm_year is None:
-        for edu in (person.get("education") or []):
-            if edu.get("source") == "album_academicum":
-                date_str = _extract_date(edu)
-                if len(date_str) >= 4:
-                    try:
-                        imm_year = int(date_str[:4])
-                        imm_date = date_str
-                        break
-                    except ValueError:
-                        pass
+        aa_entries = [
+            edu for edu in (person.get("education") or [])
+            if edu.get("source") == "album_academicum"
+        ]
+        imm_year, imm_date = _earliest_dated_education(aa_entries)
 
     # Päritolukoht
     origin = person.get("origin") or {}
