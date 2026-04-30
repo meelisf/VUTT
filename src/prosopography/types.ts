@@ -51,6 +51,8 @@ export interface ProsopoIndexEntry {
   aa_number: number | null;
   imm_year: number | null;
   imm_date: string | null;
+  floruit_year_from?: number | null;
+  floruit_year_to?: number | null;
   // Päritolu (uued väljad)
   origin_place: string | null;
   origin_place_id: string | null;

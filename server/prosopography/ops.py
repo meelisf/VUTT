@@ -197,6 +197,10 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         date_str = (date_obj.get("date") or "").strip()
         return date_str if len(date_str) >= 4 else None
 
+    floruit = person.get("floruit") or {}
+    floruit_year_from = floruit.get("year_from")
+    floruit_year_to = floruit.get("year_to")
+
     return {
         "id": person["id"],
         "label": label,
@@ -215,6 +219,8 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "aa_number": aa_number,
         "imm_year": imm_year,
         "imm_date": imm_date,
+        "floruit_year_from": floruit_year_from if isinstance(floruit_year_from, int) else None,
+        "floruit_year_to": floruit_year_to if isinstance(floruit_year_to, int) else None,
         "record_status": person.get("record_status", "draft"),
         "verification_level": person.get("verification_level", "draft"),
         "work_count": work_count,
@@ -558,6 +564,8 @@ def list_persons(
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     sort_by: Optional[str] = None,
@@ -578,6 +586,8 @@ def list_persons(
         status_id=status_id,
         source=source,
         verification_level=verification_level,
+        year_from=year_from,
+        year_to=year_to,
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,
@@ -609,6 +619,8 @@ def _filter_index_entries(
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
@@ -661,12 +673,40 @@ def _filter_index_entries(
         field = source_map.get(source)
         if field:
             results = [e for e in results if e.get(field)]
+    if year_from is not None or year_to is not None:
+        results = [e for e in results if _entry_matches_year_range(e, year_from, year_to)]
     if imm_year_from is not None:
         results = [e for e in results if (e.get("imm_year") or 0) >= imm_year_from]
     if imm_year_to is not None:
         results = [e for e in results if (e.get("imm_year") or 0) <= imm_year_to]
 
     return results
+
+
+def _entry_matches_year_range(entry: dict, year_from: Optional[int], year_to: Optional[int]) -> bool:
+    lower = year_from if year_from is not None else -10**9
+    upper = year_to if year_to is not None else 10**9
+
+    def year_in_range(value) -> bool:
+        return isinstance(value, int) and lower <= value <= upper
+
+    if year_in_range(entry.get("birth_year")):
+        return True
+    if year_in_range(entry.get("death_year")):
+        return True
+    if year_in_range(entry.get("imm_year")):
+        return True
+
+    floruit_from = entry.get("floruit_year_from")
+    floruit_to = entry.get("floruit_year_to")
+    if isinstance(floruit_from, int) and isinstance(floruit_to, int):
+        return floruit_from <= upper and floruit_to >= lower
+    if year_in_range(floruit_from):
+        return True
+    if year_in_range(floruit_to):
+        return True
+
+    return False
 
 
 def get_person_map_markers(
@@ -678,6 +718,8 @@ def get_person_map_markers(
     status_id: Optional[str] = None,
     source: Optional[str] = None,
     verification_level: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
@@ -697,6 +739,8 @@ def get_person_map_markers(
         status_id=status_id,
         source=source,
         verification_level=verification_level,
+        year_from=year_from,
+        year_to=year_to,
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,

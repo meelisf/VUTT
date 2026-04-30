@@ -126,6 +126,17 @@ def test_index_entry_includes_origin_coordinates():
     assert entry["origin_coordinates"] == coords
 
 
+def test_index_entry_includes_floruit_years():
+    person = {
+        "id": "p9",
+        "name": {"label": "Floruit Person"},
+        "floruit": {"year_from": 1648, "year_to": 1670},
+    }
+    entry = _build_entry(person)
+    assert entry["floruit_year_from"] == 1648
+    assert entry["floruit_year_to"] == 1670
+
+
 # ---- list_persons filter test ----
 
 def test_list_persons_status_id_filter(tmp_path, monkeypatch):
@@ -148,6 +159,87 @@ def test_list_persons_status_id_filter(tmp_path, monkeypatch):
     assert "p1" in ids
     assert "p2" not in ids
     assert "p3" not in ids
+
+
+def test_list_persons_year_range_uses_known_single_dates_conservatively(monkeypatch):
+    ops = importlib.import_module("server.prosopography.ops")
+
+    fake_index = {
+        "entries": [
+            {
+                "id": "birth",
+                "record_status": "draft",
+                "label": "Birth Only",
+                "sort_name": "Birth",
+                "birth_year": 1625,
+                "death_year": None,
+                "imm_year": None,
+            },
+            {
+                "id": "imm",
+                "record_status": "draft",
+                "label": "Imm Only",
+                "sort_name": "Imm",
+                "birth_year": 1625,
+                "death_year": None,
+                "imm_year": 1644,
+            },
+            {
+                "id": "outside",
+                "record_status": "draft",
+                "label": "Outside",
+                "sort_name": "Outside",
+                "birth_year": 1625,
+                "death_year": None,
+                "imm_year": None,
+            },
+        ]
+    }
+    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+
+    result = ops.list_persons(year_from=1640, year_to=1650)
+    ids = [r["id"] for r in result["results"]]
+
+    assert ids == ["imm"]
+
+
+def test_list_persons_year_range_matches_floruit_overlap(monkeypatch):
+    ops = importlib.import_module("server.prosopography.ops")
+
+    fake_index = {
+        "entries": [
+            {
+                "id": "overlap",
+                "record_status": "draft",
+                "label": "Overlap",
+                "sort_name": "Overlap",
+                "floruit_year_from": 1648,
+                "floruit_year_to": 1670,
+            },
+            {
+                "id": "before",
+                "record_status": "draft",
+                "label": "Before",
+                "sort_name": "Before",
+                "floruit_year_from": 1600,
+                "floruit_year_to": 1620,
+            },
+            {
+                "id": "single",
+                "record_status": "draft",
+                "label": "Single",
+                "sort_name": "Single",
+                "floruit_year_from": 1655,
+                "floruit_year_to": None,
+            },
+        ]
+    }
+    monkeypatch.setattr(ops, "_load_index", lambda: fake_index)
+
+    result = ops.list_persons(year_from=1650, year_to=1660)
+    ids = [r["id"] for r in result["results"]]
+
+    assert ids == ["overlap", "single"]
 
 
 def test_get_person_map_markers_groups_by_origin_place(monkeypatch):

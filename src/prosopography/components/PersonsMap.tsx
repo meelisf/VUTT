@@ -15,6 +15,8 @@ interface PersonsMapProps {
     institution?: string;
     status_id?: string;
     source?: string;
+    year_from?: number;
+    year_to?: number;
     imm_year_from?: number;
     imm_year_to?: number;
     related_to?: string;

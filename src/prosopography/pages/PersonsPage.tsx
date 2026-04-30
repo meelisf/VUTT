@@ -30,8 +30,13 @@ const PersonsPage: React.FC = () => {
   const institution = searchParams.get('institution') ?? '';
   const source = searchParams.get('source') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
-  const immYearFrom = searchParams.get('imm_year_from') ?? '';
-  const immYearTo = searchParams.get('imm_year_to') ?? '';
+  const explicitYearFrom = searchParams.get('year_from');
+  const explicitYearTo = searchParams.get('year_to');
+  const legacyImmYearFrom = searchParams.get('imm_year_from');
+  const legacyImmYearTo = searchParams.get('imm_year_to');
+  const yearFrom = explicitYearFrom ?? legacyImmYearFrom ?? '';
+  const yearTo = explicitYearTo ?? legacyImmYearTo ?? '';
+  const hasExplicitYearRange = explicitYearFrom !== null || explicitYearTo !== null;
   const statusId = searchParams.get('status_id') ?? '';
   const sortBy = searchParams.get('sort_by') ?? 'alpha';
   const view = searchParams.get('view') === 'map' ? 'map' : 'list';
@@ -67,8 +72,16 @@ const PersonsPage: React.FC = () => {
   const setInstitution = (v: string)  => setFilterParam('institution', v);
   const setSource = (v: string)       => setFilterParam('source', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
-  const setImmYearFrom = (v: string)  => setFilterParam('imm_year_from', v);
-  const setImmYearTo = (v: string)    => setFilterParam('imm_year_to', v);
+  const setYearParam = (key: 'year_from' | 'year_to', legacyKey: 'imm_year_from' | 'imm_year_to', value: string) =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      value ? n.set(key, value) : n.delete(key);
+      n.delete(legacyKey);
+      n.delete('offset');
+      return n;
+    }, { replace: true });
+  const setYearFrom = (v: string)     => setYearParam('year_from', 'imm_year_from', v);
+  const setYearTo = (v: string)       => setYearParam('year_to', 'imm_year_to', v);
   const setStatusId = (v: string)     => setFilterParam('status_id', v);
   const setSortBy = (v: string)       => setFilterParam('sort_by', v === 'alpha' ? '' : v);
   const setView = (v: 'list' | 'map') =>
@@ -113,8 +126,10 @@ const PersonsPage: React.FC = () => {
       institution: institution || undefined,
       source: source || undefined,
       gender: gender || undefined,
-      imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
-      imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
+      year_from: hasExplicitYearRange && yearFrom ? parseInt(yearFrom) : undefined,
+      year_to: hasExplicitYearRange && yearTo ? parseInt(yearTo) : undefined,
+      imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
+      imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
       status_id: statusId || undefined,
       sort_by: sortBy !== 'alpha' ? sortBy : undefined,
       limit: LIMIT,
@@ -127,7 +142,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [view, query, originGroup, institution, source, gender, immYearFrom, immYearTo, statusId, sortBy, offset, token, t]);
+  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, sortBy, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
@@ -158,7 +173,7 @@ const PersonsPage: React.FC = () => {
     getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
-  const hasActiveFilters = !!(originGroup || institution || source || gender || immYearFrom || immYearTo);
+  const hasActiveFilters = !!(originGroup || institution || source || gender || yearFrom || yearTo || statusId);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
   const mapFilters = {
@@ -167,8 +182,10 @@ const PersonsPage: React.FC = () => {
     institution: institution || undefined,
     source: source || undefined,
     gender: gender || undefined,
-    imm_year_from: immYearFrom ? parseInt(immYearFrom) : undefined,
-    imm_year_to: immYearTo ? parseInt(immYearTo) : undefined,
+    year_from: hasExplicitYearRange && yearFrom ? parseInt(yearFrom) : undefined,
+    year_to: hasExplicitYearRange && yearTo ? parseInt(yearTo) : undefined,
+    imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
+    imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
     status_id: statusId || undefined,
     related_to: relatedTo || undefined,
   };
@@ -313,8 +330,8 @@ const PersonsPage: React.FC = () => {
             institution={institution}
             source={source}
             gender={gender}
-            immYearFrom={immYearFrom}
-            immYearTo={immYearTo}
+            yearFrom={yearFrom}
+            yearTo={yearTo}
             statusId={statusId}
             originGroups={originGroupFacets}
             institutions={institutionFacets}
@@ -323,12 +340,12 @@ const PersonsPage: React.FC = () => {
             onInstitutionChange={setInstitution}
             onSourceChange={setSource}
             onGenderChange={setGender}
-            onImmYearFromChange={setImmYearFrom}
-            onImmYearToChange={setImmYearTo}
+            onYearFromChange={setYearFrom}
+            onYearToChange={setYearTo}
             onStatusIdChange={setStatusId}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
-              ['origin_group', 'institution', 'source', 'gender', 'imm_year_from', 'imm_year_to', 'status_id', 'offset'].forEach(k => n.delete(k));
+              ['origin_group', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'offset'].forEach(k => n.delete(k));
               return n;
             }, { replace: true })}
           />

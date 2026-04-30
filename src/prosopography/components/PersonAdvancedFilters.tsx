@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, ChevronDown, ChevronRight, Crown, Database, GraduationCap, MapPin, Search, Venus, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ChevronDown, ChevronRight, Crown, Database, MapPin, Search, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
@@ -30,8 +30,8 @@ interface PersonAdvancedFiltersProps {
   originGroup: string;
   institution: string;
   source: string;
-  immYearFrom: string;
-  immYearTo: string;
+  yearFrom: string;
+  yearTo: string;
   statusId: string;
   originGroups: FacetItem[];
   institutions: InstitutionItem[];
@@ -40,8 +40,8 @@ interface PersonAdvancedFiltersProps {
   onOriginGroupChange: (v: string) => void;
   onInstitutionChange: (v: string) => void;
   onSourceChange: (v: string) => void;
-  onImmYearFromChange: (v: string) => void;
-  onImmYearToChange: (v: string) => void;
+  onYearFromChange: (v: string) => void;
+  onYearToChange: (v: string) => void;
   onStatusIdChange: (v: string) => void;
   onClearAll: () => void;
 }
@@ -105,16 +105,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, originGroup, institution, source, immYearFrom, immYearTo, statusId,
+  gender, originGroup, institution, source, yearFrom, yearTo, statusId,
   originGroups, institutions, seisused,
   onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
-  onImmYearFromChange, onImmYearToChange, onStatusIdChange,
+  onYearFromChange, onYearToChange, onStatusIdChange,
   onClearAll,
 }) => {
   const { t, i18n } = useTranslation('prosopography');
-  const hasImmYear = !!(immYearFrom || immYearTo);
-  const hasActive = !!(originGroup || institution || source || gender || hasImmYear || statusId);
-  const activeCount = [originGroup, institution, source, gender, hasImmYear ? '1' : '', statusId].filter(Boolean).length;
+  const hasYearRange = !!(yearFrom || yearTo);
+  const hasActive = !!(originGroup || institution || source || gender || hasYearRange || statusId);
+  const activeCount = [originGroup, institution, source, gender, hasYearRange ? '1' : '', statusId].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -188,15 +188,15 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
 
           <div>
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-              <GraduationCap size={13} className="text-primary-600" />
-              {t('filterImmYear', 'Immatrikuleerimise aasta')}
+              <CalendarDays size={13} className="text-primary-600" />
+              {t('filterYearRange', 'Aastavahemik')}
             </h4>
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 inputMode="numeric"
-                value={immYearFrom}
-                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onImmYearFromChange(v); }}
+                value={yearFrom}
+                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onYearFromChange(v); }}
                 placeholder="1632"
                 className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
               />
@@ -204,8 +204,8 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
               <input
                 type="text"
                 inputMode="numeric"
-                value={immYearTo}
-                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onImmYearToChange(v); }}
+                value={yearTo}
+                onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 4); onYearToChange(v); }}
                 placeholder="1710"
                 className="w-24 px-2 py-1 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white/50"
               />
@@ -282,10 +282,10 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
                     <button onClick={() => onGenderChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
-                {hasImmYear && (
+                {hasYearRange && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
-                    AA {immYearFrom || '…'}–{immYearTo || '…'}
-                    <button onClick={() => { onImmYearFromChange(''); onImmYearToChange(''); }} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                    {t('filterYearRangeShort', 'Aeg')} {yearFrom || '…'}–{yearTo || '…'}
+                    <button onClick={() => { onYearFromChange(''); onYearToChange(''); }} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
                   </span>
                 )}
                 {statusId && (

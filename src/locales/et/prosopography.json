@@ -35,6 +35,8 @@
   "filterAadel": "Aadel",
   "nobility": "Aadel",
   "filterImmYear": "Immatrikuleerimise aasta",
+  "filterYearRange": "Aastavahemik",
+  "filterYearRangeShort": "Aeg",
   "sortAlpha": "A–Z",
   "sortBirthYear": "Sünniaasta",
   "sortDeathYear": "Surmaaasta",

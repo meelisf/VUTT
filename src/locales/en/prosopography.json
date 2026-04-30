@@ -35,6 +35,8 @@
   "filterAadel": "Nobility",
   "nobility": "Nobility",
   "filterImmYear": "Year of matriculation",
+  "filterYearRange": "Year range",
+  "filterYearRangeShort": "Years",
   "sortAlpha": "A–Z",
   "sortBirthYear": "Birth year",
   "sortDeathYear": "Death year",

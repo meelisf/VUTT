@@ -13,6 +13,8 @@ export async function listPersons(params?: {
   status_id?: string;
   source?: string;
   verification_level?: string;
+  year_from?: number;
+  year_to?: number;
   imm_year_from?: number;
   imm_year_to?: number;
   sort_by?: string;
@@ -40,6 +42,8 @@ export async function listPersons(params?: {
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
+  if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
+  if (params?.year_to != null) url.searchParams.set('year_to', String(params.year_to));
   if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
   if (params?.sort_by) url.searchParams.set('sort_by', params.sort_by);
@@ -64,6 +68,8 @@ export async function fetchPersonMapMarkers(params?: {
   status_id?: string;
   source?: string;
   verification_level?: string;
+  year_from?: number;
+  year_to?: number;
   imm_year_from?: number;
   imm_year_to?: number;
   ids?: string[];
@@ -78,6 +84,8 @@ export async function fetchPersonMapMarkers(params?: {
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
+  if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
+  if (params?.year_to != null) url.searchParams.set('year_to', String(params.year_to));
   if (params?.imm_year_from != null) url.searchParams.set('imm_year_from', String(params.imm_year_from));
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
