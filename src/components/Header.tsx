@@ -57,7 +57,7 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200 px-3 py-2 sm:px-6 sm:py-3 flex items-center justify-between sticky top-0 z-40 shadow-sm">
+      <header className="bg-white border-b border-gray-200 px-3 py-2 sm:px-6 sm:py-3 flex items-center justify-between sticky top-0 z-[1200] shadow-sm">
         {/* Vasak pool: logo, otsing, pealkiri */}
         <div className="flex items-center gap-2 sm:gap-4">
           <a href="/" onClick={handleLogoClick} className="hover:opacity-80 transition-opacity flex items-center gap-2 cursor-pointer">
