@@ -10,6 +10,7 @@ export interface PlaceTreeGroup {
   groupKey: string | null;
   groupLabels: Record<string, string> | null;
   sortOrder: number;
+  groupPlaceKey?: string;       // koha võti, mis kattub grupi võtmega (näit. "soome" grupp + "soome" koht)
   nodes: PlaceTreeNode[];       // direct places in this group
   subGroups: PlaceTreeGroup[];  // child groups (only at top level)
 }
@@ -66,11 +67,15 @@ export function buildPlacesTree(
   const groupMap = new Map<string, PlaceTreeGroup>();
   for (const [groupKey, groupMeta] of sortedGroups) {
     const roots = groupRoots.get(groupKey) ?? [];
+    const matchIdx = roots.indexOf(groupKey);
+    const groupPlaceKey = matchIdx !== -1 ? groupKey : undefined;
+    const filteredRoots = matchIdx !== -1 ? roots.filter((_, i) => i !== matchIdx) : roots;
     groupMap.set(groupKey, {
       groupKey,
       groupLabels: groupMeta.labels ?? null,
       sortOrder: groupMeta.sort_order ?? 50,
-      nodes: roots.map(k => buildSubtree(k, places, groupKey, placeGroupMap)),
+      groupPlaceKey,
+      nodes: filteredRoots.map(k => buildSubtree(k, places, groupKey, placeGroupMap)),
       subGroups: [],
     });
   }
