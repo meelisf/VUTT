@@ -62,7 +62,7 @@ const Places: React.FC = () => {
       .then((data: any) => {
         const counts: Record<string, number> = {};
         const samples: Record<string, { id: string; name: string; imm_year?: number | null }[]> = {};
-        for (const entry of (data.entries ?? [])) {
+        for (const entry of (data.results ?? [])) {
           const pk = entry.origin_place;
           if (!pk) continue;
           counts[pk] = (counts[pk] ?? 0) + 1;
@@ -101,6 +101,15 @@ const Places: React.FC = () => {
     setPlaces(prev => {
       const next = { ...prev };
       delete next[sourceKey];
+      return next;
+    });
+    setSelectedKey(null);
+  }, []);
+
+  const handleDeleted = useCallback((key: string) => {
+    setPlaces(prev => {
+      const next = { ...prev };
+      delete next[key];
       return next;
     });
     setSelectedKey(null);
@@ -200,6 +209,7 @@ const Places: React.FC = () => {
                     lang={lang}
                     onUpdated={handleUpdated}
                     onMerged={handleMerged}
+                    onDeleted={handleDeleted}
                     onSelectKey={setSelectedKey}
                   />
                 ) : (

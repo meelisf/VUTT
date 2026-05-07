@@ -166,7 +166,12 @@
     "mergeSuccess": "Merged — {{count}} persons redirected",
     "parentLink": "→ {{name}}",
     "ungrouped": "(no group)",
-    "loadError": "Failed to load places"
+    "loadError": "Failed to load places",
+    "delete": "Delete",
+    "deleteTitle": "Delete place",
+    "deleteConfirm": "Permanently delete place \"{{name}}\"?",
+    "deleting": "Deleting…",
+    "deleteError": "Failed to delete place"
   },
   "trash": {
     "tab": "Trash",

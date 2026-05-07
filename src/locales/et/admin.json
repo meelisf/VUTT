@@ -166,7 +166,12 @@
     "mergeSuccess": "Ühendatud — {{count}} isikut suunati ümber",
     "parentLink": "→ {{name}}",
     "ungrouped": "(määramata grupp)",
-    "loadError": "Kohtade laadimine ebaõnnestus"
+    "loadError": "Kohtade laadimine ebaõnnestus",
+    "delete": "Kustuta",
+    "deleteTitle": "Kustuta koht",
+    "deleteConfirm": "Kustuta koht \"{{name}}\" jäädavalt?",
+    "deleting": "Kustutan…",
+    "deleteError": "Kustutamine ebaõnnestus"
   },
   "trash": {
     "tab": "Prügikast",

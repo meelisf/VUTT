@@ -384,6 +384,17 @@ export async function updatePlace(
   return resp.json();
 }
 
+export async function deletePlace(key: string, token: string): Promise<void> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/places/${encodeURIComponent(key)}`,
+    { method: 'DELETE', headers: getAuthHeaders(token), timeout: 10000 },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `deletePlace: ${resp.status}`);
+  }
+}
+
 export async function mergePlaces(
   sourceKey: string,
   targetKey: string,
