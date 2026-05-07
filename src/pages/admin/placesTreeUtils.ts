@@ -10,7 +10,7 @@ export interface PlaceTreeGroup {
   groupKey: string | null;
   groupLabels: Record<string, string> | null;
   sortOrder: number;
-  groupPlaceKey?: string;       // koha võti, mis kattub grupi võtmega (näit. "soome" grupp + "soome" koht)
+  groupPlaceKey?: string;       // grupi esinduskoha võti (leitakse labelite kattuvuse järgi)
   nodes: PlaceTreeNode[];       // direct places in this group
   subGroups: PlaceTreeGroup[];  // child groups (only at top level)
 }
@@ -67,9 +67,17 @@ export function buildPlacesTree(
   const groupMap = new Map<string, PlaceTreeGroup>();
   for (const [groupKey, groupMeta] of sortedGroups) {
     const roots = groupRoots.get(groupKey) ?? [];
-    const matchIdx = roots.indexOf(groupKey);
-    const groupPlaceKey = matchIdx !== -1 ? groupKey : undefined;
-    const filteredRoots = matchIdx !== -1 ? roots.filter((_, i) => i !== matchIdx) : roots;
+    const groupLabelValues = new Set(
+      Object.values(groupMeta.labels ?? {}).map(l => l.toLowerCase())
+    );
+    const matchIdx = roots.findIndex(k => {
+      if (k.toLowerCase() === groupKey.toLowerCase()) return true;
+      return Object.values(places[k]?.labels ?? {}).some(l =>
+        groupLabelValues.has(l.toLowerCase())
+      );
+    });
+    const groupPlaceKey = matchIdx !== -1 ? roots[matchIdx] : undefined;
+    const filteredRoots = groupPlaceKey ? roots.filter((_, i) => i !== matchIdx) : roots;
     groupMap.set(groupKey, {
       groupKey,
       groupLabels: groupMeta.labels ?? null,
