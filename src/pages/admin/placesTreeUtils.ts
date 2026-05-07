@@ -10,7 +10,8 @@ export interface PlaceTreeGroup {
   groupKey: string | null;
   groupLabels: Record<string, string> | null;
   sortOrder: number;
-  nodes: PlaceTreeNode[];
+  nodes: PlaceTreeNode[];       // direct places in this group
+  subGroups: PlaceTreeGroup[];  // child groups (only at top level)
 }
 
 function resolveGroupKey(
@@ -40,7 +41,7 @@ function buildSubtree(
 
 export function buildPlacesTree(
   places: Record<string, PlaceEntry>,
-  groups: Record<string, { labels?: Record<string, string>; sort_order?: number }>,
+  groups: Record<string, { labels?: Record<string, string>; sort_order?: number; parent?: string | null }>,
 ): PlaceTreeGroup[] {
   const placeGroupMap = new Map<string, string | null>();
   for (const key of Object.keys(places)) {
@@ -58,30 +59,45 @@ export function buildPlacesTree(
     }
   }
 
-  const result: PlaceTreeGroup[] = [];
-
   const sortedGroups = Object.entries(groups).sort(
     ([, a], [, b]) => (a.sort_order ?? 50) - (b.sort_order ?? 50),
   );
 
+  const groupMap = new Map<string, PlaceTreeGroup>();
   for (const [groupKey, groupMeta] of sortedGroups) {
     const roots = groupRoots.get(groupKey) ?? [];
-    if (roots.length === 0) continue;
-    result.push({
+    groupMap.set(groupKey, {
       groupKey,
       groupLabels: groupMeta.labels ?? null,
       sortOrder: groupMeta.sort_order ?? 50,
       nodes: roots.map(k => buildSubtree(k, places, groupKey, placeGroupMap)),
+      subGroups: [],
     });
   }
 
   const ungroupedRoots = groupRoots.get(null) ?? [];
+
+  const result: PlaceTreeGroup[] = [];
+
+  for (const [groupKey, groupMeta] of sortedGroups) {
+    const parent = groupMeta.parent;
+    if (parent && groups[parent]) continue; // on alamgrupp, jätame vahele
+    const group = groupMap.get(groupKey)!;
+    const children = sortedGroups
+      .filter(([, m]) => m.parent === groupKey)
+      .map(([k]) => groupMap.get(k)!)
+      .filter(Boolean);
+    if (group.nodes.length === 0 && children.length === 0) continue;
+    result.push({ ...group, subGroups: children });
+  }
+
   if (ungroupedRoots.length > 0) {
     result.push({
       groupKey: null,
       groupLabels: null,
       sortOrder: 999,
       nodes: ungroupedRoots.map(k => buildSubtree(k, places, null, placeGroupMap)),
+      subGroups: [],
     });
   }
 

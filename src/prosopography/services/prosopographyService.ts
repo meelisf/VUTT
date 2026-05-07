@@ -395,6 +395,50 @@ export async function deletePlace(key: string, token: string): Promise<void> {
   }
 }
 
+export async function putGroup(
+  key: string,
+  data: { labels?: Record<string, string>; sort_order?: number; parent?: string | null },
+  token: string,
+): Promise<{ key: string; entry: Record<string, any> }> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/groups/${encodeURIComponent(key)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify(data),
+      timeout: 10000,
+    },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `putGroup: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function deleteGroup(key: string, token: string): Promise<void> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/groups/${encodeURIComponent(key)}`,
+    { method: 'DELETE', headers: getAuthHeaders(token), timeout: 10000 },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `deleteGroup: ${resp.status}`);
+  }
+}
+
+export async function autoAssignGroupParents(token: string): Promise<{ assigned: number; skipped: string[] }> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/groups/auto-assign`,
+    { method: 'POST', headers: getAuthHeaders(token), timeout: 10000 },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `autoAssignGroupParents: ${resp.status}`);
+  }
+  return resp.json();
+}
+
 export async function mergePlaces(
   sourceKey: string,
   targetKey: string,

@@ -74,6 +74,38 @@ function TreeNode({
   );
 }
 
+function SubGroupSection({ group, selectedKey, onSelect, lang }: {
+  group: PlaceTreeGroup;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+  lang: string;
+}) {
+  const [open, setOpen] = useState(true);
+  const label = group.groupLabels
+    ? resolveLabel(group.groupLabels, lang)
+    : (group.groupKey ?? '—');
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full text-left flex items-center gap-1 px-3 py-0.5"
+      >
+        <span className="text-gray-400">
+          {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+        </span>
+        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate">
+          {label}
+        </span>
+      </button>
+      {open && group.nodes.map(node => (
+        <TreeNode key={node.key} node={node} depth={1} selectedKey={selectedKey} onSelect={onSelect} lang={lang} />
+      ))}
+    </div>
+  );
+}
+
 const PlacesTree: React.FC<PlacesTreeProps> = ({ groups, selectedKey, onSelect, lang }) => {
   const { t } = useTranslation('admin');
 
@@ -86,19 +118,13 @@ const PlacesTree: React.FC<PlacesTreeProps> = ({ groups, selectedKey, onSelect, 
       {groups.map(group => (
         <div key={group.groupKey ?? '__ungrouped'} className="mb-3">
           <div className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {group.groupLabels
-              ? resolveLabel(group.groupLabels, lang)
-              : t('places.ungrouped')}
+            {group.groupLabels ? resolveLabel(group.groupLabels, lang) : t('places.ungrouped')}
           </div>
           {group.nodes.map(node => (
-            <TreeNode
-              key={node.key}
-              node={node}
-              depth={0}
-              selectedKey={selectedKey}
-              onSelect={onSelect}
-              lang={lang}
-            />
+            <TreeNode key={node.key} node={node} depth={0} selectedKey={selectedKey} onSelect={onSelect} lang={lang} />
+          ))}
+          {group.subGroups.map(sub => (
+            <SubGroupSection key={sub.groupKey} group={sub} selectedKey={selectedKey} onSelect={onSelect} lang={lang} />
           ))}
         </div>
       ))}
