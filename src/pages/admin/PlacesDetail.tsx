@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Edit2, GitMerge, Loader2, X, Plus } from 'lucide-react';
+import { Edit2, GitMerge, Trash2, Loader2, X, Plus } from 'lucide-react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import { icon } from 'leaflet';
-import { updatePlace } from '../../prosopography/services/prosopographyService';
+import { updatePlace, deletePlace } from '../../prosopography/services/prosopographyService';
 import type { PlaceEntry } from '../../prosopography/types';
 import PlacesMergeModal from './PlacesMergeModal';
 
@@ -39,16 +39,20 @@ interface PlacesDetailProps {
   lang: string;
   onUpdated: (key: string, entry: PlaceEntry) => void;
   onMerged: (sourceKey: string, targetKey: string) => void;
+  onDeleted: (key: string) => void;
   onSelectKey: (key: string) => void;
 }
 
 const PlacesDetail: React.FC<PlacesDetailProps> = ({
   placeKey, entry, places, meta, personCount, personSample,
-  token, lang, onUpdated, onMerged, onSelectKey,
+  token, lang, onUpdated, onMerged, onDeleted, onSelectKey,
 }) => {
   const { t } = useTranslation('admin');
   const [editing, setEditing] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Edit form state
   const [labels, setLabels] = useState<Record<string, string>>({});
@@ -359,7 +363,10 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
       {/* Päis */}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">{name}</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-0.5">{name}</h2>
+          {name !== placeKey && (
+            <p className="text-xs text-gray-400 mb-1 font-mono">{placeKey}</p>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {entry.type && (
               <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{entry.type}</span>
@@ -396,8 +403,51 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
             <GitMerge size={13} />
             {t('places.merge')}
           </button>
+          <button
+            onClick={() => { setShowDeleteConfirm(true); setDeleteError(null); }}
+            className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            <Trash2 size={13} />
+            {t('places.delete')}
+          </button>
         </div>
       </div>
+
+      {/* Kustutamise kinnitus */}
+      {showDeleteConfirm && (
+        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-sm text-red-800 mb-2">
+            {t('places.deleteConfirm', { name: resolveLabel(entry.labels, lang) || placeKey })}
+          </p>
+          {deleteError && <p className="text-xs text-red-700 mb-2">{deleteError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError(null);
+                try {
+                  await deletePlace(placeKey, token);
+                  onDeleted(placeKey);
+                } catch (e: any) {
+                  setDeleteError(e.message ?? t('places.deleteError'));
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              {deleting ? t('places.deleting') : t('places.delete')}
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(false)}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+            >
+              {t('places.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Minikaart */}
       {hasCoords && (

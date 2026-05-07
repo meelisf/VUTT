@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2, Search, Plus } from 'lucide-react';
+import { ChevronLeft, Loader2, Search, Plus, Settings } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { fetchPlaces, fetchPlacesMeta } from '../../prosopography/services/prosopographyService';
@@ -11,6 +11,7 @@ import type { PlaceEntry } from '../../prosopography/types';
 import { buildPlacesTree } from './placesTreeUtils';
 import PlacesTree from './PlacesTree';
 import PlacesDetail from './PlacesDetail';
+import PlacesGroupPanel from './PlacesGroupPanel';
 import AddPlaceModal from '../../prosopography/components/AddPlaceModal';
 
 const MAX_PERSON_SAMPLE = 5;
@@ -34,6 +35,7 @@ const Places: React.FC = () => {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showGroupPanel, setShowGroupPanel] = useState(false);
 
   const [personCounts, setPersonCounts] = useState<Record<string, number>>({});
   const [personSamples, setPersonSamples] = useState<
@@ -62,7 +64,7 @@ const Places: React.FC = () => {
       .then((data: any) => {
         const counts: Record<string, number> = {};
         const samples: Record<string, { id: string; name: string; imm_year?: number | null }[]> = {};
-        for (const entry of (data.entries ?? [])) {
+        for (const entry of (data.results ?? [])) {
           const pk = entry.origin_place;
           if (!pk) continue;
           counts[pk] = (counts[pk] ?? 0) + 1;
@@ -106,6 +108,23 @@ const Places: React.FC = () => {
     setSelectedKey(null);
   }, []);
 
+  const handleDeleted = useCallback((key: string) => {
+    setPlaces(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setSelectedKey(null);
+  }, []);
+
+  const handleGroupsChanged = useCallback((updated: Record<string, any>) => {
+    if ('__reload' in updated) {
+      fetchPlacesMeta().then(m => setMeta(m)).catch(() => {});
+      return;
+    }
+    setMeta(prev => prev ? { ...prev, groups: updated } : prev);
+  }, []);
+
   if (userLoading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -139,6 +158,13 @@ const Places: React.FC = () => {
               className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400"
             />
             <button
+              onClick={() => setShowGroupPanel(s => !s)}
+              className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded border ${showGroupPanel ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+            >
+              <Settings size={14} />
+              {t('places.groups')}
+            </button>
+            <button
               onClick={() => setShowAddModal(true)}
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 shrink-0"
             >
@@ -157,6 +183,15 @@ const Places: React.FC = () => {
             <div className="flex" style={{ minHeight: 'calc(100vh - 240px)' }}>
               {/* Vasak: puu / otsingutulemused */}
               <div className="w-64 border-r border-gray-100 overflow-y-auto shrink-0">
+                {showGroupPanel && meta && (
+                  <PlacesGroupPanel
+                    groups={meta.groups}
+                    token={authToken!}
+                    lang={lang}
+                    onGroupsChanged={handleGroupsChanged}
+                    onClose={() => setShowGroupPanel(false)}
+                  />
+                )}
                 {searchResults ? (
                   <div className="py-2">
                     {searchResults.length === 0 ? (
@@ -200,6 +235,7 @@ const Places: React.FC = () => {
                     lang={lang}
                     onUpdated={handleUpdated}
                     onMerged={handleMerged}
+                    onDeleted={handleDeleted}
                     onSelectKey={setSelectedKey}
                   />
                 ) : (

@@ -58,3 +58,50 @@ describe('buildPlacesTree', () => {
     expect(buildPlacesTree({}, {})).toEqual([]);
   });
 });
+
+describe('buildPlacesTree — nested groups', () => {
+  test('sub-group appears under parent group', () => {
+    const places = {
+      'smaland': { labels: { et: 'Småland' }, group: 'gootaland' } as PlaceEntry,
+      'rootsi-country': { labels: { et: 'Rootsi' }, group: 'rootsi' } as PlaceEntry,
+    };
+    const groups = {
+      rootsi: { labels: { et: 'Rootsi' }, sort_order: 2 },
+      gootaland: { labels: { et: 'Götaland' }, sort_order: 10, parent: 'rootsi' },
+    };
+    const result = buildPlacesTree(places, groups);
+    expect(result).toHaveLength(1);
+    expect(result[0].groupKey).toBe('rootsi');
+    expect(result[0].subGroups).toHaveLength(1);
+    expect(result[0].subGroups[0].groupKey).toBe('gootaland');
+    expect(result[0].subGroups[0].nodes[0].key).toBe('smaland');
+  });
+
+  test('top-level group with no parent stays top-level', () => {
+    const places = {
+      'livland': { labels: { et: 'Livland' }, group: 'liivimaa' } as PlaceEntry,
+    };
+    const groups = {
+      liivimaa: { labels: { et: 'Liivimaa' }, sort_order: 6 },
+    };
+    const result = buildPlacesTree(places, groups);
+    expect(result).toHaveLength(1);
+    expect(result[0].groupKey).toBe('liivimaa');
+    expect(result[0].subGroups).toHaveLength(0);
+  });
+
+  test('top-level group with only sub-groups and no direct places still renders', () => {
+    const places = {
+      'smaland': { labels: { et: 'Småland' }, group: 'gootaland' } as PlaceEntry,
+    };
+    const groups = {
+      rootsi: { labels: { et: 'Rootsi' }, sort_order: 2 },
+      gootaland: { labels: { et: 'Götaland' }, sort_order: 10, parent: 'rootsi' },
+    };
+    const result = buildPlacesTree(places, groups);
+    expect(result).toHaveLength(1);
+    expect(result[0].groupKey).toBe('rootsi');
+    expect(result[0].nodes).toHaveLength(0);
+    expect(result[0].subGroups).toHaveLength(1);
+  });
+});
