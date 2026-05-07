@@ -362,3 +362,45 @@ export async function addPlace(key: string, data: Partial<PlaceEntry>, token: st
   }
   return resp.json();
 }
+
+export async function updatePlace(
+  key: string,
+  data: Partial<PlaceEntry> & { historical_names?: string[]; notes?: string },
+  token: string,
+): Promise<{ key: string; entry: PlaceEntry }> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/places/${encodeURIComponent(key)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify(data),
+      timeout: 10000,
+    },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `updatePlace: ${resp.status}`);
+  }
+  return resp.json();
+}
+
+export async function mergePlaces(
+  sourceKey: string,
+  targetKey: string,
+  token: string,
+): Promise<{ redirected: number; target_key: string }> {
+  const resp = await fetchWithTimeout(
+    `${BASE}/admin/places/${encodeURIComponent(sourceKey)}/merge`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify({ target_key: targetKey }),
+      timeout: 15000,
+    },
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error((err as any).detail ?? `mergePlaces: ${resp.status}`);
+  }
+  return resp.json();
+}
