@@ -170,6 +170,8 @@
     "delete": "Kustuta",
     "deleteTitle": "Kustuta koht",
     "deleteConfirm": "Kustuta koht \"{{name}}\" jäädavalt?",
+    "deleteConfirmWord": "kustutan",
+    "deleteInputPlaceholder": "Kinnitamiseks trüki \"{{word}}\"",
     "deleting": "Kustutan…",
     "deleteError": "Kustutamine ebaõnnestus",
     "groups": "Grupid",

@@ -117,7 +117,7 @@ const PlacesTree: React.FC<PlacesTreeProps> = ({ groups, selectedKey, onSelect, 
     <div className="py-2">
       {groups.map(group => (
         <div key={group.groupKey ?? '__ungrouped'} className="mb-3">
-          <div className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          <div className="px-3 pb-1 text-sm font-semibold text-gray-700">
             {group.groupLabels ? resolveLabel(group.groupLabels, lang) : t('places.ungrouped')}
           </div>
           {group.nodes.map(node => (

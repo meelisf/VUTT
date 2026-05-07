@@ -170,6 +170,8 @@
     "delete": "Delete",
     "deleteTitle": "Delete place",
     "deleteConfirm": "Permanently delete place \"{{name}}\"?",
+    "deleteConfirmWord": "delete",
+    "deleteInputPlaceholder": "Type \"{{word}}\" to confirm",
     "deleting": "Deleting…",
     "deleteError": "Failed to delete place",
     "groups": "Groups",
