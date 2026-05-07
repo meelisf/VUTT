@@ -3,6 +3,7 @@ Koharegister (places.json) ja päritolugrupid (origin_groups.json).
 Cache, abifunktsioonid, propagatsioon.
 """
 import json
+import os
 import re
 import time
 import threading
@@ -10,7 +11,7 @@ import urllib.request
 import urllib.parse
 from typing import Optional
 
-from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, get_logger
+from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
 
 logger = get_logger(__name__)
@@ -484,3 +485,59 @@ def refresh_all_place_labels() -> int:
         atomic_write_json(PLACES_FILE, places)
         _load_places_cache(force_reload=True)
     return updated
+
+
+def merge_places(source_key: str, target_key: str) -> dict:
+    """
+    Ühendab source_key sihtkoha target_key alla.
+    1. Uuendab kõik isikud kelle origin.place == source_key → target_key.
+    2. Lisab source_key sihtkoha historical_names listi.
+    3. Kustutab source_key places.json-st.
+    4. Tagastab {"redirected": N, "target_key": target_key}.
+    """
+    import glob as _glob_mod
+
+    if source_key == target_key:
+        raise ValueError("Ei saa kohta iseendaga ühendada")
+
+    places = _load_places_cache(force_reload=True)
+
+    if source_key not in places:
+        raise ValueError(f"Source koht ei leitud: {source_key!r}")
+    if target_key not in places:
+        raise ValueError(f"Target koht ei leitud: {target_key!r}")
+
+    # 1. Uuenda isikute failid
+    redirected = 0
+    pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
+    for fpath in _glob_mod.glob(pattern):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                person = json.load(f)
+        except Exception:
+            continue
+        origin = person.get("origin")
+        if not isinstance(origin, dict):
+            continue
+        if origin.get("place") != source_key:
+            continue
+        origin["place"] = target_key
+        atomic_write_json(fpath, person)
+        redirected += 1
+
+    # 2. Lisa source_key sihtkoha historical_names-i
+    target = dict(places[target_key])
+    hist = list(target.get("historical_names") or [])
+    if source_key not in hist:
+        hist.append(source_key)
+    target["historical_names"] = hist
+    places[target_key] = target
+
+    # 3. Kustuta source
+    del places[source_key]
+
+    atomic_write_json(PLACES_FILE, places)
+    _load_places_cache(force_reload=True)
+
+    logger.info("merge_places: %s → %s, %d isikut ümber suunatud", source_key, target_key, redirected)
+    return {"redirected": redirected, "target_key": target_key}

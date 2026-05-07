@@ -359,3 +359,135 @@ def test_put_place_rejects_invalid_coordinates(tmp_path):
         from server.prosopography.places_ops import put_place
         with pytest.raises(ValueError, match="coordinates"):
             put_place("Bad", {"coordinates": {"lat": "56", "lon": 24}})
+
+
+# ── merge_places ────────────────────────────────────────────────────────────
+
+def test_merge_places_redirects_persons(tmp_path):
+    """Ühendamisel uuendatakse kõik isikud kelle origin.place == source_key."""
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+
+    places = {
+        "Wexionensis": {"labels": {"et": "Wexionensis"}, "type": "parish", "historical_names": []},
+        "Smaland": {"labels": {"et": "Smaland"}, "type": "province", "historical_names": ["ex Smolandia"]},
+    }
+    places_file.write_text(json.dumps(places))
+    groups_file.write_text(json.dumps({}))
+
+    person1 = {"id": "aaa", "name": "Johannes", "origin": {"place": "Wexionensis"}}
+    person2 = {"id": "bbb", "name": "Andreas", "origin": {"place": "Wexionensis"}}
+    person3 = {"id": "ccc", "name": "Petrus", "origin": {"place": "Smaland"}}
+    (prosopo_dir / "aaa.json").write_text(json.dumps(person1))
+    (prosopo_dir / "bbb.json").write_text(json.dumps(person2))
+    (prosopo_dir / "ccc.json").write_text(json.dumps(person3))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        result = merge_places("Wexionensis", "Smaland")
+
+    assert result["redirected"] == 2
+    p1 = json.loads((prosopo_dir / "aaa.json").read_text())
+    p2 = json.loads((prosopo_dir / "bbb.json").read_text())
+    p3 = json.loads((prosopo_dir / "ccc.json").read_text())
+    assert p1["origin"]["place"] == "Smaland"
+    assert p2["origin"]["place"] == "Smaland"
+    assert p3["origin"]["place"] == "Smaland"  # oli juba Smaland
+
+
+def test_merge_places_adds_source_to_historical_names(tmp_path):
+    """Source võti lisatakse sihtkoha historical_names listi."""
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+
+    places = {
+        "Wexionensis": {"labels": {"et": "Wexionensis"}, "historical_names": ["cohaesivi"]},
+        "Smaland": {"labels": {"et": "Smaland"}, "historical_names": ["ex Smolandia"]},
+    }
+    places_file.write_text(json.dumps(places))
+    groups_file.write_text(json.dumps({}))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        merge_places("Wexionensis", "Smaland")
+
+    updated_places = json.loads(places_file.read_text())
+    assert "Wexionensis" not in updated_places
+    assert "Wexionensis" in updated_places["Smaland"]["historical_names"]
+    assert "ex Smolandia" in updated_places["Smaland"]["historical_names"]  # vana säilib
+
+
+def test_merge_places_raises_on_missing_source(tmp_path):
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    places_file.write_text(json.dumps({"Smaland": {"labels": {}, "historical_names": []}}))
+    groups_file.write_text(json.dumps({}))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        with pytest.raises(ValueError, match="Source"):
+            merge_places("TundmatuKoht", "Smaland")
+
+
+def test_merge_places_raises_on_missing_target(tmp_path):
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    places_file.write_text(json.dumps({"Wexionensis": {"labels": {}, "historical_names": []}}))
+    groups_file.write_text(json.dumps({}))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        with pytest.raises(ValueError, match="Target"):
+            merge_places("Wexionensis", "TundmatuSiht")
+
+
+def test_merge_places_raises_on_self_merge(tmp_path):
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    places_file.write_text(json.dumps({"Smaland": {"labels": {}, "historical_names": []}}))
+    groups_file.write_text(json.dumps({}))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        with pytest.raises(ValueError, match="ise"):
+            merge_places("Smaland", "Smaland")
