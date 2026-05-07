@@ -363,7 +363,10 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
       {/* Päis */}
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">{name}</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-0.5">{name}</h2>
+          {name !== placeKey && (
+            <p className="text-xs text-gray-400 mb-1 font-mono">{placeKey}</p>
+          )}
           <div className="flex flex-wrap gap-1.5">
             {entry.type && (
               <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{entry.type}</span>

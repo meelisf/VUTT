@@ -43,7 +43,12 @@ function TreeNode({
             ? (open ? <ChevronDown size={13} /> : <ChevronRight size={13} />)
             : <span className="inline-block w-3" />}
         </span>
-        <span className="truncate flex-1">{resolveLabel(node.entry.labels, lang)}</span>
+        <span className="truncate flex-1">
+          {resolveLabel(node.entry.labels, lang) || node.key}
+          {!Object.values(node.entry.labels ?? {}).includes(node.key) && (
+            <span className="text-xs text-gray-400 ml-1 font-normal">{node.key}</span>
+          )}
+        </span>
         {node.entry.type && (
           <span className="text-xs text-gray-400 shrink-0">{node.entry.type}</span>
         )}
