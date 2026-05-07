@@ -565,6 +565,7 @@ def list_persons(
     gender: Optional[str] = None,
     occupation: Optional[str] = None,
     origin_group: Optional[str] = None,
+    origin_place: Optional[str] = None,
     institution: Optional[str] = None,
     status_id: Optional[str] = None,
     source: Optional[str] = None,
@@ -587,6 +588,7 @@ def list_persons(
         gender=gender,
         occupation=occupation,
         origin_group=origin_group,
+        origin_place=origin_place,
         institution=institution,
         status_id=status_id,
         source=source,
@@ -620,6 +622,7 @@ def _filter_index_entries(
     gender: Optional[str] = None,
     occupation: Optional[str] = None,
     origin_group: Optional[str] = None,
+    origin_place: Optional[str] = None,
     institution: Optional[str] = None,
     status_id: Optional[str] = None,
     source: Optional[str] = None,
@@ -663,6 +666,8 @@ def _filter_index_entries(
         ]
     if origin_group:
         results = [e for e in results if e.get("origin_group") == origin_group]
+    if origin_place:
+        results = [e for e in results if e.get("origin_place") == origin_place]
     if institution:
         inst_lower = institution.strip().lower()
         results = [

@@ -27,6 +27,7 @@ const PersonsPage: React.FC = () => {
 
   const query  = searchParams.get('q') ?? '';
   const originGroup = searchParams.get('origin_group') ?? '';
+  const originPlace = searchParams.get('origin_place') ?? '';
   const institution = searchParams.get('institution') ?? '';
   const source = searchParams.get('source') ?? '';
   const gender = (searchParams.get('gender') ?? '') as GenderFilter;
@@ -123,6 +124,7 @@ const PersonsPage: React.FC = () => {
     listPersons({
       q: query || undefined,
       origin_group: originGroup || undefined,
+      origin_place: originPlace || undefined,
       institution: institution || undefined,
       source: source || undefined,
       gender: gender || undefined,

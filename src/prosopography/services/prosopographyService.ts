@@ -9,6 +9,7 @@ export async function listPersons(params?: {
   gender?: string;
   occupation?: string;
   origin_group?: string;
+  origin_place?: string;
   institution?: string;
   status_id?: string;
   source?: string;
@@ -38,6 +39,7 @@ export async function listPersons(params?: {
   if (params?.gender) url.searchParams.set('gender', params.gender);
   if (params?.occupation) url.searchParams.set('occupation', params.occupation);
   if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
+  if (params?.origin_place) url.searchParams.set('origin_place', params.origin_place);
   if (params?.institution) url.searchParams.set('institution', params.institution);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
   if (params?.source) url.searchParams.set('source', params.source);

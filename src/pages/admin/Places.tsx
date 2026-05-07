@@ -72,7 +72,7 @@ const Places: React.FC = () => {
           if (samples[pk].length < MAX_PERSON_SAMPLE) {
             samples[pk].push({
               id: entry.id,
-              name: entry.name ?? entry.id,
+              name: entry.label ?? entry.id,
               imm_year: entry.imm_year ?? null,
             });
           }
