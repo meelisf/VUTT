@@ -518,3 +518,102 @@ def test_merge_places_raises_on_source_has_children(tmp_path):
         from server.prosopography.places_ops import merge_places
         with pytest.raises(ValueError, match="alamkohti"):
             merge_places("Wexionensis", "Smaland")
+
+
+# --- Group CRUD tests ---
+
+def test_put_group_creates_new(tmp_path, monkeypatch):
+    import json
+    groups = {"soome": {"labels": {"et": "Soome"}, "sort_order": 1}}
+    gfile = tmp_path / "origin_groups.json"
+    gfile.write_text(json.dumps(groups))
+    pfile = tmp_path / "places.json"
+    pfile.write_text("{}")
+    monkeypatch.setattr("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(gfile))
+    monkeypatch.setattr("server.prosopography.places_ops.PLACES_FILE", str(pfile))
+    monkeypatch.setattr("server.prosopography.places_ops._groups_cache", None)
+    monkeypatch.setattr("server.prosopography.places_ops._places_cache", None)
+    from server.prosopography.places_ops import put_group
+    result = put_group("gootaland", {"labels": {"et": "Götaland"}, "sort_order": 10, "parent": "soome"})
+    assert result["key"] == "gootaland"
+    assert result["entry"]["parent"] == "soome"
+    saved = json.loads(gfile.read_text())
+    assert saved["gootaland"]["parent"] == "soome"
+
+
+def test_put_group_rejects_missing_parent(tmp_path, monkeypatch):
+    import json
+    groups = {"soome": {"labels": {"et": "Soome"}, "sort_order": 1}}
+    gfile = tmp_path / "origin_groups.json"
+    gfile.write_text(json.dumps(groups))
+    pfile = tmp_path / "places.json"
+    pfile.write_text("{}")
+    monkeypatch.setattr("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(gfile))
+    monkeypatch.setattr("server.prosopography.places_ops.PLACES_FILE", str(pfile))
+    monkeypatch.setattr("server.prosopography.places_ops._groups_cache", None)
+    monkeypatch.setattr("server.prosopography.places_ops._places_cache", None)
+    from server.prosopography.places_ops import put_group
+    with pytest.raises(ValueError, match="Parent grupp ei leitud"):
+        put_group("gootaland", {"labels": {"et": "Götaland"}, "parent": "nonexistent"})
+
+
+def test_delete_group_blocked_by_places(tmp_path, monkeypatch):
+    import json
+    groups = {"soome": {"labels": {"et": "Soome"}, "sort_order": 1}}
+    gfile = tmp_path / "origin_groups.json"
+    gfile.write_text(json.dumps(groups))
+    places = {"helsinki": {"labels": {"et": "Helsinki"}, "group": "soome"}}
+    pfile = tmp_path / "places.json"
+    pfile.write_text(json.dumps(places))
+    monkeypatch.setattr("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(gfile))
+    monkeypatch.setattr("server.prosopography.places_ops.PLACES_FILE", str(pfile))
+    monkeypatch.setattr("server.prosopography.places_ops._groups_cache", None)
+    monkeypatch.setattr("server.prosopography.places_ops._places_cache", None)
+    from server.prosopography.places_ops import delete_group
+    with pytest.raises(ValueError, match="kasutab"):
+        delete_group("soome")
+
+
+def test_delete_group_blocked_by_child_groups(tmp_path, monkeypatch):
+    import json
+    groups = {
+        "rootsi": {"labels": {"et": "Rootsi"}, "sort_order": 2},
+        "gootaland": {"labels": {"et": "Götaland"}, "sort_order": 10, "parent": "rootsi"},
+    }
+    gfile = tmp_path / "origin_groups.json"
+    gfile.write_text(json.dumps(groups))
+    pfile = tmp_path / "places.json"
+    pfile.write_text("{}")
+    monkeypatch.setattr("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(gfile))
+    monkeypatch.setattr("server.prosopography.places_ops.PLACES_FILE", str(pfile))
+    monkeypatch.setattr("server.prosopography.places_ops._groups_cache", None)
+    monkeypatch.setattr("server.prosopography.places_ops._places_cache", None)
+    from server.prosopography.places_ops import delete_group
+    with pytest.raises(ValueError, match="alamgrupid"):
+        delete_group("rootsi")
+
+
+def test_auto_assign_group_parents(tmp_path, monkeypatch):
+    import json
+    groups = {
+        "rootsi": {"labels": {"et": "Rootsi"}, "sort_order": 2},
+        "gootaland": {"labels": {"et": "Götaland"}, "sort_order": 10},
+        "svealand": {"labels": {"et": "Svealand"}, "sort_order": 11},
+        "soome": {"labels": {"et": "Soome"}, "sort_order": 1},
+        "ahvenanmaa": {"labels": {"et": "Ahvenanmaa"}, "sort_order": 20},
+    }
+    gfile = tmp_path / "origin_groups.json"
+    gfile.write_text(json.dumps(groups))
+    pfile = tmp_path / "places.json"
+    pfile.write_text("{}")
+    monkeypatch.setattr("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(gfile))
+    monkeypatch.setattr("server.prosopography.places_ops.PLACES_FILE", str(pfile))
+    monkeypatch.setattr("server.prosopography.places_ops._groups_cache", None)
+    monkeypatch.setattr("server.prosopography.places_ops._places_cache", None)
+    from server.prosopography.places_ops import auto_assign_group_parents
+    result = auto_assign_group_parents()
+    assert result["assigned"] >= 2
+    saved = json.loads(gfile.read_text())
+    assert saved["gootaland"]["parent"] == "rootsi"
+    assert saved["svealand"]["parent"] == "rootsi"
+    assert saved["ahvenanmaa"]["parent"] == "soome"

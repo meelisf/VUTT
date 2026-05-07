@@ -279,6 +279,85 @@ def get_places_meta() -> dict:
     }
 
 
+def put_group(key: str, data: dict) -> dict:
+    """Lisab või uuendab gruppi origin_groups.json-s."""
+    if not key or not key.strip():
+        raise ValueError("Grupi võti on kohustuslik")
+    groups = _load_origin_groups(force_reload=True)
+    parent = data.get("parent") or None
+    if parent and parent not in groups:
+        raise ValueError(f"Parent grupp ei leitud: {parent!r}")
+    if parent == key:
+        raise ValueError("Grupp ei saa olla oma parent")
+    entry = dict(groups.get(key, {}))
+    if "labels" in data:
+        entry["labels"] = data["labels"]
+    if "sort_order" in data:
+        entry["sort_order"] = int(data["sort_order"])
+    entry["parent"] = parent
+    groups[key] = entry
+    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    _load_origin_groups(force_reload=True)
+    return {"key": key, "entry": entry}
+
+
+def delete_group(key: str) -> None:
+    """Kustutab grupi origin_groups.json-st. Blokeerib kui kasutusel."""
+    groups = _load_origin_groups(force_reload=True)
+    if key not in groups:
+        raise ValueError(f"Grupp ei leitud: {key!r}")
+    places = _load_places_cache(force_reload=True)
+    used_by_places = [k for k, e in places.items() if e.get("group") == key]
+    if used_by_places:
+        raise ValueError(
+            f"Ei saa kustutada: gruppi kasutab {len(used_by_places)} koht(a): "
+            + ", ".join(used_by_places[:5])
+        )
+    child_groups = [k for k, e in groups.items() if e.get("parent") == key]
+    if child_groups:
+        raise ValueError(
+            f"Ei saa kustutada: grupil on alamgrupid: {', '.join(child_groups)}"
+        )
+    del groups[key]
+    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    _load_origin_groups(force_reload=True)
+
+
+AUTO_PARENT_MAP = {
+    "gootaland": "rootsi",
+    "svealand": "rootsi",
+    "norrland": "rootsi",
+    "ahvenanmaa": "soome",
+    "hame": "soome",
+    "lappi": "soome",
+    "pohjanmaa": "soome",
+    "satakunta": "soome",
+    "savo": "soome",
+    "uusimaa": "soome",
+    "varsinais-suomi": "soome",
+}
+
+
+def auto_assign_group_parents() -> dict:
+    """Rakendab AUTO_PARENT_MAP automaatselt teadaolevatele alamgruppidele."""
+    groups = _load_origin_groups(force_reload=True)
+    assigned = 0
+    skipped = []
+    for child_key, parent_key in AUTO_PARENT_MAP.items():
+        if child_key not in groups:
+            skipped.append(child_key)
+            continue
+        if parent_key not in groups:
+            skipped.append(f"{child_key}->{parent_key}(missing)")
+            continue
+        groups[child_key]["parent"] = parent_key
+        assigned += 1
+    atomic_write_json(ORIGIN_GROUPS_FILE, groups)
+    _load_origin_groups(force_reload=True)
+    logger.info("auto_assign_group_parents: %d uuendatud, %d vahele jäetud", assigned, len(skipped))
+    return {"assigned": assigned, "skipped": skipped}
+
+
 def put_place(key: str, data: dict) -> dict:
     """
     Lisab või uuendab koha places.json-s.

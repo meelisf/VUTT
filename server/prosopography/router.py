@@ -30,7 +30,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels, merge_places, delete_place
+from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 
 logger = get_logger(__name__)
 
@@ -504,6 +504,32 @@ async def places_merge(
     background_tasks.add_task(_propagate_place_change, target_key)
 
     return result
+
+
+@router.put("/admin/groups/{key}")
+async def groups_put(key: str, request: Request, user=Depends(_require_role("admin"))):
+    """Lisab või uuendab gruppi (admin). Body: {labels, sort_order, parent}"""
+    data = await _get_json(request)
+    try:
+        return put_group(key, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/admin/groups/{key}")
+async def groups_delete(key: str, user=Depends(_require_role("admin"))):
+    """Kustutab grupi (admin)."""
+    try:
+        delete_group(key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"deleted": key}
+
+
+@router.post("/admin/groups/auto-assign")
+async def groups_auto_assign(user=Depends(_require_role("admin"))):
+    """Rakendab automaatse parent seadmise teadaolevatele alamgruppidele."""
+    return auto_assign_group_parents()
 
 
 @router.delete("/admin/places/{key}")
