@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { UserPlus, Users, Upload, Library, History, Trash2, Wrench } from 'lucide-react';
+import { UserPlus, Users, Upload, Library, History, Trash2, Wrench, MapPin } from 'lucide-react';
 import Header from '../components/Header';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -104,6 +104,12 @@ const Admin: React.FC = () => {
       icon: <Wrench size={18} className="text-gray-500" />,
       group: t('admin:groups.settings'),
       href: '/admin/maintenance',
+    },
+    {
+      key: 'places',
+      icon: <MapPin size={18} className="text-teal-600" />,
+      group: t('admin:groups.settings'),
+      href: '/admin/places',
     },
   ];
 
