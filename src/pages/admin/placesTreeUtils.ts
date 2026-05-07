@@ -72,12 +72,20 @@ export function buildPlacesTree(
     );
     const matchIdx = roots.findIndex(k => {
       if (k.toLowerCase() === groupKey.toLowerCase()) return true;
-      return Object.values(places[k]?.labels ?? {}).some(l =>
-        groupLabelValues.has(l.toLowerCase())
-      );
+      return Object.values(places[k]?.labels ?? {}).some(pl => {
+        const pll = pl.toLowerCase();
+        return [...groupLabelValues].some(gl => pll === gl || pll.startsWith(gl + ' '));
+      });
     });
     const groupPlaceKey = matchIdx !== -1 ? roots[matchIdx] : undefined;
-    const filteredRoots = groupPlaceKey ? roots.filter((_, i) => i !== matchIdx) : roots;
+    let filteredRoots = groupPlaceKey ? roots.filter((_, i) => i !== matchIdx) : roots;
+    // Esindaja lapsed (nt Riia < Livland) tõusevad grupi juurkirjeteks
+    if (groupPlaceKey) {
+      const repChildren = Object.keys(places).filter(k =>
+        places[k].parent_key === groupPlaceKey && placeGroupMap.get(k) === groupKey
+      );
+      filteredRoots = [...filteredRoots, ...repChildren];
+    }
     groupMap.set(groupKey, {
       groupKey,
       groupLabels: groupMeta.labels ?? null,
