@@ -2,6 +2,7 @@
 Koharegister (places.json) ja päritolugrupid (origin_groups.json).
 Cache, abifunktsioonid, propagatsioon.
 """
+import glob
 import json
 import os
 import re
@@ -495,8 +496,6 @@ def merge_places(source_key: str, target_key: str) -> dict:
     3. Kustutab source_key places.json-st.
     4. Tagastab {"redirected": N, "target_key": target_key}.
     """
-    import glob as _glob_mod
-
     if source_key == target_key:
         raise ValueError("Ei saa kohta iseendaga ühendada")
 
@@ -507,14 +506,22 @@ def merge_places(source_key: str, target_key: str) -> dict:
     if target_key not in places:
         raise ValueError(f"Target koht ei leitud: {target_key!r}")
 
+    # Kontrolli et source_key-l pole alamkohti
+    children = [k for k, e in places.items() if e.get("parent_key") == source_key]
+    if children:
+        raise ValueError(
+            f"Ei saa ühendada: kohale {source_key!r} on seotud alamkohti: {', '.join(children)}"
+        )
+
     # 1. Uuenda isikute failid
     redirected = 0
     pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
-    for fpath in _glob_mod.glob(pattern):
+    for fpath in glob.glob(pattern):
         try:
             with open(fpath, "r", encoding="utf-8") as f:
                 person = json.load(f)
-        except Exception:
+        except Exception as exc:
+            logger.warning("merge_places: skipping %s: %s", fpath, exc)
             continue
         origin = person.get("origin")
         if not isinstance(origin, dict):

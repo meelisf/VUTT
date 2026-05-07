@@ -491,3 +491,30 @@ def test_merge_places_raises_on_self_merge(tmp_path):
         from server.prosopography.places_ops import merge_places
         with pytest.raises(ValueError, match="ise"):
             merge_places("Smaland", "Smaland")
+
+
+def test_merge_places_raises_on_source_has_children(tmp_path):
+    """Kui source_key-l on alamkohti, tõstab ValueError."""
+    places_file = tmp_path / "places.json"
+    groups_file = tmp_path / "origin_groups.json"
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+
+    places = {
+        "Wexionensis": {"labels": {"et": "Wexionensis"}, "historical_names": []},
+        "Smaland": {"labels": {"et": "Smaland"}, "historical_names": []},
+        "Kronoberg": {"labels": {"et": "Kronoberg"}, "parent_key": "Wexionensis", "historical_names": []},
+    }
+    places_file.write_text(json.dumps(places))
+    groups_file.write_text(json.dumps({}))
+
+    with (
+        patch("server.prosopography.places_ops.PLACES_FILE", str(places_file)),
+        patch("server.prosopography.places_ops.ORIGIN_GROUPS_FILE", str(groups_file)),
+        patch("server.prosopography.places_ops._places_cache", None),
+        patch("server.prosopography.places_ops._groups_cache", None),
+        patch("server.prosopography.places_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)),
+    ):
+        from server.prosopography.places_ops import merge_places
+        with pytest.raises(ValueError, match="alamkohti"):
+            merge_places("Wexionensis", "Smaland")
