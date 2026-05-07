@@ -51,6 +51,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
   const [editing, setEditing] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -404,7 +405,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
             {t('places.merge')}
           </button>
           <button
-            onClick={() => { setShowDeleteConfirm(true); setDeleteError(null); }}
+            onClick={() => { setShowDeleteConfirm(true); setDeleteError(null); setDeleteConfirmInput(''); }}
             className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700"
           >
             <Trash2 size={13} />
@@ -419,6 +420,13 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
           <p className="text-sm text-red-800 mb-2">
             {t('places.deleteConfirm', { name: resolveLabel(entry.labels, lang) || placeKey })}
           </p>
+          <input
+            type="text"
+            value={deleteConfirmInput}
+            onChange={e => setDeleteConfirmInput(e.target.value)}
+            placeholder={t('places.deleteInputPlaceholder', { word: t('places.deleteConfirmWord') })}
+            className="w-full text-sm border border-red-300 rounded px-2 py-1.5 mb-2 bg-white focus:outline-none focus:ring-1 focus:ring-red-400"
+          />
           {deleteError && <p className="text-xs text-red-700 mb-2">{deleteError}</p>}
           <div className="flex gap-2">
             <button
@@ -433,7 +441,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
                   setDeleting(false);
                 }
               }}
-              disabled={deleting}
+              disabled={deleting || deleteConfirmInput !== t('places.deleteConfirmWord')}
               className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
             >
               {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}

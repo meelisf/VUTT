@@ -10,6 +10,33 @@ interface PlacesTreeProps {
   lang: string;
 }
 
+function GroupHeader({ group, selectedKey, onSelect, lang, t }: {
+  group: PlaceTreeGroup;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+  lang: string;
+  t: (key: string) => string;
+}) {
+  const label = group.groupLabels ? resolveLabel(group.groupLabels, lang) : t('places.ungrouped');
+  if (group.groupPlaceKey) {
+    const isSelected = selectedKey === group.groupPlaceKey;
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect(group.groupPlaceKey!)}
+        className={`w-full text-left px-3 pb-1 text-sm font-semibold rounded ${isSelected ? 'text-primary-700' : 'text-gray-700 hover:text-primary-600'}`}
+      >
+        {label}
+      </button>
+    );
+  }
+  return (
+    <div className="px-3 pb-1 text-sm font-semibold text-gray-700">
+      {label}
+    </div>
+  );
+}
+
 function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string {
   if (!labels) return '';
   return labels[lang] ?? labels.et ?? labels.en ?? Object.values(labels)[0] ?? '';
@@ -117,9 +144,7 @@ const PlacesTree: React.FC<PlacesTreeProps> = ({ groups, selectedKey, onSelect, 
     <div className="py-2">
       {groups.map(group => (
         <div key={group.groupKey ?? '__ungrouped'} className="mb-3">
-          <div className="px-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-            {group.groupLabels ? resolveLabel(group.groupLabels, lang) : t('places.ungrouped')}
-          </div>
+          <GroupHeader group={group} selectedKey={selectedKey} onSelect={onSelect} lang={lang} t={t as any} />
           {group.nodes.map(node => (
             <TreeNode key={node.key} node={node} depth={0} selectedKey={selectedKey} onSelect={onSelect} lang={lang} />
           ))}
