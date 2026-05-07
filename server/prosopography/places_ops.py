@@ -263,6 +263,36 @@ async def _propagate_place_change(place_key: str) -> None:
         logger.info("_propagate_place_change: uuendas indeksi place_key=%s", place_key)
 
 
+async def _propagate_place_merge(source_key: str, target_key: str) -> None:
+    """
+    Pärast kohade ühendamist uuendab nii source kui target isikud indeksis.
+    Source isikute failid ütlevad nüüd target_key — indeks peab järele jõudma.
+    """
+    from .ops import _load_index, _index_entry_from_person, get_person
+    from ..config import PROSOPOGRAPHY_INDEX_FILE
+
+    places = _load_places_cache(force_reload=True)
+    affected = _collect_descendants(target_key, places)
+    affected.add(target_key)
+    affected.add(source_key)  # redirectitud isikud on indeksis veel source_key all
+
+    index = _load_index()
+    changed = False
+    for entry in index.get("entries", []):
+        if entry.get("origin_place") not in affected:
+            continue
+        person = get_person(entry["id"])
+        if not person:
+            continue
+        new_entry = _index_entry_from_person(person, work_count=entry.get("work_count", 0))
+        entry.update(new_entry)
+        changed = True
+
+    if changed:
+        atomic_write_json(PROSOPOGRAPHY_INDEX_FILE, index)
+        logger.info("_propagate_place_merge: uuendas indeksi %s → %s", source_key, target_key)
+
+
 # ── Endpoint loogika ───────────────────────────────────────────────────────
 
 def get_places() -> dict:

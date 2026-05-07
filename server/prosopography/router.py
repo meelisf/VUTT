@@ -30,7 +30,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
+from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 
 logger = get_logger(__name__)
 
@@ -400,7 +400,7 @@ async def places_merge(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    background_tasks.add_task(_propagate_place_change, target_key)
+    background_tasks.add_task(_propagate_place_merge, source_key, target_key)
 
     return result
 
