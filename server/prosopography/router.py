@@ -379,6 +379,32 @@ async def prosopography_delete_image(
     return {"status": "ok", "updated_at": person["updated_at"]}
 
 
+@router.post("/admin/places/{source_key}/merge")
+async def places_merge(
+    source_key: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(_require_role("admin")),
+):
+    """
+    Ühendab source_key sihtkoha target_key alla (admin).
+    Body: {"target_key": "smaland"}
+    Tagastab: {"redirected": N, "target_key": "smaland"}
+    """
+    data = await _get_json(request)
+    target_key = data.get("target_key", "").strip()
+    if not target_key:
+        raise HTTPException(status_code=400, detail="target_key on kohustuslik")
+    try:
+        result = merge_places(source_key, target_key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    background_tasks.add_task(_propagate_place_change, target_key)
+
+    return result
+
+
 # ── Generaalsed /{person_id} ruutid — PEAVAD tulema PÄRAST spetsiifilisi ──
 
 @router.post("/{source_id:path}/merge")
@@ -480,32 +506,6 @@ def places_refresh_labels(user=Depends(_require_role("admin"))):
     import threading
     threading.Thread(target=rebuild_indices, daemon=True).start()
     return {"updated": count}
-
-
-@router.post("/admin/places/{source_key}/merge")
-async def places_merge(
-    source_key: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    user=Depends(_require_role("admin")),
-):
-    """
-    Ühendab source_key sihtkoha target_key alla (admin).
-    Body: {"target_key": "smaland"}
-    Tagastab: {"redirected": N, "target_key": "smaland"}
-    """
-    data = await _get_json(request)
-    target_key = data.get("target_key", "").strip()
-    if not target_key:
-        raise HTTPException(status_code=400, detail="target_key on kohustuslik")
-    try:
-        result = merge_places(source_key, target_key)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    background_tasks.add_task(_propagate_place_change, target_key)
-
-    return result
 
 
 @router.put("/admin/groups/{key}")
