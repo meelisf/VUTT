@@ -548,3 +548,46 @@ def merge_places(source_key: str, target_key: str) -> dict:
 
     logger.info("merge_places: %s → %s, %d isikut ümber suunatud", source_key, target_key, redirected)
     return {"redirected": redirected, "target_key": target_key}
+
+
+def delete_place(key: str) -> None:
+    """
+    Kustutab koha places.json-st.
+    Blokeerib kui kohale on seotud alamkohti või isikuid.
+    """
+    places = _load_places_cache(force_reload=True)
+
+    if key not in places:
+        raise ValueError(f"Koht ei leitud: {key!r}")
+
+    children = [k for k, e in places.items() if e.get("parent_key") == key]
+    if children:
+        raise ValueError(
+            f"Ei saa kustutada: kohale on seotud alamkohti: {', '.join(children)}"
+        )
+
+    # Kontrolli isikute viiteid
+    pattern = os.path.join(PROSOPOGRAPHY_DIR, "*.json")
+    referencing = []
+    for fpath in glob.glob(pattern):
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                person = json.load(f)
+        except Exception as exc:
+            logger.warning("delete_place: skipping %s: %s", fpath, exc)
+            continue
+        origin = person.get("origin")
+        if isinstance(origin, dict) and origin.get("place") == key:
+            referencing.append(os.path.basename(fpath))
+
+    if referencing:
+        raise ValueError(
+            f"Ei saa kustutada: kohale viitab {len(referencing)} isikut. "
+            "Kasuta esmalt ühendamist (merge) isikute suunamiseks."
+        )
+
+    del places[key]
+    atomic_write_json(PLACES_FILE, places)
+    _load_places_cache(force_reload=True)
+
+    logger.info("delete_place: %s kustutatud", key)

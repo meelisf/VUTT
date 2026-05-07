@@ -30,7 +30,7 @@ from .ops import (
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
-from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels, merge_places
+from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, refresh_all_place_labels, merge_places, delete_place
 
 logger = get_logger(__name__)
 
@@ -504,6 +504,19 @@ async def places_merge(
     background_tasks.add_task(_propagate_place_change, target_key)
 
     return result
+
+
+@router.delete("/admin/places/{key}")
+async def places_delete(
+    key: str,
+    user=Depends(_require_role("admin")),
+):
+    """Kustutab koha places.json-st (admin). Blokeerib kui on alamkohti või isikuviiteid."""
+    try:
+        delete_place(key)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"deleted": key}
 
 
 @router.put("/admin/places/{key}")
