@@ -180,7 +180,7 @@ const Places: React.FC = () => {
           ) : loadError ? (
             <p className="p-6 text-sm text-red-600">{loadError}</p>
           ) : (
-            <div className="flex" style={{ minHeight: 'calc(100vh - 240px)' }}>
+            <div className="flex" style={{ height: 'calc(100vh - 220px)' }}>
               {/* Vasak: puu / otsingutulemused */}
               <div className="w-64 border-r border-gray-100 overflow-y-auto shrink-0">
                 {showGroupPanel && meta && (
@@ -222,7 +222,7 @@ const Places: React.FC = () => {
               </div>
 
               {/* Parem: detailpaneel */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-y-auto">
                 {selectedEntry ? (
                   <PlacesDetail
                     placeKey={selectedKey!}
