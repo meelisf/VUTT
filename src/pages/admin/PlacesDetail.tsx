@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 import { Edit2, GitMerge, Trash2, Loader2, X, Plus } from 'lucide-react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import { icon } from 'leaflet';
+import markerIconUrl from 'leaflet/dist/images/marker-icon.png';
+import markerIconRetinaUrl from 'leaflet/dist/images/marker-icon-2x.png';
+import markerShadowUrl from 'leaflet/dist/images/marker-shadow.png';
 import { updatePlace, deletePlace } from '../../prosopography/services/prosopographyService';
 import type { PlaceEntry } from '../../prosopography/types';
 import PlacesMergeModal from './PlacesMergeModal';
@@ -17,9 +20,9 @@ const ZOOM_BY_TYPE: Record<string, number> = {
 };
 
 const DEFAULT_MARKER = icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl: markerIconUrl,
+  iconRetinaUrl: markerIconRetinaUrl,
+  shadowUrl: markerShadowUrl,
   iconSize: [25, 41], iconAnchor: [12, 41],
 });
 
