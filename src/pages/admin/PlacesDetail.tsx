@@ -23,7 +23,10 @@ const DEFAULT_MARKER = icon({
   iconUrl: markerIconUrl,
   iconRetinaUrl: markerIconRetinaUrl,
   shadowUrl: markerShadowUrl,
-  iconSize: [25, 41], iconAnchor: [12, 41],
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  shadowSize: [41, 41],
+  popupAnchor: [1, -34],
 });
 
 function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string {
@@ -464,6 +467,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
       {hasCoords && (
         <div className="mb-3 rounded-lg overflow-hidden border border-gray-200" style={{ height: 120 }}>
           <MapContainer
+            key={placeKey}
             center={[coords!.lat, coords!.lon]}
             zoom={zoom}
             style={{ height: '100%', width: '100%' }}
