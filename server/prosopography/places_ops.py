@@ -201,16 +201,28 @@ def _get_place_coordinates(key: Optional[str]) -> Optional[dict]:
 def _enrich_origin_from_places(origin: dict) -> dict:
     """
     Täidab origin['place_id'] ja origin['place_labels'] places.json-st.
-    Tõstab ValueError kui place võti ei ole registris.
+    Otsib esmalt võtme järgi, seejärel labelite järgi (et/en/de/la).
+    Tõstab ValueError kui place ei leita registrist.
     """
     place_key = origin.get("place")
     if not place_key:
         return origin
     places = _load_places_cache()
     entry = places.get(place_key)
+    canonical_key = place_key
+    if not entry:
+        # Fallback: otsi labelite hulgast (vana andmete ühilduvus)
+        place_lower = place_key.lower()
+        for key, candidate in places.items():
+            labels = candidate.get("labels") or {}
+            if any(v.lower() == place_lower for v in labels.values() if isinstance(v, str)):
+                entry = candidate
+                canonical_key = key
+                break
     if not entry:
         raise ValueError(f"Unknown origin place: {place_key!r}")
     origin = dict(origin)
+    origin["place"] = canonical_key
     origin["place_id"] = entry.get("id")
     origin["place_labels"] = entry.get("labels")
     return origin
