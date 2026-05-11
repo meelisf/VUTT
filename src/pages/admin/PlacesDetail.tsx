@@ -47,11 +47,12 @@ interface PlacesDetailProps {
   onMerged: (sourceKey: string, targetKey: string) => void;
   onDeleted: (key: string) => void;
   onSelectKey: (key: string) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 const PlacesDetail: React.FC<PlacesDetailProps> = ({
   placeKey, entry, places, meta, personCount, personSample,
-  token, lang, onUpdated, onMerged, onDeleted, onSelectKey,
+  token, lang, onUpdated, onMerged, onDeleted, onSelectKey, onDirtyChange,
 }) => {
   const { t } = useTranslation('admin');
   const [editing, setEditing] = useState(false);
@@ -78,6 +79,14 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const name = resolveLabel(entry.labels, lang) || placeKey;
+
+  useEffect(() => {
+    setEditing(false);
+  }, [placeKey]);
+
+  useEffect(() => {
+    onDirtyChange?.(editing);
+  }, [editing]);
 
   useEffect(() => {
     if (editing) {
@@ -187,7 +196,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
             >
               <option value="">—</option>
-              {PLACE_TYPES.map(tp => <option key={tp} value={tp}>{tp}</option>)}
+              {PLACE_TYPES.map(tp => <option key={tp} value={tp}>{t(`places.types.${tp}`, tp)}</option>)}
             </select>
           </div>
           <div className="w-32">
@@ -376,7 +385,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
           )}
           <div className="flex flex-wrap gap-1.5">
             {entry.type && (
-              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{entry.type}</span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs">{t(`places.types.${entry.type}`, entry.type)}</span>
             )}
             {wikidataUrl && (
               <a href={wikidataUrl} target="_blank" rel="noopener noreferrer"

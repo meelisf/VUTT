@@ -51,6 +51,7 @@ function TreeNode({
   onSelect: (key: string) => void;
   lang: string;
 }) {
+  const { t } = useTranslation('admin');
   const [open, setOpen] = useState(depth < 2);
   const hasChildren = node.children.length > 0;
   const isSelected = node.key === selectedKey;
@@ -72,12 +73,12 @@ function TreeNode({
         </span>
         <span className="truncate flex-1">
           {resolveLabel(node.entry.labels, lang) || node.key}
-          {!Object.values(node.entry.labels ?? {}).includes(node.key) && (
+          {!Object.values(node.entry.labels ?? {}).some(l => l === node.key || l === node.key.replace(/_/g, ' ')) && (
             <span className="text-xs text-gray-400 ml-1 font-normal">{node.key}</span>
           )}
         </span>
         {node.entry.type && (
-          <span className="text-xs text-gray-400 shrink-0">{node.entry.type}</span>
+          <span className="text-xs text-gray-400 shrink-0">{t(`places.types.${node.entry.type}`, node.entry.type)}</span>
         )}
         {!hasQCode && (
           <AlertTriangle size={11} className="text-amber-400 shrink-0" title="Q-kood puudub" />

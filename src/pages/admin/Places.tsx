@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ChevronLeft, Loader2, Search, Plus, Settings } from 'lucide-react';
+import { ChevronLeft, Loader2, Search, Plus, Settings, X } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { fetchPlaces, fetchPlacesMeta } from '../../prosopography/services/prosopographyService';
@@ -36,6 +36,8 @@ const Places: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGroupPanel, setShowGroupPanel] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
 
   const [personCounts, setPersonCounts] = useState<Record<string, number>>({});
   const [personSamples, setPersonSamples] = useState<
@@ -125,6 +127,14 @@ const Places: React.FC = () => {
     setMeta(prev => prev ? { ...prev, groups: updated } : prev);
   }, []);
 
+  const handleSelectKey = useCallback((key: string | null) => {
+    if (isDirty && key !== selectedKey) {
+      setPendingKey(key);
+    } else {
+      setSelectedKey(key);
+    }
+  }, [isDirty, selectedKey]);
+
   if (userLoading || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -155,8 +165,17 @@ const Places: React.FC = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('places.search')}
-              className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400"
+              className="flex-1 text-sm outline-none text-gray-700 placeholder-gray-400 min-w-0"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="text-gray-400 hover:text-gray-600 shrink-0"
+                aria-label="Tühista otsing"
+              >
+                <X size={14} />
+              </button>
+            )}
             <button
               onClick={() => setShowGroupPanel(s => !s)}
               className={`flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded border ${showGroupPanel ? 'bg-violet-50 border-violet-200 text-violet-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'}`}
@@ -201,12 +220,12 @@ const Places: React.FC = () => {
                         <button
                           key={k}
                           type="button"
-                          onClick={() => setSelectedKey(k)}
+                          onClick={() => handleSelectKey(k)}
                           className={`w-full text-left px-3 py-1.5 text-sm flex items-baseline gap-2 rounded mx-1
                             ${selectedKey === k ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
                         >
                           <span className="truncate flex-1">{resolveLabel(e.labels, lang)}</span>
-                          {e.type && <span className="text-xs text-gray-400 shrink-0">{e.type}</span>}
+                          {e.type && <span className="text-xs text-gray-400 shrink-0">{t(`places.types.${e.type}`, e.type)}</span>}
                         </button>
                       ))
                     )}
@@ -215,7 +234,7 @@ const Places: React.FC = () => {
                   <PlacesTree
                     groups={treeGroups}
                     selectedKey={selectedKey}
-                    onSelect={setSelectedKey}
+                    onSelect={handleSelectKey}
                     lang={lang}
                   />
                 )}
@@ -237,6 +256,7 @@ const Places: React.FC = () => {
                     onMerged={handleMerged}
                     onDeleted={handleDeleted}
                     onSelectKey={setSelectedKey}
+                    onDirtyChange={setIsDirty}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-sm text-gray-400 italic">
@@ -262,6 +282,29 @@ const Places: React.FC = () => {
           }}
           onClose={() => setShowAddModal(false)}
         />
+      )}
+
+      {pendingKey !== null && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
+            <h3 className="font-semibold text-gray-900 mb-2">{t('places.unsavedTitle')}</h3>
+            <p className="text-sm text-gray-600 mb-5">{t('places.unsavedBody')}</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setPendingKey(null)}
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+              >
+                {t('places.unsavedStay')}
+              </button>
+              <button
+                onClick={() => { setSelectedKey(pendingKey); setPendingKey(null); }}
+                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                {t('places.unsavedLeave')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
