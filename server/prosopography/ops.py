@@ -5,11 +5,14 @@ Jagatud indeksid (prosopography_index.json, person_to_works.json) kaitstud threa
 """
 import glob as _glob
 import json
+import logging
 import os
 import re
 import threading
 from datetime import datetime, timezone
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 PERSON_IMAGES_DIR_NAME = "images"  # PROSOPOGRAPHY_DIR / images /
 
