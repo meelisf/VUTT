@@ -161,6 +161,7 @@ const Notifications: React.FC = () => {
       setNotifications(items => items.map(item => (
         item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
       )));
+      window.dispatchEvent(new CustomEvent('vutt:notifications-changed'));
     }
     const target = notificationLink(notification);
     if (target) navigate(target);
@@ -172,6 +173,7 @@ const Notifications: React.FC = () => {
     setNotifications(items => items.map(item => (
       item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
     )));
+    window.dispatchEvent(new CustomEvent('vutt:notifications-changed'));
   };
 
   const handleSend = async (event: React.FormEvent) => {

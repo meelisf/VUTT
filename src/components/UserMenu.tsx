@@ -14,6 +14,13 @@ const UserMenu: React.FC = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [pendingRegistrationCount, setPendingRegistrationCount] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setRefreshTick(n => n + 1);
+    window.addEventListener('vutt:notifications-changed', handler);
+    return () => window.removeEventListener('vutt:notifications-changed', handler);
+  }, []);
 
   useEffect(() => {
     if (!user || !authToken) return;
@@ -34,7 +41,7 @@ const UserMenu: React.FC = () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [user, authToken]);
+  }, [user, authToken, refreshTick]);
 
   useEffect(() => {
     if (!user || user.role !== 'admin' || !authToken) {
