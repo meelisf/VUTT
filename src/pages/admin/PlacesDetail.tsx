@@ -474,7 +474,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
 
       {/* Minikaart */}
       {hasCoords && (
-        <div className="mb-3 rounded-lg overflow-hidden border border-gray-200" style={{ height: 120 }}>
+        <div className="mb-3 rounded-lg overflow-hidden border border-gray-200 isolate" style={{ height: 120 }}>
           <MapContainer
             key={placeKey}
             center={[coords!.lat, coords!.lon]}
