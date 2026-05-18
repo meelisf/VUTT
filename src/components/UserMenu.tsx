@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, History, Shield, LogOut, ChevronDown, Bell, UserPlus } from 'lucide-react';
+import { Settings, History, Shield, LogOut, ChevronDown, Bell } from 'lucide-react';
 import { useUser } from '../contexts/UserContext';
 import { UserNotification } from '../types';
 import { getNotifications, markNotificationRead } from '../services/notificationService';
@@ -178,40 +178,31 @@ const UserMenu: React.FC = () => {
               {t('common:nav.settings')}
             </Link>
 
-            <Link
-              to="/review"
-              onClick={() => setShowMenu(false)}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              <History size={16} />
-              {t('common:nav.review')}
-            </Link>
+            {user.role !== 'admin' && (
+              <Link
+                to="/review"
+                onClick={() => setShowMenu(false)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <History size={16} />
+                {t('common:nav.review')}
+              </Link>
+            )}
 
             {user.role === 'admin' && (
-              <>
-                <div className="border-t border-gray-100 my-1" />
-                <Link
-                  to="/admin/registrations"
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <UserPlus size={16} />
-                  <span className="flex-1">{t('admin:tabs.registrations')}</span>
-                  {pendingRegistrationCount > 0 && (
-                    <span className="min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
-                      {pendingRegistrationCount > 9 ? '9+' : pendingRegistrationCount}
-                    </span>
-                  )}
-                </Link>
-                <Link
-                  to="/admin"
-                  onClick={() => setShowMenu(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Shield size={16} />
-                  {t('common:nav.admin')}
-                </Link>
-              </>
+              <Link
+                to="/admin"
+                onClick={() => setShowMenu(false)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <Shield size={16} />
+                <span className="flex-1">{t('common:nav.admin')}</span>
+                {pendingRegistrationCount > 0 && (
+                  <span className="min-w-4 h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 text-center font-bold">
+                    {pendingRegistrationCount > 9 ? '9+' : pendingRegistrationCount}
+                  </span>
+                )}
+              </Link>
             )}
 
             <div className="border-t border-gray-100 my-1" />
