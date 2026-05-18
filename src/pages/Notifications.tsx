@@ -101,8 +101,7 @@ const Notifications: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
-  const [recipientMode, setRecipientMode] = useState<'single' | 'multiple' | 'all'>('single');
-  const [recipientUsername, setRecipientUsername] = useState('');
+  const [sendToAll, setSendToAll] = useState(false);
   const [selectedUsernames, setSelectedUsernames] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -140,23 +139,11 @@ const Notifications: React.FC = () => {
     if (!authToken || !canSend) return;
     setRecipientsLoading(true);
     getNotificationRecipients(authToken)
-      .then(items => {
-        const sorted = sortRecipients(items);
-        setRecipients(sorted);
-        const defaultRecipient = sorted.find(item => item.username === 'meelis') || sorted[0];
-        if (defaultRecipient) setRecipientUsername(defaultRecipient.username);
-      })
+      .then(items => setRecipients(sortRecipients(items)))
       .catch(() => setSendError(t('notifications.recipientsLoadError')))
       .finally(() => setRecipientsLoading(false));
   }, [authToken, canSend, user?.username, t]);
 
-  useEffect(() => {
-    if (recipientMode !== 'single') return;
-    if (filteredRecipients.length === 0) return;
-    if (!filteredRecipients.some(recipient => recipient.username === recipientUsername)) {
-      setRecipientUsername(filteredRecipients[0].username);
-    }
-  }, [filteredRecipients, recipientMode, recipientUsername]);
 
   if (isLoading) {
     return (
@@ -202,9 +189,8 @@ const Notifications: React.FC = () => {
 
     try {
       const count = await sendNotification(authToken, {
-        recipient_mode: recipientMode,
-        recipient_username: recipientMode === 'single' ? recipientUsername : undefined,
-        recipient_usernames: recipientMode === 'multiple' ? Array.from(selectedUsernames) : undefined,
+        recipient_mode: sendToAll ? 'all' : 'multiple',
+        recipient_usernames: sendToAll ? undefined : Array.from(selectedUsernames),
         title: title.trim(),
         body: body.trim(),
         link: normalized.link || undefined,
@@ -215,6 +201,7 @@ const Notifications: React.FC = () => {
       setLinkError('');
       setReplyingTo(null);
       setSelectedUsernames(new Set());
+      setSendToAll(false);
       setSendSuccess(t('notifications.sent', { count }));
     } catch (e) {
       setSendError(e instanceof Error ? e.message : t('notifications.sendError'));
@@ -238,8 +225,8 @@ const Notifications: React.FC = () => {
         item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item
       )));
     }
-    setRecipientMode('single');
-    setRecipientUsername(actor);
+    setSendToAll(false);
+    setSelectedUsernames(new Set([actor]));
     setRecipientFilter('');
     setTitle(notification.title?.startsWith('Re: ') ? notification.title : `Re: ${notification.title || ''}`.trim());
     setBody('');
@@ -405,105 +392,76 @@ const Notifications: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipientMode')}</label>
-                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => setRecipientMode('single')}
-                    className={`px-3 py-2 text-sm ${recipientMode === 'single' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    {t('notifications.singleRecipient')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecipientMode('multiple')}
-                    className={`px-3 py-2 text-sm border-l border-gray-200 ${recipientMode === 'multiple' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                  >
-                    {t('notifications.multipleRecipients')}
-                  </button>
-                  {canSendAll && (
-                    <button
-                      type="button"
-                      onClick={() => setRecipientMode('all')}
-                      className={`px-3 py-2 text-sm border-l border-gray-200 ${recipientMode === 'all' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {t('notifications.allRecipients')}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {recipientMode === 'single' && (
-                <div className="space-y-2">
-                  <label htmlFor="notification-recipient" className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipient')}</label>
-                  <input
-                    id="notification-recipient-filter"
-                    value={recipientFilter}
-                    onChange={(event) => setRecipientFilter(event.target.value)}
-                    placeholder={t('notifications.recipientFilter')}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <select
-                    id="notification-recipient"
-                    value={recipientUsername}
-                    onChange={(event) => setRecipientUsername(event.target.value)}
-                    disabled={recipientsLoading}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                  >
-                    {filteredRecipients.map(recipient => (
-                      <option key={recipient.username} value={recipient.username}>
-                        {recipient.name} ({recipient.username}) · {t(`roles.${recipient.role}`)}
-                      </option>
-                    ))}
-                  </select>
-                  {filteredRecipients.length === 0 && (
-                    <p className="text-xs text-gray-500">{t('notifications.noRecipients')}</p>
-                  )}
-                </div>
-              )}
-
-              {recipientMode === 'multiple' && (
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipient')}</label>
-                  <input
-                    value={recipientFilter}
-                    onChange={(event) => setRecipientFilter(event.target.value)}
-                    placeholder={t('notifications.recipientFilter')}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-md divide-y divide-gray-100">
-                    {filteredRecipients.map(recipient => (
-                      <label
-                        key={recipient.username}
-                        className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedUsernames.has(recipient.username)}
-                          onChange={() => {
-                            setSelectedUsernames(prev => {
-                              const next = new Set(prev);
-                              if (next.has(recipient.username)) next.delete(recipient.username);
-                              else next.add(recipient.username);
-                              return next;
-                            });
-                          }}
-                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                        />
-                        <span className="text-sm text-gray-800">{recipient.name} ({recipient.username})</span>
-                        <span className="ml-auto text-xs text-gray-500 shrink-0">{t(`roles.${recipient.role}`)}</span>
-                      </label>
-                    ))}
-                    {filteredRecipients.length === 0 && (
-                      <p className="text-xs text-gray-500 px-3 py-2">{t('notifications.noRecipients')}</p>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">{t('notifications.recipient')}</label>
+                {canSendAll && (
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={sendToAll}
+                      onChange={(event) => setSendToAll(event.target.checked)}
+                      className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    />
+                    {t('notifications.allRecipients')}
+                  </label>
+                )}
+                {!sendToAll && (
+                  <>
+                    <input
+                      value={recipientFilter}
+                      onChange={(event) => setRecipientFilter(event.target.value)}
+                      placeholder={t('notifications.recipientFilter')}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    <div className="max-h-40 overflow-y-auto border border-gray-300 rounded-md divide-y divide-gray-100">
+                      {filteredRecipients.map(recipient => (
+                        <label
+                          key={recipient.username}
+                          className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedUsernames.has(recipient.username)}
+                            onChange={() => {
+                              setSelectedUsernames(prev => {
+                                const next = new Set(prev);
+                                if (next.has(recipient.username)) next.delete(recipient.username);
+                                else next.add(recipient.username);
+                                return next;
+                              });
+                            }}
+                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-800">{recipient.name} ({recipient.username})</span>
+                          <span className="ml-auto text-xs text-gray-500 shrink-0">{t(`roles.${recipient.role}`)}</span>
+                        </label>
+                      ))}
+                      {filteredRecipients.length === 0 && (
+                        <p className="text-xs text-gray-500 px-3 py-2">{t('notifications.noRecipients')}</p>
+                      )}
+                    </div>
+                    {selectedUsernames.size > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {Array.from(selectedUsernames).map(username => {
+                          const name = recipients.find(r => r.username === username)?.name || username;
+                          return (
+                            <span key={username} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-0.5 bg-primary-100 text-primary-800 rounded-full text-xs font-medium">
+                              {name}
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUsernames(prev => { const next = new Set(prev); next.delete(username); return next; })}
+                                className="hover:text-primary-900 leading-none"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
                     )}
-                  </div>
-                  {selectedUsernames.size > 0 && (
-                    <p className="text-xs text-primary-700 font-medium">{t('notifications.multipleSelected', { count: selectedUsernames.size })}</p>
-                  )}
-                </div>
-              )}
+                  </>
+                )}
+              </div>
 
               <div>
                 <label htmlFor="notification-title" className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.messageTitle')}</label>
@@ -553,7 +511,7 @@ const Notifications: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={sending || Boolean(linkError) || !title.trim() || (recipientMode === 'single' && !recipientUsername) || (recipientMode === 'multiple' && selectedUsernames.size === 0)}
+                disabled={sending || Boolean(linkError) || !title.trim() || (!sendToAll && selectedUsernames.size === 0)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
