@@ -101,8 +101,9 @@ const Notifications: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);
-  const [recipientMode, setRecipientMode] = useState<'single' | 'all'>('single');
+  const [recipientMode, setRecipientMode] = useState<'single' | 'multiple' | 'all'>('single');
   const [recipientUsername, setRecipientUsername] = useState('');
+  const [selectedUsernames, setSelectedUsernames] = useState<Set<string>>(new Set());
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [link, setLink] = useState('');
@@ -203,6 +204,7 @@ const Notifications: React.FC = () => {
       const count = await sendNotification(authToken, {
         recipient_mode: recipientMode,
         recipient_username: recipientMode === 'single' ? recipientUsername : undefined,
+        recipient_usernames: recipientMode === 'multiple' ? Array.from(selectedUsernames) : undefined,
         title: title.trim(),
         body: body.trim(),
         link: normalized.link || undefined,
@@ -212,6 +214,7 @@ const Notifications: React.FC = () => {
       setLink('');
       setLinkError('');
       setReplyingTo(null);
+      setSelectedUsernames(new Set());
       setSendSuccess(t('notifications.sent', { count }));
     } catch (e) {
       setSendError(e instanceof Error ? e.message : t('notifications.sendError'));
@@ -312,9 +315,9 @@ const Notifications: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <button
+                        <div
                           onClick={() => openNotification(notification)}
-                          className="min-w-0 flex-1 text-left"
+                          className="min-w-0 flex-1 cursor-pointer"
                         >
                           <div className="flex items-center gap-2 mb-1">
                             {!isSentNotification(notification) && !notification.read_at && <span className="h-2 w-2 rounded-full bg-red-600 shrink-0" />}
@@ -351,7 +354,7 @@ const Notifications: React.FC = () => {
                               {target ? ` · ${target}` : ''}
                             </p>
                           )}
-                        </button>
+                        </div>
                         {!isSentNotification(notification) && (
                           <div className="flex shrink-0 flex-col sm:flex-row gap-2">
                             {notification.actor_username && (
@@ -402,17 +405,24 @@ const Notifications: React.FC = () => {
                 </div>
               )}
 
-              {canSendAll && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipientMode')}</label>
-                  <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setRecipientMode('single')}
-                      className={`px-3 py-2 text-sm ${recipientMode === 'single' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      {t('notifications.singleRecipient')}
-                    </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipientMode')}</label>
+                <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('single')}
+                    className={`px-3 py-2 text-sm ${recipientMode === 'single' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {t('notifications.singleRecipient')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecipientMode('multiple')}
+                    className={`px-3 py-2 text-sm border-l border-gray-200 ${recipientMode === 'multiple' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {t('notifications.multipleRecipients')}
+                  </button>
+                  {canSendAll && (
                     <button
                       type="button"
                       onClick={() => setRecipientMode('all')}
@@ -420,9 +430,9 @@ const Notifications: React.FC = () => {
                     >
                       {t('notifications.allRecipients')}
                     </button>
-                  </div>
+                  )}
                 </div>
-              )}
+              </div>
 
               {recipientMode === 'single' && (
                 <div className="space-y-2">
@@ -449,6 +459,48 @@ const Notifications: React.FC = () => {
                   </select>
                   {filteredRecipients.length === 0 && (
                     <p className="text-xs text-gray-500">{t('notifications.noRecipients')}</p>
+                  )}
+                </div>
+              )}
+
+              {recipientMode === 'multiple' && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('notifications.recipient')}</label>
+                  <input
+                    value={recipientFilter}
+                    onChange={(event) => setRecipientFilter(event.target.value)}
+                    placeholder={t('notifications.recipientFilter')}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <div className="max-h-48 overflow-y-auto border border-gray-300 rounded-md divide-y divide-gray-100">
+                    {filteredRecipients.map(recipient => (
+                      <label
+                        key={recipient.username}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedUsernames.has(recipient.username)}
+                          onChange={() => {
+                            setSelectedUsernames(prev => {
+                              const next = new Set(prev);
+                              if (next.has(recipient.username)) next.delete(recipient.username);
+                              else next.add(recipient.username);
+                              return next;
+                            });
+                          }}
+                          className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-800">{recipient.name} ({recipient.username})</span>
+                        <span className="ml-auto text-xs text-gray-500 shrink-0">{t(`roles.${recipient.role}`)}</span>
+                      </label>
+                    ))}
+                    {filteredRecipients.length === 0 && (
+                      <p className="text-xs text-gray-500 px-3 py-2">{t('notifications.noRecipients')}</p>
+                    )}
+                  </div>
+                  {selectedUsernames.size > 0 && (
+                    <p className="text-xs text-primary-700 font-medium">{t('notifications.multipleSelected', { count: selectedUsernames.size })}</p>
                   )}
                 </div>
               )}
@@ -501,7 +553,7 @@ const Notifications: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={sending || Boolean(linkError) || !title.trim() || (recipientMode === 'single' && !recipientUsername)}
+                disabled={sending || Boolean(linkError) || !title.trim() || (recipientMode === 'single' && !recipientUsername) || (recipientMode === 'multiple' && selectedUsernames.size === 0)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-md text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}

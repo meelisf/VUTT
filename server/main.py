@@ -861,6 +861,7 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
     data = await get_json_data(request)
     recipient_mode = str(data.get("recipient_mode") or "single")
     recipient_username = str(data.get("recipient_username") or "").strip()
+    recipient_usernames = data.get("recipient_usernames") or []
     title = unicodedata.normalize("NFC", str(data.get("title") or "").strip())
     body = unicodedata.normalize("NFC", str(data.get("body") or "").strip())
     link = str(data.get("link") or "").strip()
@@ -885,6 +886,13 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
             raise HTTPException(status_code=403, detail="Kõigile teavitamine on lubatud ainult administraatorile")
         recipients = sorted(users_by_username.keys())
         notification_type = "system"
+    elif recipient_mode == "multiple":
+        if not isinstance(recipient_usernames, list) or not recipient_usernames:
+            raise HTTPException(status_code=400, detail="Saajad on kohustuslikud")
+        recipients = [u for u in recipient_usernames if isinstance(u, str) and u in users_by_username]
+        if not recipients:
+            raise HTTPException(status_code=400, detail="Ühtegi kehtivat saajat ei leitud")
+        notification_type = "review_request"
     else:
         if not recipient_username or recipient_username not in users_by_username:
             raise HTTPException(status_code=400, detail="Saajat ei leitud")

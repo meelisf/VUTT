@@ -9,8 +9,9 @@ export interface NotificationRecipient {
 }
 
 export interface SendNotificationPayload {
-  recipient_mode: 'single' | 'all';
+  recipient_mode: 'single' | 'multiple' | 'all';
   recipient_username?: string;
+  recipient_usernames?: string[];
   title: string;
   body: string;
   link?: string;
