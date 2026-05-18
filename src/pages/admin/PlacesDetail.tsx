@@ -74,6 +74,29 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
   const [newHistName, setNewHistName] = useState('');
   const [lat, setLat] = useState('');
   const [lon, setLon] = useState('');
+
+  const parseDMS = (raw: string): { lat?: number; lon?: number } | null => {
+    const re = /(\d+)°\s*(\d+)[''']\s*(\d+(?:[.,]\d+)?)["""]\s*([NSEWnsew])/g;
+    const matches = [...raw.matchAll(re)];
+    if (!matches.length) return null;
+    const toDecimal = (d: string, m: string, s: string, dir: string) => {
+      const v = parseInt(d) + parseInt(m) / 60 + parseFloat(s.replace(',', '.')) / 3600;
+      return Math.round(v * 1e6) / 1e6 * ('SWsw'.includes(dir) ? -1 : 1);
+    };
+    const result: { lat?: number; lon?: number } = {};
+    for (const [, d, m, s, dir] of matches) {
+      if ('NSns'.includes(dir)) result.lat = toDecimal(d, m, s, dir);
+      else result.lon = toDecimal(d, m, s, dir);
+    }
+    return Object.keys(result).length ? result : null;
+  };
+
+  const handleCoordBlur = (field: 'lat' | 'lon', value: string) => {
+    const parsed = parseDMS(value.trim());
+    if (!parsed) return;
+    if (parsed.lat !== undefined) setLat(String(parsed.lat));
+    if (parsed.lon !== undefined) setLon(String(parsed.lon));
+  };
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -328,6 +351,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
               inputMode="decimal"
               value={lat}
               onChange={e => setLat(e.target.value)}
+              onBlur={e => handleCoordBlur('lat', e.target.value)}
               placeholder="lat (57.18)"
               className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono"
             />
@@ -336,6 +360,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
               inputMode="decimal"
               value={lon}
               onChange={e => setLon(e.target.value)}
+              onBlur={e => handleCoordBlur('lon', e.target.value)}
               placeholder="lon (14.59)"
               className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono"
             />
