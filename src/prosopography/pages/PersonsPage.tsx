@@ -70,6 +70,7 @@ const PersonsPage: React.FC = () => {
 
   const setQuery  = (v: string)       => setFilterParam('q', v);
   const setOriginGroup = (v: string)  => setFilterParam('origin_group', v);
+  const setOriginPlace = (v: string)  => setFilterParam('origin_place', v);
   const setInstitution = (v: string)  => setFilterParam('institution', v);
   const setSource = (v: string)       => setFilterParam('source', v);
   const setGender = (v: GenderFilter) => setFilterParam('gender', v);
@@ -175,7 +176,7 @@ const PersonsPage: React.FC = () => {
     getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
-  const hasActiveFilters = !!(originGroup || institution || source || gender || yearFrom || yearTo || statusId);
+  const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
   const mapFilters = {
@@ -329,6 +330,7 @@ const PersonsPage: React.FC = () => {
           {/* Täpsemad filtrid */}
           <PersonAdvancedFilters
             originGroup={originGroup}
+            originPlace={originPlace}
             institution={institution}
             source={source}
             gender={gender}
@@ -339,6 +341,7 @@ const PersonsPage: React.FC = () => {
             institutions={institutionFacets}
             seisused={seisused}
             onOriginGroupChange={setOriginGroup}
+            onOriginPlaceChange={setOriginPlace}
             onInstitutionChange={setInstitution}
             onSourceChange={setSource}
             onGenderChange={setGender}
@@ -347,7 +350,7 @@ const PersonsPage: React.FC = () => {
             onStatusIdChange={setStatusId}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
-              ['origin_group', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'offset'].forEach(k => n.delete(k));
+              ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'offset'].forEach(k => n.delete(k));
               return n;
             }, { replace: true })}
           />

@@ -28,6 +28,7 @@ interface FilterSectionProps {
 interface PersonAdvancedFiltersProps {
   gender: GenderFilter;
   originGroup: string;
+  originPlace: string;
   institution: string;
   source: string;
   yearFrom: string;
@@ -38,6 +39,7 @@ interface PersonAdvancedFiltersProps {
   seisused: { id: string; label: { et: string; en: string } }[];
   onGenderChange: (v: GenderFilter) => void;
   onOriginGroupChange: (v: string) => void;
+  onOriginPlaceChange: (v: string) => void;
   onInstitutionChange: (v: string) => void;
   onSourceChange: (v: string) => void;
   onYearFromChange: (v: string) => void;
@@ -105,16 +107,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, originGroup, institution, source, yearFrom, yearTo, statusId,
+  gender, originGroup, originPlace, institution, source, yearFrom, yearTo, statusId,
   originGroups, institutions, seisused,
-  onGenderChange, onOriginGroupChange, onInstitutionChange, onSourceChange,
+  onGenderChange, onOriginGroupChange, onOriginPlaceChange, onInstitutionChange, onSourceChange,
   onYearFromChange, onYearToChange, onStatusIdChange,
   onClearAll,
 }) => {
   const { t, i18n } = useTranslation('prosopography');
   const hasYearRange = !!(yearFrom || yearTo);
-  const hasActive = !!(originGroup || institution || source || gender || hasYearRange || statusId);
-  const activeCount = [originGroup, institution, source, gender, hasYearRange ? '1' : '', statusId].filter(Boolean).length;
+  const hasActive = !!(originGroup || originPlace || institution || source || gender || hasYearRange || statusId);
+  const activeCount = [originGroup, originPlace, institution, source, gender, hasYearRange ? '1' : '', statusId].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -258,6 +260,13 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
           {hasActive && (
             <div className="pt-2 border-t border-gray-100 space-y-2">
               <div className="flex flex-wrap gap-1.5">
+                {originPlace && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    <MapPin size={11} className="shrink-0" />
+                    {originPlace}
+                    <button onClick={() => onOriginPlaceChange('')} className="hover:bg-primary-100 rounded-full p-0.5"><X size={11} /></button>
+                  </span>
+                )}
                 {originGroup && (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
                     {originGroups.find(g => g.value === originGroup)?.label ?? originGroup}

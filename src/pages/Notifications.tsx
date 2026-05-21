@@ -97,7 +97,7 @@ const Notifications: React.FC = () => {
   const [notifications, setNotifications] = useState<UserNotification[]>([]);
   const [recipients, setRecipients] = useState<NotificationRecipient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [recipientsLoading, setRecipientsLoading] = useState(false);
+  const [, setRecipientsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState<string | null>(null);

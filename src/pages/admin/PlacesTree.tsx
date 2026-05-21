@@ -81,7 +81,7 @@ function TreeNode({
           <span className="text-xs text-gray-400 shrink-0">{t(`places.types.${node.entry.type}`, node.entry.type)}</span>
         )}
         {!hasQCode && (
-          <AlertTriangle size={11} className="text-amber-400 shrink-0" title="Q-kood puudub" />
+          <span title="Q-kood puudub"><AlertTriangle size={11} className="text-amber-400 shrink-0" /></span>
         )}
       </button>
       {hasChildren && open && (

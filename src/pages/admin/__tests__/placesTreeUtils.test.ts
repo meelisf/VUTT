@@ -1,14 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, test, expect } from 'vitest';
 import { buildPlacesTree } from '../placesTreeUtils';
 import type { PlaceEntry } from '../../../prosopography/types';
 
 const PLACES: Record<string, PlaceEntry> = {
-  Smaland: { labels: { et: 'Smaland', sv: 'Småland' }, type: 'province', group: 'rootsi' } as PlaceEntry,
-  Wexionensis: { labels: { et: 'Wexionensis' }, type: 'parish', parent_key: 'Smaland' } as PlaceEntry,
-  Kronoberg: { labels: { et: 'Kronoberg' }, type: 'county', parent_key: 'Smaland' } as PlaceEntry,
-  Riga: { labels: { et: 'Riia', en: 'Riga' }, type: 'city', parent_key: 'Livland' } as PlaceEntry,
-  Livland: { labels: { et: 'Liivimaa' }, type: 'historical_region', group: 'liivimaa' } as PlaceEntry,
-  Isolated: { labels: { et: 'Isoleeritud' }, type: 'city' } as PlaceEntry,
+  Smaland: { id: null, labels: { et: 'Smaland', sv: 'Småland' }, type: 'province', group: 'rootsi' },
+  Wexionensis: { id: null, labels: { et: 'Wexionensis' }, type: 'parish', parent_key: 'Smaland' },
+  Kronoberg: { id: null, labels: { et: 'Kronoberg' }, type: 'county', parent_key: 'Smaland' },
+  Riga: { id: null, labels: { et: 'Riia', en: 'Riga' }, type: 'city', parent_key: 'Livland' },
+  Livland: { id: null, labels: { et: 'Liivimaa' }, type: 'historical_region', group: 'liivimaa' },
+  Isolated: { id: null, labels: { et: 'Isoleeritud' }, type: 'city' },
 };
 
 const GROUPS = {
@@ -61,9 +61,9 @@ describe('buildPlacesTree', () => {
 
 describe('buildPlacesTree — nested groups', () => {
   test('sub-group appears under parent group', () => {
-    const places = {
-      'smaland': { labels: { et: 'Småland' }, group: 'gootaland' } as PlaceEntry,
-      'rootsi-country': { labels: { et: 'Rootsi' }, group: 'rootsi' } as PlaceEntry,
+    const places: Record<string, PlaceEntry> = {
+      'smaland': { id: null, labels: { et: 'Småland' }, group: 'gootaland' },
+      'rootsi-country': { id: null, labels: { et: 'Rootsi' }, group: 'rootsi' },
     };
     const groups = {
       rootsi: { labels: { et: 'Rootsi' }, sort_order: 2 },
@@ -78,8 +78,8 @@ describe('buildPlacesTree — nested groups', () => {
   });
 
   test('top-level group with no parent stays top-level', () => {
-    const places = {
-      'livland': { labels: { et: 'Livland' }, group: 'liivimaa' } as PlaceEntry,
+    const places: Record<string, PlaceEntry> = {
+      'livland': { id: null, labels: { et: 'Livland' }, group: 'liivimaa' },
     };
     const groups = {
       liivimaa: { labels: { et: 'Liivimaa' }, sort_order: 6 },
@@ -91,8 +91,8 @@ describe('buildPlacesTree — nested groups', () => {
   });
 
   test('top-level group with only sub-groups and no direct places still renders', () => {
-    const places = {
-      'smaland': { labels: { et: 'Småland' }, group: 'gootaland' } as PlaceEntry,
+    const places: Record<string, PlaceEntry> = {
+      'smaland': { id: null, labels: { et: 'Småland' }, group: 'gootaland' },
     };
     const groups = {
       rootsi: { labels: { et: 'Rootsi' }, sort_order: 2 },

@@ -91,7 +91,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
     return Object.keys(result).length ? result : null;
   };
 
-  const handleCoordBlur = (field: 'lat' | 'lon', value: string) => {
+  const handleCoordBlur = (_field: 'lat' | 'lon', value: string) => {
     const parsed = parseDMS(value.trim());
     if (!parsed) return;
     if (parsed.lat !== undefined) setLat(String(parsed.lat));
@@ -595,7 +595,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
           personCount={personCount}
           token={token}
           lang={lang}
-          onMerged={(targetKey, redirected) => {
+          onMerged={(targetKey, _redirected) => {
             setShowMerge(false);
             onMerged(placeKey, targetKey);
           }}
