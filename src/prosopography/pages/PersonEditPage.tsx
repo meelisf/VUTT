@@ -598,7 +598,7 @@ const PersonEditPage: React.FC = () => {
             value={draft.biography}
             onChange={e => set({ biography: e.target.value })}
             rows={8}
-            placeholder="Kirjelda isiku elukäiku…"
+            placeholder={t('form.biographyPlaceholder')}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y font-mono leading-relaxed"
           />
         </div>
@@ -678,7 +678,7 @@ const PersonEditPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs text-gray-400 mb-0.5">{t('form.occupation')}</label>
                     <EntityPicker
-                      placeholder="pastor, jurist, professor…"
+                      placeholder={t('form.occupationPlaceholder')}
                       type="topic"
                       value={item.id ? { label: item.label, id: item.id, labels: item.labels, source: 'wikidata' } : (item.label ? { label: item.label, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, label: v?.label ?? '', id: v?.id ?? null, labels: v?.labels ?? undefined })}
@@ -689,7 +689,7 @@ const PersonEditPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs text-gray-400 mb-0.5">{t('form.institution')}</label>
                     <EntityPicker
-                      placeholder="Academia Gustaviana…"
+                      placeholder={t('form.institutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution ?? '', id: item.institution_id, labels: item.institution_labels, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
@@ -730,7 +730,7 @@ const PersonEditPage: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <label className="block text-xs text-gray-400 mb-0.5">{t('form.educationInstitution')}</label>
                     <EntityPicker
-                      placeholder="Academia Gustaviana, Wittenberg…"
+                      placeholder={t('form.educationInstitutionPlaceholder')}
                       type="topic"
                       value={item.institution_id ? { label: item.institution, id: item.institution_id, labels: item.institution_labels ?? null, source: 'wikidata' } : (item.institution ? { label: item.institution, id: null, labels: null, source: 'manual' } : null)}
                       onChange={v => onChange({ ...item, institution: v?.label ?? '', institution_id: v?.id ?? null, institution_labels: v?.labels ?? undefined })}
@@ -841,7 +841,7 @@ const PersonEditPage: React.FC = () => {
               value={draft.notes}
               onChange={e => set({ notes: e.target.value })}
               rows={3}
-              placeholder="Sisemised märkmed (ei kuvata avalikult)…"
+              placeholder={t('form.notesPlaceholder')}
               className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"
             />
           </div>

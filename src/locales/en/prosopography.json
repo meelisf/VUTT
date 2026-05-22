@@ -118,7 +118,12 @@
       "tooLarge": "File is too large (max 10 MB).",
       "uploadFailed": "Image upload failed.",
       "deleteFailed": "Image deletion failed."
-    }
+    },
+    "biographyPlaceholder": "Describe the person's biography…",
+    "notesPlaceholder": "Internal notes (not shown publicly)…",
+    "occupationPlaceholder": "pastor, jurist, professor…",
+    "institutionPlaceholder": "Academia Gustaviana…",
+    "educationInstitutionPlaceholder": "Academia Gustaviana, Wittenberg…"
   },
   "dateField": {
     "year": "year",
@@ -144,7 +149,9 @@
     "add": "Add"
   },
   "tagsList": {
-    "label": "Keywords"
+    "label": "Keywords",
+    "add": "Add keyword…",
+    "placeholder": "Greek professor, Jesuit…"
   },
   "enrich": {
     "sectionTitle": "Enrich from external sources",
@@ -202,6 +209,12 @@
       "origin": "place of origin"
     }
   },
+  "listView": "List",
+  "loading": "Loading…",
+  "persons": "persons",
+  "immatriculation": "Matriculation",
+  "statuses": "Statuses",
+  "tags": "Keywords",
   "loadMore": "Load more",
   "bulkOccupation": {
     "title": "Assign occupation",
@@ -226,5 +239,41 @@
     "warning": "This action is irreversible. The person card will be permanently deleted. Deletion is blocked if the person has references in works or relations in other person cards.",
     "placeholder": "Type \"{{word}}\" to confirm",
     "confirm": "Delete permanently"
+  },
+  "map": {
+    "view": "Map",
+    "showRelations": "Relations map",
+    "noMarkers": "No origin places found for the map.",
+    "markerCount": "{{count}} places",
+    "mappedCount": "{{mapped}} / {{total}} persons on map",
+    "withoutCoordinates": "{{count}} persons without coordinates",
+    "shiftedMarker": "Marker slightly shifted to avoid overlap."
+  },
+  "place": {
+    "searchPlaceholder": "Search city, parish, region…",
+    "notFound": "Not found. Ask an editor to add."
+  },
+  "placeModal": {
+    "searchWikidata": "Search Wikidata",
+    "wdSearchPlaceholder": "e.g. Gävle, Riga, Westphalia…",
+    "loadingDetails": "Loading details…",
+    "coordinates": "Coordinates from Wikidata:",
+    "parentFromWikidata": "Parent region from Wikidata — click to search registry:",
+    "nameInRegistry": "Name in registry *",
+    "type": "Type",
+    "qCode": "Q-code",
+    "parentRegion": "Parent region (optional)",
+    "searchRegistry": "Search existing region…",
+    "hideWikidata": "Hide Wikidata search",
+    "parentWdPlaceholder": "e.g. Gästrikland, Livonia…",
+    "loading": "Loading…",
+    "keyLabel": "key:",
+    "typeLabel": "type:",
+    "addParent": "Add parent region to registry",
+    "group": "Group (optional)",
+    "cancel": "Cancel",
+    "add": "Add",
+    "wikidataError": "Wikidata query failed",
+    "addError": "Adding failed"
   }
 }

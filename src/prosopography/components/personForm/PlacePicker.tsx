@@ -101,7 +101,7 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
           onChange={e => { setQuery(e.target.value); setShowDropdown(true); }}
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          placeholder="Otsi linna, kihelkonda, piirkonda…"
+          placeholder={t('place.searchPlaceholder')}
           className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
         />
       )}
@@ -129,7 +129,7 @@ const PlacePicker: React.FC<PlacePickerProps> = ({ value, onChange, token, canEd
             </button>
           )}
           {filtered.length === 0 && !canEdit && (
-            <p className="px-3 py-2 text-sm text-gray-400 italic">Ei leitud. Paluge editoril lisada.</p>
+            <p className="px-3 py-2 text-sm text-gray-400 italic">{t('place.notFound')}</p>
           )}
         </div>
       )}

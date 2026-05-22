@@ -190,7 +190,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
       const proposedKey = (lbls.et || lbls.en || item.label).replace(/\s+/g, '_');
       setParentWdPreview({ q: item.q, proposedKey, labels: lbls, type: wd.type ?? '', coordinates: wd.coordinates ?? null });
     } catch {
-      setParentWdError('Wikidata päring ebaõnnestus');
+      setParentWdError(t('placeModal.wikidataError'));
     } finally {
       setParentWdLoading(false);
     }
@@ -210,7 +210,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
       setPlaces(prev => ({ ...prev, [result.key]: result.entry }));
       selectParent(result.key);
     } catch (e: any) {
-      setParentWdError(e.message ?? 'Lisamine ebaõnnestus');
+      setParentWdError(e.message ?? t('placeModal.addError'));
     } finally {
       setParentWdAdding(false);
     }
@@ -252,14 +252,14 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
 
         {/* Põhikoha Wikidata otsing */}
         <div className="mb-4">
-          <label className="block text-xs text-gray-500 mb-1">Otsi Wikidatast</label>
+          <label className="block text-xs text-gray-500 mb-1">{t('placeModal.searchWikidata')}</label>
           <div className="flex gap-2">
             <input
               type="text"
               value={wdQuery}
               onChange={e => handleWdQueryChange(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); triggerWdSearch(wdQuery); } }}
-              placeholder="nt Gävle, Riga, Westphalia…"
+              placeholder={t('placeModal.wdSearchPlaceholder')}
               autoFocus
               className="flex-1 px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none"
             />
@@ -285,16 +285,16 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             </div>
           )}
           {wdSelected && wdLoading && (
-            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Laen detailid…</p>
+            <p className="mt-1 text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> {t('placeModal.loadingDetails')}</p>
           )}
           {wdSelected && !wdLoading && wdCoordinates && (
             <p className="mt-1 text-xs text-green-700">
-              Koordinaadid Wikidatast: {wdCoordinates.lat.toFixed(5)}, {wdCoordinates.lon.toFixed(5)}
+              {t('placeModal.coordinates')} {wdCoordinates.lat.toFixed(5)}, {wdCoordinates.lon.toFixed(5)}
             </p>
           )}
           {wdSelected && !wdLoading && wdParents.length > 0 && (
             <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-1">Ülempiirkond Wikidatast — klõps otsib registrist:</p>
+              <p className="text-xs text-gray-500 mb-1">{t('placeModal.parentFromWikidata')}</p>
               {wdParents.map(p => (
                 <button key={p.q} type="button" onClick={() => handleP131Click(p)}
                   className="mr-1 mb-1 px-2 py-0.5 text-xs border border-blue-200 text-blue-700 rounded hover:bg-blue-50">
@@ -314,13 +314,13 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
             </div>
           )}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Nimi registris *</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('placeModal.nameInRegistry')}</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none" />
           </div>
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="block text-xs text-gray-500 mb-1">Tüüp</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('placeModal.type')}</label>
               <select value={placeType} onChange={e => setPlaceType(e.target.value)}
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
                 <option value="">—</option>
@@ -328,7 +328,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
               </select>
             </div>
             <div className="w-32">
-              <label className="block text-xs text-gray-500 mb-1">Q-kood</label>
+              <label className="block text-xs text-gray-500 mb-1">{t('placeModal.qCode')}</label>
               <input type="text" value={qCode} onChange={e => setQCode(e.target.value)}
                 placeholder="Q12345"
                 className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none font-mono" />
@@ -338,7 +338,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
 
           {/* Ülempiirkond */}
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Ülempiirkond (valikuline)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('placeModal.parentRegion')}</label>
 
             {/* Registriotsing */}
             <div className="relative">
@@ -354,7 +354,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                 }}
                 onFocus={() => { if (!parentKey) setParentDropOpen(true); }}
                 onBlur={() => setTimeout(() => setParentDropOpen(false), 150)}
-                placeholder="Otsi olemasolevat piirkonda…"
+                placeholder={t('placeModal.searchRegistry')}
                 readOnly={!!parentKey}
                 className={`w-full px-2 py-1.5 text-sm border rounded focus:ring-1 focus:ring-primary-500 outline-none ${parentKey ? 'border-green-300 bg-green-50 text-green-800' : 'border-gray-300'}`}
               />
@@ -384,7 +384,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                 onClick={() => { setParentWdOpen(v => !v); setParentWdResults([]); setParentWdPreview(null); setParentWdError(null); }}
                 className="mt-1.5 text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
                 <Search size={11} />
-                {parentWdOpen ? 'Peida Wikidata otsing' : 'Otsi Wikidatast'}
+                {parentWdOpen ? t('placeModal.hideWikidata') : t('placeModal.searchWikidata')}
               </button>
             )}
 
@@ -395,7 +395,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                   <input type="text" value={parentWdQuery}
                     onChange={e => { setParentWdQuery(e.target.value); triggerParentWdSearch(e.target.value); }}
                     onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); triggerParentWdSearch(parentWdQuery); } }}
-                    placeholder="nt Gästrikland, Livonia…"
+                    placeholder={t('placeModal.parentWdPlaceholder')}
                     className="flex-1 px-2 py-1 text-sm border border-blue-300 rounded focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                   />
                   <button type="button" disabled={parentWdSearching || !parentWdQuery.trim()}
@@ -418,7 +418,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                     ))}
                   </div>
                 )}
-                {parentWdLoading && <p className="text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Laen…</p>}
+                {parentWdLoading && <p className="text-xs text-gray-400 flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> {t('placeModal.loading')}</p>}
                 {parentWdPreview && !parentWdLoading && (
                   <div className="bg-white border border-blue-300 rounded p-2 space-y-1">
                     <div className="text-xs text-gray-600 space-y-0.5">
@@ -426,15 +426,15 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
                         <div key={l}><span className="font-mono text-gray-400 w-5 inline-block">{l}</span> {lbl}</div>
                       ))}
                       <div className="text-gray-400 mt-0.5">
-                        võti: <span className="font-mono">{parentWdPreview.proposedKey}</span>
-                        {parentWdPreview.type && <span className="ml-2">tüüp: {parentWdPreview.type}</span>}
+                        {t('placeModal.keyLabel')} <span className="font-mono">{parentWdPreview.proposedKey}</span>
+                        {parentWdPreview.type && <span className="ml-2">{t('placeModal.typeLabel')} {parentWdPreview.type}</span>}
                       </div>
                     </div>
                     {parentWdError && <p className="text-xs text-red-600">{parentWdError}</p>}
                     <button type="button" onClick={handleAddParentFromWd} disabled={parentWdAdding}
                       className="w-full px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1">
                       {parentWdAdding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
-                      Lisa ülempiirkond registrisse
+                      {t('placeModal.addParent')}
                     </button>
                   </div>
                 )}
@@ -444,7 +444,7 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
           </div>
 
           <div>
-            <label className="block text-xs text-gray-500 mb-1">Grupp (valikuline)</label>
+            <label className="block text-xs text-gray-500 mb-1">{t('placeModal.group')}</label>
             <select value={group} onChange={e => setGroup(e.target.value)}
               className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 outline-none">
               <option value="">—</option>
@@ -459,10 +459,10 @@ const AddPlaceModal: React.FC<AddPlaceModalProps> = ({ query, meta, places: init
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">Tühista</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800">{t('placeModal.cancel')}</button>
           <button onClick={handleSave} disabled={saving}
             className="px-3 py-1.5 text-sm font-medium bg-primary-600 text-white rounded hover:bg-primary-700 disabled:opacity-60">
-            {saving ? '…' : 'Lisa'}
+            {saving ? '…' : t('placeModal.add')}
           </button>
         </div>
       </div>

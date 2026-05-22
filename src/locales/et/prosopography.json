@@ -118,7 +118,12 @@
       "tooLarge": "Fail on liiga suur (max 10 MB).",
       "uploadFailed": "Pildi üleslaadimine ebaõnnestus.",
       "deleteFailed": "Pildi kustutamine ebaõnnestus."
-    }
+    },
+    "biographyPlaceholder": "Kirjelda isiku elukäiku…",
+    "notesPlaceholder": "Sisemised märkmed (ei kuvata avalikult)…",
+    "occupationPlaceholder": "pastor, jurist, professor…",
+    "institutionPlaceholder": "Academia Gustaviana…",
+    "educationInstitutionPlaceholder": "Academia Gustaviana, Wittenberg…"
   },
   "dateField": {
     "year": "aasta",
@@ -144,7 +149,9 @@
     "add": "Lisa"
   },
   "tagsList": {
-    "label": "Märksõnad"
+    "label": "Märksõnad",
+    "add": "Lisa märksõna…",
+    "placeholder": "kreeka keele professor, jesuiit…"
   },
   "enrich": {
     "sectionTitle": "Välisallikatest rikastamine",
@@ -202,6 +209,12 @@
       "origin": "päritolukoht"
     }
   },
+  "listView": "Nimekiri",
+  "loading": "Laadin…",
+  "persons": "isikut",
+  "immatriculation": "Immatrikuleerumine",
+  "statuses": "Seisused",
+  "tags": "Märksõnad",
   "loadMore": "Lae veel",
   "bulkOccupation": {
     "title": "Määra amet",
@@ -226,5 +239,41 @@
     "warning": "See toiming on pöördumatu. Isikukaart kustutatakse jäädavalt. Kustutamine blokeeritakse kui isikul on teostes viiteid või seoseid teistes isikukaartides.",
     "placeholder": "Kirjuta \"{{word}}\" kinnitamiseks",
     "confirm": "Kustuta jäädavalt"
+  },
+  "map": {
+    "view": "Kaart",
+    "showRelations": "Seoste kaart",
+    "noMarkers": "Kaardile kantavaid päritolukohti ei leitud.",
+    "markerCount": "{{count}} kohta",
+    "mappedCount": "{{mapped}} / {{total}} isikut kaardil",
+    "withoutCoordinates": "{{count}} isikul puudub koordinaat",
+    "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud."
+  },
+  "place": {
+    "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
+    "notFound": "Ei leitud. Paluge editoril lisada."
+  },
+  "placeModal": {
+    "searchWikidata": "Otsi Wikidatast",
+    "wdSearchPlaceholder": "nt Gävle, Riga, Westphalia…",
+    "loadingDetails": "Laen detailid…",
+    "coordinates": "Koordinaadid Wikidatast:",
+    "parentFromWikidata": "Ülempiirkond Wikidatast — klõps otsib registrist:",
+    "nameInRegistry": "Nimi registris *",
+    "type": "Tüüp",
+    "qCode": "Q-kood",
+    "parentRegion": "Ülempiirkond (valikuline)",
+    "searchRegistry": "Otsi olemasolevat piirkonda…",
+    "hideWikidata": "Peida Wikidata otsing",
+    "parentWdPlaceholder": "nt Gästrikland, Livonia…",
+    "loading": "Laen…",
+    "keyLabel": "võti:",
+    "typeLabel": "tüüp:",
+    "addParent": "Lisa ülempiirkond registrisse",
+    "group": "Grupp (valikuline)",
+    "cancel": "Tühista",
+    "add": "Lisa",
+    "wikidataError": "Wikidata päring ebaõnnestus",
+    "addError": "Lisamine ebaõnnestus"
   }
 }

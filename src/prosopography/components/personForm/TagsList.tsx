@@ -38,7 +38,7 @@ const TagsList: React.FC<{
         ))}
       </div>
       <EntityPicker
-        placeholder="kreeka keele professor, jesuiit…"
+        placeholder={t('tagsList.placeholder')}
         type="topic"
         value={pickerValue}
         onChange={v => { if (v) add(v); else setPickerValue(null); }}
