@@ -344,6 +344,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
+      matchingStrategy: query ? 'frequency' : 'last', // Haruldasemad sõnad saavad kõrgema kaalu
       filter: filter,
       limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
@@ -514,7 +515,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
-        attributesToSearchOn: attributesToSearchOn
+        attributesToSearchOn: attributesToSearchOn,
+        matchingStrategy: query ? 'frequency' : 'last'
       });
 
       const totalHits = response.estimatedTotalHits || 0;
@@ -732,7 +734,8 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
       highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
       highlightPostTag: '</em>',
       sort: ['lehekylje_number:asc'],
-      attributesToSearchOn: attributesToSearchOn
+      attributesToSearchOn: attributesToSearchOn,
+      matchingStrategy: query ? 'frequency' : 'last'
     });
 
     return response.hits.map(normalizeContentSearchHit);
