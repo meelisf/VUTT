@@ -734,9 +734,24 @@ const PersonDetailPage: React.FC = () => {
             {historyOpen && history.length > 0 && (
               <div className="border-t border-gray-100 divide-y divide-gray-50">
                 {history.map((commit) => (
-                  <div key={commit.hash} className="px-5 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
+                  <div key={commit.hash} className="overflow-hidden">
+                    <div
+                      className={`flex items-center gap-3 px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors ${expandedCommit === commit.hash ? 'bg-gray-50' : ''}`}
+                      onClick={() => {
+                        if (expandedCommit === commit.hash) {
+                          setExpandedCommit(null);
+                        } else {
+                          setExpandedCommit(commit.hash);
+                          loadDiff(commit.hash);
+                        }
+                      }}
+                    >
+                      <button className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0" onClick={e => e.stopPropagation()}>
+                        {expandedCommit === commit.hash
+                          ? <ChevronDown size={16} className="text-gray-600" />
+                          : <ChevronRight size={16} className="text-gray-400" />}
+                      </button>
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <span className="text-xs text-gray-400 font-mono flex-shrink-0">{commit.formatted_date}</span>
                         <span className="text-xs text-gray-500 flex-shrink-0">{commit.author}</span>
                         <span className="text-sm text-gray-700 truncate">{commit.message}</span>
@@ -744,36 +759,21 @@ const PersonDetailPage: React.FC = () => {
                           <span className="text-xs text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-shrink-0">Originaal</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      {!commit.is_original && (
                         <button
-                          onClick={() => {
-                            if (expandedCommit === commit.hash) {
-                              setExpandedCommit(null);
-                            } else {
-                              setExpandedCommit(commit.hash);
-                              loadDiff(commit.hash);
-                            }
-                          }}
-                          className="text-xs text-gray-500 hover:text-primary-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                          onClick={(e) => { e.stopPropagation(); handleRestore(commit.full_hash); }}
+                          disabled={restoring === commit.full_hash}
+                          className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1 flex-shrink-0"
+                          title="Taasta see versioon"
                         >
-                          {expandedCommit === commit.hash ? 'Peida' : 'Muudatused'}
+                          <RotateCcw size={12} />
+                          Taasta
                         </button>
-                        {!commit.is_original && (
-                          <button
-                            onClick={() => handleRestore(commit.full_hash)}
-                            disabled={restoring === commit.full_hash}
-                            className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1"
-                            title="Taasta see versioon"
-                          >
-                            <RotateCcw size={12} />
-                            Taasta
-                          </button>
-                        )}
-                      </div>
+                      )}
                     </div>
 
                     {expandedCommit === commit.hash && (
-                      <div className="mt-2 ml-2">
+                      <div className="border-t border-gray-200 bg-gray-50 px-5 py-3">
                         {diffCache[commit.hash] === 'error' ? (
                           <p className="text-xs text-red-400 italic">Diff laadimine ebaõnnestus</p>
                         ) : diffCache[commit.hash] ? (
@@ -782,8 +782,8 @@ const PersonDetailPage: React.FC = () => {
                           ) : (
                             <div className="space-y-1">
                               {(diffCache[commit.hash] as { field: string; old: unknown; new: unknown }[]).map((change, i) => (
-                                <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1">
-                                  <span className="text-gray-500">{change.field}: </span>
+                                <div key={i} className="text-xs font-mono bg-white rounded border border-gray-100 px-3 py-1.5">
+                                  <span className="text-gray-500 font-medium">{change.field}: </span>
                                   <span className="text-red-600">{JSON.stringify(change.old)}</span>
                                   <span className="text-gray-400"> → </span>
                                   <span className="text-green-600">{JSON.stringify(change.new)}</span>
