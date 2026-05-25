@@ -3,6 +3,7 @@ Prosopograafia FastAPI router.
 Registreeritakse main.py-s: app.include_router(router, prefix="/prosopography")
 """
 import json
+import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
 
@@ -31,6 +32,7 @@ from .ops import (
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
+from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo, save_with_git
 
 logger = get_logger(__name__)
 
@@ -403,6 +405,88 @@ async def places_merge(
     background_tasks.add_task(_propagate_place_merge, source_key, target_key)
 
     return result
+
+
+# ── Ajalugu ja taastamine ──────────────────────────────────
+
+@router.get("/{person_id:path}/history")
+async def person_history(person_id: str, user=Depends(_require_role("editor"))):
+    """Tagastab isikukaardi muudatuste ajaloo (git commitid)."""
+    nanoid = person_id.removeprefix("vutt:P")
+    relative_path = f"config/prosopography/{nanoid}.json"
+    history = get_file_git_history(relative_path, max_count=50)
+    return {"status": "ok", "history": history}
+
+
+@router.get("/{person_id:path}/diff")
+async def person_diff(person_id: str, commit: str, user=Depends(_require_role("editor"))):
+    """Tagastab commit-i muutunud väljade loendi võrreldes eelmise commitiga."""
+    nanoid = person_id.removeprefix("vutt:P")
+    relative_path = f"config/prosopography/{nanoid}.json"
+
+    after_content = get_file_at_commit(relative_path, commit)
+    if after_content is None:
+        raise HTTPException(status_code=404, detail="Commit ei leitud")
+
+    try:
+        repo = get_or_init_repo()
+        commit_obj = repo.commit(commit)
+        parent_hash = commit_obj.parents[0].hexsha if commit_obj.parents else None
+    except Exception:
+        raise HTTPException(status_code=404, detail="Commit ei leitud")
+
+    before_content = get_file_at_commit(relative_path, parent_hash) if parent_hash else None
+
+    try:
+        after = json.loads(after_content)
+        before = json.loads(before_content) if before_content else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="JSON parse viga")
+
+    from .ops import compute_person_diff
+    return {"status": "ok", "changes": compute_person_diff(before, after)}
+
+
+@router.post("/{person_id:path}/restore")
+async def person_restore(person_id: str, request: Request, user=Depends(_require_role("admin"))):
+    """Taastab isikukaardi antud commit-i seisule. Teeb uue git commit-i."""
+    from ..config import PROSOPOGRAPHY_DIR
+    from .ops import _update_index_entry, _update_aliases_entry
+    from datetime import datetime, timezone
+
+    data = await request.json()
+    commit_hash = data.get("commit_hash")
+    if not commit_hash:
+        raise HTTPException(status_code=400, detail="commit_hash puudub")
+
+    nanoid = person_id.removeprefix("vutt:P")
+    relative_path = f"config/prosopography/{nanoid}.json"
+
+    content = get_file_at_commit(relative_path, commit_hash)
+    if content is None:
+        raise HTTPException(status_code=404, detail="Commit ei leitud")
+
+    try:
+        person = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="JSON parse viga")
+
+    now = datetime.now(timezone.utc).isoformat()
+    person["updated_at"] = now
+    person["updated_by"] = user["username"]
+
+    path = os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
+    name = (person.get("name") or {}).get("label") or person_id
+    save_with_git(
+        path,
+        json.dumps(person, ensure_ascii=False, indent=2),
+        user["username"],
+        message=f"Prosopo taastamine: {name} [{person_id}]",
+    )
+
+    _update_index_entry(person)
+    _update_aliases_entry(person)
+    return {"status": "ok", "person": person}
 
 
 # ── Generaalsed /{person_id} ruutid — PEAVAD tulema PÄRAST spetsiifilisi ──

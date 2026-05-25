@@ -239,3 +239,47 @@ def test_merge_person_commits_source_and_target(tmp_path):
     call_args = prosopo_calls[0]
     primary_path = call_args.args[0] if call_args.args else call_args.kwargs.get("filepath", "")
     assert "src.json" in primary_path
+
+
+def test_person_history_uses_correct_relative_path():
+    """person_history endpoint kutsub get_file_git_history õige suhtelise teega."""
+    from unittest.mock import patch
+    import asyncio
+
+    mock_history = [{"hash": "abc12345", "full_hash": "abc12345full", "author": "testuser",
+                     "date": "2024-01-01T00:00:00", "formatted_date": "01.01.2024 00:00",
+                     "message": "Prosopo muudatus: Hans [vutt:Pabc]", "is_original": False}]
+
+    with patch("server.prosopography.router.get_file_git_history", return_value=mock_history) as mock_git:
+        from server.prosopography import router as prosopo_router
+        import importlib; importlib.reload(prosopo_router)
+        with patch("server.prosopography.router.get_file_git_history", return_value=mock_history) as mock_git2:
+            result = asyncio.run(prosopo_router.person_history("vutt:Pabc123", user={"username": "t", "role": "editor"}))
+
+    assert result["status"] == "ok"
+    called_path = mock_git2.call_args.args[0]
+    assert called_path == "config/prosopography/abc123.json"
+
+
+def test_compute_person_diff_used_in_diff_endpoint():
+    """person_diff endpoint integreerib compute_person_diff tulemuse."""
+    from unittest.mock import patch
+    import asyncio, json as _json
+
+    before = {"name": {"label": "Hans"}, "imm_year": 1640, "updated_at": "2024-01-01"}
+    after  = {"name": {"label": "Hans Uus"}, "imm_year": 1641, "updated_at": "2024-06-01"}
+
+    mock_commit = type("C", (), {"parents": [type("P", (), {"hexsha": "prevhash"})()]})()
+
+    with patch("server.prosopography.router.get_file_at_commit", side_effect=[
+               _json.dumps(after), _json.dumps(before)
+           ]), \
+         patch("server.prosopography.router.get_or_init_repo") as mock_repo:
+        mock_repo.return_value.commit.return_value = mock_commit
+        from server.prosopography import router as prosopo_router
+        result = asyncio.run(prosopo_router.person_diff("vutt:Pabc123", commit="abc12345",
+                             user={"username": "t", "role": "editor"}))
+
+    assert result["status"] == "ok"
+    fields = {c["field"] for c in result["changes"]}
+    assert "name" in fields or "imm_year" in fields
