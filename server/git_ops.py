@@ -16,6 +16,16 @@ from .utils import sanitize_id
 
 logger = get_logger(__name__)
 
+
+def _parse_person_name_from_message(message: str) -> str:
+    """Parsib isiku nime commit-sõnumist.
+    'Prosopo muudatus: Hans Ludenius [vutt:Pabc]' → 'Hans Ludenius'
+    'Prosopo liitmine: A → B' → 'A → B'
+    """
+    m = re.search(r':\s*(.+?)(?:\s*\[vutt:P[^\]]+\])?$', message.strip())
+    return m.group(1).strip() if m else message.strip()
+
+
 # Git repo globaalne muutuja (initsialiseeritakse esimesel kasutamisel)
 _git_repo = None
 
@@ -710,6 +720,47 @@ def get_recent_commits(username=None, limit=50, skip=0):
                 # Käsitle erinevaid failitüüpe
                 is_txt = filename.endswith('.txt')
                 is_metadata = filename == '_metadata.json'
+
+                # Prosopo failid: config/prosopography/{nanoid}.json
+                is_prosopo = (
+                    len(parts) >= 3
+                    and parts[0] == "config"
+                    and parts[1] == "prosopography"
+                    and filename.endswith(".json")
+                    and filename not in ("prosopography_index.json",)
+                )
+
+                if is_prosopo:
+                    nanoid = filename.removesuffix(".json")
+                    person_id = f"vutt:P{nanoid}"
+                    file_key = f"prosopo/{commit.hexsha[:8]}"  # üks kirje per commit (merge puhuks)
+                    if file_key in seen_files:
+                        continue
+                    seen_files.add(file_key)
+                    if skipped < skip:
+                        skipped += 1
+                        continue
+                    results.append({
+                        "commit_hash": commit.hexsha[:8],
+                        "full_hash": commit.hexsha,
+                        "author": commit.author.name,
+                        "date": commit.committed_datetime.isoformat(),
+                        "formatted_date": commit.committed_datetime.strftime("%d.%m.%Y %H:%M"),
+                        "message": commit.message.strip(),
+                        "work_id": None,
+                        "title": None,
+                        "year": None,
+                        "work_author": None,
+                        "lehekylje_number": None,
+                        "filepath": filepath,
+                        "change_type": "person",
+                        "person_id": person_id,
+                        "person_name": _parse_person_name_from_message(commit.message.strip()),
+                    })
+                    if len(results) >= limit:
+                        has_more = True
+                        break
+                    continue
 
                 if not is_txt and not is_metadata:
                     continue

@@ -42,3 +42,43 @@ def test_delete_file_from_git(tmp_path):
     assert result is True
     assert not test_file.exists()
     assert "Kustutamine: test.json" in repo.head.commit.message
+
+
+def test_get_recent_commits_includes_prosopo(tmp_path):
+    """get_recent_commits peab tagastama prosopo commitid."""
+    import git
+    from unittest.mock import patch
+    from server import git_ops
+
+    repo = git.Repo.init(str(tmp_path))
+    prosopo_dir = tmp_path / "config" / "prosopography"
+    prosopo_dir.mkdir(parents=True)
+    person_file = prosopo_dir / "abc123.json"
+    person_file.write_text('{"id": "vutt:Pabc123", "name": {"label": "Test Isik"}}', encoding="utf-8")
+    repo.index.add(["config/prosopography/abc123.json"])
+    repo.index.commit(
+        "Prosopo loomine: Test Isik [vutt:Pabc123]",
+        author=git.Actor("testuser", "t@t.com"),
+        committer=git.Actor("testuser", "t@t.com"),
+    )
+
+    with patch.object(git_ops, "get_or_init_repo", return_value=repo), \
+         patch.object(git_ops, "BASE_DIR", str(tmp_path)):
+        result = git_ops.get_recent_commits(limit=10)
+
+    commits = result["commits"]
+    assert len(commits) == 1
+    c = commits[0]
+    assert c["change_type"] == "person"
+    assert c["person_id"] == "vutt:Pabc123"
+    assert c["person_name"] == "Test Isik"
+    assert c["work_id"] is None
+
+
+def test_parse_person_name_from_message():
+    """_parse_person_name_from_message parsib nime commit-sõnumist."""
+    from server.git_ops import _parse_person_name_from_message
+    assert _parse_person_name_from_message("Prosopo muudatus: Hans Ludenius [vutt:Pabc]") == "Hans Ludenius"
+    assert _parse_person_name_from_message("Prosopo loomine: Johann [vutt:Pxyz]") == "Johann"
+    assert _parse_person_name_from_message("Prosopo liitmine: A → B") == "A → B"
+    assert _parse_person_name_from_message("Prosopo migratsioon: 2218 isikut") == "2218 isikut"
