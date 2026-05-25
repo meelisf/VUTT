@@ -1522,14 +1522,28 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     if target_changed:
         target["updated_at"] = now
         target["updated_by"] = username
-        atomic_write_json(_id_to_path(target_id), target)
+        # NB: kirjutatakse allpool save_with_git-iga
 
     # 1. Source → tombstone
     source["record_status"] = "tombstone"
     source["merged_into"] = target_id
     source["updated_at"] = now
     source["updated_by"] = username
-    atomic_write_json(_id_to_path(source_id), source)
+
+    # Git commit: source (primary, alati muutub) + target (additional, ainult kui muutus)
+    source_name = (source.get("name") or {}).get("label") or source_id
+    target_name = (target.get("name") or {}).get("label") or target_id
+    additional = (
+        [(_id_to_path(target_id), json.dumps(target, ensure_ascii=False, indent=2))]
+        if target_changed else None
+    )
+    save_with_git(
+        _id_to_path(source_id),
+        json.dumps(source, ensure_ascii=False, indent=2),
+        username,
+        message=f"Prosopo liitmine: {source_name} → {target_name}",
+        additional_files=additional,
+    )
 
     # 2. Relations teistes kaartides: source_id → target_id
     for fpath in _glob.glob(os.path.join(PROSOPOGRAPHY_DIR, "*.json")):
@@ -1556,7 +1570,6 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     # 3. Teoste _metadata.json: creator source_id → target_id + git + Meilisearch
     target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
     from ..config import BASE_DIR as _DATA_DIR
-    from ..git_ops import save_with_git
     from ..meilisearch_ops import sync_work_to_meilisearch_async
     changed_files = []
     if os.path.exists(_DATA_DIR):

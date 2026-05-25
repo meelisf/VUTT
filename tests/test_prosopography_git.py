@@ -190,3 +190,52 @@ def test_delete_person_calls_delete_file_from_git(tmp_path):
     call_args = mock_delete.call_args
     assert "Prosopo kustutamine:" in call_args.args[1]
     assert result["deleted"] == "vutt:Pabc123"
+
+
+def test_merge_person_commits_source_and_target(tmp_path):
+    """merge_person() peab commitama source (tombstone) + target ühes commit-is."""
+    import json
+    from unittest.mock import patch, MagicMock
+
+    source = {"id": "vutt:Psrc", "name": {"label": "Allikas"}, "record_status": "draft",
+               "updated_at": "2024-01-01T00:00:00+00:00", "relations": [], "identifiers": [],
+               "import_batch_ids": [], "statuses": [], "occupations": [], "education": [],
+               "sources": [], "confessions": [], "birth": None, "death": None,
+               "origin": {}, "gender": None, "biography": None, "notes": None, "image_url": None}
+    target = {"id": "vutt:Ptgt", "name": {"label": "Sihtmärk"}, "record_status": "draft",
+               "updated_at": "2024-01-01T00:00:00+00:00", "relations": [], "identifiers": [],
+               "import_batch_ids": [], "statuses": [], "occupations": [], "education": [],
+               "sources": [], "confessions": [], "birth": None, "death": None,
+               "origin": {}, "gender": None, "biography": None, "notes": None, "image_url": None}
+
+    (tmp_path / "src.json").write_text(json.dumps(source), encoding="utf-8")
+    (tmp_path / "tgt.json").write_text(json.dumps(target), encoding="utf-8")
+
+    mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc"})
+
+    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
+         patch("server.prosopography.ops.save_with_git", mock_save), \
+         patch("server.prosopography.ops._update_index_entry"), \
+         patch("server.prosopography.ops._update_aliases_entry"), \
+         patch("server.prosopography.ops._remove_aliases_entry"), \
+         patch("server.prosopography.ops.atomic_write_json"), \
+         patch("server.prosopography.ops._glob.glob", return_value=[]), \
+         patch("server.prosopography.ops._load_index", return_value={"entries": []}):
+        from server.prosopography import ops
+
+        def _get_person(pid):
+            nanoid = pid.removeprefix("vutt:P")
+            path = tmp_path / f"{nanoid}.json"
+            return json.loads(path.read_text()) if path.exists() else None
+
+        with patch("server.prosopography.ops.get_person", side_effect=_get_person):
+            ops.merge_person("vutt:Psrc", "vutt:Ptgt", "testuser")
+
+    # Prosopo liitmine commit must have been called
+    prosopo_calls = [c for c in mock_save.call_args_list
+                     if "Prosopo liitmine:" in (c.kwargs.get("message", "") or "")]
+    assert len(prosopo_calls) >= 1
+    # Source (tombstone) must be primary file
+    call_args = prosopo_calls[0]
+    primary_path = call_args.args[0] if call_args.args else call_args.kwargs.get("filepath", "")
+    assert "src.json" in primary_path
