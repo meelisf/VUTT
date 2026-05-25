@@ -250,7 +250,7 @@ const PersonDetailPage: React.FC = () => {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
-  const [diffCache, setDiffCache] = useState<Record<string, { field: string; old: unknown; new: unknown }[]>>({});
+  const [diffCache, setDiffCache] = useState<Record<string, { field: string; old: unknown; new: unknown }[] | 'error'>>({});
   const [restoring, setRestoring] = useState<string | null>(null);
 
   const loadHistory = async () => {
@@ -274,6 +274,7 @@ const PersonDetailPage: React.FC = () => {
       setDiffCache(prev => ({ ...prev, [commitHash]: changes }));
     } catch (e) {
       console.error('Diff laadimine ebaõnnestus:', e);
+      setDiffCache(prev => ({ ...prev, [commitHash]: 'error' }));
     }
   };
 
@@ -773,12 +774,14 @@ const PersonDetailPage: React.FC = () => {
 
                     {expandedCommit === commit.hash && (
                       <div className="mt-2 ml-2">
-                        {diffCache[commit.hash] ? (
-                          diffCache[commit.hash].length === 0 ? (
+                        {diffCache[commit.hash] === 'error' ? (
+                          <p className="text-xs text-red-400 italic">Diff laadimine ebaõnnestus</p>
+                        ) : diffCache[commit.hash] ? (
+                          (diffCache[commit.hash] as { field: string; old: unknown; new: unknown }[]).length === 0 ? (
                             <p className="text-xs text-gray-400 italic">Muudatusi ei leitud</p>
                           ) : (
                             <div className="space-y-1">
-                              {diffCache[commit.hash].map((change, i) => (
+                              {(diffCache[commit.hash] as { field: string; old: unknown; new: unknown }[]).map((change, i) => (
                                 <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1">
                                   <span className="text-gray-500">{change.field}: </span>
                                   <span className="text-red-600">{JSON.stringify(change.old)}</span>
