@@ -746,7 +746,7 @@ const PersonDetailPage: React.FC = () => {
                         }
                       }}
                     >
-                      <button className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0" onClick={e => e.stopPropagation()}>
+                      <button className="p-1 hover:bg-gray-200 rounded transition-colors flex-shrink-0">
                         {expandedCommit === commit.hash
                           ? <ChevronDown size={16} className="text-gray-600" />
                           : <ChevronRight size={16} className="text-gray-400" />}
