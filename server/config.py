@@ -100,8 +100,9 @@ ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")
 NOTIFICATIONS_DIR = os.path.join(_STATE_DIR, "notifications")
 
-# Prosopograafia isikukaardid
-PROSOPOGRAPHY_DIR = os.path.join(_STATE_DIR, "prosopography")
+# Prosopograafia isikukaardid (JSON failid — gitis, pildid — state-is)
+PROSOPOGRAPHY_DIR = os.path.join(_DATA_CONFIG_DIR, "prosopography")
+PROSOPOGRAPHY_IMAGES_DIR = os.path.join(_STATE_DIR, "prosopography", "images")
 
 # Album Academicum referentsandmed
 AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")
