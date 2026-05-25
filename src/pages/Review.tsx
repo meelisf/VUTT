@@ -29,7 +29,8 @@ import {
   Minus,
   Wand2,
   CheckCircle,
-  XCircle
+  XCircle,
+  UserCircle
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -43,13 +44,15 @@ interface RecentCommit {
   date: string;
   formatted_date: string;
   message: string;
-  work_id: string;
+  work_id: string | null;
   title: string | null;
   year: number | null;
   work_author: string | null;  // NB: 'author' on commit author
   lehekylje_number: number | null;
   filepath: string;
-  change_type?: 'page' | 'metadata' | 'import';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus, 'import' = uus teos
+  change_type?: 'page' | 'metadata' | 'import' | 'person';  // 'page' = lehekülje muudatus, 'metadata' = teose metaandmete muudatus, 'import' = uus teos, 'person' = isiku muudatus
+  person_id?: string | null;
+  person_name?: string | null;
 }
 
 interface ReocrJob {
@@ -750,49 +753,88 @@ const Review: React.FC = () => {
                           </div>
                         )}
                         
-                        {/* Teos (aasta, autor, pealkiri + lk) */}
+                        {/* Teos VÕI isik */}
                         <div className={`${isAdmin && !selectedUser ? "col-span-6" : "col-span-8"} flex items-center gap-2 min-w-0`}>
-                          <FileText size={14} className="text-gray-400 flex-shrink-0 hidden sm:block" />
-                          <span className="text-xs text-gray-500 font-mono flex-shrink-0">
-                            {commit.year || '?'}
-                          </span>
-                          {commit.work_author && (
-                            <span className="text-sm text-gray-700 flex-shrink-0 max-w-40 truncate" title={commit.work_author}>
-                              {commit.work_author}
-                            </span>
-                          )}
-                          {commit.title && (
-                            <span className="text-sm text-gray-500 truncate" title={commit.title}>
-                              {commit.title.length > 20 ? commit.title.slice(0, 20) + '…' : commit.title}
-                            </span>
-                          )}
-                          {commit.change_type === 'import' ? (
-                            <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                              {t('changeType.import', 'Uus teos')}
-                            </span>
-                          ) : commit.change_type === 'metadata' ? (
-                            <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                              {t('changeType.metadata', 'Metaandmed')}
-                            </span>
+                          {commit.change_type === 'person'
+                            ? <UserCircle size={14} className="text-indigo-400 flex-shrink-0 hidden sm:block" />
+                            : <FileText size={14} className="text-gray-400 flex-shrink-0 hidden sm:block" />
+                          }
+
+                          {commit.change_type === 'person' ? (
+                            <>
+                              <span className="text-sm text-gray-700 truncate">{commit.person_name || commit.message}</span>
+                              {commit.message.startsWith('Prosopo loomine:') && (
+                                <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">Uus isik</span>
+                              )}
+                              {commit.message.startsWith('Prosopo muudatus:') && (
+                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">Isik</span>
+                              )}
+                              {commit.message.startsWith('Prosopo kustutamine:') && (
+                                <span className="text-xs text-red-700 bg-red-100 px-1.5 py-0.5 rounded flex-shrink-0">Kustutatud</span>
+                              )}
+                              {commit.message.startsWith('Prosopo liitmine:') && (
+                                <span className="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded flex-shrink-0">Liitmine</span>
+                              )}
+                              {commit.message.startsWith('Prosopo taastamine:') && (
+                                <span className="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded flex-shrink-0">Taastamine</span>
+                              )}
+                              {commit.message.startsWith('Prosopo migratsioon:') && (
+                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">Migratsioon</span>
+                              )}
+                            </>
                           ) : (
-                            <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
-                              lk {commit.lehekylje_number}
-                            </span>
+                            <>
+                              <span className="text-xs text-gray-500 font-mono flex-shrink-0">{commit.year || '?'}</span>
+                              {commit.work_author && (
+                                <span className="text-sm text-gray-700 flex-shrink-0 max-w-40 truncate" title={commit.work_author}>
+                                  {commit.work_author}
+                                </span>
+                              )}
+                              {commit.title && (
+                                <span className="text-sm text-gray-500 truncate" title={commit.title}>
+                                  {commit.title.length > 20 ? commit.title.slice(0, 20) + '…' : commit.title}
+                                </span>
+                              )}
+                              {commit.change_type === 'import' ? (
+                                <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                                  {t('changeType.import', 'Uus teos')}
+                                </span>
+                              ) : commit.change_type === 'metadata' ? (
+                                <span className="text-xs text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                                  {t('changeType.metadata', 'Metaandmed')}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">
+                                  lk {commit.lehekylje_number}
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
 
                         {/* Link */}
                         <div className="col-span-1 flex items-center justify-end">
-                          <Link
-                            to={commit.change_type === 'metadata' || commit.change_type === 'import'
-                              ? `/work/${commit.work_id}/1`
-                              : `/work/${commit.work_id}/${commit.lehekylje_number}`}
-                            className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
-                            title={commit.change_type === 'metadata' || commit.change_type === 'import' ? t('actions.openWork', 'Ava teos') : t('actions.openPage')}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink size={18} />
-                          </Link>
+                          {commit.change_type === 'person' && commit.person_id ? (
+                            <Link
+                              to={`/prosopography/${encodeURIComponent(commit.person_id)}`}
+                              className="inline-flex items-center gap-1 p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
+                              title="Ava isiku kaart"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink size={18} />
+                            </Link>
+                          ) : commit.work_id ? (
+                            <Link
+                              to={commit.change_type === 'metadata' || commit.change_type === 'import'
+                                ? `/work/${commit.work_id}/1`
+                                : `/work/${commit.work_id}/${commit.lehekylje_number}`}
+                              className="inline-flex items-center gap-1 p-2 text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                              title={commit.change_type === 'metadata' || commit.change_type === 'import' ? t('actions.openWork', 'Ava teos') : t('actions.openPage')}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <ExternalLink size={18} />
+                            </Link>
+                          ) : null}
                         </div>
                       </div>
                       
