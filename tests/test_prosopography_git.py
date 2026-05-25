@@ -158,3 +158,35 @@ def test_update_person_calls_save_with_git(tmp_path):
     msg = mock_save.call_args.kwargs.get("message", "")
     assert "Prosopo muudatus:" in msg
     assert result["updated_by"] == "testuser"
+
+
+def test_delete_person_calls_delete_file_from_git(tmp_path):
+    """delete_person() peab kutsuma delete_file_from_git()."""
+    import json
+    from unittest.mock import patch, MagicMock
+
+    person_data = {
+        "id": "vutt:Pabc123",
+        "name": {"label": "Kustutav Isik"},
+        "record_status": "draft",
+        "updated_at": "2024-01-01T00:00:00+00:00",
+    }
+    person_file = tmp_path / "abc123.json"
+    person_file.write_text(json.dumps(person_data), encoding="utf-8")
+
+    mock_delete = MagicMock(return_value=True)
+
+    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
+         patch("server.prosopography.ops.delete_file_from_git", mock_delete), \
+         patch("server.prosopography.ops._load_person_to_works", return_value={}), \
+         patch("server.prosopography.ops._load_index", return_value={"entries": []}), \
+         patch("server.prosopography.ops.atomic_write_json"), \
+         patch("server.prosopography.ops._remove_aliases_entry"), \
+         patch("server.prosopography.ops._glob.glob", return_value=[]):
+        from server.prosopography import ops
+        result = ops.delete_person("vutt:Pabc123", "testuser")
+
+    assert mock_delete.called
+    call_args = mock_delete.call_args
+    assert "Prosopo kustutamine:" in call_args.args[1]
+    assert result["deleted"] == "vutt:Pabc123"

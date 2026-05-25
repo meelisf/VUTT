@@ -24,7 +24,7 @@ from ..config import (
     PERSON_ALIASES_FILE,
 )
 from ..utils import generate_nanoid, atomic_write_json
-from ..git_ops import save_with_git
+from ..git_ops import save_with_git, delete_file_from_git
 from .work_relations_ops import update_works_creators_index, build_works_creators_index, get_work_relations
 from .places_ops import (
     _resolve_origin_group,
@@ -1648,10 +1648,10 @@ def delete_person(person_id: str, username: str) -> dict:
     if relation_refs > 0:
         raise ValueError(f"RELATION_REFS:{relation_refs}")
 
-    # Kustuta fail
+    # Kustuta fail gitist
     path = _id_to_path(person_id)
-    if os.path.exists(path):
-        os.remove(path)
+    name = (person.get("name") or {}).get("label") or person_id
+    delete_file_from_git(path, f"Prosopo kustutamine: {name} [{person_id}]", username)
 
     # Eemalda indeksist ja aliasestest
     with _index_lock:
