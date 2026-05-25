@@ -104,3 +104,57 @@ def test_compute_person_diff_new_field():
     after  = {"name": {"label": "Hans"}, "notes": "Uus märge"}
     changes = compute_person_diff(before, after)
     assert any(c["field"] == "notes" and c["old"] is None and c["new"] == "Uus märge" for c in changes)
+
+
+def test_create_person_calls_save_with_git(tmp_path):
+    """create_person() peab kutsuma save_with_git()."""
+    import json
+    from unittest.mock import patch, MagicMock
+
+    mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc12345"})
+
+    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
+         patch("server.prosopography.ops.save_with_git", mock_save), \
+         patch("server.prosopography.ops._update_index_entry"), \
+         patch("server.prosopography.ops._update_aliases_entry"):
+        from server.prosopography import ops
+        person = ops.create_person({"name": "Test Isik"}, "testuser")
+
+    assert mock_save.called
+    call_args = mock_save.call_args
+    # message can be positional arg[3] or keyword arg
+    msg = call_args.kwargs.get("message", "")
+    if not msg and len(call_args.args) > 3:
+        msg = call_args.args[3]
+    assert "Prosopo loomine:" in msg
+    assert person["created_by"] == "testuser"
+
+
+def test_update_person_calls_save_with_git(tmp_path):
+    """update_person() peab kutsuma save_with_git()."""
+    import json
+    from unittest.mock import patch, MagicMock
+
+    person_data = {
+        "id": "vutt:Pabc123",
+        "name": {"label": "Test"},
+        "updated_at": "2024-01-01T00:00:00+00:00",
+        "record_status": "draft",
+    }
+    person_file = tmp_path / "abc123.json"
+    person_file.write_text(json.dumps(person_data), encoding="utf-8")
+
+    mock_save = MagicMock(return_value={"success": True, "commit_hash": "abc12345"})
+
+    with patch("server.prosopography.ops.PROSOPOGRAPHY_DIR", str(tmp_path)), \
+         patch("server.prosopography.ops.save_with_git", mock_save), \
+         patch("server.prosopography.ops._update_index_entry"), \
+         patch("server.prosopography.ops._update_aliases_entry"), \
+         patch("server.prosopography.ops._propagate_name_to_works"):
+        from server.prosopography import ops
+        result = ops.update_person("vutt:Pabc123", {"updated_at": "2024-01-01T00:00:00+00:00", "name": {"label": "Test muudetud"}}, "testuser")
+
+    assert mock_save.called
+    msg = mock_save.call_args.kwargs.get("message", "")
+    assert "Prosopo muudatus:" in msg
+    assert result["updated_by"] == "testuser"

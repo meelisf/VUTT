@@ -24,6 +24,7 @@ from ..config import (
     PERSON_ALIASES_FILE,
 )
 from ..utils import generate_nanoid, atomic_write_json
+from ..git_ops import save_with_git
 from .work_relations_ops import update_works_creators_index, build_works_creators_index, get_work_relations
 from .places_ops import (
     _resolve_origin_group,
@@ -434,7 +435,13 @@ def create_person(data: dict, username: str) -> dict:
     }
 
     os.makedirs(PROSOPOGRAPHY_DIR, exist_ok=True)
-    atomic_write_json(_id_to_path(person_id), person)
+    name = (person.get("name") or {}).get("label") or person_id
+    save_with_git(
+        _id_to_path(person_id),
+        json.dumps(person, ensure_ascii=False, indent=2),
+        username,
+        message=f"Prosopo loomine: {name} [{person_id}]",
+    )
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person
@@ -553,7 +560,13 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
             logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
             person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
 
-    atomic_write_json(_id_to_path(person_id), person)
+    name = (person.get("name") or {}).get("label") or person_id
+    save_with_git(
+        _id_to_path(person_id),
+        json.dumps(person, ensure_ascii=False, indent=2),
+        username,
+        message=f"Prosopo muudatus: {name} [{person_id}]",
+    )
     _update_index_entry(person)
     _update_aliases_entry(person)
 
