@@ -1,6 +1,6 @@
 """
 Prosopograafia CRUD operatsioonid.
-Per-person failid state/prosopography/{nanoid}.json.
+Per-person failid data/config/prosopography/{nanoid}.json.
 Jagatud indeksid (prosopography_index.json, person_to_works.json) kaitstud threading.Lock()-iga.
 """
 import glob as _glob
@@ -45,7 +45,7 @@ _aliases_lock = threading.Lock()
 
 
 def _id_to_path(person_id: str) -> str:
-    """vutt:Pabc123 → state/prosopography/abc123.json"""
+    """vutt:Pabc123 → data/config/prosopography/abc123.json"""
     nanoid = person_id.removeprefix("vutt:P")
     return os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
 

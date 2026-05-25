@@ -16,7 +16,7 @@ logger = get_logger(__name__)
 
 
 def _id_to_path(person_id: str) -> str:
-    """vutt:Pabc123 → state/prosopography/abc123.json"""
+    """vutt:Pabc123 → data/config/prosopography/abc123.json"""
     nanoid = person_id.removeprefix("vutt:P")
     return os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
 
