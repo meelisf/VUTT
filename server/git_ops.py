@@ -614,18 +614,32 @@ def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "V
     """
     repo = get_or_init_repo()
     relative_path = os.path.relpath(absolute_path, BASE_DIR)
+    staged = False
     try:
         if os.path.exists(absolute_path):
             try:
                 repo.index.remove([relative_path])
-            except Exception:
-                repo.git.rm("--cached", relative_path)
-            os.remove(absolute_path)
+                staged = True
+            except Exception as e:
+                logger.warning(f"GIT: index.remove ebaõnnestus ({relative_path}): {e}")
+                try:
+                    repo.git.rm("--cached", relative_path)
+                    staged = True
+                except Exception as e2:
+                    logger.error(f"GIT: git rm --cached ebaõnnestus ({relative_path}): {e2}")
+            if staged:
+                os.remove(absolute_path)
         else:
             try:
                 repo.git.rm("--cached", relative_path)
+                staged = True
             except Exception:
+                logger.info(f"GIT: Fail pole gitis jälgitud, kustutamine vahele jäetud: {relative_path}")
                 return False
+
+        if not staged:
+            logger.info(f"GIT: Midagi ei staged, commit vahele jäetud: {relative_path}")
+            return False
 
         actor = Actor(username, f"{username}@vutt.local")
         repo.index.commit(commit_msg, author=actor, committer=actor)
