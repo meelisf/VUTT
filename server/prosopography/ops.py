@@ -979,7 +979,13 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    atomic_write_json(_id_to_path(person_id), person)
+    name = (person.get("name") or {}).get("label") or person_id
+    save_with_git(
+        _id_to_path(person_id),
+        json.dumps(person, ensure_ascii=False, indent=2),
+        username,
+        message=f"Prosopo identifikaator: {name} [{person_id}]",
+    )
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person, diff
@@ -1102,7 +1108,13 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    atomic_write_json(_id_to_path(person_id), person)
+    name = (person.get("name") or {}).get("label") or person_id
+    save_with_git(
+        _id_to_path(person_id),
+        json.dumps(person, ensure_ascii=False, indent=2),
+        username,
+        message=f"Prosopo rikastus: {name} [{person_id}]",
+    )
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person
