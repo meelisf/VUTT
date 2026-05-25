@@ -461,3 +461,45 @@ export async function mergePlaces(
   }
   return resp.json();
 }
+
+export async function fetchPersonHistory(
+  personId: string,
+  token: string | null
+): Promise<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/history`, {
+    headers: getAuthHeaders(token),
+  });
+  if (!resp.ok) throw new Error(`fetchPersonHistory: ${resp.status}`);
+  const data = await resp.json();
+  return data.history ?? [];
+}
+
+export async function fetchPersonDiff(
+  personId: string,
+  commitHash: string,
+  token: string | null
+): Promise<{ field: string; old: unknown; new: unknown }[]> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/diff?commit=${commitHash}`, {
+    headers: getAuthHeaders(token),
+  });
+  if (!resp.ok) throw new Error(`fetchPersonDiff: ${resp.status}`);
+  const data = await resp.json();
+  return data.changes ?? [];
+}
+
+export async function restorePerson(
+  personId: string,
+  commitHash: string,
+  token: string | null
+): Promise<unknown> {
+  const encoded = encodeURIComponent(personId);
+  const resp = await fetchWithTimeout(`${BASE}/${encoded}/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+    body: JSON.stringify({ commit_hash: commitHash }),
+  });
+  if (!resp.ok) throw new Error(`restorePerson: ${resp.status}`);
+  return resp.json();
+}

@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users, StickyNote, Map,
+  BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw,
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
 import Header from '../../components/Header';
-import { getPerson, updatePerson } from '../services/prosopographyService';
+import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePerson } from '../services/prosopographyService';
 import EntityPicker from '../../components/EntityPicker';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -244,6 +244,53 @@ const PersonDetailPage: React.FC = () => {
 
   const token = authToken ?? '';
   const canEdit = user && (user.role === 'editor' || user.role === 'admin');
+  const isAdmin = user?.role === 'admin';
+
+  const [history, setHistory] = useState<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [expandedCommit, setExpandedCommit] = useState<string | null>(null);
+  const [diffCache, setDiffCache] = useState<Record<string, { field: string; old: unknown; new: unknown }[]>>({});
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  const loadHistory = async () => {
+    if (!id || !token || historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const h = await fetchPersonHistory(id, token);
+      setHistory(h);
+      setHistoryOpen(true);
+    } catch (e) {
+      console.error('Ajaloo laadimine ebaõnnestus:', e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const loadDiff = async (commitHash: string) => {
+    if (!id || !token || diffCache[commitHash]) return;
+    try {
+      const changes = await fetchPersonDiff(id, commitHash, token);
+      setDiffCache(prev => ({ ...prev, [commitHash]: changes }));
+    } catch (e) {
+      console.error('Diff laadimine ebaõnnestus:', e);
+    }
+  };
+
+  const handleRestore = async (commitHash: string) => {
+    if (!id || !token) return;
+    if (!window.confirm('Kas oled kindel, et soovid taastada selle versiooni?')) return;
+    setRestoring(commitHash);
+    try {
+      await restorePerson(id, commitHash, token);
+      window.location.reload();
+    } catch (e) {
+      console.error('Taastamine ebaõnnestus:', e);
+      alert('Taastamine ebaõnnestus');
+    } finally {
+      setRestoring(null);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -660,6 +707,102 @@ const PersonDetailPage: React.FC = () => {
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
             <CardHeader icon={<StickyNote size={18} />} title={t('notes', 'Märkmed')} />
             <p className="text-sm text-gray-700 whitespace-pre-wrap">{person.notes}</p>
+          </div>
+        )}
+
+        {/* ── Ajalugu (ainult admin) ── */}
+        {isAdmin && id && (
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">
+            <button
+              onClick={() => historyOpen ? setHistoryOpen(false) : loadHistory()}
+              className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-gray-700 font-medium">
+                <History size={18} className="text-gray-400" />
+                {t('history', 'Muudatuste ajalugu')}
+                {history.length > 0 && (
+                  <span className="text-xs text-gray-400 font-normal">({history.length})</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {historyLoading && <span className="text-xs text-gray-400">Laadin…</span>}
+                {historyOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
+              </div>
+            </button>
+
+            {historyOpen && history.length > 0 && (
+              <div className="border-t border-gray-100 divide-y divide-gray-50">
+                {history.map((commit) => (
+                  <div key={commit.hash} className="px-5 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xs text-gray-400 font-mono flex-shrink-0">{commit.formatted_date}</span>
+                        <span className="text-xs text-gray-500 flex-shrink-0">{commit.author}</span>
+                        <span className="text-sm text-gray-700 truncate">{commit.message}</span>
+                        {commit.is_original && (
+                          <span className="text-xs text-green-700 bg-green-50 px-1.5 py-0.5 rounded flex-shrink-0">Originaal</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => {
+                            if (expandedCommit === commit.hash) {
+                              setExpandedCommit(null);
+                            } else {
+                              setExpandedCommit(commit.hash);
+                              loadDiff(commit.hash);
+                            }
+                          }}
+                          className="text-xs text-gray-500 hover:text-primary-600 px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+                        >
+                          {expandedCommit === commit.hash ? 'Peida' : 'Muudatused'}
+                        </button>
+                        {!commit.is_original && (
+                          <button
+                            onClick={() => handleRestore(commit.full_hash)}
+                            disabled={restoring === commit.full_hash}
+                            className="text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-1"
+                            title="Taasta see versioon"
+                          >
+                            <RotateCcw size={12} />
+                            Taasta
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {expandedCommit === commit.hash && (
+                      <div className="mt-2 ml-2">
+                        {diffCache[commit.hash] ? (
+                          diffCache[commit.hash].length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">Muudatusi ei leitud</p>
+                          ) : (
+                            <div className="space-y-1">
+                              {diffCache[commit.hash].map((change, i) => (
+                                <div key={i} className="text-xs font-mono bg-gray-50 rounded px-2 py-1">
+                                  <span className="text-gray-500">{change.field}: </span>
+                                  <span className="text-red-600">{JSON.stringify(change.old)}</span>
+                                  <span className="text-gray-400"> → </span>
+                                  <span className="text-green-600">{JSON.stringify(change.new)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )
+                        ) : (
+                          <p className="text-xs text-gray-400 italic">Laadin…</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {historyOpen && history.length === 0 && !historyLoading && (
+              <div className="border-t border-gray-100 px-5 py-4 text-sm text-gray-400 italic">
+                Ajalugu puudub
+              </div>
+            )}
           </div>
         )}
 
