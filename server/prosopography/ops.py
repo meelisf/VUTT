@@ -18,6 +18,7 @@ PERSON_IMAGES_DIR_NAME = "images"  # PROSOPOGRAPHY_DIR / images /
 
 from ..config import (
     PROSOPOGRAPHY_DIR,
+    PROSOPOGRAPHY_IMAGES_DIR,
     PROSOPOGRAPHY_INDEX_FILE,
     PERSON_TO_WORKS_FILE,
     PERSON_ALIASES_FILE,
@@ -972,10 +973,9 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
 
 
 def _person_image_path(person_id: str, ext: str) -> str:
-    """Tagastab isiku pildi failitee."""
+    """Tagastab isiku pildi failitee (state/prosopography/images/ — ei ole gitis)."""
     nanoid = person_id.removeprefix("vutt:P")
-    img_dir = os.path.join(PROSOPOGRAPHY_DIR, PERSON_IMAGES_DIR_NAME)
-    return os.path.join(img_dir, f"{nanoid}{ext}")
+    return os.path.join(PROSOPOGRAPHY_IMAGES_DIR, f"{nanoid}{ext}")
 
 
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
@@ -1014,8 +1014,7 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
         if os.path.exists(old_path):
             os.remove(old_path)
 
-    img_dir = os.path.join(PROSOPOGRAPHY_DIR, PERSON_IMAGES_DIR_NAME)
-    os.makedirs(img_dir, exist_ok=True)
+    os.makedirs(PROSOPOGRAPHY_IMAGES_DIR, exist_ok=True)
     img_path = _person_image_path(person_id, ext)
     with open(img_path, "wb") as f:
         f.write(file_bytes)
@@ -1709,3 +1708,25 @@ def bulk_update_occupation(
         updated += 1
 
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
+
+
+_DIFF_IGNORED_FIELDS = frozenset({
+    "updated_at", "updated_by", "created_at", "created_by",
+    "schema_version", "import_batch_ids", "id",
+})
+
+
+def compute_person_diff(before: dict, after: dict) -> list:
+    """
+    Tagastab [{field, old, new}] muutunud väljade loendi.
+    Ignoreerib tehnilisi välju (timestamps, id jne).
+    """
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
+        old_val = before.get(key)
+        new_val = after.get(key)
+        if old_val != new_val:
+            changes.append({"field": key, "old": old_val, "new": new_val})
+    return changes

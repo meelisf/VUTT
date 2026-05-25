@@ -82,3 +82,25 @@ def test_parse_person_name_from_message():
     assert _parse_person_name_from_message("Prosopo loomine: Johann [vutt:Pxyz]") == "Johann"
     assert _parse_person_name_from_message("Prosopo liitmine: A → B") == "A → B"
     assert _parse_person_name_from_message("Prosopo migratsioon: 2218 isikut") == "2218 isikut"
+
+
+def test_compute_person_diff_basic():
+    """compute_person_diff leiab muutunud väljad."""
+    from server.prosopography.ops import compute_person_diff
+    before = {"name": {"label": "Hans"}, "imm_year": 1640, "biography": None, "updated_at": "2024-01-01"}
+    after  = {"name": {"label": "Hans Ludenius"}, "imm_year": 1642, "biography": None, "updated_at": "2024-06-01"}
+    changes = compute_person_diff(before, after)
+    fields = {c["field"] for c in changes}
+    assert "name" in fields
+    assert "imm_year" in fields
+    assert "updated_at" not in fields  # tehniline väli, ignoreerida
+    assert "biography" not in fields   # väärtus ei muutunud (mõlemad None)
+
+
+def test_compute_person_diff_new_field():
+    """compute_person_diff tuvastab uue välja lisamise."""
+    from server.prosopography.ops import compute_person_diff
+    before = {"name": {"label": "Hans"}}
+    after  = {"name": {"label": "Hans"}, "notes": "Uus märge"}
+    changes = compute_person_diff(before, after)
+    assert any(c["field"] == "notes" and c["old"] is None and c["new"] == "Uus märge" for c in changes)
