@@ -39,7 +39,7 @@ from .git_ops import (
     get_or_init_repo, save_with_git, get_file_git_history,
     get_file_at_commit, get_file_diff, get_commit_diff, commit_new_work_to_git,
     get_recent_commits, get_git_failures, clear_git_failures, run_git_fsck,
-    delete_work_from_git, delete_page_from_git
+    delete_work_from_git, delete_page_from_git, delete_file_from_git
 )
 
 # Meilisearch operatsioonid

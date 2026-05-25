@@ -20,3 +20,25 @@ def test_prosopography_images_dir_is_under_state():
     assert PROSOPOGRAPHY_IMAGES_DIR.startswith(STATE_DIR), (
         f"PROSOPOGRAPHY_IMAGES_DIR ({PROSOPOGRAPHY_IMAGES_DIR}) peab olema STATE_DIR ({STATE_DIR}) all"
     )
+
+
+def test_delete_file_from_git(tmp_path):
+    """delete_file_from_git kustutab faili gitist ja teeb commit."""
+    import git
+    from unittest.mock import patch, MagicMock
+
+    # Loo mini git repo
+    repo = git.Repo.init(str(tmp_path))
+    test_file = tmp_path / "test.json"
+    test_file.write_text('{"id": "test"}', encoding="utf-8")
+    repo.index.add(["test.json"])
+    repo.index.commit("init", author=git.Actor("test", "t@t.com"), committer=git.Actor("test", "t@t.com"))
+
+    with patch("server.git_ops.get_or_init_repo", return_value=repo), \
+         patch("server.git_ops.BASE_DIR", str(tmp_path)):
+        from server.git_ops import delete_file_from_git
+        result = delete_file_from_git(str(test_file), "Kustutamine: test.json", "testuser")
+
+    assert result is True
+    assert not test_file.exists()
+    assert "Kustutamine: test.json" in repo.head.commit.message

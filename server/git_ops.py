@@ -607,6 +607,35 @@ def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str, user
         return False
 
 
+def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "VUTT Server") -> bool:
+    """
+    Eemaldab faili gitist ja teeb commit.
+    Erinevalt delete_page_from_git()-st võtab absoluutse tee (mitte folder/base).
+    """
+    repo = get_or_init_repo()
+    relative_path = os.path.relpath(absolute_path, BASE_DIR)
+    try:
+        if os.path.exists(absolute_path):
+            try:
+                repo.index.remove([relative_path])
+            except Exception:
+                repo.git.rm("--cached", relative_path)
+            os.remove(absolute_path)
+        else:
+            try:
+                repo.git.rm("--cached", relative_path)
+            except Exception:
+                return False
+
+        actor = Actor(username, f"{username}@vutt.local")
+        repo.index.commit(commit_msg, author=actor, committer=actor)
+        logger.info(f"GIT: Kustutatud {relative_path} ({username})")
+        return True
+    except Exception as e:
+        logger.error(f"GIT viga faili kustutamisel ({relative_path}): {e}")
+        return False
+
+
 def get_recent_commits(username=None, limit=50, skip=0):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.
