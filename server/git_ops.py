@@ -40,6 +40,22 @@ _work_ids_cache = {}
 _work_info_cache = {}
 
 
+def _decode_git_path(fp: str) -> str:
+    """Dekodeerib git-i tsiteeritud tee.
+
+    Git tsiteerib non-ASCII tähemärke sisaldavad teed jutumärkidega ja kodeerib
+    need oktal-escape'idena (nt å → \\303\\245). Ilma dekodeerimiseta lõpeb
+    fname jutumärgiga ja .txt/.json kontrollid ebaõnnestuvad.
+    """
+    if not (fp.startswith('"') and fp.endswith('"')):
+        return fp
+    raw = re.sub(r'\\([0-7]{3})', lambda m: chr(int(m.group(1), 8)), fp[1:-1])
+    try:
+        return raw.encode('latin-1').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        return raw
+
+
 def get_work_ids_from_folder(folder_name):
     """
     Leiab teose ID-d kausta nime järgi.
@@ -706,6 +722,7 @@ def get_recent_commits(username=None, limit=50, skip=0):
             is_import_commit = commit.message.strip().startswith("Originaal OCR:")
 
             for filepath in file_paths:
+                filepath = _decode_git_path(filepath)
                 if not filepath:
                     continue
 
