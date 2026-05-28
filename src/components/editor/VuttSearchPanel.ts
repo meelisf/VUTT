@@ -68,6 +68,13 @@ function buildDiacriticPattern(text: string, caseSensitive: boolean): string {
 let lastSearchDisplay = '';
 let lastReplaceDisplay = '';
 
+export function primeSearch(term: string) {
+  lastSearchDisplay = term;
+}
+
+export function getLastSearchDisplay(): string {
+  return lastSearchDisplay;
+}
 
 export function createVuttSearchPanel(view: EditorView) {
     return new VuttSearchPanel(view);
