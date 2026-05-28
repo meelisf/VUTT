@@ -242,14 +242,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
 
     // Otsisõna esiletõst: avab otsingu paneeli kui navigeeriti otsingust
-    if (initialSearchTerm && !searchAppliedRef.current) {
-      const view = viewRef.current;
-      const docLength = view?.state.doc.length ?? 0;
-      if (view && docLength > 0) {
-        searchAppliedRef.current = true;
-        primeSearch(initialSearchTerm);
-        openSearchPanel(view);
-      }
+    if (initialSearchTerm && !searchAppliedRef.current && view && view.state.doc.length > 0) {
+      searchAppliedRef.current = true;
+      primeSearch(initialSearchTerm);
+      openSearchPanel(view);
     }
   }, [page, initialSearchTerm]);
 
