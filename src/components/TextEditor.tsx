@@ -21,7 +21,7 @@ import { EditorView, lineNumbers, keymap } from '@codemirror/view';
 import { EditorState, EditorSelection, Compartment, Transaction } from '@codemirror/state';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
-import { createVuttSearchPanel } from './editor/VuttSearchPanel';
+import { createVuttSearchPanel, primeSearch } from './editor/VuttSearchPanel';
 import { findContainer, findInnerPairs } from './editor/wrapTagUtils';
 import { useSpecialChars } from './editor/useSpecialChars';
 import { useReOcr } from './editor/useReOcr';
@@ -37,12 +37,12 @@ interface TextEditorProps {
   currentStatus?: PageStatus | null;
   onStatusChange?: (status: PageStatus) => void;
   triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
-
+  initialSearchTerm?: string;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, initialSearchTerm = '' }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
@@ -101,6 +101,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const handleSaveRef = useRef<() => void>(() => {});
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
   const isSavingRef = useRef(false);
+  const searchAppliedRef = useRef(false);
 
   const { reocrStatus, reocrText, reocrError, handleReOcr, applyReOcr, deleteOcrFile } = useReOcr({
     page,
@@ -216,6 +217,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     });
   }, [readOnly]);
 
+  // Resetib otsingu rakendamise lipu uue otsisõna saamisel
+  useEffect(() => {
+    searchAppliedRef.current = false;
+  }, [initialSearchTerm]);
+
   // Uuendame editori sisu lehe vahetusel
   useEffect(() => {
     setStatus(page.status);
@@ -234,7 +240,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         });
       }
     }
-  }, [page]);
+
+    // Otsisõna esiletõst: avab otsingu paneeli kui navigeeriti otsingust
+    if (initialSearchTerm && !searchAppliedRef.current) {
+      const view = viewRef.current;
+      const docLength = view?.state.doc.length ?? 0;
+      if (view && docLength > 0) {
+        searchAppliedRef.current = true;
+        primeSearch(initialSearchTerm);
+        openSearchPanel(view);
+      }
+    }
+  }, [page, initialSearchTerm]);
 
   // Hoiatus brauseri sulgemise/refreshi korral
   useEffect(() => {
