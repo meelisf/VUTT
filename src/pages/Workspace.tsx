@@ -213,6 +213,7 @@ const Workspace: React.FC = () => {
       return;
     }
 
+    // ?q= jäetakse URL-ist välja — eesmärk: otsisõna paneel avaneb ainult esimesel lehel, mitte iga lehevahetusel
     navigate(`/work/${workId}/${newPage}`, { replace: true });
   }, [workId, currentPageNum, work?.page_count, hasUnsavedChanges, navigate]);
 
