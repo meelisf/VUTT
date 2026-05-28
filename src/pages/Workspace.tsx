@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
@@ -27,6 +27,8 @@ const Workspace: React.FC = () => {
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialSearchTerm = searchParams.get('q') ?? '';
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState<Page | null>(null);
@@ -508,7 +510,7 @@ const Workspace: React.FC = () => {
             currentStatus={currentStatus}
             onStatusChange={user ? setCurrentStatus : undefined}
             triggerSave={editorSaveRef}
-
+            initialSearchTerm={initialSearchTerm}
           />
           </div>
         </div>
