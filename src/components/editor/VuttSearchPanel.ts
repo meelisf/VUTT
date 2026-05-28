@@ -69,11 +69,11 @@ let lastSearchDisplay = '';
 let lastReplaceDisplay = '';
 
 export function primeSearch(term: string) {
-  lastSearchDisplay = term;
+    lastSearchDisplay = term;
 }
 
 export function getLastSearchDisplay(): string {
-  return lastSearchDisplay;
+    return lastSearchDisplay;
 }
 
 export function createVuttSearchPanel(view: EditorView) {
