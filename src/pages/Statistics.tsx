@@ -85,13 +85,13 @@ const Statistics: React.FC = () => {
           body: JSON.stringify({
             q: '',
             limit: 0,
-            facets: ['teose_staatus', 'work_id'],
+            facets: ['status', 'work_id'],
             filter: filter.length > 0 ? filter : undefined
           })
         });
         const statusResult = await statusResponse.json();
 
-        const statusFacets = statusResult.facetDistribution?.teose_staatus || {};
+        const statusFacets = statusResult.facetDistribution?.status || {};
         const totalFromFacets = Object.values(statusFacets).reduce((sum: number, val) => sum + (val as number), 0);
         setTotalPages(totalFromFacets || statusResult.estimatedTotalHits || 0);
 

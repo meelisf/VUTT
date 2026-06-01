@@ -95,7 +95,9 @@ Wexionensis                    [✏️ Redigeeri] [⤵ Ühenda]
 
 - **Tingimus:** kuvatakse ainult kui `coordinates.lat` + `coordinates.lon` on olemas
 - Leaflet `MapContainer` (react-leaflet) — 120px kõrge, täislaiusega paneelis
-- Üks marker koordinaadil, kaart ei ole interaktiivne (scrollWheelZoom=false, dragging=false)
+- Üks marker koordinaadil
+- `scrollWheelZoom=false` (ei lähe sassi lehe kerimisega), `dragging=true` (panoraamineks)
+- Algzoom tüübipõhine: `city`/`village`/`parish` → 9, `county`/`province`/`territory`/`historical_region` → 6, määramata → 7
 - Sama muster nagu `PersonsMap.tsx` — importida sealt vajalikud stiilid
 
 ### 5c. Andmetabel

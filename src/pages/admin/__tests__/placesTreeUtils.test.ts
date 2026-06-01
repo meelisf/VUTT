@@ -45,13 +45,14 @@ describe('buildPlacesTree', () => {
     expect(smaland.children.map(c => c.key)).toContain('Kronoberg');
   });
 
-  it('Riga on Livlandi all, mitte eraldi juurena', () => {
+  it('Livland on grupi esinduskoht, Riga tõuseb grupi juurkirjeks', () => {
     const tree = buildPlacesTree(PLACES, GROUPS);
     const liivimaaGroup = tree.find(g => g.groupKey === 'liivimaa')!;
-    const livland = liivimaaGroup.nodes.find(n => n.key === 'Livland')!;
-    expect(livland.children.map(c => c.key)).toContain('Riga');
-    const allRoots = liivimaaGroup.nodes.map(n => n.key);
-    expect(allRoots).not.toContain('Riga');
+    // Livland label kattub grupi labeliga → saab groupPlaceKey-ks, ei ole nodes-is
+    expect(liivimaaGroup.groupPlaceKey).toBe('Livland');
+    expect(liivimaaGroup.nodes.map(n => n.key)).not.toContain('Livland');
+    // Livlandi lapsed tõusevad grupi juurkirjeteks
+    expect(liivimaaGroup.nodes.map(n => n.key)).toContain('Riga');
   });
 
   it('tagastab tühja puu kui kohti pole', () => {

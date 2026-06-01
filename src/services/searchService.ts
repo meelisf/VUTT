@@ -7,6 +7,8 @@ import { MEILI_HOST } from '../config';
 import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 import { buildIdMap } from '../utils/buildObjectIdMap';
+import type { MatchingStrategies } from 'meilisearch';
+
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
@@ -344,7 +346,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
-      matchingStrategy: query ? 'frequency' : 'last', // Haruldasemad sõnad saavad kõrgema kaalu
+      matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
       limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
@@ -469,8 +471,8 @@ export const searchContent = async (query: string, page: number = 1, options: Co
   if (options.pageTags && options.pageTags.length > 0) {
     for (const tag of options.pageTags) filter.push(buildPageTagFilter(tag));
   }
-  // V2: Kollektsiooni filter
-  if (options.collection) {
+  // V2: Kollektsiooni filter — kui workId on seatud, on teos juba piiratud, kollektsioon ei rakendu
+  if (options.collection && !options.workId) {
     filter.push(`collections_hierarchy = "${options.collection}"`);
   }
   // V2: Žanri filter
@@ -516,7 +518,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
         highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
         highlightPostTag: '</em>',
         attributesToSearchOn: attributesToSearchOn,
-        matchingStrategy: query ? 'frequency' : 'last'
+        matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
       });
 
       const totalHits = response.estimatedTotalHits || 0;
@@ -735,7 +737,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
       highlightPostTag: '</em>',
       sort: ['lehekylje_number:asc'],
       attributesToSearchOn: attributesToSearchOn,
-      matchingStrategy: query ? 'frequency' : 'last'
+      matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
     });
 
     return response.hits.map(normalizeContentSearchHit);
