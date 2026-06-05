@@ -7,7 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Save, Plus, Trash2, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
-import { Creator, CreatorRole } from '../types';
+import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
@@ -45,6 +45,7 @@ interface MetaForm {
   collections: string[];
   ester_id: string;
   external_url: string;
+  archive_refs: ArchiveRef[];
 }
 
 interface SuggestionItem {
@@ -66,6 +67,7 @@ const EMPTY_FORM: MetaForm = {
   collections: [],
   ester_id: '',
   external_url: '',
+  archive_refs: [],
 };
 
 const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
@@ -99,6 +101,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     genres: SuggestionItem[];
   }>({ authors: [], tags: [], places: [], printers: [], types: [], genres: [] });
 
+  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -134,6 +137,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             collections: Array.isArray(m.collections) ? m.collections : initialCollections,
             ester_id: m.ester_id ?? '',
             external_url: m.external_url ?? '',
+            archive_refs: m.archive_refs ?? [],
           });
         }
       } catch {
@@ -170,10 +174,19 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       } catch {}
     };
 
+    const loadArchives = async () => {
+      try {
+        const r = await fetchWithTimeout(`${FILE_API_URL}/config/archives`);
+        const d = await r.json();
+        if (!cancelled && d.archives) setArchives(d.archives);
+      } catch {}
+    };
+
     getVocabularies().then((v) => { if (!cancelled) setVocabularies(v); }).catch(() => {});
     loadMeta();
     loadSuggestions();
     loadPeopleRegister();
+    loadArchives();
 
     return () => { cancelled = true; };
   }, [uploadId, authToken]);
@@ -209,6 +222,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
       collections: form.collections,
       ester_id: cleanEsterId || null,
       external_url: form.external_url.trim() || null,
+      archive_refs: form.archive_refs.filter(r => r.archive_id || r.reference),
     };
 
     try {
@@ -613,6 +627,52 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               />
             </div>
           </div>
+        </div>
+
+        {/* Arhiiviviited */}
+        <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/50">
+          <h4 className="text-xs font-bold text-gray-600 uppercase">
+            {t('workspace:metadata.archiveRefs', 'Arhiiviviited')}
+          </h4>
+          {form.archive_refs.map((ref, idx) => (
+            <div key={idx} className="flex gap-2 items-start">
+              <select
+                className="border border-gray-300 rounded px-2 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-28 shrink-0"
+                value={ref.archive_id}
+                onChange={e => setForm({ ...form, archive_refs: form.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: e.target.value } : r) })}
+              >
+                <option value="">— Arhiiv —</option>
+                {Object.entries(archives).map(([id, info]) => (
+                  <option key={id} value={id}>{id} — {info.name}</option>
+                ))}
+              </select>
+              <div className="flex-1 space-y-1">
+                <textarea
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"
+                  rows={2}
+                  placeholder={t('workspace:metadata.archiveRefPlaceholder', 'Viide (nt fond, nimistu, säilik, lehed)')}
+                  value={ref.reference}
+                  onChange={e => setForm({ ...form, archive_refs: form.archive_refs.map((r, i) => i === idx ? { ...r, reference: e.target.value } : r) })}
+                />
+                <input
+                  className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                  placeholder={t('workspace:metadata.archiveRefUrl', 'URL (valikuline)')}
+                  value={ref.url || ''}
+                  onChange={e => setForm({ ...form, archive_refs: form.archive_refs.map((r, i) => i === idx ? { ...r, url: e.target.value } : r) })}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, archive_refs: form.archive_refs.filter((_, i) => i !== idx) })}
+                className="text-gray-400 hover:text-red-500 mt-1 shrink-0 text-lg leading-none"
+              >×</button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, archive_refs: [...form.archive_refs, { archive_id: '', reference: '', url: '' }] })}
+            className="text-xs text-primary-600 hover:text-primary-800 hover:underline"
+          >+ {t('workspace:metadata.addArchiveRef', 'Lisa arhiiviviide')}</button>
         </div>
 
         {/* Salvestusnupp */}

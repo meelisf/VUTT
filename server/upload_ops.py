@@ -288,6 +288,7 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
         'type', 'genre',
         'creators', 'location',
         'publisher', 'tags',
+        'archive_refs',
     }
     lock = _get_upload_lock(upload_id)
     with lock:
@@ -1038,6 +1039,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         "type", "genre",
         "location", "publisher",
         "ester_id", "external_url", "year_display",
+        "archive_refs",
     ]
     metadata = {
         "id": work_id,
@@ -1304,6 +1306,7 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
             "creators", "genre", "type", "tags",
             "location", "publisher",
             "ester_id", "external_url", "year_display",
+            "archive_refs",
         ]
         updates = {}
         if upload_meta.get('title'):
