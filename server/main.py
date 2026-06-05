@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Streamin
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
+from .access_ops import can_read_work
 
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes
@@ -113,6 +114,34 @@ def require_role(role: str):
 
 async def get_json_data(request: Request):
     return await request.json()
+
+def _load_work_metadata(work_id: str):
+    """Laeb teose _metadata.json. Tagastab None kui ei leitud."""
+    folder = find_directory_by_id(work_id)
+    if not folder:
+        return None
+    meta_path = os.path.join(folder, '_metadata.json')
+    if not os.path.exists(meta_path):
+        return None
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _get_optional_user(request: Request):
+    """Tagastab autentitud kasutaja või None anonüümsele."""
+    token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not token_str:
+        return None
+    session = get_session(token_str)
+    if not session:
+        return None
+    username = session["user"]["username"]
+    users = load_users()
+    user_data = users.get(username, {})
+    return {**session["user"], "allowed_collections": user_data.get("allowed_collections", [])}
 
 # =========================================================
 # KASUTAJAD JA SESSIOONID
@@ -1671,6 +1700,13 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
     if not folder:
         raise HTTPException(status_code=404, detail="Teos ei leitud")
 
+    # Ligipääsukontroll
+    meta_for_access = _load_work_metadata(work_id)
+    if meta_for_access is not None:
+        user = _get_optional_user(request)
+        if not can_read_work(meta_for_access, user):
+            raise HTTPException(status_code=403, detail="Ligipääs keelatud")
+
     slug = os.path.basename(folder)
 
     # Loe metaandmed päise jaoks (tekst) ja failinimeks kasutame slug-i otse
@@ -1774,7 +1810,12 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
         raise
 
 @app.get("/meta/work/{work_id}")
-async def work_meta(work_id: str):
+async def work_meta(work_id: str, request: Request):
+    meta = _load_work_metadata(work_id)
+    if meta is not None:
+        user = _get_optional_user(request)
+        if not can_read_work(meta, user):
+            return HTMLResponse(content="<html><body>Ligipääs keelatud</body></html>", status_code=403)
     return HTMLResponse(content=build_meta_html(work_id))
 
 @app.get("/health")
