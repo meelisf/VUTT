@@ -18,6 +18,7 @@ interface User {
   email: string;
   role: 'contributor' | 'editor' | 'admin';
   created_at: string | null;
+  allowed_collections?: string[];
 }
 
 const UsersPage: React.FC = () => {
@@ -190,6 +191,7 @@ const UsersPage: React.FC = () => {
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.email')}</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.role')}</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.created')}</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Piiratud kogud</th>
                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">{t('users.actions')}</th>
                   </tr>
                 </thead>
@@ -232,6 +234,11 @@ const UsersPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           {u.created_at ? formatDate(u.created_at) : '-'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-400">
+                          {u.allowed_collections && u.allowed_collections.length > 0
+                            ? u.allowed_collections.join(', ')
+                            : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right">
                           {isCurrentUser ? (

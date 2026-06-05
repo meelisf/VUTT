@@ -72,6 +72,12 @@ const CollectionEditor: React.FC = () => {
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Ligipääsukontroll
+  const [editVisibility, setEditVisibility] = useState<'public' | 'restricted'>('public');
+  const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
+  const [allUsers, setAllUsers] = useState<{ username: string; name: string }[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+
   // --- Kustutamine ---
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [deleteWorksCount, setDeleteWorksCount] = useState<number | null>(null);
@@ -90,6 +96,24 @@ const CollectionEditor: React.FC = () => {
   const [creating, setCreating] = useState(false);
   const [createSuccess, setCreateSuccess] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Lae kõik kasutajad üks kord
+  useEffect(() => {
+    if (!authToken) return;
+    fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+      body: JSON.stringify({}),
+      timeout: 10000,
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') {
+          setAllUsers(data.users.map((u: any) => ({ username: u.username, name: u.name })));
+        }
+      })
+      .catch(() => {});
+  }, [authToken]);
 
   const tree = buildCollectionTree(collections);
 
@@ -115,7 +139,19 @@ const CollectionEditor: React.FC = () => {
     setDescLongEt(col.description_long?.et || '');
     setDescLongEn(col.description_long?.en || '');
     setEditColor(col.color || 'indigo');
-  }, [selectedId, collections]);
+    setEditVisibility((col.visibility as 'public' | 'restricted') || 'public');
+    setUsersLoading(true);
+    fetchWithTimeout(`${FILE_API_URL}/admin/collections/${selectedId}/users`, {
+      headers: getAuthHeaders(authToken),
+      timeout: 10000,
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') setAllowedUsers(data.allowed_users || []);
+      })
+      .catch(() => {})
+      .finally(() => setUsersLoading(false));
+  }, [selectedId, collections, authToken]);
 
 
   const handleSave = async () => {
@@ -133,6 +169,8 @@ const CollectionEditor: React.FC = () => {
             description: { et: descEt.trim(), en: descEn.trim() },
             description_long: { et: descLongEt.trim(), en: descLongEn.trim() },
             color: editColor,
+            visibility: editVisibility,
+            allowed_users: editVisibility === 'restricted' ? allowedUsers : undefined,
           }),
           timeout: 10000,
         }
@@ -271,6 +309,84 @@ const CollectionEditor: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">{t('collections.createColor')}</label>
             <ColorPicker value={editColor} onChange={setEditColor} />
             <p className="text-xs text-gray-400 mt-1">{editColor}</p>
+          </div>
+
+          {/* Nähtavus */}
+          <div>
+            <p className="text-sm font-semibold text-gray-700 mb-2">Nähtavus</p>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="public"
+                  checked={editVisibility === 'public'}
+                  onChange={() => setEditVisibility('public')}
+                  className="text-primary-600"
+                />
+                <span className="text-sm">Avalik</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="visibility"
+                  value="restricted"
+                  checked={editVisibility === 'restricted'}
+                  onChange={() => setEditVisibility('restricted')}
+                  className="text-primary-600"
+                />
+                <span className="text-sm text-amber-700">Piiratud</span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Piiratud kollektsiooni teosed on ligipääsetavad ainult antud kasutajatele ja adminidele.
+            </p>
+
+            {editVisibility === 'restricted' && (
+              <div className="mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-700 mb-2">Ligipääsuga kasutajad:</p>
+                {usersLoading ? (
+                  <Loader2 size={14} className="animate-spin text-gray-400" />
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {allowedUsers.length === 0 && (
+                        <span className="text-xs text-gray-400">Pole ligipääsuga kasutajaid</span>
+                      )}
+                      {allowedUsers.map(username => {
+                        const u = allUsers.find(x => x.username === username);
+                        return (
+                          <span key={username} className="inline-flex items-center gap-1 bg-white border border-amber-300 px-2 py-0.5 rounded text-xs">
+                            {u?.name || username}
+                            <button
+                              type="button"
+                              onClick={() => setAllowedUsers(prev => prev.filter(x => x !== username))}
+                              className="text-gray-400 hover:text-red-500 ml-0.5"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <select
+                      onChange={e => {
+                        if (e.target.value) {
+                          setAllowedUsers(prev => [...new Set([...prev, e.target.value])]);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary-400"
+                    >
+                      <option value="">+ Lisa kasutaja</option>
+                      {allUsers.filter(u => !allowedUsers.includes(u.username)).map(u => (
+                        <option key={u.username} value={u.username}>{u.name} ({u.username})</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Lühikirjeldus */}
