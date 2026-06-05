@@ -517,6 +517,11 @@ def sync_work_to_meilisearch(dir_name):
             "tags_ids": get_all_ids(tags),
             "collections": work_collections,
             "collections_hierarchy": collections_hierarchy,
+            "is_public": any(
+                collections.get(c, {}).get("visibility", "public") == "public"
+                for c in work_collections
+            ) if work_collections else True,
+            "shareable": metadata.get("shareable", False),
             "location": get_label(location),
             "location_object": location,
             "location_id": get_id(location),
@@ -698,6 +703,75 @@ def sync_work_to_meilisearch_async(dir_name):
     Pool piirab samaagsete päringute arvu (max 10).
     """
     _meilisearch_executor.submit(_sync_work_task, dir_name)
+
+
+def _ensure_filterable_attributes():
+    """Tagab et is_public ja shareable on filterableAttributes-s."""
+    url = f"{MEILI_URL}/indexes/{INDEX_NAME}/settings/filterable-attributes"
+    req = urllib.request.Request(url, method='GET')
+    req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            current = json.loads(r.read())
+        needed = {"is_public", "shareable", "collections_hierarchy", "collections"}
+        if not needed.issubset(set(current)):
+            new_attrs = list(set(current) | needed)
+            patch_req = urllib.request.Request(
+                url,
+                data=json.dumps(new_attrs).encode(),
+                method='PUT'
+            )
+            patch_req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+            patch_req.add_header('Content-Type', 'application/json')
+            urllib.request.urlopen(patch_req, timeout=10)
+            logger.info("filterableAttributes uuendatud: lisati is_public, shareable")
+    except Exception as e:
+        logger.warning(f"filterableAttributes uuendus ebaõnnestus: {e}")
+
+
+def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
+    """Uuendab kõigi antud kollektsiooni teoste is_public välja Meilisearchi asünkroonselt."""
+    def _do_update():
+        if not os.path.isdir(BASE_DIR):
+            return
+        docs_to_update = []
+        all_cols = load_collections()
+        for folder in os.listdir(BASE_DIR):
+            meta_path = os.path.join(BASE_DIR, folder, '_metadata.json')
+            if not os.path.exists(meta_path):
+                continue
+            try:
+                with open(meta_path, 'r', encoding='utf-8') as f:
+                    meta = json.load(f)
+                work_cols = meta.get('collections', [])
+                if collection_id not in work_cols:
+                    continue
+                work_id = meta.get('work_id')
+                if not work_id:
+                    continue
+                new_is_public = any(
+                    all_cols.get(c, {}).get("visibility", "public") == "public"
+                    for c in work_cols
+                ) if work_cols else True
+                docs_to_update.append({"id": f"{work_id}-1", "work_id": work_id, "is_public": new_is_public})
+            except Exception:
+                continue
+
+        if not docs_to_update:
+            return
+
+        url = f"{MEILI_URL}/indexes/{INDEX_NAME}/documents"
+        req = urllib.request.Request(url, data=json.dumps(docs_to_update).encode(), method='POST')
+        req.add_header('Authorization', f'Bearer {MEILI_KEY}')
+        req.add_header('Content-Type', 'application/json')
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                result = json.loads(r.read())
+                logger.info(f"is_public massuuendus: task_uid={result.get('taskUid')}, {len(docs_to_update)} teost")
+        except Exception as e:
+            logger.error(f"is_public massuuendus ebaõnnestus: {e}")
+
+    _meilisearch_executor.submit(_do_update)
 
 
 MEILI_KEEPWARM_INTERVAL = 7200  # 2 tundi sekundites
