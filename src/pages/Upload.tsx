@@ -1249,6 +1249,7 @@ const Upload: React.FC = () => {
               <UploadMetaForm
                 uploadId={uploadId}
                 authToken={authToken}
+                userRole={user?.role || 'contributor'}
                 collections={collections}
                 initialTitle={title}
                 initialYear={year}

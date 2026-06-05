@@ -223,5 +223,22 @@
     "restoreError": "Taastamine ebaõnnestus",
     "unknownDate": "Kuupäev teadmata",
     "unknownUser": "Teadmata"
+  },
+  "archives": {
+    "title": "Arhiivide register",
+    "addArchive": "Lisa arhiiv",
+    "id": "Lühend",
+    "idPlaceholder": "Lühend (nt \"EKM\")",
+    "name": "Nimi",
+    "url": "URL (valikuline)",
+    "selectPlaceholder": "Arhiiv",
+    "idNameRequired": "Lühend ja nimi on kohustuslikud",
+    "duplicateId": "Lühend '{{id}}' on juba kasutusel",
+    "deleteConfirm": "Kustuta arhiiv '{{id}}'?",
+    "deleteInUseWarning": "See arhiiv on kasutusel teoses. Kustutamine ei eemalda viiteid teostest.",
+    "requestTitle": "Taotle arhiivi lisamist",
+    "requestBody": "Soovin lisada arhiivi registrisse: {{id}}, {{name}}",
+    "requestSent": "Teavitus adminidele saadetud.",
+    "send": "Saada"
   }
 }

@@ -13,6 +13,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
 import { buildMetadataPayload } from '../utils/buildMetadataPayload';
+import ArchiveSelect from './ArchiveSelect';
 
 interface MetadataModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface MetadataModalProps {
   work?: Work;
   workId: string;
   authToken: string;
+  userRole?: string;
   collections: Collections;
   onSaveSuccess: (updatedPage: Partial<Page>, updatedWork: Partial<Work>) => void;
 }
@@ -143,6 +145,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   work,
   workId,
   authToken,
+  userRole,
   collections,
   onSaveSuccess
 }) => {
@@ -756,16 +759,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
             <div className="space-y-2">
               {metaForm.archive_refs.map((ref, idx) => (
                 <div key={idx} className="flex gap-2 items-start">
-                  <select
-                    className="border border-gray-300 rounded px-2 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-28 shrink-0"
+                  <ArchiveSelect
+                    archives={archives}
                     value={ref.archive_id}
-                    onChange={e => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: e.target.value } : r) })}
-                  >
-                    <option value="">— Arhiiv —</option>
-                    {Object.entries(archives).map(([id, info]) => (
-                      <option key={id} value={id}>{id} — {info.name}</option>
-                    ))}
-                  </select>
+                    onChange={archiveId => setMetaForm({ ...metaForm, archive_refs: metaForm.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: archiveId } : r) })}
+                    onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}
+                    userRole={userRole || ''}
+                    authToken={authToken}
+                  />
                   <div className="flex-1 space-y-1">
                     <textarea
                       className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"

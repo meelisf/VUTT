@@ -545,6 +545,7 @@ const Workspace: React.FC = () => {
           work={work}
           workId={workId}
           authToken={authToken}
+          userRole={user?.role || ''}
           collections={collections}
           onSaveSuccess={handleMetadataSaved}
         />

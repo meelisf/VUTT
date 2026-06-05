@@ -16,10 +16,12 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { getLabel } from '../utils/metadataUtils';
+import ArchiveSelect from './ArchiveSelect';
 
 interface UploadMetaFormProps {
   uploadId: string;
   authToken: string;
+  userRole?: string;
   collections: Collections;
   /** Algväärtused samm 1-st (kui backend meta pole veel laaditud) */
   initialTitle?: string;
@@ -73,6 +75,7 @@ const EMPTY_FORM: MetaForm = {
 const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
   uploadId,
   authToken,
+  userRole,
   collections,
   initialTitle = '',
   initialYear = '',
@@ -636,16 +639,14 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           </h4>
           {form.archive_refs.map((ref, idx) => (
             <div key={idx} className="flex gap-2 items-start">
-              <select
-                className="border border-gray-300 rounded px-2 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white w-28 shrink-0"
+              <ArchiveSelect
+                archives={archives}
                 value={ref.archive_id}
-                onChange={e => setForm({ ...form, archive_refs: form.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: e.target.value } : r) })}
-              >
-                <option value="">— Arhiiv —</option>
-                {Object.entries(archives).map(([id, info]) => (
-                  <option key={id} value={id}>{id} — {info.name}</option>
-                ))}
-              </select>
+                onChange={archiveId => setForm({ ...form, archive_refs: form.archive_refs.map((r, i) => i === idx ? { ...r, archive_id: archiveId } : r) })}
+                onArchiveAdded={(id, info) => setArchives(prev => ({ ...prev, [id]: info }))}
+                userRole={userRole || 'contributor'}
+                authToken={authToken ?? null}
+              />
               <div className="flex-1 space-y-1">
                 <textarea
                   className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white resize-none"

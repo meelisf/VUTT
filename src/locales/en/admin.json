@@ -223,5 +223,22 @@
     "restoreError": "Restore failed",
     "unknownDate": "Unknown date",
     "unknownUser": "Unknown"
+  },
+  "archives": {
+    "title": "Archive registry",
+    "addArchive": "Add archive",
+    "id": "ID",
+    "idPlaceholder": "ID (e.g. \"BL\")",
+    "name": "Name",
+    "url": "URL (optional)",
+    "selectPlaceholder": "Archive",
+    "idNameRequired": "ID and name are required",
+    "duplicateId": "ID '{{id}}' is already in use",
+    "deleteConfirm": "Delete archive '{{id}}'?",
+    "deleteInUseWarning": "This archive is in use in a work. Deleting will not remove references from works.",
+    "requestTitle": "Request archive addition",
+    "requestBody": "I'd like to add an archive to the registry: {{id}}, {{name}}",
+    "requestSent": "Notification sent to admins.",
+    "send": "Send"
   }
 }
