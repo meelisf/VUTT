@@ -99,6 +99,17 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (verifiedUser && verifiedUser !== 'network-error') {
           setUser(verifiedUser);
           setAuthToken(storedToken);
+          // Taasta Meilisearchi kasutaja token (ilma selleta kasutatakse anonüümset filtrit)
+          try {
+            const mr = await fetch(`${FILE_API_URL}/api/meili-token/refresh`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${storedToken}` },
+            });
+            if (mr.ok) {
+              const { token: meiliToken } = await mr.json();
+              if (meiliToken) setUserToken(meiliToken);
+            }
+          } catch {}
           // Lae seaded serverist
           const settings = await loadUserSettings(storedToken);
           setUserSettings(settings);
