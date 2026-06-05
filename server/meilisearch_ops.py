@@ -33,6 +33,8 @@ import time
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
+import jwt  # PyJWT
+from datetime import datetime, timezone, timedelta
 from .config import BASE_DIR, MEILI_URL, MEILI_KEY, INDEX_NAME, COLLECTIONS_FILE, PERSON_ALIASES_FILE as PEOPLE_FILE, LABELS_FILE, ARCHIVES_FILE, get_logger
 from .utils import (
     atomic_write_json,
@@ -764,6 +766,42 @@ def _warm_dashboard_searches():
             result.get("processingTimeMs"),
             result.get("estimatedTotalHits"),
         )
+
+
+def generate_meili_token(user=None, ttl_seconds: int = 3600) -> str:
+    """Genereerib Meilisearch tenant tokeni kasutaja õiguste põhjal.
+
+    user=None → anonüümne token (filter: is_public = true)
+    user admin → piiranguta token
+    user contributor/editor → filter: is_public = true + allowed collections
+    """
+    from .config import MEILI_SEARCH_KEY, MEILI_SEARCH_KEY_UID
+
+    if not MEILI_SEARCH_KEY or not MEILI_SEARCH_KEY_UID:
+        raise RuntimeError("MEILI_SEARCH_KEY ja MEILI_SEARCH_KEY_UID peavad olema seadistatud")
+
+    base_filter = "is_public = true"
+
+    if user and user.get("role") == "admin":
+        search_rules = {"teosed": {}}
+    else:
+        allowed = (user or {}).get("allowed_collections", [])
+        if allowed:
+            cols = ", ".join(f'"{c}"' for c in allowed)
+            meili_filter = f"{base_filter} OR collections_hierarchy IN [{cols}]"
+        else:
+            meili_filter = base_filter
+        search_rules = {"teosed": {"filter": meili_filter}}
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+
+    payload = {
+        "searchRules": search_rules,
+        "apiKeyUid": MEILI_SEARCH_KEY_UID,
+        "exp": int(expires_at.timestamp()),
+    }
+    token = jwt.encode(payload, MEILI_SEARCH_KEY, algorithm="HS256")
+    return token if isinstance(token, str) else token.decode("utf-8")
 
 
 def _keepwarm_loop():

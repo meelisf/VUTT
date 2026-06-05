@@ -169,6 +169,8 @@ _DEFAULT_MEILI_URL = "http://127.0.0.1:7700"
 # 1. Proovime lugeda süsteemi keskkonnamuutujatest (Docker/Production eelistatud)
 MEILI_URL = os.getenv("MEILISEARCH_URL")
 MEILI_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY")
+MEILI_SEARCH_KEY = os.getenv("MEILI_SEARCH_KEY", "")
+MEILI_SEARCH_KEY_UID = os.getenv("MEILI_SEARCH_KEY_UID", "")
 INDEX_NAME = "teosed"
 
 def load_env_file():
