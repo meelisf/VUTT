@@ -18,6 +18,20 @@ const Maintenance: React.FC = () => {
   const [placeLabelsCount, setPlaceLabelsCount] = useState<number | null>(null);
   const [entityLabelsState, setEntityLabelsState] = useState<ActionState>('idle');
   const [entityLabelsCount, setEntityLabelsCount] = useState<number | null>(null);
+  const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
+  const [archivesLoaded, setArchivesLoaded] = useState(false);
+  const [showAddArchive, setShowAddArchive] = useState(false);
+  const [addId, setAddId] = useState('');
+  const [addName, setAddName] = useState('');
+  const [addUrl, setAddUrl] = useState('');
+  const [addError, setAddError] = useState('');
+  const [addSaving, setAddSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteForceConfirm, setDeleteForceConfirm] = useState<{ id: string; message: string } | null>(null);
 
   React.useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -63,6 +77,70 @@ const Maintenance: React.FC = () => {
     }
   };
 
+  React.useEffect(() => {
+    if (!authToken) return;
+    fetchWithTimeout(`${FILE_API_URL}/config/archives`, { headers: getAuthHeaders(authToken) })
+      .then(r => r.json())
+      .then(d => { if (d.archives) { setArchives(d.archives); setArchivesLoaded(true); } })
+      .catch(() => {});
+  }, [authToken]);
+
+  const handleAddArchive = async () => {
+    const trimId = addId.trim();
+    const trimName = addName.trim();
+    const trimUrl = addUrl.trim();
+    if (!trimId || !trimName) { setAddError(t('admin:archives.idNameRequired')); return; }
+    if (archives[trimId]) { setAddError(t('admin:archives.duplicateId', { id: trimId })); return; }
+    setAddSaving(true); setAddError('');
+    try {
+      const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: trimId, name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }),
+      });
+      if (!resp.ok) { const e = await resp.json(); setAddError(e.detail || t('common:error.unknown')); return; }
+      setArchives(prev => ({ ...prev, [trimId]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
+      setAddId(''); setAddName(''); setAddUrl('');
+      setShowAddArchive(false);
+    } catch { setAddError(t('common:error.unknown')); }
+    finally { setAddSaving(false); }
+  };
+
+  const handleUpdateArchive = async (id: string) => {
+    const trimName = editName.trim();
+    const trimUrl = editUrl.trim();
+    if (!trimName) { setEditError(t('admin:archives.name')); return; }
+    setEditSaving(true); setEditError('');
+    try {
+      const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimName, ...(trimUrl ? { url: trimUrl } : {}) }),
+      });
+      if (!resp.ok) { const e = await resp.json(); setEditError(e.detail || t('common:error.unknown')); return; }
+      setArchives(prev => ({ ...prev, [id]: { name: trimName, ...(trimUrl ? { url: trimUrl } : {}) } }));
+      setEditingId(null);
+    } catch { setEditError(t('common:error.unknown')); }
+    finally { setEditSaving(false); }
+  };
+
+  const handleDeleteArchive = async (id: string, force = false) => {
+    try {
+      const resp = await fetchWithTimeout(
+        `${FILE_API_URL}/config/archives/${encodeURIComponent(id)}${force ? '?force=true' : ''}`,
+        { method: 'DELETE', headers: getAuthHeaders(authToken) },
+      );
+      if (resp.status === 409) {
+        const e = await resp.json();
+        setDeleteForceConfirm({ id, message: e.detail });
+        return;
+      }
+      if (!resp.ok) return;
+      setArchives(prev => { const n = { ...prev }; delete n[id]; return n; });
+      setDeleteForceConfirm(null);
+    } catch { /* ignore */ }
+  };
+
   if (userLoading || !user) return null;
   if (user.role !== 'admin') return null;
 
@@ -101,6 +179,150 @@ const Maintenance: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-800">{t('admin:maintenance.title')}</h2>
         </div>
 
+        {/* Arhiivide register */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">{t('admin:archives.title')}</h3>
+            <button
+              onClick={() => { setShowAddArchive(a => !a); setAddId(''); setAddName(''); setAddUrl(''); setAddError(''); }}
+              className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-800 border border-primary-200 rounded px-2 py-1 hover:bg-primary-50"
+            >
+              + {t('admin:archives.addArchive')}
+            </button>
+          </div>
+
+          {showAddArchive && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3 space-y-2">
+              <div className="grid grid-cols-3 gap-2">
+                <input
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                  placeholder={t('admin:archives.idPlaceholder')}
+                  value={addId}
+                  onChange={e => { setAddId(e.target.value); setAddError(''); }}
+                />
+                <input
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                  placeholder={t('admin:archives.name')}
+                  value={addName}
+                  onChange={e => { setAddName(e.target.value); setAddError(''); }}
+                />
+                <input
+                  className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                  placeholder={t('admin:archives.url')}
+                  value={addUrl}
+                  onChange={e => setAddUrl(e.target.value)}
+                />
+              </div>
+              {addError && <p className="text-xs text-red-600">{addError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={handleAddArchive}
+                  disabled={addSaving}
+                  className="text-xs bg-primary-600 text-white rounded px-3 py-1.5 hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {addSaving ? '...' : t('common:buttons.save')}
+                </button>
+                <button
+                  onClick={() => setShowAddArchive(false)}
+                  className="text-xs text-gray-500 hover:text-gray-700"
+                >
+                  {t('common:buttons.cancel')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {archivesLoaded && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-xs text-gray-500 font-medium">
+                    <th className="text-left px-3 py-2 w-24">{t('admin:archives.id')}</th>
+                    <th className="text-left px-3 py-2">{t('admin:archives.name')}</th>
+                    <th className="text-left px-3 py-2 w-40">{t('admin:archives.url')}</th>
+                    <th className="w-20" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {Object.entries(archives).map(([id, info]) => (
+                    <tr key={id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-mono text-xs font-medium text-gray-700">{id}</td>
+                      {editingId === id ? (
+                        <>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                              value={editName}
+                              onChange={e => { setEditName(e.target.value); setEditError(''); }}
+                            />
+                            {editError && <p className="text-xs text-red-600 mt-0.5">{editError}</p>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:ring-1 focus:ring-primary-400 outline-none"
+                              value={editUrl}
+                              onChange={e => setEditUrl(e.target.value)}
+                              placeholder="https://..."
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => handleUpdateArchive(id)}
+                                disabled={editSaving}
+                                className="text-xs text-primary-600 hover:text-primary-800 disabled:opacity-50"
+                              >
+                                {editSaving ? '...' : t('common:buttons.save')}
+                              </button>
+                              <button
+                                onClick={() => setEditingId(null)}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                {t('common:buttons.cancel')}
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-gray-800">{info.name}</td>
+                          <td className="px-3 py-2">
+                            {info.url ? (
+                              <a href={info.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-600 hover:underline truncate block max-w-[140px]">
+                                {info.url.replace(/^https?:\/\//, '')} ↗
+                              </a>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditError(''); }}
+                                className="text-xs text-gray-400 hover:text-gray-700"
+                                title={t('common:buttons.edit')}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                onClick={() => handleDeleteArchive(id)}
+                                className="text-xs text-gray-300 hover:text-red-500"
+                                title={t('common:buttons.delete')}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
           {actions.map(({ key, label, desc, state, count, doneKey, onClick }) => (
             <div key={key} className="flex items-center justify-between px-4 py-4 gap-4">
@@ -127,6 +349,29 @@ const Maintenance: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {deleteForceConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+            <div className="bg-white rounded-lg shadow-xl p-5 w-80 space-y-3">
+              <p className="text-sm font-semibold text-gray-800">{deleteForceConfirm.message}</p>
+              <p className="text-xs text-gray-500">{t('admin:archives.deleteInUseWarning')}</p>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => setDeleteForceConfirm(null)}
+                  className="text-sm text-gray-500 px-3 py-1.5"
+                >
+                  {t('common:buttons.cancel')}
+                </button>
+                <button
+                  onClick={() => handleDeleteArchive(deleteForceConfirm.id, true)}
+                  className="text-sm bg-red-600 text-white rounded px-3 py-1.5 hover:bg-red-700"
+                >
+                  {t('common:buttons.delete')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
