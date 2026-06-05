@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import i18n from '../i18n';
+import { useMeilisearch } from './MeilisearchContext';
 
 export interface UserSettings {
   language?: 'et' | 'en';
@@ -34,6 +35,7 @@ const TOKEN_KEY = 'vutt_token';
 const SETTINGS_KEY = 'vutt_settings';
 
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const { setUserToken, clearUserToken } = useMeilisearch();
   const [user, setUser] = useState<User | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [userSettings, setUserSettings] = useState<UserSettings>({});
@@ -177,6 +179,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setAuthToken(data.token);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         localStorage.setItem(TOKEN_KEY, data.token);
+        if (data.meili_token) {
+          setUserToken(data.meili_token);
+        }
         // Lae kasutaja seaded serverist
         const settings = await loadUserSettings(data.token);
         setUserSettings(settings);
@@ -190,7 +195,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Login error:', e);
       return { success: false, error: 'Serveriga ühendamine ebaõnnestus' };
     }
-  }, [applySettings]);
+  }, [applySettings, setUserToken]);
 
   const logout = useCallback(() => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -203,11 +208,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setUser(null);
     setAuthToken(null);
+    clearUserToken();
     setUserSettings({});
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(SETTINGS_KEY);
-  }, []);
+  }, [clearUserToken]);
 
   const updateSettings = useCallback(async (newSettings: Partial<UserSettings>): Promise<boolean> => {
     if (!authToken || !user) return false;

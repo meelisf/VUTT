@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from 'react';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { UserProvider } from './contexts/UserContext';
 import { CollectionProvider } from './contexts/CollectionContext';
+import { MeilisearchProvider } from './contexts/MeilisearchContext';
 import { Loader2 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import RouteErrorBoundary from './components/RouteErrorBoundary';
@@ -176,11 +177,13 @@ const router = createBrowserRouter([
 
 const App: React.FC = () => {
   return (
-    <UserProvider>
-      <CollectionProvider>
-        <RouterProvider router={router} />
-      </CollectionProvider>
-    </UserProvider>
+    <MeilisearchProvider>
+      <UserProvider>
+        <CollectionProvider>
+          <RouterProvider router={router} />
+        </CollectionProvider>
+      </UserProvider>
+    </MeilisearchProvider>
   );
 };
 
