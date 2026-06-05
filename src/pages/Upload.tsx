@@ -53,7 +53,7 @@ interface PollResult {
 interface SavedUpload {
   id: string;
   status: string;
-  meta: { title: string; year: string; slug: string };
+  meta: { title: string; year: string; slug: string; material_type?: 'print' | 'hand' };
   created_at: string;
   expected_pages: number | null;
   files: FileEntry[];
@@ -289,6 +289,7 @@ const Upload: React.FC = () => {
         if (fetchedCollection) setSelectedCollection(fetchedCollection);
 
         // 2. Loo upload staging automaatselt
+        // Asendamise voog jätab Step 1 vahele — material_type on alati 'print'
         const createRes = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
@@ -640,6 +641,7 @@ const Upload: React.FC = () => {
     setFileUploading(false);
     setTitle('');
     setYear('');
+    setMaterialType('print');
     setSlug('');
     setSlugManual(false);
     setLocalDeleted(new Set());
@@ -676,6 +678,7 @@ const Upload: React.FC = () => {
     setFileUploading(false);
     setTitle('');
     setYear('');
+    setMaterialType('print');
     setSlug('');
     setSlugManual(false);
     setLocalDeleted(new Set());
@@ -695,6 +698,7 @@ const Upload: React.FC = () => {
     setTitle(saved.meta.title);
     setYear(saved.meta.year);
     setSlug(saved.meta.slug);
+    setMaterialType(saved.meta.material_type ?? 'print');
     setSlugManual(true);
 
     const poll: PollResult = {
