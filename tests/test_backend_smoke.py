@@ -469,3 +469,42 @@ def test_login_returns_meili_token(client, backend_env):
     assert "meili_token" in data
     # meili_token on None või string (tühi string lubatud test envs)
     assert data["meili_token"] is None or isinstance(data["meili_token"], str)
+
+
+def test_create_upload_material_type_print(backend_env):
+    """Vaikimisi material_type on 'print', remote path sisaldab 'print/'."""
+    upload_ops = backend_env["upload_ops"]
+    state = upload_ops.create_upload({
+        "title": "Test teos",
+        "year": "1680",
+        "slug": "test-teos",
+        "material_type": "print",
+    })
+    assert state["meta"]["material_type"] == "print"
+    assert "AUTO-OCR/print/" in state["remote_staging_path"]
+
+
+def test_create_upload_material_type_hand(backend_env):
+    """Käsikiri: material_type='hand', remote path sisaldab 'hand/'."""
+    upload_ops = backend_env["upload_ops"]
+    state = upload_ops.create_upload({
+        "title": "Käsikirjaline materjal",
+        "year": "",
+        "slug": "kasikiri-test",
+        "material_type": "hand",
+    })
+    assert state["meta"]["material_type"] == "hand"
+    assert "AUTO-OCR/hand/" in state["remote_staging_path"]
+    assert "AUTO-OCR/hand/" in state["remote_work_path"]
+
+
+def test_create_upload_material_type_default(backend_env):
+    """Kui material_type puudub, kasutatakse 'print' vaikeväärtust."""
+    upload_ops = backend_env["upload_ops"]
+    state = upload_ops.create_upload({
+        "title": "Ilma tüübita teos",
+        "year": "1700",
+        "slug": "ilma-tyybita",
+    })
+    assert state["meta"]["material_type"] == "print"
+    assert "AUTO-OCR/print/" in state["remote_staging_path"]

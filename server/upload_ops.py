@@ -238,6 +238,9 @@ def create_upload(meta: dict) -> dict:
 
     year = str(meta.get('year', ''))
     slug = meta.get('slug', sanitize_slug(meta.get('title', '')))
+    material_type = meta.get('material_type', 'print')
+    if material_type not in ('print', 'hand'):
+        material_type = 'print'
 
     # Loo uploads/{id}/thumbs/ kaustad
     thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
@@ -258,10 +261,11 @@ def create_upload(meta: dict) -> dict:
             "collections": meta.get('collections', []),
             "languages": meta.get('languages', []),
             "tags": meta.get('tags', []),
+            "material_type": material_type,
         },
         "expected_pages": None,
-        "remote_staging_path": f"AUTO-OCR/{upload_id}",
-        "remote_work_path": f"AUTO-OCR/{upload_id}/{slug}",
+        "remote_staging_path": f"AUTO-OCR/{material_type}/{upload_id}",
+        "remote_work_path": f"AUTO-OCR/{material_type}/{upload_id}/{slug}",
         "files": [],
         "created_at": datetime.now().isoformat(),
         "replace_work_id": meta.get('replace_work_id') or None,
