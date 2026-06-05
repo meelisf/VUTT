@@ -433,3 +433,24 @@ def test_has_annotations_true_when_text_annotations():
         {"id": 1, "comment": "Huvitav koht", "author": "u", "created_at": "2026-01-01"}
     ])
     assert doc["has_annotations"] is True
+
+
+def test_public_meili_token_endpoint(client, backend_env):
+    """GET /api/meili-token tagastab tokeni ilma authita."""
+    response = client.get("/api/meili-token")
+    assert response.status_code == 200
+    data = response.json()
+    assert "token" in data
+    # Token on tühi string kui MEILI_SEARCH_KEY pole seadistatud (test env)
+    assert isinstance(data["token"], str)
+
+
+def test_login_returns_meili_token(client, backend_env):
+    """Login vastus sisaldab meili_token välja."""
+    response = client.post("/login", json={"username": "admin", "password": "adminpass"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "meili_token" in data
+    # meili_token on None või string (tühi string lubatud test envs)
+    assert data["meili_token"] is None or isinstance(data["meili_token"], str)

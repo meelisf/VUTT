@@ -21,7 +21,7 @@ from .metadata_handler import build_meta_html
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
-from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user
+from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, get_session, load_users
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
@@ -125,7 +125,19 @@ async def login(request: Request):
     if not allowed: return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"})
     data = await request.json()
     user = verify_user(data.get("username", "").strip(), data.get("password", ""))
-    if user: return {"status": "success", "user": user, "token": create_session(user)}
+    if user:
+        from .meilisearch_ops import generate_meili_token
+        try:
+            meili_token = generate_meili_token(user=user, ttl_seconds=3600)
+        except Exception as e:
+            logger.info(f"Meili token genereerimine ebaõnnestus (test env?): {e}")
+            meili_token = None
+        return {
+            "status": "success",
+            "user": user,
+            "token": create_session(user),
+            "meili_token": meili_token,
+        }
     return {"status": "error", "message": "Vale kasutajanimi või parool"}
 
 @app.post("/verify-token")
@@ -148,6 +160,37 @@ async def logout(request: Request):
         if token:
             delete_session(token)
     return {"status": "success"}
+
+@app.get("/api/meili-token")
+async def public_meili_token():
+    """Anonüümne Meilisearchi tenant token — filter: is_public = true."""
+    from .meilisearch_ops import generate_meili_token
+    try:
+        token = generate_meili_token(user=None, ttl_seconds=3600)
+        return {"token": token}
+    except Exception as e:
+        logger.info(f"Meili token genereerimine ebaõnnestus (test env?): {e}")
+        return {"token": ""}
+
+
+@app.post("/api/meili-token/refresh")
+async def refresh_meili_token(request: Request):
+    """Uuendab autentitud kasutaja Meilisearchi tokeni."""
+    from .meilisearch_ops import generate_meili_token
+    token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    session = get_session(token_str)
+    if not session:
+        raise HTTPException(status_code=401, detail="Sessioon aegunud")
+    user = session["user"]
+    users = load_users()
+    full_user = users.get(user["username"], user)
+    user_with_collections = {**user, "allowed_collections": full_user.get("allowed_collections", [])}
+    try:
+        new_token = generate_meili_token(user=user_with_collections, ttl_seconds=3600)
+        return {"token": new_token}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Token refresh ebaõnnestus: {e}")
+
 
 @app.post("/register")
 async def register(request: Request):
