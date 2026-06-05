@@ -101,9 +101,19 @@ Mõlemad lisatakse Meilisearch'i `filterableAttributes` nimekirja. `collections_
 Meilisearch'i tenant token kaitseb ainult otsingut. Otsene API päring work_id-ga läheb Meilisearch'ist mööda. Seega peab kõigil lugemise endpoint'idel olema eraldi kontroll:
 
 ```python
-def can_read_work(work_metadata: dict, user: dict | None) -> bool:
+def is_work_public(work_metadata: dict, collections_config: dict) -> bool:
+    """Arvutab teose avalikkuse dünaamiliselt collections.json põhjal."""
+    work_cols = work_metadata.get("collections", [])
+    if not work_cols:
+        return True  # kollektsioonieta teos on alati avalik
+    for col_id in work_cols:
+        if collections_config.get(col_id, {}).get("visibility", "public") == "public":
+            return True  # "public wins" — piisab ühest avalikust kollektsioonist
+    return False
+
+def can_read_work(work_metadata: dict, user: dict | None, collections_config: dict) -> bool:
     """Kontrollib kas kasutajal on õigus teost lugeda."""
-    if work_metadata.get("is_public", True):
+    if is_work_public(work_metadata, collections_config):
         return True
     if work_metadata.get("shareable", False):
         return True
@@ -112,11 +122,13 @@ def can_read_work(work_metadata: dict, user: dict | None) -> bool:
     if user.get("role") == "admin":
         return True
     allowed = set(user.get("allowed_collections", []))
-    work_collections = set(work_metadata.get("collections_hierarchy", []))
+    work_collections = set(work_metadata.get("collections", []))
     return bool(allowed & work_collections)
 ```
 
-**`is_public` allikatõde:** `can_read_work()` arvutab `is_public` reaalajas `_metadata.json`-i `collections` välja ja `collections.json` `visibility`-te põhjal — ei tugine Meilisearch'i indekseeritud väärtusele. See tagab et backend'i kontroll on kohene, isegi kui Meilisearch'i indeks pole veel järgi jõudnud.
+**`is_public` allikatõde:** `can_read_work()` arvutab avalikkuse dünaamiliselt `_metadata.json`-i `collections` välja ja `collections.json` `visibility`-te põhjal. `is_public` välja `_metadata.json`-is **ei ole** — see on ainult Meilisearch'i indekseeritud väli. Backend'i kontroll on seega kohene pärast `collections.json` uuendust, sõltumata Meilisearch'i indeksi seisust.
+
+`collections_config` antakse argumendina — kasutatakse `get_cached_collections()` tulemust (cache TTL 5 min, olemasolev mehhanism).
 
 **Endpoint'id kus `can_read_work()` peab kehtima:**
 - `GET /work/{work_id}` (metadata)
@@ -241,6 +253,10 @@ export function MeilisearchProvider({ children }) {
   useEffect(() => { loadToken(); }, [loadToken]);
 
   // Refresh iga 55 minuti järel (token TTL = 1h)
+  // NB: setInterval ei käivitu kui brauser suspendeerib tab'i.
+  // Seetõttu peab useMeiliIndex() hook kontrollima tokeni vanust enne päringut
+  // ja käivitama on-demand refresh kui token aegub järgmise 60s jooksul.
+  // Lisaks peab Meilisearch'i 401/403 vastus käivitama kohese token refresh'i.
   useEffect(() => {
     const id = setInterval(loadToken, 55 * 60 * 1000);
     return () => clearInterval(id);
@@ -310,7 +326,12 @@ function SearchPage() {
 
 Kasutajate haldus on **kollektsiooni juures** — admin valib kollektsioonile kasutajad, mitte vastupidi.
 
-Kui `visibility` muutub `public → restricted`, käivitub backend'is Meilisearch'i massuuendus (`is_public = false` kõigil selle kollektsiooni teostel) ja **ootab task'i lõppu** enne vastuse saatmist. See välistab lekkeakna kus config on juba restricted aga indeks veel mitte.
+Kui `visibility` muutub `public → restricted`:
+1. `collections.json` uuendatakse koheselt — `can_read_work()` kaitseb teoseid kohe
+2. Meilisearch'i massuuendus (`is_public = false`) käib **asünkroonselt** (background task)
+3. Backend vastab adminile kohe pärast config salvestamist
+
+Lühike lekkeaken Meilisearch'i otsingus on aktsepteeritav: restricted teos võib hetkeliselt otsingutulemustes ilmuda, aga `can_read_work()` blokeerib lugemise niikuinii. Blocking wait välditud — suure kollektsiooni korral võib Meilisearch'i task kesta kauem kui Nginx'i timeout (30–60s).
 
 ### 5b. Kasutajate haldus (olemasolev leht)
 
