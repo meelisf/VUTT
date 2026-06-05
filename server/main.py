@@ -12,7 +12,7 @@ from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger, ARCHIVES_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
 from .access_ops import can_read_work
 
@@ -959,6 +959,13 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
             raise HTTPException(status_code=403, detail="Kõigile teavitamine on lubatud ainult administraatorile")
         recipients = sorted(users_by_username.keys())
         notification_type = "system"
+    elif recipient_mode == "admins":
+        recipients = sorted([
+            account.get("username")
+            for account in get_all_users()
+            if account.get("role") == "admin" and account.get("username")
+        ])
+        notification_type = "review_request"
     elif recipient_mode == "multiple":
         if not isinstance(recipient_usernames, list) or not recipient_usernames:
             raise HTTPException(status_code=400, detail="Saajad on kohustuslikud")
@@ -1426,6 +1433,71 @@ async def collections(): return {"status": "success", "collections": get_cached_
 @app.get("/config/archives")
 async def get_archives(): return {"status": "success", "archives": get_cached_archives()}
 
+@app.post("/config/archives")
+async def create_archive(request: Request, user=Depends(require_role("admin"))):
+    body = await get_json_data(request)
+    archive_id = str(body.get("id") or "").strip()
+    name = str(body.get("name") or "").strip()
+    url = str(body.get("url") or "").strip()
+    if not archive_id or not name:
+        raise HTTPException(status_code=400, detail="Lühend ja nimi on kohustuslikud")
+    archives = {}
+    if os.path.exists(ARCHIVES_FILE):
+        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+            archives = json.load(f)
+    if archive_id in archives:
+        raise HTTPException(status_code=409, detail=f"Arhiiv tähisega '{archive_id}' on juba olemas")
+    entry: dict = {"name": name}
+    if url:
+        entry["url"] = url
+    archives[archive_id] = entry
+    atomic_write_json(ARCHIVES_FILE, archives)
+    invalidate_cache()
+    return {"status": "success", "id": archive_id, "archive": entry}
+
+@app.put("/config/archives/{archive_id}")
+async def update_archive(archive_id: str, request: Request, user=Depends(require_role("admin"))):
+    body = await get_json_data(request)
+    name = str(body.get("name") or "").strip()
+    url = str(body.get("url") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nimi on kohustuslik")
+    archives = {}
+    if os.path.exists(ARCHIVES_FILE):
+        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+            archives = json.load(f)
+    if archive_id not in archives:
+        raise HTTPException(status_code=404, detail=f"Arhiivi '{archive_id}' ei leitud")
+    entry: dict = {"name": name}
+    if url:
+        entry["url"] = url
+    archives[archive_id] = entry
+    atomic_write_json(ARCHIVES_FILE, archives)
+    invalidate_cache()
+    return {"status": "success", "id": archive_id, "archive": entry}
+
+@app.delete("/config/archives/{archive_id}")
+async def delete_archive(archive_id: str, force: bool = False, user=Depends(require_role("admin"))):
+    archives = {}
+    if os.path.exists(ARCHIVES_FILE):
+        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
+            archives = json.load(f)
+    if archive_id not in archives:
+        raise HTTPException(status_code=404, detail=f"Arhiivi '{archive_id}' ei leitud")
+    if not force:
+        in_use = _find_works_with_archive(archive_id)
+        if in_use:
+            work_titles = [meta.get('title', 'Pealkirjata') for _, meta in in_use[:3]]
+            extra = f" ja {len(in_use) - 3} rohkem" if len(in_use) > 3 else ""
+            raise HTTPException(
+                status_code=409,
+                detail=f"Arhiiv '{archive_id}' on kasutusel {len(in_use)} teoses: {', '.join(work_titles)}{extra}",
+            )
+    del archives[archive_id]
+    atomic_write_json(ARCHIVES_FILE, archives)
+    invalidate_cache()
+    return {"status": "success"}
+
 @app.put("/admin/collections/{collection_id}")
 async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     """Uuendab kollektsiooni description, description_long, color ja visibility välju."""
@@ -1591,6 +1663,25 @@ def _find_works_with_collection(collection_id: str):
             with open(meta_path, 'r', encoding='utf-8') as f:
                 meta = json.load(f)
             if collection_id in meta.get('collections', []):
+                results.append((meta_path, meta))
+        except Exception:
+            continue
+    return results
+
+def _find_works_with_archive(archive_id: str):
+    """Leiab kõik teoste _metadata.json failid mis sisaldavad antud arhiivi ID-d."""
+    results = []
+    if not os.path.isdir(BASE_DIR):
+        return results
+    for folder in os.listdir(BASE_DIR):
+        meta_path = os.path.join(BASE_DIR, folder, '_metadata.json')
+        if not os.path.exists(meta_path):
+            continue
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+            refs = meta.get('archive_refs') or []
+            if any(isinstance(ref, dict) and ref.get('archive_id') == archive_id for ref in refs):
                 results.append((meta_path, meta))
         except Exception:
             continue

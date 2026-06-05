@@ -508,3 +508,123 @@ def test_create_upload_material_type_default(backend_env):
     })
     assert state["meta"]["material_type"] == "print"
     assert "AUTO-OCR/print/" in state["remote_staging_path"]
+
+
+# ---------------------------------------------------------------------------
+# Arhiivide register CRUD
+# ---------------------------------------------------------------------------
+
+def test_create_archive_writes_file(client, login, backend_env):
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.post(
+        "/config/archives",
+        headers=headers,
+        json={"id": "EKM", "name": "Eesti Kirjandusmuuseum", "url": "https://www.kirmus.ee"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["id"] == "EKM"
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert archives["EKM"]["name"] == "Eesti Kirjandusmuuseum"
+    assert archives["EKM"]["url"] == "https://www.kirmus.ee"
+
+
+def test_create_archive_duplicate_returns_409(client, login, backend_env):
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.post(
+        "/config/archives",
+        headers=headers,
+        json={"id": "RA", "name": "Teine RA"},
+    )
+
+    assert response.status_code == 409
+    assert "RA" in response.json()["detail"]
+
+
+def test_update_archive_writes_file(client, login, backend_env):
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.put(
+        "/config/archives/RA",
+        headers=headers,
+        json={"name": "Uus nimi", "url": "https://uus.ee"},
+    )
+
+    assert response.status_code == 200
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert archives["RA"]["name"] == "Uus nimi"
+    assert archives["RA"]["url"] == "https://uus.ee"
+
+
+def test_update_archive_not_found_returns_404(client, login, backend_env):
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.put(
+        "/config/archives/NOTEXIST",
+        headers=headers,
+        json={"name": "Test"},
+    )
+
+    assert response.status_code == 404
+
+
+def test_delete_archive_removes_from_file(client, login, backend_env, monkeypatch):
+    import server.main as main_mod
+    monkeypatch.setattr(main_mod, "_find_works_with_archive", lambda _: [])
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.delete("/config/archives/RA", headers=headers)
+
+    assert response.status_code == 200
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert "RA" not in archives
+
+
+def test_delete_archive_in_use_returns_409(client, login, backend_env, monkeypatch):
+    import server.main as main_mod
+    monkeypatch.setattr(
+        main_mod, "_find_works_with_archive",
+        lambda _: [("/data/teos1/_metadata.json", {"title": "Teos 1"})]
+    )
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.delete("/config/archives/RA", headers=headers)
+
+    assert response.status_code == 409
+    assert "Teos 1" in response.json()["detail"]
+
+
+def test_delete_archive_force_removes_despite_usage(client, login, backend_env, monkeypatch):
+    import server.main as main_mod
+    monkeypatch.setattr(
+        main_mod, "_find_works_with_archive",
+        lambda _: [("/data/teos1/_metadata.json", {"title": "Teos 1"})]
+    )
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.delete("/config/archives/RA?force=true", headers=headers)
+
+    assert response.status_code == 200
+    archives = json.loads(backend_env["archives_file"].read_text(encoding="utf-8"))
+    assert "RA" not in archives
+
+
+def test_delete_archive_requires_admin(client, login, backend_env):
+    token = login("editor", "editorpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.delete("/config/archives/RA", headers=headers)
+
+    # Süsteem tagastab 401 ka ebapiisavate õiguste korral (require_token → get_user → 401)
+    assert response.status_code in (401, 403)

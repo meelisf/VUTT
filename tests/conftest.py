@@ -69,6 +69,11 @@ def backend_env(tmp_path, monkeypatch):
         ),
         encoding="utf-8",
     )
+    archives_file = state_dir / "archives.json"
+    archives_file.write_text(
+        json.dumps({"RA": {"name": "Rahvusarhiiv", "url": "https://ais.ra.ee"}}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     auth = importlib.import_module("server.auth")
     registration = importlib.import_module("server.registration")
@@ -84,6 +89,7 @@ def backend_env(tmp_path, monkeypatch):
     monkeypatch.setattr(registration, "INVITE_TOKENS_FILE", str(invite_tokens_file))
 
     monkeypatch.setattr(main, "COLLECTIONS_FILE", str(collections_file))
+    monkeypatch.setattr(main, "ARCHIVES_FILE", str(archives_file))
     monkeypatch.setattr(main, "USER_SETTINGS_DIR", str(user_settings_dir))
     monkeypatch.setattr(main, "UPLOADS_DIR", str(uploads_dir))
     monkeypatch.setattr(main, "invalidate_cache", lambda: None)
@@ -110,6 +116,7 @@ def backend_env(tmp_path, monkeypatch):
             "users_file": users_file,
             "invite_tokens_file": invite_tokens_file,
             "collections_file": collections_file,
+            "archives_file": archives_file,
             "user_settings_dir": user_settings_dir,
             "uploads_dir": uploads_dir,
             "upload_ops": upload_ops,
