@@ -206,6 +206,7 @@ const Upload: React.FC = () => {
   // --- Samm 1 vorm ---
   const [title, setTitle] = useState('');
   const [year, setYear] = useState('');
+  const [materialType, setMaterialType] = useState<'print' | 'hand'>('print');
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
 
@@ -386,7 +387,8 @@ const Upload: React.FC = () => {
   // Samm 1 — staging loomine
   // ---------------------------------------------------------------------------
   async function handleStep1Submit() {
-    if (!title.trim() || !year.trim() || !authToken) return;
+    if (!title.trim() || !authToken) return;
+    if (materialType === 'print' && !year.trim()) return;
     setStep1Loading(true);
     setStep1Error('');
 
@@ -406,6 +408,7 @@ const Upload: React.FC = () => {
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
             replace_work_id: replaceWorkId || null,
+            material_type: materialType,
           }),
         });
         const d = await r.json();
@@ -929,10 +932,34 @@ const Upload: React.FC = () => {
                   />
                 </div>
 
+                {/* Materjali tüüp */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('step1.materialTypeLabel')}
+                  </label>
+                  <div className="flex gap-4">
+                    {(['print', 'hand'] as const).map((mt) => (
+                      <label key={mt} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="materialType"
+                          value={mt}
+                          checked={materialType === mt}
+                          onChange={() => setMaterialType(mt)}
+                          className="accent-primary-600"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {mt === 'print' ? t('step1.materialTypePrint') : t('step1.materialTypeHand')}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Aasta */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {t('step1.yearLabel')} <span className="text-red-500">*</span>
+                    {materialType === 'hand' ? t('step1.yearLabelOptional') : t('step1.yearLabel')} {materialType !== 'hand' && <span className="text-red-500">*</span>}
                   </label>
                   <input
                     type="number"
@@ -944,6 +971,11 @@ const Upload: React.FC = () => {
                     className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-400 mt-1">{t('step1.yearHint')}</p>
+                  {materialType === 'hand' && (
+                    <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1">
+                      {t('step1.materialTypeHandYearHint')}
+                    </p>
+                  )}
                 </div>
 
                 {/* Slug — automaatne, nähtav ainult vihjena */}
@@ -983,7 +1015,7 @@ const Upload: React.FC = () => {
 
                 <button
                   onClick={handleStep1Submit}
-                  disabled={!title.trim() || !year.trim() || !slug.trim() || step1Loading}
+                  disabled={!title.trim() || (materialType === 'print' && !year.trim()) || !slug.trim() || step1Loading}
                   className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
                 >
                   {step1Loading ? (
