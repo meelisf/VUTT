@@ -109,7 +109,7 @@ const Maintenance: React.FC = () => {
   const handleUpdateArchive = async (id: string) => {
     const trimName = editName.trim();
     const trimUrl = editUrl.trim();
-    if (!trimName) { setEditError(t('admin:archives.name')); return; }
+    if (!trimName) { setEditError(t('admin:archives.idNameRequired')); return; }
     setEditSaving(true); setEditError('');
     try {
       const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`, {
@@ -135,7 +135,11 @@ const Maintenance: React.FC = () => {
         setDeleteForceConfirm({ id, message: e.detail });
         return;
       }
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        console.error('Delete archive failed:', e.detail || resp.status);
+        return;
+      }
       setArchives(prev => { const n = { ...prev }; delete n[id]; return n; });
       setDeleteForceConfirm(null);
     } catch { /* ignore */ }
