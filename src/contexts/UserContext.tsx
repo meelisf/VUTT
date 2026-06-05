@@ -14,6 +14,7 @@ interface User {
   username: string;
   name: string;
   role: string;
+  allowed_collections?: string[];
 }
 
 interface UserContextType {

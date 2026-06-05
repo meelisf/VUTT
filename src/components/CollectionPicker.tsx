@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
+import { useUser } from '../contexts/UserContext';
 import { buildCollectionTree, CollectionTreeNode, getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
 
@@ -97,13 +98,25 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
 }) => {
   const { t, i18n } = useTranslation(['common']);
   const { selectedCollection, setSelectedCollection, collections } = useCollection();
+  const { user } = useUser();
   const lang = getLangCode(i18n.language);
+
+  // Filtreeri kollektsioonid kasutaja ligipääsu järgi
+  const visibleCollections = useMemo(() => {
+    if (user?.role === 'admin') return collections;
+    const allowed = new Set(user?.allowed_collections ?? []);
+    return Object.fromEntries(
+      Object.entries(collections).filter(([id, col]) =>
+        (col as any).visibility !== 'restricted' || allowed.has(id)
+      )
+    );
+  }, [collections, user]);
 
   // Laiendatud sõlmed
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
     // Vaikimisi laienda kõik tippkollektsioonid
     const initial = new Set<string>();
-    Object.entries(collections).forEach(([id, col]) => {
+    Object.entries(visibleCollections).forEach(([id, col]) => {
       if (!col.parent) {
         initial.add(id);
       }
@@ -112,7 +125,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
   });
 
   // Ehita puu
-  const tree = useMemo(() => buildCollectionTree(collections), [collections]);
+  const tree = useMemo(() => buildCollectionTree(visibleCollections), [visibleCollections]);
 
   const toggleExpanded = (id: string) => {
     setExpandedIds((prev) => {
