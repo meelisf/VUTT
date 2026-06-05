@@ -101,19 +101,23 @@ Mõlemad lisatakse Meilisearch'i `filterableAttributes` nimekirja. `collections_
 Meilisearch'i tenant token kaitseb ainult otsingut. Otsene API päring work_id-ga läheb Meilisearch'ist mööda. Seega peab kõigil lugemise endpoint'idel olema eraldi kontroll:
 
 ```python
-def is_work_public(work_metadata: dict, collections_config: dict) -> bool:
+# server/access_ops.py  (uus fail)
+from .cache import get_cached_collections
+
+def is_work_public(work_metadata: dict) -> bool:
     """Arvutab teose avalikkuse dünaamiliselt collections.json põhjal."""
     work_cols = work_metadata.get("collections", [])
     if not work_cols:
         return True  # kollektsioonieta teos on alati avalik
+    collections_config = get_cached_collections()
     for col_id in work_cols:
         if collections_config.get(col_id, {}).get("visibility", "public") == "public":
             return True  # "public wins" — piisab ühest avalikust kollektsioonist
     return False
 
-def can_read_work(work_metadata: dict, user: dict | None, collections_config: dict) -> bool:
+def can_read_work(work_metadata: dict, user: dict | None) -> bool:
     """Kontrollib kas kasutajal on õigus teost lugeda."""
-    if is_work_public(work_metadata, collections_config):
+    if is_work_public(work_metadata):
         return True
     if work_metadata.get("shareable", False):
         return True
@@ -126,9 +130,9 @@ def can_read_work(work_metadata: dict, user: dict | None, collections_config: di
     return bool(allowed & work_collections)
 ```
 
-**`is_public` allikatõde:** `can_read_work()` arvutab avalikkuse dünaamiliselt `_metadata.json`-i `collections` välja ja `collections.json` `visibility`-te põhjal. `is_public` välja `_metadata.json`-is **ei ole** — see on ainult Meilisearch'i indekseeritud väli. Backend'i kontroll on seega kohene pärast `collections.json` uuendust, sõltumata Meilisearch'i indeksi seisust.
+Asub uues `server/access_ops.py` failis (mitte `utils.py`-s) — `cache.py` impordib `utils.py`-st, seega `utils.py → cache.py` tekitaks circular impordi. `access_ops.py` on leaf moodul mis impordib `cache.py`-st vabalt.
 
-`collections_config` antakse argumendina — kasutatakse `get_cached_collections()` tulemust (cache TTL 5 min, olemasolev mehhanism).
+**`is_public` allikatõde:** `can_read_work()` arvutab avalikkuse dünaamiliselt `_metadata.json`-i `collections` välja ja `collections.json` `visibility`-te põhjal (`get_cached_collections()` kaudu, TTL 5 min). `is_public` välja `_metadata.json`-is **ei ole** — see on ainult Meilisearch'i indekseeritud väli. Backend'i kontroll on seega kohene pärast `collections.json` uuendust, sõltumata Meilisearch'i indeksi seisust.
 
 **Endpoint'id kus `can_read_work()` peab kehtima:**
 - `GET /work/{work_id}` (metadata)
@@ -391,7 +395,7 @@ Toimub osana tavalisest `server_seed_data.sh` re-indekseerimisest.
 
 **Kollektsiooni kustutamine:** Backend eemaldab kustutatud kollektsiooni ID kõigi kasutajate `allowed_collections` nimekirjast automaatselt.
 
-**`public → restricted` muutus:** Backend ootab Meilisearch'i update task'i lõppu enne vastuse saatmist. `can_read_work()` on kohene (config põhjal), seega backend endpoint'id on kaitstud kohe.
+**`public → restricted` muutus:** `collections.json` uuendatakse koheselt — `can_read_work()` kaitseb teoseid kohe. Meilisearch'i massuuendus käib **asünkroonselt** (background task), backend vastab adminile kohe. Lühike lekkeaken otsingus on aktsepteeritav kuna `can_read_work()` blokeerib lugemise niikuinii.
 
 ---
 
@@ -402,8 +406,8 @@ Toimub osana tavalisest `server_seed_data.sh` re-indekseerimisest.
 | `data/config/collections.json` | Lisa `visibility` väli uutele piiratud kollektsioonidele |
 | `state/users.json` | Backend lisab `allowed_collections: []` automaatselt uutele kasutajatele |
 | `server/auth.py` | `get_all_users()` lisab `allowed_collections` välja |
-| `server/utils.py` | Uus `can_read_work(work_metadata, user)` helper |
-| `server/main.py` | `can_read_work()` kõigil lugemise endpoint'idel; `/api/meili-token` endpoint; login vastusesse `meili_token`; kollektsiooni `visibility` haldus + kasutajate haldus kollektsiooni kaudu; Meilisearch massuuendus visibility muutumisel (blocking); `shareable` toggle endpoint; `allowed_collections` cleanup kollektsiooni kustutamisel |
+| `server/access_ops.py` | Uus fail: `is_work_public()` + `can_read_work(work_metadata, user)` |
+| `server/main.py` | `can_read_work()` kõigil lugemise endpoint'idel; `/api/meili-token` endpoint; login vastusesse `meili_token`; kollektsiooni `visibility` haldus + kasutajate haldus kollektsiooni kaudu; Meilisearch massuuendus visibility muutumisel (async); `shareable` toggle endpoint; `allowed_collections` cleanup kollektsiooni kustutamisel |
 | `server/meilisearch_ops.py` | Lisa `is_public`, `shareable` indekseerimisse; `filterableAttributes` uuendus; `generate_meili_token()` funktsioon (search-only key + UID); massuuendus visibility muutumisel |
 | `src/contexts/MeilisearchContext.tsx` | Uus context, 55min refresh interval |
 | `src/services/meiliService.ts` | Eemalda staatiline `index` eksport |
