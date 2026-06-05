@@ -15,7 +15,8 @@ import {
   Wrench,
   Wand2,
   Copy,
-  Check
+  Check,
+  Link
 } from 'lucide-react';
 import { Page, Work } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -347,12 +348,40 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const [slugCopied, setSlugCopied] = useState(false);
   const slug = page.original_path?.replace(/^data\//, '').split('/')[0];
 
+  // Jagamise toggle state
+  const [shareable, setShareable] = useState<boolean>(work?.shareable ?? false);
+  const [shareableSaving, setShareableSaving] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  React.useEffect(() => {
+    setShareable(work?.shareable ?? false);
+  }, [work?.shareable]);
+
   const copySlug = () => {
     if (!slug) return;
     navigator.clipboard.writeText(slug).then(() => {
       setSlugCopied(true);
       setTimeout(() => setSlugCopied(false), 2000);
     });
+  };
+
+  const handleShareableToggle = async (newValue: boolean) => {
+    if (!work?.work_id || !authToken) return;
+    setShareable(newValue);
+    setShareableSaving(true);
+    try {
+      await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/shareable`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({ shareable: newValue }),
+        timeout: 10000,
+      });
+    } catch {
+      // Taasta eelmine olek vea korral
+      setShareable(!newValue);
+    } finally {
+      setShareableSaving(false);
+    }
   };
 
   return (
@@ -526,6 +555,61 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       ) : (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm px-5 py-6 text-center text-sm text-gray-400">
           {t('history.loginToView')}
+        </div>
+      )}
+
+      {/* Jagamine — editor ja admin */}
+      {(user?.role === 'editor' || user?.role === 'admin') && work && (
+        <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
+            <Link size={15} className="text-gray-400" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Jagamine</span>
+          </div>
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-6">
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="shareable"
+                  checked={!shareable}
+                  onChange={() => handleShareableToggle(false)}
+                  disabled={shareableSaving}
+                  className="text-primary-600"
+                />
+                <span className="text-sm text-gray-700">Privaatne</span>
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="radio"
+                  name="shareable"
+                  checked={shareable}
+                  onChange={() => handleShareableToggle(true)}
+                  disabled={shareableSaving}
+                  className="text-primary-600"
+                />
+                <span className="text-sm text-gray-700">Jagatav (otselingiga)</span>
+              </label>
+              {shareableSaving && <Loader2 size={13} className="animate-spin text-gray-400" />}
+            </div>
+            {shareable && (
+              <div className="mt-3 flex items-center gap-2">
+                <code className="text-xs text-gray-500 font-mono truncate flex-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/workspace/${work.work_id}` : ''}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/workspace/${work.work_id}`);
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 bg-gray-50 hover:bg-gray-100 rounded transition-colors"
+                >
+                  {linkCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                  {linkCopied ? 'Kopeeritud' : 'Kopeeri'}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

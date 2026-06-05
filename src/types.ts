@@ -132,6 +132,9 @@ export interface Work {
   external_url?: string;
   archive_refs?: ArchiveRef[] | null;
 
+  // Jagamine
+  shareable?: boolean;
+
   // Lehekülje info (esimese lehe andmed)
   page_count: number;
   thumbnail_url: string;

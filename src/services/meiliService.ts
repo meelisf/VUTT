@@ -96,7 +96,8 @@ export const normalizeWork = (hit: any): Work => {
     page_count: hit.page_count || hit.teose_lehekylgede_arv || 0,
     thumbnail_url: getThumbUrl(workId),
     work_status: hit.work_status || hit.teose_staatus,
-    page_tags: hit.page_tags || []
+    page_tags: hit.page_tags || [],
+    shareable: hit.shareable ?? false,
   };
 };
 
