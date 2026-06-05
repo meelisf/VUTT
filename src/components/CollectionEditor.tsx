@@ -77,6 +77,7 @@ const CollectionEditor: React.FC = () => {
   const [allowedUsers, setAllowedUsers] = useState<string[]>([]);
   const [allUsers, setAllUsers] = useState<{ username: string; name: string }[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersSaving, setUsersSaving] = useState(false);
 
   // --- Kustutamine ---
   const [deleteConfirming, setDeleteConfirming] = useState(false);
@@ -153,6 +154,37 @@ const CollectionEditor: React.FC = () => {
       .finally(() => setUsersLoading(false));
   }, [selectedId, collections, authToken]);
 
+  const saveAllowedUsers = async (newUsers: string[]) => {
+    if (!selectedId || !authToken) return;
+    setUsersSaving(true);
+    try {
+      await fetchWithTimeout(
+        `${FILE_API_URL}/admin/collections/${selectedId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+          body: JSON.stringify({ visibility: editVisibility, allowed_users: newUsers }),
+          timeout: 10000,
+        }
+      );
+    } catch {
+      // vaikne ebaõnnestumine — Salvesta nupp on alati ka olemas
+    } finally {
+      setUsersSaving(false);
+    }
+  };
+
+  const handleAddUser = (username: string) => {
+    const newUsers = [...new Set([...allowedUsers, username])];
+    setAllowedUsers(newUsers);
+    saveAllowedUsers(newUsers);
+  };
+
+  const handleRemoveUser = (username: string) => {
+    const newUsers = allowedUsers.filter(x => x !== username);
+    setAllowedUsers(newUsers);
+    saveAllowedUsers(newUsers);
+  };
 
   const handleSave = async () => {
     if (!selectedId) return;
@@ -360,7 +392,7 @@ const CollectionEditor: React.FC = () => {
                             {u?.name || username}
                             <button
                               type="button"
-                              onClick={() => setAllowedUsers(prev => prev.filter(x => x !== username))}
+                              onClick={() => handleRemoveUser(username)}
                               className="text-gray-400 hover:text-red-500 ml-0.5"
                             >
                               ×
@@ -372,13 +404,14 @@ const CollectionEditor: React.FC = () => {
                     <select
                       onChange={e => {
                         if (e.target.value) {
-                          setAllowedUsers(prev => [...new Set([...prev, e.target.value])]);
+                          handleAddUser(e.target.value);
                           e.target.value = '';
                         }
                       }}
-                      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary-400"
+                      disabled={usersSaving}
+                      className="text-sm border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-primary-400 disabled:opacity-50"
                     >
-                      <option value="">+ Lisa kasutaja</option>
+                      <option value="">{usersSaving ? 'Salvestab...' : '+ Lisa kasutaja'}</option>
                       {allUsers.filter(u => !allowedUsers.includes(u.username)).map(u => (
                         <option key={u.username} value={u.username}>{u.name} ({u.username})</option>
                       ))}
