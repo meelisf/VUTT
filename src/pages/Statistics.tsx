@@ -5,11 +5,9 @@ import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
 import { BarChart3, PieChart as PieChartIcon, BookOpen, FileText, Loader2, Library, Tag, Link2, Check } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import Header from '../components/Header';
-import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { getGenreFacets, getGenreLabelMap } from '../services/searchService';
 
@@ -66,14 +64,9 @@ const Statistics: React.FC = () => {
   const [yearFromInput, setYearFromInput] = useState('');
   const [yearToInput, setYearToInput] = useState('');
 
-  const meiliHeaders = useMemo<Record<string, string>>(() => {
-    const h: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (MEILI_API_KEY) h['Authorization'] = `Bearer ${MEILI_API_KEY}`;
-    return h;
-  }, []);
-
   // KPI + staatuse päring (kollektsioon + žanr)
   useEffect(() => {
+    if (!index) return;
     const fetchStats = async () => {
       setIsLoading(true);
       try {
@@ -81,17 +74,11 @@ const Statistics: React.FC = () => {
         if (selectedCollection) filter.push(`collections_hierarchy = "${selectedCollection}"`);
         if (selectedGenre) filter.push(`genre_ids = "${selectedGenre}"`);
 
-        const statusResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
-          method: 'POST',
-          headers: meiliHeaders,
-          body: JSON.stringify({
-            q: '',
-            limit: 0,
-            facets: ['status', 'work_id'],
-            filter: filter.length > 0 ? filter : undefined
-          })
+        const statusResult = await index.search('', {
+          limit: 0,
+          facets: ['status', 'work_id'],
+          filter: filter.length > 0 ? filter : undefined
         });
-        const statusResult = await statusResponse.json();
 
         const statusFacets = statusResult.facetDistribution?.status || {};
         const totalFromFacets = Object.values(statusFacets).reduce((sum: number, val) => sum + (val as number), 0);
@@ -120,7 +107,7 @@ const Statistics: React.FC = () => {
     };
 
     fetchStats();
-  }, [selectedCollection, selectedGenre, lang, meiliHeaders]);
+  }, [selectedCollection, selectedGenre, lang, index]);
 
   // Žanride päring
   useEffect(() => {
@@ -141,6 +128,7 @@ const Statistics: React.FC = () => {
 
   // Ajajoone päring — vahemik ja andmed järjestikku (väldib race condition'it)
   useEffect(() => {
+    if (!index) return;
     const fetchTimeline = async () => {
       setIsTimelineLoading(true);
       try {
@@ -152,12 +140,7 @@ const Statistics: React.FC = () => {
         const rangeFilter = ['lehekylje_number = 1'];
         if (collectionFilter) rangeFilter.push(collectionFilter);
 
-        const rangeResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
-          method: 'POST',
-          headers: meiliHeaders,
-          body: JSON.stringify({ q: '', limit: 0, facets: ['year'], filter: rangeFilter })
-        });
-        const rangeResult = await rangeResponse.json();
+        const rangeResult = await index.search('', { limit: 0, facets: ['year'], filter: rangeFilter });
         const rangeYears = Object.keys(rangeResult.facetDistribution?.year || {})
           .map(Number).filter(y => y > 1400 && y < 1900);
 
@@ -181,12 +164,7 @@ const Statistics: React.FC = () => {
         if (collectionFilter) dataFilter.push(collectionFilter);
         if (selectedGenre) dataFilter.push(`genre_ids = "${selectedGenre}"`);
 
-        const dataResponse = await fetchWithTimeout(`${MEILI_HOST}/indexes/teosed/search`, {
-          method: 'POST',
-          headers: meiliHeaders,
-          body: JSON.stringify({ q: '', limit: 0, facets: ['year'], filter: dataFilter })
-        });
-        const dataResult = await dataResponse.json();
+        const dataResult = await index.search('', { limit: 0, facets: ['year'], filter: dataFilter });
 
         const rawData: YearCount[] = Object.entries(dataResult.facetDistribution?.year || {})
           .map(([year, count]) => ({ year: parseInt(year), count: count as number }))
@@ -206,7 +184,7 @@ const Statistics: React.FC = () => {
     };
 
     fetchTimeline();
-  }, [selectedCollection, selectedGenre, lang, meiliHeaders]);
+  }, [selectedCollection, selectedGenre, lang, index]);
 
   // Kuvatav alamhulk (slaiduri vahemik)
   const displayedData = useMemo(

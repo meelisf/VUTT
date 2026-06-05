@@ -12,7 +12,6 @@ vi.mock('../meiliService', () => ({
 // config.ts kasutab window.location.origin — mockime
 vi.mock('../../config', () => ({
   MEILI_HOST: 'http://localhost:7700',
-  MEILI_API_KEY: '',
   MEILI_INDEX: 'teosed',
   IMAGE_BASE_URL: '/api/images',
   FILE_API_URL: '/api/files',
