@@ -24,6 +24,7 @@ export interface Collection {
   description?: CollectionName;
   description_long?: CollectionName;
   color?: string;          // Tailwind värvi nimi (nt 'amber', 'teal', 'violet')
+  visibility?: 'public' | 'restricted';
 }
 
 // Tailwind värviklassid kollektsioonide jaoks
