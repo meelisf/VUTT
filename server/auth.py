@@ -110,7 +110,8 @@ def verify_user(username, password):
         return {
             "username": username,
             "name": users[username]["name"],
-            "role": users[username].get("role", "user")
+            "role": users[username].get("role", "user"),
+            "allowed_collections": users[username].get("allowed_collections", []),
         }
     return None
 
@@ -202,7 +203,8 @@ def get_all_users():
             "name": user_data.get("name", ""),
             "email": user_data.get("email", ""),
             "role": user_data.get("role", "contributor"),
-            "created_at": user_data.get("created_at")
+            "created_at": user_data.get("created_at"),
+            "allowed_collections": user_data.get("allowed_collections", []),
         })
     # Sorteeri loomisaja järgi (uuemad ees), kui loomisaeg puudub, siis lõppu
     result.sort(key=lambda x: x.get("created_at") or "0000", reverse=True)

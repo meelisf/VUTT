@@ -9,15 +9,12 @@ def test_login_and_verify_token_roundtrip(client, login):
     response = client.post("/verify-token", json={"token": token})
 
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "success",
-        "user": {
-            "username": "admin",
-            "name": "Admin User",
-            "role": "admin",
-        },
-        "valid": True,
-    }
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["valid"] is True
+    assert data["user"]["username"] == "admin"
+    assert data["user"]["role"] == "admin"
+    assert "allowed_collections" in data["user"]
 
 
 def test_user_chars_roundtrip_with_bearer_token(client, login, backend_env):
@@ -443,6 +440,24 @@ def test_public_meili_token_endpoint(client, backend_env):
     assert "token" in data
     # Token on tühi string kui MEILI_SEARCH_KEY pole seadistatud (test env)
     assert isinstance(data["token"], str)
+
+
+def test_collection_visibility_update(client, login, backend_env):
+    """Admin saab kollektsiooni visibility muuta."""
+    token = login("admin", "adminpass")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.put(
+        "/admin/collections/sample",
+        headers=headers,
+        json={"visibility": "restricted"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+
+    import json
+    updated = json.loads(backend_env["collections_file"].read_text())
+    assert updated["sample"]["visibility"] == "restricted"
 
 
 def test_login_returns_meili_token(client, backend_env):

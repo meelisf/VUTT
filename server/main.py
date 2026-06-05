@@ -17,12 +17,12 @@ from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, gen
 from .access_ops import can_read_work
 
 logger = get_logger(__name__)
-from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes
+from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
 from .metadata_handler import build_meta_html
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
-from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, get_session, load_users
+from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, get_session, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
@@ -1427,8 +1427,8 @@ async def collections(): return {"status": "success", "collections": get_cached_
 async def get_archives(): return {"status": "success", "archives": get_cached_archives()}
 
 @app.put("/admin/collections/{collection_id}")
-async def admin_update_collection(collection_id: str, request: Request, user=Depends(require_role("admin"))):
-    """Uuendab kollektsiooni description, description_long ja color välju."""
+async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    """Uuendab kollektsiooni description, description_long, color ja visibility välju."""
     body = await request.json()
     description = body.get("description")      # { et, en }
     description_long = body.get("description_long")  # { et, en }
@@ -1468,13 +1468,60 @@ async def admin_update_collection(collection_id: str, request: Request, user=Dep
         elif "color" in data[collection_id]:
             del data[collection_id]["color"]
 
+    # Nähtavus
+    visibility = body.get("visibility")
+    old_visibility = data[collection_id].get("visibility", "public")
+    if visibility in ("public", "restricted"):
+        data[collection_id]["visibility"] = visibility
+    elif visibility is not None:
+        return {"status": "error", "message": "visibility peab olema 'public' või 'restricted'"}
+
     # Kirjuta tagasi
     atomic_write_json(COLLECTIONS_FILE, data)
 
     # Invalideerib cache → järgmine /collections päring laeb uued andmed
     invalidate_cache()
 
+    # Kui visibility muutus, uuenda Meilisearchis is_public asünkroonselt
+    new_visibility = data[collection_id].get("visibility", "public")
+    if visibility and old_visibility != new_visibility:
+        background_tasks.add_task(update_collection_is_public_async, collection_id, new_visibility == "public")
+
+    # allowed_collections: kasutajate ligipääsu haldus kollektsiooni tasandil
+    allowed_users_param = body.get("allowed_users")
+    if allowed_users_param is not None:
+        users_data = load_users()
+        for username, udata in users_data.items():
+            current = set(udata.get("allowed_collections", []))
+            if username in allowed_users_param:
+                current.add(collection_id)
+            else:
+                current.discard(collection_id)
+            users_data[username]["allowed_collections"] = list(current)
+        save_users(users_data)
+
     return {"status": "success"}
+
+@app.get("/admin/collections/{collection_id}/users")
+async def admin_collection_users(collection_id: str, user=Depends(require_role("admin"))):
+    """Tagastab kollektsiooni metaandmed koos ligipääsuga kasutajate nimekirjaga."""
+    if not os.path.exists(COLLECTIONS_FILE):
+        return {"status": "error", "message": "collections.json ei leitud"}
+    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    if collection_id not in data:
+        return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
+    col = data[collection_id]
+    users_data = load_users()
+    allowed_usernames = [
+        uname for uname, udata in users_data.items()
+        if collection_id in udata.get("allowed_collections", [])
+    ]
+    return {
+        "status": "success",
+        "collection": col,
+        "allowed_users": allowed_usernames,
+    }
 
 @app.post("/admin/collections")
 async def admin_create_collection(request: Request, user=Depends(require_role("admin"))):
@@ -1517,6 +1564,19 @@ async def admin_create_collection(request: Request, user=Depends(require_role("a
 
     invalidate_cache()
     return {"status": "success"}
+
+def _cleanup_allowed_collections_on_delete(collection_id: str):
+    """Eemaldab kustutatud kollektsiooni ID kõigi kasutajate allowed_collections'ist."""
+    users_data = load_users()
+    changed = False
+    for uname, udata in users_data.items():
+        current = udata.get("allowed_collections", [])
+        if collection_id in current:
+            users_data[uname]["allowed_collections"] = [c for c in current if c != collection_id]
+            changed = True
+    if changed:
+        save_users(users_data)
+
 
 def _find_works_with_collection(collection_id: str):
     """Leiab kõik teoste _metadata.json failid mis sisaldavad antud kollektsiooni ID-d."""
@@ -1597,6 +1657,7 @@ async def admin_delete_collection(collection_id: str, background_tasks: Backgrou
 
     # Kustuta kollektsioonist
     del data[collection_id]
+    _cleanup_allowed_collections_on_delete(collection_id)
     atomic_write_json(COLLECTIONS_FILE, data)
 
     invalidate_cache()
