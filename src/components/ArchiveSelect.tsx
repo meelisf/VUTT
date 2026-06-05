@@ -124,7 +124,7 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
       <div className="flex gap-1 items-center">
         <button
           type="button"
-          onClick={() => { setOpen(o => !o); setFilter(''); }}
+          onClick={() => { setOpen(o => !o); setShowAddForm(false); setFilter(''); }}
           className="flex items-center gap-1 border border-gray-300 rounded px-2 py-2 text-sm bg-white w-28 shrink-0 hover:border-gray-400 text-left"
         >
           <span className="flex-1 truncate text-xs text-gray-700">{selectedLabel}</span>
@@ -137,6 +137,7 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
             onClick={() => {
               if (userRole === 'admin') {
                 setShowAddForm(f => !f);
+                setOpen(false);
                 setShowNotifyModal(false);
               } else {
                 setNotifyText(t('admin:archives.requestBody', { id: '', name: '' }));
