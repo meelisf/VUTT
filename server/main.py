@@ -1663,6 +1663,31 @@ async def admin_delete_collection(collection_id: str, background_tasks: Backgrou
     invalidate_cache()
     return {"status": "success", "affected_works": len(affected)}
 
+
+@app.post("/work/{work_id}/shareable")
+async def toggle_shareable(work_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
+    """Seab teose shareable lipu. Body: {shareable: bool}. Nähtav editorile ja adminile."""
+    body = await request.json()
+    shareable = bool(body.get("shareable", False))
+
+    folder = find_directory_by_id(work_id)
+    if not folder:
+        return {"status": "error", "message": "Teos ei leitud"}
+
+    meta_path = os.path.join(folder, '_metadata.json')
+    slug = os.path.basename(folder)
+    save_work_metadata(
+        meta_path,
+        {"shareable": shareable},
+        user["username"],
+        f"{'Aktiveeri' if shareable else 'Deaktiveeri'} jagamine: {slug}",
+        background_tasks=background_tasks,
+        sync_meili=True,
+        call_ptw=False,
+    )
+    return {"status": "success", "shareable": shareable}
+
+
 @app.get("/vocabularies")
 async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}
 
