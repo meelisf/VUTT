@@ -4,10 +4,10 @@
 
 import { Work, ContentSearchResponse, ContentSearchOptions, ContentSearchHit } from '../types';
 import { MEILI_HOST } from '../config';
-import { index, checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
+import { checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 import { buildIdMap } from '../utils/buildObjectIdMap';
-import type { MatchingStrategies } from 'meilisearch';
+import type { MatchingStrategies, Index } from 'meilisearch';
 
 
 // Interface for dashboard search options
@@ -48,6 +48,7 @@ export interface SearchWorksResult {
 // Valikuline collection parameeter filtreerib kollektsiooni järgi
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTeoseTagsFacets = async (
+  index: Index,
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
@@ -93,6 +94,7 @@ export const getTeoseTagsFacets = async (
 // Saab kõik žanrid (genre) koos loendiga - facet query
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getGenreFacets = async (
+  index: Index,
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
@@ -137,6 +139,7 @@ export const getGenreFacets = async (
 // Saab kõik tüübid (type) koos loendiga - facet query
 // yearStart/yearEnd võimaldavad filtrite dünaamilist uuendamist aasta vahemiku järgi
 export const getTypeFacets = async (
+  index: Index,
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
@@ -180,6 +183,7 @@ export const getTypeFacets = async (
 
 // Laeb žanri labelid (Q-kood → label) genre_object-ist
 export const getGenreLabelMap = async (
+  index: Index,
   collection?: string,
   lang: string = 'et',
 ): Promise<Record<string, string>> => {
@@ -204,6 +208,7 @@ export const getGenreLabelMap = async (
 // Laeb tag labelid (Q-kood → label) collection esimeste lehekülgede tags_object-ist
 // Kasutatakse kui otsingutulemused puuduvad aga collection on valitud
 export const getTagsLabelMap = async (
+  index: Index,
   collection?: string,
   lang: string = 'et',
   yearStart?: number,
@@ -242,6 +247,7 @@ export const getTagsLabelMap = async (
 
 // Autorite facetid (author_names väljast)
 export const getAuthorFacets = async (
+  index: Index,
   collection?: string,
   yearStart?: number,
   yearEnd?: number
@@ -284,7 +290,7 @@ export const getAuthorFacets = async (
 };
 
 // Dashboardi otsing: otsib teoseid
-export const searchWorks = async (query: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
+export const searchWorks = async (index: Index, query: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
   checkMixedContent();
 
   try {
@@ -452,7 +458,7 @@ export const searchWorks = async (query: string, options?: DashboardSearchOption
 // Täisteksti otsing
 // Kui workId on määratud - otsib ainult sellest teosest (kõik vasted, ilma distinct'ita)
 // Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
-export const searchContent = async (query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
+export const searchContent = async (index: Index, query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
   checkMixedContent();
 
   const limit = options.workId ? 20 : 10; // Teose piires rohkem vasteid lehel
@@ -708,7 +714,7 @@ export const searchContent = async (query: string, page: number = 1, options: Co
 };
 
 // Laadi ühe teose kõik otsingutulemused (akordioni avamiseks)
-export const searchWorkHits = async (query: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
+export const searchWorkHits = async (index: Index, query: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
   checkMixedContent();
 
   const filter: string[] = [`work_id = "${workId}"`];
@@ -748,7 +754,7 @@ export const searchWorkHits = async (query: string, workId: string, options: Con
 };
 
 // Märksõnade autocomplete: saa kõik unikaalsed märksõnad koos ID-dega
-export const getAllTags = async (lang: string = 'et'): Promise<{ label: string; id: string | null }[]> => {
+export const getAllTags = async (index: Index, lang: string = 'et'): Promise<{ label: string; id: string | null }[]> => {
   checkMixedContent();
   try {
     // Kasuta spetsiaalset suggest välja, mis sisaldab ID-sid (formaat: Label|||ID)

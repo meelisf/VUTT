@@ -13,6 +13,7 @@ import ConfirmModal from '../components/ConfirmModal';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import MetadataModal from '../components/MetadataModal';
 import { ChevronLeft, ChevronRight, AlertTriangle, Search, LogIn, Copy, Check } from 'lucide-react';
 import UserMenu from '../components/UserMenu';
@@ -25,6 +26,7 @@ const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
+  const index = useMeiliIndex();
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,7 @@ const Workspace: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!index) return;
     const loadData = async () => {
       if (!workId) {
         setError("Töö ID on puudu.");
@@ -112,8 +115,8 @@ const Workspace: React.FC = () => {
       setError(null);
       try {
         const [pageData, workData] = await Promise.all([
-          getPage(workId, currentPageNum),
-          getWorkMetadata(workId)
+          getPage(index, workId, currentPageNum),
+          getWorkMetadata(index, workId)
         ]);
 
         if (!pageData) {
@@ -136,7 +139,7 @@ const Workspace: React.FC = () => {
       }
     };
     loadData();
-  }, [workId, currentPageNum, navigate]);
+  }, [index, workId, currentPageNum, navigate]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
@@ -183,13 +186,13 @@ const Workspace: React.FC = () => {
   };
 
   const handleOpenGridView = useCallback(async () => {
-    if (!work) return;
+    if (!work || !index) return;
     setIsGridView(true);
     setGridLoading(true);
-    const pages = await getWorkPageImages(work.work_id, work.page_count);
+    const pages = await getWorkPageImages(index, work.work_id, work.page_count);
     setGridPages(pages);
     setGridLoading(false);
-  }, [work]);
+  }, [work, index]);
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);

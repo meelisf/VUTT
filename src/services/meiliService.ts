@@ -4,9 +4,12 @@
  * =============================================================================
  *
  * See fail sisaldab ainult:
- *   - Meilisearch client init (index eksportitud teiste teenuste jaoks)
  *   - Jagatud normaliseerijad (normalizeWork, normalizePage, normalizeContentSearchHit)
  *   - Jagatud utiliidid (calculateWorkStatus, checkMixedContent)
+ *
+ * NB: Meilisearch index ei ole enam siit eksportitud — see luuakse
+ * MeilisearchContext-is (tokeni-põhine) ja antakse teenusefunktsioonidele
+ * esimese argumendina (dependency injection).
  *
  * Teosed ja leheküljed:
  *   searchService.ts  — otsing, facetid, sirvimispäringud
@@ -27,18 +30,9 @@
  * =============================================================================
  */
 
-import { MeiliSearch } from 'meilisearch';
 import { Page, Work, PageStatus, WorkStatus, ContentSearchHit } from '../types';
-import { MEILI_HOST, MEILI_API_KEY, MEILI_INDEX } from '../config';
+import { MEILI_HOST } from '../config';
 import { getFullImageUrl, getThumbUrl } from './workImageService';
-
-// Initialize Meilisearch client
-const client = new MeiliSearch({
-  host: MEILI_HOST,
-  apiKey: MEILI_API_KEY,
-});
-
-export const index = client.index(MEILI_INDEX);
 
 // Check for Mixed Content (HTTPS vs HTTP)
 export const checkMixedContent = () => {

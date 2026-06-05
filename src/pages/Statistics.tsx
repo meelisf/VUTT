@@ -7,6 +7,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import Header from '../components/Header';
 import { MEILI_HOST, MEILI_API_KEY } from '../config';
 import { useCollection } from '../contexts/CollectionContext';
+import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -26,6 +27,7 @@ interface YearCount {
 const Statistics: React.FC = () => {
   const { t, i18n } = useTranslation(['statistics', 'common']);
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const index = useMeiliIndex();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -122,10 +124,11 @@ const Statistics: React.FC = () => {
 
   // Žanride päring
   useEffect(() => {
+    if (!index) return;
     const fetchGenres = async () => {
       const [result, labelMap] = await Promise.all([
-        getGenreFacets(selectedCollection || undefined, lang),
-        getGenreLabelMap(selectedCollection || undefined, lang),
+        getGenreFacets(index, selectedCollection || undefined, lang),
+        getGenreLabelMap(index, selectedCollection || undefined, lang),
       ]);
       setGenres(result);
       setGenreLabelMap(labelMap);
@@ -134,7 +137,7 @@ const Statistics: React.FC = () => {
       }
     };
     fetchGenres();
-  }, [selectedCollection, lang]);
+  }, [selectedCollection, lang, index]);
 
   // Ajajoone päring — vahemik ja andmed järjestikku (väldib race condition'it)
   useEffect(() => {

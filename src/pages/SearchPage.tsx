@@ -6,6 +6,7 @@ import { getCollectionColorClasses } from '../services/collectionService';
 import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar } from 'lucide-react';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
+import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import SearchFilters from './search/SearchFilters';
 import SearchResults from './search/SearchResults';
 import { getLangCode } from '../utils/getLangCode';
@@ -23,6 +24,7 @@ const SearchPage: React.FC = () => {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+    const index = useMeiliIndex();
 
     const urlParams = useSearchUrlParams();
     const lang = i18n.language;
@@ -52,8 +54,8 @@ const SearchPage: React.FC = () => {
 
     // Laadi teose info kui tullakse work-filter-iga (nt Workspace'ist)
     useEffect(() => {
-        if (urlParams.workId && !draft.selectedWorkInfo) {
-            getWorkMetadata(urlParams.workId).then(work => {
+        if (urlParams.workId && !draft.selectedWorkInfo && index) {
+            getWorkMetadata(index, urlParams.workId).then(work => {
                 if (work) {
                     let author = (work as any).author || '';
                     if (work.creators?.length > 0) {
@@ -66,7 +68,7 @@ const SearchPage: React.FC = () => {
         } else if (!urlParams.workId) {
             actions.setSelectedWorkInfo(null);
         }
-    }, [urlParams.workId]);
+    }, [urlParams.workId, index]);
 
     const { genreLabelToId, typeLabelToId, tagsLabelToId } = qCodeMaps;
 

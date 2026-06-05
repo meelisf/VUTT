@@ -4,7 +4,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockSearch } = vi.hoisted(() => ({ mockSearch: vi.fn() }));
 
 vi.mock('../meiliService', () => ({
-  index: { search: mockSearch },
   checkMixedContent: vi.fn(),
   normalizeWork: vi.fn(),
   normalizeContentSearchHit: vi.fn(),
@@ -21,6 +20,9 @@ vi.mock('../../config', () => ({
 
 import { getGenreLabelMap } from '../searchService';
 
+// Mock index antakse otse funktsiooni argumendina (dependency injection)
+const mockIndex = { search: mockSearch } as any;
+
 // Abifunktsioon: tekitab mockSearch vastuse
 const makeResponse = (hits: object[]) =>
   Promise.resolve({ hits, facetDistribution: {}, estimatedTotalHits: hits.length });
@@ -32,7 +34,7 @@ beforeEach(() => {
 describe('getGenreLabelMap', () => {
   it('tagastab tühja kaardi kui hits on tühi', async () => {
     mockSearch.mockReturnValue(makeResponse([]));
-    expect(await getGenreLabelMap()).toEqual({});
+    expect(await getGenreLabelMap(mockIndex)).toEqual({});
   });
 
   it('loob Q-kood → label kaardi genre_object massiivi põhjal', async () => {
@@ -40,7 +42,7 @@ describe('getGenreLabelMap', () => {
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon', en: 'oration' } }] },
       { genre_object: [{ id: 'Q789', label: 'disputatsioon', labels: { et: 'disputatsioon', en: 'disputation' } }] },
     ]));
-    const result = await getGenreLabelMap(undefined, 'et');
+    const result = await getGenreLabelMap(mockIndex, undefined,'et');
     expect(result['Q861911']).toBe('Oratsioon');
     expect(result['Q789']).toBe('Disputatsioon');
   });
@@ -49,7 +51,7 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: { id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } } },
     ]));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
@@ -57,8 +59,8 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon', en: 'oration' } }] },
     ]));
-    const resultEt = await getGenreLabelMap(undefined, 'et');
-    const resultEn = await getGenreLabelMap(undefined, 'en');
+    const resultEt = await getGenreLabelMap(mockIndex, undefined,'et');
+    const resultEn = await getGenreLabelMap(mockIndex, undefined,'en');
     expect(resultEt['Q861911']).toBe('Oratsioon');
     expect(resultEn['Q861911']).toBe('Oration');
   });
@@ -67,7 +69,7 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
     ]));
-    const result = await getGenreLabelMap(undefined, 'en');
+    const result = await getGenreLabelMap(mockIndex, undefined,'en');
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
@@ -75,7 +77,7 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ id: 'Q861911', label: 'oratsioon' }] },
     ]));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
@@ -83,7 +85,7 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ id: 'Q1', label: 'funeral sermon', labels: { en: 'funeral sermon' } }] },
     ]));
-    const result = await getGenreLabelMap(undefined, 'en');
+    const result = await getGenreLabelMap(mockIndex, undefined,'en');
     expect(result['Q1']).toBe('Funeral sermon');
   });
 
@@ -93,7 +95,7 @@ describe('getGenreLabelMap', () => {
       { title: 'teos ilma žanrita' },
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
     ]));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
@@ -101,7 +103,7 @@ describe('getGenreLabelMap', () => {
     mockSearch.mockReturnValue(makeResponse([
       { genre_object: [{ label: 'tundmatu', labels: { et: 'tundmatu' } }] },
     ]));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result).toEqual({});
   });
 
@@ -110,33 +112,33 @@ describe('getGenreLabelMap', () => {
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
       { genre_object: [{ id: 'Q861911', label: 'oratsioon', labels: { et: 'oratsioon' } }] },
     ]));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result['Q861911']).toBe('Oratsioon');
   });
 
   it('tagastab tühja kaardi vea korral', async () => {
     mockSearch.mockRejectedValue(new Error('network error'));
-    const result = await getGenreLabelMap();
+    const result = await getGenreLabelMap(mockIndex);
     expect(result).toEqual({});
   });
 
   it('edastab collection filtri Meilisearch päringule', async () => {
     mockSearch.mockReturnValue(makeResponse([]));
-    await getGenreLabelMap('academia-gustaviana', 'et');
+    await getGenreLabelMap(mockIndex, 'academia-gustaviana', 'et');
     const [, options] = mockSearch.mock.calls[0];
     expect(options.filter).toContain('collections_hierarchy = "academia-gustaviana"');
   });
 
   it('alati sisaldab lehekylje_number = 1 filtrit', async () => {
     mockSearch.mockReturnValue(makeResponse([]));
-    await getGenreLabelMap();
+    await getGenreLabelMap(mockIndex);
     const [, options] = mockSearch.mock.calls[0];
     expect(options.filter).toContain('lehekylje_number = 1');
   });
 
   it('kasutab limit 5000 et kõik teosed oleksid kaetud', async () => {
     mockSearch.mockReturnValue(makeResponse([]));
-    await getGenreLabelMap();
+    await getGenreLabelMap(mockIndex);
     const [, options] = mockSearch.mock.calls[0];
     expect(options.limit).toBe(5000);
   });

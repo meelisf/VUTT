@@ -9,6 +9,7 @@ import Header from '../components/Header';
 import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
+import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import CollectionInfoBanner from '../components/CollectionInfoBanner';
@@ -32,6 +33,7 @@ const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
   const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
   const scrollContainerRef = useRef<HTMLElement>(null);
@@ -320,6 +322,7 @@ const Dashboard: React.FC = () => {
 
   // Perform search when params change
   useEffect(() => {
+    if (!index) return;
     const fetchWorks = async () => {
       setLoading(true);
       setError(null);
@@ -328,7 +331,7 @@ const Dashboard: React.FC = () => {
         const end = parseInt(yearEnd) || undefined;
 
         // Pass filter options to the API (including status filter - server-side)
-        const result = await searchWorks(queryParam, {
+        const result = await searchWorks(index, queryParam, {
           yearStart: start,
           yearEnd: end,
           sort: sort,
@@ -363,7 +366,7 @@ const Dashboard: React.FC = () => {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
+  }, [index, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
   const toggleWorkSelection = (workId: string) => {

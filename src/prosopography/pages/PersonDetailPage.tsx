@@ -12,8 +12,8 @@ import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePe
 import EntityPicker from '../../components/EntityPicker';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
+import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
-import { index } from '../../services/meiliService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
 import WorkRelationsCard from '../components/WorkRelationsCard';
 
@@ -233,6 +233,7 @@ const PersonDetailPage: React.FC = () => {
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const { user, authToken } = useUser();
   const { selectedCollection, collections } = useCollection();
+  const index = useMeiliIndex();
 
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -301,7 +302,7 @@ const PersonDetailPage: React.FC = () => {
         setPerson(data);
         setError(null);
         const uniqueWorkIds = [...new Set((data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean))];
-        if (uniqueWorkIds.length > 0) {
+        if (uniqueWorkIds.length > 0 && index) {
           // Teoste pealkirjad: päri partiidena (max 50 korraga), et vältida Meilisearch IN-filtri piiranguid
           const BATCH = 50;
           const allHits: any[] = [];
@@ -327,7 +328,7 @@ const PersonDetailPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isiku laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [id, token]);
+  }, [id, token, index]);
 
   // ── Loading ──────────────────────────────────────────────
   if (loading) {

@@ -6,6 +6,7 @@ import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
 import { getLangCode } from '../../../utils/getLangCode';
 import { FILE_API_URL } from '../../../config';
+import { useMeiliIndex } from '../../../contexts/MeilisearchContext';
 import {
     mergeFacetsWithExisting, mergeTagsWithExisting,
     mergeSelectedIntoFacets, mergeSelectedIntoTags
@@ -27,6 +28,7 @@ export function useSearchFacets(
     selectedCollection: string | null,
     results: ContentSearchResponse | null
 ): FacetsState {
+    const index = useMeiliIndex();
     const [availableTeoseTags, setAvailableTeoseTags] = useState<{ tag: string; count: number }[]>([]);
     const [availableGenres, setAvailableGenres] = useState<{ value: string; count: number }[]>([]);
     const [availableTypes, setAvailableTypes] = useState<{ value: string; count: number }[]>([]);
@@ -48,15 +50,15 @@ export function useSearchFacets(
 
                 const hasActiveContentFilters = !!urlParams.q || !!urlParams.workId || !!urlParams.author ||
                     urlParams.teoseTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0;
-                if (hasActiveContentFilters) return;
+                if (hasActiveContentFilters || !index) return;
 
                 const facetLang = getLangCode(lang);
                 const [tags, genres, types, authors, labels] = await Promise.all([
-                    getTeoseTagsFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getGenreFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getTypeFacets(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getAuthorFacets(selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd),
-                    getTagsLabelMap(selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
+                    getTeoseTagsFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
+                    getGenreFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
+                    getTypeFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
+                    getAuthorFacets(index, selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd),
+                    getTagsLabelMap(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
                 ]);
                 setTagLabels(labels);
                 setAvailableTeoseTags(mergeSelectedIntoTags(tags, urlParams.teoseTags));
@@ -70,7 +72,7 @@ export function useSearchFacets(
         load();
     }, [selectedCollection, lang, urlParams.yearStart, urlParams.yearEnd,
         urlParams.q, urlParams.workId, urlParams.author,
-        urlParams.teoseTags.length, urlParams.genres.length, urlParams.types.length]);
+        urlParams.teoseTags.length, urlParams.genres.length, urlParams.types.length, index]);
 
     // Uuenda facets otsinguvastusest
     useEffect(() => {

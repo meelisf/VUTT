@@ -3,6 +3,7 @@ import { searchContent } from '../../../services/searchService';
 import { ContentSearchResponse } from '../../../types';
 import { SearchUrlParams } from './useSearchUrlParams';
 import { getLangCode } from '../../../utils/getLangCode';
+import { useMeiliIndex } from '../../../contexts/MeilisearchContext';
 
 export interface SearchResultsState {
     results: ContentSearchResponse | null;
@@ -11,6 +12,7 @@ export interface SearchResultsState {
 }
 
 export function useSearchResults(urlParams: SearchUrlParams, lang: string, selectedCollection: string | null): SearchResultsState {
+    const index = useMeiliIndex();
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -26,12 +28,14 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
             return;
         }
 
+        if (!index) return;
+
         let cancelled = false;
         const run = async () => {
             setLoading(true);
             setError(null);
             try {
-                const data = await searchContent(urlParams.q, urlParams.page, {
+                const data = await searchContent(index, urlParams.q, urlParams.page, {
                     yearStart: urlParams.yearStart,
                     yearEnd: urlParams.yearEnd,
                     scope: urlParams.scope,
@@ -58,7 +62,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
         urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
         urlParams.genres.join(','), urlParams.types.join(','),
-        urlParams.author, urlParams.subjectPerson, selectedCollection, lang]);
+        urlParams.author, urlParams.subjectPerson, selectedCollection, lang, index]);
 
     return { results, loading, error };
 }

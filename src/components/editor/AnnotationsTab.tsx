@@ -15,6 +15,7 @@ import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { useCollection } from '../../contexts/CollectionContext';
+import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 
 interface AnnotationsTabProps {
@@ -60,6 +61,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { collections } = useCollection();
+  const index = useMeiliIndex();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState<number | null>(null);
   const [editingAnnText, setEditingAnnText] = useState('');
@@ -117,12 +119,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
   // Lae kõik olemasolevad märksõnad Meilisearchist
   useEffect(() => {
+    if (!index) return;
     const loadTags = async () => {
-      const fetchedTags = await getAllTags(lang);
+      const fetchedTags = await getAllTags(index, lang);
       setAllAvailableTags(fetchedTags);
     };
     loadTags();
-  }, [lang]);
+  }, [lang, index]);
 
   // Ühenda serveri soovitused ja Meilisearchi märksõnad
   const mergedTagSuggestions = React.useMemo(() => {

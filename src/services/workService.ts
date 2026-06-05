@@ -3,12 +3,13 @@
  */
 
 import { Work, WorkStatus, PageStatus } from '../types';
-import { index, calculateWorkStatus, checkMixedContent } from './meiliService';
+import { calculateWorkStatus, checkMixedContent } from './meiliService';
 import { getThumbUrl, getPageThumbUrl } from './workImageService';
+import type { Index } from 'meilisearch';
 
 // Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)
 // NB: Kuna indeksil on distinct='work_id', peame tegema eraldi päringud iga teose jaoks
-export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, WorkStatus>> => {
+export const getWorkStatuses = async (index: Index, workIds: string[]): Promise<Map<string, WorkStatus>> => {
   const statusMap = new Map<string, WorkStatus>();
 
   if (workIds.length === 0) return statusMap;
@@ -43,7 +44,7 @@ export const getWorkStatuses = async (workIds: string[]): Promise<Map<string, Wo
 };
 
 // Töölaud: Saa teose metaandmed
-export const getWorkMetadata = async (workId: string): Promise<Work | undefined> => {
+export const getWorkMetadata = async (index: Index, workId: string): Promise<Work | undefined> => {
   try {
     // Otsime work_id (nanoid) järgi
     const response = await index.search('', {
@@ -117,6 +118,7 @@ export const getWorkMetadata = async (workId: string): Promise<Work | undefined>
 
 // Kõigi teose lehtede thumbnailide URL-id grid-vaate jaoks
 export const getWorkPageImages = async (
+  index: Index,
   workId: string,
   pageCount: number
 ): Promise<{ pageNum: number; imageUrl: string; hasAnnotations: boolean }[]> => {

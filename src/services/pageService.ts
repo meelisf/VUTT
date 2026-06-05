@@ -5,8 +5,9 @@
 import { Annotation, Page, PageStatus } from '../types';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
-import { index, checkMixedContent } from './meiliService';
+import { checkMixedContent } from './meiliService';
 import { getFullImageUrl } from './workImageService';
+import type { Index } from 'meilisearch';
 
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, authToken?: string): Promise<boolean> => {
@@ -84,7 +85,7 @@ const saveToFileSystem = async (page: Page, original_catalog: string, image_url:
 };
 
 // Töölaud: Saa ühe lehekülje andmed
-export const getPage = async (workId: string, pageNum: number): Promise<Page | null> => {
+export const getPage = async (index: Index, workId: string, pageNum: number): Promise<Page | null> => {
   checkMixedContent();
   try {
     // Otsime work_id (nanoid) järgi

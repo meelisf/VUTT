@@ -5,6 +5,7 @@ import { ContentSearchHit, ContentSearchResponse } from '../../types';
 import { Vocabularies, getCollectionColorClasses } from '../../services/collectionService';
 import { searchWorkHits } from '../../services/searchService';
 import { useCollection } from '../../contexts/CollectionContext';
+import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getLabel } from '../../utils/metadataUtils';
 import { getLangCode } from '../../utils/getLangCode';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
@@ -44,6 +45,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     const { t, i18n } = useTranslation(['search', 'common']);
     const navigate = useNavigate();
     const { getCollectionName, collections } = useCollection();
+    const index = useMeiliIndex();
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Accordion state — ainult SearchResults vajab neid
@@ -74,10 +76,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             newSet.delete(workId);
         } else {
             newSet.add(workId);
-            if (!workHits.has(workId) && queryParam) {
+            if (!workHits.has(workId) && queryParam && index) {
                 setLoadingWorkHits(prev => new Set(prev).add(workId));
                 try {
-                    const hits = await searchWorkHits(queryParam, workId, {
+                    const hits = await searchWorkHits(index, queryParam, workId, {
                         yearStart: yearStartParam,
                         yearEnd: yearEndParam,
                         scope: scopeParam !== 'all' ? scopeParam : undefined
