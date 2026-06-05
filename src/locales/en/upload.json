@@ -26,7 +26,12 @@
     "languagesLabel": "Languages (optional)",
     "continue": "Continue to upload",
     "required": "Required field",
-    "timeEstimate": "Upload and OCR processing duration depends on page count (approx. 2–3 pages/min)."
+    "timeEstimate": "Upload and OCR processing duration depends on page count (approx. 2–3 pages/min).",
+    "materialTypeLabel": "Material type",
+    "materialTypePrint": "Printed text",
+    "materialTypeHand": "Manuscript",
+    "materialTypeHandYearHint": "For manuscripts, dating is often approximate or unknown — leave the year empty or enter a range (e.g. early 17th c.).",
+    "yearLabelOptional": "Year (optional)"
   },
   "step2": {
     "title": "Upload PDF or images",

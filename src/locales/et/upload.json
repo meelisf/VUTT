@@ -26,7 +26,12 @@
     "languagesLabel": "Keeled (valikuline)",
     "continue": "Jätka üleslaadimisele",
     "required": "Kohustuslik väli",
-    "timeEstimate": "Üleslaadimine ja OCR töötlemine kestab vastavalt lk arvule (u 2–3 lk/min)."
+    "timeEstimate": "Üleslaadimine ja OCR töötlemine kestab vastavalt lk arvule (u 2–3 lk/min).",
+    "materialTypeLabel": "Materjali tüüp",
+    "materialTypePrint": "Trükitekst",
+    "materialTypeHand": "Käsikiri",
+    "materialTypeHandYearHint": "Käsikirjaliste materjalide puhul on dateering sageli umbkaudne või teadmata — aasta võib jätta tühjaks või sisestada vahemiku (nt 17. saj I pool).",
+    "yearLabelOptional": "Aasta (valikuline)"
   },
   "step2": {
     "title": "Laadi üles PDF või pildid",
