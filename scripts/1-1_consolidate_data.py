@@ -415,6 +415,7 @@ def get_work_metadata(doc_path, dir_name, collections):
                 result['ester_id'] = meta.get('ester_id')
                 result['external_url'] = meta.get('external_url')
                 result['archive_refs'] = meta.get('archive_refs') or []
+                result['shareable'] = meta.get('shareable', False)
 
                 # Seeria (kui on)
                 if meta.get('series'):
@@ -586,6 +587,11 @@ def create_meilisearch_data_per_page():
                 
                 'collections': doc_metadata.get('collections', []),
                 'collections_hierarchy': doc_metadata.get('collections_hierarchy', []),
+                'is_public': any(
+                    collections.get(c, {}).get("visibility", "public") == "public"
+                    for c in doc_metadata.get('collections', [])
+                ) if doc_metadata.get('collections') else True,
+                'shareable': doc_metadata.get('shareable', False),
 
                 # Isikud
                 'creators': creators,
