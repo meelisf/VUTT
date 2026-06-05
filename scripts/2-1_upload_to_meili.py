@@ -95,7 +95,9 @@ def main():
             'status',
             'teose_staatus',
             'tags',
-            'tags_et', 'tags_en'
+            'tags_et', 'tags_en',
+            'is_public',
+            'shareable',
         ],
         'sortableAttributes': [
             'year', 
