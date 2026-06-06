@@ -88,6 +88,24 @@ const Workspace: React.FC = () => {
     setInputPage(pageNum || '1');
   }, [pageNum]);
 
+  // Sisselogitud kasutaja pildi HMAC token — laetakse üks kord teos kohta.
+  // Vajalik piiratud kollektsioonide piltidele, kuna image server on eraldi server
+  // ja auth credentials-eid ei saa <img src> päringuga kaasa saata.
+  useEffect(() => {
+    if (!authToken || !workId) return;
+    setImageToken(null);
+    fetch(`${FILE_API_URL}/work/${workId}/viewer-token`, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (data?.image_exp && data?.image_sig) {
+          setImageToken({ exp: data.image_exp, sig: data.image_sig });
+        }
+      })
+      .catch(() => {});
+  }, [workId, authToken]);
+
   // skipBlockerRef: tõese väärtuse korral ignoreerib blocker hasUnsavedChanges kontrolli
   // (kasutatakse "Salvesta ja lahku" ajal — navigeerimiseks pärast salvestamist)
   const skipBlockerRef = useRef(false);
