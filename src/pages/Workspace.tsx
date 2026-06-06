@@ -216,6 +216,18 @@ const Workspace: React.FC = () => {
     return `${url}${sep}exp=${imageToken.exp}&sig=${imageToken.sig}`;
   }, [imageToken]);
 
+  const currentImageSrc = useMemo(() => {
+    if (!page?.image_url) return '';
+    try {
+      const replaced = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
+      const key = `${workId}/${page.page_number}`;
+      if (replaced[key]) {
+        return appendImageToken(`${page.image_url}?v=${replaced[key]}`);
+      }
+    } catch { /* ignore */ }
+    return appendImageToken(page.image_url);
+  }, [appendImageToken, page?.image_url, page?.page_number, workId]);
+
   const handleOpenGridView = useCallback(async () => {
     if (!work || !effectiveIndex) return;
     setIsGridView(true);
@@ -223,7 +235,7 @@ const Workspace: React.FC = () => {
     const pages = await getWorkPageImages(effectiveIndex, work.work_id, work.page_count);
     setGridPages(imageToken ? pages.map(p => ({ ...p, imageUrl: appendImageToken(p.imageUrl) })) : pages);
     setGridLoading(false);
-  }, [work, effectiveIndex]);
+  }, [work, effectiveIndex, imageToken, appendImageToken]);
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
@@ -497,17 +509,7 @@ const Workspace: React.FC = () => {
         <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
           {page.image_url ? (
-            <ImageViewer src={(() => {
-              // Kontrolli, kas see pilt on hiljuti asendatud (cache bust)
-              try {
-                const replaced = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
-                const key = `${workId}/${page.page_number}`;
-                if (replaced[key]) {
-                  return appendImageToken(`${page.image_url}?v=${replaced[key]}`);
-                }
-              } catch { /* ignore */ }
-              return appendImageToken(page.image_url);
-            })()} pageNum={page.page_number} onGridView={handleOpenGridView} onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)} />
+            <ImageViewer src={currentImageSrc} pageNum={page.page_number} onGridView={handleOpenGridView} onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)} />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
               Pilt puudub
@@ -552,6 +554,7 @@ const Workspace: React.FC = () => {
       <div className="md:hidden flex-1 overflow-hidden">
         <WorkspaceMobileView
           page={page}
+          imageSrc={currentImageSrc}
           work={work}
           workId={workId!}
           currentPageNum={currentPageNum}

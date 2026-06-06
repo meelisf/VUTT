@@ -20,6 +20,7 @@ import { getLangCode } from '../../utils/getLangCode';
 
 interface WorkspaceMobileViewProps {
   page: Page;
+  imageSrc: string;
   work?: Work;
   workId: string;
   currentPageNum: number;
@@ -37,6 +38,7 @@ interface WorkspaceMobileViewProps {
 
 const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   page,
+  imageSrc,
   work,
   workId,
   currentPageNum,
@@ -267,8 +269,8 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
       <div className="flex-1 min-h-0 overflow-hidden mt-2">
         {activeTab === 'image' ? (
           <div className="h-full bg-slate-900">
-            {page.image_url ? (
-              <ImageViewer src={page.image_url} pageNum={page.page_number} onGridView={handleOpenGrid} />
+            {imageSrc ? (
+              <ImageViewer src={imageSrc} pageNum={page.page_number} onGridView={handleOpenGrid} />
             ) : (
               <div className="flex items-center justify-center h-full text-white/50">
                 Pilt puudub
