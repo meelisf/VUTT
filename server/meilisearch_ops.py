@@ -753,7 +753,14 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
                     all_cols.get(c, {}).get("visibility", "public") == "public"
                     for c in work_cols
                 ) if work_cols else True
-                docs_to_update.append({"id": f"{work_id}-1", "work_id": work_id, "is_public": new_is_public})
+                folder_path = os.path.join(BASE_DIR, folder)
+                images = sorted([
+                    f for f in os.listdir(folder_path)
+                    if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')
+                ])
+                page_count = len(images) or 1
+                for page_num in range(1, page_count + 1):
+                    docs_to_update.append({"id": f"{work_id}-{page_num}", "work_id": work_id, "is_public": new_is_public})
             except Exception:
                 continue
 
