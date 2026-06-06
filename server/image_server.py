@@ -57,7 +57,7 @@ def _load_work_meta_for_path(resolved_path: str):
 def _check_image_access(work_id: str, meta, query_string: str) -> bool:
     """Kontrollib kas pildipäring on lubatud.
     Avalikud teosed läbivad alati. Piiratud teoste puhul valideeritakse HMAC token."""
-    if meta is None or is_work_public(meta):
+    if meta is None or is_work_public(meta) or meta.get('shareable', False):
         return True
     token_work_id = work_id or meta.get('id') or meta.get('work_id') or ''
     parsed_qs = urllib.parse.parse_qs(query_string)

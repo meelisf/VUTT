@@ -149,7 +149,23 @@ const Workspace: React.FC = () => {
         } else {
           setPage(pageData);
           setCurrentStatus(pageData.status);
-          if (workData) setWork(workData);
+          if (workData) {
+            let freshWorkData = workData;
+            if (authToken) {
+              try {
+                const metaResponse = await fetch(`${FILE_API_URL}/get-work-metadata`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+                  body: JSON.stringify({ work_id: workId, original_path: pageData.original_path }),
+                });
+                const metaData = await metaResponse.json();
+                if (metaData.status === 'success' && metaData.metadata && typeof metaData.metadata.shareable === 'boolean') {
+                  freshWorkData = { ...workData, shareable: metaData.metadata.shareable };
+                }
+              } catch { /* Meili väärtus jääb fallbackiks */ }
+            }
+            setWork(freshWorkData);
+          }
           // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
           // update the URL to reflect reality.
           if (pageData.page_number !== currentPageNum) {
@@ -164,7 +180,7 @@ const Workspace: React.FC = () => {
       }
     };
     loadData();
-  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, t]);
+  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, t]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
