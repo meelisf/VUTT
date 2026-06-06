@@ -32,6 +32,7 @@ const Maintenance: React.FC = () => {
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [deleteForceConfirm, setDeleteForceConfirm] = useState<{ id: string; message: string } | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   React.useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -109,7 +110,7 @@ const Maintenance: React.FC = () => {
   const handleUpdateArchive = async (id: string) => {
     const trimName = editName.trim();
     const trimUrl = editUrl.trim();
-    if (!trimName) { setEditError(t('admin:archives.idNameRequired')); return; }
+    if (!trimName) { setEditError(t('admin:archives.nameRequired')); return; }
     setEditSaving(true); setEditError('');
     try {
       const resp = await fetchWithTimeout(`${FILE_API_URL}/config/archives/${encodeURIComponent(id)}`, {
@@ -137,9 +138,10 @@ const Maintenance: React.FC = () => {
       }
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
-        console.error('Delete archive failed:', e.detail || resp.status);
+        setDeleteError(e.detail || t('admin:archives.deleteFailed'));
         return;
       }
+      setDeleteError('');
       setArchives(prev => { const n = { ...prev }; delete n[id]; return n; });
       setDeleteForceConfirm(null);
     } catch { /* ignore */ }
@@ -234,6 +236,10 @@ const Maintenance: React.FC = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {deleteError && (
+            <p className="text-xs text-red-600 mb-2">{deleteError}</p>
           )}
 
           {archivesLoaded && (

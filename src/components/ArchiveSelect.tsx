@@ -102,7 +102,7 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
     if (!notifyText.trim() || !authToken) return;
     setSaving(true);
     try {
-      await fetchWithTimeout(`${FILE_API_URL}/notifications/send`, {
+      const resp = await fetchWithTimeout(`${FILE_API_URL}/notifications/send`, {
         method: 'POST',
         headers: { ...getAuthHeaders(authToken), 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -111,6 +111,7 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
           body: notifyText,
         }),
       });
+      if (!resp.ok) return;
       setNotifySent(true);
     } catch {
       // ignore send errors
@@ -189,7 +190,7 @@ const ArchiveSelect: React.FC<ArchiveSelectProps> = ({
               </li>
             ))}
             {filtered.length === 0 && (
-              <li className="px-3 py-2 text-xs text-gray-400">{'Tulemusi ei leitud'}</li>
+              <li className="px-3 py-2 text-xs text-gray-400">{t('admin:archives.noResults')}</li>
             )}
           </ul>
         </div>
