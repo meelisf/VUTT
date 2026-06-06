@@ -885,6 +885,24 @@ def generate_meili_token(user=None, ttl_seconds: int = 3600) -> str:
     return token if isinstance(token, str) else token.decode("utf-8")
 
 
+def generate_work_scoped_meili_token(work_id: str, ttl_seconds: int = 3600) -> str:
+    """Genereerib Meilisearch tokeni mis annab lugemisjuurdepääsu ainult ühele teosele."""
+    from .config import MEILI_SEARCH_KEY, MEILI_SEARCH_KEY_UID
+
+    if not MEILI_SEARCH_KEY or not MEILI_SEARCH_KEY_UID:
+        raise RuntimeError("MEILI_SEARCH_KEY ja MEILI_SEARCH_KEY_UID peavad olema seadistatud")
+
+    search_rules = {"teosed": {"filter": f'work_id = "{work_id}"'}}
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+    payload = {
+        "searchRules": search_rules,
+        "apiKeyUid": MEILI_SEARCH_KEY_UID,
+        "exp": int(expires_at.timestamp()),
+    }
+    token = jwt.encode(payload, MEILI_SEARCH_KEY, algorithm="HS256")
+    return token if isinstance(token, str) else token.decode("utf-8")
+
+
 def _keepwarm_loop():
     """Taustalõim, mis hoiab Meilisearchi otsingu- ja sync-rajad soojad.
 

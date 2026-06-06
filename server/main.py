@@ -1779,6 +1779,21 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
     return {"status": "success", "shareable": shareable}
 
 
+@app.get("/work/{work_id}/viewer-token")
+async def get_viewer_token(work_id: str, request: Request):
+    """Tagastab Meilisearch tokeni mis annab juurdepääsu ainult sellele teosele.
+    Kasutatakse shareable ja restricted teoste otselinkide jaoks."""
+    from .meilisearch_ops import generate_work_scoped_meili_token
+    meta = _load_work_metadata(work_id)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    user = _get_optional_user(request)
+    if not can_read_work(meta, user):
+        raise HTTPException(status_code=403, detail="Ligipääs keelatud")
+    token = generate_work_scoped_meili_token(work_id)
+    return {"token": token, "work_id": work_id}
+
+
 @app.get("/vocabularies")
 async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}
 

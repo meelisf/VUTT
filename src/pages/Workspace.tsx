@@ -1,6 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
+import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
@@ -21,12 +22,18 @@ import WorkspaceMobileView from '../components/mobile/WorkspaceMobileView';
 import LoginModal from '../components/LoginModal';
 import { getLabel } from '../utils/metadataUtils';
 import { ErrorBanner } from '../components/ErrorBanner';
+import { FILE_API_URL, MEILI_HOST, MEILI_INDEX } from '../config';
 
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
+  const [viewerToken, setViewerToken] = useState<string | null>(null);
+  const effectiveIndex = useMemo(() => {
+    if (viewerToken) return new MeiliSearch({ host: MEILI_HOST, apiKey: viewerToken }).index(MEILI_INDEX);
+    return index;
+  }, [index, viewerToken]);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -104,7 +111,7 @@ const Workspace: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!index) return;
+    if (!effectiveIndex) return;
     const loadData = async () => {
       if (!workId) {
         setError("Töö ID on puudu.");
@@ -114,10 +121,24 @@ const Workspace: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const [pageData, workData] = await Promise.all([
-          getPage(index, workId, currentPageNum),
-          getWorkMetadata(index, workId)
+        let [pageData, workData] = await Promise.all([
+          getPage(effectiveIndex, workId, currentPageNum),
+          getWorkMetadata(effectiveIndex, workId)
         ]);
+
+        // Shareable fallback: teos on piiratud kollektsioonis aga võib olla jagatud
+        if (!pageData && !viewerToken) {
+          const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`);
+          if (r.ok) {
+            const { token } = await r.json();
+            setViewerToken(token);
+            return; // effectiveIndex uuendub → useEffect käivitub uuesti
+          } else if (r.status === 403) {
+            setError(t('errors.accessDenied', { defaultValue: "Ligipääs keelatud." }));
+            setLoading(false);
+            return;
+          }
+        }
 
         if (!pageData) {
           setError("Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele.");
@@ -139,7 +160,7 @@ const Workspace: React.FC = () => {
       }
     };
     loadData();
-  }, [index, workId, currentPageNum, navigate]);
+  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, t]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
@@ -186,13 +207,13 @@ const Workspace: React.FC = () => {
   };
 
   const handleOpenGridView = useCallback(async () => {
-    if (!work || !index) return;
+    if (!work || !effectiveIndex) return;
     setIsGridView(true);
     setGridLoading(true);
-    const pages = await getWorkPageImages(index, work.work_id, work.page_count);
+    const pages = await getWorkPageImages(effectiveIndex, work.work_id, work.page_count);
     setGridPages(pages);
     setGridLoading(false);
-  }, [work, index]);
+  }, [work, effectiveIndex]);
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);

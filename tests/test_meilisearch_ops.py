@@ -1,5 +1,6 @@
 import json
 import pytest
+import jwt
 
 COLLECTIONS = {
     "col-restricted": {"name": {"et": "Piiratud"}, "visibility": "restricted"},
@@ -95,3 +96,33 @@ def test_update_collection_visibility_correct_is_public_value(tmp_path, monkeypa
 
     assert len(sent_docs) == 1
     assert sent_docs[0]["is_public"] is True
+
+
+def test_generate_work_scoped_meili_token():
+    """Scoped token peab sisaldama ainult selle work_id filtrit."""
+    from server.meilisearch_ops import generate_work_scoped_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+
+    token = generate_work_scoped_meili_token("abc123")
+    payload = jwt.decode(token, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    assert payload["searchRules"] == {"teosed": {"filter": 'work_id = "abc123"'}}
+    assert payload["apiKeyUid"] == "test-uid-1234"
+    assert payload["exp"] > 0
+
+
+def test_generate_work_scoped_meili_token_different_works():
+    """Iga teos saab erineva filtriga tokeni."""
+    from server.meilisearch_ops import generate_work_scoped_meili_token
+    import server.config as cfg
+    cfg.MEILI_SEARCH_KEY = "test-key-32-chars-long-padding-x"
+    cfg.MEILI_SEARCH_KEY_UID = "test-uid-1234"
+
+    token1 = generate_work_scoped_meili_token("work1")
+    token2 = generate_work_scoped_meili_token("work2")
+    p1 = jwt.decode(token1, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    p2 = jwt.decode(token2, "test-key-32-chars-long-padding-x", algorithms=["HS256"])
+    assert 'work_id = "work1"' in p1["searchRules"]["teosed"]["filter"]
+    assert 'work_id = "work2"' in p2["searchRules"]["teosed"]["filter"]
+    assert p1["searchRules"] != p2["searchRules"]

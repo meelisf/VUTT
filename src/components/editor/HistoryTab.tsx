@@ -594,11 +594,11 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
             {shareable && (
               <div className="mt-3 flex items-center gap-2">
                 <code className="text-xs text-gray-500 font-mono truncate flex-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
-                  {typeof window !== 'undefined' ? `${window.location.origin}/workspace/${work.work_id}` : ''}
+                  {typeof window !== 'undefined' ? `${window.location.origin}/work/${work.work_id}` : ''}
                 </code>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/workspace/${work.work_id}`);
+                    navigator.clipboard.writeText(`${window.location.origin}/work/${work.work_id}`);
                     setLinkCopied(true);
                     setTimeout(() => setLinkCopied(false), 2000);
                   }}
