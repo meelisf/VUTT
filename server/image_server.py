@@ -19,6 +19,23 @@ if __name__ == '__main__' and __package__ is None:
 from .config import ALLOWED_ORIGINS, BASE_DIR
 from .utils import find_directory_by_id, build_work_id_cache
 
+_ALLOWED_IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png'})
+
+
+def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:
+    """Kontrollib kas tee viitab lubatud pildifailile base_dir sees.
+    Kaitseb mitte-pildifailide lekkimise ja symlink-põhise path traversal eest.
+    """
+    try:
+        real_path = os.path.realpath(resolved_path)
+        real_base = os.path.realpath(base_dir)
+        if not real_path.startswith(real_base + os.sep):
+            return False
+        _, ext = os.path.splitext(real_path)
+        return ext.lower() in _ALLOWED_IMAGE_EXTENSIONS
+    except Exception:
+        return False
+
 # Pillow thumbnail genereerimiseks
 try:
     from PIL import Image, ImageOps
@@ -230,7 +247,11 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.serve_page_thumbnail(work_id, thumb_filename)
             return
 
-        # Muu puhul kasuta vaikimisi käitumist
+        # Muu puhul: luba ainult pildifailid BASE_DIR sees
+        resolved = self.translate_path(self.path)
+        if not _is_safe_image_path(resolved, DIRECTORY):
+            self.send_error(403, "Keelatud")
+            return
         return super().do_GET()
 
     def serve_thumbnail(self, work_id):
