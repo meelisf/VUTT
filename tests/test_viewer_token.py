@@ -101,3 +101,21 @@ def test_viewer_token_200_admin(env, monkeypatch):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert r.status_code == 200
+
+
+def test_viewer_token_includes_image_credentials(env, monkeypatch):
+    """Viewer token peab sisaldama pildi HMAC andmeid."""
+    import hmac as hmac_mod
+    import hashlib
+    import server.config as cfg
+    cfg.IMAGE_TOKEN_SECRET = "test-image-secret"
+
+    set_work(monkeypatch, SHAREABLE_META)
+    r = env["client"].get("/work/def456/viewer-token")
+    assert r.status_code == 200
+    data = r.json()
+    assert "image_exp" in data
+    assert "image_sig" in data
+    exp = str(data["image_exp"])
+    expected = hmac_mod.new(b"test-image-secret", f"image:def456:{exp}".encode(), hashlib.sha256).hexdigest()
+    assert data["image_sig"] == expected

@@ -30,6 +30,7 @@ const Workspace: React.FC = () => {
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
   const [viewerToken, setViewerToken] = useState<string | null>(null);
+  const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
   const effectiveIndex = useMemo(() => {
     if (viewerToken) return new MeiliSearch({ host: MEILI_HOST, apiKey: viewerToken }).index(MEILI_INDEX);
     return index;
@@ -130,8 +131,11 @@ const Workspace: React.FC = () => {
         if (!pageData && !viewerToken) {
           const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`);
           if (r.ok) {
-            const { token } = await r.json();
-            setViewerToken(token);
+            const data = await r.json();
+            setViewerToken(data.token);
+            if (data.image_exp && data.image_sig) {
+              setImageToken({ exp: data.image_exp, sig: data.image_sig });
+            }
             return; // effectiveIndex uuendub → useEffect käivitub uuesti
           } else if (r.status === 403) {
             setError(t('errors.accessDenied', { defaultValue: "Ligipääs keelatud." }));
@@ -206,12 +210,18 @@ const Workspace: React.FC = () => {
     }
   };
 
+  const appendImageToken = useCallback((url: string): string => {
+    if (!imageToken) return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}exp=${imageToken.exp}&sig=${imageToken.sig}`;
+  }, [imageToken]);
+
   const handleOpenGridView = useCallback(async () => {
     if (!work || !effectiveIndex) return;
     setIsGridView(true);
     setGridLoading(true);
     const pages = await getWorkPageImages(effectiveIndex, work.work_id, work.page_count);
-    setGridPages(pages);
+    setGridPages(imageToken ? pages.map(p => ({ ...p, imageUrl: appendImageToken(p.imageUrl) })) : pages);
     setGridLoading(false);
   }, [work, effectiveIndex]);
 
@@ -493,10 +503,10 @@ const Workspace: React.FC = () => {
                 const replaced = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
                 const key = `${workId}/${page.page_number}`;
                 if (replaced[key]) {
-                  return `${page.image_url}?v=${replaced[key]}`;
+                  return appendImageToken(`${page.image_url}?v=${replaced[key]}`);
                 }
               } catch { /* ignore */ }
-              return page.image_url;
+              return appendImageToken(page.image_url);
             })()} pageNum={page.page_number} onGridView={handleOpenGridView} onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)} />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">

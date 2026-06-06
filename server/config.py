@@ -173,6 +173,10 @@ MEILI_SEARCH_KEY = os.getenv("MEILI_SEARCH_KEY", "")
 MEILI_SEARCH_KEY_UID = os.getenv("MEILI_SEARCH_KEY_UID", "")
 INDEX_NAME = "teosed"
 
+# Pildi-HMAC allkirjastamise saladus (image_server + main.py jagavad sama saladust)
+# Tootmises sea IMAGE_TOKEN_SECRET keskkonnamuutujaga
+IMAGE_TOKEN_SECRET = os.getenv("IMAGE_TOKEN_SECRET", "dev-image-secret-change-in-production")
+
 def load_env_file():
     """
     Laeb .env failist seaded, kui süsteemi muutujad puuduvad.

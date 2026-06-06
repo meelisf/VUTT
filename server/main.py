@@ -1781,17 +1781,27 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
 
 @app.get("/work/{work_id}/viewer-token")
 async def get_viewer_token(work_id: str, request: Request):
-    """Tagastab Meilisearch tokeni mis annab juurdepääsu ainult sellele teosele.
+    """Tagastab Meilisearch tokeni + pildi HMAC andmed juurdepääsuks ühele teosele.
     Kasutatakse shareable ja restricted teoste otselinkide jaoks."""
+    import hashlib as _hashlib
+    import hmac as _hmac
+    import time as _time
     from .meilisearch_ops import generate_work_scoped_meili_token
+    from .config import IMAGE_TOKEN_SECRET
     meta = _load_work_metadata(work_id)
     if meta is None:
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     user = _get_optional_user(request)
     if not can_read_work(meta, user):
         raise HTTPException(status_code=403, detail="Ligipääs keelatud")
-    token = generate_work_scoped_meili_token(work_id)
-    return {"token": token, "work_id": work_id}
+    meili_token = generate_work_scoped_meili_token(work_id)
+    image_exp = int(_time.time()) + 3600
+    image_sig = _hmac.new(
+        IMAGE_TOKEN_SECRET.encode(),
+        f"image:{work_id}:{image_exp}".encode(),
+        _hashlib.sha256,
+    ).hexdigest()
+    return {"token": meili_token, "work_id": work_id, "image_exp": image_exp, "image_sig": image_sig}
 
 
 @app.get("/vocabularies")

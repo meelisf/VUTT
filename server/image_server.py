@@ -16,10 +16,53 @@ if __name__ == '__main__' and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     __package__ = "server"
 
-from .config import ALLOWED_ORIGINS, BASE_DIR
+import hashlib
+import hmac
+import time
+
+from .config import ALLOWED_ORIGINS, BASE_DIR, IMAGE_TOKEN_SECRET
 from .utils import find_directory_by_id, build_work_id_cache
+from .access_ops import is_work_public
 
 _ALLOWED_IMAGE_EXTENSIONS = frozenset({'.jpg', '.jpeg', '.png'})
+
+
+def _validate_image_token(work_id: str, exp: str, sig: str) -> bool:
+    """Kontrollib pildipäringu HMAC-allkirja. Formaat: HMAC(secret, "image:{work_id}:{exp}")."""
+    try:
+        exp_int = int(exp)
+        if exp_int < int(time.time()):
+            return False
+        secret = IMAGE_TOKEN_SECRET.encode()
+        message = f"image:{work_id}:{exp}".encode()
+        expected = hmac.new(secret, message, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, sig)
+    except Exception:
+        return False
+
+
+def _load_work_meta_for_path(resolved_path: str):
+    """Laeb _metadata.json lahendatud pilditee vanemkataloogist."""
+    work_dir = os.path.dirname(resolved_path)
+    meta_path = os.path.join(work_dir, '_metadata.json')
+    if not os.path.exists(meta_path):
+        return None
+    try:
+        with open(meta_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _check_image_access(work_id: str, meta, query_string: str) -> bool:
+    """Kontrollib kas pildipäring on lubatud.
+    Avalikud teosed läbivad alati. Piiratud teoste puhul valideeritakse HMAC token."""
+    if meta is None or is_work_public(meta):
+        return True
+    parsed_qs = urllib.parse.parse_qs(query_string)
+    exp = parsed_qs.get('exp', [''])[0]
+    sig = parsed_qs.get('sig', [''])[0]
+    return _validate_image_token(work_id, exp, sig)
 
 
 def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:
@@ -252,14 +295,31 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         if not _is_safe_image_path(resolved, DIRECTORY):
             self.send_error(403, "Keelatud")
             return
+        meta = _load_work_meta_for_path(resolved)
+        work_id = (meta or {}).get('work_id', '')
+        parsed = urllib.parse.urlparse(self.path)
+        if not _check_image_access(work_id, meta, parsed.query):
+            self.send_error(403, "Keelatud")
+            return
         return super().do_GET()
 
     def serve_thumbnail(self, work_id):
         """Serveerib teose thumbnaili, genereerides selle vajadusel."""
-        # Leia teose kataloog
         work_path = find_directory_by_id(work_id)
         if not work_path:
             self.send_error(404, f"Teost ei leitud: {work_id}")
+            return
+
+        meta_path = os.path.join(work_path, '_metadata.json')
+        meta = None
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        except Exception:
+            pass
+        parsed = urllib.parse.urlparse(self.path)
+        if not _check_image_access(work_id, meta, parsed.query):
+            self.send_error(403, "Keelatud")
             return
 
         # Saa või genereeri thumbnail
@@ -287,6 +347,18 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         work_path = find_directory_by_id(work_id)
         if not work_path:
             self.send_error(404, f"Teost ei leitud: {work_id}")
+            return
+
+        meta_path = os.path.join(work_path, '_metadata.json')
+        meta = None
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = json.load(f)
+        except Exception:
+            pass
+        parsed = urllib.parse.urlparse(self.path)
+        if not _check_image_access(work_id, meta, parsed.query):
+            self.send_error(403, "Keelatud")
             return
 
         thumb_path = get_or_create_page_thumbnail(work_path, thumb_filename)
