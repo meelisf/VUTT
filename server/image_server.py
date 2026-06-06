@@ -59,7 +59,7 @@ def _check_image_access(work_id: str, meta, query_string: str) -> bool:
     Avalikud teosed läbivad alati. Piiratud teoste puhul valideeritakse HMAC token."""
     if meta is None or is_work_public(meta) or meta.get('shareable', False):
         return True
-    token_work_id = work_id or meta.get('id') or meta.get('work_id') or ''
+    token_work_id = work_id
     parsed_qs = urllib.parse.parse_qs(query_string)
     exp = parsed_qs.get('exp', [''])[0]
     sig = parsed_qs.get('sig', [''])[0]
@@ -223,8 +223,7 @@ def get_or_create_thumbnail(work_path):
         os.makedirs(thumbs_dir, exist_ok=True)
         success = generate_thumbnail(first_image, expected_thumb_path)
         if not success:
-            # Fallback: tagasta originaalpilt
-            return first_image
+            return None
 
     return expected_thumb_path
 
@@ -253,7 +252,7 @@ def get_or_create_page_thumbnail(work_path, thumb_filename):
         os.makedirs(thumbs_dir, exist_ok=True)
         success = generate_thumbnail(source_path, thumb_path)
         if not success:
-            return source_path  # Fallback: originaalpilt
+            return None
 
     return thumb_path
 
@@ -297,7 +296,7 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(403, "Keelatud")
             return
         meta = _load_work_meta_for_path(resolved)
-        work_id = (meta or {}).get('work_id', '')
+        work_id = (meta or {}).get('id', '')
         parsed = urllib.parse.urlparse(self.path)
         if not _check_image_access(work_id, meta, parsed.query):
             self.send_error(403, "Keelatud")
@@ -410,13 +409,9 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         found_dir = find_directory_by_id(work_id_or_slug)
         
         if found_dir:
-            # Kui leidsime kausta, liidame ülejäänud failinime
             return os.path.join(found_dir, *remaining_path)
-        
-        # Fallback: Kui ei leidnud ID järgi, äkki on otse kaustanimi?
-        # See on vajalik SimpleHTTPRequestHandleri vaikimisi käitumise säilitamiseks
-        # (juhul kui find_directory_by_id mingil põhjusel ei leia)
-        return os.path.join(DIRECTORY, *parts)
+
+        return DIRECTORY
 
 class SafeThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """ThreadingHTTPServer parema exception handlinguga."""

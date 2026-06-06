@@ -1801,7 +1801,7 @@ async def get_viewer_token(work_id: str, request: Request):
         f"image:{work_id}:{image_exp}".encode(),
         _hashlib.sha256,
     ).hexdigest()
-    return {"token": meili_token, "work_id": work_id, "image_exp": image_exp, "image_sig": image_sig}
+    return {"token": meili_token, "image_exp": image_exp, "image_sig": image_sig}
 
 
 @app.get("/vocabularies")
