@@ -411,7 +411,7 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
         if found_dir:
             return os.path.join(found_dir, *remaining_path)
 
-        return DIRECTORY
+        return os.path.join(DIRECTORY, *parts)
 
 class SafeThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """ThreadingHTTPServer parema exception handlinguga."""
