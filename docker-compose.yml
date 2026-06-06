@@ -10,6 +10,7 @@ services:
       - MEILISEARCH_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
       - MEILI_SEARCH_KEY=${MEILI_SEARCH_KEY:-}
       - MEILI_SEARCH_KEY_UID=${MEILI_SEARCH_KEY_UID:-}
+      - IMAGE_TOKEN_SECRET=${IMAGE_TOKEN_SECRET:-dev-image-secret-change-in-production}
       - UPLOAD_ENABLED=${UPLOAD_ENABLED:-false}
       - OCR_SERVER_HOST=${OCR_SERVER_HOST:-172.17.120.146}
       - OCR_SERVER_USER=${OCR_SERVER_USER:-mf}
