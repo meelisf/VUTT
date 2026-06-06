@@ -59,10 +59,11 @@ def _check_image_access(work_id: str, meta, query_string: str) -> bool:
     Avalikud teosed läbivad alati. Piiratud teoste puhul valideeritakse HMAC token."""
     if meta is None or is_work_public(meta):
         return True
+    token_work_id = work_id or meta.get('id') or meta.get('work_id') or ''
     parsed_qs = urllib.parse.parse_qs(query_string)
     exp = parsed_qs.get('exp', [''])[0]
     sig = parsed_qs.get('sig', [''])[0]
-    return _validate_image_token(work_id, exp, sig)
+    return _validate_image_token(token_work_id, exp, sig)
 
 
 def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:

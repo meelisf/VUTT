@@ -118,3 +118,11 @@ def test_validate_image_token_missing_params():
     from server.image_server import _validate_image_token
     assert _validate_image_token("work123", "", "") is False
     assert _validate_image_token("work123", "not-a-number", "sig") is False
+
+
+def test_check_image_access_accepts_meta_id_when_work_id_missing():
+    from server.image_server import _check_image_access
+    exp = int(time.time()) + 3600
+    sig = _make_sig("syktl7", exp)
+    meta = {"id": "syktl7", "collections": ["col-restricted"], "shareable": True}
+    assert _check_image_access("", meta, f"exp={exp}&sig={sig}") is True
