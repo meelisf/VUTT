@@ -52,6 +52,7 @@ interface HistoryTabProps {
   readOnly: boolean;
   handleReOcr?: () => void;
   reocrStatus?: string;
+  onShareableChange?: (shareable: boolean) => void;
 }
 
 const HistoryTab: React.FC<HistoryTabProps> = ({
@@ -62,7 +63,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   onRestore,
   readOnly,
   handleReOcr,
-  reocrStatus
+  reocrStatus,
+  onShareableChange
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const navigate = useNavigate();
@@ -370,12 +372,18 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     setShareable(newValue);
     setShareableSaving(true);
     try {
-      await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/shareable`, {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/shareable`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
         body: JSON.stringify({ shareable: newValue }),
         timeout: 10000,
       });
+      const data = await response.json();
+      if (!response.ok || data.status !== 'success') {
+        throw new Error(data.message || 'Jagamise oleku salvestamine ebaõnnestus');
+      }
+      setShareable(data.shareable);
+      onShareableChange?.(data.shareable);
     } catch {
       // Taasta eelmine olek vea korral
       setShareable(!newValue);

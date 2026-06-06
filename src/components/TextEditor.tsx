@@ -37,11 +37,12 @@ interface TextEditorProps {
   currentStatus?: PageStatus | null;
   onStatusChange?: (status: PageStatus) => void;
   triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
+  onWorkUpdate?: (updatedWork: Partial<Work>) => void;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
@@ -967,6 +968,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             authToken={authToken}
             handleReOcr={handleReOcr}
             reocrStatus={reocrStatus}
+            onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
             onRestore={(content, restoredTextAnnotations) => {
               const view = viewRef.current;
               if (view) {
