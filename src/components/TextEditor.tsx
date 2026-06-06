@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
+import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { LinkedEntity } from '../types/LinkedEntity';
@@ -38,11 +39,12 @@ interface TextEditorProps {
   onStatusChange?: (status: PageStatus) => void;
   triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
   onWorkUpdate?: (updatedWork: Partial<Work>) => void;
+  collections?: Collections;
 }
 
 type TabType = 'edit' | 'annotate' | 'history';
 
-const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate }) => {
+const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
@@ -969,6 +971,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             handleReOcr={handleReOcr}
             reocrStatus={reocrStatus}
             onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
+            collections={collections}
             onRestore={(content, restoredTextAnnotations) => {
               const view = viewRef.current;
               if (view) {

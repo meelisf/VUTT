@@ -19,6 +19,7 @@ import {
   Link
 } from 'lucide-react';
 import { Page, Work } from '../../types';
+import type { Collections } from '../../services/collectionService';
 import type { TextAnnotation } from '../../types';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
@@ -53,6 +54,7 @@ interface HistoryTabProps {
   handleReOcr?: () => void;
   reocrStatus?: string;
   onShareableChange?: (shareable: boolean) => void;
+  collections?: Collections;
 }
 
 const HistoryTab: React.FC<HistoryTabProps> = ({
@@ -64,7 +66,8 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   readOnly,
   handleReOcr,
   reocrStatus,
-  onShareableChange
+  onShareableChange,
+  collections
 }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const navigate = useNavigate();
@@ -354,6 +357,9 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
   const [shareable, setShareable] = useState<boolean>(work?.shareable ?? false);
   const [shareableSaving, setShareableSaving] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const hasRestrictedCollection = (work?.collections || []).some(
+    collectionId => collections?.[collectionId]?.visibility === 'restricted'
+  );
 
   React.useEffect(() => {
     setShareable(work?.shareable ?? false);
@@ -567,7 +573,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       )}
 
       {/* Jagamine — editor ja admin */}
-      {(user?.role === 'editor' || user?.role === 'admin') && work && (
+      {(user?.role === 'editor' || user?.role === 'admin') && work && hasRestrictedCollection && (
         <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
             <Link size={15} className="text-gray-400" />

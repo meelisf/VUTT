@@ -546,6 +546,7 @@ const Workspace: React.FC = () => {
             onStatusChange={user ? setCurrentStatus : undefined}
             triggerSave={editorSaveRef}
             onWorkUpdate={(updatedWork) => setWork(prev => prev ? { ...prev, ...updatedWork } : prev)}
+            collections={collections}
           />
           </div>
         </div>
