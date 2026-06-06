@@ -8,6 +8,9 @@ import { getEntityUrl } from '../utils/entityUrl';
 import { useCollection } from '../contexts/CollectionContext';
 import { getCollectionColorClasses } from '../services/collectionService';
 import { getLangCode } from '../utils/getLangCode';
+import { useUser } from '../contexts/UserContext';
+import { FILE_API_URL } from '../config';
+import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 
 interface WorkCardProps {
   work: Work;
@@ -22,6 +25,14 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   const { t, i18n } = useTranslation(['dashboard', 'common', 'workspace']);
   const navigate = useNavigate();
   const { collections, getCollectionName } = useCollection();
+  const { authToken } = useUser();
+  const [thumbnailSrc, setThumbnailSrc] = useState(work.thumbnail_url);
+  const thumbnailTokenTriedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    setThumbnailSrc(work.thumbnail_url);
+    thumbnailTokenTriedRef.current = false;
+  }, [work.thumbnail_url]);
 
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
@@ -38,6 +49,23 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   // Info-overlay nähtavus (desktop: hover + 150ms delay, mobiil: touch-hold)
   const [infoVisible, setInfoVisible] = useState(false);
   const infoDelayRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleThumbnailError = async () => {
+    if (thumbnailTokenTriedRef.current || !work.work_id) return;
+    thumbnailTokenTriedRef.current = true;
+    try {
+      const response = await fetchWithTimeout(`${FILE_API_URL}/work/${work.work_id}/viewer-token`, {
+        headers: getAuthHeaders(authToken),
+        timeout: 10000,
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.image_exp && data.image_sig) {
+        const sep = work.thumbnail_url.includes('?') ? '&' : '?';
+        setThumbnailSrc(`${work.thumbnail_url}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
+      }
+    } catch { /* thumbnail jääb placeholder-taustale */ }
+  };
 
   // Navigeeri töölaudale
   const handleOpenWorkspace = (e: React.MouseEvent) => {
@@ -156,10 +184,11 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           </div>
         )}
         <img
-          src={work.thumbnail_url}
+          src={thumbnailSrc}
           alt={work.title}
           loading={isPriority ? 'eager' : 'lazy'}
           fetchPriority={isPriority ? 'high' : 'auto'}
+          onError={handleThumbnailError}
           onClick={!selectMode ? handleOpenWorkspace : undefined}
           className={`w-full h-full object-cover opacity-90 group-hover/card:opacity-100 transition-opacity ${!selectMode ? 'cursor-pointer' : ''}`}
         />
