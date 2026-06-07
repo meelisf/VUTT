@@ -44,6 +44,32 @@ Uuendada `lehekylje_pilt` Meilisearchi indekseerimise käigus NanoID + failinime
 
 ---
 
+## Tehniline võlg — koodibaasi dubleerimine ja fallbackid
+
+Analüüsitud 2026-06-07, vt `docs/codebase_duplication_fallback_review_2026-06-07.md`.
+
+### ✅ P1: Backend LinkedEntity utiliidid konsolideeritud (2026-06-08)
+
+`scripts/1-1_consolidate_data.py` impordib nüüd LinkedEntity funktsioonid `server/utils.py`-st (fake-package mustriga, väldib `__init__.py` kõrvalefekte). Eemaldati ~130 rida duplikaatkoodi. `labels.json` kanooniline register laaditakse indekseerimise käigus ja edastatakse `get_labels_by_lang` väljakutsetele — indeks ja runtime näitavad nüüd samu kanoonilisi silte. 13/13 testi rohelised.
+
+### P1: Frontend label fallback ühtlustamine
+
+`labelUtils.ts`, `metadataUtils.ts` ja `server/cache.py` kasutavad eri fallback-ahelaid. Kanooniline peaks olema `UI keel → et → en → la → de → raw Q-kood`. Vt review dok lõik "Keele fallbackid".
+
+### P2: Frontendi normaliseerijad tugevdada
+
+`normalizePage` / `normalizeWork` (`meiliService.ts`) ei kata kõiki erijuhte mis `pageService.ts` ja `workService.ts` teevad (`page_tags_object`, `languages` fallback). Enne asendamist täiendada jagatud normaliseerijaid. Vt review dok lõik 2.
+
+### P2: Bulk-operatsioonide atomic write
+
+`main.py` `bulk_collection`, `bulk_tags`, `bulk_genre` — TOCTOU risk: luku vabastamine arvutuse ajal. Lisa helper mis hoiab lukku terve read-compute-write tsükli vältel. Vt review dok lõik 4.
+
+### P3: Legacy fallbackid sulgeda migratsioonidega
+
+Kohtade labeli järgi lineaarne runtime-otsing (`places_ops.py`), `status`/`confession` legacy fallbackid (`prosopography/ops.py`). Siduda migratsiooniskriptidega või lisada diagnostiline hoiatus.
+
+---
+
 ## TODO CLAUDE.md-st (üle toodud siia)
 
 | Ülesanne | Prioriteet |
@@ -51,3 +77,6 @@ Uuendada `lehekylje_pilt` Meilisearchi indekseerimise käigus NanoID + failinime
 | Automaatne backup-süsteem | Kõrge (ootab IT-d) |
 | JSON cleanup (`page_number` eemaldamine) | Madal |
 | `crossLangTypeMap` eemaldamine AdvancedFilters-ist | Madal (kui kõigil teostel on `type_ids` indekseeritud) |
+
+=== MINU LISANDUSED ===
+Arhiiviviidetel puudub inglise keel praegu.
