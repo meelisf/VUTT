@@ -16,8 +16,10 @@ Kasutamine:
 """
 
 import os
+import sys
 import json
 import re
+import types
 import unicodedata
 from tqdm import tqdm
 
@@ -29,6 +31,21 @@ COLLECTIONS_FILE = os.path.join(CONFIG_DIR, 'collections.json')
 PEOPLE_FILE = os.path.join(CONFIG_DIR, 'person_aliases.json')
 ARCHIVES_FILE = os.path.join(CONFIG_DIR, 'archives.json')
 # --- LÕPP ---
+
+# Impordime LinkedEntity utiliidid server/utils.py-st.
+# Kasutame fake-package mustrit, et vältida server/__init__.py kõrvalefekte
+# (FastAPI, gitpython, kasutajate cache jms).
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if 'server' not in sys.modules:
+    _server_pkg = types.ModuleType('server')
+    _server_pkg.__path__ = [os.path.join(_project_root, 'server')]
+    _server_pkg.__package__ = 'server'
+    sys.modules.setdefault('server', _server_pkg)
+sys.path.insert(0, _project_root)
+from server.utils import (
+    capitalize_first, get_label, get_id, get_all_labels,
+    get_primary_labels, get_labels_by_lang, get_all_ids
+)
 
 
 def sanitize_id(text):
@@ -198,136 +215,6 @@ def get_collection_hierarchy(collections, collection_ids):
 
     return result
 
-
-
-def capitalize_first(text):
-    """Teeb esimese tähe suureks, ülejäänud jätab samaks."""
-    if not text:
-        return ""
-    return text[0].upper() + text[1:]
-
-
-def get_label(value, lang='et'):
-    """Tagastab sildi LinkedEntity objektist, stringist või massiivist (esimene element) eelistatud keeles."""
-    if not value:
-        return ""
-    if isinstance(value, list):
-        return get_label(value[0], lang) if value else ""
-    if isinstance(value, str):
-        return capitalize_first(value)
-    if isinstance(value, dict):
-        # Proovi leida silti konkreetses keeles
-        labels = value.get('labels')
-        if labels and isinstance(labels, dict):
-            if labels.get(lang):
-                return capitalize_first(labels[lang])
-            # Fallback eesti keelele
-            if labels.get('et'):
-                return capitalize_first(labels['et'])
-        
-        # Fallback peamisele sildile
-        return capitalize_first(value.get('label', ''))
-    return capitalize_first(str(value))
-
-
-def get_id(value):
-    """Tagastab ID LinkedEntity objektist."""
-    if isinstance(value, dict):
-        return value.get('id')
-    return None
-
-
-def get_all_labels(value):
-    """Kogub kõik sildid (sh mitmekeelsed) LinkedEntity objektist või massiivist."""
-    if not value:
-        return []
-    
-    values = value if isinstance(value, list) else [value]
-    labels = []
-    
-    for val in values:
-        if isinstance(val, str):
-            labels.append(capitalize_first(val))
-        elif isinstance(val, dict):
-            # Peamine silt
-            if val.get('label'):
-                labels.append(capitalize_first(val['label']))
-            # Mitmekeelsed sildid
-            if val.get('labels') and isinstance(val['labels'], dict):
-                for l in val['labels'].values():
-                    if l:
-                        labels.append(capitalize_first(l))
-    
-    return sorted(list(set(labels)))
-
-
-def get_primary_labels(value):
-    """Tagastab ainult peamised sildid LinkedEntity objektist või massiivist. Eelistab eesti keelt."""
-    if not value:
-        return []
-    
-    values = value if isinstance(value, list) else [value]
-    labels = []
-    
-    for val in values:
-        if isinstance(val, str):
-            labels.append(capitalize_first(val))
-        elif isinstance(val, dict):
-            # Eelisjärjekord: et > label > esimene väärtus labels dictist
-            label = None
-            if val.get('labels') and isinstance(val['labels'], dict):
-                label = val['labels'].get('et')
-            
-            if not label:
-                label = val.get('label')
-            
-            if label:
-                labels.append(capitalize_first(label))
-                
-    return labels
-
-
-def get_labels_by_lang(value, lang):
-    """Tagastab sildid konkreetses keeles (või fallback)."""
-    if not value:
-        return []
-    
-    values = value if isinstance(value, list) else [value]
-    labels = []
-    
-    for val in values:
-        if isinstance(val, str):
-            # Stringi puhul ei tea keelt, tagastame alati (eeldades et on primaarne)
-            labels.append(capitalize_first(val))
-        elif isinstance(val, dict):
-            label = None
-            # Otsi konkreetses keeles
-            if val.get('labels') and isinstance(val['labels'], dict):
-                label = val['labels'].get(lang)
-            
-            # Fallback: primaarne label
-            if not label:
-                label = val.get('label')
-            
-            if label:
-                labels.append(capitalize_first(label))
-                
-    return labels
-
-
-def get_all_ids(value):
-    """Kogub kõik ID-d LinkedEntity objektist või massiivist."""
-    if not value:
-        return []
-    
-    values = value if isinstance(value, list) else [value]
-    ids = []
-    
-    for val in values:
-        if isinstance(val, dict) and val.get('id'):
-            ids.append(val['id'])
-            
-    return sorted(list(set(ids)))
 
 
 def get_work_metadata(doc_path, dir_name, collections):
