@@ -182,3 +182,24 @@ class TestConfigDirPath:
             "Kontrolli CONFIG_DIR teed — peab olema DATA_ROOT_DIR/config, mitte DATA_ROOT_DIR/state."
         )
         assert "matusetrykised" in hierarchy
+
+
+# --- get_labels_by_lang koos labels_store toega ---
+
+class TestLabelsStore:
+    """Kontrollib, et skript kasutab labels_store kanoonilisi silte."""
+
+    def _load(self):
+        spec = importlib.util.spec_from_file_location("consolidate_data", _script_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_get_labels_by_lang_uses_labels_store(self):
+        mod = self._load()
+        entity = {'id': 'Q999', 'label': 'Vana Silt', 'labels': {'et': 'Vana Silt'}}
+        labels_store = {'Q999': {'et': 'Kanooniline Silt'}}
+        result = mod.get_labels_by_lang(entity, 'et', labels_store)
+        assert result == ['Kanooniline Silt'], (
+            f"labels_store-ist peaks tulema 'Kanooniline Silt', sain: {result}"
+        )
