@@ -33,6 +33,7 @@ const Maintenance: React.FC = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [deleteForceConfirm, setDeleteForceConfirm] = useState<{ id: string; message: string } | null>(null);
   const [deleteError, setDeleteError] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -306,21 +307,40 @@ const Maintenance: React.FC = () => {
                             )}
                           </td>
                           <td className="px-3 py-2">
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditError(''); }}
-                                className="text-xs text-gray-400 hover:text-gray-700"
-                                title={t('common:buttons.edit')}
-                              >
-                                ✎
-                              </button>
-                              <button
-                                onClick={() => handleDeleteArchive(id)}
-                                className="text-xs text-gray-300 hover:text-red-500"
-                                title={t('common:buttons.delete')}
-                              >
-                                ×
-                              </button>
+                            <div className="flex gap-2 justify-end items-center">
+                              {pendingDeleteId === id ? (
+                                <>
+                                  <button
+                                    onClick={() => { setPendingDeleteId(null); handleDeleteArchive(id); }}
+                                    className="text-xs text-red-600 hover:text-red-800 font-medium"
+                                  >
+                                    {t('common:buttons.delete')}
+                                  </button>
+                                  <button
+                                    onClick={() => setPendingDeleteId(null)}
+                                    className="text-xs text-gray-400 hover:text-gray-700"
+                                  >
+                                    {t('common:buttons.cancel')}
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditError(''); }}
+                                    className="text-xs text-gray-400 hover:text-gray-700"
+                                    title={t('common:buttons.edit')}
+                                  >
+                                    ✎
+                                  </button>
+                                  <button
+                                    onClick={() => setPendingDeleteId(id)}
+                                    className="text-xs text-gray-300 hover:text-red-400"
+                                    title={t('common:buttons.delete')}
+                                  >
+                                    ×
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </>
