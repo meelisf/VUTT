@@ -6,14 +6,47 @@ import { Vocabularies, getCollectionColorClasses } from '../../services/collecti
 import { searchWorkHits } from '../../services/searchService';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
+import { useUser } from '../../contexts/UserContext';
 import { getLabel } from '../../utils/metadataUtils';
 import { getLangCode } from '../../utils/getLangCode';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
+import { FILE_API_URL } from '../../config';
+import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
     Bookmark, FolderOpen, SquarePen
 } from 'lucide-react';
+
+const PageThumbnail: React.FC<{ workId: string; src: string; className: string }> = ({ workId, src, className }) => {
+    const { authToken } = useUser();
+    const [imgSrc, setImgSrc] = useState(src);
+    const triedRef = useRef(false);
+
+    useEffect(() => {
+        setImgSrc(src);
+        triedRef.current = false;
+    }, [src]);
+
+    const handleError = async () => {
+        if (triedRef.current || !workId) return;
+        triedRef.current = true;
+        try {
+            const response = await fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
+                headers: getAuthHeaders(authToken),
+                timeout: 10000,
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            if (data.image_exp && data.image_sig) {
+                const sep = src.includes('?') ? '&' : '?';
+                setImgSrc(`${src}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
+            }
+        } catch { /* thumbnail jääb tühjaks */ }
+    };
+
+    return <img src={imgSrc} alt="" loading="lazy" className={className} onError={handleError} />;
+};
 
 interface WorkInfo {
     title: string;
@@ -208,12 +241,10 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                             className="shrink-0 w-20 h-28 bg-gray-100 rounded overflow-hidden hidden sm:block hover:ring-2 hover:ring-primary-300 transition-all cursor-pointer self-start"
                             title={t('results.openWorkspaceTitle')}
                         >
-                            <img
+                            <PageThumbnail
+                                workId={hit.work_id}
                                 src={getPageThumbUrl(hit.work_id, hit.lehekylje_pilt)}
-                                alt=""
-                                loading="lazy"
                                 className="w-full h-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none'; }}
                             />
                         </button>
                     )}
