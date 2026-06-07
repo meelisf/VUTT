@@ -30,6 +30,7 @@ CONFIG_DIR = os.path.join(DATA_ROOT_DIR, 'config')
 COLLECTIONS_FILE = os.path.join(CONFIG_DIR, 'collections.json')
 PEOPLE_FILE = os.path.join(CONFIG_DIR, 'person_aliases.json')
 ARCHIVES_FILE = os.path.join(CONFIG_DIR, 'archives.json')
+LABELS_FILE = os.path.join(CONFIG_DIR, 'labels.json')
 # --- LÕPP ---
 
 # Impordime LinkedEntity utiliidid server/utils.py-st.
@@ -342,7 +343,12 @@ def create_meilisearch_data_per_page():
     collections = load_collections()
     people_data = load_people_aliases()
     archives = load_archives()
-    print(f"Laetud {len(collections)} kollektsiooni, {len(people_data)} isiku andmed, {len(archives)} arhiivi")
+    labels_store = {}
+    if os.path.exists(LABELS_FILE):
+        with open(LABELS_FILE, 'r', encoding='utf-8') as _lf:
+            labels_store = json.load(_lf)
+    print(f"Laetud {len(collections)} kollektsiooni, {len(people_data)} isiku andmed, "
+          f"{len(archives)} arhiivi, {len(labels_store)} kanoonilise sildi kirjet")
 
     # Kogu andmed teose kaupa
     works_data = {}
