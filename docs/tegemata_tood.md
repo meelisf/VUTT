@@ -70,6 +70,20 @@ Kohtade labeli järgi lineaarne runtime-otsing (`places_ops.py`), `status`/`conf
 
 ---
 
+## `PageThumbnail` — jagatud komponent (praegu duplitseeritud)
+
+**Failid:** `src/pages/search/SearchResults.tsx`, `src/pages/WorkManage.tsx`
+
+**Probleem:**  
+Viewer-token retry loogika (piiratud kollektsioonide pisipiltide laadimiseks) on duplikeeritud kahes kohas lokaalsete komponentidena (`PageThumbnail` SearchResults-is, `PageThumb` WorkManage-s). Mõlemad teevad sama asja: 403-viga → küsi viewer-token → lisa `exp`+`sig` parameetrid URLi.
+
+`ThumbnailGrid.tsx` (töölaua pisipildivaade) samuti ei kasuta viewer-tokenit.
+
+**Soovituslik parandus:**  
+Luua `src/components/PageThumbnail.tsx` jagatud komponent ja asendada kõik kolm kasutuskohta sellega.
+
+---
+
 ## TODO CLAUDE.md-st (üle toodud siia)
 
 | Ülesanne | Prioriteet |
