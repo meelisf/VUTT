@@ -466,14 +466,14 @@ def create_meilisearch_data_per_page():
 
                 # Taksonoomia
                 'type': get_label(doc_metadata.get('type', 'impressum')), # Vaikimisi (et)
-                'type_et': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'et'),
-                'type_en': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'en'),
+                'type_et': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'et', labels_store),
+                'type_en': get_labels_by_lang(doc_metadata.get('type', 'impressum'), 'en', labels_store),
                 'type_object': doc_metadata.get('type'),
                 'type_ids': get_all_ids(doc_metadata.get('type')),
                 
                 'genre': get_label(doc_metadata.get('genre')), # Vaikimisi (et)
-                'genre_et': get_labels_by_lang(doc_metadata.get('genre'), 'et'),
-                'genre_en': get_labels_by_lang(doc_metadata.get('genre'), 'en'),
+                'genre_et': get_labels_by_lang(doc_metadata.get('genre'), 'et', labels_store),
+                'genre_en': get_labels_by_lang(doc_metadata.get('genre'), 'en', labels_store),
                 'genre_object': doc_metadata.get('genre'),
                 'genre_search': get_all_labels(doc_metadata.get('genre')),
                 'genre_ids': get_all_ids(doc_metadata.get('genre')),
@@ -495,8 +495,8 @@ def create_meilisearch_data_per_page():
 
                 # Täiendav klassifikatsioon (märksõnad)
                 'tags': get_primary_labels(doc_metadata.get('tags', [])), # Vaikimisi (et)
-                'tags_et': get_labels_by_lang(doc_metadata.get('tags', []), 'et'),
-                'tags_en': get_labels_by_lang(doc_metadata.get('tags', []), 'en'),
+                'tags_et': get_labels_by_lang(doc_metadata.get('tags', []), 'et', labels_store),
+                'tags_en': get_labels_by_lang(doc_metadata.get('tags', []), 'en', labels_store),
                 'tags_object': doc_metadata.get('tags', []),
                 'tags_search': get_all_labels(doc_metadata.get('tags')) + get_entity_aliases(doc_metadata.get('tags', []), people_data),
                 'tags_ids': get_all_ids(doc_metadata.get('tags')),
@@ -512,8 +512,8 @@ def create_meilisearch_data_per_page():
 
                 # Annotatsioonid ja staatus
                 'page_tags': [l.lower() for l in get_primary_labels(page_meta.get('tags', []))],
-                'page_tags_et': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'et')],
-                'page_tags_en': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'en')],
+                'page_tags_et': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'et', labels_store)],
+                'page_tags_en': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'en', labels_store)],
                 'page_tags_ids': get_all_ids(page_meta.get('tags', [])),
                 'page_tags_suggest_et': [
                     f"{get_label(t, 'et')}|||{t.get('id') if isinstance(t, dict) else ''}" 
