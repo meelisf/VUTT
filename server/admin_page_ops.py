@@ -140,4 +140,13 @@ def rebalance_sequences(dir_path: str):
         else:
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump({'sequence': new_seq, 'status': 'Toores'}, f, indent=2)
-            os.chmod(json_path, 0o644)
+
+
+def split_text_at_pb(text: str) -> tuple:
+    """Lõikab teksti esimese <pb/> tägi juures.
+    Kui <pb/> puudub, tagastab mõlemale sama teksti.
+    """
+    if '<pb/>' in text:
+        idx = text.index('<pb/>')
+        return text[:idx].strip(), text[idx + 5:].strip()
+    return text, text
