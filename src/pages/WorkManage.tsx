@@ -16,8 +16,10 @@ import {
   Download,
   Upload,
   RefreshCw,
+  Scissors,
 } from 'lucide-react';
 import Header from '../components/Header';
+import SplitPageModal from '../components/SplitPageModal';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -140,6 +142,7 @@ const WorkManage: React.FC = () => {
 
   // Pildi HMAC token piiratud teoste allalaadimiseks
   const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
+  const [splitPageTarget, setSplitPageTarget] = useState<{ pageNum: number; filename: string } | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -654,6 +657,16 @@ const WorkManage: React.FC = () => {
                               <Upload size={12} />
                             )}
                           </button>
+                          <button
+                            onClick={() => setSplitPageTarget({
+                              pageNum: page.page_num,
+                              filename: page.lehekylje_pilt.split('/').pop() ?? '',
+                            })}
+                            className="p-1 bg-white/80 hover:bg-amber-50 text-gray-400 hover:text-amber-600 rounded shadow-sm transition-colors"
+                            title="Lõika leht kaheks"
+                          >
+                            <Scissors size={12} />
+                          </button>
                         </div>
                       </div>
 
@@ -982,6 +995,21 @@ const WorkManage: React.FC = () => {
         )}
 
       </div>
+
+      {/* Lehe lõikamise modaal */}
+      {splitPageTarget && (
+        <SplitPageModal
+          workId={workId!}
+          pageNum={splitPageTarget.pageNum}
+          imageFilename={splitPageTarget.filename}
+          imageToken={imageToken}
+          onClose={() => setSplitPageTarget(null)}
+          onSuccess={async () => {
+            setSplitPageTarget(null);
+            await loadPages();
+          }}
+        />
+      )}
     </div>
   );
 };
