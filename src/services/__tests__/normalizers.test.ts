@@ -120,3 +120,38 @@ describe('normalizePage', () => {
     });
   });
 });
+
+describe('getPage wires normalizePage', () => {
+  it('returns page_number as integer from string hit', async () => {
+    const { getPage } = await import('../pageService');
+    const mockIndex = {
+      search: vi.fn().mockResolvedValue({
+        hits: [{ ...basePageHit, lehekylje_number: '5', work_id: 'abc123' }],
+      }),
+    } as any;
+    const page = await getPage(mockIndex, 'abc123', 5);
+    expect(page?.page_number).toBe(5);
+  });
+
+  it('returns empty languages array when hit has none (no lat hardcode)', async () => {
+    const { getPage } = await import('../pageService');
+    const { languages, ...hitWithoutLang } = basePageHit as any;
+    const mockIndex = {
+      search: vi.fn().mockResolvedValue({ hits: [hitWithoutLang] }),
+    } as any;
+    const page = await getPage(mockIndex, 'abc123', 3);
+    expect(page?.languages).toEqual([]);
+  });
+
+  it('prefers page_tags_object over string page_tags', async () => {
+    const { getPage } = await import('../pageService');
+    const tags = [{ id: 'Q1', label: 'Test' }];
+    const mockIndex = {
+      search: vi.fn().mockResolvedValue({
+        hits: [{ ...basePageHit, page_tags_object: tags, page_tags: ['foo'] }],
+      }),
+    } as any;
+    const page = await getPage(mockIndex, 'abc123', 3);
+    expect(page?.page_tags).toEqual(tags);
+  });
+});

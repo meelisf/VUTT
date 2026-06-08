@@ -2,11 +2,10 @@
  * Lehekülje operatsioonid: lugemine, salvestamine, ootel muudatused
  */
 
-import { Annotation, Page, PageStatus } from '../types';
+import { Annotation, Page } from '../types';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
-import { checkMixedContent } from './meiliService';
-import { getFullImageUrl } from './workImageService';
+import { checkMixedContent, normalizePage } from './meiliService';
 import type { Index } from 'meilisearch';
 
 // Abifunktsioon failisüsteemi salvestamiseks
@@ -97,46 +96,7 @@ export const getPage = async (index: Index, workId: string, pageNum: number): Pr
 
     if (response.hits.length === 0) return null;
     const hit: any = response.hits[0];
-
-    return {
-      // Identifikaatorid
-      id: hit.id,
-      work_id: hit.work_id,
-
-      // Lehekülje andmed
-      page_number: parseInt(hit.lehekylje_number),
-      text_content: hit.text_content || hit.lehekylje_tekst || '',
-      image_url: getFullImageUrl(hit.lehekylje_pilt),
-      status: hit.status || PageStatus.RAW,
-      comments: hit.comments || [],
-      // Eelistame page_tags_object (objektid), fallback page_tags (stringid)
-      page_tags: hit.page_tags_object || Array.from(new Set((hit.page_tags || []).map((t: any) =>
-        typeof t === 'string' ? t.toLowerCase() : t
-      ))),
-      history: hit.history || [],
-      text_annotations: hit.text_annotations || [],
-
-      // Teose andmed
-      title: hit.title,
-      year: hit.year ?? hit.aasta,
-      location: hit.location_object ?? null,
-      publisher: hit.publisher_object ?? null,
-      type: hit.type_object ?? null,
-      genre: hit.genre_object ?? null,
-      collections: hit.collections || [],
-      collections_hierarchy: hit.collections_hierarchy || [],
-      creators: hit.creators || [],
-      authors_text: hit.authors_text || [],
-      tags: hit.tags_object ?? [],
-      languages: hit.languages || ['lat'],
-
-      // Tagasiühilduvus (filtrite väljad)
-      original_path: hit.originaal_kataloog,
-      originaal_kataloog: hit.originaal_kataloog,
-      autor: hit.autor,
-      respondens: hit.respondens,
-      aasta: hit.aasta ?? hit.year,
-    };
+    return normalizePage(hit);
   } catch (error) {
     console.error("Get Page Error:", error);
     throw error;
