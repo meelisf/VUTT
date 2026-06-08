@@ -10,7 +10,7 @@ from datetime import datetime
 
 from .config import BASE_DIR, COLLECTIONS_FILE, VOCABULARIES_FILE, ARCHIVES_FILE, MEILI_URL, MEILI_KEY, INDEX_NAME
 from .people_ops import load_people_data
-from .utils import get_label, get_id, get_primary_labels, get_labels_by_lang
+from .utils import get_label, get_id, get_primary_labels, get_labels_by_lang, pick_best_label
 from .meilisearch_ops import load_labels_store
 
 # =========================================================
@@ -169,12 +169,9 @@ def _build_suggestions(preferred_lang):
             if id_code: seen_ids[(store_name, id_code)] = True
             # Kontrolli labels_store esmalt (kanooniline allikas)
             if id_code and id_code in labels_store:
-                fallback_lang = 'en' if preferred_lang == 'et' else 'et'
-                label_text = labels_store[id_code].get(preferred_lang) or labels_store[id_code].get(fallback_lang, '')
+                label_text = pick_best_label(labels_store[id_code], preferred_lang)
             else:
-                labels_dict = val.get('labels', {})
-                fallback_lang = 'en' if preferred_lang == 'et' else 'et'
-                label_text = labels_dict.get(preferred_lang) or labels_dict.get(fallback_lang) or val.get('label', '').strip()
+                label_text = pick_best_label(val.get('labels', {}), preferred_lang) or val.get('label', '').strip()
             if label_text and isinstance(label_text, str):
                 label_text = label_text.strip()
                 key = label_text.lower()

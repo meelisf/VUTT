@@ -1,4 +1,5 @@
 import { LinkedEntity } from '../types/LinkedEntity';
+import { pickLabelByLang } from './labelUtils';
 
 /**
  * Capitalizes the first letter of a string, keeping the rest as is.
@@ -21,9 +22,6 @@ export function getLabel(
   
   let label = '';
   
-  // Puhasta keelekood (nt 'et-EE' -> 'et')
-  const baseLang = lang.split('-')[0];
-
   // Kui on massiiv, töötle esimest elementi
   if (Array.isArray(value)) {
     if (value.length === 0) return '';
@@ -32,7 +30,7 @@ export function getLabel(
     label = value;
   } else if (value.labels && value.source !== 'local') {
     // Wikidata kirjetel kasuta mitmekeelseid tõlkeid; lokaalsetel (VUTT isikud) mitte
-    label = value.labels[lang] || value.labels[baseLang] || value.label || '';
+    label = pickLabelByLang(value.labels, lang) || value.label || '';
   } else {
     // LinkedEntity ilma eelistatud keeleta (fallback label)
     label = value.label || '';

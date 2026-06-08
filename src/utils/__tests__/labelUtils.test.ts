@@ -1,5 +1,37 @@
 import { describe, it, expect } from 'vitest';
-import { resolveEntityLabel } from '../labelUtils';
+import { resolveEntityLabel, pickLabelByLang } from '../labelUtils';
+
+describe('pickLabelByLang', () => {
+    it('tagastab täpse keele kui olemas', () => {
+        expect(pickLabelByLang({ et: 'füüsika', en: 'physics' }, 'et')).toBe('Füüsika');
+        expect(pickLabelByLang({ et: 'füüsika', en: 'physics' }, 'en')).toBe('Physics');
+    });
+
+    it('langeb et-le kui UI keel puudub', () => {
+        expect(pickLabelByLang({ et: 'juhuluule' }, 'de')).toBe('Juhuluule');
+    });
+
+    it('langeb en-le kui et puudub', () => {
+        expect(pickLabelByLang({ en: 'funeral sermon', la: 'oratio funebris' }, 'et')).toBe('Funeral sermon');
+    });
+
+    it('langeb la-le kui et ja en puuduvad', () => {
+        expect(pickLabelByLang({ la: 'philosophia', de: 'Philosophie' }, 'et')).toBe('Philosophia');
+    });
+
+    it('langeb de-le kui et, en ja la puuduvad', () => {
+        expect(pickLabelByLang({ de: 'Philosophie' }, 'et')).toBe('Philosophie');
+    });
+
+    it('tagastab tühja stringi kui kõik puuduvad', () => {
+        expect(pickLabelByLang({}, 'et')).toBe('');
+        expect(pickLabelByLang({ fr: 'bonjour' }, 'et')).toBe('');
+    });
+
+    it('käsitleb keelekoodi regiooniga (et-EE → et)', () => {
+        expect(pickLabelByLang({ et: 'tartu', en: 'tartu' }, 'et-EE')).toBe('Tartu');
+    });
+});
 
 describe('resolveEntityLabel', () => {
     const enrichedLabels: Record<string, Record<string, string>> = {

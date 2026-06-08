@@ -8,6 +8,18 @@
 
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+const LANG_CHAIN = ['et', 'en', 'la', 'de'] as const;
+
+/** Kanooniline keele-fallback ahel: lang → et → en → la → de → ''. */
+export function pickLabelByLang(labels: Record<string, string>, lang: string): string {
+    const baseLang = lang.split('-')[0];
+    if (labels[baseLang]) return cap(labels[baseLang]);
+    for (const l of LANG_CHAIN) {
+        if (l !== baseLang && labels[l]) return cap(labels[l]);
+    }
+    return '';
+}
+
 export function resolveEntityLabel(
     qCode: string,
     enrichedLabels: Record<string, Record<string, string>>,
@@ -16,7 +28,7 @@ export function resolveEntityLabel(
 ): string {
     const e = enrichedLabels[qCode];
     if (e) {
-        return cap(e[lang] || e.et || e.en || e.la || e.de || qCode);
+        return pickLabelByLang(e, lang) || qCode;
     }
     return fallbackMap?.[qCode] || qCode;
 }

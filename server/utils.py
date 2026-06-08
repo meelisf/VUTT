@@ -96,6 +96,21 @@ def capitalize_first(text):
     return text[0].upper() + text[1:]
 
 
+_LANG_CHAIN = ['et', 'en', 'la', 'de']
+
+def pick_best_label(labels_dict, lang):
+    """Kanooniline keele-fallback: lang → et → en → la → de → ''."""
+    if not labels_dict or not isinstance(labels_dict, dict):
+        return ''
+    base_lang = lang.split('-')[0]
+    if labels_dict.get(base_lang):
+        return labels_dict[base_lang]
+    for l in _LANG_CHAIN:
+        if l != base_lang and labels_dict.get(l):
+            return labels_dict[l]
+    return ''
+
+
 def build_work_id_cache():
     """Ehitab mälu-cache'i work_id -> directory_path vastavustest.
     
@@ -192,16 +207,11 @@ def get_label(value, lang='et'):
     if isinstance(value, str):
         return capitalize_first(value)
     if isinstance(value, dict):
-        # Proovi leida silti konkreetses keeles
         labels = value.get('labels')
         if labels and isinstance(labels, dict):
-            if labels.get(lang):
-                return capitalize_first(labels[lang])
-            # Fallback eesti keelele
-            if labels.get('et'):
-                return capitalize_first(labels['et'])
-        
-        # Fallback peamisele sildile
+            label = pick_best_label(labels, lang)
+            if label:
+                return capitalize_first(label)
         return capitalize_first(value.get('label', ''))
     return capitalize_first(str(value))
 
@@ -286,13 +296,10 @@ def get_labels_by_lang(value, lang, labels_store=None):
             qcode = val.get('id', '')
             # Kontrolli labels_store esmalt (kanooniline allikas — ületab _metadata.json labeli)
             if labels_store and qcode and qcode in labels_store:
-                label = labels_store[qcode].get(lang) or labels_store[qcode].get('et')
+                label = pick_best_label(labels_store[qcode], lang)
             else:
-                # Fallback: _metadata.json labels objekt
                 if val.get('labels') and isinstance(val['labels'], dict):
-                    label = val['labels'].get(lang)
-
-                # Fallback: primaarne label
+                    label = pick_best_label(val['labels'], lang)
                 if not label:
                     label = val.get('label')
 
