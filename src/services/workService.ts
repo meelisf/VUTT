@@ -3,8 +3,8 @@
  */
 
 import { Work, WorkStatus, PageStatus } from '../types';
-import { calculateWorkStatus, checkMixedContent } from './meiliService';
-import { getThumbUrl, getPageThumbUrl } from './workImageService';
+import { calculateWorkStatus, checkMixedContent, normalizeWork } from './meiliService';
+import { getPageThumbUrl } from './workImageService';
 import type { Index } from 'meilisearch';
 
 // Pärib mitme teose staatused korraga (efektiivsem kui ühekaupa)
@@ -65,50 +65,14 @@ export const getWorkMetadata = async (index: Index, workId: string): Promise<Wor
     if (response.hits.length === 0) return undefined;
     const hit: any = response.hits[0];
 
+    const base = normalizeWork(hit);
     return {
-      // Identifikaatorid
-      id: hit.id,
-      work_id: hit.work_id,
-
-      // Teose andmed
-      title: hit.title || '',
-      year: hit.year ?? hit.aasta ?? 0,
-      year_display: hit.year_display || null,
-      location: hit.location_object ?? null,
-      publisher: hit.publisher_object ?? null,
-
-      // V2 taksonoomia
-      type: hit.type_object ?? null,
-      genre: hit.genre_object ?? null,
-      collections: hit.collections || [],
-      collections_hierarchy: hit.collections_hierarchy || [],
-
-      // V2 isikud
-      creators: hit.creators || [],
-      authors_text: hit.authors_text || [],
-
-      // V2 märksõnad
-      tags: hit.tags_object ?? [],
-      languages: hit.languages || ['lat'],
-
-      // Seosed
-      series: hit.series,
-      series_title: hit.series_title,
-
-      // Välised lingid ja arhiiviviited
-      ester_id: hit.ester_id,
-      external_url: hit.external_url,
-      archive_refs: hit.archive_refs || null,
-
-      // Lehekülje info
-      page_count: hit.teose_lehekylgede_arv || 0,
-      thumbnail_url: getThumbUrl(hit.work_id),  // Kasuta thumbnaili URL-i (40x väiksem)
-
-      // Tagasiühilduvus (filtrite väljad)
+      ...base,
+      // Legacy deprecated fields — workspace tagasiühilduvus
       catalog_name: hit.originaal_kataloog,
       author: hit.autor || (hit.creators?.[0]?.name) || '',
       respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
-      aasta: hit.aasta ?? hit.year
+      aasta: hit.aasta ?? hit.year,
     } as Work;
   } catch (e) {
     console.error("Work Metadata Error:", e);

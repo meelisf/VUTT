@@ -18,7 +18,7 @@ vi.mock('../meiliService', async (importOriginal) => {
   return { ...actual, checkMixedContent: vi.fn() };
 });
 
-import { normalizePage } from '../meiliService';
+import { normalizePage, normalizeWork } from '../meiliService';
 
 const basePageHit = {
   id: 'abc123-1',
@@ -153,5 +153,78 @@ describe('getPage wires normalizePage', () => {
     } as any;
     const page = await getPage(mockIndex, 'abc123', 3);
     expect(page?.page_tags).toEqual(tags);
+  });
+});
+
+const baseWorkHit = {
+  id: 'abc123-1',
+  work_id: 'abc123',
+  title: 'Test Work',
+  year: 1680,
+  collections: ['coll-1'],
+  creators: [],
+};
+
+describe('normalizeWork', () => {
+  describe('collections_hierarchy', () => {
+    it('defaults to empty array when absent', () => {
+      expect(normalizeWork(baseWorkHit).collections_hierarchy).toEqual([]);
+    });
+    it('passes through existing hierarchy', () => {
+      expect(normalizeWork({ ...baseWorkHit, collections_hierarchy: ['a', 'b'] }).collections_hierarchy)
+        .toEqual(['a', 'b']);
+    });
+  });
+
+  describe('languages', () => {
+    it('returns empty array when absent (no lat hardcode)', () => {
+      expect(normalizeWork(baseWorkHit).languages).toEqual([]);
+    });
+    it('passes through existing languages', () => {
+      expect(normalizeWork({ ...baseWorkHit, languages: ['lat'] }).languages).toEqual(['lat']);
+    });
+  });
+
+  describe('year fallback', () => {
+    it('uses year field', () => {
+      expect(normalizeWork({ ...baseWorkHit, year: 1650 }).year).toBe(1650);
+    });
+    it('falls back to aasta when year absent', () => {
+      const { year, ...hit } = baseWorkHit as any;
+      expect(normalizeWork({ ...hit, aasta: 1660 }).year).toBe(1660);
+    });
+    it('returns 0 when both absent', () => {
+      const { year, ...hit } = baseWorkHit as any;
+      expect(normalizeWork(hit).year).toBe(0);
+    });
+  });
+
+  describe('work_id derivation', () => {
+    it('derives work_id from id when work_id absent', () => {
+      const { work_id, ...hit } = baseWorkHit as any;
+      expect(normalizeWork(hit).work_id).toBe('abc123');
+    });
+  });
+});
+
+describe('getWorkMetadata wires normalizeWork', () => {
+  it('returns empty collections_hierarchy when absent in hit', async () => {
+    const { getWorkMetadata } = await import('../workService');
+    const mockIndex = {
+      search: vi.fn().mockResolvedValue({
+        hits: [{ ...baseWorkHit }],
+      }),
+    } as any;
+    const work = await getWorkMetadata(mockIndex, 'abc123');
+    expect(work?.collections_hierarchy).toEqual([]);
+  });
+
+  it('returns empty languages array when hit has none (no lat hardcode)', async () => {
+    const { getWorkMetadata } = await import('../workService');
+    const mockIndex = {
+      search: vi.fn().mockResolvedValue({ hits: [{ ...baseWorkHit }] }),
+    } as any;
+    const work = await getWorkMetadata(mockIndex, 'abc123');
+    expect(work?.languages).toEqual([]);
   });
 });
