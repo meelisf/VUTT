@@ -6,6 +6,7 @@ git commit, person_to_works indeks ja Meilisearch sync ühes kohas.
 """
 import json
 import os
+from typing import Callable
 
 from .utils import metadata_lock
 from .git_ops import save_with_git
@@ -44,6 +45,65 @@ def clean_archive_refs(value):
 
 # Vanad v1 väljad mis eemaldatakse kui leitakse
 _V1_FIELDS = ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]
+
+
+def bulk_update_field(
+    meta_path: str,
+    transform: Callable[[dict], dict],
+    username: str,
+    git_message: str,
+    *,
+    background_tasks=None,
+    sync_meili: bool = False,
+    call_ptw: bool = False,
+) -> None:
+    """
+    Atomaarne bulk-uuendus: loeb, transformeerib ja kirjutab ühe metadata_lock tsükliga.
+    Väldib TOCTOU akent, mis tekib eraldi loe+kirjuta kutsete vahel.
+
+    transform(current_meta) → dict of field updates to apply.
+    """
+    if not os.path.exists(meta_path):
+        return
+
+    with metadata_lock:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+
+        updates = transform(meta)
+        clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
+        meta.update(clean)
+        for field in _V1_FIELDS:
+            meta.pop(field, None)
+
+        save_with_git(
+            meta_path,
+            json.dumps(meta, indent=2, ensure_ascii=False),
+            username,
+            message=git_message,
+        )
+
+    slug = os.path.basename(os.path.dirname(meta_path))
+
+    if call_ptw:
+        ptw_args = (
+            meta.get("id"),
+            meta.get("creators", []),
+            meta.get("tags") or [],
+            meta.get("publisher"),
+            meta.get("title") or "",
+            meta.get("year"),
+        )
+        if background_tasks is not None:
+            background_tasks.add_task(update_person_to_works, *ptw_args)
+        else:
+            update_person_to_works(*ptw_args)
+
+    if sync_meili:
+        if background_tasks is not None:
+            background_tasks.add_task(sync_work_to_meilisearch_async, slug)
+        else:
+            sync_work_to_meilisearch(slug)
 
 
 def save_work_metadata(
