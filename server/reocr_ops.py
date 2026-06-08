@@ -143,14 +143,16 @@ def list_reocr_jobs() -> list:
         ]
 
 
-def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "") -> str:
+def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "", material_type: str = "print") -> str:
     """
     Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.
     Tagastab job_id, mille abil saab staatust küsida poll_reocr_job() kaudu.
     """
+    if material_type not in ('print', 'hand'):
+        material_type = 'print'
     job_id = generate_nanoid()
-    remote_staging = f"AUTO-OCR/{job_id}"
-    remote_work = f"AUTO-OCR/{job_id}/{slug}"
+    remote_staging = f"AUTO-OCR/{material_type}/{job_id}"
+    remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
     remote_img_name = f"{slug}_pg_001.jpg"
 
     _reocr_jobs[job_id] = {

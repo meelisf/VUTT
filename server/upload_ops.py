@@ -1039,7 +1039,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         "type", "genre",
         "location", "publisher",
         "ester_id", "external_url", "year_display",
-        "archive_refs",
+        "archive_refs", "material_type",
     ]
     metadata = {
         "id": work_id,
