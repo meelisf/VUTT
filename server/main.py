@@ -693,7 +693,7 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
         raise HTTPException(status_code=400, detail="split_x on kohustuslik")
     try:
         result = split_page(work_id, page_num, float(split_x), user["username"])
-    except ValueError as e:
+    except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
         raise HTTPException(status_code=404, detail="Teost või lehekülge ei leitud")

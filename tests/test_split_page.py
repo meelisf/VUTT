@@ -168,6 +168,16 @@ def test_split_endpoint_401_no_auth(backend_env):
     assert r.status_code == 401
 
 
+def test_split_endpoint_400_missing_split_x(backend_env, login):
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/w1/page/1/split",
+        json={},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
+
+
 def test_split_endpoint_403_editor(backend_env, login):
     token = login("editor", "editorpass")
     r = backend_env["client"].post(
@@ -176,7 +186,7 @@ def test_split_endpoint_403_editor(backend_env, login):
         headers={"Authorization": f"Bearer {token}"},
     )
     # Süsteem tagastab 401 ka ebapiisavate õiguste korral (require_token → get_user → 401)
-    assert r.status_code in (401, 403)
+    assert r.status_code == 401
 
 
 def test_split_endpoint_404_unknown_work(backend_env, login, monkeypatch):
