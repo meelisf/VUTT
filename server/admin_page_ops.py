@@ -140,6 +140,7 @@ def rebalance_sequences(dir_path: str):
         else:
             with open(json_path, 'w', encoding='utf-8') as f:
                 json.dump({'sequence': new_seq, 'status': 'Toores'}, f, indent=2)
+            os.chmod(json_path, 0o644)
 
 
 def split_text_at_pb(text: str) -> tuple:
