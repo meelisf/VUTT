@@ -125,6 +125,9 @@
     "refreshEntityLabels": "Refresh entity labels from Wikidata",
     "refreshEntityLabelsDesc": "Updates genre, type and tag names in labels.json.",
     "refreshEntityLabelsDone": "Updated {{count}} entries",
+    "enrichPageTagLabels": "Enrich page tag labels",
+    "enrichPageTagLabelsDesc": "Adds page-level tag Q-codes to labels.json (they are not enriched automatically on save).",
+    "enrichPageTagLabelsDone": "Queued {{count}} Q-codes",
     "refreshing": "Fetching from Wikidata…",
     "refreshError": "Refresh failed"
   },

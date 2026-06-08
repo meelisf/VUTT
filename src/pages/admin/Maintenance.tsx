@@ -18,6 +18,8 @@ const Maintenance: React.FC = () => {
   const [placeLabelsCount, setPlaceLabelsCount] = useState<number | null>(null);
   const [entityLabelsState, setEntityLabelsState] = useState<ActionState>('idle');
   const [entityLabelsCount, setEntityLabelsCount] = useState<number | null>(null);
+  const [enrichPageTagsState, setEnrichPageTagsState] = useState<ActionState>('idle');
+  const [enrichPageTagsCount, setEnrichPageTagsCount] = useState<number | null>(null);
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [archivesLoaded, setArchivesLoaded] = useState(false);
   const [showAddArchive, setShowAddArchive] = useState(false);
@@ -57,6 +59,25 @@ const Maintenance: React.FC = () => {
       setPlaceLabelsState('done');
     } catch {
       setPlaceLabelsState('error');
+    }
+  };
+
+  const handleEnrichPageTagLabels = async () => {
+    if (!authToken) return;
+    setEnrichPageTagsState('running');
+    setEnrichPageTagsCount(null);
+    try {
+      const resp = await fetchWithTimeout(`${FILE_API_URL}/admin/enrich-page-tag-labels`, {
+        method: 'POST',
+        headers: getAuthHeaders(authToken),
+        timeout: 30000,
+      });
+      if (!resp.ok) throw new Error(String(resp.status));
+      const data = await resp.json();
+      setEnrichPageTagsCount(data.queued ?? 0);
+      setEnrichPageTagsState('done');
+    } catch {
+      setEnrichPageTagsState('error');
     }
   };
 
@@ -169,6 +190,15 @@ const Maintenance: React.FC = () => {
       count: entityLabelsCount,
       doneKey: 'refreshEntityLabelsDone' as const,
       onClick: handleRefreshEntityLabels,
+    },
+    {
+      key: 'enrichPageTagLabels',
+      label: t('admin:maintenance.enrichPageTagLabels'),
+      desc: t('admin:maintenance.enrichPageTagLabelsDesc'),
+      state: enrichPageTagsState,
+      count: enrichPageTagsCount,
+      doneKey: 'enrichPageTagLabelsDone' as const,
+      onClick: handleEnrichPageTagLabels,
     },
   ];
 

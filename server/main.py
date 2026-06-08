@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
 from .metadata_handler import build_meta_html
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
-from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, refresh_all_entity_labels
+from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, get_session, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
@@ -738,6 +738,12 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     if work_id:
         work_dir = os.path.join(BASE_DIR, catalog)
         background_tasks.add_task(update_page_person_mentions, work_id, work_dir)
+    page_tag_qcodes = {
+        t['id'] for t in (data.get('meta_content') or {}).get('tags', [])
+        if isinstance(t, dict) and isinstance(t.get('id'), str) and t['id'].startswith('Q')
+    }
+    if page_tag_qcodes:
+        background_tasks.add_task(enrich_entity_labels_async_qcodes, page_tag_qcodes)
     return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
 
 
@@ -1828,6 +1834,36 @@ async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
     """Värskendab kõik labels.json Q-koodid Wikidatast (admin)."""
     count = refresh_all_entity_labels()
     return {"updated": count}
+
+@app.post("/admin/enrich-page-tag-labels")
+async def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+    """Rikastab kõik lehekülje-tagide Q-koodid labels.json-i (retroaktiivselt).
+
+    Skannib kõik lehekülje JSON-failid, kogub Q-koodid page_tags väljalt
+    ja lisab puuduvad labels.json-i taustal.
+    """
+    def collect_page_tag_qcodes():
+        qcodes = set()
+        for entry in os.scandir(BASE_DIR):
+            if not entry.is_dir():
+                continue
+            try:
+                for f in os.scandir(entry.path):
+                    if not f.name.endswith('.json') or f.name == '_metadata.json' or f.name.startswith('_'):
+                        continue
+                    with open(f.path, 'r', encoding='utf-8') as fh:
+                        page = json.load(fh)
+                    for t in page.get('tags', []):
+                        if isinstance(t, dict) and isinstance(t.get('id'), str) and t['id'].startswith('Q'):
+                            qcodes.add(t['id'])
+            except Exception:
+                pass
+        return qcodes
+
+    qcodes = collect_page_tag_qcodes()
+    if qcodes:
+        background_tasks.add_task(enrich_entity_labels_async_qcodes, qcodes)
+    return {"queued": len(qcodes)}
 
 # =========================================================
 # KASUTAJA SEADED (state/user_settings/{username}.json)

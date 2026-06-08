@@ -125,6 +125,9 @@
     "refreshEntityLabels": "Värskenda kirjete sildid Wikidatast",
     "refreshEntityLabelsDesc": "Uuendab labels.json žanride, tüüpide ja märksõnade nimed.",
     "refreshEntityLabelsDone": "Uuendatud {{count}} kirjet",
+    "enrichPageTagLabels": "Rikastad lehekülje-tagide sildid",
+    "enrichPageTagLabelsDesc": "Lisab labels.json-i lehekülje märksõnade Q-koodid (need ei lisandu automaatselt teose salvestamisel).",
+    "enrichPageTagLabelsDone": "Järjekorda lisatud {{count}} Q-koodi",
     "refreshing": "Pärin Wikidatast…",
     "refreshError": "Viga värskendamisel"
   },
