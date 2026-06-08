@@ -5,10 +5,13 @@ Eraldatud main.py-st parema testitavuse ja hallatavuse jaoks.
 
 import os
 import json
+import shutil
 from git import Actor
 from git.exc import GitCommandError
 from .config import BASE_DIR, get_logger
-from .git_ops import get_or_init_repo
+from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git
+from .utils import find_directory_by_id, generate_nanoid
+from .meilisearch_ops import sync_work_to_meilisearch
 
 logger = get_logger(__name__)
 
@@ -151,3 +154,143 @@ def split_text_at_pb(text: str) -> tuple:
         idx = text.index('<pb/>')
         return text[:idx].strip(), text[idx + 5:].strip()
     return text, text
+
+
+def split_page(work_id: str, page_num: int, split_x: float, username: str) -> dict:
+    """Lõikab topeltlehekülje kaheks vertikaalse lõikejoone alusel.
+
+    Args:
+        work_id: Teose ID
+        page_num: Lehekülje number (1-indekseeritud)
+        split_x: Lõikejoone asukoht (0.0–1.0), nt 0.47 = 47% laiusest
+        username: Admin kasutajanimi git commitile
+
+    Returns:
+        {"success": True, "new_page_count": int} või {"found": False}
+
+    Raises:
+        ValueError: kui split_x on väljaspool [0.05, 0.95]
+    """
+    if not (0.05 <= split_x <= 0.95):
+        raise ValueError(f"split_x peab olema vahemikus [0.05, 0.95], sain {split_x}")
+
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+
+    folder_name = os.path.basename(path)
+    images = get_sorted_images(path)
+    if page_num < 1 or page_num > len(images):
+        return {"found": False}
+
+    orig_filename = images[page_num - 1]
+    orig_base = os.path.splitext(orig_filename)[0]
+    orig_img_path = os.path.join(path, orig_filename)
+    orig_txt_path = os.path.join(path, orig_base + '.txt')
+    orig_json_path = os.path.join(path, orig_base + '.json')
+
+    # Loe originaali sequence
+    orig_seq = get_page_sequence(orig_json_path)
+    if orig_seq == float('inf'):
+        orig_seq = page_num * 100
+    orig_seq = int(orig_seq)
+
+    # Loe originaali metaandmed (staatus jne)
+    orig_meta = {'status': 'Toores'}
+    if os.path.exists(orig_json_path):
+        try:
+            with open(orig_json_path, 'r', encoding='utf-8') as f:
+                orig_meta = json.load(f)
+        except Exception:
+            pass
+
+    # Loe ja lõika tekst <pb/> juures
+    orig_txt = ''
+    if os.path.exists(orig_txt_path):
+        with open(orig_txt_path, 'r', encoding='utf-8') as f:
+            orig_txt = f.read()
+    left_txt, right_txt = split_text_at_pb(orig_txt)
+
+    # Lõika pilt Pillowiga
+    try:
+        from PIL import Image as PILImage
+        with PILImage.open(orig_img_path) as img:
+            width, height = img.size
+            split_pixel = max(1, int(width * split_x))
+
+            left_crop = img.crop((0, 0, split_pixel, height)).copy()
+            right_crop = img.crop((split_pixel, 0, width, height)).copy()
+    except ImportError:
+        raise RuntimeError("Pillow pole paigaldatud")
+
+    # Genereeri unikaalsed failinimed
+    def _unique_name():
+        nid = generate_nanoid()
+        name = f"{folder_name}-{work_id}-{nid}.jpg"
+        while os.path.exists(os.path.join(path, name)):
+            nid = generate_nanoid()
+            name = f"{folder_name}-{work_id}-{nid}.jpg"
+        return name
+
+    left_filename = _unique_name()
+    right_filename = _unique_name()
+    left_base = os.path.splitext(left_filename)[0]
+    right_base = os.path.splitext(right_filename)[0]
+
+    # Salvesta pildifailid kettale (ei ole git-tracked)
+    left_img_path = os.path.join(path, left_filename)
+    right_img_path = os.path.join(path, right_filename)
+    left_crop.save(left_img_path, "JPEG", quality=95)
+    right_crop.save(right_img_path, "JPEG", quality=95)
+    os.chmod(left_img_path, 0o644)
+    os.chmod(right_img_path, 0o644)
+
+    # Koosta .json andmed mõlemale
+    left_meta = {**orig_meta, 'sequence': orig_seq}
+    right_meta = {**orig_meta, 'sequence': orig_seq + 50}
+
+    left_txt_path = os.path.join(path, left_base + '.txt')
+    left_json_path = os.path.join(path, left_base + '.json')
+    right_txt_path = os.path.join(path, right_base + '.txt')
+    right_json_path = os.path.join(path, right_base + '.json')
+
+    # Kirjuta tekstifailid ja JSON-id kettale enne git commiti
+    for fpath, content in [
+        (left_txt_path, left_txt),
+        (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+        (right_txt_path, right_txt),
+        (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+    ]:
+        with open(fpath, 'w', encoding='utf-8') as f:
+            f.write(content)
+        os.chmod(fpath, 0o644)
+
+    # Git commit 1: lisa mõlemad uued lehed ühes commitinas
+    save_with_git(
+        left_txt_path, left_txt, username,
+        message=f"Lõika leht {page_num} ({folder_name}): vasakpoolne [{work_id}]",
+        additional_files=[
+            (left_json_path, json.dumps(left_meta, indent=2, ensure_ascii=False)),
+            (right_txt_path, right_txt),
+            (right_json_path, json.dumps(right_meta, indent=2, ensure_ascii=False)),
+        ]
+    )
+
+    # Liiguta originaali .jpg prügikasti (ei ole git-tracked)
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
+    os.makedirs(trash_dir, exist_ok=True)
+    if os.path.exists(orig_img_path):
+        shutil.move(orig_img_path, os.path.join(trash_dir, orig_filename))
+
+    # Git commit 2: eemalda originaali .txt ja .json
+    delete_page_from_git(
+        folder_name, orig_base,
+        f"Lõika leht {page_num} ({folder_name}): eemalda originaal [{work_id}]",
+        username
+    )
+
+    # Meilisearch sync
+    sync_work_to_meilisearch(folder_name)
+
+    new_page_count = len(get_sorted_images(path))
+    return {"success": True, "new_page_count": new_page_count}
