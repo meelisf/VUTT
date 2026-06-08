@@ -49,7 +49,7 @@ from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequ
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
-from .metadata_ops import save_work_metadata, ALLOWED_METADATA_FIELDS
+from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -1133,9 +1133,6 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
 
 @app.post("/works/bulk-collection")
 async def bulk_collection(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
-    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
-    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
-    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     """Määrab mitme teose kollektsioonid korraga.
 
     Body: { work_ids: [...], mode: "add"|"set"|"remove", collection_id: "..." }
@@ -1151,62 +1148,65 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
     for work_id in data.get('work_ids', []):
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
-        with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
-                cur_meta = json.load(f)
-        current = cur_meta.get('collections', [])
-        if mode == 'add':
-            if collection_id and collection_id not in current:
-                current = current + [collection_id]
-        elif mode == 'remove':
-            current = [c for c in current if c != collection_id]
-        else:  # set
-            current = [collection_id] if collection_id else []
-        save_work_metadata(
+
+        def make_transform(coll_id=collection_id, m=mode):
+            def transform(meta):
+                current = meta.get('collections', [])
+                if m == 'add':
+                    if coll_id and coll_id not in current:
+                        return {'collections': current + [coll_id]}
+                    return {'collections': current}
+                elif m == 'remove':
+                    return {'collections': [c for c in current if c != coll_id]}
+                else:  # set
+                    return {'collections': [coll_id] if coll_id else []}
+            return transform
+
+        bulk_update_field(
             os.path.join(path, '_metadata.json'),
-            {'collections': current},
+            make_transform(),
             user['username'],
             f"Bulk collection: {work_id}",
             background_tasks=background_tasks,
-            sync_meili=False,
-            call_ptw=False,
         )
     invalidate_cache()
     return {"status": "success"}
 
 @app.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
-    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
-    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
-    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     data = await get_json_data(request)
+    tags_to_update = data.get('tags', [])
+    tag_mode = data.get('mode', 'set')
+
     for work_id in data.get('work_ids', []):
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
-        # Loe praegused tägid, arvuta uus nimekiri
-        with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
-                cur_meta = json.load(f)
-        cur = cur_meta.get('tags', [])
-        if data.get('mode') == 'add':
-            for t in data.get('tags', []):
-                if t not in cur: cur.append(t)
-        elif data.get('mode') == 'remove':
-            remove_ids = {t['id'] for t in data.get('tags', []) if t.get('id')}
-            remove_labels = {t.get('label', '').lower() for t in data.get('tags', []) if not t.get('id')}
-            cur = [t for t in cur if not (
-                (t.get('id') and t['id'] in remove_ids) or
-                (not t.get('id') and t.get('label', '').lower() in remove_labels)
-            )]
-        else:
-            cur = data.get('tags', [])
-        save_work_metadata(
+
+        def make_transform(mode=tag_mode, new_tags=tags_to_update):
+            def transform(meta):
+                cur = list(meta.get('tags', []))
+                if mode == 'add':
+                    for t in new_tags:
+                        if t not in cur:
+                            cur.append(t)
+                elif mode == 'remove':
+                    remove_ids = {t['id'] for t in new_tags if t.get('id')}
+                    remove_labels = {t.get('label', '').lower() for t in new_tags if not t.get('id')}
+                    cur = [t for t in cur if not (
+                        (t.get('id') and t['id'] in remove_ids) or
+                        (not t.get('id') and t.get('label', '').lower() in remove_labels)
+                    )]
+                else:
+                    cur = list(new_tags)
+                return {'tags': cur}
+            return transform
+
+        bulk_update_field(
             os.path.join(path, '_metadata.json'),
-            {'tags': cur},
+            make_transform(),
             user['username'],
             f"Bulk tags: {work_id}",
             background_tasks=background_tasks,
-            sync_meili=False,
             call_ptw=True,
         )
     invalidate_cache()
@@ -1214,9 +1214,6 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
 
 @app.post("/works/bulk-genre")
 async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
-    # NB: Bulk operatsioonid ei ole mõeldud samaaegseks kasutamiseks.
-    # Kaks samaaegselt käivat bulk-operatsiooni võivad teineteise muudatusi üle kirjutada
-    # (TOCTOU). Praeguses kasutuskontekstis (üks admin korraga) on see aktsepteeritav.
     """Määrab žanri mitmele teosele korraga.
 
     Body: { work_ids: [...], genre: LinkedEntity|null, mode: "add"|"set"|"remove" }
@@ -1231,25 +1228,28 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
     for work_id in data.get('work_ids', []):
         path = find_directory_by_id(work_id)
         if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
-        with metadata_lock:
-            with open(os.path.join(path, '_metadata.json'), 'r', encoding='utf-8') as f:
-                cur_meta = json.load(f)
-        current = cur_meta.get('genre', [])
-        if not isinstance(current, list): current = [current] if current else []
-        if mode == 'add':
-            if genre and genre not in current: current.append(genre)
-        elif mode == 'remove':
-            current = [g for g in current if g != genre]
-        else:  # set
-            current = [genre] if genre else []
-        save_work_metadata(
+
+        def make_transform(g=genre, m=mode):
+            def transform(meta):
+                current = meta.get('genre', [])
+                if not isinstance(current, list):
+                    current = [current] if current else []
+                if m == 'add':
+                    if g and g not in current:
+                        current = current + [g]
+                elif m == 'remove':
+                    current = [x for x in current if x != g]
+                else:  # set
+                    current = [g] if g else []
+                return {'genre': current}
+            return transform
+
+        bulk_update_field(
             os.path.join(path, '_metadata.json'),
-            {'genre': current},
+            make_transform(),
             user['username'],
             f"Bulk genre: {work_id}",
             background_tasks=background_tasks,
-            sync_meili=False,
-            call_ptw=False,
         )
     invalidate_cache()
     return {"status": "success"}
