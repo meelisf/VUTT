@@ -61,8 +61,8 @@ const SplitPageModal: React.FC<Props> = ({
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
       onSuccess();
-    } catch (e: any) {
-      setError(e.message || 'Lõikamine ebaõnnestus');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Lõikamine ebaõnnestus');
       setSaving(false);
       setShowConfirm(false);
     }
@@ -103,6 +103,7 @@ const SplitPageModal: React.FC<Props> = ({
               alt={`Leht ${pageNum}`}
               className="w-full h-auto block pointer-events-none"
               draggable={false}
+              onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
             />
 
             {/* Lõikejoon */}
