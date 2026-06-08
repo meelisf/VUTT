@@ -348,8 +348,10 @@ const Workspace: React.FC = () => {
 
   // Navigeerimine otsingusse (selle teose piires)
   const handleNavigateToSearch = () => {
-    const workCollection = work?.collections_hierarchy?.[0] ?? work?.collections?.[0] ?? null;
-    if (workCollection && workCollection !== selectedCollection) {
+    const workCollections = work?.collections_hierarchy ?? work?.collections ?? [];
+    const workCollection = workCollections[0] ?? null;
+    // Ära kirjuta üle, kui praegune valik on juba teose hierarhias (nt virtuaalkollektsioon)
+    if (workCollection && !workCollections.includes(selectedCollection ?? '')) {
       setSelectedCollection(workCollection);
     }
     if (hasUnsavedChanges) {
