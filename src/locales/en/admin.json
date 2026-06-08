@@ -127,7 +127,7 @@
     "refreshEntityLabelsDone": "Updated {{count}} entries",
     "enrichPageTagLabels": "Enrich page tag labels",
     "enrichPageTagLabelsDesc": "Adds page-level tag Q-codes to labels.json (they are not enriched automatically on save).",
-    "enrichPageTagLabelsDone": "Queued {{count}} Q-codes",
+    "enrichPageTagLabelsDone": "Enrichment started ({{count}} Q-codes) — wait ~10s, then re-index",
     "refreshing": "Fetching from Wikidata…",
     "refreshError": "Refresh failed"
   },
