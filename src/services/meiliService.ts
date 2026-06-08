@@ -114,29 +114,42 @@ export const normalizePage = (hit: any): Page => {
   return {
     id: hit.id,
     work_id: workId,
-    page_number: hit.lehekylje_number || 0,
-    text_content: hit.lehekylje_tekst || hit.text_content || '',
+    page_number: hit.lehekylje_number != null ? parseInt(hit.lehekylje_number) : 0,
+    text_content: hit.text_content || hit.lehekylje_tekst || '',
     image_url: getFullImageUrl(hit.lehekylje_pilt || ''),
     status: (hit.status as PageStatus) || PageStatus.RAW,
     comments: hit.comments || [],
     text_annotations: hit.text_annotations || [],
-    page_tags: hit.page_tags || hit.tags || [],
+    page_tags: hit.page_tags_object ||
+      Array.from(new Set((hit.page_tags || hit.tags || []).map((t: any) =>
+        typeof t === 'string' ? t.toLowerCase() : t
+      ))),
     history: hit.history || [],
     // Denormaliseeritud teose andmed
     title: hit.title,
-    year: hit.year,
+    year: hit.year ?? hit.aasta ?? null,
     year_display: hit.year_display || null,
     location: hit.location_object ?? null,
     publisher: hit.publisher_object ?? null,
     type: hit.type_object ?? null,
     genre: hit.genre_object ?? null,
     collections: hit.collections || [],
-    collections_hierarchy: hit.collections_hierarchy,
-    creators: hit.creators,
-    languages: hit.languages,
+    collections_hierarchy: hit.collections_hierarchy || [],
+    creators: hit.creators || [],
+    authors_text: hit.authors_text || [],
+    tags: hit.tags_object ?? [],
+    languages: hit.languages || [],
+    series: hit.series,
+    series_title: hit.series_title,
     ester_id: hit.ester_id,
     external_url: hit.external_url,
     archive_refs: hit.archive_refs || null,
+    // @deprecated väljad — töölaua tagasiühilduvus
+    original_path: hit.originaal_kataloog,
+    originaal_kataloog: hit.originaal_kataloog,
+    autor: hit.autor,
+    respondens: hit.respondens,
+    aasta: hit.aasta ?? hit.year,
   };
 };
 
