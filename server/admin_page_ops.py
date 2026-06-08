@@ -213,8 +213,9 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
 
     # Lõika pilt Pillowiga
     try:
-        from PIL import Image as PILImage
-        with PILImage.open(orig_img_path) as img:
+        from PIL import Image as PILImage, ImageOps
+        with PILImage.open(orig_img_path) as raw:
+            img = ImageOps.exif_transpose(raw)  # rakenda EXIF orientatsioon pikslitele
             width, height = img.size
             split_pixel = max(1, int(width * split_x))
 
