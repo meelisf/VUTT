@@ -158,3 +158,70 @@ def test_split_page_invalid_split_x(work_dir):
 
     with pytest.raises(ValueError):
         split_page(work_dir["work_id"], 1, 0.98, "testadmin")
+
+
+# ─── Endpoint testid ──────────────────────────────────────────────
+
+
+def test_split_endpoint_401_no_auth(backend_env):
+    r = backend_env["client"].post("/admin/work/w1/page/1/split", json={"split_x": 0.5})
+    assert r.status_code == 401
+
+
+def test_split_endpoint_403_editor(backend_env, login):
+    token = login("editor", "editorpass")
+    r = backend_env["client"].post(
+        "/admin/work/w1/page/1/split",
+        json={"split_x": 0.5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    # Süsteem tagastab 401 ka ebapiisavate õiguste korral (require_token → get_user → 401)
+    assert r.status_code in (401, 403)
+
+
+def test_split_endpoint_404_unknown_work(backend_env, login, monkeypatch):
+    import server.main as main
+    monkeypatch.setattr(main, "split_page", lambda *a, **kw: {"found": False})
+
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/unknown/page/1/split",
+        json={"split_x": 0.5},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 404
+
+
+def test_split_endpoint_400_invalid_split_x(backend_env, login, monkeypatch):
+    import server.main as main
+
+    def _raise(*a, **kw):
+        raise ValueError("split_x peab olema vahemikus [0.05, 0.95]")
+
+    monkeypatch.setattr(main, "split_page", _raise)
+
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/w1/page/1/split",
+        json={"split_x": 0.02},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
+
+
+def test_split_endpoint_200_success(backend_env, login, monkeypatch):
+    import server.main as main
+    monkeypatch.setattr(
+        main, "split_page", lambda *a, **kw: {"success": True, "new_page_count": 2}
+    )
+
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/testwork1/page/1/split",
+        json={"split_x": 0.47},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["status"] == "success"
+    assert data["new_page_count"] == 2

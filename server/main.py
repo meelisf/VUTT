@@ -45,7 +45,7 @@ from .cache import (
     get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages
+from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
@@ -682,6 +682,22 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
 
     new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
+
+
+@app.post("/admin/work/{work_id}/page/{page_num}/split")
+async def admin_split_page(work_id: str, page_num: int, request: Request, user=Depends(require_role("admin"))):
+    """Lõikab topeltlehekülje kaheks. Body: { split_x: float (0.05–0.95) }"""
+    data = await get_json_data(request)
+    split_x = data.get("split_x")
+    if split_x is None:
+        raise HTTPException(status_code=400, detail="split_x on kohustuslik")
+    try:
+        result = split_page(work_id, page_num, float(split_x), user["username"])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not result.get("found", True):
+        raise HTTPException(status_code=404, detail="Teost või lehekülge ei leitud")
+    return {"status": "success", "new_page_count": result["new_page_count"]}
 
 
 @app.post("/admin/work/{work_id}/reorder-pages")
