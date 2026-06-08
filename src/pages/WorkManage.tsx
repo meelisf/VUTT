@@ -138,6 +138,9 @@ const WorkManage: React.FC = () => {
   const [deletingWork, setDeletingWork] = useState(false);
   const [deleteWorkError, setDeleteWorkError] = useState<string | null>(null);
 
+  // Pildi HMAC token piiratud teoste allalaadimiseks
+  const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
+
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
@@ -207,6 +210,21 @@ const WorkManage: React.FC = () => {
 
   useEffect(() => {
     if (isAdmin) loadPages();
+  }, [workId, authToken, isAdmin]);
+
+  useEffect(() => {
+    if (!workId || !authToken || !isAdmin) return;
+    fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
+      headers: getAuthHeaders(authToken),
+      timeout: 10000,
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.image_exp && d?.image_sig) {
+          setImageToken({ exp: d.image_exp, sig: d.image_sig });
+        }
+      })
+      .catch(() => {});
   }, [workId, authToken, isAdmin]);
 
   useEffect(() => {
@@ -608,7 +626,13 @@ const WorkManage: React.FC = () => {
                         {/* Lae alla / Asenda nupud — alumises servas */}
                         <div className="absolute bottom-1 left-1 right-1 flex justify-between">
                           <a
-                            href={`${IMAGE_BASE_URL}/${workId}/${page.lehekylje_pilt.split('/').pop()}`}
+                            href={(() => {
+                              const filename = page.lehekylje_pilt.split('/').pop();
+                              const base = `${IMAGE_BASE_URL}/${workId}/${filename}`;
+                              return imageToken
+                                ? `${base}?exp=${imageToken.exp}&sig=${imageToken.sig}`
+                                : base;
+                            })()}
                             download
                             className="p-1 bg-white/80 hover:bg-primary-50 text-gray-400 hover:text-primary-600 rounded shadow-sm transition-colors"
                             title={t('manage.downloadImage')}
