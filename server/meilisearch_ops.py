@@ -432,7 +432,8 @@ def sync_work_to_meilisearch(dir_name):
                     # Toeta nii vana kui uut formaati (meta_content wrapper)
                     source = p_data.get('meta_content', p_data)
                     page_meta['status'] = source.get('status', 'Toores')
-                    # Eelistame uut nime 'page_tags'
+                    # tags-fallback: serveril on 35 lehekülge vana 'tags' väljaga (OCR-artefaktid, stringid, mitte Q-objektid).
+                    # Eemaldada pärast nende lehekülgede migreerimist või puhastamist.
                     page_meta['tags'] = source.get('page_tags', source.get('tags', []))
                     page_meta['comments'] = source.get('comments', [])
                     page_meta['text_annotations'] = source.get('text_annotations', [])

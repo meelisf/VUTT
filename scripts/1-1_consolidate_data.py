@@ -429,6 +429,8 @@ def create_meilisearch_data_per_page():
                     with open(json_path, 'r', encoding='utf-8') as jf:
                         file_json = json.load(jf)
                         source = file_json.get('meta_content', file_json)
+                        # tags-fallback: serveril on 35 lehekülge vana 'tags' väljaga (OCR-artefaktid, stringid, mitte Q-objektid).
+                        # Eemaldada pärast nende lehekülgede migreerimist või puhastamist.
                         page_meta['tags'] = source.get('page_tags', source.get('tags', []))
                         page_meta['comments'] = source.get('comments', [])
                         page_meta['text_annotations'] = source.get('text_annotations', [])

@@ -94,3 +94,5 @@ Luua `src/components/PageThumbnail.tsx` jagatud komponent ja asendada kõik kolm
 
 === MINU LISANDUSED ===
 Arhiiviviidetel puudub inglise keel praegu.
+
+main.py on hiigelsuureks kasvanud
