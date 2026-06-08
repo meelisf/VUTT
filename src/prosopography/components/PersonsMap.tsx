@@ -199,7 +199,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
                     </div>
                     <div className="max-h-56 overflow-y-auto space-y-1 pr-1">
                       {marker.persons.map(person => (
-                        <Link key={person.id} to={`/persons/${encodeURIComponent(person.id)}`} className="block rounded px-2 py-1 text-sm text-primary-700 hover:bg-primary-50">
+                        <Link key={person.id} to={`/persons/${person.id}`} className="block rounded px-2 py-1 text-sm text-primary-700 hover:bg-primary-50">
                           {person.label}
                           {(person.birth_year || person.death_year) && (
                             <span className="ml-1 text-xs text-gray-400">

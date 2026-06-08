@@ -816,7 +816,7 @@ const Review: React.FC = () => {
                         <div className="col-span-1 flex items-center justify-end">
                           {commit.change_type === 'person' && commit.person_id ? (
                             <Link
-                              to={`/persons/${encodeURIComponent(commit.person_id)}`}
+                              to={`/persons/${commit.person_id}`}
                               className="inline-flex items-center gap-1 p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
                               title="Ava isiku kaart"
                               onClick={(e) => e.stopPropagation()}

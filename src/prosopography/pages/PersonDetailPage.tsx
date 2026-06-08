@@ -175,7 +175,7 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
               <span key={i}>
                 {i > 0 && ', '}
                 {r.target_id
-                  ? <Link to={`/persons/${encodeURIComponent(r.target_id)}`} className="underline hover:text-gray-700">{displayName}</Link>
+                  ? <Link to={`/persons/${r.target_id}`} className="underline hover:text-gray-700">{displayName}</Link>
                   : displayName
                 }
                 {typeLabel ? ` (${typeLabel})` : ''}

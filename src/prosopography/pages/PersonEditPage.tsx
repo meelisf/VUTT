@@ -98,7 +98,7 @@ const PersonEditPage: React.FC = () => {
 
   // Suuna mitteeditor kasutaja tagasi
   useEffect(() => {
-    if (!canEdit) navigate(isNew ? '/persons' : `/persons/${encodeURIComponent(id!)}`, { replace: true });
+    if (!canEdit) navigate(isNew ? '/persons' : `/persons/${id!}`, { replace: true });
   }, [canEdit]);
 
   useEffect(() => {
@@ -203,12 +203,12 @@ const PersonEditPage: React.FC = () => {
         const payload = draftToPayload(draft, created, seisused, konfessioonid);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
         skipGuardRef.current = true;
-        navigate(`/persons/${encodeURIComponent(created.id)}`);
+        navigate(`/persons/${created.id}`);
       } else {
         const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
         await updatePerson(id!, payload, token);
         skipGuardRef.current = true;
-        navigate(`/persons/${encodeURIComponent(id!)}`);
+        navigate(`/persons/${id!}`);
       }
     } catch (e: any) {
       if (e?.conflict) {
@@ -264,7 +264,7 @@ const PersonEditPage: React.FC = () => {
 
         {/* Tagasi */}
         <button
-          onClick={() => navigate(isNew ? '/persons' : `/persons/${encodeURIComponent(id!)}`)}
+          onClick={() => navigate(isNew ? '/persons' : `/persons/${id!}`)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 transition-colors mb-4"
         >
           <ArrowLeft size={15} />
@@ -822,7 +822,7 @@ const PersonEditPage: React.FC = () => {
                       type: formatRelationTypeLabel(item.type, item.type_labels, lang),
                     }).split('\x00LINK\x00').flatMap((part, i, arr) =>
                       i < arr.length - 1
-                        ? [part, <Link key="l" to={`/persons/${encodeURIComponent(item.target_id!)}`} className="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">{item.name}</Link>]
+                        ? [part, <Link key="l" to={`/persons/${item.target_id!}`} className="underline hover:text-gray-600" target="_blank" rel="noopener noreferrer">{item.name}</Link>]
                         : [part]
                     )}
                   </p>
