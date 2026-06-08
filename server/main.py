@@ -1378,17 +1378,15 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
         raise HTTPException(status_code=404, detail="Pilti ei leitud")
     page_number = data.get("page_number")
     meta_path = os.path.join(path, '_metadata.json')
-    material_type = 'print'
+    ocr_model = 'print'
     if os.path.isfile(meta_path):
         with open(meta_path, 'r', encoding='utf-8') as _mf:
             _meta = json.load(_mf)
-        if _meta.get('material_type') in ('print', 'hand'):
-            material_type = _meta['material_type']
-        elif isinstance(_meta.get('type'), dict) and _meta['type'].get('id') == 'manuscriptum':
-            material_type = 'hand'
+        if isinstance(_meta.get('type'), dict) and _meta['type'].get('id') == 'Q87167':
+            ocr_model = 'hand'
     tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
     shutil.copy2(img_path, tmp_path)
-    job_id = start_reocr_job(work_id, slug, tmp_path, page_filename=page_filename, page_number=page_number, username=user['username'], material_type=material_type)
+    job_id = start_reocr_job(work_id, slug, tmp_path, page_filename=page_filename, page_number=page_number, username=user['username'], material_type=ocr_model)
     return {"status": "accepted", "job_id": job_id}
 
 @app.get("/admin/reocr/{job_id}/status")

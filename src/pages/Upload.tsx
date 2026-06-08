@@ -53,7 +53,7 @@ interface PollResult {
 interface SavedUpload {
   id: string;
   status: string;
-  meta: { title: string; year: string; slug: string; material_type?: 'print' | 'hand' };
+  meta: { title: string; year: string; slug: string; type?: { id: string; label: string; source: string; labels?: Record<string, string> } };
   created_at: string;
   expected_pages: number | null;
   files: FileEntry[];
@@ -71,6 +71,9 @@ function ocrEstimate(pages: number | null | undefined): string {
   const mins = Math.ceil(pages / OCR_PAGES_PER_MIN);
   return `~${mins} min`;
 }
+
+const TYPE_PRINT = { id: 'Q1261026', label: 'trükis',   source: 'wikidata', labels: { et: 'trükis',   en: 'printed matter' } };
+const TYPE_HAND  = { id: 'Q87167',  label: 'käsikiri', source: 'wikidata', labels: { et: 'käsikiri', en: 'manuscript' } };
 
 // ---------------------------------------------------------------------------
 // Slug utiliit (peegeldab serveri sanitize_slug)
@@ -206,7 +209,7 @@ const Upload: React.FC = () => {
   // --- Samm 1 vorm ---
   const [title, setTitle] = useState('');
   const [year, setYear] = useState('');
-  const [materialType, setMaterialType] = useState<'print' | 'hand'>('print');
+  const [workType, setWorkType] = useState(TYPE_PRINT);
   const [slug, setSlug] = useState('');
   const [slugManual, setSlugManual] = useState(false);
 
@@ -289,7 +292,7 @@ const Upload: React.FC = () => {
         if (fetchedCollection) setSelectedCollection(fetchedCollection);
 
         // 2. Loo upload staging automaatselt
-        // Asendamise voog jätab Step 1 vahele — material_type on alati 'print'
+        // Asendamise voog jätab Step 1 vahele — type tuleb asendatava teose metaandmetest (backend loeb ise)
         const createRes = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
@@ -389,7 +392,7 @@ const Upload: React.FC = () => {
   // ---------------------------------------------------------------------------
   async function handleStep1Submit() {
     if (!title.trim() || !authToken) return;
-    if (materialType === 'print' && !year.trim()) return;
+    if (workType.id !== 'Q87167' && !year.trim()) return;
     setStep1Loading(true);
     setStep1Error('');
 
@@ -409,7 +412,7 @@ const Upload: React.FC = () => {
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
             replace_work_id: replaceWorkId || null,
-            material_type: materialType,
+            type: workType,
           }),
         });
         const d = await r.json();
@@ -698,7 +701,7 @@ const Upload: React.FC = () => {
     setTitle(saved.meta.title);
     setYear(saved.meta.year);
     setSlug(saved.meta.slug);
-    setMaterialType(saved.meta.material_type ?? 'print');
+    setWorkType(saved.meta.type?.id === 'Q87167' ? TYPE_HAND : TYPE_PRINT);
     setSlugManual(true);
 
     const poll: PollResult = {
@@ -936,24 +939,24 @@ const Upload: React.FC = () => {
                   />
                 </div>
 
-                {/* Materjali tüüp */}
+                {/* Tüüp (trükis / käsikiri) */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('step1.materialTypeLabel')}
                   </label>
                   <div className="flex gap-4">
-                    {(['print', 'hand'] as const).map((mt) => (
-                      <label key={mt} className="flex items-center gap-2 cursor-pointer">
+                    {([TYPE_PRINT, TYPE_HAND] as const).map((t_) => (
+                      <label key={t_.id} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="radio"
-                          name="materialType"
-                          value={mt}
-                          checked={materialType === mt}
-                          onChange={() => setMaterialType(mt)}
+                          name="workType"
+                          value={t_.id}
+                          checked={workType.id === t_.id}
+                          onChange={() => setWorkType(t_)}
                           className="accent-primary-600"
                         />
                         <span className="text-sm text-gray-700">
-                          {mt === 'print' ? t('step1.materialTypePrint') : t('step1.materialTypeHand')}
+                          {t_.id === 'Q1261026' ? t('step1.materialTypePrint') : t('step1.materialTypeHand')}
                         </span>
                       </label>
                     ))}
@@ -963,7 +966,7 @@ const Upload: React.FC = () => {
                 {/* Aasta */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    {materialType === 'hand' ? t('step1.yearLabelOptional') : t('step1.yearLabel')} {materialType !== 'hand' && <span className="text-red-500">*</span>}
+                    {workType.id === 'Q87167' ? t('step1.yearLabelOptional') : t('step1.yearLabel')} {workType.id !== 'Q87167' && <span className="text-red-500">*</span>}
                   </label>
                   <input
                     type="number"
@@ -975,7 +978,7 @@ const Upload: React.FC = () => {
                     className="w-48 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <p className="text-xs text-gray-400 mt-1">{t('step1.yearHint')}</p>
-                  {materialType === 'hand' && (
+                  {workType.id === 'Q87167' && (
                     <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-1 mt-1">
                       {t('step1.materialTypeHandYearHint')}
                     </p>
@@ -1019,7 +1022,7 @@ const Upload: React.FC = () => {
 
                 <button
                   onClick={handleStep1Submit}
-                  disabled={!title.trim() || (materialType === 'print' && !year.trim()) || !slug.trim() || step1Loading}
+                  disabled={!title.trim() || (workType.id !== 'Q87167' && !year.trim()) || !slug.trim() || step1Loading}
                   className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
                 >
                   {step1Loading ? (

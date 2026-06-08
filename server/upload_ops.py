@@ -238,9 +238,8 @@ def create_upload(meta: dict) -> dict:
 
     year = str(meta.get('year', ''))
     slug = meta.get('slug', sanitize_slug(meta.get('title', '')))
-    material_type = meta.get('material_type', 'print')
-    if material_type not in ('print', 'hand'):
-        material_type = 'print'
+    work_type = meta.get('type') or {}
+    ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
 
     # Loo uploads/{id}/thumbs/ kaustad
     thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
@@ -261,11 +260,10 @@ def create_upload(meta: dict) -> dict:
             "collections": meta.get('collections', []),
             "languages": meta.get('languages', []),
             "tags": meta.get('tags', []),
-            "material_type": material_type,
         },
         "expected_pages": None,
-        "remote_staging_path": f"AUTO-OCR/{material_type}/{upload_id}",
-        "remote_work_path": f"AUTO-OCR/{material_type}/{upload_id}/{slug}",
+        "remote_staging_path": f"AUTO-OCR/{ocr_model}/{upload_id}",
+        "remote_work_path": f"AUTO-OCR/{ocr_model}/{upload_id}/{slug}",
         "files": [],
         "created_at": datetime.now().isoformat(),
         "replace_work_id": meta.get('replace_work_id') or None,
@@ -1039,7 +1037,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         "type", "genre",
         "location", "publisher",
         "ester_id", "external_url", "year_display",
-        "archive_refs", "material_type",
+        "archive_refs",
     ]
     metadata = {
         "id": work_id,
