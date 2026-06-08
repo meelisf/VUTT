@@ -739,7 +739,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         work_dir = os.path.join(BASE_DIR, catalog)
         background_tasks.add_task(update_page_person_mentions, work_id, work_dir)
     page_tag_qcodes = {
-        t['id'] for t in (data.get('meta_content') or {}).get('tags', [])
+        t['id'] for t in (data.get('meta_content') or {}).get('page_tags', [])
         if isinstance(t, dict) and isinstance(t.get('id'), str) and t['id'].startswith('Q')
     }
     if page_tag_qcodes:
