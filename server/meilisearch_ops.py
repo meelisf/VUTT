@@ -496,11 +496,11 @@ def sync_work_to_meilisearch(dir_name):
             "page_tags_en": get_labels_by_lang(page_tags_data, 'en', labels_store), # Inglise label, capitalize_first
             "page_tags_ids": get_all_ids(page_tags_data),              # Q-koodid (filtreeritav, nagu tags_ids)
             "page_tags_suggest_et": [
-                f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') if isinstance(t, dict) else ''}"
+                f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
                 for t in page_tags_data
             ],
             "page_tags_suggest_en": [
-                f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') if isinstance(t, dict) else ''}"
+                f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
                 for t in page_tags_data
             ],
             "page_tags_object": page_tags_data,

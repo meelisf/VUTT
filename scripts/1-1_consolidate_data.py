@@ -516,11 +516,11 @@ def create_meilisearch_data_per_page():
                 'page_tags_en': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'en', labels_store)],
                 'page_tags_ids': get_all_ids(page_meta.get('tags', [])),
                 'page_tags_suggest_et': [
-                    f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') if isinstance(t, dict) else ''}"
+                    f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
                     for t in page_meta.get('tags', [])
                 ],
                 'page_tags_suggest_en': [
-                    f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') if isinstance(t, dict) else ''}"
+                    f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
                     for t in page_meta.get('tags', [])
                 ],
                 'page_tags_object': page_meta.get('tags', []),

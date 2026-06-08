@@ -1853,7 +1853,7 @@ async def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=D
                         continue
                     with open(f.path, 'r', encoding='utf-8') as fh:
                         page = json.load(fh)
-                    for t in page.get('tags', []):
+                    for t in page.get('page_tags', []):
                         if isinstance(t, dict) and isinstance(t.get('id'), str) and t['id'].startswith('Q'):
                             qcodes.add(t['id'])
             except Exception:
