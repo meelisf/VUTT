@@ -247,3 +247,110 @@ def test_work_id_escaped_in_urls(patch_find):
     html_out = build_meta_html('work<script>')
     assert '<script>' not in html_out
     assert 'work&lt;script&gt;' in html_out or 'work%3Cscript%3E' in html_out
+
+
+def test_sitemap_includes_public_work():
+    from server.metadata_handler import build_sitemap_xml
+
+    cache = {"work001": ("/data/test-slug", 1700000000.0)}
+    meta_store = {
+        "work001": {"id": "work001", "title": "Teos", "collections": []},
+    }
+
+    def load_meta(work_id):
+        return meta_store.get(work_id)
+
+    def is_public(meta):
+        return True
+
+    xml = build_sitemap_xml(cache, is_public, load_meta)
+
+    assert "work001" in xml
+    assert "<loc>" in xml
+    assert "vutt.utlib.ut.ee" in xml
+
+
+def test_sitemap_excludes_restricted_work():
+    from server.metadata_handler import build_sitemap_xml
+
+    cache = {"work999": ("/data/restricted", 1700000000.0)}
+    meta_store = {
+        "work999": {"id": "work999", "title": "Piiratud", "collections": ["restricted-col"]},
+    }
+
+    def load_meta(work_id):
+        return meta_store.get(work_id)
+
+    def is_public(meta):
+        return False
+
+    xml = build_sitemap_xml(cache, is_public, load_meta)
+
+    assert "work999" not in xml
+
+
+def test_sitemap_excludes_work_with_none_meta():
+    from server.metadata_handler import build_sitemap_xml
+
+    cache = {"workX": ("/data/missing", 1700000000.0)}
+
+    def load_meta(work_id):
+        return None
+
+    def is_public(meta):
+        return True
+
+    xml = build_sitemap_xml(cache, is_public, load_meta)
+
+    assert "workX" not in xml
+
+
+def test_sitemap_has_lastmod():
+    from server.metadata_handler import build_sitemap_xml
+    import datetime
+
+    cache = {"work001": ("/data/test-slug", 1700000000.0)}
+    meta_store = {"work001": {"id": "work001", "title": "Teos", "collections": []}}
+
+    def load_meta(work_id):
+        return meta_store.get(work_id)
+
+    def is_public(meta):
+        return True
+
+    xml = build_sitemap_xml(cache, is_public, load_meta)
+
+    assert "<lastmod>" in xml
+    expected_date = datetime.datetime.utcfromtimestamp(1700000000.0).strftime("%Y-%m-%d")
+    assert expected_date in xml
+
+
+def test_sitemap_valid_xml_structure():
+    from server.metadata_handler import build_sitemap_xml
+
+    cache = {}
+
+    xml = build_sitemap_xml(cache, lambda m: True, lambda wid: None)
+
+    assert xml.startswith("<?xml")
+    assert "<urlset" in xml
+    assert "</urlset>" in xml
+
+
+def test_sitemap_multiple_works():
+    from server.metadata_handler import build_sitemap_xml
+
+    cache = {
+        "w1": ("/data/w1", 1700000000.0),
+        "w2": ("/data/w2", 1700001000.0),
+        "w3": ("/data/w3", 1700002000.0),
+    }
+    metas = {
+        "w1": {"id": "w1", "collections": []},
+        "w2": {"id": "w2", "collections": []},
+        "w3": {"id": "w3", "collections": []},
+    }
+
+    xml = build_sitemap_xml(cache, lambda m: True, lambda wid: metas.get(wid))
+
+    assert xml.count("<url>") == 3

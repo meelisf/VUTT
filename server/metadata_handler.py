@@ -179,3 +179,48 @@ def build_meta_html(work_id: str) -> str:
     {f'<span class="Z3988" title="{coins_str}"></span>' if coins_str else ''}
 </body>
 </html>"""
+
+
+def build_sitemap_xml(
+    work_id_cache: dict,
+    is_work_public_fn,
+    load_meta_fn,
+) -> str:
+    """
+    Genereerib sitemap.xml kõigi avalike teoste jaoks.
+
+    work_id_cache: {work_id: (path, mtime)} või {work_id: path}
+    is_work_public_fn: callable(meta) -> bool
+    load_meta_fn: callable(work_id) -> dict | None
+    """
+    import datetime
+
+    urls = []
+    for work_id, value in work_id_cache.items():
+        if isinstance(value, tuple):
+            path, mtime = value
+        else:
+            path = value
+            try:
+                meta_path = os.path.join(path, "_metadata.json")
+                mtime = os.path.getmtime(meta_path) if os.path.exists(meta_path) else 0.0
+            except Exception:
+                mtime = 0.0
+
+        meta = load_meta_fn(work_id)
+        if meta is None:
+            continue
+        if not is_work_public_fn(meta):
+            continue
+
+        lastmod = datetime.datetime.utcfromtimestamp(mtime).strftime("%Y-%m-%d")
+        loc = f"{SITE_URL}/work/{html.escape(work_id)}"
+        urls.append(f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>")
+
+    body = "\n".join(urls)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{body}\n"
+        "</urlset>"
+    )
