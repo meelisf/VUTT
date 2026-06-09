@@ -1067,7 +1067,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     )
     background_tasks.add_task(process_person_fields_metadata, meta)
     background_tasks.add_task(enrich_entity_labels_async, meta)
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 @app.post("/get-work-metadata")
@@ -1191,7 +1191,7 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
             f"Bulk collection: {work_id}",
             background_tasks=background_tasks,
         )
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 @app.post("/works/bulk-tags")
@@ -1231,7 +1231,7 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
             background_tasks=background_tasks,
             call_ptw=True,
         )
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 @app.post("/works/bulk-genre")
@@ -1273,7 +1273,7 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
             f"Bulk genre: {work_id}",
             background_tasks=background_tasks,
         )
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 # =========================================================
@@ -1481,7 +1481,7 @@ async def create_archive(request: Request, user=Depends(require_role("admin"))):
         entry["url"] = url
     archives[archive_id] = entry
     atomic_write_json(ARCHIVES_FILE, archives)
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
 @app.put("/config/archives/{archive_id}")
@@ -1502,7 +1502,7 @@ async def update_archive(archive_id: str, request: Request, user=Depends(require
         entry["url"] = url
     archives[archive_id] = entry
     atomic_write_json(ARCHIVES_FILE, archives)
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
 @app.delete("/config/archives/{archive_id}")
@@ -1524,7 +1524,7 @@ async def delete_archive(archive_id: str, force: bool = False, user=Depends(requ
             )
     del archives[archive_id]
     atomic_write_json(ARCHIVES_FILE, archives)
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 @app.put("/admin/collections/{collection_id}")
@@ -1581,7 +1581,7 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     atomic_write_json(COLLECTIONS_FILE, data)
 
     # Invalideerib cache → järgmine /collections päring laeb uued andmed
-    invalidate_cache()
+    _invalidate_all_caches()
 
     # Kui visibility muutus, uuenda Meilisearchis is_public asünkroonselt
     new_visibility = data[collection_id].get("visibility", "public")
@@ -1663,7 +1663,7 @@ async def admin_create_collection(request: Request, user=Depends(require_role("a
 
     atomic_write_json(COLLECTIONS_FILE, data)
 
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success"}
 
 def _cleanup_allowed_collections_on_delete(collection_id: str):
@@ -1780,7 +1780,7 @@ async def admin_delete_collection(collection_id: str, background_tasks: Backgrou
     _cleanup_allowed_collections_on_delete(collection_id)
     atomic_write_json(COLLECTIONS_FILE, data)
 
-    invalidate_cache()
+    _invalidate_all_caches()
     return {"status": "success", "affected_works": len(affected)}
 
 
@@ -2080,6 +2080,12 @@ async def work_meta(work_id: str, request: Request):
     return HTMLResponse(content=build_meta_html(work_id))
 
 _sitemap_cache: dict = {"xml": None, "expires": 0.0}
+
+
+def _invalidate_all_caches():
+    """Tühjendab kõik cache'id: kollektsioonid, soovitused, sitemap."""
+    invalidate_cache()
+    _sitemap_cache["xml"] = None
 
 
 @app.get("/sitemap.xml")
