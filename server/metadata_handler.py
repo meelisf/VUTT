@@ -213,7 +213,7 @@ def build_sitemap_xml(
         if not is_work_public_fn(meta):
             continue
 
-        lastmod = datetime.datetime.utcfromtimestamp(mtime).strftime("%Y-%m-%d")
+        lastmod = datetime.datetime.fromtimestamp(mtime, datetime.timezone.utc).strftime("%Y-%m-%d")
         loc = f"{SITE_URL}/work/{html.escape(work_id)}"
         urls.append(f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>")
 

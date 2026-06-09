@@ -321,7 +321,7 @@ def test_sitemap_has_lastmod():
     xml = build_sitemap_xml(cache, is_public, load_meta)
 
     assert "<lastmod>" in xml
-    expected_date = datetime.datetime.utcfromtimestamp(1700000000.0).strftime("%Y-%m-%d")
+    expected_date = datetime.datetime.fromtimestamp(1700000000.0, datetime.timezone.utc).strftime("%Y-%m-%d")
     assert expected_date in xml
 
 
