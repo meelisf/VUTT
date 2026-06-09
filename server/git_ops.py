@@ -146,13 +146,34 @@ def get_work_info_from_folder(folder_name):
 _images_cache = {}
 
 
+def _get_page_sequence_for_img(folder_path, img_name):
+    """Loeb sequence välja lehekülje JSON-failist (sama loogika nagu meilisearch_ops-is)."""
+    json_path = os.path.join(folder_path, os.path.splitext(img_name)[0] + '.json')
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                d = json.load(f)
+                seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                if seq is not None:
+                    return int(seq)
+        except Exception:
+            pass
+    return float('inf')
+
+
+def _build_images_list(folder_path):
+    """Tagastab sorteeritud piltide nimekirja, kasutades sequence-põhist sortimist (nagu Meilisearch)."""
+    raw = [f for f in os.listdir(folder_path)
+           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+    return sorted(raw, key=lambda f: (_get_page_sequence_for_img(folder_path, f), f))
+
+
 def get_page_number_from_txt(folder_name, txt_filename):
     """
     Leiab lehekülje numbri txt-faili järgi.
 
-    Meilisearch kasutab PILDI positsiooni sorteeritud nimekirjas (1-indekseeritud).
-    See funktsioon tagastab sama numbri, et Review lehel ja Workspace'is
-    oleksid samad leheküljenumbrid.
+    Kasutab sequence-põhist sortimist (sama mis meilisearch_ops), et numbrid
+    klapsaksid Workspace URL-iga.
 
     Args:
         folder_name: Kausta nimi (nt "1632-1")
@@ -161,13 +182,10 @@ def get_page_number_from_txt(folder_name, txt_filename):
     Returns:
         int: Lehekülje number (1-indekseeritud) või 1 kui ei leia
     """
-    # Kasuta cache'i
     if folder_name not in _images_cache:
         folder_path = os.path.join(BASE_DIR, folder_name)
         if os.path.exists(folder_path):
-            images = sorted([f for f in os.listdir(folder_path)
-                           if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')])
-            _images_cache[folder_name] = images
+            _images_cache[folder_name] = _build_images_list(folder_path)
         else:
             _images_cache[folder_name] = []
 
