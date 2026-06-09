@@ -326,6 +326,11 @@ def sync_work_to_meilisearch(dir_name):
     title = metadata.get('title', 'Pealkiri puudub')
     year = metadata.get('year', 0)
     year_display = metadata.get('year_display') or None
+    # Kui year puudub aga year_display sisaldab aastat (nt "ca. 1750"), kasuta seda filtri jaoks
+    if not year and year_display:
+        _m = re.search(r'\d{4}', year_display)
+        if _m:
+            year = int(_m.group())
 
     # Autor ja respondens creators massiivist
     creators = metadata.get('creators', [])
