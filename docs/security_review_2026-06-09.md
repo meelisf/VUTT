@@ -69,6 +69,57 @@ leitavad ja kraabitavad. Sihitud lõppaudit selle nurga alt.
 
 Kõik kolm on **nginx/serveri muudatused** (mitte repo-koodis jõustatavad) ja vajavad live-testi (rate limit liiga madalal katkestaks SPA). Prod nginx tuleb enne kontrollida (CSP näitas, et repo võib triivida).
 
+### Tegevusplaan — M1 (`/meili/` rate limit), teostus 2026-06-11
+
+> Eesmärk: peatada kraapijad/DoS, MITTE piirata legitiimset kasutust. SPA teeb ühe
+> lehe laadimisel mitu meili-päringut → limiit peab olema HELDE.
+
+**Samm 0 — kontrolli prod-i (repo võib triivida):**
+```bash
+ssh vutt "grep -nE 'limit_req_zone|location /meili/|limit_req' /etc/nginx/sites-available/vutt"
+ssh vutt "sudo cp /etc/nginx/sites-available/vutt /etc/nginx/sites-available/vutt.bak-$(date +%F)"  # varukoopia
+```
+
+**Samm 1 — uus dedicated zone** (`http {}` blokki, kus on juba `vutt_auth`/`vutt_api` zone'id):
+```nginx
+# Otsing on bursti-rohke (SPA: search + facetid + suggestions ühe laadimisega) → helde
+limit_req_zone $binary_remote_addr zone=vutt_meili:10m rate=20r/s;
+```
+
+**Samm 2 — rakenda `/meili/` blokis** (`nginx.host.conf:130` / prod vastav):
+```nginx
+location /meili/ {
+    limit_req zone=vutt_meili burst=50 nodelay;   # ~20 r/s püsiv, kuni 50 burst
+    proxy_pass http://127.0.0.1:7700/;
+    proxy_set_header Host $host;
+    proxy_set_header Authorization $http_authorization;
+}
+```
+Lähtekoht: `rate=20r/s` + `burst=50`. Kui live-test näitab 429 normaalkasutuses → tõsta
+burst (nt 100) või rate. Kui liiga lõtv → langeta järk-järgult.
+
+**Samm 3 — rakenda + valideeri:**
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+**Samm 4 — live-test brauseris (KOHUSTUSLIK, devtools Network avatud):**
+- [ ] Dashboard laeb täielikult, teosed nähtaval (mitu meili-päringut korraga → ei tohi 429)
+- [ ] Otsing toimib, tulemused tulevad
+- [ ] Facetite/filtrite kiire klõpsimine järjest → ei tohi 429
+- [ ] Kollektsiooni vahetus → ei tohi 429
+- [ ] Teose vaade avaneb (viewer-token + Meilisearch)
+- [ ] `ssh vutt "sudo tail -50 /var/log/nginx/error.log | grep limiting"` — kontrolli, kas legitiimset kasutust limititi
+- [ ] DoS-kontroll: `for i in $(seq 1 100); do curl -s -o /dev/null -w "%{http_code} " https://vutt.utlib.ut.ee/meili/health; done` → peab hakkama tagastama 429
+
+**Rollback (kui midagi katki):** `sudo cp /etc/nginx/sites-available/vutt.bak-<kuupäev> /etc/nginx/sites-available/vutt && sudo nginx -t && sudo systemctl reload nginx`
+
+**Sünkrooni repo:** sama muudatus ka `nginx.host.conf`-i (zone + `/meili/` blokk), et repo ei triiviks prod-ist (Leid 4/D õppetund).
+
+### M2 / M3 (sama päev, kui aega) — lühidalt
+- **M2:** `location /api/images/` lisa `limit_req zone=vutt_api burst=50 nodelay;` (helde, pildid laetakse mitu korraga). Kaalu `access_log` osaline tagasilülitamine (kraapimise nähtavus).
+- **M3:** `proxy_set_header Authorization "";` `/meili/` blokis SUNNIB search-key kasutust. **Test enne:** kinnita, et frontend kasutab tenant-tokenit query-param/muul viisil, mitte Authorization-header'is — vastasel juhul katkeks otsing. Kui ebakindel, jäta praeguseks (Leid 1 järel madal risk).
+
 ## Mis jäi tegemata (teadlik, madal prioriteet)
 
 | Teema | Miks edasi lükatud |
