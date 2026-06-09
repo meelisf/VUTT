@@ -86,6 +86,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [annPopover, setAnnPopover] = useState<{ annId: number; x: number; y: number } | null>(null);
   const [annPopoverEditing, setAnnPopoverEditing] = useState(false);
   const [annPopoverEditText, setAnnPopoverEditText] = useState('');
+  const [annPopoverPendingDelete, setAnnPopoverPendingDelete] = useState(false);
   const annPopoverAnnotationsRef = useRef(textAnnotations);
   useEffect(() => { annPopoverAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
   const [annDialogError, setAnnDialogError] = useState('');
@@ -543,6 +544,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       if (!target) {
         setAnnPopover(null);
         setAnnPopoverEditing(false);
+        setAnnPopoverPendingDelete(false);
         return;
       }
       const annId = parseInt(target.getAttribute('data-ann-id') || '', 10);
@@ -552,6 +554,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       setAnnPopover({ annId, x: rect.left + rect.width / 2, y: rect.top });
       setAnnPopoverEditing(false);
       setAnnPopoverEditText('');
+      setAnnPopoverPendingDelete(false);
     };
 
     container.addEventListener('click', handleClick);
@@ -561,7 +564,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // Sulge popover klikkimisel väljaspool
   useEffect(() => {
     if (!annPopover) return;
-    const handleOutside = () => { setAnnPopover(null); setAnnPopoverEditing(false); };
+    const handleOutside = () => { setAnnPopover(null); setAnnPopoverEditing(false); setAnnPopoverPendingDelete(false); };
     document.addEventListener('click', handleOutside);
     return () => document.removeEventListener('click', handleOutside);
   }, [annPopover]);
@@ -1048,23 +1051,44 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                 <div className="flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 pt-2">
                   <span>{ann.author}</span>
                   {!readOnly && (
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(ann.comment); }}
-                        className="px-2 py-1 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                        title={t('info.editComment')}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { handleDeleteAndSaveTextAnnotation(ann.id); setAnnPopover(null); }}
-                        className="px-2 py-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title={t('info.deleteComment')}
-                      >
-                        ✕
-                      </button>
+                    <div className="flex gap-2 items-center">
+                      {annPopoverPendingDelete ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { handleDeleteAndSaveTextAnnotation(ann.id); setAnnPopover(null); }}
+                            className="text-xs text-red-600 hover:text-red-800 font-medium"
+                          >
+                            {t('common:buttons.delete', 'Kustuta')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAnnPopoverPendingDelete(false)}
+                            className="text-xs text-gray-400 hover:text-gray-700"
+                          >
+                            {t('common:buttons.cancel', 'Tühista')}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(ann.comment); }}
+                            className="px-2 py-1 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                            title={t('info.editComment')}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAnnPopoverPendingDelete(true)}
+                            className="px-2 py-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title={t('info.deleteComment')}
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1111,7 +1135,24 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
               ) : (
                 <>
                   <p className="text-xs text-amber-600 italic mb-3">{t('annotations.orphanedAnchor', 'Kommentaar puudub')}</p>
-                  {!readOnly && (
+                  {!readOnly && (annPopoverPendingDelete ? (
+                    <div className="flex gap-2 items-center">
+                      <button
+                        type="button"
+                        onClick={() => { removeAnnotationFromEditor(annPopover.annId); setAnnPopover(null); }}
+                        className="text-xs text-red-600 hover:text-red-800 font-medium"
+                      >
+                        {t('common:buttons.delete', 'Kustuta')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setAnnPopoverPendingDelete(false)}
+                        className="text-xs text-gray-400 hover:text-gray-700"
+                      >
+                        {t('common:buttons.cancel', 'Tühista')}
+                      </button>
+                    </div>
+                  ) : (
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1122,14 +1163,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       </button>
                       <button
                         type="button"
-                        onClick={() => { removeAnnotationFromEditor(annPopover.annId); setAnnPopover(null); }}
+                        onClick={() => setAnnPopoverPendingDelete(true)}
                         className="px-2 py-1.5 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
                         title={t('annotations.deleteAnchor', 'Kustuta ankur')}
                       >
                         ✕
                       </button>
                     </div>
-                  )}
+                  ))}
                 </>
               )}
             </div>
