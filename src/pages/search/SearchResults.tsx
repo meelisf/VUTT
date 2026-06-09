@@ -12,6 +12,7 @@ import { getLangCode } from '../../utils/getLangCode';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { parseYearDisplayRange } from '../../utils/yearDisplayUtils';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
@@ -65,7 +66,7 @@ export interface SearchResultsProps {
     scopeParam: 'all' | 'original' | 'annotation';
     vocabularies: Vocabularies | null;
     onAuthorFilter: (authorName: string) => void;
-    onYearFilter: (year: string) => void;
+    onYearFilter: (start: string, end: string) => void;
     onSearchInWork: (workId: string, info: WorkInfo) => void;
     onPageChange: (page: number) => void;
 }
@@ -392,14 +393,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                                     {/* Aasta */}
                                                     <button
                                                         onClick={() => {
-                                                            const year = firstHit.year?.toString();
-                                                            if (year) onYearFilter(year);
+                                                            const range = parseYearDisplayRange(firstHit.year, (firstHit as any).year_display);
+                                                            if (range) onYearFilter(range.start.toString(), range.end.toString());
                                                         }}
                                                         className="text-gray-700 flex items-center gap-1 hover:text-primary-600 transition-colors text-left"
                                                         title={t('results.searchYearWorks')}
                                                     >
                                                         <Calendar size={12} className="text-gray-400" />
-                                                        <span className="hover:underline">{firstHit.year ?? (firstHit as any).aasta ?? '...'}</span>
+                                                        <span className="hover:underline">{(firstHit as any).year_display ?? firstHit.year ?? (firstHit as any).aasta ?? '...'}</span>
                                                     </button>
 
                                                     {/* Žanr */}

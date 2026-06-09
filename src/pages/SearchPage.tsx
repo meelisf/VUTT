@@ -384,10 +384,10 @@ const SearchPage: React.FC = () => {
                         actions.setAuthorInput(authorName);
                         setSearchParams(prev => { prev.set('author', authorName); prev.set('p', '1'); return prev; });
                     }}
-                    onYearFilter={(year) => {
-                        actions.setYearStart(year);
-                        actions.setYearEnd(year);
-                        setSearchParams(prev => { prev.set('ys', year); prev.set('ye', year); prev.set('p', '1'); return prev; });
+                    onYearFilter={(start, end) => {
+                        actions.setYearStart(start);
+                        actions.setYearEnd(end);
+                        setSearchParams(prev => { prev.set('ys', start); prev.set('ye', end); prev.set('p', '1'); return prev; });
                     }}
                     onSearchInWork={(workId, info) => {
                         actions.setSelectedWork(workId);

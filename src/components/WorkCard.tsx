@@ -11,6 +11,7 @@ import { getLangCode } from '../utils/getLangCode';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { parseYearDisplayRange } from '../utils/yearDisplayUtils';
 
 interface WorkCardProps {
   work: Work;
@@ -311,8 +312,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
           <button
             onClick={(e) => {
               e.preventDefault();
-              // Navigate to dashboard with year filter
-              navigate(`/?ys=${work.year}&ye=${work.year}`);
+              const range = parseYearDisplayRange(work.year, work.year_display);
+              if (range) navigate(`/?ys=${range.start}&ye=${range.end}`);
             }}
             className="flex items-center gap-2 hover:text-primary-600 transition-colors text-left w-full"
             title={t('workCard.filterByYear')}
