@@ -96,23 +96,28 @@ def test_sitemap_uses_snapshot_not_live_cache(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_csp_no_unsafe_inline_in_nginx_config():
-    """Nginx konfiguratsioon ei tohi sisaldada script-src unsafe-inline."""
-    import subprocess
-    result = subprocess.run(
-        ["ssh", "vutt", "grep -n 'unsafe-inline' /etc/nginx/sites-available/vutt"],
-        capture_output=True, text=True, timeout=10,
-    )
+    """Repo nginx.host.conf CSP script-src ei tohi sisaldada 'unsafe-inline' (Leid 4/D).
+
+    Loeb REPO faili (mitte SSH produktsiooni) — nii valideerivad lokaalsed testid ja CI,
+    et reposse ei satuks ebaturvalist CSP-d märkamatult. style-src 'unsafe-inline' on lubatud
+    (Tailwind runtime stiilid).
+    """
     import re
+    from pathlib import Path
+
+    config_path = Path(__file__).resolve().parent.parent / "nginx.host.conf"
+    content = config_path.read_text(encoding="utf-8")
+
     problem_lines = []
-    for line in result.stdout.splitlines():
+    for line in content.splitlines():
         if "Content-Security-Policy" not in line:
             continue
         # Eraldame script-src direktiivi väärtuse (lõpeb ';' või stringilõpuga)
         m = re.search(r"script-src\s+([^;\"]+)", line)
         if m and "'unsafe-inline'" in m.group(1):
-            problem_lines.append(line)
+            problem_lines.append(line.strip())
     assert not problem_lines, (
-        f"Nginx CSP script-src sisaldab unsafe-inline:\n" + "\n".join(problem_lines)
+        "nginx.host.conf CSP script-src sisaldab 'unsafe-inline':\n" + "\n".join(problem_lines)
     )
 
 

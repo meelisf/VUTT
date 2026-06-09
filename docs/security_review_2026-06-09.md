@@ -385,7 +385,7 @@ Eelnev ülevaade keskendus avalikule pinnale (SEO, XSS, CSP, saladused, rate lim
 | **A** — renderVuttMarkup atribuudid | ✅ **parandatud** | pre-escape kõik `<` mis pole VUTT-tägi (`renderVuttMarkup.ts`); 18 testi `sanitizeHtml.test.ts` + `renderVuttMarkup.test.ts` |
 | **L** (uus) — PlacesMergeModal i18n XSS | ✅ **parandatud** | `escapeValue:false` + `dangerouslySetInnerHTML` + kohanimi → `escapeHtml(sourceName)` enne `t()`; editor/admin-skoobis, kuid kaitse sügavuti |
 | **K** — lost-update isikufailides | ⏸ ootab | per-isiku lukk; andmeterviklus, mitte turvaauk |
-| **4/D** — CSP unsafe-inline + test | ⏸ ootab | vajab elava frontendi testimist (CodeMirror, modaalid) pärast `script-src` kitsendamist |
+| **4/D** — CSP unsafe-inline + test | ✅ **parandatud** | **Produktsioon oli juba õige** (`/etc/nginx/sites-available/vutt` script-src ilma unsafe-inline). Repo `nginx.host.conf` oli mittesünkroonis → eemaldatud `'unsafe-inline'` script-src-ist (style-src jäi). Test loeb nüüd repo faili (mitte SSH). JSON-LD + Umami töötavad prod-is selle CSP-ga → empiiriliselt kinnitatud, et inline JSON-LD pole blokeeritud |
 | Madal: Pillow bomb, enumeratsioon, SPARQL | ⏸ ootab | madala prioriteediga kõvendus |
 
 Backend: kõik 307 testi läbivad. Frontend: kõik 276 testi läbivad + `npm run build` ok. (v.a SSH-sõltuv CSP-test, vt Leid D). Allpool leidude täiskirjeldus.
