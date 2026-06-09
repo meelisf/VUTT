@@ -83,9 +83,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const [annDialogOpen, setAnnDialogOpen] = useState(false);
   const [annDialogComment, setAnnDialogComment] = useState('');
-  const [annTooltip, setAnnTooltip] = useState<{ comment: string; x: number; y: number } | null>(null);
-  const annTooltipAnnotationsRef = useRef(textAnnotations);
-  useEffect(() => { annTooltipAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
+  const [annPopover, setAnnPopover] = useState<{ annId: number; x: number; y: number } | null>(null);
+  const [annPopoverEditing, setAnnPopoverEditing] = useState(false);
+  const [annPopoverEditText, setAnnPopoverEditText] = useState('');
+  const annPopoverAnnotationsRef = useRef(textAnnotations);
+  useEffect(() => { annPopoverAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
   const [annDialogError, setAnnDialogError] = useState('');
   const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
@@ -536,30 +538,33 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const container = editorContainerRef.current;
     if (!container) return;
 
-    const handleMouseOver = (e: MouseEvent) => {
+    const handleClick = (e: MouseEvent) => {
       const target = (e.target as Element).closest('[data-ann-id]') as HTMLElement | null;
-      if (!target) return;
+      if (!target) {
+        setAnnPopover(null);
+        setAnnPopoverEditing(false);
+        return;
+      }
       const annId = parseInt(target.getAttribute('data-ann-id') || '', 10);
       if (isNaN(annId)) return;
-      const ann = annTooltipAnnotationsRef.current.find(a => a.id === annId);
-      if (!ann) return;
+      e.stopPropagation();
       const rect = target.getBoundingClientRect();
-      setAnnTooltip({ comment: ann.comment, x: rect.left + rect.width / 2, y: rect.top });
+      setAnnPopover({ annId, x: rect.left + rect.width / 2, y: rect.top });
+      setAnnPopoverEditing(false);
+      setAnnPopoverEditText('');
     };
 
-    const handleMouseOut = (e: MouseEvent) => {
-      const related = e.relatedTarget as Element | null;
-      if (related?.closest('[data-ann-id]')) return;
-      setAnnTooltip(null);
-    };
+    container.addEventListener('click', handleClick);
+    return () => container.removeEventListener('click', handleClick);
+  }, []); // mount kord — annPopoverAnnotationsRef hoiab annotations ajakohasena
 
-    container.addEventListener('mouseover', handleMouseOver);
-    container.addEventListener('mouseout', handleMouseOut);
-    return () => {
-      container.removeEventListener('mouseover', handleMouseOver);
-      container.removeEventListener('mouseout', handleMouseOut);
-    };
-  }, []); // mount kord — annTooltipAnnotationsRef hoiab annotations ajakohasena
+  // Sulge popover klikkimisel väljaspool
+  useEffect(() => {
+    if (!annPopover) return;
+    const handleOutside = () => { setAnnPopover(null); setAnnPopoverEditing(false); };
+    document.addEventListener('click', handleOutside);
+    return () => document.removeEventListener('click', handleOutside);
+  }, [annPopover]);
 
   const insertAnnotation = useCallback((comment: string) => {
     const view = viewRef.current;
@@ -991,14 +996,147 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       </div>
     </div>
 
-    {annTooltip && (
-      <div
-        className="fixed z-40 bg-gray-900 text-white text-xs rounded px-2 py-1.5 max-w-xs shadow-lg pointer-events-none"
-        style={{ left: annTooltip.x, top: annTooltip.y - 36, transform: 'translateX(-50%)' }}
-      >
-        {annTooltip.comment}
-      </div>
-    )}
+    {annPopover && (() => {
+      const ann = annPopoverAnnotationsRef.current.find(a => a.id === annPopover.annId);
+      return (
+        <div
+          className="fixed z-40 bg-white border border-gray-200 rounded-lg shadow-xl w-72 max-w-xs"
+          style={{ left: annPopover.x, top: annPopover.y - 8, transform: 'translate(-50%, -100%)' }}
+          onClick={e => e.stopPropagation()}
+        >
+          {ann ? (
+            annPopoverEditing ? (
+              <div className="p-3 space-y-2">
+                <textarea
+                  autoFocus
+                  className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none"
+                  rows={3}
+                  value={annPopoverEditText}
+                  onChange={e => setAnnPopoverEditText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setAnnPopoverEditing(false); }
+                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && annPopoverEditText.trim()) {
+                      const updated = annPopoverAnnotationsRef.current.map(a => a.id === ann.id ? { ...a, comment: annPopoverEditText.trim() } : a);
+                      handleSaveTextAnnotations(updated);
+                      setAnnPopover(null);
+                      setAnnPopoverEditing(false);
+                    }
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={() => setAnnPopoverEditing(false)} className="px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100">
+                    {t('common:buttons.cancel', 'Tühista')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!annPopoverEditText.trim()}
+                    onClick={() => {
+                      const updated = annPopoverAnnotationsRef.current.map(a => a.id === ann.id ? { ...a, comment: annPopoverEditText.trim() } : a);
+                      handleSaveTextAnnotations(updated);
+                      setAnnPopover(null);
+                      setAnnPopoverEditing(false);
+                    }}
+                    className="px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50"
+                  >
+                    {t('common:buttons.save', 'Salvesta')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3">
+                <p className="text-sm text-gray-800 mb-2 leading-relaxed whitespace-pre-wrap">{ann.comment}</p>
+                <div className="flex items-center justify-between text-xs text-gray-400 border-t border-gray-100 pt-2">
+                  <span>{ann.author}</span>
+                  {!readOnly && (
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(ann.comment); }}
+                        className="px-2 py-1 text-gray-500 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                        title={t('info.editComment')}
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { handleDeleteAndSaveTextAnnotation(ann.id); setAnnPopover(null); }}
+                        className="px-2 py-1 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title={t('info.deleteComment')}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          ) : (
+            <div className="p-3">
+              {annPopoverEditing ? (
+                <div className="space-y-2">
+                  <textarea
+                    autoFocus
+                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none"
+                    rows={3}
+                    placeholder={t('editor.annotateCommentPlaceholder', 'Kommentaar...')}
+                    value={annPopoverEditText}
+                    onChange={e => setAnnPopoverEditText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') { setAnnPopoverEditing(false); }
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && annPopoverEditText.trim()) {
+                        const newAnn: TextAnnotation = { id: annPopover.annId, comment: annPopoverEditText.trim(), author: user?.name || 'Anonüümne', created_at: new Date().toISOString() };
+                        handleSaveTextAnnotations([...annPopoverAnnotationsRef.current, newAnn]);
+                        setAnnPopover(null); setAnnPopoverEditing(false);
+                      }
+                    }}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setAnnPopoverEditing(false)} className="px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100">
+                      {t('common:buttons.cancel', 'Tühista')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!annPopoverEditText.trim()}
+                      onClick={() => {
+                        const newAnn: TextAnnotation = { id: annPopover.annId, comment: annPopoverEditText.trim(), author: user?.name || 'Anonüümne', created_at: new Date().toISOString() };
+                        handleSaveTextAnnotations([...annPopoverAnnotationsRef.current, newAnn]);
+                        setAnnPopover(null); setAnnPopoverEditing(false);
+                      }}
+                      className="px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50"
+                    >
+                      {t('common:buttons.save', 'Salvesta')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-amber-600 italic mb-3">{t('annotations.orphanedAnchor', 'Kommentaar puudub')}</p>
+                  {!readOnly && (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(''); }}
+                        className="flex-1 px-2 py-1.5 text-xs text-primary-700 border border-primary-200 rounded hover:bg-primary-50 transition-colors"
+                      >
+                        {t('annotations.addComment', 'Lisa kommentaar')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { removeAnnotationFromEditor(annPopover.annId); setAnnPopover(null); }}
+                        className="px-2 py-1.5 text-xs text-red-600 border border-red-200 rounded hover:bg-red-50 transition-colors"
+                        title={t('annotations.deleteAnchor', 'Kustuta ankur')}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    })()}
 
     {annDialogOpen && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

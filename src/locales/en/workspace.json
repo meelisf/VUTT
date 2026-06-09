@@ -277,6 +277,9 @@
   },
   "annotations": {
     "textAnnotations": "Text annotations",
-    "anchorMissing": "Linked text span not found"
+    "anchorMissing": "Linked text span not found",
+    "orphanedAnchor": "No comment",
+    "addComment": "Add comment",
+    "deleteAnchor": "Delete anchor"
   }
 }
