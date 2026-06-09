@@ -12,3 +12,5 @@ Disallow: /review
 Disallow: /statistics
 Disallow: /api/
 Disallow: /meili/
+
+Sitemap: https://vutt.utlib.ut.ee/sitemap.xml
