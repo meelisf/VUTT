@@ -279,6 +279,7 @@
     "textAnnotations": "Tekst-annotatsioonid",
     "anchorMissing": "Seotud tekstilõiku ei leitud",
     "orphanedAnchor": "Kommentaar puudub",
+    "annotationLabel": "Märge",
     "addComment": "Lisa kommentaar",
     "deleteAnchor": "Kustuta ankur"
   }

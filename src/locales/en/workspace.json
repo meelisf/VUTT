@@ -279,6 +279,7 @@
     "textAnnotations": "Text annotations",
     "anchorMissing": "Linked text span not found",
     "orphanedAnchor": "No comment",
+    "annotationLabel": "Annotation",
     "addComment": "Add comment",
     "deleteAnchor": "Delete anchor"
   }
