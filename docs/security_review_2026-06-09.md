@@ -45,6 +45,30 @@ IMAGE_TOKEN_SECRET=<reaalne>
 ```
 Kui `VUTT_ENV=production` ja saladus on vaikeväärtus/puudub → backend EI käivitu (Leid 1, tahtlik). Umami saladused (`UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET`) on eraldi konteinerites — hallata `.env`-is käsitsi (backend neid ei näe).
 
+## Avastatavuse-fookusega lõppülevaade (2026-06-10)
+
+Sitemap eemaldas "security through obscurity" → avalikud pinnad on nüüd Google'i kaudu
+leitavad ja kraabitavad. Sihitud lõppaudit selle nurga alt.
+
+**Kinnitatud TURVALINE (andmelekke pind — avastatavuse kriitilisim osa):**
+- Kõik teose-sisu lugemisteed jõustavad ligipääsu: `/download`, `/meta/work`, `/viewer-token` → `can_read_work` ✅
+- Anonüümne Meilisearch tenant-token filtreerib `is_public = true` → piiratud teosed pole otsitavad ✅
+- `/get-work-metadata` on `require_role("editor")` — ei leki anonüümselt ✅
+- `work_id` on nanoid (mitte järjestik) → enumeratsioon ebareaalne; sitemap listib ainult `is_work_public` ✅
+- Backend-pordid (7700/8001/8002) seotud `127.0.0.1`-ga → väljastpoolt kättesaamatud, ainult nginx-proxy kaudu ✅
+- `robots.txt` keelab `/admin`, `/api/`, `/meili/`, `/search`, `/register`, `/review`, `/statistics` ✅
+- `/api/meili-token` on nginx `/api/files/` all → kaetud `vutt_api` rate-limitiga (Leid C lahendatud nginx-tasandil) ✅
+
+**Residuaalid (availability / kraapimine — MITTE andmeleke):**
+
+| # | Leid | Mõju | Soovitus |
+|---|------|------|----------|
+| M1 | **`/meili/` ilma rate-limitita** (`nginx.host.conf:130`) — see on PEAMINE avalik otsingurada (frontend pärib `window.location.origin/meili` otse) | Kraapija/ründaja saab Meilisearchi piiramatult koormata → DoS/koormus. Kõige asjakohasem avastatavuse-residuaal | Lisa `limit_req` (nginx-zone'id juba olemas). **NB:** SPA teeb ühe lehe laadimisel mitu meili-päringut (otsing+facetid+suggestions) → vaja helde limiit (oma zone, kõrgem rps), MUIDU katkeb normaalkasutus. Vajab live-testi. Prod nginx võib repo-st erineda (nagu CSP) — kontrolli enne. |
+| M2 | **`/api/images/` ilma rate-limitita + `access_log off`** (`nginx.host.conf:119`) | Crawler saab tõmmata kõik avalikud lehepildid piiramatult; logid pimedad kuritarvitusele. 30d cache leevendab, aga cache-miss origin-päringud piiramata | Mõõdukas `limit_req` (helde, sest legitiimne lugeja laeb mitu pilti); kaalu `access_log` tagasi (vähemalt sample) |
+| M3 | **`/meili/` edastab `Authorization`** (`nginx.host.conf:134`) | Avalik proxy lubab kliendil saata suvalist võtit Meilisearchi. Leid 1 järel on master key reaalne (mitte arvatav) → praktiline risk madal; kaitse sügavuti | Kaaluda `proxy_set_header Authorization ""` (sunnib search-key kasutust) — AGA vajab hoolikat testi, et search-päringud jätkaks tööd |
+
+Kõik kolm on **nginx/serveri muudatused** (mitte repo-koodis jõustatavad) ja vajavad live-testi (rate limit liiga madalal katkestaks SPA). Prod nginx tuleb enne kontrollida (CSP näitas, et repo võib triivida).
+
 ## Mis jäi tegemata (teadlik, madal prioriteet)
 
 | Teema | Miks edasi lükatud |
