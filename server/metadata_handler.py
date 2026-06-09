@@ -95,9 +95,10 @@ def build_meta_html(work_id: str) -> str:
                     description = f"{creator_names}. {year}" if year else creator_names
             except Exception:
                 pass
-        image_url = f"{SITE_URL}/api/images/{work_id}/_thumb"
+        image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_thumb"
 
-    work_url = f"{SITE_URL}/work/{work_id}"
+    safe_work_id = _escape(work_id)
+    work_url = f"{SITE_URL}/work/{safe_work_id}"
     safe_title = _escape(title)
     safe_desc = _escape(description)
     coins_str = _escape(_build_coins(meta)) if meta else ""

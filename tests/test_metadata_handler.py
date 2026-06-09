@@ -239,3 +239,11 @@ def test_unknown_work_returns_fallback(patch_find):
     html = build_meta_html("nonexistent")
     assert "VUTT" in html
     assert "<html>" in html
+
+
+def test_work_id_escaped_in_urls(patch_find):
+    from server.metadata_handler import build_meta_html
+    # work_id tundmatu — fallback haru
+    html_out = build_meta_html('work<script>')
+    assert '<script>' not in html_out
+    assert 'work&lt;script&gt;' in html_out or 'work%3Cscript%3E' in html_out
