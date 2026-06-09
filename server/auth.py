@@ -7,6 +7,7 @@ import hashlib
 import uuid
 import threading
 import time
+import bcrypt
 from datetime import datetime
 from .config import USERS_FILE, SESSION_DURATION
 from .utils import atomic_write_json
@@ -99,21 +100,37 @@ def reload_users_cache():
 load_users()
 
 
+def hash_password(password: str) -> str:
+    """Hashib parooli bcrypt-iga (soolaga)."""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _verify_and_upgrade(username: str, password: str, users: dict) -> bool:
+    """Kontrollib parooli ja uuendab SHA-256 hashi bcrypt-ile sisselogimisel."""
+    stored = users[username]["password_hash"]
+    if stored.startswith("$2b$") or stored.startswith("$2a$"):
+        return bcrypt.checkpw(password.encode(), stored.encode())
+    # SHA-256 tagasiühilduvus — uuenda bcrypt-ile
+    if stored == hashlib.sha256(password.encode()).hexdigest():
+        users[username]["password_hash"] = hash_password(password)
+        save_users(users)
+        return True
+    return False
+
+
 def verify_user(username, password):
     """Kontrollib kasutajanime ja parooli."""
     users = load_users()
     if username not in users:
         return None
-
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-    if users[username]["password_hash"] == password_hash:
-        return {
-            "username": username,
-            "name": users[username]["name"],
-            "role": users[username].get("role", "user"),
-            "allowed_collections": users[username].get("allowed_collections", []),
-        }
-    return None
+    if not _verify_and_upgrade(username, password, users):
+        return None
+    return {
+        "username": username,
+        "name": users[username]["name"],
+        "role": users[username].get("role", "user"),
+        "allowed_collections": users[username].get("allowed_collections", []),
+    }
 
 
 def create_session(user):

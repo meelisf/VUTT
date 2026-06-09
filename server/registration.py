@@ -312,7 +312,8 @@ def create_user_from_invite(token, password):
     # Loo uus kasutaja (vaikimisi editor-roll)
     # Vaikimisi roll on 'editor' (mitte 'contributor'), kuna pending-edits voog
     # pole veel implementeeritud. Muuta ainult koos /save endpointi uuendamisega.
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    from .auth import hash_password
+    password_hash = hash_password(password)
 
     users[username] = {
         "password_hash": password_hash,
