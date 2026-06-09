@@ -2072,6 +2072,10 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
 
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str, request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/meta/work')
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
     meta = _load_work_metadata(work_id)
     if meta is not None:
         user = _get_optional_user(request)
@@ -2095,7 +2099,7 @@ async def sitemap_xml():
     now = time.time()
     if _sitemap_cache["xml"] is None or now > _sitemap_cache["expires"]:
         _sitemap_cache["xml"] = build_sitemap_xml(
-            utils_module.WORK_ID_CACHE,
+            dict(utils_module.WORK_ID_CACHE),
             is_work_public,
             _load_work_metadata,
         )

@@ -143,6 +143,7 @@ RATE_LIMITS = {
     '/register': (6, 3600),         # 6 taotlust tunnis
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
+    '/meta/work': (60, 60),         # 60 bot-metaandmete päringut minutis IP kohta
 }
 
 # =========================================================
