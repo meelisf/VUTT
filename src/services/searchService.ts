@@ -8,6 +8,7 @@ import { checkMixedContent, normalizeWork, normalizeContentSearchHit } from './m
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 import { buildIdMap } from '../utils/buildObjectIdMap';
 import type { MatchingStrategies, Index } from 'meilisearch';
+import { HIGHLIGHT_PRE_TAG, HIGHLIGHT_POST_TAG } from '../utils/sanitizeHtml';
 
 
 // Interface for dashboard search options
@@ -522,8 +523,8 @@ export const searchContent = async (index: Index, query: string, page: number = 
         attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
         // Ei kasuta croppi - näitame kogu teksti
         attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
-        highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
-        highlightPostTag: '</em>',
+        highlightPreTag: HIGHLIGHT_PRE_TAG,
+        highlightPostTag: HIGHLIGHT_POST_TAG,
         attributesToSearchOn: attributesToSearchOn,
         matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
       });
@@ -633,8 +634,8 @@ export const searchContent = async (index: Index, query: string, page: number = 
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
           attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
-          highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
-          highlightPostTag: '</em>',
+          highlightPreTag: HIGHLIGHT_PRE_TAG,
+          highlightPostTag: HIGHLIGHT_POST_TAG,
           attributesToSearchOn: attributesToSearchOn
         }),
         // Päring 3: Lehekülgede arvud teoste kaupa (work_id facet)
@@ -740,8 +741,8 @@ export const searchWorkHits = async (index: Index, query: string, workId: string
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
       attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
-      highlightPreTag: '<em class="bg-yellow-200 font-bold not-italic">',
-      highlightPostTag: '</em>',
+      highlightPreTag: HIGHLIGHT_PRE_TAG,
+      highlightPostTag: HIGHLIGHT_POST_TAG,
       sort: ['lehekylje_number:asc'],
       attributesToSearchOn: attributesToSearchOn,
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies

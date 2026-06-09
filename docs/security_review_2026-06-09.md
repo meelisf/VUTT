@@ -380,10 +380,17 @@ Eelnev ülevaade keskendus avalikule pinnale (SEO, XSS, CSP, saladused, rate lim
 | **J** — Wikidata-proksi rate limit | ✅ **parandatud** | `RATE_LIMITS['/prosopography/wikidata'] = (30, 60)`; `_check_wikidata_rate_limit` mõlemal avalikul endpointil |
 | **G** — `allowed_collections` write-kontroll | ✅ **parandatud** | otsus: jah. `can_write_work` (`access_ops.py`) = `can_read_work` + nõuab autenditud kasutaja; rakendatud `/save` ja `/work/{id}/shareable`; ei mõjuta avalike teoste editeerimist; 5 testi `test_access_ops.py`-s |
 | **I** — sessiooni rolli-hetktõmmis | ✅ **parandatud** | Variant B: invalideeri sessioonid muutmisel (null kulu päringu kohta). `delete_user_sessions` (`auth.py`) kutsutud `update_user_role`, `delete_user` ja kollektsiooni-ligipääsu muutmisel (`main.py`); parandab ka latentse lukuvea `delete_user`-is; 4 testi `test_session_invalidation.py`-s |
+| **1** — vaikimisi saladused | ✅ **parandatud** | `check_production_secrets()` (`config.py`) `sys.exit` kui `VUTT_ENV=production` + vaikesaladus/puudub; `docker-compose.yml` `VUTT_ENV`; 7 testi. Deploy: serveri `.env`-is juba seatud |
+| **B** — kommentaarid/snippet/tag XSS | ✅ **parandatud** | uus `src/utils/sanitizeHtml.ts` `sanitizeHighlight` (escape kõik, taasta ainult highlight-tägi); rakendatud `SearchResults.tsx` 3 kohas; highlight-tägi konstandid jagatud `searchService.ts`-ga. **NB:** valisin escape-restore mustri DOMPurify asemel (node test-env, 0 sõltuvust) |
+| **A** — renderVuttMarkup atribuudid | ✅ **parandatud** | pre-escape kõik `<` mis pole VUTT-tägi (`renderVuttMarkup.ts`); 18 testi `sanitizeHtml.test.ts` + `renderVuttMarkup.test.ts` |
+| **L** (uus) — PlacesMergeModal i18n XSS | ✅ **parandatud** | `escapeValue:false` + `dangerouslySetInnerHTML` + kohanimi → `escapeHtml(sourceName)` enne `t()`; editor/admin-skoobis, kuid kaitse sügavuti |
 | **K** — lost-update isikufailides | ⏸ ootab | per-isiku lukk; andmeterviklus, mitte turvaauk |
+| **4/D** — CSP unsafe-inline + test | ⏸ ootab | vajab elava frontendi testimist (CodeMirror, modaalid) pärast `script-src` kitsendamist |
 | Madal: Pillow bomb, enumeratsioon, SPARQL | ⏸ ootab | madala prioriteediga kõvendus |
 
-Kõik 291 testi läbivad (v.a SSH-sõltuv CSP-test, vt Leid D). Allpool leidude täiskirjeldus.
+Backend: kõik 307 testi läbivad. Frontend: kõik 276 testi läbivad + `npm run build` ok. (v.a SSH-sõltuv CSP-test, vt Leid D). Allpool leidude täiskirjeldus.
+
+**Uus leid L (gap-review käigus, ei olnud algses ülevaates):** `escapeValue: false` (i18n.ts) tähendab, et react-i18next EI escape'i interpoleeritud väärtusi. Enamik `dangerouslySetInnerHTML` + `t()` kohti interpoleerib ainult arve (ohutu), AGA `PlacesMergeModal.tsx` interpoleeris kohanime (kasutaja/admin-sisend) → võimalik stored XSS editor/admin-skoobis. Parandatud `escapeHtml`-iga. `MarkdownPreview.tsx` kontrollitud — escape'ib sisendi esimesena (ohutu) ja pole praegu kasutusel.
 
 ### Kõrge — uus leid, osaliselt autentimata
 

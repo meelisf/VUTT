@@ -13,6 +13,7 @@ import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseYearDisplayRange } from '../../utils/yearDisplayUtils';
+import { sanitizeHighlight } from '../../utils/sanitizeHtml';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
@@ -185,7 +186,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                         {(scopeParam === 'all' || scopeParam === 'original') && snippet && (
                             <div
                                 className="text-sm text-gray-800 leading-relaxed font-serif bg-white p-2 rounded border border-gray-100 shadow-sm"
-                                dangerouslySetInnerHTML={{ __html: snippet.replace(/\n/g, '<br>') }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHighlight(snippet, { allowBr: true }) }}
                             />
                         )}
                         {(hasHighlightedTags || showRawTags) && (
@@ -200,7 +201,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                     : formattedTags?.filter((tag: string) => tag.includes('<em')).map((tagHtml: string, idx: number) => (
                                         <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full">
                                             <Tag size={10} />
-                                            <span dangerouslySetInnerHTML={{ __html: tagHtml }} />
+                                            <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(tagHtml) }} />
                                         </span>
                                     ))
                                 }
@@ -216,7 +217,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                         </div>
                                         {showRawComments
                                             ? <div>{comment.text}</div>
-                                            : <div dangerouslySetInnerHTML={{ __html: comment.text }} />
+                                            : <div dangerouslySetInnerHTML={{ __html: sanitizeHighlight(comment.text) }} />
                                         }
                                     </div>
                                 ))}

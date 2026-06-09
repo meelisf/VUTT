@@ -4,6 +4,10 @@
 export function renderVuttMarkup(text: string): string {
   let html = text
     .replace(/&/g, '&amp;')
+    // Escape kõik < mis EI alusta lubatud VUTT-tägi (avav/sulgev) → kaitse HTML-injektsiooni
+    // eest (security_review Leid A). Kasutaja sisestatud <span onclick=...>, <img onerror=...>
+    // jne muutuvad &lt;-ks; ainult VUTT-tägid (b,i,cs,m,hi,fn,pb) jäävad töötlemiseks alles.
+    .replace(/<(?!\/?(?:b|i|cs|m|hi|fn|pb)\b)/g, '&lt;')
     // <pb/> — leheküljevahetus
     .replace(/<pb\/>/g, '<span class="block text-center text-gray-300 text-xs my-1 select-none">── lk ──</span>')
     // <fn>n</fn> — joonealune viide superscriptina
