@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, ChevronLeft, Wrench } from 'lucide-react';
+import { RefreshCw, ChevronLeft, Wrench, Pencil, Trash2 } from 'lucide-react';
 import Header from '../../components/Header';
 import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
@@ -357,17 +357,17 @@ const Maintenance: React.FC = () => {
                                 <>
                                   <button
                                     onClick={() => { setEditingId(id); setEditName(info.name); setEditUrl(info.url || ''); setEditError(''); }}
-                                    className="text-xs text-gray-400 hover:text-gray-700"
+                                    className="text-gray-300 hover:text-gray-600 transition-colors"
                                     title={t('common:buttons.edit')}
                                   >
-                                    ✎
+                                    <Pencil size={13} />
                                   </button>
                                   <button
                                     onClick={() => setPendingDeleteId(id)}
-                                    className="text-xs text-gray-300 hover:text-red-400"
+                                    className="text-gray-300 hover:text-red-500 transition-colors"
                                     title={t('common:buttons.delete')}
                                   >
-                                    ×
+                                    <Trash2 size={13} />
                                   </button>
                                 </>
                               )}
