@@ -25,6 +25,7 @@ from ..config import (
 )
 from ..utils import generate_nanoid, atomic_write_json
 from ..git_ops import save_with_git, delete_file_from_git
+from .locks import person_lock
 from .work_relations_ops import update_works_creators_index, build_works_creators_index, get_work_relations
 from .places_ops import (
     _resolve_origin_group,
@@ -553,44 +554,47 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     Kui data["updated_at"] ei klapi failiga → tõstatab ValueError("conflict").
     Kui name.label muutus, uuendatakse ka teoste creator labelid.
     """
-    person = get_person(person_id)
-    if person is None:
-        raise KeyError(person_id)
+    # Per-isiku lukk: serialiseerib read-modify-write, et taustal jooksev sync_reciprocals
+    # või paralleelne edit ei kirjutaks muudatusi üle (Leid K).
+    with person_lock(person_id):
+        person = get_person(person_id)
+        if person is None:
+            raise KeyError(person_id)
 
-    # Optimistlik konkurentsikontroll
-    client_updated_at = data.get("updated_at")
-    if client_updated_at and person.get("updated_at") != client_updated_at:
-        raise ValueError(f"conflict:{person['updated_at']}")
+        # Optimistlik konkurentsikontroll
+        client_updated_at = data.get("updated_at")
+        if client_updated_at and person.get("updated_at") != client_updated_at:
+            raise ValueError(f"conflict:{person['updated_at']}")
 
-    old_label = (person.get("name") or {}).get("label") or ""
+        old_label = (person.get("name") or {}).get("label") or ""
 
-    now = datetime.now(timezone.utc).isoformat()
-    # Säilitame süsteemiväljad, ülekirjutame kasutaja andmed
-    for key in ("id", "created_at", "created_by", "schema_version",
-                "import_batch_ids", "merged_into", "auth_token", "token"):
-        data.pop(key, None)
+        now = datetime.now(timezone.utc).isoformat()
+        # Säilitame süsteemiväljad, ülekirjutame kasutaja andmed
+        for key in ("id", "created_at", "created_by", "schema_version",
+                    "import_batch_ids", "merged_into", "auth_token", "token"):
+            data.pop(key, None)
 
-    person.update(data)
-    person["updated_at"] = now
-    person["updated_by"] = username
+        person.update(data)
+        person["updated_at"] = now
+        person["updated_by"] = username
 
-    # Normaliseeri päritolukoht places.json-st
-    origin = person.get("origin") or {}
-    if origin.get("place"):
-        try:
-            person["origin"] = _enrich_origin_from_places(origin)
-        except ValueError:
-            # Tundmatu koht places.json-s — tühjenda place, salvesta muud väljad
-            logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
-            person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
+        # Normaliseeri päritolukoht places.json-st
+        origin = person.get("origin") or {}
+        if origin.get("place"):
+            try:
+                person["origin"] = _enrich_origin_from_places(origin)
+            except ValueError:
+                # Tundmatu koht places.json-s — tühjenda place, salvesta muud väljad
+                logger.warning("Tundmatu päritolukoht: %r — place tühjendatakse", origin.get("place"))
+                person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
 
-    name = (person.get("name") or {}).get("label") or person_id
-    save_with_git(
-        _id_to_path(person_id),
-        json.dumps(person, ensure_ascii=False, indent=2),
-        username,
-        message=f"Prosopo muudatus: {name} [{person_id}]",
-    )
+        name = (person.get("name") or {}).get("label") or person_id
+        save_with_git(
+            _id_to_path(person_id),
+            json.dumps(person, ensure_ascii=False, indent=2),
+            username,
+            message=f"Prosopo muudatus: {name} [{person_id}]",
+        )
     _update_index_entry(person)
     _update_aliases_entry(person)
 
@@ -985,31 +989,33 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     """
     from .enrichment import fetch_and_diff
 
-    person = get_person(person_id)
-    if person is None:
-        raise KeyError(person_id)
+    # Per-isiku lukk: read-modify-write serialiseerimine (Leid K).
+    with person_lock(person_id):
+        person = get_person(person_id)
+        if person is None:
+            raise KeyError(person_id)
 
-    # Kontrolli duplikaati
-    existing = person.get("identifiers") or []
-    for ident in existing:
-        if ident.get("scheme") == scheme and ident.get("id") == ext_id:
-            break
-    else:
-        existing.append({"scheme": scheme, "id": ext_id, "checked_at": None})
-        person["identifiers"] = existing
+        # Kontrolli duplikaati
+        existing = person.get("identifiers") or []
+        for ident in existing:
+            if ident.get("scheme") == scheme and ident.get("id") == ext_id:
+                break
+        else:
+            existing.append({"scheme": scheme, "id": ext_id, "checked_at": None})
+            person["identifiers"] = existing
 
-    diff = fetch_and_diff(scheme, ext_id, person)
+        diff = fetch_and_diff(scheme, ext_id, person)
 
-    now = datetime.now(timezone.utc).isoformat()
-    person["updated_at"] = now
-    person["updated_by"] = username
-    name = (person.get("name") or {}).get("label") or person_id
-    save_with_git(
-        _id_to_path(person_id),
-        json.dumps(person, ensure_ascii=False, indent=2),
-        username,
-        message=f"Prosopo identifikaator: {name} [{person_id}]",
-    )
+        now = datetime.now(timezone.utc).isoformat()
+        person["updated_at"] = now
+        person["updated_by"] = username
+        name = (person.get("name") or {}).get("label") or person_id
+        save_with_git(
+            _id_to_path(person_id),
+            json.dumps(person, ensure_ascii=False, indent=2),
+            username,
+            message=f"Prosopo identifikaator: {name} [{person_id}]",
+        )
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person, diff
@@ -1111,10 +1117,6 @@ def delete_person_image(person_id: str, username: str) -> dict:
 
 def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
     """Rakendab kasutaja kinnitatud rikastusmuudatused."""
-    person = get_person(person_id)
-    if person is None:
-        raise KeyError(person_id)
-
     def _deep_set(obj: dict, path: str, value):
         """Seab obj[a][b] = value dotted path järgi."""
         parts = path.split(".", 1)
@@ -1125,26 +1127,32 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
                 obj[parts[0]] = {}
             _deep_set(obj[parts[0]], parts[1], value)
 
-    for field_path, value in approved.items():
-        _deep_set(person, field_path, value)
+    # Per-isiku lukk: read-modify-write serialiseerimine (Leid K).
+    with person_lock(person_id):
+        person = get_person(person_id)
+        if person is None:
+            raise KeyError(person_id)
 
-    # Märgi identifikaatorid kontrollituks
-    scheme = approved.get("_enrichment_scheme")
-    if scheme:
-        for ident in person.get("identifiers") or []:
-            if ident.get("scheme") == scheme:
-                ident["checked_at"] = datetime.now(timezone.utc).date().isoformat()
+        for field_path, value in approved.items():
+            _deep_set(person, field_path, value)
 
-    now = datetime.now(timezone.utc).isoformat()
-    person["updated_at"] = now
-    person["updated_by"] = username
-    name = (person.get("name") or {}).get("label") or person_id
-    save_with_git(
-        _id_to_path(person_id),
-        json.dumps(person, ensure_ascii=False, indent=2),
-        username,
-        message=f"Prosopo rikastus: {name} [{person_id}]",
-    )
+        # Märgi identifikaatorid kontrollituks
+        scheme = approved.get("_enrichment_scheme")
+        if scheme:
+            for ident in person.get("identifiers") or []:
+                if ident.get("scheme") == scheme:
+                    ident["checked_at"] = datetime.now(timezone.utc).date().isoformat()
+
+        now = datetime.now(timezone.utc).isoformat()
+        person["updated_at"] = now
+        person["updated_by"] = username
+        name = (person.get("name") or {}).get("label") or person_id
+        save_with_git(
+            _id_to_path(person_id),
+            json.dumps(person, ensure_ascii=False, indent=2),
+            username,
+            message=f"Prosopo rikastus: {name} [{person_id}]",
+        )
     _update_index_entry(person)
     _update_aliases_entry(person)
     return person
@@ -1750,30 +1758,32 @@ def bulk_update_occupation(
     occ_label = (occupation.get("label") or "").strip().lower()
 
     for person_id in person_ids:
-        person = get_person(person_id)
-        if not person:
-            skipped += 1
-            continue
-
-        existing = person.get("occupations") or []
-
-        if mode == "replace":
-            new_occupations = [occupation]
-        else:
-            already = any(
-                (occ_id and isinstance(item, dict) and item.get("id") == occ_id)
-                or (not occ_id and isinstance(item, dict) and (item.get("label") or "").strip().lower() == occ_label)
-                for item in existing
-            )
-            if already:
+        # Per-isiku lukk: read-modify-write serialiseerimine iga isiku kohta (Leid K).
+        with person_lock(person_id):
+            person = get_person(person_id)
+            if not person:
                 skipped += 1
                 continue
-            new_occupations = list(existing) + [occupation]
 
-        person["occupations"] = new_occupations
-        atomic_write_json(_id_to_path(person_id), person)
-        _update_index_entry(person)
-        updated += 1
+            existing = person.get("occupations") or []
+
+            if mode == "replace":
+                new_occupations = [occupation]
+            else:
+                already = any(
+                    (occ_id and isinstance(item, dict) and item.get("id") == occ_id)
+                    or (not occ_id and isinstance(item, dict) and (item.get("label") or "").strip().lower() == occ_label)
+                    for item in existing
+                )
+                if already:
+                    skipped += 1
+                    continue
+                new_occupations = list(existing) + [occupation]
+
+            person["occupations"] = new_occupations
+            atomic_write_json(_id_to_path(person_id), person)
+            _update_index_entry(person)
+            updated += 1
 
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}
 

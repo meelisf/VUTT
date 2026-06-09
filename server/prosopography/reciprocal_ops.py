@@ -11,6 +11,7 @@ from typing import Optional
 
 from ..config import PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
+from .locks import person_lock
 
 logger = get_logger(__name__)
 
@@ -64,40 +65,43 @@ def sync_reciprocals(
     now = datetime.now(timezone.utc).isoformat()
 
     for b_id in added:
-        b = _load_person(b_id)
-        if b is None:
-            logger.warning("sync_reciprocals: isikut %s ei leitud, jätan vahele", b_id)
-            continue
-        # Reegel 3: idempotentsus — ära lisa kui B-l on juba seos A-ga
-        if any(r.get("target_id") == person_id for r in b.get("relations", [])):
-            continue
-        b.setdefault("relations", []).append({
-            "name": a_label,
-            "type": "",
-            "target_id": person_id,
-            "reciprocal_auto": True,
-        })
-        b["updated_at"] = now
-        b["updated_by"] = username
-        atomic_write_json(_id_to_path(b_id), b)
-        synced.append(b_id)
+        # Per-isiku lukk: B-kaardi read-modify-write ei tohi võistelda update_person'iga (Leid K).
+        with person_lock(b_id):
+            b = _load_person(b_id)
+            if b is None:
+                logger.warning("sync_reciprocals: isikut %s ei leitud, jätan vahele", b_id)
+                continue
+            # Reegel 3: idempotentsus — ära lisa kui B-l on juba seos A-ga
+            if any(r.get("target_id") == person_id for r in b.get("relations", [])):
+                continue
+            b.setdefault("relations", []).append({
+                "name": a_label,
+                "type": "",
+                "target_id": person_id,
+                "reciprocal_auto": True,
+            })
+            b["updated_at"] = now
+            b["updated_by"] = username
+            atomic_write_json(_id_to_path(b_id), b)
+            synced.append(b_id)
 
     for b_id in removed:
-        b = _load_person(b_id)
-        if b is None:
-            logger.warning("sync_reciprocals: isikut %s ei leitud, jätan vahele", b_id)
-            continue
-        before = b.get("relations", [])
-        after = [
-            r for r in before
-            if not (r.get("target_id") == person_id and r.get("reciprocal_auto"))
-        ]
-        if len(after) == len(before):
-            continue  # midagi ei muutunud
-        b["relations"] = after
-        b["updated_at"] = now
-        b["updated_by"] = username
-        atomic_write_json(_id_to_path(b_id), b)
-        synced.append(b_id)
+        with person_lock(b_id):
+            b = _load_person(b_id)
+            if b is None:
+                logger.warning("sync_reciprocals: isikut %s ei leitud, jätan vahele", b_id)
+                continue
+            before = b.get("relations", [])
+            after = [
+                r for r in before
+                if not (r.get("target_id") == person_id and r.get("reciprocal_auto"))
+            ]
+            if len(after) == len(before):
+                continue  # midagi ei muutunud
+            b["relations"] = after
+            b["updated_at"] = now
+            b["updated_by"] = username
+            atomic_write_json(_id_to_path(b_id), b)
+            synced.append(b_id)
 
     return synced
