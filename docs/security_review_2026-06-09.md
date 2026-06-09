@@ -1,6 +1,70 @@
 # Security review: SEO ja avaliku indekseerimise järel
 
-Kuupäev: 2026-06-09
+Kuupäev: 2026-06-09 (teostus ja lõpetamine: 2026-06-09 … 2026-06-10)
+
+---
+
+# ✅ LÕPPSEIS — teostatud turvatöö (2026-06-10)
+
+> See sektsioon on autoriteetne kokkuvõte. Allpool on algne ülevaade, gap-analüüs ja
+> leidude täiskirjeldused. Kõik tuvastatud augud on suletud.
+
+## Mis tehti — leiud ja parandused
+
+Iga parandus on testitud ja `main`-ile commit'itud. **Deployitud: jah** (backend `server_update.sh`, frontend `npm run build` + `rsync dist/`, 2026-06-10).
+
+| # | Leid | Raskus | Fail(id) | Testid |
+|---|------|--------|----------|--------|
+| 1 | **Vaikimisi saladused tootmises** — backend võis käivituda teadaolevate arendussaladustega | kõrge | `config.py` (`check_production_secrets`), `docker-compose.yml` (`VUTT_ENV`) | 7 |
+| F | **Path traversal prosopograafias `person_id` kaudu** — osaliselt autentimata LFI / faili kustutus | **kõrge** | `prosopography/ops.py` (`_safe_nanoid` + realpath), `prosopography/router.py` (history/diff/restore) | 8 |
+| B | **Stored XSS Meilisearch `_formatted` väljadel** — kommentaarid/snippet/tag'id renderdati saniteerimata | kõrge | `utils/sanitizeHtml.ts` (uus), `pages/search/SearchResults.tsx`, `services/searchService.ts` | (jagatud, vt allpool) |
+| A | **DOM XSS `renderVuttMarkup`-is** — whitelistitud elemendid pääsesid läbi atribuutidega (`<span onclick>`) | kõrge | `utils/renderVuttMarkup.ts` (pre-escape) | 18 (A+B koos) |
+| L | **i18n XSS PlacesMergeModal-is** (UUS, polnud algses ülevaates) — `escapeValue:false` + kohanimi `dangerouslySetInnerHTML`-is | keskmine | `pages/admin/PlacesMergeModal.tsx` (`escapeHtml`) | — |
+| G | **`allowed_collections` ei jõustunud kirjutamisel** — editor sai kirjutada piiratud teosesse | keskmine | `access_ops.py` (`can_write_work`), `main.py` (`/save`, `/shareable`) | 5 |
+| H | **slug/upload_id path traversal upload-voos** | keskmine | `main.py`, `upload_ops.py` (`sanitize_slug` alati, `_valid_upload_id`) | 7 |
+| I | **Sessioon hoidis rolli hetktõmmist** — rolli/õiguse tühistamine ei jõustunud kuni 24h | keskmine | `auth.py` (`delete_user_sessions`), `main.py` (kollektsiooni-ligipääs) | 4 |
+| J | **Wikidata-proksi ilma rate limitita** — anonüümne proxy abuse / DoS | keskmine | `prosopography/router.py`, `config.py` (`/prosopography/wikidata` 30/min) | — |
+| 4/D | **CSP `script-src 'unsafe-inline'`** + SSH-sõltuv test | keskmine | `nginx.host.conf` (repo sünkroonis prod-iga), `tests/test_security_fixes.py` (loeb repo faili) | 1 |
+| K | **Lost-update isikufailides** (andmeterviklus) — lukustamata read-modify-write | keskmine | `prosopography/locks.py` (uus, `person_lock`), `ops.py`, `reciprocal_ops.py` | 3 |
+
+**Testid kokku:** backend 311 ✅, frontend 276 ✅. Kõik läbivad.
+
+**Olulised märkused:**
+- **4/D:** produktsiooni nginx (`/etc/nginx/sites-available/vutt`) oli juba turvaline (`script-src` ilma `unsafe-inline`). Auk oli repo `nginx.host.conf` triiv → tulevane deploy oleks haavatavuse taastanud. Produktsiooni EI muudetud. JSON-LD + Umami töötavad selle CSP-ga (empiiriline kinnitus, et inline JSON-LD data-blokk pole blokeeritud).
+- **B:** valiti escape-restore muster DOMPurify asemel (test-env on `node`, mitte jsdom → DOMPurify vajaks 2 uut sõltuvust). Kitsa kasutusjuhu (ainult `<em>` highlight) jaoks on escape-kõik-taasta-teadaolev-tägi sama turvaline ja sõltuvusvaba. Highlight-tägi konstandid (`HIGHLIGHT_PRE_TAG`/`POST_TAG`) jagatud `searchService.ts`-ga, et ei tekiks triivi.
+- **G:** `can_write_work` = `can_read_work` + nõuab autenditud kasutaja. Avalikud/shareable teosed on editorile alati kirjutatavad (töölaua normaaljuht) — piirang puudutab AINULT piiratud kollektsioone.
+- **I:** valiti Variant B (invalideeri sessioonid muutmisel) — null kulu päringu kohta; parandas ka latentse lukuvea `delete_user`-is (muteeris `sessions` ilma `_sessions_lock`-ita).
+
+## Deploy-nõue (kirja jaoks)
+
+Serveri `.env`-is peab tootmises olema (juba seatud 2026-06-10):
+```
+VUTT_ENV=production
+MEILI_MASTER_KEY=<reaalne>
+IMAGE_TOKEN_SECRET=<reaalne>
+```
+Kui `VUTT_ENV=production` ja saladus on vaikeväärtus/puudub → backend EI käivitu (Leid 1, tahtlik). Umami saladused (`UMAMI_DB_PASSWORD`, `UMAMI_APP_SECRET`) on eraldi konteinerites — hallata `.env`-is käsitsi (backend neid ei näe).
+
+## Mis jäi tegemata (teadlik, madal prioriteet)
+
+| Teema | Miks edasi lükatud |
+|-------|-------------------|
+| `merge_person` / `delete_person` per-isiku lukk (Leid K jääk) | Admin-only + harvad. `merge` teeb DB-ülese relations-ümberkirjutuse → eraldi, suurem teema. Lost-update risk neis madal (käsitsi admin-toiming, mitte taustaprotsess). |
+| Pillow decompression bomb / üleslaadimise failisuuruse piirang | Admin-only üleslaadimine. `MAX_IMAGE_PIXELS` + keha-limiit oleksid head, aga ründepind kitsas. |
+| Kasutajanimede enumeratsioon (`/register/username-preview`, `/invite/{token}`, `/verify-token` ilma rate limitita) | Tokenid UUIDv4 (122 bit), brute-force ebareaalne; risk peamiselt info-leke, madal. |
+| SPARQL string-interpolatsioon `enrich`/`identifiers` endpointides | Editor-only, read-only päring; SPARQL-injektsioon ei anna eskalatsiooni. Kosmeetiline. |
+
+## Aktsepteeritud disainiotsused (ei ole vead)
+
+- **Kollektsioonita teosed on avalikud** — tahtlik (digitaalhumanitaaria platvorm).
+- **`shareable` = "avalik, sitemapist väljas"** — tekst+pildid anonüümselt loetavad. viewer-token aegub 1h (pärast privaatseks muutmist töötavad pildid veel kuni 1h — aktsepteeritud).
+- **Prosopograafia/kohtade register avalik** — andmed on projekti väärtus; DTO-filter oleks üleliigne.
+
+## Commit'id (krono)
+
+`1eac1bc` (F,G,H,I,J,1) → `ff9c92e` (A,B,L) → `eb2bd09` (4/D CSP sünk) → `12ae5e0` (K).
+
+---
 
 ## Ulatus
 
