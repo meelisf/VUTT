@@ -346,9 +346,10 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
     const searchParams: any = {
       attributesToRetrieve: [
         'id', 'work_id', 'title', 'year', 'year_display', 'publisher_id',
+        'publisher_object', 'location_object',
         'type_object', 'genre_object', 'collections', 'collections_hierarchy',
         'creators', 'authors_text', 'tags_object', 'languages',
-        'series', 'series_title', 'ester_id', 'external_url',
+        'series', 'series_title', 'ester_id', 'external_url', 'archive_refs',
         'last_modified', 'teose_lehekylgede_arv', 'teose_staatus'
       ],
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest

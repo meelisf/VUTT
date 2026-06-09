@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info } from 'lucide-react';
+import { BookOpen, Calendar, User, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -49,6 +49,26 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   // Info-overlay nähtavus (desktop: hover + 150ms delay, mobiil: touch-hold)
   const [infoVisible, setInfoVisible] = useState(false);
   const infoDelayRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyInfo = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const lang = getLangCode(i18n.language) as 'et' | 'en';
+    const parts: string[] = [work.title];
+    if (work.creators && work.creators.length > 0) {
+      parts.push(work.creators.map(c => c.name).join(', '));
+    }
+    if (work.archive_refs && work.archive_refs.length > 0) {
+      parts.push(work.archive_refs.map(r => `${r.archive_id}${r.reference ? ' ' + r.reference : ''}`).join('; '));
+    } else {
+      if (work.publisher) parts.push(getLabel(work.publisher, lang));
+      if (work.location) parts.push(getLabel(work.location, lang));
+    }
+    navigator.clipboard.writeText(parts.filter(Boolean).join(' — ')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const handleThumbnailError = async () => {
     if (thumbnailTokenTriedRef.current || !work.work_id) return;
@@ -360,17 +380,22 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
       {/* Info-ikoon + täiskaardi metaandmete overlay */}
       {!selectMode && (
         <>
+          {/* "Kopeeritud" teade nupu kõrval */}
+          <div className={`absolute top-2 right-9 z-30 bg-green-600 text-white text-[11px] px-2 py-0.5 rounded pointer-events-none transition-opacity duration-300 ${copied ? 'opacity-100' : 'opacity-0'}`}>
+            {t('workCard.copied', 'Kopeeritud')}
+          </div>
+
           {/* Info-nupp — desktop hover + mobiil touch-hold */}
           <button
-            className="absolute top-2 right-2 z-30 w-6 h-6 rounded-full bg-black/25 hover:bg-black/50 flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110"
-            onClick={(e) => e.stopPropagation()}
+            className={`absolute top-2 right-2 z-30 w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-150 hover:scale-110 ${copied ? 'bg-green-500/80 hover:bg-green-500/90' : 'bg-black/25 hover:bg-black/50'}`}
+            onClick={handleCopyInfo}
             onMouseEnter={() => { infoDelayRef.current = setTimeout(() => setInfoVisible(true), 200); }}
             onMouseLeave={() => { if (infoDelayRef.current) clearTimeout(infoDelayRef.current); setInfoVisible(false); }}
             onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); setInfoVisible(v => !v); }}
             tabIndex={-1}
-            aria-label={t('workCard.showMetadata', 'Näita metaandmeid')}
+            aria-label={copied ? t('workCard.copied', 'Kopeeritud') : t('workCard.showMetadata', 'Näita metaandmeid')}
           >
-            <Info size={11} className="text-white/90" />
+            {copied ? <Check size={11} className="text-white" /> : <Info size={11} className="text-white/90" />}
           </button>
 
           {/* Overlay — katab kogu kaardi; mobiilil toks suleb */}
@@ -395,8 +420,8 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
               </div>
             )}
 
-            {/* Trükkal ja trükikoht */}
-            {(work.publisher || work.location) && (
+            {/* Trükkal, trükikoht ja arhiiviviited */}
+            {(work.publisher || work.location || (work.archive_refs && work.archive_refs.length > 0)) && (
               <div className="border-t border-white/10 pt-2 mt-auto space-y-1">
                 {work.publisher && (
                   <div className="flex items-center gap-1.5 text-[13px] text-gray-400">
@@ -410,6 +435,12 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
                     <span>{getLabel(work.location, lang)}</span>
                   </div>
                 )}
+                {work.archive_refs && work.archive_refs.map((ref, idx) => (
+                  <div key={idx} className="flex items-start gap-1.5 text-[13px] text-gray-400">
+                    <Bookmark size={10} className="text-gray-500 shrink-0 mt-0.5" />
+                    <span className="truncate">{ref.archive_id}{ref.reference ? ` ${ref.reference}` : ''}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
