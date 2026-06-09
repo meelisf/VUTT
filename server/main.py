@@ -10,15 +10,15 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException, Depends, status, BackgroundTasks, UploadFile
 from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse, Response
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger, ARCHIVES_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
-from .access_ops import can_read_work
+from .access_ops import can_read_work, is_work_public
 
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
-from .metadata_handler import build_meta_html
+from .metadata_handler import build_meta_html, build_sitemap_xml
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
@@ -2078,6 +2078,24 @@ async def work_meta(work_id: str, request: Request):
         if not can_read_work(meta, user):
             return HTMLResponse(content="<html><body>Ligipääs keelatud</body></html>", status_code=403)
     return HTMLResponse(content=build_meta_html(work_id))
+
+_sitemap_cache: dict = {"xml": None, "expires": 0.0}
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml():
+    import time
+    from . import utils as utils_module
+    now = time.time()
+    if _sitemap_cache["xml"] is None or now > _sitemap_cache["expires"]:
+        _sitemap_cache["xml"] = build_sitemap_xml(
+            utils_module.WORK_ID_CACHE,
+            is_work_public,
+            _load_work_metadata,
+        )
+        _sitemap_cache["expires"] = now + 3600
+    return Response(content=_sitemap_cache["xml"], media_type="application/xml")
+
 
 @app.get("/health")
 async def health(): return {"status": "ok"}
