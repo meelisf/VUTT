@@ -46,10 +46,31 @@ _aliases_lock = threading.Lock()
 # =========================================================
 
 
+# Lubatud nanoid-märgid: generate_nanoid annab [a-z0-9], lubame ka legacy variandid
+# (A-Z, _, -). EI sisalda path-ohtlikke märke (., /, \) → kaitseb path traversal'i eest.
+_NANOID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _safe_nanoid(person_id: str) -> str:
+    """vutt:Pabc123 → abc123; valideerib, et tulemus ei sisalda path traversal'i.
+
+    Tõstab ValueError, kui ID sisaldab kaldkriipse, punkte vms. Kaitse-sügavuti:
+    kutsuja peaks lisaks kontrollima, et lahendatud tee jääks õigesse kausta.
+    """
+    nanoid = person_id.removeprefix("vutt:P")
+    if not _NANOID_RE.match(nanoid):
+        raise ValueError(f"Vigane person_id: {person_id!r}")
+    return nanoid
+
+
 def _id_to_path(person_id: str) -> str:
     """vutt:Pabc123 → data/config/prosopography/abc123.json"""
-    nanoid = person_id.removeprefix("vutt:P")
-    return os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
+    nanoid = _safe_nanoid(person_id)
+    path = os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
+    # Kaitse sügavuti: lahendatud tee peab jääma PROSOPOGRAPHY_DIR sisse
+    if os.path.commonpath([os.path.realpath(path), os.path.realpath(PROSOPOGRAPHY_DIR)]) != os.path.realpath(PROSOPOGRAPHY_DIR):
+        raise ValueError(f"person_id lahendub väljapoole prosopograafia kausta: {person_id!r}")
+    return path
 
 
 def _strip_markup(text: str) -> str:
@@ -363,8 +384,11 @@ def _update_aliases_entry(person: dict):
 # =========================================================
 
 def get_person(person_id: str) -> Optional[dict]:
-    """Laeb isiku faili. Tagastab None kui ei leitud."""
-    path = _id_to_path(person_id)
+    """Laeb isiku faili. Tagastab None kui ei leitud või kui ID on vigane."""
+    try:
+        path = _id_to_path(person_id)
+    except ValueError:
+        return None
     if not os.path.exists(path):
         return None
     try:
@@ -993,8 +1017,11 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
 
 def _person_image_path(person_id: str, ext: str) -> str:
     """Tagastab isiku pildi failitee (state/prosopography/images/ — ei ole gitis)."""
-    nanoid = person_id.removeprefix("vutt:P")
-    return os.path.join(PROSOPOGRAPHY_IMAGES_DIR, f"{nanoid}{ext}")
+    nanoid = _safe_nanoid(person_id)
+    path = os.path.join(PROSOPOGRAPHY_IMAGES_DIR, f"{nanoid}{ext}")
+    if os.path.commonpath([os.path.realpath(path), os.path.realpath(PROSOPOGRAPHY_IMAGES_DIR)]) != os.path.realpath(PROSOPOGRAPHY_IMAGES_DIR):
+        raise ValueError(f"person_id lahendub väljapoole piltide kausta: {person_id!r}")
+    return path
 
 
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
@@ -1051,11 +1078,14 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
 
 
 def get_person_image_path(person_id: str) -> Optional[str]:
-    """Tagastab isiku pildi failitee kui olemas, muidu None."""
-    for ext in (".jpg", ".webp"):
-        path = _person_image_path(person_id, ext)
-        if os.path.exists(path):
-            return path
+    """Tagastab isiku pildi failitee kui olemas, muidu None (ka vigase ID korral)."""
+    try:
+        for ext in (".jpg", ".webp"):
+            path = _person_image_path(person_id, ext)
+            if os.path.exists(path):
+                return path
+    except ValueError:
+        return None
     return None
 
 

@@ -77,6 +77,40 @@ def test_user_without_matching_collection_cannot_read():
     assert can_read_work({"collections": ["col-restricted"]}, user=user) is False
 
 
+# ---- can_write_work (Leid G) ----
+
+def test_editor_can_write_public_work():
+    """Avalik teos on editorile alati kirjutatav (töölaua normaaljuht)."""
+    from server.access_ops import can_write_work
+    user = {"role": "editor", "allowed_collections": []}
+    assert can_write_work({"collections": ["col-public"]}, user=user) is True
+    assert can_write_work({"collections": []}, user=user) is True
+
+
+def test_editor_cannot_write_restricted_without_collection():
+    """Piiratud teosesse ei saa editor ilma allowed_collections kattuvuseta kirjutada."""
+    from server.access_ops import can_write_work
+    user = {"role": "editor", "allowed_collections": []}
+    assert can_write_work({"collections": ["col-restricted"]}, user=user) is False
+
+
+def test_editor_can_write_restricted_with_collection():
+    from server.access_ops import can_write_work
+    user = {"role": "editor", "allowed_collections": ["col-restricted"]}
+    assert can_write_work({"collections": ["col-restricted"]}, user=user) is True
+
+
+def test_admin_can_write_restricted():
+    from server.access_ops import can_write_work
+    user = {"role": "admin", "allowed_collections": []}
+    assert can_write_work({"collections": ["col-restricted"]}, user=user) is True
+
+
+def test_anonymous_cannot_write():
+    from server.access_ops import can_write_work
+    assert can_write_work({"collections": ["col-public"]}, user=None) is False
+
+
 def test_generate_meili_token_anonymous(monkeypatch):
     import jwt
     from server.meilisearch_ops import generate_meili_token

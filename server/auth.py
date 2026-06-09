@@ -158,6 +158,22 @@ def delete_session(token):
         sessions.pop(token, None)
 
 
+def delete_user_sessions(username):
+    """Kustutab kõik kasutaja aktiivsed sessioonid. Tagastab kustutatud sessioonide arvu.
+
+    Kasutatakse kasutaja kustutamisel JA rolli muutmisel — sunnib kasutaja uuesti
+    sisse logima, et roll/õigused jõustuksid kohe (sessioon hoiab user-hetktõmmist).
+    """
+    with _sessions_lock:
+        tokens_to_delete = [
+            token for token, session_data in sessions.items()
+            if session_data["user"]["username"] == username
+        ]
+        for token in tokens_to_delete:
+            del sessions[token]
+    return len(tokens_to_delete)
+
+
 def require_token(data, min_role=None):
     """
     Kontrollib tokenit päringus.
@@ -262,7 +278,11 @@ def update_user_role(username, new_role, admin_user):
     users[username]["role"] = new_role
     save_users(users)
 
-    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}")
+    # Invalideeri kasutaja sessioonid, et uus roll jõustuks kohe (sessioon hoiab
+    # user-hetktõmmist) — sama muster nagu delete_user. Kasutaja peab uuesti sisse logima.
+    invalidated = delete_user_sessions(username)
+
+    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}. Invalideeritud {invalidated} sessiooni.")
     return True, "Roll muudetud"
 
 
@@ -295,14 +315,8 @@ def delete_user(username, admin_user):
     del users[username]
     save_users(users)
 
-    # Eemalda kasutaja aktiivsed sessioonid
-    tokens_to_delete = []
-    for token, session_data in sessions.items():
-        if session_data["user"]["username"] == username:
-            tokens_to_delete.append(token)
+    # Eemalda kasutaja aktiivsed sessioonid (lukuga, vt delete_user_sessions)
+    removed = delete_user_sessions(username)
 
-    for token in tokens_to_delete:
-        del sessions[token]
-
-    print(f"Admin '{admin_user['username']}' kustutas kasutaja '{username}' ({deleted_name}). Eemaldatud {len(tokens_to_delete)} sessiooni.")
+    print(f"Admin '{admin_user['username']}' kustutas kasutaja '{username}' ({deleted_name}). Eemaldatud {removed} sessiooni.")
     return True, "Kasutaja kustutatud"

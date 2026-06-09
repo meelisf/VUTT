@@ -144,6 +144,7 @@ RATE_LIMITS = {
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
     '/meta/work': (60, 60),         # 60 bot-metaandmete päringut minutis IP kohta
+    '/prosopography/wikidata': (30, 60),  # 30 Wikidata-proksi päringut minutis IP kohta (anonüümne)
 }
 
 # =========================================================
@@ -213,3 +214,51 @@ def load_env_file():
 
 # Lae seaded kohe mooduli importimisel
 load_env_file()
+
+
+# =========================================================
+# TOOTMISE SALADUSTE KONTROLL (Leid 1)
+# =========================================================
+
+# Teadaolevad arendusvaikeväärtused — tootmises ei tohi nendega käivituda.
+# Vt docker-compose.yml: MEILI_MASTER_KEY ja IMAGE_TOKEN_SECRET fallbackid.
+_KNOWN_DEFAULT_SECRETS = {
+    "vutt_master_key",
+    "dev-image-secret-change-in-production",
+}
+
+
+def check_production_secrets(exit_on_fail=True):
+    """Tootmises (VUTT_ENV=production) keeldu käivitumast teadaolevate arendussaladustega.
+
+    Kontrollib backend-i kontrolli all olevaid saladusi (Meilisearch master key, pildi-HMAC).
+    Umami saladused (UMAMI_DB_PASSWORD, UMAMI_APP_SECRET) on eraldi konteinerites — backend
+    neid ei näe — ja tuleb hallata deploy-tasandil (.env / docker-compose).
+
+    Tagastab probleemide nimekirja. exit_on_fail=True korral kutsub sys.exit, kui leidub.
+    """
+    if os.getenv("VUTT_ENV", "dev").lower() != "production":
+        return []
+
+    problems = []
+    checks = [
+        ("MEILISEARCH master key (MEILISEARCH_MASTER_KEY / MEILI_MASTER_KEY)", MEILI_KEY),
+        ("IMAGE_TOKEN_SECRET", IMAGE_TOKEN_SECRET),
+    ]
+    for name, val in checks:
+        if not val:
+            problems.append(f"  - {name}: puudub")
+        elif val in _KNOWN_DEFAULT_SECRETS:
+            problems.append(f"  - {name}: kasutab teadaolevat arendusvaikeväärtust")
+
+    if problems and exit_on_fail:
+        sys.exit(
+            "FATAL: tootmises (VUTT_ENV=production) ei tohi käivituda arendussaladustega:\n"
+            + "\n".join(problems)
+            + "\nSea õiged saladused keskkonnamuutujatega ja käivita uuesti."
+        )
+    return problems
+
+
+# Käivita kontroll kohe mooduli importimisel (enne serveri starti)
+check_production_secrets()

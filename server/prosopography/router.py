@@ -28,15 +28,28 @@ from .ops import (
     get_person_image_path,
     delete_person_image,
     bulk_update_occupation,
+    _safe_nanoid,
 )
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo, save_with_git
+from ..rate_limit import get_client_ip, check_rate_limit
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+
+def _check_wikidata_rate_limit(request: Request):
+    """Rate-limit anonüümsetele Wikidata-proksi endpointidele (proxy abuse / DoS kaitse)."""
+    allowed, retry_after = check_rate_limit(get_client_ip(request), '/prosopography/wikidata')
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Liiga palju päringuid, proovi uuesti {retry_after}s pärast",
+            headers={"Retry-After": str(retry_after)},
+        )
 
 # =========================================================
 # AUTH HELPERS
@@ -412,7 +425,10 @@ async def places_merge(
 @router.get("/{person_id:path}/history")
 async def person_history(person_id: str, user=Depends(_require_role("editor"))):
     """Tagastab isikukaardi muudatuste ajaloo (git commitid)."""
-    nanoid = person_id.removeprefix("vutt:P")
+    try:
+        nanoid = _safe_nanoid(person_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     relative_path = f"config/prosopography/{nanoid}.json"
     history = get_file_git_history(relative_path, max_count=50)
     return {"status": "ok", "history": history}
@@ -421,7 +437,10 @@ async def person_history(person_id: str, user=Depends(_require_role("editor"))):
 @router.get("/{person_id:path}/diff")
 async def person_diff(person_id: str, commit: str, user=Depends(_require_role("editor"))):
     """Tagastab commit-i muutunud väljade loendi võrreldes eelmise commitiga."""
-    nanoid = person_id.removeprefix("vutt:P")
+    try:
+        nanoid = _safe_nanoid(person_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     relative_path = f"config/prosopography/{nanoid}.json"
 
     after_content = get_file_at_commit(relative_path, commit)
@@ -459,7 +478,10 @@ async def person_restore(person_id: str, request: Request, user=Depends(_require
     if not commit_hash:
         raise HTTPException(status_code=400, detail="commit_hash puudub")
 
-    nanoid = person_id.removeprefix("vutt:P")
+    try:
+        nanoid = _safe_nanoid(person_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     relative_path = f"config/prosopography/{nanoid}.json"
 
     content = get_file_at_commit(relative_path, commit_hash)
@@ -557,14 +579,16 @@ async def prosopography_work_relations(
 # ── Places register ────────────────────────────────────────────────────────
 
 @router.get("/places/wikidata-search")
-async def places_wikidata_search(q: str = "", lang: str = "en"):
-    """Otsib Wikidatast kohti nime järgi. Avalik."""
+async def places_wikidata_search(request: Request, q: str = "", lang: str = "en"):
+    """Otsib Wikidatast kohti nime järgi. Avalik (rate-limititud, et vältida proksi kuritarvitust)."""
+    _check_wikidata_rate_limit(request)
     return search_places_wikidata(q.strip(), lang=lang)
 
 
 @router.get("/places/wikidata/{qid}")
-async def places_wikidata_fetch(qid: str):
-    """Pärib Wikidatast koha andmed (labelid, tüüp, P131 ülempiirkonnad). Avalik."""
+async def places_wikidata_fetch(qid: str, request: Request):
+    """Pärib Wikidatast koha andmed (labelid, tüüp, P131 ülempiirkonnad). Avalik (rate-limititud)."""
+    _check_wikidata_rate_limit(request)
     result = fetch_place_wikidata(qid)
     if result is None:
         raise HTTPException(status_code=400, detail=f"Vigane Q-kood: {qid}")

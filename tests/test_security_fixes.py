@@ -114,3 +114,85 @@ def test_csp_no_unsafe_inline_in_nginx_config():
     assert not problem_lines, (
         f"Nginx CSP script-src sisaldab unsafe-inline:\n" + "\n".join(problem_lines)
     )
+
+
+# ---------------------------------------------------------------------------
+# 4. Prosopograafia path traversal kaitse (Leid F)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("bad_id", [
+    "vutt:P../../../etc/passwd",
+    "vutt:P/etc/passwd",
+    "vutt:P..",
+    "vutt:P../secret",
+    "vutt:Pa/b",
+    "vutt:P.",
+])
+def test_person_id_path_traversal_blocked(bad_id):
+    """_id_to_path ja _person_image_path peavad tõstma ValueError path traversal'i korral."""
+    from server.prosopography.ops import _id_to_path, _person_image_path
+    with pytest.raises(ValueError):
+        _id_to_path(bad_id)
+    with pytest.raises(ValueError):
+        _person_image_path(bad_id, ".jpg")
+
+
+def test_person_id_valid_passes():
+    """Korrektne nanoid läbib ja lahendub prosopograafia kausta."""
+    import os
+    from server.prosopography.ops import _id_to_path
+    from server.config import PROSOPOGRAPHY_DIR
+    path = _id_to_path("vutt:Pabc123")
+    assert path == os.path.join(PROSOPOGRAPHY_DIR, "abc123.json")
+
+
+def test_get_person_returns_none_for_malformed_id():
+    """get_person / get_person_image_path tagastavad None (mitte erind) vigase ID korral."""
+    from server.prosopography.ops import get_person, get_person_image_path
+    assert get_person("vutt:P../../../etc/passwd") is None
+    assert get_person_image_path("vutt:P../../../etc/passwd") is None
+
+
+# ---------------------------------------------------------------------------
+# 5. Upload slug / upload_id path traversal kaitse (Leid H)
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("evil_slug", [
+    "../../../etc/passwd",
+    "../escape",
+    "/abs/path",
+    "a/b/c",
+])
+def test_sanitize_slug_neutralizes_traversal(evil_slug):
+    """sanitize_slug eemaldab kõik path-ohtlikud märgid (., /)."""
+    from server.upload_ops import sanitize_slug
+    result = sanitize_slug(evil_slug)
+    assert ".." not in result
+    assert "/" not in result
+    assert "." not in result
+
+
+def test_sanitize_slug_idempotent():
+    """Juba korrektne slug ei muutu re-sanitiseerimisel."""
+    from server.upload_ops import sanitize_slug
+    valid = "tartu-akadeemia-1632"
+    assert sanitize_slug(valid) == valid
+
+
+@pytest.mark.parametrize("bad_id", [
+    "../../../tmp/evil",
+    "../escape",
+    "a/b",
+    "UPPER",
+    "has space",
+    "x" * 21,
+])
+def test_valid_upload_id_rejects_traversal(bad_id):
+    """_valid_upload_id lükkab tagasi kõik mitte-nanoid stringid."""
+    from server.upload_ops import _valid_upload_id
+    assert _valid_upload_id(bad_id) is False
+
+
+def test_valid_upload_id_accepts_nanoid():
+    from server.upload_ops import _valid_upload_id
+    assert _valid_upload_id("abc123def456") is True

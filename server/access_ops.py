@@ -31,3 +31,18 @@ def can_read_work(work_metadata: dict, user: Optional[dict]) -> bool:
     allowed = set(user.get("allowed_collections", []))
     work_collections = set(work_metadata.get("collections", []))
     return bool(allowed & work_collections)
+
+
+def can_write_work(work_metadata: dict, user: Optional[dict]) -> bool:
+    """Kontrollib kas kasutajal on õigus teost MUUTA (salvestada, shareable lippu seada).
+
+    Kirjutamisõigus järgib lugemisõigust: editor/admin saab kirjutada teosesse, mida ta
+    saab lugeda. Avalikud/shareable teosed on editorile alati kirjutatavad (töölaua
+    normaalne kasutus); piiratud kollektsioonide teostele on vaja allowed_collections
+    kattuvust või admin-rolli. Anonüümne kasutaja ei saa kirjutada.
+
+    NB: kutsuja peab juba olema autenditud editor+ (require_role("editor")).
+    """
+    if user is None:
+        return False
+    return can_read_work(work_metadata, user)

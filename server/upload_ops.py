@@ -237,7 +237,9 @@ def create_upload(meta: dict) -> dict:
         upload_id = generate_nanoid()
 
     year = str(meta.get('year', ''))
-    slug = meta.get('slug', sanitize_slug(meta.get('title', '')))
+    # Saniteeri slug alati — see jõuab failiteedesse (data/{slug}/, SFTP) → path traversal kaitse.
+    # sanitize_slug on idempotentne: juba korrektne slug ei muutu.
+    slug = sanitize_slug(meta.get('slug') or meta.get('title', ''))
     work_type = meta.get('type') or {}
     ocr_model = 'hand' if work_type.get('id') == 'Q87167' else 'print'
 

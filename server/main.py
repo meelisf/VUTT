@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, Streamin
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger, ARCHIVES_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
-from .access_ops import can_read_work, is_work_public
+from .access_ops import can_read_work, can_write_work, is_work_public
 
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
@@ -22,7 +22,7 @@ from .metadata_handler import build_meta_html, build_sitemap_xml
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
-from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, get_session, load_users, save_users
+from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, delete_user_sessions, get_session, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
@@ -33,7 +33,7 @@ from .upload_ops import (
     sanitize_slug, check_slug_conflict, create_upload, update_upload_meta,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work, replace_work_content,
+    import_as_work, replace_work_content, _valid_upload_id,
 )
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
@@ -730,7 +730,19 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     text = unicodedata.normalize('NFC', data.get('text_content', '')) if data.get('text_content') else ""
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
-    
+
+    # Kirjutamisõiguse kontroll: piiratud kollektsiooni teosesse saab kirjutada ainult
+    # editor allowed_collections kattuvusega või admin (Leid G). Avalikud teosed läbivad alati.
+    _work_meta_path = os.path.join(BASE_DIR, catalog, '_metadata.json')
+    if os.path.exists(_work_meta_path):
+        try:
+            with open(_work_meta_path, 'r', encoding='utf-8') as f:
+                _work_meta = json.load(f)
+        except Exception:
+            _work_meta = None
+        if _work_meta is not None and not can_write_work(_work_meta, user):
+            raise HTTPException(status_code=403, detail="Puudub õigus sellesse teosesse kirjutada")
+
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     additional = []
     if data.get('meta_content'):
@@ -1288,7 +1300,10 @@ async def admin_uploads(user=Depends(require_role("admin"))):
 @app.post("/admin/upload/create")
 async def admin_upload_create(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    slug = data.get('slug') or sanitize_slug(data.get('title', ''))
+    # Saniteeri slug alati (ka kliendi antud) — väldib path traversal'i import_as_work-is.
+    # sanitize_slug on idempotentne, seega juba korrektne slug ei muutu.
+    slug = sanitize_slug(data.get('slug') or data.get('title', ''))
+    data['slug'] = slug
     if check_slug_conflict(data.get('year'), slug): return JSONResponse(status_code=409, content={"status": "error", "conflict": True})
     return {"status": "success", "upload": create_upload(data)}
 
@@ -1300,12 +1315,14 @@ async def admin_upload_status(upload_id: str, user=Depends(require_role("admin")
 
 @app.get("/admin/upload/{upload_id}/thumb/{page_num}")
 async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
+    if not _valid_upload_id(upload_id): raise HTTPException(status_code=400, detail="Vigane upload_id")
     path = os.path.join(UPLOADS_DIR, upload_id, 'thumbs', f"{page_num:03d}.jpg")
     if not os.path.isfile(path): raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg")
 
 @app.post("/admin/upload/{upload_id}/files")
 async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
+    if not _valid_upload_id(upload_id): raise HTTPException(status_code=400, detail="Vigane upload_id")
     x_pg, x_total = int(request.headers.get('X-Page-Number', '0')), int(request.headers.get('X-Total-Pages', '0'))
     tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
     try:
@@ -1592,14 +1609,21 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     allowed_users_param = body.get("allowed_users")
     if allowed_users_param is not None:
         users_data = load_users()
+        changed_users = []
         for username, udata in users_data.items():
             current = set(udata.get("allowed_collections", []))
+            updated = set(current)
             if username in allowed_users_param:
-                current.add(collection_id)
+                updated.add(collection_id)
             else:
-                current.discard(collection_id)
-            users_data[username]["allowed_collections"] = list(current)
+                updated.discard(collection_id)
+            if updated != current:
+                changed_users.append(username)
+            users_data[username]["allowed_collections"] = list(updated)
         save_users(users_data)
+        # Invalideeri muutunud kasutajate sessioonid, et uus ligipääs jõustuks kohe (Leid I)
+        for username in changed_users:
+            delete_user_sessions(username)
 
     return {"status": "success"}
 
@@ -1795,6 +1819,15 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
         return {"status": "error", "message": "Teos ei leitud"}
 
     meta_path = os.path.join(folder, '_metadata.json')
+    # Kirjutamisõiguse kontroll praeguse (toggle-eelse) seisu põhjal (Leid G).
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                _cur_meta = json.load(f)
+        except Exception:
+            _cur_meta = None
+        if _cur_meta is not None and not can_write_work(_cur_meta, user):
+            raise HTTPException(status_code=403, detail="Puudub õigus selle teose jagamist muuta")
     slug = os.path.basename(folder)
     save_work_metadata(
         meta_path,
