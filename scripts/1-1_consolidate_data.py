@@ -240,6 +240,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'collections_hierarchy': [],
         'title': 'Pealkiri puudub',
         'year': None,
+        'year_display': None,
         'location': None,
         'publisher': None,
         'creators': [],
@@ -276,6 +277,13 @@ def get_work_metadata(doc_path, dir_name, collections):
                 # V1/V2 fallback: v2 esmalt, siis v1
                 result['title'] = meta.get('title') or meta.get('pealkiri', result['title'])
                 result['year'] = meta.get('year') or meta.get('aasta')
+                result['year_display'] = meta.get('year_display') or None
+                # Kui year puudub aga year_display sisaldab aastat (nt "ca. 1750"),
+                # kasuta seda numbrilise year-filtri jaoks (sama loogika nagu meilisearch_ops.py)
+                if not result['year'] and result['year_display']:
+                    _ym = re.search(r'\d{4}', result['year_display'])
+                    if _ym:
+                        result['year'] = int(_ym.group())
                 result['location'] = meta.get('location') or meta.get('koht')
                 result['publisher'] = meta.get('publisher') or meta.get('trükkal')
 
@@ -459,6 +467,7 @@ def create_meilisearch_data_per_page():
                 # Teose andmed (lamedaks lüüdud otsinguks ja kuvamiseks)
                 'title': doc_metadata.get('title', ''),
                 'year': doc_metadata.get('year'),
+                'year_display': doc_metadata.get('year_display'),
                 'location': get_label(doc_metadata.get('location')),
                 'location_id': get_id(doc_metadata.get('location')),
                 'location_object': doc_metadata.get('location'),

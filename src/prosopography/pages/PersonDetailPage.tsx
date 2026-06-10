@@ -238,7 +238,7 @@ const PersonDetailPage: React.FC = () => {
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; collections: string[] }>>({});
+  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; year_display: string | null; collections: string[] }>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
   const [tagsSaving, setTagsSaving] = useState(false);
@@ -312,14 +312,14 @@ const PersonDetailPage: React.FC = () => {
             const ids = batch.map((wid: string) => `"${wid}"`).join(', ');
             return index.search('', {
               filter: `work_id IN [${ids}] AND lehekylje_number = 1`,
-              attributesToRetrieve: ['work_id', 'title', 'year', 'collections_hierarchy'],
+              attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'collections_hierarchy'],
               limit: BATCH,
             }).then(res => allHits.push(...res.hits)).catch(() => {});
           })).then(() => {
-            const map: Record<string, { title: string; year: number | null; collections: string[] }> = {};
+            const map: Record<string, { title: string; year: number | null; year_display: string | null; collections: string[] }> = {};
             for (const hit of allHits) {
               if (hit.work_id && !map[hit.work_id]) {
-                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, collections: hit.collections_hierarchy ?? [] };
+                map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, collections: hit.collections_hierarchy ?? [] };
               }
             }
             setWorkTitles(map);
@@ -377,11 +377,16 @@ const PersonDetailPage: React.FC = () => {
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
   const birth = formatHistoricalDate(person.birth, '*', boundLabels, lang);
   const death = formatHistoricalDate(person.death, '†', boundLabels, lang);
-  const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort((a, b) => {
-    const ya = workTitles[a.work_id]?.year ?? 9999;
-    const yb = workTitles[b.work_id]?.year ?? 9999;
-    return ya - yb;
-  });
+  // Sorteerimisaasta: number-väli, muidu year_display'st leitud 4-kohaline aasta (nt "ca. 1750")
+  const sortYear = (workId: string): number => {
+    const meta = workTitles[workId];
+    if (meta?.year) return meta.year;
+    const m = meta?.year_display?.match(/\d{4}/);
+    return m ? parseInt(m[0]) : 9999;
+  };
+  const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort(
+    (a, b) => sortYear(a.work_id) - sortYear(b.work_id)
+  );
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
 
   const uniqueRoles = [...new Set(works.map(w => w.role))];
@@ -661,7 +666,8 @@ const PersonDetailPage: React.FC = () => {
                 const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
-                const year = meta?.year;
+                // Eelista kuvatavat aastat (nt "ca. 1750"); muidu number-aasta, kui see pole 0
+                const yearLabel = meta?.year_display || (meta?.year ? String(meta.year) : '');
                 const inCollection = selectedCollection && meta?.collections?.includes(selectedCollection);
                 const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
                 return (
@@ -675,7 +681,7 @@ const PersonDetailPage: React.FC = () => {
                       <span className={`text-sm transition-colors truncate ${inCollection ? colorClasses?.text : 'text-gray-700 group-hover:text-primary-700'}`}>
                         {title}
                       </span>
-                      {year && <span className={`text-xs shrink-0 ${inCollection ? colorClasses?.text + ' opacity-70' : 'text-gray-400'}`}>{year}</span>}
+                      {yearLabel && <span className={`text-xs shrink-0 ${inCollection ? colorClasses?.text + ' opacity-70' : 'text-gray-400'}`}>{yearLabel}</span>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0 ml-3">
                       <span className={`text-xs px-1.5 py-0.5 rounded ${inCollection ? `${colorClasses?.text} bg-white/50` : 'text-gray-400 bg-gray-100'}`}>
