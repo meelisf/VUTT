@@ -60,32 +60,38 @@ def sanitize_id(text):
 
 
 def clean_text_for_search(text):
-    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused."""
+    """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
+
+    Toetab mõlemat märgendusformaati:
+    - Uus XML: <i>, <b>, <cs>, <m>, <hi>, <fn>n</fn>, <pb/>
+    - Vana pseudo-markdown: *italic*, **bold**, ~cs~, [[m:text]], --lk--, [^n]
+
+    NB: hoia SÜNKROONIS server/meilisearch_ops.py clean_text_for_search-iga
+    (kaks indekseerimisteed — vt MEMORY project_meili_two_index_paths).
+    """
     if not text:
         return ""
-    
-    # 0. Käitle reavahetuse poolituskriipse (nt "spen-\ner", "spen⸗\ner" või "spen¬ \ner" -> "spener")
-    # Toetab standardset kriipsu (-), topeltkriipsu (⸗) ja poolitusmärki (¬)
+
+    # 1. Uus XML märgendus — eemalda kõik VUTT tägid
+    # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
+    text = re.sub(r'<fn>\d+</fn>', ' ', text)  # joonealuse viite marker
+    text = re.sub(r'<pb/>', ' ', text)           # leheküljevahetus
+    text = re.sub(r'</?[a-z]+>', '', text)       # avamis/sulgemistägid (<i>, </i>, <b>, <cs> jne)
+
+    # 2. Vana pseudo-markdown (legacy, kui faile pole veel migreeritud)
+    text = text.replace('*', ' ')               # bold/italic tärnid
+    text = text.replace('~', ' ')               # koodivahetus
+    text = text.replace('[[m:', ' ').replace(']]', ' ')  # ääremärkus
+    text = text.replace('--lk--', ' ')          # leheküljevahetus
+    text = re.sub(r'\[\^\d+\]', ' ', text)      # joonealuse viite marker
+
+    # 3. Käitle reavahetuse poolituskriipse PÄRAST tägide eemaldamist
+    # (nt "<i>Sueco¬</i>\n<i>rum" -> pärast tägide eemaldust "Sueco¬\nrum" -> "Suecorum")
     text = re.sub(r'[-⸗¬]\s*\n\s*', '', text)
-    
-    # 1. Bold/Italic (*)
-    text = text.replace('*', ' ')
-    
-    # 2. Koodivahetus (~)
-    text = text.replace('~', ' ')
-    
-    # 3. Ääremärkuse markerid [[m: ja ]]
-    text = text.replace('[[m:', ' ').replace(']]', ' ')
-    
-    # 4. Leheküljevahetus --lk--
-    text = text.replace('--lk--', ' ')
-    
-    # 5. Joonealused viited [^...]
-    text = re.sub(r'\[\^\d+\]', ' ', text)
-    
-    # 6. Eemalda üleliigsed tühikud
+
+    # 4. Eemalda üleliigsed tühikud
     text = re.sub(r'\s+', ' ', text).strip()
-    
+
     return text
 
 
@@ -161,20 +167,34 @@ def build_text_annotations_text(text_annotations):
     return ' '.join(parts) if parts else None
 
 
+def _invert_name(name):
+    """Teisendab 'Perenimi, Eesnimi' → 'Eesnimi Perenimi'. Tagastab None kui komat pole."""
+    if ',' in name:
+        parts = name.split(',', 1)
+        return f"{parts[1].strip()} {parts[0].strip()}"
+    return None
+
+
 def get_creator_aliases(creators, people_data):
-    """Leiab isikutele aliased."""
+    """Leiab isikutele aliased (nimevariandid).
+    Lisab igale 'Perenimi, Eesnimi' aliasele ka inverteeritud 'Eesnimi Perenimi' versiooni.
+    (Sünk meilisearch_ops-iga — vt MEMORY project_meili_two_index_paths.)"""
     aliases = []
     for creator in creators:
         creator_id = creator.get('id')
         if creator_id and people_data.get(creator_id):
             person = people_data[creator_id]
-            if person.get('aliases'):
-                aliases.extend(person['aliases'])
+            for alias in person.get('aliases', []):
+                aliases.append(alias)
+                inverted = _invert_name(alias)
+                if inverted:
+                    aliases.append(inverted)
     return aliases
 
 
 def get_entity_aliases(entity_or_list, people_data):
-    """Leiab LinkedEntity(te) aliased people.json-ist (trükkal, märksõnad vms)."""
+    """Leiab LinkedEntity(te) aliased people.json-ist (trükkal, märksõnad vms).
+    Lisab ka inverteeritud nimevariandid (sünk meilisearch_ops-iga)."""
     aliases = []
     items = entity_or_list if isinstance(entity_or_list, list) else ([entity_or_list] if entity_or_list else [])
     for item in items:
@@ -182,7 +202,11 @@ def get_entity_aliases(entity_or_list, people_data):
             continue
         item_id = item.get('id')
         if item_id and people_data.get(item_id):
-            aliases.extend(people_data[item_id].get('aliases', []))
+            for alias in people_data[item_id].get('aliases', []):
+                aliases.append(alias)
+                inverted = _invert_name(alias)
+                if inverted:
+                    aliases.append(inverted)
     return aliases
 
 
@@ -522,9 +546,9 @@ def create_meilisearch_data_per_page():
                 'originaal_kataloog': dir_name,
 
                 # Annotatsioonid ja staatus
-                'page_tags': [l.lower() for l in get_primary_labels(page_meta.get('tags', []))],
-                'page_tags_et': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'et', labels_store)],
-                'page_tags_en': [l.lower() for l in get_labels_by_lang(page_meta.get('tags', []), 'en', labels_store)],
+                'page_tags': get_primary_labels(page_meta.get('tags', [])),                          # capitalize_first (ühtlane teose tags-iga, sünk meilisearch_ops-iga)
+                'page_tags_et': get_labels_by_lang(page_meta.get('tags', []), 'et', labels_store),
+                'page_tags_en': get_labels_by_lang(page_meta.get('tags', []), 'en', labels_store),
                 'page_tags_ids': get_all_ids(page_meta.get('tags', [])),
                 'page_tags_suggest_et': [
                     f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
@@ -563,9 +587,9 @@ def create_meilisearch_data_per_page():
             # Tekst-annotatsioonid (alati lisatud, et Meilisearch registreeriks välja)
             meili_doc['text_annotations_text'] = build_text_annotations_text(page_meta['text_annotations']) or ''
 
-            # V3 bibliograafia (täisobjektid dünaamilise UI jaoks)
-            meili_doc['location'] = doc_metadata.get('location')
-            meili_doc['publisher'] = doc_metadata.get('publisher')
+            # V3 bibliograafia: täisobjektid on juba location_object/publisher_object väljadel.
+            # Flat location/publisher JÄÄB string-labeliks (filter `publisher = "Vogel"` + display),
+            # sünk meilisearch_ops-iga — ÄRA kirjuta neid siin objektiga üle.
             meili_doc['location_search'] = get_all_labels(doc_metadata.get('location'))
             meili_doc['publisher_search'] = get_all_labels(doc_metadata.get('publisher')) + get_entity_aliases(doc_metadata.get('publisher'), people_data)
 
