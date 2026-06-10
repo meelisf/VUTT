@@ -1381,9 +1381,8 @@ def rebuild_indices():
       1. prosopography_index.json
       2. person_aliases.json
       3. person_to_works.json (teoste _metadata.json ja leheküljefailide põhjal)
+      4. work_collections_index.json (work_id → teose enda kollektsioonid)
     """
-    from ..config import BASE_DIR
-
     if not os.path.exists(PROSOPOGRAPHY_DIR):
         return
 
@@ -1402,6 +1401,7 @@ def rebuild_indices():
 
     # person_to_works: kogu esmalt teoste metadata põhjal
     ptw: dict[str, list] = {}
+    wc: dict[str, list] = {}
     if os.path.exists(BASE_DIR):
         for entry in os.scandir(BASE_DIR):
             if not entry.is_dir():
@@ -1417,6 +1417,9 @@ def rebuild_indices():
             work_id = meta.get("id") or meta.get("work_id")
             if not work_id:
                 continue
+            cols = meta.get("collections") or []
+            if cols:
+                wc[work_id] = list(cols)
             for creator in meta.get("creators") or []:
                 pid = creator.get("id") or ""
                 if pid.startswith("vutt:P"):
@@ -1460,6 +1463,10 @@ def rebuild_indices():
     # Kirjuta person_to_works
     with _works_lock:
         atomic_write_json(PERSON_TO_WORKS_FILE, ptw)
+
+    # Kirjuta work_collections_index
+    with _work_collections_lock:
+        atomic_write_json(WORK_COLLECTIONS_INDEX_FILE, wc)
 
     # Ehita works_creators_index
     try:
