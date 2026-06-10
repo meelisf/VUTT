@@ -76,7 +76,7 @@ def clean_text_for_search(text):
     # <fn>n</fn> ja <pb/> asendame tühikuga, ülejäänud tägid eemaldame
     text = re.sub(r'<fn>\d+</fn>', ' ', text)  # joonealuse viite marker
     text = re.sub(r'<pb/>', ' ', text)           # leheküljevahetus
-    text = re.sub(r'</?[a-z]+>', '', text)       # avamis/sulgemistägid (<i>, </i>, <b>, <cs> jne)
+    text = re.sub(r'</?[a-z]+\d*>', '', text)    # avamis/sulgemistägid (<i>, </i>, <cs>, <ann1>, </ann1> jne)
 
     # 2. Vana pseudo-markdown (legacy, kui faile pole veel migreeritud)
     text = text.replace('*', ' ')               # bold/italic tärnid
