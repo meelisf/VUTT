@@ -9,6 +9,7 @@ import string
 import tempfile
 import threading
 import unicodedata
+from typing import Optional, Tuple
 from .config import BASE_DIR, get_logger
 
 logger = get_logger(__name__)
@@ -109,6 +110,45 @@ def pick_best_label(labels_dict, lang):
         if l != base_lang and labels_dict.get(l):
             return labels_dict[l]
     return ''
+
+
+# Sajandimuster: "19. saj", "19. sajand", "19 saj" (stringi algusest, trimmituna)
+_CENTURY_RE = re.compile(r'^(\d{1,2})\.?\s*saj', re.IGNORECASE)
+_YEAR4_RE = re.compile(r'\d{4}')
+_APPROX_RE = re.compile(r'\bca\.?\b', re.IGNORECASE)
+
+
+def parse_year_range(year, year_display) -> Optional[Tuple[int, int]]:
+    """Tuletab teose aastavahemiku (year_start, year_end) filtreerimise jaoks.
+
+    "19. saj"   -> (1801, 1900)   N. sajand = (N-1)*100+1 ... N*100
+    "ca. 1750"  -> (1740, 1760)
+    "1670-1690" -> (1670, 1690)
+    "1750"      -> (1750, 1750)
+    Tagastab None kui aastat ei tuvastata.
+    NB: peegelloogika frontendis: src/utils/yearDisplayUtils.ts parseYearDisplayRange
+    """
+    if year_display:
+        s = str(year_display).strip()
+        m = _CENTURY_RE.match(s)
+        if m:
+            c = int(m.group(1))
+            return ((c - 1) * 100 + 1, c * 100)
+        years = [int(y) for y in _YEAR4_RE.findall(s)]
+        if len(years) >= 2:
+            return (years[0], years[-1])
+        if len(years) == 1:
+            y = years[0]
+            if _APPROX_RE.search(s):
+                return (y - 10, y + 10)
+            return (y, y)
+    try:
+        numeric = int(year) if year else 0
+    except (TypeError, ValueError):
+        numeric = 0
+    if numeric:
+        return (numeric, numeric)
+    return None
 
 
 def build_work_id_cache():
