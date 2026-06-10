@@ -61,3 +61,12 @@ def test_year_as_string():
 
 def test_garbage_year():
     assert parse_year_range("pole aasta", None) is None
+
+
+def test_float_year_truncated():
+    # JSON-numbrid võivad olla floatid; käitumine on dokumenteeritult trunkeeriv
+    assert parse_year_range(1750.0, None) == (1750, 1750)
+
+
+def test_whitespace_only_display_falls_through_to_year():
+    assert parse_year_range(1700, "   ") == (1700, 1700)

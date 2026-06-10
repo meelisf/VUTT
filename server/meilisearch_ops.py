@@ -40,7 +40,7 @@ from .utils import (
     atomic_write_json,
     sanitize_id, generate_default_metadata, normalize_genre,
     calculate_work_status, get_label, get_id, get_all_labels, get_all_ids, get_primary_labels,
-    get_labels_by_lang
+    get_labels_by_lang, parse_year_range
 )
 
 logger = get_logger(__name__)
@@ -326,11 +326,13 @@ def sync_work_to_meilisearch(dir_name):
     title = metadata.get('title', 'Pealkiri puudub')
     year = metadata.get('year', 0)
     year_display = metadata.get('year_display') or None
-    # Kui year puudub aga year_display sisaldab aastat (nt "ca. 1750"), kasuta seda filtri jaoks
-    if not year and year_display:
-        _m = re.search(r'\d{4}', year_display)
-        if _m:
-            year = int(_m.group())
+    year_range = parse_year_range(year, year_display)
+    # Kui year puudub aga year_display annab vahemiku (nt "ca. 1750", "19. saj"),
+    # kasuta sortimisväärtusena vahemiku keskpaika
+    if not year and year_range:
+        year = (year_range[0] + year_range[1]) // 2
+    year_start = year_range[0] if year_range else 0
+    year_end = year_range[1] if year_range else 0
 
     # Autor ja respondens creators massiivist
     creators = metadata.get('creators', [])
@@ -490,6 +492,8 @@ def sync_work_to_meilisearch(dir_name):
             "aasta": year,       # Filtreerimiseks ja sortimiseks (jääb)
             "year": year,
             "year_display": year_display,
+            "year_start": year_start,  # Filtreerimiseks (vahemike kattuvus)
+            "year_end": year_end,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
             "lehekylje_tekst": clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)
@@ -719,7 +723,7 @@ def _ensure_filterable_attributes():
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             current = json.loads(r.read())
-        needed = {"is_public", "shareable", "collections_hierarchy", "collections"}
+        needed = {"is_public", "shareable", "collections_hierarchy", "collections", "year_start", "year_end"}
         if not needed.issubset(set(current)):
             new_attrs = list(set(current) | needed)
             patch_req = urllib.request.Request(
