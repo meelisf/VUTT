@@ -54,7 +54,7 @@ Pärast deploy'd: täisreindeks serveris (`./scripts/server_seed_data.sh`).
 
 ## 3. Filtreerimine (frontend)
 
-`src/services/searchService.ts` — kõik 9 kohta, kus praegu:
+`src/services/searchService.ts` — kõik 8 kohta, kus praegu:
 
 ```ts
 if (yearStart) filter.push(`year >= ${yearStart}`);
@@ -70,7 +70,7 @@ if (yearEnd) filter.push(`year_start <= ${yearEnd}`);
 
 Loogika: kaks vahemikku kattuvad ⇔ `A.end >= B.start AND A.start <= B.end`. Teosed ilma aastata (`year_start=year_end=0`) käituvad identselt praegusega (`year=0`).
 
-Korduv muster ekstraheeritakse abifunktsiooni (nt `pushYearFilter(filter, yearStart, yearEnd)`), et 9 kohta ei läheks tulevikus lahku.
+Korduv muster ekstraheeritakse abifunktsiooni (nt `pushYearFilter(filter, yearStart, yearEnd)`), et 8 kohta ei läheks tulevikus lahku.
 
 ## 4. Kuvamine + i18n
 
