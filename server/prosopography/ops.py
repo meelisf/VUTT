@@ -22,6 +22,8 @@ from ..config import (
     PROSOPOGRAPHY_INDEX_FILE,
     PERSON_TO_WORKS_FILE,
     PERSON_ALIASES_FILE,
+    WORK_COLLECTIONS_INDEX_FILE,
+    BASE_DIR,
 )
 from ..utils import generate_nanoid, atomic_write_json
 from ..git_ops import save_with_git, delete_file_from_git
@@ -40,6 +42,7 @@ from .places_ops import (
 _index_lock = threading.Lock()
 _works_lock = threading.Lock()
 _aliases_lock = threading.Lock()
+_work_collections_lock = threading.Lock()
 
 
 # =========================================================
@@ -104,6 +107,63 @@ def _load_person_to_works() -> dict:
         except Exception:
             pass
     return {}
+
+
+def _load_work_collections() -> dict:
+    if os.path.exists(WORK_COLLECTIONS_INDEX_FILE):
+        try:
+            with open(WORK_COLLECTIONS_INDEX_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def update_work_collections(work_id: str, collections: list) -> None:
+    """Uuendab work_collections_index.json üht kirjet teose salvestamisel.
+
+    Salvestab teose ENDA kollektsioonid (mitte esivanematega laiendatud
+    hierarhiat) — laiendamine toimub päringuajal cache'itud konfist.
+    Peab jooksma TINGIMUSTETA igal metaandmete salvestusel (ka bulk-collection,
+    kus call_ptw=False), sest just seal kollektsioonid muutuvad.
+    """
+    if not work_id:
+        return
+    with _work_collections_lock:
+        data = _load_work_collections()
+        if collections:
+            data[work_id] = list(collections)
+        else:
+            data.pop(work_id, None)
+        atomic_write_json(WORK_COLLECTIONS_INDEX_FILE, data)
+
+
+def _collection_descendants(collection_id: str, collections: dict) -> set:
+    """Tagastab {collection_id} ∪ kõik järglased (rekursiivselt) konfi põhjal."""
+    target = {collection_id}
+    changed = True
+    while changed:
+        changed = False
+        for cid, col in (collections or {}).items():
+            if isinstance(col, dict) and col.get("parent") in target and cid not in target:
+                target.add(cid)
+                changed = True
+    return target
+
+
+def _persons_in_collection(collection_id: str) -> set:
+    """Isikute id-d, kes esinevad mõnes selle kollektsiooni (või
+    alamkollektsiooni) teoses ükskõik mis rollis (creator/publisher/
+    subject/mentioned)."""
+    from ..cache import get_cached_collections
+    collections = get_cached_collections() or {}
+    target = _collection_descendants(collection_id, collections)
+    wc = _load_work_collections()
+    ptw = _load_person_to_works()
+    return {
+        pid for pid, entries in ptw.items()
+        if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
+    }
 
 
 def _load_person_aliases() -> dict:
@@ -621,6 +681,7 @@ def list_persons(
     imm_year_to: Optional[int] = None,
     sort_by: Optional[str] = None,
     ids: Optional[list] = None,
+    collection: Optional[str] = None,
     limit: int = 48,
     offset: int = 0,
 ) -> dict:
@@ -628,6 +689,13 @@ def list_persons(
     Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
     Otsing q= töötab label + sort_name + aliases (sh Wikidata/GND) vastu.
     """
+    if collection:
+        collection_ids = _persons_in_collection(collection)
+        if ids is not None:
+            ids = [i for i in ids if i in collection_ids]
+        else:
+            ids = list(collection_ids)
+
     results = _filter_index_entries(
         q=q,
         gender=gender,
@@ -779,11 +847,19 @@ def get_person_map_markers(
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
     related_to: Optional[str] = None,
+    collection: Optional[str] = None,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     if related_to:
         network_ids = get_person_relation_network_ids(related_to)
         ids = list(dict.fromkeys([*(ids or []), *network_ids])) if ids else network_ids
+
+    if collection:
+        collection_ids = _persons_in_collection(collection)
+        if ids is not None:
+            ids = [i for i in ids if i in collection_ids]
+        else:
+            ids = list(collection_ids)
 
     entries = _filter_index_entries(
         q=q,
@@ -925,6 +1001,7 @@ def get_person_facets(
     q: Optional[str] = None,
     gender: Optional[str] = None,
     ids: Optional[list] = None,
+    collection: Optional[str] = None,
 ) -> dict:
     """
     Tagastab persons-listingu jaoks facetid.
@@ -935,6 +1012,7 @@ def get_person_facets(
         q=q,
         gender=gender,
         ids=ids,
+        collection=collection,
         limit=10**9,
         offset=0,
     )["results"]
@@ -1349,9 +1427,8 @@ def rebuild_indices():
       1. prosopography_index.json
       2. person_aliases.json
       3. person_to_works.json (teoste _metadata.json ja leheküljefailide põhjal)
+      4. work_collections_index.json (work_id → teose enda kollektsioonid)
     """
-    from ..config import BASE_DIR
-
     if not os.path.exists(PROSOPOGRAPHY_DIR):
         return
 
@@ -1370,6 +1447,7 @@ def rebuild_indices():
 
     # person_to_works: kogu esmalt teoste metadata põhjal
     ptw: dict[str, list] = {}
+    wc: dict[str, list] = {}
     if os.path.exists(BASE_DIR):
         for entry in os.scandir(BASE_DIR):
             if not entry.is_dir():
@@ -1385,6 +1463,9 @@ def rebuild_indices():
             work_id = meta.get("id") or meta.get("work_id")
             if not work_id:
                 continue
+            cols = meta.get("collections") or []
+            if cols:
+                wc[work_id] = list(cols)
             for creator in meta.get("creators") or []:
                 pid = creator.get("id") or ""
                 if pid.startswith("vutt:P"):
@@ -1428,6 +1509,10 @@ def rebuild_indices():
     # Kirjuta person_to_works
     with _works_lock:
         atomic_write_json(PERSON_TO_WORKS_FILE, ptw)
+
+    # Kirjuta work_collections_index
+    with _work_collections_lock:
+        atomic_write_json(WORK_COLLECTIONS_INDEX_FILE, wc)
 
     # Ehita works_creators_index
     try:

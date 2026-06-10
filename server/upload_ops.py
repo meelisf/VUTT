@@ -1082,7 +1082,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
 
     # Person-to-works indeks (uus teos võib juba sisaldada creators/tags isikuid)
     try:
-        from .prosopography.ops import update_person_to_works
+        from .prosopography.ops import update_person_to_works, update_work_collections
         update_person_to_works(
             work_id,
             metadata.get("creators", []),
@@ -1091,6 +1091,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
             metadata.get("title") or "",
             metadata.get("year"),
         )
+        update_work_collections(work_id, metadata.get("collections") or [])
     except Exception as e:
         logger.warning(f"import {upload_id}: person_to_works viga: {e}")
 

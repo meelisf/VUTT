@@ -127,6 +127,7 @@ async def prosopography_list(
     imm_year_to: int = None,
     sort_by: str = None,
     ids: str = None,
+    collection: str = None,
     limit: int = 48,
     offset: int = 0,
     user=Depends(_optional_user),
@@ -149,6 +150,7 @@ async def prosopography_list(
         imm_year_to=imm_year_to,
         sort_by=sort_by,
         ids=id_list,
+        collection=collection,
         limit=limit,
         offset=offset,
     )
@@ -176,6 +178,7 @@ async def prosopography_query(request: Request):
         imm_year_to=data.get("imm_year_to"),
         sort_by=data.get("sort_by"),
         ids=data.get("ids"),
+        collection=data.get("collection"),
         limit=data.get("limit", 48),
         offset=data.get("offset", 0),
     )
@@ -198,6 +201,7 @@ async def prosopography_map(
     imm_year_to: int = None,
     ids: str = None,
     related_to: str = None,
+    collection: str = None,
     user=Depends(_optional_user),
 ):
     """Tagastab koordinaadiga isikud päritolukoha järgi grupeeritud markeritena."""
@@ -217,6 +221,7 @@ async def prosopography_map(
         imm_year_to=imm_year_to,
         ids=id_list,
         related_to=related_to,
+        collection=collection,
     )
 
 
@@ -225,6 +230,7 @@ async def prosopography_facets(
     q: str = None,
     gender: str = None,
     ids: str = None,
+    collection: str = None,
 ):
     """Tagastab persons-lehe facetid filtripaneeli jaoks."""
     id_list = [i for i in ids.split(",") if i] if ids else None
@@ -232,6 +238,7 @@ async def prosopography_facets(
         q=q,
         gender=gender,
         ids=id_list,
+        collection=collection,
     )
 
 
@@ -244,6 +251,7 @@ async def prosopography_facets_post(request: Request):
         q=data.get("q"),
         gender=data.get("gender"),
         ids=id_list,
+        collection=data.get("collection"),
     )
 
 

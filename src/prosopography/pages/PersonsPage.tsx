@@ -10,6 +10,7 @@ import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAd
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
 import { getVocabularies } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
 import type { ProsopoIndexEntry } from '../types';
 
 const LIMIT = 48;
@@ -17,6 +18,7 @@ const LIMIT = 48;
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { user, authToken } = useUser();
+  const { selectedCollection } = useCollection();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -135,6 +137,7 @@ const PersonsPage: React.FC = () => {
       imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
       status_id: statusId || undefined,
       sort_by: sortBy !== 'alpha' ? sortBy : undefined,
+      collection: selectedCollection || undefined,
       limit: LIMIT,
       offset,
     }, token)
@@ -145,12 +148,13 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, sortBy, offset, token, t]);
+  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, sortBy, selectedCollection, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
       q: query || undefined,
       gender: gender || undefined,
+      collection: selectedCollection || undefined,
     }, token)
       .then(data => {
         const lang = i18n.language?.slice(0, 2) ?? 'et';
@@ -162,7 +166,7 @@ const PersonsPage: React.FC = () => {
         setInstitutionFacets(data.institutions || []);
       })
       .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); });
-  }, [query, gender, token, i18n.language]);
+  }, [query, gender, selectedCollection, token, i18n.language]);
 
   useEffect(() => {
     fetchPersons();
@@ -191,6 +195,7 @@ const PersonsPage: React.FC = () => {
     imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
     status_id: statusId || undefined,
     related_to: relatedTo || undefined,
+    collection: selectedCollection || undefined,
   };
 
   // Select-mood helpers

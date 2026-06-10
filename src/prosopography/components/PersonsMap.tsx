@@ -20,6 +20,7 @@ interface PersonsMapProps {
     imm_year_from?: number;
     imm_year_to?: number;
     related_to?: string;
+    collection?: string;
   };
   token?: string;
   focusPlace?: string;

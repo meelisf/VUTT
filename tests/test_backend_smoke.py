@@ -320,9 +320,8 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(aliases_file))
     monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
 
-    # rebuild_indices kasutab `from ..config import BASE_DIR` funktsiooni sees
-    import server.config as config_mod
-    monkeypatch.setattr(config_mod, "BASE_DIR", str(data_dir))
+    # rebuild_indices kasutab mooduli-tasandi BASE_DIR importi (ops.py)
+    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
 
     prosopo_ops.rebuild_indices()
 
