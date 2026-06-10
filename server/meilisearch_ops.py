@@ -716,7 +716,7 @@ def sync_work_to_meilisearch_async(dir_name):
 
 
 def _ensure_filterable_attributes():
-    """Tagab et is_public ja shareable on filterableAttributes-s."""
+    """Tagab et filterableAttributes sisaldab kõiki vajalikke filtrite välju."""
     url = f"{MEILI_URL}/indexes/{INDEX_NAME}/settings/filterable-attributes"
     req = urllib.request.Request(url, method='GET')
     req.add_header('Authorization', f'Bearer {MEILI_KEY}')
@@ -734,7 +734,7 @@ def _ensure_filterable_attributes():
             patch_req.add_header('Authorization', f'Bearer {MEILI_KEY}')
             patch_req.add_header('Content-Type', 'application/json')
             urllib.request.urlopen(patch_req, timeout=10)
-            logger.info("filterableAttributes uuendatud: lisati is_public, shareable")
+            logger.info("filterableAttributes uuendatud: lisati puuduvad atribuudid")
     except Exception as e:
         logger.warning(f"filterableAttributes uuendus ebaõnnestus: {e}")
 
