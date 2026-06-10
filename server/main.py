@@ -383,6 +383,8 @@ async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
     shutil.rmtree(path)
     delete_work_from_git(folder_name, title, work_id, username=user['username'])
     delete_work_from_meilisearch(work_id)
+    from .prosopography.ops import update_work_collections
+    update_work_collections(work_id, [])
     build_work_id_cache()
     return {"status": "success"}
 

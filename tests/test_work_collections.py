@@ -119,3 +119,27 @@ def test_list_persons_collection_filters(tmp_path):
     ids = {e["id"] for e in res["results"]}
     assert ids == {"vutt:Pin"}
     assert res["total"] == 1
+
+
+def test_save_work_metadata_updates_collections_even_when_call_ptw_false(tmp_path):
+    metadata_ops = importlib.import_module("server.metadata_ops")
+    ops = importlib.import_module("server.prosopography.ops")
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    meta_path = work_dir / "_metadata.json"
+    meta_path.write_text(json.dumps({"id": "w1", "title": "T", "collections": ["c-old"]}), encoding="utf-8")
+    wc_file = tmp_path / "work_collections_index.json"
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(metadata_ops, "save_with_git", lambda *a, **k: None), \
+         mock.patch.object(metadata_ops, "sync_work_to_meilisearch", lambda *a, **k: None):
+        metadata_ops.save_work_metadata(
+            str(meta_path),
+            {"collections": ["c-new"]},
+            username="tester",
+            git_message="bulk",
+            call_ptw=False,
+            sync_meili=False,
+        )
+        data = json.loads(wc_file.read_text(encoding="utf-8"))
+    assert data == {"w1": ["c-new"]}
