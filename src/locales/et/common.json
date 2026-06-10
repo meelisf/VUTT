@@ -23,6 +23,9 @@
     "reset": "Lähtesta",
     "remove": "Eemalda"
   },
+  "year": {
+    "century": "{{n}}. saj"
+  },
   "status": {
     "Toores": "Toores",
     "Töös": "Töös",

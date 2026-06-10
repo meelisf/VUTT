@@ -23,6 +23,9 @@
     "reset": "Reset",
     "remove": "Remove"
   },
+  "year": {
+    "century": "{{ord}} century"
+  },
   "status": {
     "Toores": "Raw",
     "Töös": "In Progress",
