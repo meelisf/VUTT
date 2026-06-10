@@ -138,6 +138,34 @@ def update_work_collections(work_id: str, collections: list) -> None:
         atomic_write_json(WORK_COLLECTIONS_INDEX_FILE, data)
 
 
+def _collection_descendants(collection_id: str, collections: dict) -> set:
+    """Tagastab {collection_id} ∪ kõik järglased (rekursiivselt) konfi põhjal."""
+    target = {collection_id}
+    changed = True
+    while changed:
+        changed = False
+        for cid, col in (collections or {}).items():
+            if isinstance(col, dict) and col.get("parent") in target and cid not in target:
+                target.add(cid)
+                changed = True
+    return target
+
+
+def _persons_in_collection(collection_id: str) -> set:
+    """Isikute id-d, kes esinevad mõnes selle kollektsiooni (või
+    alamkollektsiooni) teoses ükskõik mis rollis (creator/publisher/
+    subject/mentioned)."""
+    from ..cache import get_cached_collections
+    collections = get_cached_collections() or {}
+    target = _collection_descendants(collection_id, collections)
+    wc = _load_work_collections()
+    ptw = _load_person_to_works()
+    return {
+        pid for pid, entries in ptw.items()
+        if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
+    }
+
+
 def _load_person_aliases() -> dict:
     if os.path.exists(PERSON_ALIASES_FILE):
         try:

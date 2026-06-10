@@ -61,3 +61,35 @@ def test_rebuild_indices_builds_work_collections(tmp_path):
         ops.rebuild_indices()
         data = json.loads(wc_file.read_text(encoding="utf-8"))
     assert data == {"w1": ["c-child", "c-other"]}
+
+
+COLLECTIONS = {
+    "parent": {"name": {"et": "Vanem"}},
+    "c-child": {"name": {"et": "Laps"}, "parent": "parent"},
+    "c-other": {"name": {"et": "Muu"}},
+}
+
+
+def test_persons_in_collection_roles_and_inheritance(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    # w1 kuulub alamkollektsiooni 'c-child'; w2 kuulub 'c-other'
+    wc_file.write_text(json.dumps({"w1": ["c-child"], "w2": ["c-other"]}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({
+        "vutt:Pauthor":    [{"work_id": "w1", "role": "creator"}],
+        "vutt:Pmention":   [{"work_id": "w1", "role": "mentioned"}],
+        "vutt:Ppublisher": [{"work_id": "w1", "role": "publisher"}],
+        "vutt:Pother":     [{"work_id": "w2", "role": "creator"}],
+        "vutt:Pnowork":    [],
+    }), encoding="utf-8")
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
+        # Valitud vanemkollektsioon → hõlmab alamkollektsiooni w1 isikuid
+        result = ops._persons_in_collection("parent")
+
+    assert result == {"vutt:Pauthor", "vutt:Pmention", "vutt:Ppublisher"}
+    assert "vutt:Pother" not in result   # teine kollektsioon
+    assert "vutt:Pnowork" not in result  # teosteta isik
