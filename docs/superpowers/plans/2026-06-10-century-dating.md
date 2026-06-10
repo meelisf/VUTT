@@ -10,6 +10,33 @@
 
 **Spek:** `docs/superpowers/specs/2026-06-10-century-dating-design.md`
 
+## TÄITMISE SEIS (2026-06-10, sessioon katkes konteksti täitumisel)
+
+Töövoog: subagent-driven-development (implementer + spec-review + quality-review iga taski kohta).
+Haru: `feature/century-dating` (loodud main-ist).
+
+| Task | Seis | Commit |
+|------|------|--------|
+| Task 1: FE parser (CENTURY_RE, parseYearDisplayRange) | ✅ valmis, mõlemad review'd läbitud | `52bbb7f` |
+| Task 2: formatYearDisplay + i18n võtmed | ✅ valmis, mõlemad review'd läbitud | `52bbb7f` (kood) + `abea2bb` (locales; commit-jaotus erines plaanist, sisu OK) |
+| Task 3: Python parse_year_range + 14 testi | ✅ valmis, mõlemad review'd läbitud (full suite 331/331) | `7c9a6e3` |
+| Task 4: Live-indekseerimine | ⏳ JÄRGMINE — dispatch oli ette valmistatud, vt märkus all | — |
+| Task 5–8 | ootel | — |
+
+**Task 4 lisanõue (Task 3 quality-review soovitus):** enne Task 4 põhisamme lisa `tests/test_year_range.py` lõppu kaks hardening-testi:
+```python
+def test_float_year_truncated():
+    # JSON-numbrid võivad olla floatid; käitumine on dokumenteeritult trunkeeriv
+    assert parse_year_range(1750.0, None) == (1750, 1750)
+
+
+def test_whitespace_only_display_falls_through_to_year():
+    assert parse_year_range(1700, "   ") == (1700, 1700)
+```
+(peaksid kohe PASS-ima; commiti koos Task 4 muudatustega: `git add server/meilisearch_ops.py tests/test_year_range.py`).
+
+**Jätkamine:** käivita superpowers:subagent-driven-development selle plaaniga; jätka Task 4-st (sammud allpool muutmata kujul). Reviewer-mudelid: implementer haiku/sonnet, review opus.
+
 **NB (Python):** käivita testid alati `.venv/bin/python -m pytest` (host venv). Python 3.9 ühilduvus: `Optional`/`Tuple` typing-moodulist, MITTE `int | None`.
 
 ---
