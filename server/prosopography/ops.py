@@ -681,6 +681,7 @@ def list_persons(
     imm_year_to: Optional[int] = None,
     sort_by: Optional[str] = None,
     ids: Optional[list] = None,
+    collection: Optional[str] = None,
     limit: int = 48,
     offset: int = 0,
 ) -> dict:
@@ -688,6 +689,13 @@ def list_persons(
     Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult.
     Otsing q= töötab label + sort_name + aliases (sh Wikidata/GND) vastu.
     """
+    if collection:
+        collection_ids = _persons_in_collection(collection)
+        if ids is not None:
+            ids = [i for i in ids if i in collection_ids]
+        else:
+            ids = list(collection_ids)
+
     results = _filter_index_entries(
         q=q,
         gender=gender,
@@ -839,11 +847,19 @@ def get_person_map_markers(
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
     related_to: Optional[str] = None,
+    collection: Optional[str] = None,
 ) -> dict:
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     if related_to:
         network_ids = get_person_relation_network_ids(related_to)
         ids = list(dict.fromkeys([*(ids or []), *network_ids])) if ids else network_ids
+
+    if collection:
+        collection_ids = _persons_in_collection(collection)
+        if ids is not None:
+            ids = [i for i in ids if i in collection_ids]
+        else:
+            ids = list(collection_ids)
 
     entries = _filter_index_entries(
         q=q,
@@ -985,6 +1001,7 @@ def get_person_facets(
     q: Optional[str] = None,
     gender: Optional[str] = None,
     ids: Optional[list] = None,
+    collection: Optional[str] = None,
 ) -> dict:
     """
     Tagastab persons-listingu jaoks facetid.
@@ -995,6 +1012,7 @@ def get_person_facets(
         q=q,
         gender=gender,
         ids=ids,
+        collection=collection,
         limit=10**9,
         offset=0,
     )["results"]

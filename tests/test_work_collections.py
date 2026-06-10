@@ -93,3 +93,29 @@ def test_persons_in_collection_roles_and_inheritance(tmp_path):
     assert result == {"vutt:Pauthor", "vutt:Pmention", "vutt:Ppublisher"}
     assert "vutt:Pother" not in result   # teine kollektsioon
     assert "vutt:Pnowork" not in result  # teosteta isik
+
+
+def test_list_persons_collection_filters(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
+    wc_file.write_text(json.dumps({"w1": ["c-child"], "w2": ["c-other"]}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({
+        "vutt:Pin":  [{"work_id": "w1", "role": "creator"}],
+        "vutt:Pout": [{"work_id": "w2", "role": "creator"}],
+    }), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": [
+        {"id": "vutt:Pin", "label": "Sees", "sort_name": "sees", "record_status": "published"},
+        {"id": "vutt:Pout", "label": "Väljas", "sort_name": "valjas", "record_status": "published"},
+    ]}), encoding="utf-8")
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+         mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
+        res = ops.list_persons(collection="parent")
+
+    ids = {e["id"] for e in res["results"]}
+    assert ids == {"vutt:Pin"}
+    assert res["total"] == 1
