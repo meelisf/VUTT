@@ -644,7 +644,7 @@ const Upload: React.FC = () => {
     setFileUploading(false);
     setTitle('');
     setYear('');
-    setMaterialType('print');
+    setWorkType(TYPE_PRINT);
     setSlug('');
     setSlugManual(false);
     setLocalDeleted(new Set());
@@ -681,7 +681,7 @@ const Upload: React.FC = () => {
     setFileUploading(false);
     setTitle('');
     setYear('');
-    setMaterialType('print');
+    setWorkType(TYPE_PRINT);
     setSlug('');
     setSlugManual(false);
     setLocalDeleted(new Set());
