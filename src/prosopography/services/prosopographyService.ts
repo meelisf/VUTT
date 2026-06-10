@@ -20,6 +20,7 @@ export async function listPersons(params?: {
   imm_year_to?: number;
   sort_by?: string;
   ids?: string[];
+  collection?: string;
   limit?: number;
   offset?: number;
 }, token?: string): Promise<{ results: ProsopoIndexEntry[]; total: number; offset: number; limit: number }> {
@@ -50,6 +51,7 @@ export async function listPersons(params?: {
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
   if (params?.sort_by) url.searchParams.set('sort_by', params.sort_by);
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
+  if (params?.collection) url.searchParams.set('collection', params.collection);
   if (params?.limit != null) url.searchParams.set('limit', String(params.limit));
   if (params?.offset != null) url.searchParams.set('offset', String(params.offset));
 
@@ -76,6 +78,7 @@ export async function fetchPersonMapMarkers(params?: {
   imm_year_to?: number;
   ids?: string[];
   related_to?: string;
+  collection?: string;
 }, token?: string): Promise<ProsopoMapResponse> {
   const url = new URL(`${BASE}/map`, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
@@ -92,6 +95,7 @@ export async function fetchPersonMapMarkers(params?: {
   if (params?.imm_year_to != null) url.searchParams.set('imm_year_to', String(params.imm_year_to));
   if (params?.ids?.length) url.searchParams.set('ids', params.ids.join(','));
   if (params?.related_to) url.searchParams.set('related_to', params.related_to);
+  if (params?.collection) url.searchParams.set('collection', params.collection);
 
   const resp = await fetchWithTimeout(url.toString(), {
     headers: getAuthHeaders(token),
@@ -105,6 +109,7 @@ export async function getPersonFacets(params?: {
   q?: string;
   gender?: string;
   ids?: string[];
+  collection?: string;
 }, token?: string): Promise<{
   origin_groups: { value: string; labels: Record<string, string>; label_et: string; label_en: string; count: number }[];
   institutions: { value: string; count: number }[];
@@ -124,6 +129,7 @@ export async function getPersonFacets(params?: {
   const url = new URL(`${BASE}/facets`, window.location.origin);
   if (params?.q) url.searchParams.set('q', params.q);
   if (params?.gender) url.searchParams.set('gender', params.gender);
+  if (params?.collection) url.searchParams.set('collection', params.collection);
 
   const resp = await fetchWithTimeout(url.toString(), {
     headers: getAuthHeaders(token),
