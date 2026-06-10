@@ -7,6 +7,7 @@ import {
   BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw,
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
+import { formatYearDisplay, parseYearDisplayRange } from '../../utils/yearDisplayUtils';
 import Header from '../../components/Header';
 import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePerson } from '../services/prosopographyService';
 import EntityPicker from '../../components/EntityPicker';
@@ -377,12 +378,12 @@ const PersonDetailPage: React.FC = () => {
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
   const birth = formatHistoricalDate(person.birth, '*', boundLabels, lang);
   const death = formatHistoricalDate(person.death, '†', boundLabels, lang);
-  // Sorteerimisaasta: number-väli, muidu year_display'st leitud 4-kohaline aasta (nt "ca. 1750")
+  // Sorteerimisaasta: number-väli, muidu year_display vahemiku keskpaik (nt "ca. 1750", "19. saj")
   const sortYear = (workId: string): number => {
     const meta = workTitles[workId];
     if (meta?.year) return meta.year;
-    const m = meta?.year_display?.match(/\d{4}/);
-    return m ? parseInt(m[0]) : 9999;
+    const range = parseYearDisplayRange(null, meta?.year_display);
+    return range ? Math.floor((range.start + range.end) / 2) : 9999;
   };
   const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort(
     (a, b) => sortYear(a.work_id) - sortYear(b.work_id)
@@ -667,7 +668,7 @@ const PersonDetailPage: React.FC = () => {
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
                 // Eelista kuvatavat aastat (nt "ca. 1750"); muidu number-aasta, kui see pole 0
-                const yearLabel = meta?.year_display || (meta?.year ? String(meta.year) : '');
+                const yearLabel = formatYearDisplay(meta?.year_display, meta?.year, t);
                 const inCollection = selectedCollection && meta?.collections?.includes(selectedCollection);
                 const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
                 return (

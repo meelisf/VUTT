@@ -16,6 +16,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
 import { replyToComment } from '../services/pageService';
+import { formatYearDisplay } from '../utils/yearDisplayUtils';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
@@ -666,7 +667,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           <div className="px-4 py-1.5 border-b border-gray-50 flex items-center gap-2 text-[11px] text-gray-500 bg-gray-50/50">
             <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
             <span className="text-gray-300">•</span>
-            <span className="text-gray-400">{work.year_display || work.year}</span>
+            <span className="text-gray-400">{formatYearDisplay(work.year_display, work.year, t)}</span>
             <span className="text-gray-300">•</span>
             <span className="italic truncate flex-1">{work.title}</span>
           </div>

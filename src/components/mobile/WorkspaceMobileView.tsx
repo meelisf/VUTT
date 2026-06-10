@@ -17,6 +17,7 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 import { getLangCode } from '../../utils/getLangCode';
+import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 
 interface WorkspaceMobileViewProps {
   page: Page;
@@ -354,7 +355,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
-                        <p className="text-gray-900">{work.year_display || work.year}</p>
+                        <p className="text-gray-900">{formatYearDisplay(work.year_display, work.year, t)}</p>
                       </div>
                       {work.type && (
                         <div>

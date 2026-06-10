@@ -12,7 +12,7 @@ import { getLangCode } from '../../utils/getLangCode';
 import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
-import { parseYearDisplayRange } from '../../utils/yearDisplayUtils';
+import { parseYearDisplayRange, formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { sanitizeHighlight } from '../../utils/sanitizeHtml';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
@@ -401,7 +401,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                                         title={t('results.searchYearWorks')}
                                                     >
                                                         <Calendar size={12} className="text-gray-400" />
-                                                        <span className="hover:underline">{(firstHit as any).year_display ?? firstHit.year ?? (firstHit as any).aasta ?? '...'}</span>
+                                                        <span className="hover:underline">{formatYearDisplay((firstHit as any).year_display, firstHit.year ?? (firstHit as any).aasta, t) || '...'}</span>
                                                     </button>
 
                                                     {/* Žanr */}

@@ -11,7 +11,7 @@ import { getLangCode } from '../utils/getLangCode';
 import { useUser } from '../contexts/UserContext';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
-import { parseYearDisplayRange } from '../utils/yearDisplayUtils';
+import { parseYearDisplayRange, formatYearDisplay } from '../utils/yearDisplayUtils';
 
 interface WorkCardProps {
   work: Work;
@@ -319,7 +319,7 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
             title={t('workCard.filterByYear')}
           >
             <Calendar size={14} />
-            <span>{work.year_display || work.year}</span>
+            <span>{formatYearDisplay(work.year_display, work.year, t)}</span>
           </button>
           <div className="flex items-center gap-2">
             <BookOpen size={14} />

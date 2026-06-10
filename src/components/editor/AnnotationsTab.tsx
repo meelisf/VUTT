@@ -17,6 +17,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
+import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -293,7 +294,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{t('metadata.year')}</span>
-                <p className="text-gray-900">{work.year_display || work.year}</p>
+                <p className="text-gray-900">{formatYearDisplay(work.year_display, work.year, t)}</p>
               </div>
               
               {/* Tüüp */}
