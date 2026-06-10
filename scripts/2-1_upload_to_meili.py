@@ -62,6 +62,8 @@ def main():
         'filterableAttributes': [
             'work_id',
             'year',
+            'year_start',
+            'year_end',
             'title',
             'location_id',
             'location',

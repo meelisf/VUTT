@@ -45,7 +45,7 @@ if 'server' not in sys.modules:
 sys.path.insert(0, _project_root)
 from server.utils import (
     capitalize_first, get_label, get_id, get_all_labels,
-    get_primary_labels, get_labels_by_lang, get_all_ids
+    get_primary_labels, get_labels_by_lang, get_all_ids, parse_year_range
 )
 
 
@@ -302,12 +302,13 @@ def get_work_metadata(doc_path, dir_name, collections):
                 result['title'] = meta.get('title') or meta.get('pealkiri', result['title'])
                 result['year'] = meta.get('year') or meta.get('aasta')
                 result['year_display'] = meta.get('year_display') or None
-                # Kui year puudub aga year_display sisaldab aastat (nt "ca. 1750"),
-                # kasuta seda numbrilise year-filtri jaoks (sama loogika nagu meilisearch_ops.py)
-                if not result['year'] and result['year_display']:
-                    _ym = re.search(r'\d{4}', result['year_display'])
-                    if _ym:
-                        result['year'] = int(_ym.group())
+                _yr = parse_year_range(result['year'], result['year_display'])
+                # Kui year puudub aga year_display annab vahemiku (nt "ca. 1750", "19. saj"),
+                # kasuta sortimisväärtusena keskpaika (sama loogika nagu meilisearch_ops.py)
+                if not result['year'] and _yr:
+                    result['year'] = (_yr[0] + _yr[1]) // 2
+                result['year_start'] = _yr[0] if _yr else 0
+                result['year_end'] = _yr[1] if _yr else 0
                 result['location'] = meta.get('location') or meta.get('koht')
                 result['publisher'] = meta.get('publisher') or meta.get('trükkal')
 
@@ -492,6 +493,8 @@ def create_meilisearch_data_per_page():
                 'title': doc_metadata.get('title', ''),
                 'year': doc_metadata.get('year'),
                 'year_display': doc_metadata.get('year_display'),
+                'year_start': doc_metadata.get('year_start', 0),  # Filtreerimiseks (vahemike kattuvus)
+                'year_end': doc_metadata.get('year_end', 0),
                 'location': get_label(doc_metadata.get('location')),
                 'location_id': get_id(doc_metadata.get('location')),
                 'location_object': doc_metadata.get('location'),
