@@ -155,12 +155,18 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       if (!result) {
-        // Server kinnitas et token on aegunud — logi välja
+        // Server kinnitas et token on aegunud — degradeeri VAIKSELT anonüümseks,
+        // täpselt nagu initAuth teeb lehe laadimisel/refreshil. Avalik vaade
+        // (teosed, isikud) jääb kättesaadavaks; sisselogimist küsitakse alles
+        // autenditud toimingul (nt salvestus → handleSave 401 → LoginModal).
+        // NB: EI sea setSessionExpired(true) — blokeeriv modaal jättis kasutaja
+        // avalikku sisu vaadates "token expired" akna taha lõksu (ainult hard
+        // refresh, mis läbib initAuth vaikse tee, päästis).
         setUser(null);
         setAuthToken(null);
+        clearUserToken();
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(STORAGE_KEY);
-        setSessionExpired(true);
       }
     }, 5 * 60 * 1000); // 5 minutit
 
