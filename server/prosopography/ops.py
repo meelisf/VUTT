@@ -22,6 +22,8 @@ from ..config import (
     PROSOPOGRAPHY_INDEX_FILE,
     PERSON_TO_WORKS_FILE,
     PERSON_ALIASES_FILE,
+    WORK_COLLECTIONS_INDEX_FILE,
+    BASE_DIR,
 )
 from ..utils import generate_nanoid, atomic_write_json
 from ..git_ops import save_with_git, delete_file_from_git
@@ -40,6 +42,7 @@ from .places_ops import (
 _index_lock = threading.Lock()
 _works_lock = threading.Lock()
 _aliases_lock = threading.Lock()
+_work_collections_lock = threading.Lock()
 
 
 # =========================================================
@@ -104,6 +107,35 @@ def _load_person_to_works() -> dict:
         except Exception:
             pass
     return {}
+
+
+def _load_work_collections() -> dict:
+    if os.path.exists(WORK_COLLECTIONS_INDEX_FILE):
+        try:
+            with open(WORK_COLLECTIONS_INDEX_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def update_work_collections(work_id: str, collections: list) -> None:
+    """Uuendab work_collections_index.json üht kirjet teose salvestamisel.
+
+    Salvestab teose ENDA kollektsioonid (mitte esivanematega laiendatud
+    hierarhiat) — laiendamine toimub päringuajal cache'itud konfist.
+    Peab jooksma TINGIMUSTETA igal metaandmete salvestusel (ka bulk-collection,
+    kus call_ptw=False), sest just seal kollektsioonid muutuvad.
+    """
+    if not work_id:
+        return
+    with _work_collections_lock:
+        data = _load_work_collections()
+        if collections:
+            data[work_id] = list(collections)
+        else:
+            data.pop(work_id, None)
+        atomic_write_json(WORK_COLLECTIONS_INDEX_FILE, data)
 
 
 def _load_person_aliases() -> dict:
