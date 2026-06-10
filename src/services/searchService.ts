@@ -10,6 +10,13 @@ import { buildIdMap } from '../utils/buildObjectIdMap';
 import type { MatchingStrategies, Index } from 'meilisearch';
 import { HIGHLIGHT_PRE_TAG, HIGHLIGHT_POST_TAG } from '../utils/sanitizeHtml';
 
+// Aastafilter vahemike kattuvusena: teose [year_start, year_end] kattub kasutaja vahemikuga.
+// Kattuvus: A.end >= B.start AND A.start <= B.end.
+// Aastata teosed (year_start=year_end=0) käituvad nagu varasem year=0.
+const pushYearFilter = (filter: string[], yearStart?: number, yearEnd?: number): void => {
+  if (yearStart) filter.push(`year_end >= ${yearStart}`);
+  if (yearEnd) filter.push(`year_start <= ${yearEnd}`);
+};
 
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
@@ -66,12 +73,7 @@ export const getTeoseTagsFacets = async (
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
     }
-    if (yearStart) {
-      filter.push(`year >= ${yearStart}`);
-    }
-    if (yearEnd) {
-      filter.push(`year <= ${yearEnd}`);
-    }
+    pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
       filter,
@@ -111,12 +113,7 @@ export const getGenreFacets = async (
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
     }
-    if (yearStart) {
-      filter.push(`year >= ${yearStart}`);
-    }
-    if (yearEnd) {
-      filter.push(`year <= ${yearEnd}`);
-    }
+    pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
       filter,
@@ -156,12 +153,7 @@ export const getTypeFacets = async (
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
     }
-    if (yearStart) {
-      filter.push(`year >= ${yearStart}`);
-    }
-    if (yearEnd) {
-      filter.push(`year <= ${yearEnd}`);
-    }
+    pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
       filter,
@@ -219,8 +211,7 @@ export const getTagsLabelMap = async (
   try {
     const filter: string[] = ['lehekylje_number = 1'];
     if (collection) filter.push(`collections_hierarchy = "${collection}"`);
-    if (yearStart) filter.push(`year >= ${yearStart}`);
-    if (yearEnd) filter.push(`year <= ${yearEnd}`);
+    pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
       filter,
@@ -260,12 +251,7 @@ export const getAuthorFacets = async (
     if (collection) {
       filter.push(`collections_hierarchy = "${collection}"`);
     }
-    if (yearStart) {
-      filter.push(`year >= ${yearStart}`);
-    }
-    if (yearEnd) {
-      filter.push(`year <= ${yearEnd}`);
-    }
+    pushYearFilter(filter, yearStart, yearEnd);
 
     const response = await index.search('', {
       filter,
@@ -304,12 +290,7 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
     }
 
     // Apply server-side filters if provided
-    if (options?.yearStart) {
-      filter.push(`year >= ${options.yearStart}`);
-    }
-    if (options?.yearEnd) {
-      filter.push(`year <= ${options.yearEnd}`);
-    }
+    pushYearFilter(filter, options?.yearStart, options?.yearEnd);
     if (options?.author) {
       filter.push(`(author_names = "${options.author}" OR respondens_names = "${options.author}")`);
     }
@@ -468,8 +449,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
   const filter: string[] = [];
 
   if (options.workId) filter.push(`work_id = "${options.workId}"`);
-  if (options.yearStart) filter.push(`year >= ${options.yearStart}`);
-  if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
+  pushYearFilter(filter, options.yearStart, options.yearEnd);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
   // Teose märksõnade filter (AND loogika)
   if (options.teoseTags && options.teoseTags.length > 0) {
@@ -721,8 +701,7 @@ export const searchWorkHits = async (index: Index, query: string, workId: string
 
   const filter: string[] = [`work_id = "${workId}"`];
 
-  if (options.yearStart) filter.push(`year >= ${options.yearStart}`);
-  if (options.yearEnd) filter.push(`year <= ${options.yearEnd}`);
+  pushYearFilter(filter, options.yearStart, options.yearEnd);
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
