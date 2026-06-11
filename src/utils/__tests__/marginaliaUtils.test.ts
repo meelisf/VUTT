@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -50,9 +50,14 @@ describe('findMarginaliaBlocks', () => {
   it('tühi tekst', () => {
     expect(findMarginaliaBlocks('')).toHaveLength(0);
   });
-});
 
-import { stackMarginalia } from '../marginaliaUtils';
+  it('dokumendi lõpus olevad järjestikused plokid ei anna kattuvaid peitevahemikke', () => {
+    const text = 'tekst\n<m>a</m>\n<m>b</m>';
+    const blocks = findMarginaliaBlocks(text);
+    expect(blocks).toHaveLength(2);
+    expect(blocks[1].hideFrom).toBeGreaterThanOrEqual(blocks[0].hideTo);
+  });
+});
 
 describe('stackMarginalia', () => {
   it('kattumiseta plokid jäävad oma ankru kõrgusele', () => {

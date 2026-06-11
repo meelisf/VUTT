@@ -1,7 +1,6 @@
 // src/components/editor/__tests__/MarginaliaExtension.test.ts
 import { describe, it, expect } from 'vitest';
-import { EditorState } from '@codemirror/state';
-import { Transaction } from '@codemirror/state';
+import { EditorState, Transaction } from '@codemirror/state';
 import {
   marginaliaExtension,
   marginaliaField,
@@ -59,6 +58,12 @@ describe('dekoratsioonid', () => {
   it('suletud plokid annavad replace + widget dekoratsioonid (2 plokki → 4 dekoratsiooni)', () => {
     const state = mkState();
     expect(state.field(marginaliaDecoField).deco.size).toBe(4);
+  });
+
+  it('dokumendi lõpus olevad järjestikused plokid ei viska erandit', () => {
+    const state = mkState('tekst\n<m>a</m>\n<m>b</m>');
+    expect(state.field(marginaliaField).blocks).toHaveLength(2);
+    expect(state.field(marginaliaDecoField).deco.size).toBeGreaterThan(0);
   });
 
   it('avatud plokk annab line-dekoratsioonid + × widgeti', () => {

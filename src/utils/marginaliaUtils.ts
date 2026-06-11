@@ -55,6 +55,13 @@ export function findMarginaliaBlocks(text: string): MarginaliaBlock[] {
     blocks.push({ from, to, contentFrom: from + 3, contentTo: to - 4, hideFrom, hideTo, anchorPos });
   }
 
+  // Dokumendi lõpus laenab viimane plokk eelneva reavahetuse — see võib kattuda
+  // eelmise ploki peitealaga. Kattuvad block-replace dekoratsioonid viskaksid
+  // CM6-s erandi, seega lõikame kattuvuse ära.
+  for (let i = 1; i < blocks.length; i++) {
+    if (blocks[i].hideFrom < blocks[i - 1].hideTo) blocks[i].hideFrom = blocks[i - 1].hideTo;
+  }
+
   // Kui ankur satub teise peidetud ploki sisse (järjestikused plokid),
   // liigu edasi kuni esimese nähtava positsioonini.
   for (const b of blocks) {

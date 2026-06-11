@@ -119,7 +119,7 @@ function buildDeco(state: EditorState): DecoSets {
   const doc = state.doc;
   type Item = { from: number; to: number; deco: Decoration };
   const items: Item[] = [];
-  const atomicB = new RangeSetBuilder<Decoration>();
+  const atomicRanges: { from: number; to: number }[] = [];
 
   for (const b of blocks) {
     if (isOpen(b, openMarks)) {
@@ -146,13 +146,18 @@ function buildDeco(state: EditorState): DecoSets {
       items.push({ from: b.hideFrom, to: b.hideTo, deco: Decoration.replace({ block: true }) });
       const anchor = Math.min(b.anchorPos, doc.length);
       items.push({ from: anchor, to: anchor, deco: Decoration.widget({ widget, side: -1 }) });
-      atomicB.add(b.hideFrom, b.hideTo, atomicMark);
+      atomicRanges.push({ from: b.hideFrom, to: b.hideTo });
     }
   }
 
-  items.sort((a, b2) => (a.from - b2.from) || (a.to - b2.to));
+  items.sort((a, b2) => (a.from - b2.from) || (a.deco.startSide - b2.deco.startSide) || (a.to - b2.to));
   const decoB = new RangeSetBuilder<Decoration>();
   for (const it of items) decoB.add(it.from, it.to, it.deco);
+
+  atomicRanges.sort((a, b2) => (a.from - b2.from) || (a.to - b2.to));
+  const atomicB = new RangeSetBuilder<Decoration>();
+  for (const r of atomicRanges) atomicB.add(r.from, r.to, atomicMark);
+
   return { deco: decoB.finish(), atomic: atomicB.finish() };
 }
 
