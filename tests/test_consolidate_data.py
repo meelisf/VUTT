@@ -203,3 +203,24 @@ class TestLabelsStore:
         assert result == ['Kanooniline Silt'], (
             f"labels_store-ist peaks tulema 'Kanooniline Silt', sain: {result}"
         )
+
+
+# --- split_marginalia üksiktestid ---
+
+class TestSplitMarginalia:
+    def _fns(self):
+        spec = importlib.util.spec_from_file_location("consolidate_data", _script_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod.split_marginalia, mod.clean_text_for_search
+
+    def test_eraldab_ja_fraas_liitub(self):
+        split_marginalia, clean = self._fns()
+        text = "der Teuffel\n<m>Vide Picrium</m>\nvnd Satanas."
+        main, marg = split_marginalia(text)
+        assert "Teuffel vnd Satanas" in clean(main)
+        assert "Vide Picrium" in marg
+
+    def test_tyhi(self):
+        split_marginalia, _ = self._fns()
+        assert split_marginalia("") == ("", "")
