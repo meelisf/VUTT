@@ -258,6 +258,11 @@
       "cleanMarkupButton": "Puhasta",
       "annotate": "Märgi ja kommenteeri (vali tekst enne)"
     },
+    "marginalia": {
+      "toggle": "Marginaalid",
+      "collapse": "Klapi marginaaliveerg kokku (märgivaade)",
+      "expand": "Ava marginaaliveerg"
+    },
     "annotateTitle": "Lisa kommentaar",
     "annotateCommentPlaceholder": "Kommentaar...",
     "annotateOverlapError": "Valitud tekst sisaldab juba annotatsiooni — vali kattumatult",
