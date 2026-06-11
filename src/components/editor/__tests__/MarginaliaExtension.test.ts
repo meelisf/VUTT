@@ -1,6 +1,7 @@
 // src/components/editor/__tests__/MarginaliaExtension.test.ts
 import { describe, it, expect } from 'vitest';
 import { EditorState } from '@codemirror/state';
+import { Transaction } from '@codemirror/state';
 import {
   marginaliaExtension,
   marginaliaField,
@@ -66,5 +67,49 @@ describe('dekoratsioonid', () => {
     state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
     // Plokk 1 avatud (1 rida): 1 line-deco + 1 close-widget; plokk 2 suletud: replace + note-widget
     expect(state.field(marginaliaDecoField).deco.size).toBe(4);
+  });
+});
+
+describe('marginaliaProtectionFilter', () => {
+  it('kasutaja kustutamine üle peidetud ploki jätab ploki alles', () => {
+    const doc = 'AAAA\n<m>note</m>\nBBBB';
+    let state = mkState(doc);
+    // Kustuta kogu dokument kasutaja-eventina
+    state = state.update({
+      changes: { from: 0, to: doc.length, insert: '' },
+      annotations: Transaction.userEvent.of('delete.selection'),
+    }).state;
+    expect(state.doc.toString()).toContain('<m>note</m>');
+    expect(state.doc.toString()).not.toContain('AAAA');
+    expect(state.doc.toString()).not.toContain('BBBB');
+  });
+
+  it('avatud ploki kustutamine on lubatud', () => {
+    const doc = 'AAAA\n<m>note</m>\nBBBB';
+    let state = mkState(doc);
+    const b = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    state = state.update({
+      changes: { from: 0, to: doc.length, insert: '' },
+      annotations: Transaction.userEvent.of('delete.selection'),
+    }).state;
+    expect(state.doc.toString()).toBe('');
+  });
+
+  it('programmiline muudatus (ilma userEventita) läheb läbi puutumata', () => {
+    const doc = 'AAAA\n<m>note</m>\nBBBB';
+    let state = mkState(doc);
+    state = state.update({ changes: { from: 0, to: doc.length, insert: 'uus' } }).state;
+    expect(state.doc.toString()).toBe('uus');
+  });
+
+  it('tavaline kustutamine nähtavas tekstis töötab', () => {
+    const doc = 'AAAA\n<m>note</m>\nBBBB';
+    let state = mkState(doc);
+    state = state.update({
+      changes: { from: 0, to: 2, insert: '' },
+      annotations: Transaction.userEvent.of('delete.backward'),
+    }).state;
+    expect(state.doc.toString()).toBe('AA\n<m>note</m>\nBBBB');
   });
 });
