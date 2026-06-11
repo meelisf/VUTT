@@ -167,3 +167,26 @@ class TestSplitMarginalia:
     def test_tyhi(self):
         assert split_marginalia("") == ("", "")
         assert split_marginalia(None) == ("", "")
+
+    def test_inline_m_ei_liimi_sonasid(self):
+        """Inline <m> ei tohi liita ümbritsevaid sõnu üheks tokeniks."""
+        # Tühikuga ümbritsetud inline
+        main_ws, marg_ws = split_marginalia("foo <m>note</m> bar")
+        assert "note" in marg_ws
+        assert "foobar" not in clean_text_for_search(main_ws)
+        assert "foo" in clean_text_for_search(main_ws)
+        assert "bar" in clean_text_for_search(main_ws)
+        # Ilma tühikuta — kriitiline juhtum
+        main_nows, marg_nows = split_marginalia("foo<m>note</m>bar")
+        assert "note" in marg_nows
+        assert "foobar" not in clean_text_for_search(main_nows)
+        assert "foo" in clean_text_for_search(main_nows)
+        assert "bar" in clean_text_for_search(main_nows)
+
+    def test_sulgemata_m_tag_degradeerub_graatsiliselt(self):
+        """Sulgemata <m> ei tohi sisu kaotada — jääb põhiteksti puhastajale."""
+        main, marg = split_marginalia("tekst <m>pooleli")
+        # Marginaalia on tühi (regex ei leidnud sulgevat tagi)
+        assert marg == ""
+        # Sisu peab jääma otsingus kättesaadavaks (clean_text_for_search eemaldab rämpsu)
+        assert "pooleli" in clean_text_for_search(main)

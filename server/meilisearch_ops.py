@@ -64,7 +64,9 @@ def split_marginalia(text):
     if not text:
         return "", ""
     notes = M_CONTENT_RE.findall(text)
-    main = M_CONTENT_RE.sub('', text)
+    # Tühik (mitte tühi string) väldib inline <m> korral ümbritsevate sõnade kokkuliimimist
+    # (nt "foo<m>note</m>bar" → "foo bar", mitte "foobar")
+    main = M_CONTENT_RE.sub(' ', text)
     return main, "\n".join(notes)
 
 
