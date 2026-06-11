@@ -118,3 +118,28 @@ describe('marginaliaProtectionFilter', () => {
     expect(state.doc.toString()).toBe('AA\n<m>note</m>\nBBBB');
   });
 });
+
+describe('lehevahetuse fix: closeAllMarginalia koos dokumendiasendusega', () => {
+  it('kogu dok asendus + closeAllMarginalia tühjendab openMarks (vanad positsioonid ei jää)', () => {
+    // Avame ploki, seejärel asendame kogu dokumendi koos closeAll efektiga —
+    // see simuleerib TextEditor lehevahetuse dispatch'd.
+    // Ilma closeAll-ita mapitaks vana marker pos 0-le ja avaks ploki uuel lehel
+    // (kui uus dok algab <m>-iga).
+    let state = mkState();
+    const b = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    expect(state.field(marginaliaField).openMarks).toHaveLength(1);
+
+    // Lehevahetusel: asendame kogu dok + saadame closeAllMarginalia
+    const newDoc = '<m>uus marginaalia</m>\nrida';
+    state = state.update({
+      changes: { from: 0, to: state.doc.length, insert: newDoc },
+      effects: closeAllMarginalia.of(null),
+    }).state;
+
+    // openMarks peab olema tühi — closeAll võidab mapping'u üle
+    expect(state.field(marginaliaField).openMarks).toHaveLength(0);
+    // Veendume, et uus dok on õige (1 plokk)
+    expect(state.field(marginaliaField).blocks).toHaveLength(1);
+  });
+});

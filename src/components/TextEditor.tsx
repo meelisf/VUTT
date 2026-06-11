@@ -256,6 +256,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     if (!el) return;
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width ?? 9999;
+      // Peidetud paan (display:none) annab 0-laiuse — ära muuda režiimi
+      if (w === 0) return;
       setNarrowPane(w < 640);
     });
     ro.observe(el);
@@ -285,6 +287,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       if (currentText !== page.text_content) {
         view.dispatch({
           changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
+          // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
+          // avaks võõra ploki uuel lehel
+          effects: closeAllMarginalia.of(null),
         });
       }
     }
