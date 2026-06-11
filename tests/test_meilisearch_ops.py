@@ -126,3 +126,44 @@ def test_generate_work_scoped_meili_token_different_works():
     assert 'work_id = "work1"' in p1["searchRules"]["teosed"]["filter"]
     assert 'work_id = "work2"' in p2["searchRules"]["teosed"]["filter"]
     assert p1["searchRules"] != p2["searchRules"]
+
+
+# --- split_marginalia ---
+from server.meilisearch_ops import split_marginalia, clean_text_for_search
+
+
+class TestSplitMarginalia:
+    def test_eraldab_ploki(self):
+        text = "rida üks\n<m>Apoc. 12.</m>\nrida kaks"
+        main, marg = split_marginalia(text)
+        assert "<m>" not in main
+        assert "Apoc. 12." in marg
+        assert "rida üks" in main and "rida kaks" in main
+
+    def test_fraas_liitub_yle_ploki(self):
+        text = "welcher iſt der Teuffel\n<m>Vide Picrium\nin hyeroglyphicis</m>\nvnd Satanas."
+        main, marg = split_marginalia(text)
+        assert "Teuffel vnd Satanas" in clean_text_for_search(main)
+        assert "Vide Picrium" in marg
+
+    def test_poolitus_yle_ploki(self):
+        text = "die rechten we⸗\n<m>märkus</m>\nge deß HErrn"
+        main, _ = split_marginalia(text)
+        assert "wege" in clean_text_for_search(main)
+
+    def test_mitu_plokki(self):
+        text = "a\n<m>üks</m>\nb\n<m>kaks</m>\nc"
+        main, marg = split_marginalia(text)
+        assert "<m>" not in main
+        assert "üks" in marg and "kaks" in marg
+
+    def test_marginaalia_sisemine_margendus_puhastub(self):
+        _, marg = split_marginalia("a\n<m>Vide <i>Picrium</i></m>\nb")
+        assert clean_text_for_search(marg) == "Vide Picrium"
+
+    def test_plokki_pole(self):
+        assert split_marginalia("lihtne tekst") == ("lihtne tekst", "")
+
+    def test_tyhi(self):
+        assert split_marginalia("") == ("", "")
+        assert split_marginalia(None) == ("", "")
