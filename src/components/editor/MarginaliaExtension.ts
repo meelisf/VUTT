@@ -39,6 +39,19 @@ function isOpen(block: MarginaliaBlock, openMarks: number[]): boolean {
   return openMarks.some(p => p >= block.from && p <= block.to);
 }
 
+/**
+ * PEIDETUD (suletud) plokkide peitevahemikud kasvavas järjestuses.
+ * Kasutavad: marginaliaProtectionFilter ja TextEditor.cleanMarkup —
+ * peidetud sisu ei tohi sattuda asendusteksti (muidu dubleeruks).
+ */
+export function hiddenBlockRanges(state: EditorState): { from: number; to: number }[] {
+  const { blocks, openMarks } = state.field(marginaliaField);
+  return blocks
+    .filter(b => !isOpen(b, openMarks))
+    .map(b => ({ from: b.hideFrom, to: b.hideTo }))
+    .sort((a, b) => a.from - b.from);
+}
+
 export const marginaliaField = StateField.define<MarginaliaState>({
   create(state) {
     return { blocks: findMarginaliaBlocks(state.doc.toString()), openMarks: [] };
@@ -72,8 +85,14 @@ class MarginNoteWidget extends WidgetType {
     const div = document.createElement('div');
     div.className = 'vutt-margin-note';
     div.dataset.mFrom = String(this.blockFrom);
-    // renderVuttMarkup escape'ib HTML-i (XSS-kaitse) ja renderdab sisemise märgenduse
-    div.innerHTML = renderVuttMarkup(this.content);
+    if (this.content.trim() === '') {
+      // Tühi noot: ilma placeholder'ita oleks 0-kõrgusega ja klikkimatu
+      div.classList.add('vutt-margin-note-empty');
+      div.textContent = '(–)';
+    } else {
+      // renderVuttMarkup escape'ib HTML-i (XSS-kaitse) ja renderdab sisemise märgenduse
+      div.innerHTML = renderVuttMarkup(this.content);
+    }
     return div;
   }
   eq(other: MarginNoteWidget) { return other.content === this.content && other.blockFrom === this.blockFrom; }
@@ -224,11 +243,7 @@ const marginaliaKeymap = keymap.of([
 // vuttTagProtectionFilter VuttMarkupExtensionis — vt CLAUDE.md).
 const marginaliaProtectionFilter = EditorState.transactionFilter.of(tr => {
   if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr;
-  const { blocks, openMarks } = tr.startState.field(marginaliaField);
-  const hidden = blocks
-    .filter(b => !isOpen(b, openMarks))
-    .map(b => ({ from: b.hideFrom, to: b.hideTo }))
-    .sort((a, b) => a.from - b.from);
+  const hidden = hiddenBlockRanges(tr.startState);
   if (hidden.length === 0) return tr;
 
   let overlaps = false;
@@ -259,6 +274,9 @@ const marginaliaProtectionFilter = EditorState.transactionFilter.of(tr => {
   if (!overlaps) return tr;
   return [{
     changes: pieces,
+    // Efektid (nt openMarginalia/closeAllMarginalia) peavad ümberkirjutatud
+    // tehingus säilima — muidu kaoks kaasapandud olekumuudatus vaikselt
+    effects: tr.effects,
     annotations: [Transaction.userEvent.of(tr.annotation(Transaction.userEvent)!)],
     scrollIntoView: tr.scrollIntoView,
   }];

@@ -8,6 +8,7 @@ import {
   openMarginalia,
   closeMarginalia,
   closeAllMarginalia,
+  hiddenBlockRanges,
 } from '../MarginaliaExtension';
 
 const DOC = 'rida üks\n<m>Apoc. 12.</m>\nrida kaks\n<m>Vide Picrium</m>\nrida kolm';
@@ -116,6 +117,74 @@ describe('marginaliaProtectionFilter', () => {
       annotations: Transaction.userEvent.of('delete.backward'),
     }).state;
     expect(state.doc.toString()).toBe('AA\n<m>note</m>\nBBBB');
+  });
+});
+
+describe('hiddenBlockRanges', () => {
+  it('tagastab suletud plokkide peitevahemikud', () => {
+    const state = mkState('AA <i>x</i>\n<m>note</m>\nBB');
+    const blocks = state.field(marginaliaField).blocks;
+    expect(blocks).toHaveLength(1);
+    const ranges = hiddenBlockRanges(state);
+    expect(ranges).toEqual([{ from: blocks[0].hideFrom, to: blocks[0].hideTo }]);
+  });
+
+  it('avatud plokk ei ole peidetud', () => {
+    let state = mkState('AA\n<m>note</m>\nBB');
+    const b = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    expect(hiddenBlockRanges(state)).toHaveLength(0);
+  });
+});
+
+describe('cleanMarkup peidetud marginaalia üle (simulatsioon)', () => {
+  it('peidetud ploki sisu ei dubleerita insert-teksti', () => {
+    // Simuleerib TextEditor.cleanMarkup dispatchi: peidetud vahemikud lõigatakse
+    // valikust välja ENNE tägide eemaldamist; kaitsefilter hoiab ploki dokis alles.
+    const doc = 'AA <i>x</i>\n<m>note</m>\nBB';
+    let state = mkState(doc);
+    const hidden = hiddenBlockRanges(state);
+    let visible = '';
+    let cursor = 0;
+    for (const h of hidden) {
+      visible += doc.slice(cursor, h.from);
+      cursor = Math.max(cursor, h.to);
+    }
+    visible += doc.slice(cursor);
+    const cleaned = visible.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
+
+    state = state.update({
+      changes: { from: 0, to: doc.length, insert: cleaned },
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+
+    const result = state.doc.toString();
+    // Plokk säilib täpselt üks kord ja 'note' ei esine väljaspool tägi
+    expect(result.match(/<m>note<\/m>/g)).toHaveLength(1);
+    expect(result.replace('<m>note</m>', '')).not.toContain('note');
+    // Nähtav tekst on puhastatud
+    expect(result).toContain('AA x');
+    expect(result).not.toContain('<i>');
+  });
+});
+
+describe('marginaliaProtectionFilter edastab effects', () => {
+  it('ümberkirjutatud tehing säilitab tr.effects (closeAllMarginalia koos kustutusega)', () => {
+    const doc = 'AA\n<m>one</m>\nBB\n<m>two</m>\nCC';
+    let state = mkState(doc);
+    const b2 = state.field(marginaliaField).blocks[1];
+    state = state.update({ effects: openMarginalia.of(b2.contentFrom) }).state;
+    expect(state.field(marginaliaField).openMarks).toHaveLength(1);
+
+    // Kustutus üle PEIDETUD ploki 1 → filter kirjutab tehingu ümber;
+    // kaasapandud closeAllMarginalia efekt peab ikkagi mõjuma
+    state = state.update({
+      changes: { from: 0, to: 16, insert: '' },
+      effects: closeAllMarginalia.of(null),
+      annotations: Transaction.userEvent.of('delete.selection'),
+    }).state;
+    expect(state.field(marginaliaField).openMarks).toHaveLength(0);
+    expect(state.doc.toString()).toContain('<m>one</m>');
   });
 });
 

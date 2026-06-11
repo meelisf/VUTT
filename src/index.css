@@ -144,6 +144,13 @@ body:has(.workspace-container) {
   background-color: #fafaf9;
 }
 
+/* Tühi noot: placeholder, et plokk oleks nähtav ja klikitav */
+.vutt-margin-note-empty {
+  color: #a8a29e; /* stone-400 */
+  font-style: italic;
+  min-height: 1.35em;
+}
+
 /* Konnektor allapoole nihkunud ploki ja ta päris ankrurea vahel */
 .vutt-margin-connector {
   position: absolute;

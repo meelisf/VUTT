@@ -11,7 +11,7 @@ import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
-import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia } from './editor/MarginaliaExtension';
+import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
@@ -589,7 +589,17 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     }
 
-    const selected = view.state.doc.sliceString(from, to);
+    // Lõika PEIDETUD marginaalia plokid valikust välja ENNE tägide eemaldamist —
+    // kaitsefilter hoiab plokid dokumendis alles, seega insert ei tohi nende
+    // sisu sisaldada (muidu dubleeruks sisu nähtava tekstina)
+    const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
+    let selected = '';
+    let cursor = from;
+    for (const h of hidden) {
+      selected += view.state.doc.sliceString(cursor, Math.max(cursor, Math.min(h.from, to)));
+      cursor = Math.max(cursor, Math.min(h.to, to));
+    }
+    selected += view.state.doc.sliceString(cursor, to);
     // Eemalda kõik VUTT tägid täpse nimeloendi järgi
     const cleaned = selected.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
 
