@@ -16,7 +16,9 @@ export function renderVuttMarkup(text: string): string {
     .replace(/<b>([\s\S]*?)<\/b>/g, '<strong>$1</strong>')
     .replace(/<i>([\s\S]*?)<\/i>/g, '<em>$1</em>')
     .replace(/<cs>([\s\S]*?)<\/cs>/g, '<span class="italic tracking-wide">$1</span>')
-    .replace(/<m>([\s\S]*?)<\/m>/g, '<span class="text-gray-400 text-sm border-l-2 border-gray-200 pl-1">$1</span>')
+    // <m>...</m> — marginaalia plokk-kaardina: taane, väiksem kiri, vasak ääris.
+    // Sisemine märgendus (<i>, <cs> jne) renderdub tavaliste reeglitega.
+    .replace(/<m>([\s\S]*?)<\/m>/g, '<span class="block text-[0.85em] leading-snug text-stone-600 border-l-2 border-stone-300 pl-2 my-1">$1</span>')
     .replace(/<hi>([\s\S]*?)<\/hi>/g, '<mark class="bg-yellow-100">$1</mark>');
 
   // Eemaldame ülejäänud tundmatud VUTT-tägid; meie sisestatud HTML-elemendid (strong, em, span,

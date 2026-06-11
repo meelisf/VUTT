@@ -20,6 +20,18 @@ describe('renderVuttMarkup — VUTT-tägide renderdamine', () => {
     expect(renderVuttMarkup('<cs>x</cs>')).toContain('italic tracking-wide');
     expect(renderVuttMarkup('<m>x</m>')).toContain('border-l-2');
   });
+
+  it('renderdab <m> ploki kaardina (block, väiksem kiri, ilma sundkursiivita)', () => {
+    const html = renderVuttMarkup('põhi\n<m>Apoc. 12.</m>\ntekst');
+    expect(html).toContain('class="block');
+    expect(html).toContain('Apoc. 12.');
+    expect(html).not.toContain('italic">Apoc'); // sisu EI ole sundkursiivis
+  });
+
+  it('<m> sisemine märgendus renderdub tavaliselt', () => {
+    const html = renderVuttMarkup('<m>Vide <i>Picrium</i></m>');
+    expect(html).toContain('<em>Picrium</em>');
+  });
 });
 
 describe('renderVuttMarkup — XSS kaitse (Leid A)', () => {
