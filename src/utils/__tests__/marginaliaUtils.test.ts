@@ -51,3 +51,40 @@ describe('findMarginaliaBlocks', () => {
     expect(findMarginaliaBlocks('')).toHaveLength(0);
   });
 });
+
+import { stackMarginalia } from '../marginaliaUtils';
+
+describe('stackMarginalia', () => {
+  it('kattumiseta plokid jäävad oma ankru kõrgusele', () => {
+    const out = stackMarginalia([
+      { anchorTop: 0, height: 20 },
+      { anchorTop: 100, height: 20 },
+    ]);
+    expect(out).toEqual([
+      { top: 0, offset: 0 },
+      { top: 100, offset: 0 },
+    ]);
+  });
+
+  it('kattuv plokk nihkub eelmise alla (gap 6)', () => {
+    const out = stackMarginalia([
+      { anchorTop: 0, height: 90 },
+      { anchorTop: 50, height: 20 },
+    ]);
+    expect(out[1]).toEqual({ top: 96, offset: 46 });
+  });
+
+  it('mitu järjestikust konflikti kuhjuvad', () => {
+    const out = stackMarginalia([
+      { anchorTop: 0, height: 50 },
+      { anchorTop: 10, height: 50 },
+      { anchorTop: 20, height: 50 },
+    ]);
+    expect(out[1].top).toBe(56);
+    expect(out[2].top).toBe(112);
+  });
+
+  it('tühi sisend', () => {
+    expect(stackMarginalia([])).toEqual([]);
+  });
+});
