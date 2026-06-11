@@ -6,6 +6,7 @@ import {
   marginaliaField,
   marginaliaDecoField,
   openMarginalia,
+  closeMarginalia,
   closeAllMarginalia,
 } from '../MarginaliaExtension';
 
@@ -41,6 +42,16 @@ describe('marginaliaField', () => {
     expect(openMarks[0]).toBeGreaterThanOrEqual(blocks[0].from);
     expect(openMarks[0]).toBeLessThanOrEqual(blocks[0].to);
   });
+});
+
+it('closeMarginalia sulgeb ainult selle ploki', () => {
+  let state = mkState();
+  const [b1, b2] = state.field(marginaliaField).blocks;
+  state = state.update({ effects: [openMarginalia.of(b1.contentFrom), openMarginalia.of(b2.contentFrom)] }).state;
+  state = state.update({ effects: closeMarginalia.of(b1.from + 1) }).state;
+  const { blocks, openMarks } = state.field(marginaliaField);
+  expect(openMarks).toHaveLength(1);
+  expect(openMarks[0]).toBeGreaterThanOrEqual(blocks[1].from);
 });
 
 describe('dekoratsioonid', () => {
