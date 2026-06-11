@@ -34,10 +34,10 @@ Avalik teose leht `/work/:id/:page` on desktopil seesama editor readOnly-režiim
 **Marginaaliaga lehekülg:**
 
 - Vasakus servas marginaaliveerg (~130px), peenikese eraldusjoonega. Reanumbrite gutter on peidetud (Compartment kaudu, et hiljem saaks numbrid mõne vaate jaoks tagasi tuua konfiguratsioonimuudatusega).
-- `<m>`-plokk (sh mitmerealine) on dokumendis peidetud; sisu renderdub veerus oma ankrurea kõrval: väiksem kiri, kursiiv, oma reavahe (`line-height` ~1.35), murdmine veeru laiusesse (`overflow-wrap`) — sissejooks põhiteksti on välistatud. Marginaalia andmesisesed reavahetused säilivad failis muutumatult; kuvas murduvad ainult liiga pikad read.
+- `<m>`-plokk (sh mitmerealine) on dokumendis peidetud; sisu renderdub veerus oma ankrurea kõrval: väiksem kiri (mitte kursiiv — vt allpool), oma reavahe (`line-height` ~1.35), murdmine veeru laiusesse (`overflow-wrap`) — sissejooks põhiteksti on välistatud. Marginaalia sisemine märgendus (`<i>`, `<b>`, `<cs>` jne) renderdub veerus samade stiilireeglitega nagu põhitekstis (tägid peidetud, sisu stiilitud); selleks kasutab veeru-widget jagatud mini-renderdajat (`marginaliaUtils`/`renderVuttMarkup` loogika). Marginaalia andmesisesed reavahetused säilivad failis muutumatult; kuvas murduvad ainult liiga pikad read.
 - **Ankrureegel:** plokk kuulub *järgmise* tekstirea juurde (failis seisab plokk enne rida, mille kõrval ta skännil on). Dokumendi lõpus olev plokk ankurdub eelmise rea juurde. Ploki ülaserv = ankrurea ülaserv; põhiteksti rida-realt vastavus skänniga ei muutu kunagi.
 - **Virnastamine:** kui plokk ei mahu enne järgmise ploki ankrukohta, algab järgmine plokk eelmise alt; punktiir-konnektor + täpp näitavad päris ankrurida. Hover tõstab esile ploki ja ta ankrurea. Lehe lõpus võib veerg tekstist allapoole ulatuda (editor saab lisapadjandi).
-- **Muutmine:** klikk plokil avab `<m>` sisu oma päris kohas teksti sees (kollane taust nagu praegune `vutt-marginalia`). Sisu on tavaline dokumenditekst — undo, otsing, erimärkide paneel ja tägikaitse töötavad muudatusteta. Esc või klikk väljapoole sulgeb. Korraga võib lahti olla mitu plokki; avatud olek map'itakse dokumendimuudatuste läbi.
+- **Muutmine:** klikk plokil avab `<m>` sisu oma päris kohas teksti sees. Avatud ala ümber on punktiirraam, mille nurgas on sulgemisnupp (×), ja **kogu raami-sisene piirkond** saab ühtlase heleda tausta (line-dekoratsioonid täisreale, mitte teksti-highlight üksikutele märkidele) — nii loeb kogu ala ühe asjana ja on selge, kus marginaalia lõpeb ja põhitekst jätkub. Sulgeb × või Esc; klikk väljapoole EI sulge, et saaks avatud marginaalia kõrval rahulikult põhiteksti muuta. Sulgemine ei kaota midagi (tekst on dokumendis; kinni/lahti on puhtalt visuaalne olek). Sisu on tavaline dokumenditekst — undo, otsing, erimärkide paneel ja tägikaitse töötavad muudatusteta. Korraga võib lahti olla mitu plokki; avatud olek map'itakse dokumendimuudatuste läbi.
 - **Kaitse:** suletud plokk on atomic (kursor hüppab üle) ja `vuttTagProtectionFilter` laieneb nii, et kasutaja kustutamine, mis ulatub üle peidetud ploki, lõikab ploki muudatusest välja — nähtamatut sisu ei saa kogemata kustutada. Kustutamiseks ava plokk.
 - **Uue marginaalia lisamine:** tööriistariba nupp loob kursori rea kohale tühja `<m></m>` oma reale ja avab selle kohe muutmiseks.
 - **Lüliti:** kiip editori päises klapib veeru kokku → märgivaade. Eelistus `localStorage`-is (võti nt `vutt_marginalia_view`).
@@ -50,7 +50,7 @@ Avalik teose leht `/work/:id/:page` on desktopil seesama editor readOnly-režiim
 
 ### Mobiilne lugemisvaade (WorkspaceMobileView)
 
-`renderVuttMarkup` hakkab `<m>`-plokki renderdama eraldi plokk-elemendina: taane, väiksem kiri, kursiiv, vasak ääris ("marginaalia-kaart" teksti sees). Mitte enam hall inline-span lause keskel. Mobiilis veergu ei üritata — sisu nähtavus ilma interaktsioonita on seal tähtsam kui originaalipaigutus.
+`renderVuttMarkup` hakkab `<m>`-plokki renderdama eraldi plokk-elemendina: taane, väiksem kiri, vasak ääris ("marginaalia-kaart" teksti sees); sisemine märgendus renderdub tavaliste reeglitega. Mitte enam hall inline-span lause keskel. Mobiilis veergu ei üritata — sisu nähtavus ilma interaktsioonita on seal tähtsam kui originaalipaigutus.
 
 ### Otsinguindeks (Meilisearch)
 
@@ -68,7 +68,7 @@ Praegu eemaldab `clean_text_for_search` ainult tägid ja marginaalia *sisu* jä�
 |---|---|
 | `src/utils/marginaliaUtils.ts` (uus) | Ploki-parser + virnastamisalgoritm puhaste funktsioonidena (unit-testitavad); kasutavad editor ja renderVuttMarkup |
 | `src/components/editor/MarginaliaExtension.ts` (uus) | CM6 laiendus: peitmis-dekoratsioonid (block replace + atomic), veeru-widgetid, virnastamise ViewPlugin (mõõtmine + translateY + konnektorid), avatud-olekute StateField, märgivaade |
-| `src/components/editor/VuttMarkupExtension.ts` | Protection filter laieneb peidetud plokkidele. Senine `vutt-marginalia` inline-mark jääb alles — peidetud plokil on see nagunii nähtamatu ja avatud plokil annab just see kollase tausta |
+| `src/components/editor/VuttMarkupExtension.ts` | Protection filter laieneb peidetud plokkidele. Senine `vutt-marginalia` teksti-mark ei anna marginaalia-režiimis enam tausta — avatud ploki taust tuleb täisrea line-dekoratsioonidelt (üks ühtlane ala raami sees) |
 | `src/components/TextEditor.tsx` | Veeru/märgivaate lüliti-kiip, tööriistariba "Marginaalia" nupp, gutteri Compartment (numbrid väljas marginaaliaga lehel), localStorage eelistus |
 | `src/utils/renderVuttMarkup.ts` | `<m>` → plokk-element ("marginaalia-kaart") |
 | `src/index.css` | Veeru, plokkide, konnektorite, kaardi stiilid |
