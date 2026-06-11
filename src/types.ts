@@ -301,6 +301,7 @@ export interface ContentSearchHit {
   work_id: string;
   lehekylje_number: number | string;
   lehekylje_tekst: string;
+  marginaalia_tekst?: string;
   lehekylje_pilt: string;
 
   // V2 VÄLJAD - KASUTA NEID
@@ -321,6 +322,7 @@ export interface ContentSearchHit {
 
   _formatted?: {
     lehekylje_tekst: string;
+    marginaalia_tekst?: string;
     tags?: string[];
     page_tags?: string[];
     comments?: Annotation[];

@@ -484,8 +484,8 @@ export const searchContent = async (index: Index, query: string, page: number = 
   const typeFacetField = 'type_ids';
   const tagsFacetField = 'tags_ids';
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
-  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'];
+  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst', 'marginaalia_tekst'];
   else if (options.scope === 'annotation') {
     attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
     // Tühi query matchib kõiki dokumente — filtreeri ainult annotatsioonidega leheküljed
@@ -500,9 +500,9 @@ export const searchContent = async (index: Index, query: string, page: number = 
         limit,
         filter,
         facets: ['originaal_kataloog', 'work_id'],
-        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+        attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
         // Ei kasuta croppi - näitame kogu teksti
-        attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
+        attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'],
         highlightPreTag: HIGHLIGHT_PRE_TAG,
         highlightPostTag: HIGHLIGHT_POST_TAG,
         attributesToSearchOn: attributesToSearchOn,
@@ -549,7 +549,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
         })
@@ -610,10 +610,10 @@ export const searchContent = async (index: Index, query: string, page: number = 
           limit,
           filter,
           distinct: 'work_id',
-          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
+          attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
-          attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
+          attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'],
           highlightPreTag: HIGHLIGHT_PRE_TAG,
           highlightPostTag: HIGHLIGHT_POST_TAG,
           attributesToSearchOn: attributesToSearchOn
@@ -705,8 +705,8 @@ export const searchWorkHits = async (index: Index, query: string, workId: string
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', tagsField, 'comments.text'];
-  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst'];
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'];
+  if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst', 'marginaalia_tekst'];
   else if (options.scope === 'annotation') {
     attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
     if (!query) filter.push('has_annotations = true');
@@ -716,10 +716,10 @@ export const searchWorkHits = async (index: Index, query: string, workId: string
     const response = await index.search(query, {
       filter,
       limit: 500, // Piisav ühele teosele
-      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
+      attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
-      attributesToHighlight: ['lehekylje_tekst', tagsField, 'comments.text'],
+      attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'],
       highlightPreTag: HIGHLIGHT_PRE_TAG,
       highlightPostTag: HIGHLIGHT_POST_TAG,
       sort: ['lehekylje_number:asc'],

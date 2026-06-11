@@ -52,6 +52,7 @@ def main():
             'tags_search',
             'series_title',
             'lehekylje_tekst',
+            'marginaalia_tekst',
             'page_tags',
             'page_tags_et',
             'page_tags_en',
