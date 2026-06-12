@@ -13,7 +13,7 @@ import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
-import { cleanMarkupSpecs } from '../utils/marginaliaUtils';
+import { cleanMarkupSpecs, marginaliaFromSelection } from '../utils/marginaliaUtils';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -560,15 +560,41 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     insertAtCursor(char);
   }, [insertAtCursor]);
 
-  // Uus marginaalia: tühi <m></m> kursori rea kohale omaette reale, kohe avatuna
+  // Uus marginaalia: valik tõstetakse <m> plokki valiku algusrea kohale;
+  // ilma valikuta tühi <m></m> kursori rea kohale. Mõlemal juhul kohe avatuna.
   const insertMarginalia = useCallback(() => {
     const view = viewRef.current;
     if (!view || readOnly) return;
-    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    let { from, to } = view.state.selection.main;
+
+    if (from === to) {
+      const line = view.state.doc.lineAt(from);
+      view.dispatch({
+        changes: { from: line.from, insert: '<m></m>\n' },
+        effects: openMarginalia.of(line.from + 3),
+        selection: EditorSelection.cursor(line.from + 3),
+        annotations: Transaction.userEvent.of('input.format'),
+      });
+      view.focus();
+      return;
+    }
+
+    // Laienda valikut üle poolikute tägide (sama loogika mis cleanMarkup)
+    const { tagRanges } = view.state.field(vuttMarkupField);
+    for (const r of tagRanges) {
+      if (r.from < to && r.to > from) {
+        from = Math.min(from, r.from);
+        to = Math.max(to, r.to);
+      }
+    }
+    const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
+    const { changes, cursor } = marginaliaFromSelection(
+      view.state.doc.toString(), from, to, hidden,
+    );
     view.dispatch({
-      changes: { from: line.from, insert: '<m></m>\n' },
-      effects: openMarginalia.of(line.from + 3),
-      selection: EditorSelection.cursor(line.from + 3),
+      changes,
+      effects: openMarginalia.of(changes[0].from + 3),
+      selection: EditorSelection.cursor(cursor),
       annotations: Transaction.userEvent.of('input.format'),
     });
     view.focus();

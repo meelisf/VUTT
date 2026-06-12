@@ -113,17 +113,40 @@ class MarginBadgeWidget extends WidgetType {
 }
 
 class MarginCloseWidget extends WidgetType {
-  constructor(readonly blockFrom: number) { super(); }
+  constructor(readonly blockFrom: number, readonly canDelete: boolean) { super(); }
   toDOM() {
+    const wrap = document.createElement('span');
+    wrap.className = 'vutt-marg-actions';
+    if (this.canDelete) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'vutt-marg-delete';
+      del.dataset.mFrom = String(this.blockFrom);
+      del.textContent = '🗑';
+      del.title = 'Kustuta marginaalia / Delete marginalia';
+      wrap.appendChild(del);
+    }
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'vutt-marg-close';
     btn.dataset.mFrom = String(this.blockFrom);
     btn.textContent = '×';
-    return btn;
+    wrap.appendChild(btn);
+    return wrap;
   }
-  eq(other: MarginCloseWidget) { return other.blockFrom === this.blockFrom; }
+  eq(other: MarginCloseWidget) { return other.blockFrom === this.blockFrom && other.canDelete === this.canDelete; }
   ignoreEvent() { return false; }
+}
+
+/**
+ * Ploki täieliku kustutamise muudatus (rida + reavahetus). Dispatchitakse ILMA
+ * userEvent-annotatsioonita — programmaatiline muudatus läbib kaitsefiltrid;
+ * undo (Ctrl+Z) taastab ploki.
+ */
+export function deleteMarginaliaSpec(state: EditorState, blockFrom: number): { from: number; to: number } | null {
+  const blk = state.field(marginaliaField).blocks.find(b => b.from === blockFrom);
+  if (!blk) return null;
+  return { from: blk.hideFrom, to: blk.hideTo };
 }
 
 // --- Dekoratsioonid ---
@@ -154,7 +177,7 @@ function buildDeco(state: EditorState): DecoSets {
       }
       items.push({
         from: firstLine.from, to: firstLine.from,
-        deco: Decoration.widget({ widget: new MarginCloseWidget(b.from), side: -1 }),
+        deco: Decoration.widget({ widget: new MarginCloseWidget(b.from, state.facet(EditorView.editable)), side: -1 }),
       });
     } else {
       // Suletud plokk: peida read tervikuna + widget ankrurea alguses
@@ -220,6 +243,33 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
       view.dispatch({ effects: closeMarginalia.of(Number(closeEl.dataset.mFrom) + 1) });
       event.preventDefault();
       return true;
+    }
+
+    const deleteEl = target.closest('.vutt-marg-delete') as HTMLElement | null;
+    if (deleteEl?.dataset.mFrom !== undefined && view.state.facet(EditorView.editable)) {
+      const spec = deleteMarginaliaSpec(view.state, Number(deleteEl.dataset.mFrom));
+      if (spec) {
+        // ILMA userEvent'ita: kaitsefiltrid ei sekku; undo taastab
+        view.dispatch({ changes: spec });
+        view.focus();
+      }
+      event.preventDefault();
+      return true;
+    }
+
+    // Klikk avatud ploki peidetud tägialale (nt tühja ploki kasti): kursor
+    // klammerdatakse sisu piiridesse, et tippimine/paste läheks ploki SISSE
+    const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+    if (pos !== null) {
+      const { blocks, openMarks } = view.state.field(marginaliaField);
+      const blk = blocks.find(b => isOpen(b, openMarks) && pos >= b.from && pos <= b.to
+        && (pos < b.contentFrom || pos > b.contentTo));
+      if (blk) {
+        view.dispatch({ selection: { anchor: pos < blk.contentFrom ? blk.contentFrom : blk.contentTo } });
+        view.focus();
+        event.preventDefault();
+        return true;
+      }
     }
     return false;
   },

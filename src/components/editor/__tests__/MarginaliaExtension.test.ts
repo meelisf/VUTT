@@ -9,8 +9,9 @@ import {
   closeMarginalia,
   closeAllMarginalia,
   hiddenBlockRanges,
+  deleteMarginaliaSpec,
 } from '../MarginaliaExtension';
-import { cleanMarkupSpecs } from '../../../utils/marginaliaUtils';
+import { cleanMarkupSpecs, marginaliaFromSelection } from '../../../utils/marginaliaUtils';
 
 const DOC = 'rida üks\n<m>Apoc. 12.</m>\nrida kaks\n<m>Vide Picrium</m>\nrida kolm';
 
@@ -248,5 +249,71 @@ describe('cleanMarkup per-segment dispatch (uus käitumine)', () => {
 
     expect(state.doc.toString()).toBe('A q\n<m>one</m>\nB\n<m>two</m>\nC z');
     expect(state.field(marginaliaField).blocks).toHaveLength(2);
+  });
+});
+
+describe('insertMarginalia valikuga (simulatsioon)', () => {
+  it('valik tõuseb plokki, peidetud plokk jääb alles ega dubleeru', () => {
+    const doc = 'pealkiri\nvalitud tekst\n<m>vana</m>\nlõpp';
+    let state = mkState(doc);
+    const from = doc.indexOf('valitud');
+    const to = doc.length; // valik üle peidetud ploki kuni lõpuni
+    const hidden = hiddenBlockRanges(state).filter(h => h.from < to && h.to > from);
+    const { changes } = marginaliaFromSelection(doc, from, to, hidden);
+    state = state.update({
+      changes,
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+
+    const result = state.doc.toString();
+    // uus plokk valiku algusrea kohal, sisus AINULT nähtav tekst
+    expect(result).toContain('<m>valitud tekst\nlõpp</m>');
+    // vana plokk säilib täpselt üks kord
+    expect(result.match(/<m>vana<\/m>/g)).toHaveLength(1);
+    // 'vana' ei esine väljaspool oma tägi
+    expect(result.replace('<m>vana</m>', '')).not.toContain('vana');
+  });
+});
+
+describe('paste avatud plokki', () => {
+  it('insert avatud ploki sisu positsioonil läbib filtrid', () => {
+    const doc = 'rida\n<m></m>\nlõpp';
+    let state = mkState(doc);
+    const b = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    // paste kursoriga contentFrom-il (tühi plokk: contentFrom === contentTo)
+    state = state.update({
+      changes: { from: b.contentFrom, to: b.contentFrom, insert: 'kleebitud' },
+      annotations: Transaction.userEvent.of('input.paste'),
+    }).state;
+    expect(state.doc.toString()).toContain('<m>kleebitud</m>');
+  });
+});
+
+describe('deleteMarginaliaSpec', () => {
+  it('kustutab ploki täielikult (rida + reavahetus), ilma userEvent\'ita läbib filtrid', () => {
+    const doc = 'rida üks\n<m>kustutatav</m>\nrida kaks';
+    let state = mkState(doc);
+    const b = state.field(marginaliaField).blocks[0];
+    const spec = deleteMarginaliaSpec(state, b.from);
+    expect(spec).not.toBeNull();
+    state = state.update({ changes: spec! }).state;
+    expect(state.doc.toString()).toBe('rida üks\nrida kaks');
+    expect(state.field(marginaliaField).blocks).toHaveLength(0);
+  });
+
+  it('avatud ploki kustutus töötab samuti', () => {
+    const doc = 'a\n<m>note</m>\nb';
+    let state = mkState(doc);
+    const b = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    const spec = deleteMarginaliaSpec(state, b.from);
+    state = state.update({ changes: spec! }).state;
+    expect(state.doc.toString()).toBe('a\nb');
+  });
+
+  it('olematu blockFrom annab null', () => {
+    const state = mkState('tekst ilma plokita');
+    expect(deleteMarginaliaSpec(state, 5)).toBeNull();
   });
 });

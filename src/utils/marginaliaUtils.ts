@@ -69,10 +69,26 @@ export function findMarginaliaBlocks(text: string): MarginaliaBlock[] {
     while (moved) {
       moved = false;
       for (const other of blocks) {
-        if (other !== b && b.anchorPos >= other.hideFrom && b.anchorPos < other.hideTo) {
+        if (b.anchorPos >= other.hideFrom && b.anchorPos < other.hideTo) {
           b.anchorPos = other.hideTo;
           moved = true;
         }
+      }
+    }
+    // Dokumendi lõpus olev klaster: edasi-nihutus jõuab doc lõppu, kus widget
+    // on block-replace piiril ega renderdu. Ankurda TAGASI — klastri-eelse
+    // nähtava rea algusesse (klastri algus = kontiguaalsete peitealade esimene).
+    if (b.anchorPos >= text.length) {
+      let clusterStart = text.length;
+      let shrunk = true;
+      while (shrunk) {
+        shrunk = false;
+        for (const other of blocks) {
+          if (other.hideTo === clusterStart) { clusterStart = other.hideFrom; shrunk = true; }
+        }
+      }
+      if (clusterStart < text.length) {
+        b.anchorPos = clusterStart > 0 ? text.lastIndexOf('\n', clusterStart - 2) + 1 : 0;
       }
     }
   }
@@ -140,4 +156,40 @@ export function cleanMarkupSpecs(
   }
   pushSegment(cursor, to);
   return specs;
+}
+
+export interface MarginaliaFromSelection {
+  changes: CleanChangeSpec[];
+  /** Kursori positsioon UUE dokumendi koordinaatides (sisu lõpp) */
+  cursor: number;
+}
+
+/**
+ * Ehitab muudatused, mis tõstavad valitud teksti uude `<m>` plokki valiku
+ * algusrea kohale. Peidetud marginaalia plokid jäetakse sisust välja (need
+ * jäävad kaitsefiltri toel dokumenti alles; sisusse võttes dubleeruks tekst).
+ */
+export function marginaliaFromSelection(
+  doc: string,
+  from: number,
+  to: number,
+  hidden: { from: number; to: number }[],
+): MarginaliaFromSelection {
+  let selected = '';
+  let cursor = from;
+  for (const h of hidden) {
+    if (h.to <= from || h.from >= to) continue;
+    selected += doc.slice(cursor, Math.max(cursor, Math.min(h.from, to)));
+    cursor = Math.max(cursor, Math.min(h.to, to));
+  }
+  selected += doc.slice(cursor, to);
+
+  const lineStart = doc.lastIndexOf('\n', from - 1) + 1;
+  return {
+    changes: [
+      { from: lineStart, to: lineStart, insert: `<m>${selected}</m>\n` },
+      { from, to, insert: '' },
+    ],
+    cursor: lineStart + 3 + selected.length,
+  };
 }

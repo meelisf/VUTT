@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -56,6 +56,40 @@ describe('findMarginaliaBlocks', () => {
     const blocks = findMarginaliaBlocks(text);
     expect(blocks).toHaveLength(2);
     expect(blocks[1].hideFrom).toBeGreaterThanOrEqual(blocks[0].hideTo);
+  });
+
+  it('lõpuklastri ankrud EI tohi sattuda peidetud alasse ega dokumendi lõppu (nopt05/4 bug)', () => {
+    // Tegelik juhtum: 4 järjestikust plokki dokumendi lõpus — kõigi ankrud
+    // lükati doc lõppu (peidetud ala piirile) ja widget'id ei renderdunud
+    const text = 'imaginem referre videtur.\n<m>Tranſitio.</m>\n<m>Narratio-</m>\n<m>nis initi-</m>\n<m>um.</m>';
+    const blocks = findMarginaliaBlocks(text);
+    expect(blocks).toHaveLength(4);
+    for (const b of blocks) {
+      // ankur on nähtaval positsioonil: mitte ühegi ploki peidetud vahemikus
+      for (const other of blocks) {
+        const inside = b.anchorPos >= other.hideFrom && b.anchorPos < other.hideTo;
+        expect(inside).toBe(false);
+      }
+      // ega dokumendi lõpus (block-replace piiril widget ei renderdu)
+      expect(b.anchorPos).toBeLessThan(text.length);
+    }
+    // kõik ankurduvad viimase nähtava rea ('imaginem...') algusesse
+    for (const b of blocks) expect(b.anchorPos).toBe(0);
+  });
+
+  it("lõpuklaster trailing-newline'iga ankurdub samuti eelmisele nähtavale reale", () => {
+    const text = 'rida\n<m>a</m>\n<m>b</m>\n';
+    const blocks = findMarginaliaBlocks(text);
+    expect(blocks).toHaveLength(2);
+    for (const b of blocks) expect(b.anchorPos).toBe(0);
+  });
+
+  it('keset dokumenti olevad järjestikused plokid ankurduvad endiselt EDASI', () => {
+    const text = 'enne\n<m>a</m>\n<m>b</m>\npärast';
+    const blocks = findMarginaliaBlocks(text);
+    const parastPos = text.indexOf('pärast');
+    expect(blocks[0].anchorPos).toBe(parastPos);
+    expect(blocks[1].anchorPos).toBe(parastPos);
   });
 });
 
@@ -142,5 +176,34 @@ describe('cleanMarkupSpecs', () => {
     for (const s of specs) {
       expect(s.insert).toBe(clean(doc.slice(s.from, s.to)));
     }
+  });
+});
+
+describe('marginaliaFromSelection', () => {
+  it('valik liigub uude <m> plokki valiku algusrea kohale', () => {
+    const doc = 'esimene rida\nteine valitud rida\nkolmas';
+    const from = doc.indexOf('teine');
+    const to = doc.indexOf(' rida\nkolmas');
+    const r = marginaliaFromSelection(doc, from, to, []);
+    // muudatused: plokk rea algusesse + valiku kustutus
+    expect(r.changes).toEqual([
+      { from: 13, to: 13, insert: '<m>teine valitud</m>\n' },
+      { from, to, insert: '' },
+    ]);
+    // kursor ploki sisu lõppu (uue doki koordinaadid)
+    expect(r.cursor).toBe(13 + 3 + 'teine valitud'.length);
+  });
+
+  it('peidetud plokid valikus EI satu uue marginaalia sisusse', () => {
+    const doc = 'AA\n<m>vana</m>\nBB';
+    // peidetud: '<m>vana</m>\n' = 3..15
+    const r = marginaliaFromSelection(doc, 0, doc.length, [{ from: 3, to: 15 }]);
+    expect(r.changes[0].insert).toBe('<m>AA\nBB</m>\n');
+  });
+
+  it('mitmerealine valik säilitab reavahetused sisus', () => {
+    const doc = 'a\nb\nc';
+    const r = marginaliaFromSelection(doc, 0, doc.length, []);
+    expect(r.changes[0].insert).toBe('<m>a\nb\nc</m>\n');
   });
 });
