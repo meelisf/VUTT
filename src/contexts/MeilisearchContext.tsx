@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MeiliSearch, Index } from 'meilisearch';
 import { MEILI_HOST, MEILI_INDEX } from '../config';
+import { TOKEN_TTL_MS, CHECK_INTERVAL_MS, shouldRefreshToken } from '../utils/meiliTokenRefresh';
 
 interface MeilisearchContextValue {
   index: Index | null;
@@ -29,7 +30,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
       const { token } = await r.json();
       if (token) {
         setIndex(makeIndex(token));
-        tokenExpiresAt.current = Date.now() + 60 * 60 * 1000;
+        tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
         isUserToken.current = false;
       }
     } catch (e) {
@@ -49,7 +50,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
           const { token } = await r.json();
           if (token) {
             setIndex(makeIndex(token));
-            tokenExpiresAt.current = Date.now() + 60 * 60 * 1000;
+            tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
             return;
           }
         }
@@ -60,7 +61,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
 
   const setUserToken = useCallback((token: string) => {
     setIndex(makeIndex(token));
-    tokenExpiresAt.current = Date.now() + 60 * 60 * 1000;
+    tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
     isUserToken.current = true;
   }, []);
 
@@ -74,12 +75,21 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
   }, [fetchAnonToken]);
 
   useEffect(() => {
-    const id = setInterval(() => {
-      if (Date.now() > tokenExpiresAt.current - 60_000) {
+    const maybeRefresh = () => {
+      if (shouldRefreshToken(Date.now(), tokenExpiresAt.current)) {
         refreshToken();
       }
-    }, 55 * 60 * 1000);
-    return () => clearInterval(id);
+    };
+    // Taustatabis/unerežiimis taimerid ei jookse — kontrolli ka fookusesse tulekul
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') maybeRefresh();
+    };
+    const id = setInterval(maybeRefresh, CHECK_INTERVAL_MS);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [refreshToken]);
 
   return (
