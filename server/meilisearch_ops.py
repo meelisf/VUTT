@@ -52,6 +52,8 @@ import re
 
 M_CONTENT_RE = re.compile(r'<m>([\s\S]*?)</m>')
 
+from .marginalia_normalize import normalize_marginalia_tags
+
 
 def split_marginalia(text):
     """Eraldab marginaalia plokid põhitekstist enne indekseerimist.
@@ -63,6 +65,9 @@ def split_marginalia(text):
     """
     if not text:
         return "", ""
+    # Normaliseeri ristuvad/mässitud <m>-tägid (<i><m>X</i></m> → <m><i>X</i></m>)
+    # enne eraldamist — muidu jääks orv inline-täg põhiteksti / marginaaliasse.
+    text = normalize_marginalia_tags(text)
     notes = M_CONTENT_RE.findall(text)
     # Tühik (mitte tühi string) väldib inline <m> korral ümbritsevate sõnade kokkuliimimist
     # (nt "foo<m>note</m>bar" → "foo bar", mitte "foobar")

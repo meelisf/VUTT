@@ -21,6 +21,21 @@ OCR_CONNECT_TIMEOUT = 10
 
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, get_logger
 from .utils import generate_nanoid
+from .marginalia_normalize import normalize_marginalia_tags
+
+
+def _normalize_txt_file(path: str):
+    """Normaliseerib alla laetud OCR .txt marginaalia-tägid kanoonilisele kujule.
+    OCR-mudel toodab ristuvaid <i><m>...</i></m> — vt server/marginalia_normalize.py."""
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            raw = f.read()
+        fixed = normalize_marginalia_tags(raw)
+        if fixed != raw:
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(fixed)
+    except Exception:
+        pass  # normaliseerimise tõrge ei tohi importi katkestada
 
 logger = get_logger(__name__)
 
@@ -1013,6 +1028,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
 
             try:
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
+                _normalize_txt_file(local_txt)
             except FileNotFoundError:
                 open(local_txt, 'w').close()
             os.chmod(local_txt, 0o644)
@@ -1268,6 +1284,7 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
 
             try:
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
+                _normalize_txt_file(local_txt)
             except FileNotFoundError:
                 open(local_txt, 'w').close()
             os.chmod(local_txt, 0o644)

@@ -50,6 +50,7 @@ from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
+from .marginalia_normalize import normalize_marginalia_tags
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -730,6 +731,9 @@ async def admin_reorder_pages(work_id: str, request: Request, user=Depends(requi
 async def save(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     text = unicodedata.normalize('NFC', data.get('text_content', '')) if data.get('text_content') else ""
+    # Marginaalia-tägid kanoonilisele kujule (<m> välimiseks) — hoiab failid puhtana
+    # ja teeb editori/otsingu usaldusväärseks (vt server/marginalia_normalize.py).
+    text = normalize_marginalia_tags(text)
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
 

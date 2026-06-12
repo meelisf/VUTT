@@ -47,6 +47,7 @@ from server.utils import (
     capitalize_first, get_label, get_id, get_all_labels,
     get_primary_labels, get_labels_by_lang, get_all_ids, parse_year_range
 )
+from server.marginalia_normalize import normalize_marginalia_tags
 
 
 def sanitize_id(text):
@@ -72,6 +73,9 @@ def split_marginalia(text):
     """
     if not text:
         return "", ""
+    # Normaliseeri ristuvad/mässitud <m>-tägid (<i><m>X</i></m> → <m><i>X</i></m>)
+    # enne eraldamist — muidu jääks orv inline-täg põhiteksti / marginaaliasse.
+    text = normalize_marginalia_tags(text)
     notes = M_CONTENT_RE.findall(text)
     # Tühik (mitte tühi string) väldib inline <m> korral ümbritsevate sõnade kokkuliimimist
     # (nt "foo<m>note</m>bar" → "foo bar", mitte "foobar")
