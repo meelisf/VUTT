@@ -9,10 +9,15 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import unicodedata
 from datetime import datetime
+
+# OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
+# minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
+OCR_CONNECT_TIMEOUT = 10
 
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, get_logger
 from .utils import generate_nanoid
@@ -135,7 +140,11 @@ def get_or_create_ssh(upload_id: str):
                 pass
 
         logger.info(f"SSH: loob ühenduse {OCR_SERVER_USER}@{OCR_SERVER_HOST} (upload {upload_id})")
-        transport = paramiko.Transport((OCR_SERVER_HOST, 22))
+        # Loo socket eraldi LÜHIKESE timeout'iga — paramiko.Transport((host, 22))
+        # kasutaks OS-i vaikimisi TCP-connect timeouti (~130 s), mis surnud OCR-hosti
+        # korral blokeeris kogu backendi (2026-06-13 outage).
+        sock = socket.create_connection((OCR_SERVER_HOST, 22), timeout=OCR_CONNECT_TIMEOUT)
+        transport = paramiko.Transport(sock)
         transport.set_keepalive(30)
         transport.connect()
         key = _load_ssh_key()
