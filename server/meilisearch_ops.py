@@ -50,6 +50,26 @@ MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
 import re
 
+M_CONTENT_RE = re.compile(r'<m>([\s\S]*?)</m>')
+
+
+def split_marginalia(text):
+    """Eraldab marginaalia plokid põhitekstist enne indekseerimist.
+
+    Tagastab (põhitekst ilma <m>-plokkideta, marginaaliate sisu reavahetustega liidetult).
+    Põhiteksti fraasid jätkuvad üle eemaldatud ploki koha — clean_text_for_search
+    liidab poolitused ja kollapsib tühikud ka mitme järjestikuse reavahetuse korral.
+    NB: hoia SÜNKROONIS scripts/1-1_consolidate_data.py koopiaga!
+    """
+    if not text:
+        return "", ""
+    notes = M_CONTENT_RE.findall(text)
+    # Tühik (mitte tühi string) väldib inline <m> korral ümbritsevate sõnade kokkuliimimist
+    # (nt "foo<m>note</m>bar" → "foo bar", mitte "foobar")
+    main = M_CONTENT_RE.sub(' ', text)
+    return main, "\n".join(notes)
+
+
 def clean_text_for_search(text):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
@@ -483,6 +503,7 @@ def sync_work_to_meilisearch(dir_name):
                     if inverted:
                         tag_aliases.append(inverted)
 
+        main_text, marginalia_text = split_marginalia(page_text)
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
@@ -496,8 +517,9 @@ def sync_work_to_meilisearch(dir_name):
             "year_end": year_end,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)
-            "text_content": page_text,                          # REDAKTORI JAOKS (algne tekst koos kõigi märkidega)
+            "lehekylje_tekst": clean_text_for_search(main_text),   # OTSING: põhitekst ILMA marginaaliata
+            "marginaalia_tekst": clean_text_for_search(marginalia_text),  # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
+            "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,
             "status": page_meta['status'],

@@ -91,9 +91,11 @@ Praegu eemaldab `clean_text_for_search` ainult tägid ja marginaalia *sisu* jä�
 
 ## Deploy järjekord
 
-1. Frontend build + rsync (editor töötab vana indeksiga — `marginaalia_tekst` puudumine ei tohi midagi lõhkuda).
-2. Backend rebuild (`server_update.sh`).
-3. Täisreindeks (`server_seed_data.sh`).
+**NB: frontend VIIMASENA.** Uus frontend saadab `attributesToSearchOn: [..., 'marginaalia_tekst']` igas sisuotsingu päringus; vana indeksi `searchableAttributes` seda välja ei sisalda → Meilisearch tagastab vea ja KOGU sisuotsing on katki kuni täisreindeksini. (Editor ise töötaks ka vana indeksiga, aga otsing mitte.)
+
+1. Backend rebuild (`server_update.sh`).
+2. Täisreindeks (`server_seed_data.sh` — uuendab `searchableAttributes` + kõik dokumendid).
+3. Frontend build + rsync.
 
 ## Järkjärgulisus
 

@@ -258,6 +258,11 @@
       "cleanMarkupButton": "Clean",
       "annotate": "Highlight and comment (select text first)"
     },
+    "marginalia": {
+      "toggle": "Marginalia",
+      "collapse": "Collapse margin column (badge view)",
+      "expand": "Show margin column"
+    },
     "annotateTitle": "Add comment",
     "annotateCommentPlaceholder": "Comment...",
     "annotateOverlapError": "Selection contains an existing annotation — choose non-overlapping text",

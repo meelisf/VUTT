@@ -112,6 +112,113 @@ body:has(.workspace-container) {
   cursor: default;
 }
 
+/* --- Marginaalia veerg (MarginaliaExtension) --- */
+
+/* Veerg: sisu saab vasaku paddingu, gutter peidetakse, read positsioneeritavad */
+.vutt-has-margin .cm-content { padding-left: 146px; }
+.vutt-has-margin .cm-gutters { display: none; }
+.vutt-marg-mode .cm-line { position: relative; }
+
+/* Marginaalia-režiimis ei anna teksti-mark enam tausta — avatud ploki taust
+   tuleb täisrea line-dekoratsioonidelt (üks ühtlane ala raami sees) */
+.vutt-marg-mode .vutt-marginalia { background-color: transparent; }
+
+/* Suletud ploki sisu veerus */
+.vutt-margin-note {
+  position: absolute;
+  left: -138px;
+  top: 0;
+  width: 118px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #57534e; /* stone-600 */
+  overflow-wrap: break-word;
+  white-space: pre-wrap; /* andmete reavahetused säilivad, pikad read murduvad */
+  cursor: pointer;
+  user-select: none;
+  border-radius: 2px;
+}
+.vutt-margin-note:hover {
+  outline: 1px dashed #d6d3d1;
+  outline-offset: 3px;
+  background-color: #fafaf9;
+}
+
+/* Tühi noot: placeholder, et plokk oleks nähtav ja klikitav */
+.vutt-margin-note-empty {
+  color: #a8a29e; /* stone-400 */
+  font-style: italic;
+  min-height: 1.35em;
+}
+
+/* Konnektor allapoole nihkunud ploki ja ta päris ankrurea vahel */
+.vutt-margin-connector {
+  position: absolute;
+  left: -8px;
+  width: 0;
+  border-left: 1px dashed #eab308; /* yellow-500 */
+  pointer-events: none;
+}
+.vutt-margin-connector::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #eab308;
+}
+
+/* Märgivaade: väike kollane m ankrurea alguses */
+.vutt-marg-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fef9c3; /* yellow-100 */
+  border: 1px solid #eab308;
+  color: #854d0e;
+  font-size: 10px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  vertical-align: 2px;
+  margin-right: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Avatud plokk: ühtlane taust + punktiirraam ümber kogu ala */
+.vutt-marg-open {
+  background-color: #fefce8; /* yellow-50 */
+  border-left: 1px dashed #ca8a04; /* yellow-600 */
+  border-right: 1px dashed #ca8a04;
+}
+.vutt-marg-open-first { border-top: 1px dashed #ca8a04; }
+.vutt-marg-open-last { border-bottom: 1px dashed #ca8a04; }
+
+/* Sulgemisnupp avatud ploki esimese rea paremas servas */
+.vutt-marg-close {
+  position: absolute;
+  right: 2px;
+  top: 1px;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: #a16207;
+  background: #fef9c3;
+  border: 1px solid #eab308;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+  z-index: 2;
+}
+.vutt-marg-close:hover { background: #fde047; }
+
 /* --- Vanad Digital Edition stailid (säilitatakse legacy kuvamise jaoks) --- */
 
 /* Koodivahetus (vana pseudo-markdown) */

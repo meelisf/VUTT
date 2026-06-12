@@ -153,6 +153,8 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
     const renderHit = (hit: ContentSearchHit, isAdditional = false) => {
         const snippet = hit._formatted?.lehekylje_tekst || hit.lehekylje_tekst;
+        const marginaliaSnippet = hit._formatted?.marginaalia_tekst;
+        const showMarginalia = marginaliaSnippet?.includes('<em');
         const lang = getLangCode(i18n.language);
         const tagsField = `page_tags_${lang}`;
         const formattedTags = (hit._formatted as any)?.[tagsField] || hit._formatted?.page_tags;
@@ -187,6 +189,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                             <div
                                 className="text-sm text-gray-800 leading-relaxed font-serif bg-white p-2 rounded border border-gray-100 shadow-sm"
                                 dangerouslySetInnerHTML={{ __html: sanitizeHighlight(snippet, { allowBr: true }) }}
+                            />
+                        )}
+                        {(scopeParam === 'all' || scopeParam === 'original') && showMarginalia && (
+                            <div className="text-xs text-stone-600 leading-relaxed font-serif bg-stone-50 border-l-2 border-stone-300 p-2 mt-1 rounded-r"
+                                dangerouslySetInnerHTML={{ __html: sanitizeHighlight(marginaliaSnippet!, { allowBr: true }) }}
                             />
                         )}
                         {(hasHighlightedTags || showRawTags) && (

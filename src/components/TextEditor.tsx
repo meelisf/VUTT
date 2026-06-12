@@ -11,6 +11,9 @@ import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
+import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
+import type { MarginaliaMode } from './editor/MarginaliaExtension';
+import { cleanMarkupSpecs } from '../utils/marginaliaUtils';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -104,9 +107,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const editableCompartmentRef = useRef(new Compartment());
+  const marginaliaCompartmentRef = useRef(new Compartment());
   const handleSaveRef = useRef<() => void>(() => {});
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
   const isSavingRef = useRef(false);
+
+  // Kasutaja eelistus (localStorage) + kitsa paani sundrežiim
+  const [marginaliaUserMode, setMarginaliaUserMode] = useState<MarginaliaMode>(
+    () => (localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
+  );
+  const [narrowPane, setNarrowPane] = useState(false);
+  const [marginaliaCount, setMarginaliaCount] = useState(0);
+  const marginaliaMode: MarginaliaMode = narrowPane ? 'badge' : marginaliaUserMode;
 
   const { reocrStatus, reocrText, reocrError, handleReOcr, applyReOcr, deleteOcrFile } = useReOcr({
     page,
@@ -194,9 +206,14 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           ),
           search({ top: false, createPanel: createVuttSearchPanel }),
           vuttMarkupExtension,
+          marginaliaCompartmentRef.current.of(
+            marginaliaExtension(localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
+          ),
           vuttTheme,
           EditorView.updateListener.of((update) => {
             if (update.docChanged) setIsDirty(true);
+            const count = update.state.field(marginaliaField).blocks.length;
+            setMarginaliaCount(prev => (prev === count ? prev : count));
           }),
           EditorView.domEventHandlers({ copy: copyHandler }),
         ],
@@ -205,6 +222,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     });
 
     viewRef.current = view;
+    setMarginaliaCount(view.state.field(marginaliaField).blocks.length);
 
     return () => {
       view.destroy();
@@ -222,6 +240,39 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     });
   }, [readOnly]);
 
+  // Marginaalia režiimi vahetus: reconfigure + sule avatud plokid
+  // (facet'i muutus üksi ei käivita dekoratsioonide ümberehitust — closeAll efekt teeb seda)
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: [
+        marginaliaCompartmentRef.current.reconfigure(marginaliaExtension(marginaliaMode)),
+        closeAllMarginalia.of(null),
+      ],
+    });
+  }, [marginaliaMode]);
+
+  // Kitsas paan (< 640px) sunnib märgivaate — veerg ei mahu
+  useEffect(() => {
+    const el = editorContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width ?? 9999;
+      // Peidetud paan (display:none) annab 0-laiuse — ära muuda režiimi
+      if (w === 0) return;
+      setNarrowPane(w < 640);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const toggleMarginaliaMode = useCallback(() => {
+    setMarginaliaUserMode(prev => {
+      const next = prev === 'column' ? 'badge' : 'column';
+      localStorage.setItem('vutt_marginalia_view', next);
+      return next;
+    });
+  }, []);
+
   // Uuendame editori sisu lehe vahetusel
   useEffect(() => {
     setStatus(page.status);
@@ -237,6 +288,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       if (currentText !== page.text_content) {
         view.dispatch({
           changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
+          // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
+          // avaks võõra ploki uuel lehel
+          effects: closeAllMarginalia.of(null),
         });
       }
     }
@@ -506,6 +560,20 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     insertAtCursor(char);
   }, [insertAtCursor]);
 
+  // Uus marginaalia: tühi <m></m> kursori rea kohale omaette reale, kohe avatuna
+  const insertMarginalia = useCallback(() => {
+    const view = viewRef.current;
+    if (!view || readOnly) return;
+    const line = view.state.doc.lineAt(view.state.selection.main.head);
+    view.dispatch({
+      changes: { from: line.from, insert: '<m></m>\n' },
+      effects: openMarginalia.of(line.from + 3),
+      selection: EditorSelection.cursor(line.from + 3),
+      annotations: Transaction.userEvent.of('input.format'),
+    });
+    view.focus();
+  }, [readOnly]);
+
   const cleanMarkup = useCallback(() => {
     const view = viewRef.current;
     if (!view || readOnly) return;
@@ -522,13 +590,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     }
 
-    const selected = view.state.doc.sliceString(from, to);
-    // Eemalda kõik VUTT tägid täpse nimeloendi järgi
-    const cleaned = selected.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
+    // Puhasta iga nähtav segment ERALDI muudatusena — peidetud marginaalia
+    // plokke ei puudutata üldse, nii jäävad nad oma ridadele ja ankrutele
+    // (üks valikut kattev muudatus laseks kaitsefiltril ploki valiku lõppu
+    // nihutada, kus ta degradeeruks inline-margiks)
+    const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
+    const specs = cleanMarkupSpecs(
+      view.state.doc.toString(), from, to, hidden,
+      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
+    );
+    if (specs.length === 0) return;
+    const changes = view.state.changes(specs);
 
     view.dispatch({
-      changes: { from, to, insert: cleaned },
-      selection: EditorSelection.range(from, from + cleaned.length),
+      changes,
+      selection: EditorSelection.range(changes.mapPos(from, -1), changes.mapPos(to, 1)),
       annotations: Transaction.userEvent.of('input.format'),
     });
     view.focus();
@@ -736,7 +812,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
                     <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={() => wrapWithTag('m')} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
+                    <button type="button" onClick={insertMarginalia} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
@@ -770,6 +846,16 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                           ✎ Ann
                         </button>
                       </>
+                    )}
+                    {marginaliaCount > 0 && !narrowPane && (
+                      <button
+                        type="button"
+                        onClick={toggleMarginaliaMode}
+                        className={`px-2 h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
+                        title={marginaliaUserMode === 'column' ? t('editor.marginalia.collapse') : t('editor.marginalia.expand')}
+                      >
+                        ⊟ {t('editor.marginalia.toggle')}
+                      </button>
                     )}
                   </div>
                 )}

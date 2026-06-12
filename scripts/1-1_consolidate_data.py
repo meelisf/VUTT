@@ -59,6 +59,26 @@ def sanitize_id(text):
     return sanitized
 
 
+M_CONTENT_RE = re.compile(r'<m>([\s\S]*?)</m>')
+
+
+def split_marginalia(text):
+    """Eraldab marginaalia plokid põhitekstist enne indekseerimist.
+
+    Tagastab (põhitekst ilma <m>-plokkideta, marginaaliate sisu reavahetustega liidetult).
+    Põhiteksti fraasid jätkuvad üle eemaldatud ploki koha — clean_text_for_search
+    liidab poolitused ja kollapsib tühikud ka mitme järjestikuse reavahetuse korral.
+    NB: hoia SÜNKROONIS server/meilisearch_ops.py koopiaga!
+    """
+    if not text:
+        return "", ""
+    notes = M_CONTENT_RE.findall(text)
+    # Tühik (mitte tühi string) väldib inline <m> korral ümbritsevate sõnade kokkuliimimist
+    # (nt "foo<m>note</m>bar" → "foo bar", mitte "foobar")
+    main = M_CONTENT_RE.sub(' ', text)
+    return main, "\n".join(notes)
+
+
 def clean_text_for_search(text):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
@@ -482,6 +502,7 @@ def create_meilisearch_data_per_page():
                 last_mod = int(os.path.getmtime(os.path.join(doc_path, jpg_filename)) * 1000)
 
             image_path = os.path.join(dir_name, jpg_filename)
+            main_text, marginalia_text = split_marginalia(page_text)
 
             # Meilisearch dokument (v2/v3 formaat)
             meili_doc = {
@@ -543,7 +564,8 @@ def create_meilisearch_data_per_page():
                 # Lehekülje andmed
                 'teose_lehekylgede_arv': teose_lehekylgede_arv,
                 'lehekylje_number': page_index + 1,
-                'lehekylje_tekst': clean_text_for_search(page_text), # OTSINGU JAOKS (puhastatud märkidest ja poolitustest)
+                'lehekylje_tekst': clean_text_for_search(main_text),   # OTSING: põhitekst ILMA marginaaliata
+                'marginaalia_tekst': clean_text_for_search(marginalia_text),  # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
                 'text_content': page_text,                          # REDAKTORI JAOKS (algne tekst koos kõigi märkidega)
                 'lehekylje_pilt': image_path,
                 'originaal_kataloog': dir_name,
