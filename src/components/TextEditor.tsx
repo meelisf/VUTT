@@ -13,6 +13,7 @@ import CharSetEditor from './editor/CharSetEditor';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
+import { cleanMarkupSpecs } from '../utils/marginaliaUtils';
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
@@ -589,23 +590,21 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       }
     }
 
-    // Lõika PEIDETUD marginaalia plokid valikust välja ENNE tägide eemaldamist —
-    // kaitsefilter hoiab plokid dokumendis alles, seega insert ei tohi nende
-    // sisu sisaldada (muidu dubleeruks sisu nähtava tekstina)
+    // Puhasta iga nähtav segment ERALDI muudatusena — peidetud marginaalia
+    // plokke ei puudutata üldse, nii jäävad nad oma ridadele ja ankrutele
+    // (üks valikut kattev muudatus laseks kaitsefiltril ploki valiku lõppu
+    // nihutada, kus ta degradeeruks inline-margiks)
     const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
-    let selected = '';
-    let cursor = from;
-    for (const h of hidden) {
-      selected += view.state.doc.sliceString(cursor, Math.max(cursor, Math.min(h.from, to)));
-      cursor = Math.max(cursor, Math.min(h.to, to));
-    }
-    selected += view.state.doc.sliceString(cursor, to);
-    // Eemalda kõik VUTT tägid täpse nimeloendi järgi
-    const cleaned = selected.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
+    const specs = cleanMarkupSpecs(
+      view.state.doc.toString(), from, to, hidden,
+      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
+    );
+    if (specs.length === 0) return;
+    const changes = view.state.changes(specs);
 
     view.dispatch({
-      changes: { from, to, insert: cleaned },
-      selection: EditorSelection.range(from, from + cleaned.length),
+      changes,
+      selection: EditorSelection.range(changes.mapPos(from, -1), changes.mapPos(to, 1)),
       annotations: Transaction.userEvent.of('input.format'),
     });
     view.focus();

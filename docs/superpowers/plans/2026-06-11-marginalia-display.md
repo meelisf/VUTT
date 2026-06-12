@@ -1479,13 +1479,15 @@ Expected: kõik PASS, build edukas
 
 - [ ] **Step 3: Deploy (kasutaja kinnitusel, EI tee automaatselt):**
 
+**NB: frontend VIIMASENA** — uus frontend saadab `attributesToSearchOn: marginaalia_tekst`, mida vana indeksi `searchableAttributes` ei sisalda → kogu sisuotsing oleks katki kuni reindeksini.
+
 ```bash
-# 1. Frontend (töötab vana indeksiga, marginaalia_tekst puudumine ei lõhu midagi)
-npm run build && rsync -avz dist/ vutt:~/VUTT/dist/
-# 2. Backend
+# 1. Backend
 ssh vutt 'cd ~/VUTT && ./scripts/server_update.sh'
-# 3. Täisreindeks (marginaalia_tekst väli + puhastatud lehekylje_tekst)
+# 2. Täisreindeks (marginaalia_tekst väli + searchableAttributes + puhastatud lehekylje_tekst)
 ssh vutt 'cd ~/VUTT && ./scripts/server_seed_data.sh'
+# 3. Frontend
+npm run build && rsync -avz dist/ vutt:~/VUTT/dist/
 ```
 
 NB: pärast deploy'd kontrolli serveris: fraasiotsing "Teuffel vnd Satanas" leiab teose lzogr0 lk 17; otsing "Picrium" leiab sama lehe marginaalia kaudu.

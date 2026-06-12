@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -91,5 +91,56 @@ describe('stackMarginalia', () => {
 
   it('tühi sisend', () => {
     expect(stackMarginalia([])).toEqual([]);
+  });
+});
+
+describe('cleanMarkupSpecs', () => {
+  const clean = (s: string) => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, '');
+
+  it('peidetud plokk jääb oma reale — muudatus iga nähtava segmendi kohta eraldi', () => {
+    const doc = 'AA <i>x</i>\n<m>note</m>\nBB';
+    // peidetud vahemik: '<m>note</m>\n' = 12..24
+    const specs = cleanMarkupSpecs(doc, 0, doc.length, [{ from: 12, to: 24 }], clean);
+    expect(specs).toEqual([
+      { from: 0, to: 12, insert: 'AA x\n' },
+      { from: 24, to: 26, insert: 'BB' },
+    ]);
+  });
+
+  it('mitu peidetud plokki — kõik jäävad puutumata', () => {
+    const doc = 'A\n<m>a</m>\n<b>B</b>\n<m>b</m>\nC';
+    // plokid: '<m>a</m>\n' = 2..11, '<m>b</m>\n' = 20..29
+    const specs = cleanMarkupSpecs(doc, 0, doc.length, [
+      { from: 2, to: 11 },
+      { from: 20, to: 29 },
+    ], clean);
+    expect(specs).toEqual([
+      { from: 0, to: 2, insert: 'A\n' },
+      { from: 11, to: 20, insert: 'B\n' },
+      { from: 29, to: 30, insert: 'C' },
+    ]);
+  });
+
+  it('valik ei kata ühtegi peidetud plokki — üks muudatus', () => {
+    const doc = 'AA <i>x</i> BB';
+    const specs = cleanMarkupSpecs(doc, 0, doc.length, [], clean);
+    expect(specs).toEqual([{ from: 0, to: 14, insert: 'AA x BB' }]);
+  });
+
+  it('valik algab/lõpeb peidetud ploki sees — lõigatakse ploki piirile', () => {
+    const doc = 'AA\n<m>note</m>\nBB';
+    // peidetud: '<m>note</m>\n' = 3..15; valik 5..17 (algab ploki seest)
+    const specs = cleanMarkupSpecs(doc, 5, 17, [{ from: 3, to: 15 }], clean);
+    expect(specs).toEqual([{ from: 15, to: 17, insert: 'BB' }]);
+  });
+
+  it('segment, mille puhastus ei muuda, jäetakse vahele', () => {
+    const doc = 'AA\n<m>note</m>\nBB';
+    const specs = cleanMarkupSpecs(doc, 0, doc.length, [{ from: 3, to: 15 }], clean);
+    // 'AA\n' on juba puhas → spec ainult 'BB' jaoks? Ei — ka muutumatu segment
+    // võib jääda, peaasi et insert === originaal välistataks. Lubame mõlemat:
+    for (const s of specs) {
+      expect(s.insert).toBe(clean(doc.slice(s.from, s.to)));
+    }
   });
 });

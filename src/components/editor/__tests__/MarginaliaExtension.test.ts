@@ -10,6 +10,7 @@ import {
   closeAllMarginalia,
   hiddenBlockRanges,
 } from '../MarginaliaExtension';
+import { cleanMarkupSpecs } from '../../../utils/marginaliaUtils';
 
 const DOC = 'rida üks\n<m>Apoc. 12.</m>\nrida kaks\n<m>Vide Picrium</m>\nrida kolm';
 
@@ -210,5 +211,42 @@ describe('lehevahetuse fix: closeAllMarginalia koos dokumendiasendusega', () => 
     expect(state.field(marginaliaField).openMarks).toHaveLength(0);
     // Veendume, et uus dok on õige (1 plokk)
     expect(state.field(marginaliaField).blocks).toHaveLength(1);
+  });
+});
+
+describe('cleanMarkup per-segment dispatch (uus käitumine)', () => {
+  it('peidetud plokk jääb oma reale ja PLOKINA alles', () => {
+    const doc = 'AA <i>x</i>\n<m>note</m>\nBB';
+    let state = mkState(doc);
+    const hidden = hiddenBlockRanges(state);
+    const specs = cleanMarkupSpecs(
+      doc, 0, doc.length, hidden,
+      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
+    );
+    state = state.update({
+      changes: state.changes(specs),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+
+    expect(state.doc.toString()).toBe('AA x\n<m>note</m>\nBB');
+    // Plokk on endiselt PLOKK-marginaalia (mitte inline) — parser tunneb ära
+    expect(state.field(marginaliaField).blocks).toHaveLength(1);
+  });
+
+  it('mitu plokki valikus — kõik jäävad oma kohale', () => {
+    const doc = 'A <b>q</b>\n<m>one</m>\nB\n<m>two</m>\nC <i>z</i>';
+    let state = mkState(doc);
+    const hidden = hiddenBlockRanges(state);
+    const specs = cleanMarkupSpecs(
+      doc, 0, doc.length, hidden,
+      s => s.replace(/<\/?(?:i|b|cs|m|hi|fn|pb)[^>]*>/g, ''),
+    );
+    state = state.update({
+      changes: state.changes(specs),
+      annotations: Transaction.userEvent.of('input.format'),
+    }).state;
+
+    expect(state.doc.toString()).toBe('A q\n<m>one</m>\nB\n<m>two</m>\nC z');
+    expect(state.field(marginaliaField).blocks).toHaveLength(2);
   });
 });
