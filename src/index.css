@@ -124,13 +124,15 @@ body:has(.workspace-container) {
    tuleb täisrea line-dekoratsioonidelt (üks ühtlane ala raami sees) */
 .vutt-marg-mode .vutt-marginalia { background-color: transparent; }
 
-/* Overlay-kiht: position:absolute .cm-scrolleris, scrollib koos sisuga.
+/* Overlay-kiht: position:absolute .cm-editoris (view.dom).
+   .cm-scroller-il puudub position:relative, seega containing block on .cm-editor.
    pointer-events:none — üksikud note-divid saavad pointer-events:auto eraldi. */
 .vutt-margin-overlay {
   position: absolute;
   top: 0;
   left: 0;
   pointer-events: none;
+  z-index: 5;
 }
 
 /* Suletud ploki sisu overlay-s (ei ole enam .cm-line sees) */
