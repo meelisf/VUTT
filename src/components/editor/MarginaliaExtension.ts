@@ -198,6 +198,40 @@ export const marginaliaDecoField = StateField.define<DecoSets>({
   ],
 });
 
+// --- Kustutamise kinnitus (DOM abifunktsioonid) ---
+// Kaheastmeline kinnitus: 🗑 → [Tühista][Kustuta?] → kustutus.
+// DOM mutatsioon (ei CM6 state) — reset toimub ka ploki sulgemisel/avamisel.
+
+function makeDeleteConfirmBtn(mFrom: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'vutt-marg-delete-confirm';
+  btn.dataset.mFrom = mFrom;
+  btn.textContent = 'Kustuta';
+  return btn;
+}
+
+function makeDeleteCancelBtn(mFrom: string): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'vutt-marg-delete-cancel';
+  btn.dataset.mFrom = mFrom;
+  btn.textContent = 'Tühista';
+  return btn;
+}
+
+function restoreDeleteBtn(wrap: HTMLElement | null, mFrom: string) {
+  if (!wrap) return;
+  wrap.querySelectorAll('.vutt-marg-delete-confirm, .vutt-marg-delete-cancel').forEach(el => el.remove());
+  const del = document.createElement('button');
+  del.type = 'button';
+  del.className = 'vutt-marg-delete';
+  del.dataset.mFrom = mFrom;
+  del.textContent = '🗑';
+  del.title = 'Kustuta marginaalia / Delete marginalia';
+  wrap.prepend(del);
+}
+
 // --- Overlay ViewPlugin ---
 // Renderdab suletud marginaalia plokid vasakveergu DOM-ülekattena.
 // Overlay on position:absolute .cm-scrolleris → scrollib koos sisuga.
@@ -366,14 +400,42 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
       return true;
     }
 
-    const deleteEl = target.closest('.vutt-marg-delete') as HTMLElement | null;
-    if (deleteEl?.dataset.mFrom !== undefined && view.state.facet(EditorView.editable)) {
-      const spec = deleteMarginaliaSpec(view.state, Number(deleteEl.dataset.mFrom));
+    // Kinnituse "Kustuta" nupp (teine klikk) → kustuta
+    const confirmEl = target.closest('.vutt-marg-delete-confirm') as HTMLElement | null;
+    if (confirmEl?.dataset.mFrom !== undefined && view.state.facet(EditorView.editable)) {
+      const spec = deleteMarginaliaSpec(view.state, Number(confirmEl.dataset.mFrom));
       if (spec) {
         // ILMA userEvent'ita: kaitsefiltrid ei sekku; undo taastab
         view.dispatch({ changes: spec });
         view.focus();
       }
+      event.preventDefault();
+      return true;
+    }
+
+    // "Tühista" nupp → taasta 🗑
+    const cancelDelEl = target.closest('.vutt-marg-delete-cancel') as HTMLElement | null;
+    if (cancelDelEl?.dataset.mFrom !== undefined) {
+      restoreDeleteBtn(cancelDelEl.parentElement, cancelDelEl.dataset.mFrom);
+      event.preventDefault();
+      return true;
+    }
+
+    // Esimene klikk 🗑 nupul → näita kinnitusnuppusid (annotatsioonide muster)
+    const deleteEl = target.closest('.vutt-marg-delete') as HTMLElement | null;
+    if (deleteEl?.dataset.mFrom !== undefined && view.state.facet(EditorView.editable)) {
+      const wrap = deleteEl.parentElement;
+      if (!wrap) return false;
+      const mFrom = deleteEl.dataset.mFrom;
+      deleteEl.remove();
+      const cancel = makeDeleteCancelBtn(mFrom);
+      const confirm = makeDeleteConfirmBtn(mFrom);
+      wrap.prepend(confirm);
+      wrap.prepend(cancel);
+      // Auto-reset 4s pärast (kui kasutaja ei tee midagi)
+      setTimeout(() => {
+        if (confirm.isConnected) restoreDeleteBtn(wrap, mFrom);
+      }, 4000);
       event.preventDefault();
       return true;
     }
