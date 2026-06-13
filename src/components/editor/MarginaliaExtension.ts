@@ -224,9 +224,30 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
   constructor(readonly view: EditorView) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'vutt-margin-overlay';
+    // KRIITILINE: EditorView.domEventHandlers seob kuulajad contentDOM-i külge,
+    // aga overlay on scrollDOM-is (contentDOM-i ÕDE, mitte järglane) → klikk
+    // overlay-noodil ei jõuaks marginaliaClickHandler-ini. Seega oma kuulaja siia.
+    this.overlay.addEventListener('mousedown', this.onMouseDown);
     view.scrollDOM.appendChild(this.overlay);
     this.schedule();
   }
+
+  // Klikk overlay-noodil → ava plokk muutmiseks (toortekst inline nähtavale).
+  onMouseDown = (event: MouseEvent) => {
+    const target = event.target as HTMLElement;
+    const noteEl = target.closest('.vutt-margin-note') as HTMLElement | null;
+    if (noteEl?.dataset.mFrom === undefined) return;
+    const from = Number(noteEl.dataset.mFrom);
+    const blk = this.view.state.field(marginaliaField).blocks.find(b => b.from === from);
+    if (blk) {
+      this.view.dispatch({
+        effects: openMarginalia.of(blk.contentFrom),
+        selection: { anchor: Math.min(blk.contentFrom, this.view.state.doc.length) },
+      });
+      this.view.focus();
+    }
+    event.preventDefault();
+  };
 
   update(u: ViewUpdate) {
     if (u.docChanged || u.viewportChanged || u.geometryChanged ||
@@ -334,6 +355,7 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
   }
 
   destroy() {
+    this.overlay.removeEventListener('mousedown', this.onMouseDown);
     this.overlay.remove();
   }
 });
