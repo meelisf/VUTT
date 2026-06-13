@@ -117,18 +117,29 @@ body:has(.workspace-container) {
 /* Veerg: sisu saab vasaku paddingu, gutter peidetakse, read positsioneeritavad */
 .vutt-has-margin .cm-content { padding-left: 146px; }
 .vutt-has-margin .cm-gutters { display: none; }
+/* position:relative vajalik MarginCloseWidget nuppude (×, 🗑) absoluutpositsioneerimiseks */
 .vutt-marg-mode .cm-line { position: relative; }
 
 /* Marginaalia-režiimis ei anna teksti-mark enam tausta — avatud ploki taust
    tuleb täisrea line-dekoratsioonidelt (üks ühtlane ala raami sees) */
 .vutt-marg-mode .vutt-marginalia { background-color: transparent; }
 
-/* Suletud ploki sisu veerus */
+/* Overlay-kiht: position:absolute .cm-scrolleris, scrollib koos sisuga.
+   pointer-events:none — üksikud note-divid saavad pointer-events:auto eraldi. */
+.vutt-margin-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+/* Suletud ploki sisu overlay-s (ei ole enam .cm-line sees) */
 .vutt-margin-note {
   position: absolute;
-  left: -138px;
-  top: 0;
+  left: 8px;    /* oli: -138px suhtes .cm-line; nüüd: overlay vasakust servast */
+  top: 0;       /* JS seab täpse väärtuse coordsAtPos põhjal */
   width: 118px;
+  pointer-events: auto;
   font-size: 12px;
   line-height: 1.35;
   color: #57534e; /* stone-600 */
@@ -170,7 +181,24 @@ body:has(.workspace-container) {
   background: #eab308;
 }
 
-/* Märgivaade: väike kollane m ankrurea alguses */
+/* Tekstisisene ankur, mis näitab, et real on marginaalia */
+.vutt-marg-inline {
+  display: inline-block;
+  margin-left: 0.35em;
+  color: #a16207; /* yellow-700 */
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.72em;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.vutt-marg-inline:hover {
+  color: #854d0e; /* yellow-800 */
+  text-decoration: underline;
+}
+
+/* Märgivaade: väike kollane m ankrurea lõpus */
 .vutt-marg-badge {
   display: inline-flex;
   align-items: center;

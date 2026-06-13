@@ -58,9 +58,11 @@ it('closeMarginalia sulgeb ainult selle ploki', () => {
 });
 
 describe('dekoratsioonid', () => {
-  it('suletud plokid annavad replace + widget dekoratsioonid (2 plokki → 4 dekoratsiooni)', () => {
+  it('suletud plokid annavad ainult replace-dekoratsioonid (2 plokki → 2 dekoratsiooni)', () => {
+    // Overlay-arhitektuuris: suletud plokk = 1 block-replace (EI widgeti).
+    // Overlay plugin renderdab note-divid eraldi DOM-kihis (coordsAtPos-põhine).
     const state = mkState();
-    expect(state.field(marginaliaDecoField).deco.size).toBe(4);
+    expect(state.field(marginaliaDecoField).deco.size).toBe(2);
   });
 
   it('dokumendi lõpus olevad järjestikused plokid ei viska erandit', () => {
@@ -73,8 +75,9 @@ describe('dekoratsioonid', () => {
     let state = mkState();
     const b = state.field(marginaliaField).blocks[0];
     state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
-    // Plokk 1 avatud (1 rida): 1 line-deco + 1 close-widget; plokk 2 suletud: replace + note-widget
-    expect(state.field(marginaliaDecoField).deco.size).toBe(4);
+    // Plokk 1 avatud (1 rida): 1 line-deco + 1 close-widget = 2; plokk 2 suletud: 1 replace = 1.
+    // Kokku 3 (overlay-arhitektuuris note-widget puudub suletud plokil).
+    expect(state.field(marginaliaDecoField).deco.size).toBe(3);
   });
 });
 

@@ -1,13 +1,13 @@
-// MarginaliaExtension.ts — marginaalia visuaalne esitus CM6-s.
-// Režiimid: 'column' (veerg vasakus servas) | 'badge' (väike märk ankrurea alguses).
-// Suletud plokk on peidetud (block replace + atomic); klikk veerunoodil/märgil avab
-// ploki tagasi oma päris kohas (täisrea taust + punktiirraam + × nupp).
-// Vt docs/superpowers/specs/2026-06-11-marginalia-display-design.md
+// MarginaliaExtension.ts — marginaalia visuaalne esitus CM6-s (overlay-arhitektuur).
+// Suletud plokid peidetakse block-replace'iga (ILMA CM-widgetita) ja renderdatakse
+// eraldi DOM-ülekattena (position:absolute .cm-scrolleris, coordsAtPos-põhine).
+// Avatud plokid (muutmisrežiim): täisrea taust + × nupp, toortekst inline nähtav.
+// Vt docs/superpowers/plans/2026-06-13-marginalia-overlay-rendering.md
 //
 // KRIITILISED REEGLID (samad mis VuttMarkupExtension):
 // - RangeSetBuilder.add(): from ASC, sama from korral to ASC
 // - replace-dekoratsioonid ei tohi kattuda
-// - block-replace vahemik peab olema reapiiridel (vt plaani riskimärkus)
+// - block-replace vahemik peab olema reapiiridel
 
 import { Decoration, DecorationSet, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
 import type { ViewUpdate } from '@codemirror/view';
@@ -79,26 +79,7 @@ export const marginaliaField = StateField.define<MarginaliaState>({
 
 // --- Widgetid ---
 
-class MarginNoteWidget extends WidgetType {
-  constructor(readonly content: string, readonly blockFrom: number) { super(); }
-  toDOM() {
-    const div = document.createElement('div');
-    div.className = 'vutt-margin-note';
-    div.dataset.mFrom = String(this.blockFrom);
-    if (this.content.trim() === '') {
-      // Tühi noot: ilma placeholder'ita oleks 0-kõrgusega ja klikkimatu
-      div.classList.add('vutt-margin-note-empty');
-      div.textContent = '(–)';
-    } else {
-      // renderVuttMarkup escape'ib HTML-i (XSS-kaitse) ja renderdab sisemise märgenduse
-      div.innerHTML = renderVuttMarkup(this.content);
-    }
-    return div;
-  }
-  eq(other: MarginNoteWidget) { return other.content === this.content && other.blockFrom === this.blockFrom; }
-  ignoreEvent() { return false; }
-}
-
+// MarginBadgeWidget: märgivaate väike 'm' ankureal (badge-mode, ei ole block-piiril)
 class MarginBadgeWidget extends WidgetType {
   constructor(readonly blockFrom: number) { super(); }
   toDOM() {
@@ -180,15 +161,15 @@ function buildDeco(state: EditorState): DecoSets {
         deco: Decoration.widget({ widget: new MarginCloseWidget(b.from, state.facet(EditorView.editable)), side: -1 }),
       });
     } else {
-      // Suletud plokk: peida read tervikuna + widget ankrurea alguses
-      const content = doc.sliceString(b.contentFrom, b.contentTo);
-      const widget = mode === 'column'
-        ? new MarginNoteWidget(content, b.from)
-        : new MarginBadgeWidget(b.from);
+      // Suletud plokk: block-replace ILMA widgetita.
+      // Veerurežiim → overlay plugin renderdab koordinaadipõhiselt (ei saa kaduda).
+      // Märgivaade → badge widget ankureal (ei ole block-piiril → usaldusväärne).
       items.push({ from: b.hideFrom, to: b.hideTo, deco: Decoration.replace({ block: true }) });
-      const anchor = Math.min(b.anchorPos, doc.length);
-      items.push({ from: anchor, to: anchor, deco: Decoration.widget({ widget, side: -1 }) });
       atomicRanges.push({ from: b.hideFrom, to: b.hideTo });
+      if (mode === 'badge') {
+        const anchor = Math.min(b.anchorPos, doc.length);
+        items.push({ from: anchor, to: anchor, deco: Decoration.widget({ widget: new MarginBadgeWidget(b.from), side: -1 }) });
+      }
     }
   }
 
@@ -217,12 +198,152 @@ export const marginaliaDecoField = StateField.define<DecoSets>({
   ],
 });
 
+// --- Overlay ViewPlugin ---
+// Renderdab suletud marginaalia plokid vasakveergu DOM-ülekattena.
+// Overlay on position:absolute .cm-scrolleris → scrollib koos sisuga.
+// Positsioneerimine: coordsAtPos(anchorPos) → y, stack → translateY.
+// EI kasuta CM-widgete → ei saa materialiseerumata jääda (lahendab põhivea).
+
+interface OverlayItem {
+  blockFrom: number;
+  content: string;
+  top: number;     // viewport→scroller-relative y, px
+  height: number;  // olemasoleva elemendi kõrgus (eelmine tsükkel), px
+}
+interface OverlayMeasure {
+  items: OverlayItem[];
+  hasBlocks: boolean;
+  mode: MarginaliaMode;
+}
+
+const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
+  overlay: HTMLDivElement;
+  noteEls: Map<number, HTMLDivElement> = new Map();
+
+  constructor(readonly view: EditorView) {
+    this.overlay = document.createElement('div');
+    this.overlay.className = 'vutt-margin-overlay';
+    view.scrollDOM.appendChild(this.overlay);
+    this.schedule();
+  }
+
+  update(u: ViewUpdate) {
+    if (u.docChanged || u.viewportChanged || u.geometryChanged ||
+        u.transactions.some(tr => tr.effects.some(e =>
+          e.is(openMarginalia) || e.is(closeMarginalia) || e.is(closeAllMarginalia)))) {
+      this.schedule();
+    }
+  }
+
+  schedule() {
+    const view = this.view;
+    view.requestMeasure<OverlayMeasure>({
+      key: this,   // ainult üks ootel mõõtmine korraga
+      read: (): OverlayMeasure => {
+        const mode = view.state.facet(modeFacet);
+        const { blocks, openMarks } = view.state.field(marginaliaField);
+        const hasBlocks = blocks.length > 0;
+        if (mode !== 'column') return { items: [], hasBlocks, mode };
+
+        const scrollerRect = view.scrollDOM.getBoundingClientRect();
+        const scrollTop = view.scrollDOM.scrollTop;
+        const docLen = view.state.doc.length;
+
+        const items: OverlayItem[] = [];
+        for (const b of blocks) {
+          if (isOpen(b, openMarks)) continue;
+          const anchorPos = Math.min(b.anchorPos, docLen);
+          const coords = view.coordsAtPos(anchorPos);
+          if (coords === null) continue;
+          items.push({
+            blockFrom: b.from,
+            content: view.state.doc.sliceString(b.contentFrom, b.contentTo),
+            top: coords.top - scrollerRect.top + scrollTop,
+            // Loe olemasoleva elemendi kõrgus (eelmisest tsüklist) — ühes read-faasis
+            height: this.noteEls.get(b.from)?.offsetHeight ?? 20,
+          });
+        }
+        items.sort((a, b) => a.top - b.top);
+        return { items, hasBlocks, mode };
+      },
+      write: ({ items, hasBlocks, mode }: OverlayMeasure): void => {
+        view.dom.classList.toggle('vutt-marg-mode', true);
+        view.dom.classList.toggle('vutt-has-margin', mode === 'column' && hasBlocks);
+
+        if (mode !== 'column') {
+          this.overlay.style.display = 'none';
+          return;
+        }
+        this.overlay.style.display = '';
+
+        // Uuenda note elementide sisu
+        const prevEls = new Map(this.noteEls);
+        const newEls = new Map<number, HTMLDivElement>();
+
+        for (const item of items) {
+          let el = prevEls.get(item.blockFrom);
+          if (!el) {
+            el = document.createElement('div');
+            el.className = 'vutt-margin-note';
+            el.dataset.mFrom = String(item.blockFrom);
+            this.overlay.appendChild(el);
+          }
+          const isEmpty = item.content.trim() === '';
+          el.classList.toggle('vutt-margin-note-empty', isEmpty);
+          if (isEmpty) {
+            el.textContent = '(–)';
+          } else {
+            el.innerHTML = renderVuttMarkup(item.content);
+          }
+          newEls.set(item.blockFrom, el);
+        }
+        for (const [from, el] of prevEls) {
+          if (!newEls.has(from)) el.remove();
+        }
+        this.noteEls = newEls;
+
+        // Virna (stackMarginalia): kasutab eelmise tsükli kõrgusi read-faasist
+        const stacked = stackMarginalia(
+          items.map(i => ({ anchorTop: i.top, height: i.height }))
+        );
+
+        // Paiguta note divid
+        items.forEach((item, i) => {
+          const el = newEls.get(item.blockFrom);
+          if (!el) return;
+          const { top, offset } = stacked[i];
+          el.style.top = `${top}px`;
+
+          // Konnektor ankurist nihkunud noodi juurde
+          let conn = el.querySelector<HTMLElement>('.vutt-margin-connector');
+          if (offset > 0) {
+            if (!conn) {
+              conn = document.createElement('div');
+              conn.className = 'vutt-margin-connector';
+              el.appendChild(conn);
+            }
+            conn.style.height = `${offset}px`;
+            conn.style.top = `${-offset}px`;
+          } else if (conn) {
+            conn.remove();
+          }
+        });
+      },
+    });
+  }
+
+  destroy() {
+    this.overlay.remove();
+  }
+});
+
 // --- Interaktsioon ---
 
 const marginaliaClickHandler = EditorView.domEventHandlers({
   mousedown(event, view) {
     const target = event.target as HTMLElement;
 
+    // Klikk suletud ploki noodil (overlay või badge) → ava plokk muutmiseks
     const openEl = target.closest('.vutt-margin-note, .vutt-marg-badge') as HTMLElement | null;
     if (openEl?.dataset.mFrom !== undefined) {
       const from = Number(openEl.dataset.mFrom);
@@ -289,8 +410,7 @@ const marginaliaKeymap = keymap.of([
 
 // --- Kaitse: kasutaja kustutamine ei tohi haarata PEIDETUD plokke ---
 // Peidetud vahemikud lõigatakse muudatusest välja; avatud plokk on tavaline tekst.
-// Filtreeritakse ainult userEvent-annotatsiooniga tehinguid (nagu vana
-// vuttTagProtectionFilter VuttMarkupExtensionis — vt CLAUDE.md).
+// Filtreeritakse ainult userEvent-annotatsiooniga tehinguid (vt CLAUDE.md).
 const marginaliaProtectionFilter = EditorState.transactionFilter.of(tr => {
   if (!tr.docChanged || tr.annotation(Transaction.userEvent) === undefined) return tr;
   const hidden = hiddenBlockRanges(tr.startState);
@@ -332,61 +452,6 @@ const marginaliaProtectionFilter = EditorState.transactionFilter.of(tr => {
   }];
 });
 
-// --- Layout: has-margin klass + virnastamine + konnektorid ---
-// Mõõtmine käib requestMeasure kaudu (mitte update sees!) — väldib värelust.
-// transform ei muuda layouti, seega uut measure-tsüklit ei teki.
-const marginaliaLayoutPlugin = ViewPlugin.fromClass(class {
-  constructor(readonly view: EditorView) {
-    this.schedule();
-  }
-  update(u: ViewUpdate) {
-    if (u.docChanged || u.viewportChanged || u.geometryChanged ||
-        u.transactions.some(tr => tr.effects.some(e =>
-          e.is(openMarginalia) || e.is(closeMarginalia) || e.is(closeAllMarginalia)))) {
-      this.schedule();
-    }
-  }
-  schedule() {
-    const view = this.view;
-    view.requestMeasure({
-      read: () => {
-        const notes = Array.from(view.contentDOM.querySelectorAll<HTMLElement>('.vutt-margin-note'));
-        return notes.map(el => ({
-          el,
-          // offsetParent on .cm-line (position: relative) — anchorTop = rea ülaserv sisu suhtes
-          anchorTop: (el.offsetParent as HTMLElement | null)?.offsetTop ?? 0,
-          height: el.offsetHeight,
-        }));
-      },
-      write: measured => {
-        const mode = view.state.facet(modeFacet);
-        const hasBlocks = view.state.field(marginaliaField).blocks.length > 0;
-        view.dom.classList.toggle('vutt-marg-mode', true);
-        view.dom.classList.toggle('vutt-has-margin', mode === 'column' && hasBlocks);
-        if (measured.length === 0) return;
-        const sorted = [...measured].sort((a, b) => a.anchorTop - b.anchorTop);
-        const stacked = stackMarginalia(sorted.map(m => ({ anchorTop: m.anchorTop, height: m.height })));
-        sorted.forEach((m, i) => {
-          const { offset } = stacked[i];
-          m.el.style.transform = offset > 0 ? `translateY(${offset}px)` : '';
-          let conn = m.el.querySelector<HTMLElement>('.vutt-margin-connector');
-          if (offset > 0) {
-            if (!conn) {
-              conn = document.createElement('div');
-              conn.className = 'vutt-margin-connector';
-              m.el.appendChild(conn);
-            }
-            conn.style.height = `${offset}px`;
-            conn.style.top = `${-offset}px`;
-          } else if (conn) {
-            conn.remove();
-          }
-        });
-      },
-    });
-  }
-});
-
 // --- Avalik laiendusfabrik ---
 // Kaitsefilter peab olema VIIMANE listis (vt CLAUDE.md VuttMarkupExtension reeglid)
 
@@ -397,7 +462,7 @@ export function marginaliaExtension(mode: MarginaliaMode): Extension {
     marginaliaDecoField,
     marginaliaClickHandler,
     marginaliaKeymap,
-    marginaliaLayoutPlugin,
+    marginaliaOverlayPlugin,
     marginaliaProtectionFilter,
   ];
 }
