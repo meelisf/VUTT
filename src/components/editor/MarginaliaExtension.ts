@@ -230,6 +230,22 @@ interface OverlayMeasure {
   mode: MarginaliaMode;
 }
 
+/**
+ * Ankrurea viewport-y (px, sama ruum mis `coordsAtPos(...).top`).
+ *
+ * `coordsAtPos` on MÄRGI-koordinaadi päring ja tagastab CM6-s `null`, kui pos
+ * langeb peidetud `Decoration.replace` tägi servale — nt kui ankrurida algab
+ * `<cs>`/`<i>`/`<b>`/`<pb/>`-ga (VuttMarkupExtension peidab avatägi rea alguses).
+ * Siis kaoks ülekatte-kaart vaikselt. Fallback kasutab rea BLOKK-geomeetriat
+ * (`lineBlockAt` + `documentTop`), mis ei sõltu inline-dekoratsioonidest.
+ */
+function anchorTop(view: EditorView, pos: number): number | null {
+  const c = view.coordsAtPos(pos, 1) ?? view.coordsAtPos(pos, -1);
+  if (c) return c.top;
+  try { return view.documentTop + view.lineBlockAt(pos).top; }
+  catch { return null; }
+}
+
 const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
   overlay: HTMLDivElement;
   noteEls: Map<number, HTMLDivElement> = new Map();
@@ -289,15 +305,15 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
         for (const g of groupMarginaliaBlocks(blocks)) {
           if (isGroupOpen(g, openMarks)) continue;
           const anchorPos = Math.min(g.anchorPos, docLen);
-          const coords = view.coordsAtPos(anchorPos);
-          if (coords === null) continue;
+          const top = anchorTop(view, anchorPos);
+          if (top === null) continue;
           const content = g.blocks
             .map(b => view.state.doc.sliceString(b.contentFrom, b.contentTo))
             .join('\n');
           items.push({
             blockFrom: g.from,
             content,
-            top: coords.top - scrollerRect.top + scrollTop,
+            top: top - scrollerRect.top + scrollTop,
             // Loe olemasoleva elemendi kõrgus (eelmisest tsüklist) — ühes read-faasis
             height: this.noteEls.get(g.from)?.offsetHeight ?? 20,
           });
