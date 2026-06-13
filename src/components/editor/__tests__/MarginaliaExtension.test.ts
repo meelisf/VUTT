@@ -71,6 +71,14 @@ describe('dekoratsioonid', () => {
     expect(state.field(marginaliaDecoField).deco.size).toBeGreaterThan(0);
   });
 
+  it('järjestikused plokid grupeeritakse ÜHEKS block-replace dekoratsiooniks', () => {
+    // 3 järjestikust plokki keset dokumenti → 1 grupp → 1 block-replace
+    // (mitte 3 kõrvutist, mis CM6-s habras ja võib kaduda).
+    const state = mkState('enne\n<m>a</m>\n<m>b</m>\n<m>c</m>\npärast');
+    expect(state.field(marginaliaField).blocks).toHaveLength(3);
+    expect(state.field(marginaliaDecoField).deco.size).toBe(1);
+  });
+
   it('avatud plokk annab line-dekoratsioonid + × widgeti', () => {
     let state = mkState();
     const b = state.field(marginaliaField).blocks[0];
@@ -138,6 +146,22 @@ describe('hiddenBlockRanges', () => {
     let state = mkState('AA\n<m>note</m>\nBB');
     const b = state.field(marginaliaField).blocks[0];
     state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    expect(hiddenBlockRanges(state)).toHaveLength(0);
+  });
+
+  it('järjestikused plokid → üks pidev peitevahemik (grupeeritud)', () => {
+    const state = mkState('enne\n<m>a</m>\n<m>b</m>\n<m>c</m>\npärast');
+    const ranges = hiddenBlockRanges(state);
+    expect(ranges).toHaveLength(1);
+    const txt = 'enne\n<m>a</m>\n<m>b</m>\n<m>c</m>\npärast';
+    expect(txt.slice(ranges[0].from, ranges[0].to)).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>\n');
+  });
+
+  it('grupi avamine (esimese liikme marker) paljastab kogu grupi', () => {
+    let state = mkState('enne\n<m>a</m>\n<m>b</m>\n<m>c</m>\npärast');
+    const first = state.field(marginaliaField).blocks[0];
+    state = state.update({ effects: openMarginalia.of(first.contentFrom) }).state;
+    // Kogu grupp avatud → mitte ükski liige pole peidetud
     expect(hiddenBlockRanges(state)).toHaveLength(0);
   });
 });

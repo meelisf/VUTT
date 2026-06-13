@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -90,6 +90,38 @@ describe('findMarginaliaBlocks', () => {
     const parastPos = text.indexOf('pärast');
     expect(blocks[0].anchorPos).toBe(parastPos);
     expect(blocks[1].anchorPos).toBe(parastPos);
+  });
+});
+
+describe('groupMarginaliaBlocks', () => {
+  it('liidab järjestikused plokid üheks grupiks', () => {
+    const text = 'enne\n<m>a</m>\n<m>b</m>\n<m>c</m>\npärast';
+    const groups = groupMarginaliaBlocks(findMarginaliaBlocks(text));
+    expect(groups).toHaveLength(1);
+    expect(groups[0].blocks).toHaveLength(3);
+    expect(groups[0].from).toBe(text.indexOf('<m>a'));
+    expect(groups[0].hideFrom).toBe(text.indexOf('<m>a'));
+    expect(groups[0].hideTo).toBe(text.indexOf('pärast'));
+  });
+
+  it('eraldi (mittejärjestikused) plokid jäävad eraldi gruppidesse', () => {
+    const text = 'üks\n<m>a</m>\nkaks\n<m>b</m>\nkolm';
+    const groups = groupMarginaliaBlocks(findMarginaliaBlocks(text));
+    expect(groups).toHaveLength(2);
+    expect(groups[0].blocks).toHaveLength(1);
+    expect(groups[1].blocks).toHaveLength(1);
+  });
+
+  it('mitu klastrit: igaüks oma grupp, sisemine järjestikkus liidetud', () => {
+    const text = 'a\n<m>x1</m>\n<m>x2</m>\nb\n<m>y1</m>\n<m>y2</m>\n<m>y3</m>\nc';
+    const groups = groupMarginaliaBlocks(findMarginaliaBlocks(text));
+    expect(groups).toHaveLength(2);
+    expect(groups[0].blocks).toHaveLength(2);
+    expect(groups[1].blocks).toHaveLength(3);
+  });
+
+  it('tühi sisend', () => {
+    expect(groupMarginaliaBlocks([])).toEqual([]);
   });
 });
 

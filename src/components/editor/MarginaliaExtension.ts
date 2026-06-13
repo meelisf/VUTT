@@ -13,8 +13,8 @@ import { Decoration, DecorationSet, EditorView, WidgetType, ViewPlugin, keymap }
 import type { ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder, StateField, StateEffect, EditorState, Transaction, Facet } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
-import { findMarginaliaBlocks, stackMarginalia } from '../../utils/marginaliaUtils';
-import type { MarginaliaBlock } from '../../utils/marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, groupMarginaliaBlocks } from '../../utils/marginaliaUtils';
+import type { MarginaliaBlock, MarginaliaGroup } from '../../utils/marginaliaUtils';
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 
 export type MarginaliaMode = 'column' | 'badge';
@@ -39,6 +39,12 @@ function isOpen(block: MarginaliaBlock, openMarks: number[]): boolean {
   return openMarks.some(p => p >= block.from && p <= block.to);
 }
 
+// Grupp on avatud, kui MÕNI ta liige on avatud. Avamine lisab markeri ainult
+// esimese liikme sisse (vt onMouseDown), aga kogu grupp renderdatakse avatuna.
+function isGroupOpen(group: MarginaliaGroup, openMarks: number[]): boolean {
+  return group.blocks.some(b => isOpen(b, openMarks));
+}
+
 /**
  * PEIDETUD (suletud) plokkide peitevahemikud kasvavas järjestuses.
  * Kasutavad: marginaliaProtectionFilter ja TextEditor.cleanMarkup —
@@ -46,9 +52,10 @@ function isOpen(block: MarginaliaBlock, openMarks: number[]): boolean {
  */
 export function hiddenBlockRanges(state: EditorState): { from: number; to: number }[] {
   const { blocks, openMarks } = state.field(marginaliaField);
-  return blocks
-    .filter(b => !isOpen(b, openMarks))
-    .map(b => ({ from: b.hideFrom, to: b.hideTo }))
+  // Üks pidev peitevahemik suletud grupi kohta (järjestikused plokid liidetud).
+  return groupMarginaliaBlocks(blocks)
+    .filter(g => !isGroupOpen(g, openMarks))
+    .map(g => ({ from: g.hideFrom, to: g.hideTo }))
     .sort((a, b) => a.from - b.from);
 }
 
@@ -125,9 +132,11 @@ class MarginCloseWidget extends WidgetType {
  * undo (Ctrl+Z) taastab ploki.
  */
 export function deleteMarginaliaSpec(state: EditorState, blockFrom: number): { from: number; to: number } | null {
-  const blk = state.field(marginaliaField).blocks.find(b => b.from === blockFrom);
-  if (!blk) return null;
-  return { from: blk.hideFrom, to: blk.hideTo };
+  // Kustutab terve grupi (kogu ääremärkuse), mitte üksiku `<m>` rea.
+  const groups = groupMarginaliaBlocks(state.field(marginaliaField).blocks);
+  const g = groups.find(gr => gr.blocks.some(b => b.from === blockFrom));
+  if (!g) return null;
+  return { from: g.hideFrom, to: g.hideTo };
 }
 
 // --- Dekoratsioonid ---
@@ -144,11 +153,15 @@ function buildDeco(state: EditorState): DecoSets {
   const items: Item[] = [];
   const atomicRanges: { from: number; to: number }[] = [];
 
-  for (const b of blocks) {
-    if (isOpen(b, openMarks)) {
-      // Avatud plokk: täisrea taust + raam, × nupp esimesel real
-      const firstLine = doc.lineAt(Math.min(b.from, doc.length));
-      const lastLine = doc.lineAt(Math.min(b.to, doc.length));
+  // Grupeerime järjestikused plokid: suletud grupp = ÜKS block-replace (mitte N
+  // kõrvutist → väldib CM6 kõrvutiste block-replace'ide habrast renderdust) ja
+  // overlay's üks kaart. Avatud grupp = kõik liikme-read nähtavale muutmiseks.
+  const groups = groupMarginaliaBlocks(blocks);
+  for (const g of groups) {
+    if (isGroupOpen(g, openMarks)) {
+      // Avatud grupp: täisrea taust + raam üle kõigi liikme-ridade, × esimesel real
+      const firstLine = doc.lineAt(Math.min(g.blocks[0].from, doc.length));
+      const lastLine = doc.lineAt(Math.min(g.blocks[g.blocks.length - 1].to, doc.length));
       for (let ln = firstLine.number; ln <= lastLine.number; ln++) {
         const line = doc.line(ln);
         let cls = 'vutt-marg-open';
@@ -158,17 +171,17 @@ function buildDeco(state: EditorState): DecoSets {
       }
       items.push({
         from: firstLine.from, to: firstLine.from,
-        deco: Decoration.widget({ widget: new MarginCloseWidget(b.from, state.facet(EditorView.editable)), side: -1 }),
+        deco: Decoration.widget({ widget: new MarginCloseWidget(g.from, state.facet(EditorView.editable)), side: -1 }),
       });
     } else {
-      // Suletud plokk: block-replace ILMA widgetita.
+      // Suletud grupp: üks block-replace ILMA widgetita üle terve klastri.
       // Veerurežiim → overlay plugin renderdab koordinaadipõhiselt (ei saa kaduda).
       // Märgivaade → badge widget ankureal (ei ole block-piiril → usaldusväärne).
-      items.push({ from: b.hideFrom, to: b.hideTo, deco: Decoration.replace({ block: true }) });
-      atomicRanges.push({ from: b.hideFrom, to: b.hideTo });
+      items.push({ from: g.hideFrom, to: g.hideTo, deco: Decoration.replace({ block: true }) });
+      atomicRanges.push({ from: g.hideFrom, to: g.hideTo });
       if (mode === 'badge') {
-        const anchor = Math.min(b.anchorPos, doc.length);
-        items.push({ from: anchor, to: anchor, deco: Decoration.widget({ widget: new MarginBadgeWidget(b.from), side: -1 }) });
+        const anchor = Math.min(g.anchorPos, doc.length);
+        items.push({ from: anchor, to: anchor, deco: Decoration.widget({ widget: new MarginBadgeWidget(g.from), side: -1 }) });
       }
     }
   }
@@ -272,17 +285,21 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
         const docLen = view.state.doc.length;
 
         const items: OverlayItem[] = [];
-        for (const b of blocks) {
-          if (isOpen(b, openMarks)) continue;
-          const anchorPos = Math.min(b.anchorPos, docLen);
+        // Üks kaart suletud grupi kohta; sisu = liikmete read '\n'-iga liidetud.
+        for (const g of groupMarginaliaBlocks(blocks)) {
+          if (isGroupOpen(g, openMarks)) continue;
+          const anchorPos = Math.min(g.anchorPos, docLen);
           const coords = view.coordsAtPos(anchorPos);
           if (coords === null) continue;
+          const content = g.blocks
+            .map(b => view.state.doc.sliceString(b.contentFrom, b.contentTo))
+            .join('\n');
           items.push({
-            blockFrom: b.from,
-            content: view.state.doc.sliceString(b.contentFrom, b.contentTo),
+            blockFrom: g.from,
+            content,
             top: coords.top - scrollerRect.top + scrollTop,
             // Loe olemasoleva elemendi kõrgus (eelmisest tsüklist) — ühes read-faasis
-            height: this.noteEls.get(b.from)?.offsetHeight ?? 20,
+            height: this.noteEls.get(g.from)?.offsetHeight ?? 20,
           });
         }
         items.sort((a, b) => a.top - b.top);
@@ -406,7 +423,11 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
     const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
     if (pos !== null) {
       const { blocks, openMarks } = view.state.field(marginaliaField);
-      const blk = blocks.find(b => isOpen(b, openMarks) && pos >= b.from && pos <= b.to
+      // Avatud grupi KÕIK liikmed on klammerdatavad (mitte ainult markeriga esimene).
+      const openBlocks = groupMarginaliaBlocks(blocks)
+        .filter(g => isGroupOpen(g, openMarks))
+        .flatMap(g => g.blocks);
+      const blk = openBlocks.find(b => pos >= b.from && pos <= b.to
         && (pos < b.contentFrom || pos > b.contentTo));
       if (blk) {
         view.dispatch({ selection: { anchor: pos < blk.contentFrom ? blk.contentFrom : blk.contentTo } });

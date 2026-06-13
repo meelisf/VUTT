@@ -95,6 +95,46 @@ export function findMarginaliaBlocks(text: string): MarginaliaBlock[] {
   return blocks;
 }
 
+/**
+ * Üks visuaalne ääremärkus, mis koosneb ühest või mitmest järjestikusest `<m>`
+ * plokist. OCR lõhub pika ääremärkuse mitmeks `<m>` reaks (üks füüsiline rida =
+ * üks `<m>`); siin liidame järjestikused plokid tagasi ÜHEKS kaardiks.
+ *
+ * Grupeerimine toimub RENDERDUSE tasandil (overlay + dekoratsioonid), parser
+ * (`findMarginaliaBlocks`) jääb per-`<m>` puhtaks. Vt plaani Task 3.
+ */
+export interface MarginaliaGroup {
+  /** Grupi liikme-plokid dokumendi järjekorras */
+  blocks: MarginaliaBlock[];
+  /** Esimese ploki `from` — grupi identifikaator (dataset.mFrom) */
+  from: number;
+  /** Peidetav ala: esimese ploki hideFrom kuni viimase ploki hideTo (pidev) */
+  hideFrom: number;
+  hideTo: number;
+  /** Jagatud ankrurea positsioon */
+  anchorPos: number;
+}
+
+/**
+ * Liidab järjestikused plokid gruppideks. Kaks plokki on samas grupis, kui nende
+ * peidetavad alad on PIDEVAD (`b.hideFrom === eelmise.hideTo`) JA neil on sama
+ * ankur. `findMarginaliaBlocks` tagab juba, et klastri liikmete hideFrom/hideTo
+ * on pidevad ja ankrud võrdsed.
+ */
+export function groupMarginaliaBlocks(blocks: MarginaliaBlock[]): MarginaliaGroup[] {
+  const groups: MarginaliaGroup[] = [];
+  for (const b of blocks) {
+    const last = groups[groups.length - 1];
+    if (last && b.hideFrom === last.hideTo && b.anchorPos === last.anchorPos) {
+      last.blocks.push(b);
+      last.hideTo = b.hideTo;
+    } else {
+      groups.push({ blocks: [b], from: b.from, hideFrom: b.hideFrom, hideTo: b.hideTo, anchorPos: b.anchorPos });
+    }
+  }
+  return groups;
+}
+
 export interface StackInput {
   /** Ploki loomulik ülaserv (= ankrurea ülaserv), px */
   anchorTop: number;
