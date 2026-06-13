@@ -200,15 +200,15 @@ export const marginaliaDecoField = StateField.define<DecoSets>({
 
 // --- Overlay ViewPlugin ---
 // Renderdab suletud marginaalia plokid vasakveergu DOM-ülekattena.
-// Overlay on position:absolute .cm-editoris (view.dom) — .cm-scroller puudub
-// position:relative, mistõttu containing block on niikuinii .cm-editor.
-// Positsioneerimine: coordsAtPos(anchorPos) → top = viewportY - editorTop.
+// Overlay on position:absolute .cm-scrolleris (view.scrollDOM) — scrollib koos sisuga.
+// .cm-scroller-il ON position:relative (CM6 base theme) → containing block korrektne.
+// Positsioneerimine: coordsAtPos(anchorPos) → top = viewportY - scrollerTop + scrollTop.
 // EI kasuta CM-widgete → ei saa materialiseerumata jääda (lahendab põhivea).
 
 interface OverlayItem {
   blockFrom: number;
   content: string;
-  top: number;     // editor-suhteline y (viewport-y - editorRect.top), px
+  top: number;     // scroller-suhteline y (viewport-y - scrollerTop + scrollTop), px
   height: number;  // olemasoleva elemendi kõrgus (eelmine tsükkel), px
 }
 interface OverlayMeasure {
@@ -224,7 +224,7 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
   constructor(readonly view: EditorView) {
     this.overlay = document.createElement('div');
     this.overlay.className = 'vutt-margin-overlay';
-    view.dom.appendChild(this.overlay);
+    view.scrollDOM.appendChild(this.overlay);
     this.schedule();
   }
 
@@ -246,7 +246,8 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
         const hasBlocks = blocks.length > 0;
         if (mode !== 'column') return { items: [], hasBlocks, mode };
 
-        const editorRect = view.dom.getBoundingClientRect();
+        const scrollerRect = view.scrollDOM.getBoundingClientRect();
+        const scrollTop = view.scrollDOM.scrollTop;
         const docLen = view.state.doc.length;
 
         const items: OverlayItem[] = [];
@@ -258,8 +259,7 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
           items.push({
             blockFrom: b.from,
             content: view.state.doc.sliceString(b.contentFrom, b.contentTo),
-            // viewport-y miinus editoritop = editor-suhteline y (overlay on view.dom-is)
-            top: coords.top - editorRect.top,
+            top: coords.top - scrollerRect.top + scrollTop,
             // Loe olemasoleva elemendi kõrgus (eelmisest tsüklist) — ühes read-faasis
             height: this.noteEls.get(b.from)?.offsetHeight ?? 20,
           });
