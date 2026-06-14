@@ -37,3 +37,9 @@ docs/_archive/
 loss/state/prosopography/
 .superpowers/
 .worktrees/
+
+# Claude Code lokaalsed sätted + ajutised worktree'd (masina-spetsiifilised)
+.claude/
+
+# Suured skännid reference_data-s ei kuulu reposse (txt/csv kuuluvad)
+reference_data/*.jpg
