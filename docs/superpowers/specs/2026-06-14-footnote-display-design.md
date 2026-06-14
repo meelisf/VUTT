@@ -19,6 +19,8 @@ Kasutaja soovib, et joonealune käituks marginaalia-laadselt, **AGA kuvaks kehad
 
 **Failiformaat (transkriptsioonitekst) on selle kihi allikas.** Markerid ja kehad elavad dokumenditekstis; kõik muudatused on esitus-/interaktsioonikihis ning loomis-/navigeerimisloogikas.
 
+**Greenfield — migratsiooni pole.** Joonealuseid pole praegu tegelikult märgendatud: kasutaja on pannud käsitsi rea sisse markeri-märgi (ilma `<fn>`-ta) ja lehe lõppu nn joonealused (ilma `[^N]:`-ta) puhta tekstina. St olemasolevat `<fn>`/`[^N]:` andmestikku, mida migreerida, ei ole, ja `FootnoteWidget`/`MarkdownPreview` rajad on joonealuste jaoks praktikas kasutamata. Uus formaat tuleb kasutusele edaspidi (mudeli väljund + kasutaja markerid).
+
 ## Vastuvõetud otsused
 
 | Otsus | Valik | Tagasilükatud alternatiivid |
