@@ -117,7 +117,7 @@ body:has(.workspace-container) {
 /* Veerg: sisu saab vasaku paddingu, gutter peidetakse, read positsioneeritavad */
 .vutt-has-margin .cm-content { padding-left: 146px; }
 .vutt-has-margin .cm-gutters { display: none; }
-/* position:relative vajalik MarginCloseWidget nuppude (×, 🗑) absoluutpositsioneerimiseks */
+/* position:relative vajalik MarginCloseWidget × nupu absoluutpositsioneerimiseks */
 .vutt-marg-mode .cm-line { position: relative; }
 
 /* Marginaalia-režiimis ei anna teksti-mark enam tausta — avatud ploki taust
@@ -228,11 +228,11 @@ body:has(.workspace-container) {
 .vutt-marg-open-first { border-top: 1px dashed #ca8a04; }
 .vutt-marg-open-last { border-bottom: 1px dashed #ca8a04; }
 
-/* Nupud avatud ploki esimese rea paremas servas (×, 🗑) */
-.vutt-marg-actions { display: contents; }
-.vutt-marg-close, .vutt-marg-delete {
+/* × sulgemisnupp avatud ploki esimese rea paremas servas */
+.vutt-marg-close {
   position: absolute;
   top: 1px;
+  right: 2px;
   width: 16px;
   height: 16px;
   line-height: 14px;
@@ -246,10 +246,7 @@ body:has(.workspace-container) {
   user-select: none;
   z-index: 2;
 }
-.vutt-marg-close { right: 2px; }
-.vutt-marg-delete { right: 22px; font-size: 9px; }
 .vutt-marg-close:hover { background: #fde047; }
-.vutt-marg-delete:hover { background: #fecaca; border-color: #dc2626; color: #b91c1c; }
 
 /* --- Vanad Digital Edition stailid (säilitatakse legacy kuvamise jaoks) --- */
 

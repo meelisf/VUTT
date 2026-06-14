@@ -101,42 +101,20 @@ class MarginBadgeWidget extends WidgetType {
 }
 
 class MarginCloseWidget extends WidgetType {
-  constructor(readonly blockFrom: number, readonly canDelete: boolean) { super(); }
+  constructor(readonly blockFrom: number) { super(); }
   toDOM() {
-    const wrap = document.createElement('span');
-    wrap.className = 'vutt-marg-actions';
-    if (this.canDelete) {
-      const del = document.createElement('button');
-      del.type = 'button';
-      del.className = 'vutt-marg-delete';
-      del.dataset.mFrom = String(this.blockFrom);
-      del.textContent = '🗑';
-      del.title = 'Kustuta marginaalia / Delete marginalia';
-      wrap.appendChild(del);
-    }
+    // Ainult × (sulge). Kustutamisnupp eemaldatud — kustutamine käib
+    // klaviatuurilt (sisu + rida) ja 🗑 oli × kõrval kogemata-kustutamise risk.
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'vutt-marg-close';
     btn.dataset.mFrom = String(this.blockFrom);
     btn.textContent = '×';
-    wrap.appendChild(btn);
-    return wrap;
+    btn.title = 'Sulge / Close';
+    return btn;
   }
-  eq(other: MarginCloseWidget) { return other.blockFrom === this.blockFrom && other.canDelete === this.canDelete; }
+  eq(other: MarginCloseWidget) { return other.blockFrom === this.blockFrom; }
   ignoreEvent() { return false; }
-}
-
-/**
- * Ploki täieliku kustutamise muudatus (rida + reavahetus). Dispatchitakse ILMA
- * userEvent-annotatsioonita — programmaatiline muudatus läbib kaitsefiltrid;
- * undo (Ctrl+Z) taastab ploki.
- */
-export function deleteMarginaliaSpec(state: EditorState, blockFrom: number): { from: number; to: number } | null {
-  // Kustutab terve grupi (kogu ääremärkuse), mitte üksiku `<m>` rea.
-  const groups = groupMarginaliaBlocks(state.field(marginaliaField).blocks);
-  const g = groups.find(gr => gr.blocks.some(b => b.from === blockFrom));
-  if (!g) return null;
-  return { from: g.hideFrom, to: g.hideTo };
 }
 
 // --- Dekoratsioonid ---
@@ -171,7 +149,7 @@ function buildDeco(state: EditorState): DecoSets {
       }
       items.push({
         from: firstLine.from, to: firstLine.from,
-        deco: Decoration.widget({ widget: new MarginCloseWidget(g.from, state.facet(EditorView.editable)), side: -1 }),
+        deco: Decoration.widget({ widget: new MarginCloseWidget(g.from), side: -1 }),
       });
     } else {
       // Suletud grupp: üks block-replace ILMA widgetita üle terve klastri.
@@ -431,18 +409,6 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
     const closeEl = target.closest('.vutt-marg-close') as HTMLElement | null;
     if (closeEl?.dataset.mFrom !== undefined) {
       view.dispatch({ effects: closeMarginalia.of(Number(closeEl.dataset.mFrom) + 1) });
-      event.preventDefault();
-      return true;
-    }
-
-    const deleteEl = target.closest('.vutt-marg-delete') as HTMLElement | null;
-    if (deleteEl?.dataset.mFrom !== undefined && view.state.facet(EditorView.editable)) {
-      const spec = deleteMarginaliaSpec(view.state, Number(deleteEl.dataset.mFrom));
-      if (spec) {
-        // ILMA userEvent'ita: kaitsefiltrid ei sekku; undo taastab
-        view.dispatch({ changes: spec });
-        view.focus();
-      }
       event.preventDefault();
       return true;
     }

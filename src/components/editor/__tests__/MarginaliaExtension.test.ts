@@ -9,7 +9,6 @@ import {
   closeMarginalia,
   closeAllMarginalia,
   hiddenBlockRanges,
-  deleteMarginaliaSpec,
 } from '../MarginaliaExtension';
 import { cleanMarkupSpecs, marginaliaFromSelection } from '../../../utils/marginaliaUtils';
 
@@ -317,30 +316,19 @@ describe('paste avatud plokki', () => {
   });
 });
 
-describe('deleteMarginaliaSpec', () => {
-  it('kustutab ploki täielikult (rida + reavahetus), ilma userEvent\'ita läbib filtrid', () => {
+describe('marginaalia kustutamine klaviatuurilt (kaitsefilter ei blokeeri avatud plokki)', () => {
+  it('avatud ploki sisu + rea kustutamine eemaldab kogu marginaalia', () => {
     const doc = 'rida üks\n<m>kustutatav</m>\nrida kaks';
     let state = mkState(doc);
     const b = state.field(marginaliaField).blocks[0];
-    const spec = deleteMarginaliaSpec(state, b.from);
-    expect(spec).not.toBeNull();
-    state = state.update({ changes: spec! }).state;
+    // Ava plokk (edit-mode) → hiddenBlockRanges tühi → kaitsefilter ei sekku
+    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
+    // Kustuta kogu ploki rida koos ümbritseva reavahetusega kasutaja-eventina
+    state = state.update({
+      changes: { from: b.hideFrom, to: b.hideTo, insert: '' },
+      annotations: Transaction.userEvent.of('delete.selection'),
+    }).state;
     expect(state.doc.toString()).toBe('rida üks\nrida kaks');
     expect(state.field(marginaliaField).blocks).toHaveLength(0);
-  });
-
-  it('avatud ploki kustutus töötab samuti', () => {
-    const doc = 'a\n<m>note</m>\nb';
-    let state = mkState(doc);
-    const b = state.field(marginaliaField).blocks[0];
-    state = state.update({ effects: openMarginalia.of(b.contentFrom) }).state;
-    const spec = deleteMarginaliaSpec(state, b.from);
-    state = state.update({ changes: spec! }).state;
-    expect(state.doc.toString()).toBe('a\nb');
-  });
-
-  it('olematu blockFrom annab null', () => {
-    const state = mkState('tekst ilma plokita');
-    expect(deleteMarginaliaSpec(state, 5)).toBeNull();
   });
 });
