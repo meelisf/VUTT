@@ -258,8 +258,19 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
     // overlay-noodil ei jõuaks marginaliaClickHandler-ini. Seega oma kuulaja siia.
     this.overlay.addEventListener('mousedown', this.onMouseDown);
     view.scrollDOM.appendChild(this.overlay);
+    // KRIITILINE (Firefox): akna fookuse tagasitulekul (alt-tab) ei anna CM6
+    // geometryChanged'i ja Firefox lükkab taustaaknas rAF/layout-mõõtmise edasi
+    // → overlay jääb aegunud positsiooni/klassiga ("serva taha"). Sunni värske
+    // mõõtmine fookusel/nähtavaks-saamisel (sama mis manuaalne režiimi-toggle).
+    window.addEventListener('focus', this.onRefresh);
+    document.addEventListener('visibilitychange', this.onRefresh);
     this.schedule();
   }
+
+  // Akna fookus/nähtavus tagasi → mõõda overlay uuesti (parandab alt-tab glitchi).
+  onRefresh = () => {
+    if (document.visibilityState === 'visible') this.schedule();
+  };
 
   // Klikk overlay-noodil → ava plokk muutmiseks (toortekst inline nähtavale).
   onMouseDown = (event: MouseEvent) => {
@@ -279,7 +290,7 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
   };
 
   update(u: ViewUpdate) {
-    if (u.docChanged || u.viewportChanged || u.geometryChanged ||
+    if (u.docChanged || u.viewportChanged || u.geometryChanged || u.focusChanged ||
         u.transactions.some(tr => tr.effects.some(e =>
           e.is(openMarginalia) || e.is(closeMarginalia) || e.is(closeAllMarginalia)))) {
       this.schedule();
@@ -389,6 +400,8 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
 
   destroy() {
     this.overlay.removeEventListener('mousedown', this.onMouseDown);
+    window.removeEventListener('focus', this.onRefresh);
+    document.removeEventListener('visibilitychange', this.onRefresh);
     this.overlay.remove();
   }
 });
