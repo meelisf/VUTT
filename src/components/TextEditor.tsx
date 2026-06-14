@@ -6,7 +6,7 @@ import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, ChevronRight, X, Settings2, Superscript, SeparatorHorizontal, Trash2, Pencil } from 'lucide-react';
+import { Save, Loader2, ChevronRight, X, Settings2, Superscript, SeparatorHorizontal, Trash2, Pencil, StickyNote, RemoveFormatting, SquarePen, Columns2 } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
@@ -117,6 +117,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     () => (localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
   );
   const [narrowPane, setNarrowPane] = useState(false);
+  // Kitsas paan (kõrvuti aknad) → laiad tekst-sildid kokku ikoonideks.
+  // Eraldi (kõrgem) lävend kui narrowPane (640) — sildid kaovad enne badge-režiimi.
+  const [compactToolbar, setCompactToolbar] = useState(false);
   const [marginaliaCount, setMarginaliaCount] = useState(0);
   const marginaliaMode: MarginaliaMode = narrowPane ? 'badge' : marginaliaUserMode;
 
@@ -260,6 +263,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       // Peidetud paan (display:none) annab 0-laiuse — ära muuda režiimi
       if (w === 0) return;
       setNarrowPane(w < 640);
+      setCompactToolbar(w < 760);
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -838,11 +842,11 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                     <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
                     <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={insertMarginalia} className="px-2 h-7 flex items-center justify-center rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200" title={t('editor.tooltips.marginalia')}>Marginalia</button>
+                    <button type="button" onClick={insertMarginalia} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.marginalia')}><StickyNote size={14} />{!compactToolbar && <span>Marginalia</span>}</button>
                     <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
                     <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
                     <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={cleanMarkup} className="px-2 h-7 flex items-center justify-center rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100" title={t('editor.tooltips.cleanMarkup')}>{t('editor.tooltips.cleanMarkupButton')}</button>
+                    <button type="button" onClick={cleanMarkup} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.cleanMarkup')}><RemoveFormatting size={14} />{!compactToolbar && <span>{t('editor.tooltips.cleanMarkupButton')}</span>}</button>
                     {!readOnly && (
                       <>
                         <div className="w-px h-4 bg-gray-300 mx-1"></div>
@@ -866,10 +870,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                             setAnnDialogError('');
                             setAnnDialogOpen(true);
                           }}
-                          className="px-2 h-7 flex items-center justify-center rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200"
+                          className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200 ${compactToolbar ? 'w-7' : 'px-2'}`}
                           title={t('editor.tooltips.annotate', 'Märgi ja kommenteeri (vali tekst enne)')}
                         >
-                          ✎ Ann
+                          <SquarePen size={14} />{!compactToolbar && <span>Ann</span>}
                         </button>
                       </>
                     )}
@@ -877,10 +881,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <button
                         type="button"
                         onClick={toggleMarginaliaMode}
-                        className={`px-2 h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
+                        className={`h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${compactToolbar ? 'w-7' : 'px-2'} ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
                         title={marginaliaUserMode === 'column' ? t('editor.marginalia.collapse') : t('editor.marginalia.expand')}
                       >
-                        ⊟ {t('editor.marginalia.toggle')}
+                        <Columns2 size={14} />{!compactToolbar && <span>{t('editor.marginalia.toggle')}</span>}
                       </button>
                     )}
                   </div>
