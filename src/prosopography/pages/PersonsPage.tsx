@@ -54,6 +54,9 @@ const PersonsPage: React.FC = () => {
   const [inputValue, setInputValue] = useState(query);
   // Sünkroniseeri inputValue kui URL muutub väljastpoolt (nt tagasinupp)
   useEffect(() => { setInputValue(query); }, [query]);
+  useEffect(() => {
+    setSearchParams(p => { const n = new URLSearchParams(p); n.delete('offset'); return n; }, { replace: true });
+  }, [selectedCollection]); // eslint-disable-line react-hooks/exhaustive-deps
   // Debounce: uuenda URL 300ms pärast viimast klahvivajutust
   useEffect(() => {
     const timer = setTimeout(() => {
