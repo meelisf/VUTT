@@ -417,7 +417,8 @@ const Upload: React.FC = () => {
         });
         const d = await r.json();
         if (r.ok) {
-          if (candidateSlug !== slug) setSlug(candidateSlug); // uuenda nähtavat vihjet
+          // Backend küpsetab work_id slug'i → kuva reaalne kaustanimi (data/{slug}-{work_id}/)
+          if (d.upload?.meta?.slug) setSlug(d.upload.meta.slug);
           setUploadId(d.upload.id);
           setStep(2);
           return;
