@@ -81,12 +81,15 @@ def test_og_title_present(patch_find):
     assert "Disputatio de pace" in html
 
 
-def test_meta_refresh_still_present(patch_find):
+def test_no_meta_refresh(patch_find):
+    # Meta-refresh PEAB puuduma: see osutas samale URL-ile → Google luges
+    # selle self-redirect'iks → "Redirect error" (981 lehte GSC-s, 2026-06).
+    # Botid saavad UA-routing'uga selle prerendatud HTML-i, brauserid SPA — refresh oli kasutu.
     from server.metadata_handler import build_meta_html
     registry, tmp_path = patch_find
     registry["work001"] = _write_meta(tmp_path, FULL_META)
     html = build_meta_html("work001")
-    assert 'http-equiv="refresh"' in html
+    assert 'http-equiv="refresh"' not in html
 
 
 def test_dublin_core_title(patch_find):

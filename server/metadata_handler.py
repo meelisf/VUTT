@@ -171,8 +171,6 @@ def build_meta_html(work_id: str) -> str:
     <meta name="twitter:title" content="{safe_title}">
     <meta name="twitter:description" content="{safe_desc}">
     <meta name="twitter:image" content="{image_url}">
-
-    <meta http-equiv="refresh" content="0; url={work_url}">
 </head>
 <body>
     {body_content}
