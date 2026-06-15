@@ -96,3 +96,5 @@ Luua `src/components/PageThumbnail.tsx` jagatud komponent ja asendada kõik kolm
 Arhiiviviidetel puudub inglise keel praegu.
 
 main.py on hiigelsuureks kasvanud
+
+tähelepanek: marginaalial on nii, et kopeerimiste jms tõttu jääb mõnikord teksti nn tühje tage. nt <m><i></i></m> vms. see ei renderdu visuaalselt kuidagi, aga txt faili jääb sisse. iseenesest pole suur probleem, tühjad tagid saab välja pärast korjata, aga hea see nüüd ka pole. mure on peamiselt selles, et mudeli treenimisel võivad need hakata segadust tekitama. https://vutt.utlib.ut.ee/work/jyxgrs/5
