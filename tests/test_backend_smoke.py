@@ -639,3 +639,18 @@ def test_page_base_name_old_convention():
     """Vana kaust ilma work_id'ta → work_id lisatakse failinimme."""
     from server.upload_ops import _page_base_name
     assert _page_base_name("kirjad", "ab12cd", 7) == "kirjad-ab12cd-007"
+
+
+def test_create_upload_appends_work_id(backend_env):
+    """create_upload genereerib work_id ja küpsetab selle slug'i."""
+    upload_ops = backend_env["upload_ops"]
+    state = upload_ops.create_upload({
+        "title": "Adam Koljo kiri",
+        "year": "",
+        "slug": "adam-koljo-kiri",
+    })
+    meta = state["meta"]
+    work_id = meta["work_id"]
+    assert len(work_id) == 6
+    assert meta["slug"] == f"adam-koljo-kiri-{work_id}"
+    assert meta["slug"].endswith(f"-{work_id}")
