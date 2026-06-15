@@ -627,3 +627,15 @@ def test_delete_archive_requires_admin(client, login, backend_env):
 
     # Süsteem tagastab 401 ka ebapiisavate õiguste korral (require_token → get_user → 401)
     assert response.status_code in (401, 403)
+
+
+def test_page_base_name_new_convention():
+    """Slug juba sisaldab work_id'd → seda ei lisata uuesti."""
+    from server.upload_ops import _page_base_name
+    assert _page_base_name("adam-koljo-kiri-pcdm0f", "pcdm0f", 1) == "adam-koljo-kiri-pcdm0f-001"
+
+
+def test_page_base_name_old_convention():
+    """Vana kaust ilma work_id'ta → work_id lisatakse failinimme."""
+    from server.upload_ops import _page_base_name
+    assert _page_base_name("kirjad", "ab12cd", 7) == "kirjad-ab12cd-007"

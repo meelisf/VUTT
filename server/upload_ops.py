@@ -230,6 +230,17 @@ def sanitize_slug(text: str) -> str:
     return slug or 'teos'
 
 
+def _page_base_name(slug: str, work_id: str, pn: int) -> str:
+    """Lehekülje failinime tüvi (ilma laiendita).
+
+    Uus konventsioon: kaust = {slug}, kus slug juba sisaldab work_id'd → {slug}-{pn}.
+    Vana konventsioon: kaust = {slug} ilma work_id'ta → {slug}-{work_id}-{pn}.
+    """
+    if slug.endswith(f"-{work_id}"):
+        return f"{slug}-{pn:03d}"
+    return f"{slug}-{work_id}-{pn:03d}"
+
+
 def check_slug_conflict(year, slug: str) -> bool:
     """
     Tagastab True kui slug on juba kasutusel:
