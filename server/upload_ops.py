@@ -1290,7 +1290,7 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
-            base_name = f"{slug}-{work_id}-{pn:03d}"
+            base_name = _page_base_name(slug, work_id, pn)
             local_jpg = os.path.join(work_dir, f"{base_name}.jpg")
             local_txt = os.path.join(work_dir, f"{base_name}.txt")
             local_json = os.path.join(work_dir, f"{base_name}.json")
