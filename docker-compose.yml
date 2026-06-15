@@ -1,9 +1,19 @@
+# Docker json-file logide rotatsioon (muidu kasvavad piiramatult).
+# Iga konteiner: max 10MB × 5 faili = ~50MB. NB: rakendub konteineri
+# (taas)loomisel — `docker compose up -d` (mitte ainult restart).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # Backend: Python serverid (File Server + Image Server)
   backend:
     build: .
     container_name: vutt-backend
     restart: always
+    logging: *default-logging
     environment:
       # VUTT_ENV=production aktiveerib startup-kontrolli vaikimisi saladuste vastu (Leid 1).
       # Sea .env failis VUTT_ENV=production tootmises; arenduses jäta määramata (dev).
@@ -40,6 +50,7 @@ services:
     image: getmeili/meilisearch:v1
     container_name: vutt-meili
     restart: always
+    logging: *default-logging
     environment:
       - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
       - MEILI_NO_ANALYTICS=true
@@ -54,6 +65,7 @@ services:
     image: postgres:15-alpine
     container_name: vutt-umami-db
     restart: always
+    logging: *default-logging
     environment:
       POSTGRES_DB: umami
       POSTGRES_USER: umami
@@ -66,6 +78,7 @@ services:
     image: ghcr.io/umami-software/umami:postgresql-latest
     container_name: vutt-umami
     restart: always
+    logging: *default-logging
     environment:
       DATABASE_URL: postgresql://umami:${UMAMI_DB_PASSWORD:-vutt_umami_db_pass}@db-umami:5432/umami
       DATABASE_TYPE: postgresql
