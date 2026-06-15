@@ -76,6 +76,31 @@ def test_verify_user_bcrypt_wrong_password_returns_none(tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# verify_user — ajastuse-leke (kasutajanime enumeratsioon)
+# ---------------------------------------------------------------------------
+
+def test_verify_user_unknown_runs_bcrypt_to_equalize_timing(monkeypatch):
+    """Olematu kasutaja korral peab bcrypt ikka jooksma (dummy hash vastu),
+    et vastuse aeg ei reedaks, kas kasutajanimi eksisteerib."""
+    import server.auth as auth_mod
+
+    monkeypatch.setattr(auth_mod, "_users_cache", {})
+
+    calls = {"n": 0}
+    real_checkpw = auth_mod.bcrypt.checkpw
+
+    def spy_checkpw(pw, h):
+        calls["n"] += 1
+        return real_checkpw(pw, h)
+
+    monkeypatch.setattr(auth_mod.bcrypt, "checkpw", spy_checkpw)
+
+    result = auth_mod.verify_user("olematu_kasutaja", "ükskõik")
+    assert result is None
+    assert calls["n"] == 1, "bcrypt.checkpw peab jooksma ka olematu kasutaja korral (timing equalization)"
+
+
+# ---------------------------------------------------------------------------
 # verify_user — SHA-256 tagasiühilduvus
 # ---------------------------------------------------------------------------
 

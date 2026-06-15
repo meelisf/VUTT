@@ -100,6 +100,12 @@ def reload_users_cache():
 load_users()
 
 
+# Dummy bcrypt hash ajastuse-leke vältimiseks: kui kasutajat pole, jooksutame
+# ikka bcrypt'i selle vastu, et vastuse aeg ei reedaks kasutajanime olemasolu
+# (kasutajanime enumeratsioon ajastuse kaudu). Arvutatakse korra impordil.
+_DUMMY_BCRYPT_HASH = bcrypt.hashpw(b"timing-equalizer", bcrypt.gensalt())
+
+
 def hash_password(password: str) -> str:
     """Hashib parooli bcrypt-iga (soolaga)."""
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -122,6 +128,9 @@ def verify_user(username, password):
     """Kontrollib kasutajanime ja parooli."""
     users = load_users()
     if username not in users:
+        # Jooksuta bcrypt dummy hashi vastu, et vastuse aeg oleks sama nagu
+        # olemasoleva kasutaja korral (ajastuse-leke / enumeratsiooni vältimine).
+        bcrypt.checkpw(password.encode(), _DUMMY_BCRYPT_HASH)
         return None
     if not _verify_and_upgrade(username, password, users):
         return None

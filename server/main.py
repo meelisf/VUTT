@@ -23,7 +23,7 @@ from .people_ops import process_creators_metadata, process_person_fields_metadat
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import verify_user, create_session, delete_session, require_token, get_all_users, update_user_role, delete_user, delete_user_sessions, get_session, load_users, save_users
-from .rate_limit import get_client_ip, check_rate_limit
+from .rate_limit import get_client_ip, check_rate_limit, check_account_lockout, record_login_failure, clear_login_failures
 from .registration import (
     add_registration, load_pending_registrations, get_registration_by_id,
     update_registration_status, create_invite_token, validate_invite_token,
@@ -151,11 +151,19 @@ def _get_optional_user(request: Request):
 @app.post("/login")
 async def login(request: Request):
     client_ip = get_client_ip(request)
+    # IP-põhine rate-limit (kaitse ühelt IP-lt tuleva brute-force'i vastu)
     allowed, retry_after = check_rate_limit(client_ip, '/login')
     if not allowed: return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"})
     data = await request.json()
-    user = verify_user(data.get("username", "").strip(), data.get("password", ""))
+    username = data.get("username", "").strip()
+    # Konto-põhine lockout (kaitse credential-stuffingu vastu — palju IP-sid, üks konto)
+    locked, acc_retry = check_account_lockout(username)
+    if locked:
+        logger.warning(f"Login blokeeritud (konto lukus): username={username!r} ip={client_ip} retry_after={acc_retry}s")
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"Liiga palju ebaõnnestunud katseid. Proovi uuesti {acc_retry}s pärast"})
+    user = verify_user(username, data.get("password", ""))
     if user:
+        clear_login_failures(username)
         from .meilisearch_ops import generate_meili_token
         try:
             meili_token = generate_meili_token(user=user, ttl_seconds=3600)
@@ -168,6 +176,8 @@ async def login(request: Request):
             "token": create_session(user),
             "meili_token": meili_token,
         }
+    record_login_failure(username)
+    logger.warning(f"Ebaõnnestunud login: username={username!r} ip={client_ip}")
     return {"status": "error", "message": "Vale kasutajanimi või parool"}
 
 @app.post("/verify-token")

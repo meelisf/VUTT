@@ -11,6 +11,15 @@ from .config import RATE_LIMITS
 _rate_limit_store = {}
 _rate_limit_lock = threading.Lock()
 
+# Konto-põhine ebaõnnestunud login-katsete ajalugu: {username: [timestamp, ...]}
+# Kaitseb credential-stuffingu eest: IP-limiit ei aita, kui ründaja kasutab
+# paljusid IP-sid ühe konto vastu. Loendur on IP-st sõltumatu.
+_account_failures = {}
+_account_lock = threading.Lock()
+
+ACCOUNT_LOCKOUT_THRESHOLD = 10   # mitu ebaõnnestumist akna jooksul lukustab konto
+ACCOUNT_LOCKOUT_WINDOW = 900     # libisev aken sekundites (15 min)
+
 # Puhastuse intervall (sekundites)
 RATE_LIMIT_CLEANUP_INTERVAL = 600  # 10 minutit
 
@@ -49,6 +58,16 @@ def _cleanup_rate_limit_store():
                     # Eemalda tühi endpoint
                     if not _rate_limit_store[endpoint]:
                         del _rate_limit_store[endpoint]
+
+            # Puhasta ka konto-throttle aegunud kirjed
+            with _account_lock:
+                for username in list(_account_failures.keys()):
+                    valid = [ts for ts in _account_failures[username]
+                             if now - ts < ACCOUNT_LOCKOUT_WINDOW]
+                    if valid:
+                        _account_failures[username] = valid
+                    else:
+                        del _account_failures[username]
 
             if total_removed > 0:
                 print(f"Rate limit puhastus: eemaldatud {total_removed} IP kirjet")
@@ -114,6 +133,48 @@ def check_rate_limit(ip, endpoint):
         # Lisa uus päring
         _rate_limit_store[endpoint][ip].append(now)
         return True, 0
+
+
+def check_account_lockout(username):
+    """
+    Kontrollib, kas konto on liiga paljude ebaõnnestunud login-katsete tõttu lukus.
+    IP-st sõltumatu — kaitse credential-stuffingu vastu (palju IP-sid, üks konto).
+    Tagastab (locked, retry_after_seconds).
+    """
+    now = time.time()
+    with _account_lock:
+        timestamps = _account_failures.get(username)
+        if not timestamps:
+            return False, 0
+        # Hoia ainult akna sees olevad ebaõnnestumised
+        valid = [ts for ts in timestamps if now - ts < ACCOUNT_LOCKOUT_WINDOW]
+        if valid:
+            _account_failures[username] = valid
+        else:
+            del _account_failures[username]
+            return False, 0
+
+        if len(valid) >= ACCOUNT_LOCKOUT_THRESHOLD:
+            oldest = min(valid)
+            retry_after = int(ACCOUNT_LOCKOUT_WINDOW - (now - oldest)) + 1
+            return True, retry_after
+        return False, 0
+
+
+def record_login_failure(username):
+    """Registreerib ühe ebaõnnestunud login-katse kasutajanime kohta."""
+    now = time.time()
+    with _account_lock:
+        bucket = _account_failures.setdefault(username, [])
+        # Prune aknast välja jäänud kirjed, et list ei kasvaks lõpmatult
+        bucket[:] = [ts for ts in bucket if now - ts < ACCOUNT_LOCKOUT_WINDOW]
+        bucket.append(now)
+
+
+def clear_login_failures(username):
+    """Tühjendab konto ebaõnnestumiste loenduri (kutsutakse eduka login'i järel)."""
+    with _account_lock:
+        _account_failures.pop(username, None)
 
 
 def rate_limit_response(handler, retry_after, send_cors_headers_func):
