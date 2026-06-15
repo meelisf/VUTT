@@ -254,7 +254,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     });
   }, [marginaliaMode]);
 
-  // Kitsas paan (< 640px) sunnib märgivaate — veerg ei mahu
+  // Kitsas paan sunnib märgivaate — veerg ei mahu.
+  // Lävend 500px: veerg ise võtab 146px (.vutt-has-margin padding-left), jättes
+  // ~350px tekstile. 640 oli liiga vara — sildid kadusid kuigi ruumi veel jätkus.
   useEffect(() => {
     const el = editorContainerRef.current;
     if (!el) return;
@@ -262,7 +264,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       const w = entries[0]?.contentRect.width ?? 9999;
       // Peidetud paan (display:none) annab 0-laiuse — ära muuda režiimi
       if (w === 0) return;
-      setNarrowPane(w < 640);
+      setNarrowPane(w < 500);
       setCompactToolbar(w < 760);
     });
     ro.observe(el);
