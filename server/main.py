@@ -30,7 +30,7 @@ from .registration import (
     create_user_from_invite, suggest_username_for_email
 )
 from .upload_ops import (
-    sanitize_slug, check_slug_conflict, create_upload, update_upload_meta,
+    sanitize_slug, create_upload, update_upload_meta,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
     import_as_work, replace_work_content, _valid_upload_id,
@@ -1310,7 +1310,6 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
     # sanitize_slug on idempotentne, seega juba korrektne slug ei muutu.
     slug = sanitize_slug(data.get('slug') or data.get('title', ''))
     data['slug'] = slug
-    if check_slug_conflict(data.get('year'), slug): return JSONResponse(status_code=409, content={"status": "error", "conflict": True})
     return {"status": "success", "upload": create_upload(data)}
 
 @app.get("/admin/upload/{upload_id}/status")
