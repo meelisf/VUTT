@@ -993,8 +993,9 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         raise ValueError("Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
     importable.sort(key=lambda f: f['page'])
 
-    # Genereeri work_id (nanoid)
-    work_id = generate_nanoid()
+    # Kasuta create_upload-is genereeritud work_id'd; vana pooleliolev upload
+    # (enne deploy't, ilma meta.work_id'ta) saab uue nanoid'i (vana failinime konventsioon).
+    work_id = meta.get('work_id') or generate_nanoid()
 
     # Sihtkoha kaust data/{slug}/
     work_dir = os.path.join(BASE_DIR, slug)
@@ -1033,7 +1034,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
-            base_name = f"{slug}-{work_id}-{pn:03d}"
+            base_name = _page_base_name(slug, work_id, pn)
             local_jpg = os.path.join(work_dir, f"{base_name}.jpg")
             local_txt = os.path.join(work_dir, f"{base_name}.txt")
             local_json = os.path.join(work_dir, f"{base_name}.json")
