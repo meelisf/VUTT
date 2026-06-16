@@ -38,6 +38,13 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
+  // Kasutaja-tokeni värskendus. KRIITILINE: transientne viga EI TOHI degradeerida
+  // sisseloginud tabi anonüümseks. Varasem bug: iga ebaõnnestumine (võrgu-blip, 5xx/502
+  // backendi redeploy ajal, 429, tühi token) kukkus `fetchAnonToken()`-isse, mis seadis
+  // isUserToken=false → tab jäi PÜSIVALT anonüümseks (piiratud teosed nähtamatud) kuni
+  // full reloadini. Lahendus: ainult 401 (sessioon päriselt aegunud) degradeerib anon-iks;
+  // transientne viga säilitab olemasoleva kasutaja-tokeni ja proovib järgmisel tsüklil
+  // uuesti (lookahead 5min / intervall 1min = ~5 katset enne tegelikku aegumist).
   const refreshToken = useCallback(async () => {
     if (isUserToken.current) {
       try {
@@ -54,7 +61,19 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
             return;
           }
         }
-      } catch {}
+        // 401 = sessioon päriselt aegunud → degradeeri anon-iks.
+        if (r.status === 401) {
+          await fetchAnonToken();
+          return;
+        }
+        // Muu viga (5xx/429/tühi token) on transientne — säilita kasutaja-token,
+        // ära degradeeri. tokenExpiresAt jääb muutmata → shouldRefreshToken jääb
+        // true → uus katse järgmisel tsüklil.
+        return;
+      } catch {
+        // Võrgu-blip — transientne, säilita kasutaja-token, proovi hiljem uuesti.
+        return;
+      }
     }
     await fetchAnonToken();
   }, [fetchAnonToken]);

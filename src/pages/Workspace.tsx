@@ -145,9 +145,15 @@ const Workspace: React.FC = () => {
           getWorkMetadata(effectiveIndex, workId)
         ]);
 
-        // Shareable fallback: teos on piiratud kollektsioonis aga võib olla jagatud
+        // Shareable fallback: teos on piiratud kollektsioonis aga võib olla jagatud.
+        // Saadame ka Authorization päise — kui Meili indeks on (veel/taas) anonüümses
+        // olekus (init-võidujooks või tokeni-värskenduse degradatsioon), siis getPage
+        // tagastab piiratud teose puhul null. Auth päisega saab autenditud admin/editor
+        // siiski teose-skoobiga tokeni ja leht laeb; ilma selleta tuli "Ligipääs keelatud".
         if (!pageData && !viewerToken) {
-          const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`);
+          const r = await fetch(`${FILE_API_URL}/work/${workId}/viewer-token`, {
+            headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          });
           if (r.ok) {
             const data = await r.json();
             setViewerToken(data.token);
