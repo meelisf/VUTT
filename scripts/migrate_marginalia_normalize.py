@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
 Ühekordne migratsioon: normaliseerib KÕIGI lehekülgede .txt marginaalia-tägid
-kanoonilisele kujule (<m> välimiseks). Vt server/marginalia_normalize.py.
+kanoonilisele kujule (<m> välimiseks) JA koristab tühjad tagid (<m></m>, <i></i>
+jms). Vt server/marginalia_normalize.py.
 
 Taust (2026-06-13): ~1500 rida 4171-st on ristuva tägiga (<i><m>X</i></m>) →
-ei renderdu editoris ega indekseeru otsingus. See skript parandab olemasolevad
-failid; edaspidi hoiab /save + import need puhtana.
+ei renderdu editoris ega indekseeru otsingus.
+Taust (2026-06-16): kopeerimised/kustutused jätsid tühje tage (<m><i></i></m>) →
+ei renderdu, aga risustavad faili ja segavad mudeli treenimist.
+See skript parandab olemasolevad failid; edaspidi hoiab /save + import need puhtana.
 
 KASUTUS (serveris, Dockeris):
   docker exec vutt-backend python3 scripts/migrate_marginalia_normalize.py --dry-run
@@ -60,7 +63,9 @@ def main():
         except Exception as e:
             print(f"  LUGEMISVIGA {path}: {e}")
             continue
-        if '<m>' not in raw:
+        # Töötle faile, kus on mistahes täg — normalize koristab ka inline-tühjad
+        # (<i></i>) failides ILMA <m>-ta. Tagideta failid jätame vahele (kiirus).
+        if '<' not in raw:
             continue
         fixed = normalize_marginalia_tags(raw)
         if fixed == raw:

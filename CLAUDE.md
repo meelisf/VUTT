@@ -229,6 +229,26 @@ Kaitseb tägi positsioone kasutaja juhuslike kustutamiste eest.
 - `isReplace && r.from < lastReplaceEnd`: ainult replace'id blokeeritakse, mitte markid
 - Protection filter peab jääma `vuttMarkupExtension` listi viimaseks (pärast `vuttMarkupField`)
 
+## Marginaalia — normaliseerimine ja kopeerimine
+
+**Põhimõte: ettearvatav, kogu aeg ühte moodi.** Koristus toimub ainult **salvestamisel**
+(`server/marginalia_normalize.py`), MITTE elavalt iga klahvivajutuse peal (see lõhuks
+kursori/voo). `normalize_marginalia_tags(text)` teeb kaks asja, idempotentselt:
+1. **`<m>` välimiseks tägiks** real, mis on tervikuna marginaalia-plokk (ristuvate
+   OCR-tägide `<i><m>X</i></m>` parandus).
+2. **`strip_empty_tags`** — eemaldab tühjad paaris-tagid (`<m></m>`, `<i></i>`,
+   `<m><i></i></m>` pesastatud püsipunktini). Komplekt: `m, i, b, cs, hi`. Säilitab sisu
+   (ws ei kao: `<i> </i>` → ` `). **EI puutu** `ann\d*` (ID), `fn`, `pb`.
+
+Kutsutud KÕIGIS kirjutusteedes: `/save` (`main.py`), `import_as_work` (`upload_ops.py`),
+meili/consolidate `split_marginalia`. Olemasolevate failide koristus:
+`scripts/migrate_marginalia_normalize.py` (serveris Dockeris, `--dry-run` → `--apply --commit`).
+
+**Kopeerimise mudel (oluline, ettearvatav):** kopeeritud marginaalia-sisu on alati **plain**
+— `TextEditor.tsx` copy-handler eemaldab tagid. **Sihtkoht määrab vormingu**: marginaaliasse
+(avatud plokk) kleepides → marginaalia, põhiteksti → tavatekst. Üle ploki-piiri kustutus
+avatud plokis liidab `<m>` plokid; jäänused koristab salvestamisel `strip_empty_tags`.
+
 ## i18n
 
 ```tsx

@@ -46,15 +46,48 @@ def _normalize_line(line: str) -> str:
     return f'{ws1}<m>{lead_opens}{middle}{trail_closes}</m>{ws2}'
 
 
+# Tühje paaris-tage koristatakse komplektist (m + inline). EI sisalda 'ann\d*'
+# (ID viitab andmetele), 'fn' (joonealuse viide) ega 'pb' (self-closing).
+_EMPTY_RE = re.compile(r'<(m|i|b|cs|hi)>(\s*)</\1>')
+
+
+def strip_empty_tags(text: str) -> str:
+    """Eemaldab tühjad/ainult-tühikuga paaris-tagid (`<m></m>`, `<i></i>` jms).
+
+    Kopeerimised/kustutused jätavad `.txt`-i tühje tage, mis ei renderdu, aga
+    risustavad faili ja segavad mudeli treenimist. See koristab need.
+
+    Reeglid (ettearvatav, deterministlik):
+    - Komplekt: `m, i, b, cs, hi`. Puutumata: `ann\\d*`, `fn`, `pb`.
+    - **Säilitab sisu, eemaldab ainult tagid:** `<i> </i>` → ` ` (mitte ``), nii ei
+      kao kunagi nähtavat märki põhitekstis.
+    - **Pesastatud püsipunktini:** `<m><i></i></m>` → `<m></m>` → ``.
+    - Idempotentne.
+    """
+    if not text or '<' not in text:
+        return text
+    prev = None
+    cur = text
+    # Püsipunkt: pesastatud tühjad (<m><i></i></m>) vajavad mitut käiku.
+    while prev != cur:
+        prev = cur
+        cur = _EMPTY_RE.sub(lambda m: m.group(2), cur)
+    return cur
+
+
 def normalize_marginalia_tags(text: str) -> str:
-    """Teeb `<m>` välimiseks tägiks igal real, mis on tervikuna marginaalia.
+    """Teeb `<m>` välimiseks tägiks igal real, mis on tervikuna marginaalia, ja
+    koristab tühjad tagid (`strip_empty_tags`).
 
     Idempotentne. Puutumata jäävad: puhtad plokid, rea-kesksed inline-`<m>`,
     mitmerealised plokid (kus `<m>`/`</m>` on eri ridadel), tavaline tekst.
     Reavahetused ja taanded säilivad täpselt.
     """
-    if not text or '<m>' not in text:
+    if not text:
         return text
-    # Rea-kaupa, et säilitada täpsed reavahetused (sh lõpu-reavahetus).
-    parts = text.split('\n')
-    return '\n'.join(_normalize_line(p) for p in parts)
+    if '<m>' in text:
+        # Rea-kaupa, et säilitada täpsed reavahetused (sh lõpu-reavahetus).
+        parts = text.split('\n')
+        text = '\n'.join(_normalize_line(p) for p in parts)
+    # Tühjade tagide koristus jookseb ALATI (ka inline-tühjad failides ilma <m>-ta).
+    return strip_empty_tags(text)
