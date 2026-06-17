@@ -234,6 +234,29 @@ grep -l "delete.marginalia" dist/assets/*.js   # → Workspace-*.js
 
 Frontend deploy: `rsync -avz dist/ vutt:~/VUTT/dist/`
 
+### 4.6 Harnessi mahavõtmine
+
+Kui servajuhud on rohelised ja oled valmis, võta harness maha:
+
+```bash
+# 1) peata dev-server
+pkill -f vite
+
+# 2) korista ühekordsed verify-skriptid (need ei ole git-is)
+rm -f /tmp/verify*.mjs
+
+# 3) kinnita, et server on maas
+curl -s -o /dev/null -w "%{http_code}\n" --max-time 3 http://localhost:3000/ || echo down
+ps aux | grep -E "node.*vite|vite/bin" | grep -v grep || echo "fully down"
+```
+
+**Gotcha:** `pgrep -f vite` annab pärast tapmist sageli valepositiivse — `pgrep`-i ENDA
+käsurida sisaldab sõna "vite" ja matchib iseennast. Kontrolli `ps aux | grep node.*vite`
+asemel, või ignoreeri ainsat järelejäänud rida, mis on su grep-käsk ise.
+
+`repro/` jääb alles (git-is, korduvkasutuseks). Järgmisel korral piisab `npm run dev`-ist —
+harnessi ei pea uuesti ehitama.
+
 ---
 
 ## 5. Juhised tulevasele tööle siin
