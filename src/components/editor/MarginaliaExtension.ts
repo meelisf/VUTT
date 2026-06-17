@@ -3,6 +3,8 @@
 // eraldi DOM-ülekattena (position:absolute .cm-scrolleris, coordsAtPos-põhine).
 // Avatud plokid (muutmisrežiim): täisrea taust + × nupp, toortekst inline nähtav.
 // Vt docs/superpowers/plans/2026-06-13-marginalia-overlay-rendering.md
+// Servajuhud (kustutamine, tühjad read), kaitsefilter ja test-harness:
+//   docs/marginalia-editor-harness-ja-servajuhud.md
 //
 // KRIITILISED REEGLID (samad mis VuttMarkupExtension):
 // - RangeSetBuilder.add(): from ASC, sama from korral to ASC
@@ -11,7 +13,7 @@
 
 import { Decoration, DecorationSet, EditorView, WidgetType, ViewPlugin, keymap } from '@codemirror/view';
 import type { ViewUpdate } from '@codemirror/view';
-import { RangeSetBuilder, StateField, StateEffect, EditorState, Transaction, Facet } from '@codemirror/state';
+import { RangeSetBuilder, StateField, StateEffect, EditorState, Transaction, Facet, Prec } from '@codemirror/state';
 import type { Extension } from '@codemirror/state';
 import { findMarginaliaBlocks, stackMarginalia, groupMarginaliaBlocks } from '../../utils/marginaliaUtils';
 import type { MarginaliaBlock, MarginaliaGroup } from '../../utils/marginaliaUtils';
@@ -74,8 +76,15 @@ export const marginaliaField = StateField.define<MarginaliaState>({
     for (const e of tr.effects) {
       if (e.is(openMarginalia)) { openMarks = [...openMarks, e.value]; changed = true; }
       if (e.is(closeMarginalia)) {
-        const blk = blocks.find(b => e.value >= b.from && e.value <= b.to);
-        if (blk) { openMarks = openMarks.filter(p => p < blk.from || p > blk.to); changed = true; }
+        // Sulgeme KOGU grupi (mitte üksiku ploki) — avamisel märgistame kõik
+        // liikmed, seega sulgemine peab kõik liikme-margid eemaldama.
+        const grp = groupMarginaliaBlocks(blocks).find(g =>
+          e.value >= g.blocks[0].from && e.value <= g.blocks[g.blocks.length - 1].to);
+        if (grp) {
+          const lo = grp.blocks[0].from, hi = grp.blocks[grp.blocks.length - 1].to;
+          openMarks = openMarks.filter(p => p < lo || p > hi);
+          changed = true;
+        }
       }
       if (e.is(closeAllMarginalia)) { openMarks = []; changed = true; }
     }
@@ -145,6 +154,10 @@ function buildDeco(state: EditorState): DecoSets {
         let cls = 'vutt-marg-open';
         if (ln === firstLine.number) cls += ' vutt-marg-open-first';
         if (ln === lastLine.number) cls += ' vutt-marg-open-last';
+        // Tühi marginaalia-rida (nt <m></m>): kogu sisu on peidetud tägid → muidu
+        // height:0 (nähtamatu). Lisa klass, mis annab reale kõrguse (vt CSS) — nii
+        // on tühi rida nähtav ja ühtib overlay'ga.
+        if (line.text.replace(/<\/?[a-z]+[^>]*>/g, '').trim() === '') cls += ' vutt-marg-open-empty';
         items.push({ from: line.from, to: line.from, deco: Decoration.line({ class: cls }) });
       }
       items.push({
@@ -256,11 +269,15 @@ const marginaliaOverlayPlugin = ViewPlugin.fromClass(class {
     const noteEl = target.closest('.vutt-margin-note') as HTMLElement | null;
     if (noteEl?.dataset.mFrom === undefined) return;
     const from = Number(noteEl.dataset.mFrom);
-    const blk = this.view.state.field(marginaliaField).blocks.find(b => b.from === from);
-    if (blk) {
+    const { blocks } = this.view.state.field(marginaliaField);
+    const grp = groupMarginaliaBlocks(blocks).find(g => g.from === from);
+    if (grp) {
+      // Märgista KÕIK grupi plokid avatuks — nii ei kuku osa kasti kinni, kui
+      // kasutaja lisab kasti keskele tühja rea (grupp jaguneb, aga mõlemad pooled
+      // jäävad avatuks). Vajalik ka kleepimise konteksti-tuvastusele.
       this.view.dispatch({
-        effects: openMarginalia.of(blk.contentFrom),
-        selection: { anchor: Math.min(blk.contentFrom, this.view.state.doc.length) },
+        effects: grp.blocks.map(b => openMarginalia.of(b.contentFrom)),
+        selection: { anchor: Math.min(grp.blocks[0].contentFrom, this.view.state.doc.length) },
       });
       this.view.focus();
     }
@@ -394,11 +411,13 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
     const openEl = target.closest('.vutt-margin-note, .vutt-marg-badge') as HTMLElement | null;
     if (openEl?.dataset.mFrom !== undefined) {
       const from = Number(openEl.dataset.mFrom);
-      const blk = view.state.field(marginaliaField).blocks.find(b => b.from === from);
-      if (blk) {
+      const { blocks } = view.state.field(marginaliaField);
+      const grp = groupMarginaliaBlocks(blocks).find(g => g.from === from);
+      if (grp) {
+        // Märgista KÕIK grupi plokid avatuks (vt onMouseDown selgitus).
         view.dispatch({
-          effects: openMarginalia.of(blk.contentFrom),
-          selection: { anchor: Math.min(blk.contentFrom, view.state.doc.length) },
+          effects: grp.blocks.map(b => openMarginalia.of(b.contentFrom)),
+          selection: { anchor: Math.min(grp.blocks[0].contentFrom, view.state.doc.length) },
         });
         view.focus();
       }
@@ -435,6 +454,41 @@ const marginaliaClickHandler = EditorView.domEventHandlers({
   },
 });
 
+// Tühja marginaalia-rea puhas kustutamine (Backspace/Delete). Kaks juhtu:
+//  1) Kursor on TÄIESTI tühjal plokil (<m></m> või <m>\n</m>) → eemalda KOGU plokk
+//     (mõlemad tägid + rida) ühe vajutusega.
+//  2) Kursor on nähtaval-tühjal real MITTE-tühja ploki sees (nt `</m>`-rida, mis
+//     tekib kui Enter vajutati sisu lõpus PEIDETUD </m> ette) → eemalda ainult
+//     reavahetus (liida üles), tägi jääb alles. Muidu sööks vaikimisi Delete
+//     atomic </m> tägi ära ja lõhuks ploki kaheks (sisu muutuks tavatekstiks).
+// Tagastab false, kui rida pole nähtaval-tühi → vaikimisi kustutus.
+function deleteMarginaliaEmptyLine(view: EditorView): boolean {
+  const sel = view.state.selection.main;
+  if (!sel.empty) return false;
+  const pos = sel.head;
+  const doc = view.state.doc;
+  const { blocks } = view.state.field(marginaliaField);
+  const blk = blocks.find(b => pos >= b.from && pos <= b.to);
+  if (!blk) return false;
+  // 1) terve tühi plokk
+  if (doc.sliceString(blk.contentFrom, blk.contentTo).trim() === '') {
+    view.dispatch({
+      changes: { from: blk.hideFrom, to: Math.min(blk.hideTo, doc.length), insert: '' },
+      userEvent: 'delete.marginalia',
+    });
+    return true;
+  }
+  // 2) nähtaval-tühi rida mitte-tühja ploki sees → eemalda eelnev reavahetus (liida üles)
+  const line = doc.lineAt(pos);
+  if (line.text.replace(/<\/?[a-z]+[^>]*>/g, '').trim() !== '') return false; // real on sisu
+  if (line.from <= blk.from) return false; // esimene rida — pole eelnevat \n liita
+  view.dispatch({
+    changes: { from: line.from - 1, to: line.from, insert: '' },
+    userEvent: 'delete.marginalia',
+  });
+  return true;
+}
+
 // Esc sulgeb kõik avatud plokid (kui mõni on lahti; muidu laseb Esc-i edasi)
 const marginaliaKeymap = keymap.of([
   {
@@ -445,6 +499,8 @@ const marginaliaKeymap = keymap.of([
       return true;
     },
   },
+  { key: 'Backspace', run: deleteMarginaliaEmptyLine },
+  { key: 'Delete', run: deleteMarginaliaEmptyLine },
 ]);
 
 // --- Kaitse: kasutaja kustutamine ei tohi haarata PEIDETUD plokke ---
@@ -500,7 +556,9 @@ export function marginaliaExtension(mode: MarginaliaMode): Extension {
     marginaliaField,
     marginaliaDecoField,
     marginaliaClickHandler,
-    marginaliaKeymap,
+    // Prec.high: Backspace/Delete tühja ploki kustutus peab käivituma ENNE
+    // defaultKeymap'i (mis muidu kustutaks ükshaaval atomic-tägi).
+    Prec.high(marginaliaKeymap),
     marginaliaOverlayPlugin,
     marginaliaProtectionFilter,
   ];

@@ -227,6 +227,9 @@ body:has(.workspace-container) {
 }
 .vutt-marg-open-first { border-top: 1px dashed #ca8a04; }
 .vutt-marg-open-last { border-bottom: 1px dashed #ca8a04; }
+/* Tühja marginaalia-rea (<m></m>) kogu sisu on peidetud tägid → rida kukuks kokku
+   (height:0). Anna talle ühe rea kõrgus, et oleks nähtav ja paste'itav. */
+.vutt-marg-open-empty::after { content: "\200B"; } /* zero-width space → rea kõrgus */
 
 /* × sulgemisnupp avatud ploki esimese rea paremas servas */
 .vutt-marg-close {
