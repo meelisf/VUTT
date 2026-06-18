@@ -50,43 +50,71 @@ Uus per-page funktsioon.
 
 **Sisend:**
 - `work_id: str`
-- `page_num: int` (1-indekseeritud)
+- `filename: str` — lehe pildifaili nimi (mitte jäik indeks; vt 3a, endpoint §2)
 - `angle: float` (kraadid, vaikimisi `0.0`)
 - `crop: Optional[dict]` — `{x, y, w, h}` normaliseeritud 0–1, vaikimisi `None` = terve pilt
 - `username: str`
 
-**Loogika (alati sama järjekord):**
-1. Leia kaust ja lehe failinimi (`find_directory_by_id`, `get_sorted_images`) — sama
-   valideerimine nagu `split_page`/`replace-image` (404 kui leht puudub).
-2. Ava pilt → `ImageOps.exif_transpose(raw)` (rakenda EXIF orientatsioon pikslitele).
-3. Kui `angle != 0`: `img.rotate(-angle, expand=True, fillcolor=(255,255,255))`.
-   `expand=True` säilitab kõik nurgad; valge täide. (Nurga märk täpsustatakse
-   implementatsioonis nii, et UI sleider ja tulemus klapivad.)
-4. Kui `crop` antud: arvuta pikslikoordinaadid **pööratud** pildi mõõtmetest
-   (`x*W, y*H, (x+w)*W, (y+h)*H`), klampi piiridesse, `img.crop(...)`.
-5. Salvesta JPEG q95 **üle sama failinime** (lehe identiteet säilib).
-6. Vana pilt → `._trash/{work_id}/replaced_images/{base}_{timestamp}.jpg` (sama kui
-   `replace-image`).
-7. Regenereeri thumbnail (`_thumbs/_thumb_{img_name}`).
-8. Kirjuta `replace_image.log` (või eraldi `transform_image.log` — täpsustatakse).
-9. `sync_work_to_meilisearch(folder_name)`.
-10. Tagasta `{"success": True, "filename": img_name}`.
+**Loogika (kindel, varundus-enne-muutust järjekord — arvustuse parandus):**
+1. **Valideeri sisend ja leia fail.** `find_directory_by_id` → kaust; kontrolli, et
+   `filename` kuulub teosesse (`get_sorted_images`). Puuduv → 404.
+2. **No-op kaitse.** Kui `angle == 0` ja `crop is None` → ära puutu faili, tagasta
+   `{"success": True, "changed": False, "reason": "no_transform"}`. (Frontend ei tohiks
+   sellist päringut üldse saata — see on kaitse.) Valideeri `crop` ∈ [0,1], `w,h > 0` ja
+   tulemus ≥ minimaalne suurus (nt 8×8 px) → muidu 400.
+3. **Varunda ENNE muutmist.** Kopeeri praegune fail prügikasti
+   `._trash/{work_id}/replaced_images/{base}_{timestamp}{ext}`. **Lisaks** kirjuta pristine
+   originaal **üks kord** `._originals/{work_id}/{filename}` (ainult kui veel ei eksisteeri)
+   — vt all "Kumulatiivse kvaliteedikao märkus".
+4. **Ava pilt → `ImageOps.exif_transpose(raw)`** (rakenda EXIF orientatsioon pikslitele).
+5. **Värviruum.** Kui väljundformaat on JPEG ja pilt on `RGBA`/`LA`/`P` → lapenda valgele
+   taustale / `convert("RGB")` (vajalik nii `fillcolor` kui JPEG-salvestuse jaoks).
+6. **Pööre** sama matemaatikaga, mida frontend preview kasutab (vt §3 par-nõue):
+   `img.rotate(SIGN*angle, expand=True, fillcolor=valge)`. `expand=True` säilitab nurgad.
+   **Märgi konventsioon lukustatakse aktseptantsitestiga** (§Testimine).
+7. **Crop pööratud pildi mõõtmetest.** `W,H = img.size` (pärast pööret); pikslid
+   `(x*W, y*H, (x+w)*W, (y+h)*H)`, klampi piiridesse, `img.crop(...)`.
+8. **Salvesta ajutisse faili** (`{filename}.tmp`) **lähtefaili formaadis** (vt all).
+9. **Atomaarne asendus** `os.replace(tmp, orig)` — väldib pooliku faili nähtavust.
+10. **Regenereeri thumbnail** (`_thumbs/_thumb_{filename}`).
+11. **Logi** `transform_image.log` (struktureeritud): timestamp, user, work_id, filename,
+    angle, crop, varukoopia tee, vana mõõt → uus mõõt.
+12. `sync_work_to_meilisearch(folder_name)`.
+13. Tagasta `{"success": True, "changed": True, "filename": filename, "size": [W,H]}`.
+
+**Väljundformaat (arvustuse punkt: PNG/värviruum).** Säilita lähtefaili konteiner:
+`.jpg/.jpeg` → JPEG q95 (`convert("RGB")` enne); `.png` → PNG (kadudeta, väldib
+kumulatiivset kadu nendel failidel). Failinimi ei muutu kunagi → lehe identiteet säilib.
+(Olemasolevad lehed on valdavalt JPEG; PNG-d on harvad, aga `get_sorted_images` lubab neid.)
+
+**Kumulatiivse kvaliteedikao märkus (arvustuse punkt).** JPEG-lehe iga transform
+dekodeerib + rekodeerib → see **EI OLE mitte-destruktiivne töövoog**, q95 kaod kuhjuvad
+mitme järjestikuse teisenduse korral. Leevendus: (a) pristine originaal säilib **üks kord**
+`._originals/{work_id}/{filename}` all, nii et algne skänn on alati puhtalt taastatav;
+(b) iga toimingu eelne versioon säilib prügikastis (undo-last). Teisendus rakendub siiski
+alati **praegusele** failile (inkrementaalne) — täielikku "rakenda originaalist uuesti"
+ahelat me YAGNI tõttu ei ehita.
 
 **Git:** pildid ei ole git-tracked → commiti pole vaja (nagu `split_page` piltidega).
-
-**Veapiir:** kui `angle == 0` ja `crop is None`, ära tee midagi (tagasta no-op või viga —
-täpsustatakse). Valideeri `crop` väärtused vahemikus [0,1] ja `w,h > 0`.
+`._originals/` ja `._trash/` asuvad väljaspool teose kausta → `get_sorted_images` neid ei
+skanni (ei teki "fantoom-lehti").
 
 ### 2. Endpoint (`server/main.py`)
 
+**Failinime-põhine** (arvustuse punkt: `page_num` on pärast mutatsioone habras — split
+muudab arvu ja indekseid; failinime-ankur on stabiilne):
+
 ```
-POST /admin/work/{work_id}/page/{page_num}/transform
+POST /admin/work/{work_id}/page-image/{filename}/transform
 body: { "angle": float, "crop": {"x","y","w","h"} | null }
 require_role("admin")
 ```
 
-Kutsub `transform_page_image(...)`, tagastab tulemuse. Vea käsitlus nagu
-`admin_split_page` (400 valedele parameetritele, 404 puuduvale lehele).
+Kutsub `transform_page_image(work_id, filename, ...)`. Vea käsitlus: 400 vigastele
+parameetritele, 404 puuduvale failile. `filename` URL-kodeeritakse (sisaldab nanoidi +
+laiendit). **NB:** poolitamise (`/split`) endpoint jääb esialgu `page_num`-põhiseks, AGA
+frontend peab `page_num`-i alati võtma **viimati laetud `pages` nimekirjast** (modaal
+positsioneerib niikuinii failinime-ankru järgi), mitte säilitama vana indeksit.
 
 **Bulk (hiljem, ei ehita praegu):** `POST /admin/work/{work_id}/transform-all` sama
 per-page funktsiooni üle loopides.
@@ -104,6 +132,19 @@ jagatud osa välja).
 - **Poolita** — lõikejoone-drag (praegune `SplitPageModal` loogika). "Rakenda" →
   `POST .../split`.
 
+**KRIITILINE: preview ↔ serveri geomeetria peab olema matemaatiliselt sama** (arvustuse
+kõige riskantsem punkt). `CSS transform: rotate(...)` muudab ainult visuaalset
+bounding-box'i, mitte `naturalWidth/naturalHeight`-i — kui kärpe-koordinaadid arvutatakse
+valest baasist, lõikab server *mujalt* kui kasutaja nägi. Nõue:
+- Frontend renderdab pööratud pildi **expand'itud bounding-box'i** (sama valem kui Pillow
+  `rotate(expand=True)`: `W' = |W·cos θ| + |H·sin θ|`, `H' = |W·sin θ| + |H·cos θ|`) ja
+  joonistab kärpe **selle** kasti suhtes, mitte algse pildi suhtes.
+- Crop saadetakse **normaliseeritud pööratud-pildi koordinaatides** (`x,y,w,h ∈ [0,1]`
+  pööratud W'×H' suhtes). Server rakendab pööret esimesena, siis kärpe samadest
+  normaliseeritud väärtustest → identne tulemus.
+- Pöördenurga **märk** (CSS `rotate(+θ)` vs Pillow `rotate(SIGN·θ)`) lukustatakse
+  aktseptantsitestiga (§Testimine), et vältida "vasak/parem" nihet.
+
 **Navigeerimine (mõlemas režiimis):**
 - ← → noole-nupud päises + klaviatuuri `ArrowLeft`/`ArrowRight`.
 - Modaal saab propsiks **kogu järjestatud lehtede nimekirja** (`pages`) + jooksva indeksi.
@@ -116,9 +157,15 @@ jagatud osa välja).
 **Salvestamine + auto-edasi (batch-töövoo tuum):**
 - "Rakenda" **ei sulge modaali**. Edukal toimingul liigub modaal automaatselt **järgmise
   päris-skänni juurde** (vt nimekirja-sünk allpool).
-- Kinnituse-samm säilib poolitamisel ja teisendusel ("vana pilt säilib prügikastis 90
-  päeva; tekst ja metaandmed jäävad muutmata"). Batch-monotoonsuse vältimiseks kaalu
-  "ära küsi uuesti selles seansis" linnukest (täpsustatakse implementatsioonis).
+- **Kinnitus batch-sõbralikuks (arvustuse punkt — peaaegu vajalik, mitte mugavus).**
+  Vaikekäitumine: esimene toiming seansis küsib kinnitust ("vana pilt säilib prügikastis 90
+  päeva; tekst ja metaandmed jäävad muutmata") + linnuke **"ära küsi selles aknas uuesti"**.
+  Linnukese märkimisel rakenduvad järgnevad toimingud kohe ja modaal liigub automaatselt
+  edasi. Linnuke on modaali-seansi-skoobis (sulgemisel lähtestub).
+- **Poolitamise järel auto-edasi on hea, aga kasutaja tahab tihti tulemust kontrollida
+  (arvustuse punkt).** Pärast `split`-i liigu vaikimisi järgmisele originaal-skännile, AGA
+  näita toast'i "Leht poolitatud" tegevuslingiga **"Vaata uusi pooli"** (kerib/positsioneerib
+  kahe uue poole esimesele). Crop/rotate'il piisab lihtsast õnnestumis-toastist.
 
 **Props:** `workId`, `pages` (järjestatud), `initialIndex`, `imageTokenLookup`/`imageToken`,
 `onClose`, `onPagesChanged` (kutsutakse pärast iga mutatsiooni, et `WorkManage` laeks
@@ -163,20 +210,23 @@ asemel **koondatakse kõik lehe-toimingud ühte overflow-menüüsse:**
 
 ```
 PageImageEditorModal (klient) — jääb avatuks üle lehtede
-  ┌─ Pööra & kärbi → { angle, crop } → POST /admin/work/{id}/page/{n}/transform
-  └─ Poolita       → { split_x }     → POST /admin/work/{id}/page/{n}/split
-       → server (Pillow): exif_transpose → rotate(expand)/crop VÕI split
-       → vana pilt prügikasti, thumbnail regen, log, meili sync
+  ┌─ Pööra & kärbi → { angle, crop } → POST /admin/work/{id}/page-image/{filename}/transform
+  └─ Poolita       → { split_x }     → POST /admin/work/{id}/page/{n}/split  (n viimasest pages-st)
+       → server: VARUNDA enne (trash + esmane originals) → Pillow exif→rotate(expand)→crop
+                 → ajutine fail → atomaarne os.replace → thumbnail regen → log → meili sync
   → onPagesChanged → WorkManage laeb pages uuesti → propsina tagasi
   → modaal positsioneerib end ankur-failinime järgi → JÄRGMINE leht (ei sulgu)
 ```
 
 ## Pöördumatusele kindel
 
-- Vana pilt säilib `._trash/{work_id}/replaced_images/` (sama 90-päeva muster kui
-  `replace-image`).
+- **Varundus toimub ENNE ülekirjutust** (arvustuse parandus) — iga toimingu eelne versioon
+  `._trash/{work_id}/replaced_images/` (sama 90-päeva muster kui `replace-image`).
+- **Pristine originaal säilib üks kord** `._originals/{work_id}/{filename}` → algne skänn
+  alati puhtalt taastatav (vt kumulatiivse kao märkust §1).
+- Atomaarne `os.replace` → poolikut faili ei jää kunagi nähtavale.
 - Tekst, JSON, `sequence` ei muutu kunagi.
-- Toiming logitakse püsivasse logifaili.
+- Toiming logitakse `transform_image.log`-i (struktureeritud väljad).
 
 ## Roll ja õigused
 
@@ -187,8 +237,16 @@ asendamine, kustutamine on kõik admin-only).
 
 - Backend: `transform_page_image` ühiktestid — 90° pööre muudab mõõtmeid õigesti;
   deskew + `expand=True` säilitab sisu; crop normaliseeritud koordinaadid → õiged pikslid;
-  vana pilt jõuab prügikasti; thumbnail regenereeritakse; tekst/JSON/sequence puutumata;
-  veapiir (puuduv leht → 404, vigane crop → 400, no-op).
+  **varundus jõuab prügikasti ENNE faili muutmist** (loe varukoopiat → võrdne *vana*
+  pildiga, mitte uuega); **pristine originals kirjutatakse ainult esimesel korral**
+  (teine transform ei kirjuta üle); **formaadi säilitus** (.jpg→JPEG, .png→PNG);
+  RGBA/P → RGB enne JPEG-i; thumbnail regenereeritakse; tekst/JSON/sequence puutumata;
+  veapiir (puuduv fail → 404, vigane crop / liiga väike → 400, **no-op → `changed:False`**).
+- **Aktseptantsitest — preview ↔ server geomeetria (arvustuse kõige tähtsam):** sama
+  `(angle, crop)` rakendatuna frontend preview valemiga ja serveri Pillow'ga annab
+  **sama bounding-box'i ja sama kärbitud ala**; **pöördenurga märk lukku** (+2° UI-s ⇒ pööre
+  samas suunas kui server) — sünteetiline test markeriga pildil (nt must ruut teadaolevas
+  nurgas → kontrolli, kuhu ta pärast pööret+kärbet satub).
 - Frontend: modaali interaktsioon (pööre + kärbe → õige `{angle, crop}` payload;
   poolitamine → `{split_x}`); kinnituse-samm; tabide vahetus.
 - Frontend navigeerimine (kõige olulisem uus loogika): ← → liigutab lehte; **ankur-reegel**
@@ -201,6 +259,8 @@ asendamine, kustutamine on kõik admin-only).
 - Bulk-toimingud (per-page funktsioon jääb bulk-sõbralikuks, aga ei ehita) — terve
   dokumendi läbitöötlemine lahendatakse hoopis navigeeritava modaaliga (üks leht korraga,
   aga sujuvalt järjest), mitte ühe massipäringuga.
-- Mittedestruktiivne (parameetrite) ajalugu — säilitame ainult viimase varundatud pildi
-  prügikastis, mitte teisenduste ahelat.
+- **Täielik mitte-destruktiivne parameetri-ajalugu** ("rakenda alati pristine originaalist
+  uuesti, hoia teisenduste ahelat") — me EI ehita. Säilitame pristine originaali üks kord
+  + iga toimingu eelse versiooni prügikastis (undo-last), aga teisendus rakendub
+  inkrementaalselt praegusele failile (vt §1 kumulatiivse kao märkust).
 - Perspektiivi-/trapets-korrektsioon (ainult pööre + ristkülik-kärbe).
