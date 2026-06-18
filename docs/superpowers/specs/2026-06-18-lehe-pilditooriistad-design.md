@@ -1,4 +1,4 @@
-# Lehe pilditööriistad: pööra + kärbi
+# Lehe pildiredaktor: pööra, kärbi, poolita (navigeeritav)
 
 **Kuupäev:** 2026-06-18
 **Staatus:** Disain kinnitatud, ootab spetsi-ülevaatust
@@ -15,6 +15,11 @@ transkribeerimist:
 
 Praegu on lehekülgede haldus (`WorkManage.tsx`, admin) olemas: järjekord, poolitamine,
 kustutamine, pildi asendamine, lehe lisamine, prügikast. Crop/rotate puudub.
+
+**Töövoo-probleem:** sageli vajab terve dokument (nt 20 topeltlehte) sama toimingut järjest.
+Praegu peab iga lehe puhul modaali uuesti avama — monotoonne. Vaja **navigeeritavat
+modaali**, mis jääb avatuks ja laseb nooltega lehelt lehele liikuda, et terve dokument
+ühe seansiga läbi töödelda.
 
 ## Põhimõte ja arhitektuuriline koht
 
@@ -86,19 +91,53 @@ Kutsub `transform_page_image(...)`, tagastab tulemuse. Vea käsitlus nagu
 **Bulk (hiljem, ei ehita praegu):** `POST /admin/work/{work_id}/transform-all` sama
 per-page funktsiooni üle loopides.
 
-### 3. Frontend: `src/components/ImageEditModal.tsx`
+### 3. Frontend: `src/components/PageImageEditorModal.tsx` (ühendatud navigeeritav)
 
-Uus kombineeritud modaal (eraldi `SplitPageModal`-ist, sest semantika erineb).
+**Üks modaal, mis sisaldab mõlemat tööriista** (crop/rotate + poolitamine) ja navigeerib
+lehtede vahel ilma sulgumata. Asendab senise plaani kaks eraldi modaali; olemasolev
+`SplitPageModal` loogika tõstetakse selle modaali poolitamis-tabi alla (või refaktoreeritakse
+jagatud osa välja).
 
-- **Pööramine:** 90° nupud (←/→/180°) + peenhäälestuse sleider (deskew, nt ±10°).
-  Pilt pöördub elavalt CSS-transformiga eelvaates.
-- **Kärbe:** vaba ristkülik, mille kasutaja joonistab *pööratud* pildil (sama
-  drag-muster nagu `SplitPageModal` lõikejoonel, aga ristkülik).
-- **Salvestamine:** saadab `{ angle, crop }` (mitte pilti) endpoindile. Kinnituse-samm
-  nagu poolitamisel: "Vana pilt säilib prügikastis 90 päeva. Tekst ja metaandmed jäävad
-  muutmata."
-- Props sarnased `SplitPageModal`-ile: `workId`, `pageNum`, `imageFilename`,
-  `imageToken`, `onClose`, `onSuccess`.
+**Tabid / režiimid** modaali sees:
+- **Pööra & kärbi** — 90° nupud (←/→/180°) + deskew-sleider (±10°), pilt pöördub elavalt
+  CSS-transformiga; vaba kärpe-ristkülik *pööratud* pildil. "Rakenda" → `POST .../transform`.
+- **Poolita** — lõikejoone-drag (praegune `SplitPageModal` loogika). "Rakenda" →
+  `POST .../split`.
+
+**Navigeerimine (mõlemas režiimis):**
+- ← → noole-nupud päises + klaviatuuri `ArrowLeft`/`ArrowRight`.
+- Modaal saab propsiks **kogu järjestatud lehtede nimekirja** (`pages`) + jooksva indeksi.
+  Pilt, token ja lehe number tulevad nimekirjast.
+- Navigeerimine lähtestab parajasti pooleli oleva (rakendamata) teisenduse — iga leht
+  algab puhtalt lehelt (nurk 0, kärbe puudub). Kui kasutajal on rakendamata muudatus,
+  küsi kinnitust enne lahkumist (lihtne `confirm` või "rakendamata muudatused" hoiatus).
+- Päises lehe-loendur "Leht X / N".
+
+**Salvestamine + auto-edasi (batch-töövoo tuum):**
+- "Rakenda" **ei sulge modaali**. Edukal toimingul liigub modaal automaatselt **järgmise
+  päris-skänni juurde** (vt nimekirja-sünk allpool).
+- Kinnituse-samm säilib poolitamisel ja teisendusel ("vana pilt säilib prügikastis 90
+  päeva; tekst ja metaandmed jäävad muutmata"). Batch-monotoonsuse vältimiseks kaalu
+  "ära küsi uuesti selles seansis" linnukest (täpsustatakse implementatsioonis).
+
+**Props:** `workId`, `pages` (järjestatud), `initialIndex`, `imageTokenLookup`/`imageToken`,
+`onClose`, `onPagesChanged` (kutsutakse pärast iga mutatsiooni, et `WorkManage` laeks
+nimekirja uuesti).
+
+### 3a. Nimekirja-sünk pärast mutatsiooni (kriitiline)
+
+Crop/rotate ja poolitamine käituvad nimekirja suhtes erinevalt — modaal peab end
+**failinime järgi** positsioneerima, mitte jäiga indeksi järgi:
+
+- **Crop/rotate** — lehtede arv ei muutu, failinimi säilib. "Järgmine" = praeguse järel
+  olev leht nimekirjas.
+- **Poolitamine** — originaalfail kustub, asemele kaks uut nanoid-faili; arv kasvab.
+
+**Ühtne ankur-reegel:** enne "Rakenda" jäta meelde **järgmise lehe failinimi**
+(praegusele järgnev). Pärast `onPagesChanged` → uus `pages` jõuab propsina tagasi → leia
+selle ankur-failinime indeks → liigu sinna. Poolitamisel hüppab see õigesti üle mõlema uue
+poole järgmise päris-skänni juurde; crop/rotate'il viib lihtsalt +1 võrra edasi. Kui
+praegune oli viimane leht, jää viimasele (või sulge) ja näita "viimane leht".
 
 ### 4. Frontend: `WorkManage.tsx` integratsioon — overflow-menüü
 
@@ -110,25 +149,26 @@ asemel **koondatakse kõik lehe-toimingud ühte overflow-menüüsse:**
 - Klõps avab popover-menüü toimingutega (ikoon + tekst igal real):
   - **Lae alla** (`Download`) — säilib `<a download>` linkina (sama token-URL loogika).
   - **Asenda pilt** (`Upload`) — käivitab peidetud failisisendi (`replaceInputRef`).
-  - **Crop / pööra** (`Crop` v `Frame`) — avab `ImageEditModal`.
-  - **Lõika leht kaheks** (`Scissors`) — avab `SplitPageModal`.
+  - **Pööra / kärbi** (`Crop` v `Frame`) — avab `PageImageEditorModal` selle lehe indeksil,
+    "Pööra & kärbi" tabil.
+  - **Lõika leht kaheks** (`Scissors`) — avab sama `PageImageEditorModal`, "Poolita" tabil.
 - **Kustuta** jääb eraldi üleval-paremas nurgas (`Trash2`), **lehe nr/staatus** üleval-vasakul
   — destruktiivseim tegevus eraldi, ei peitu menüüsse.
 - Menüü sulgub väljaklõpsul (outside-click handler) ja toimingu valikul. Korraga avatud
   ainult ühe lehe menüü (`openMenuPage: number | null` state).
-- `ImageEditModal.onSuccess` → sama värskendus nagu poolitamisel (thumbnaili cache-bust,
-  lehtede uuesti laadimine).
+- `onPagesChanged` → sama värskendus nagu praegu poolitamisel (thumbnaili cache-bust,
+  `loadPages`).
 
 ## Andmevoog
 
 ```
-ImageEditModal (klient)
-  → kasutaja pöörab + joonistab kärpe → { angle, crop }
-  → POST /admin/work/{id}/page/{n}/transform
-    → transform_page_image()
-       → Pillow: exif_transpose → rotate(expand) → crop → JPEG q95 üle sama faili
+PageImageEditorModal (klient) — jääb avatuks üle lehtede
+  ┌─ Pööra & kärbi → { angle, crop } → POST /admin/work/{id}/page/{n}/transform
+  └─ Poolita       → { split_x }     → POST /admin/work/{id}/page/{n}/split
+       → server (Pillow): exif_transpose → rotate(expand)/crop VÕI split
        → vana pilt prügikasti, thumbnail regen, log, meili sync
-  → onSuccess → WorkManage värskendab thumbnaili (cache-bust)
+  → onPagesChanged → WorkManage laeb pages uuesti → propsina tagasi
+  → modaal positsioneerib end ankur-failinime järgi → JÄRGMINE leht (ei sulgu)
 ```
 
 ## Pöördumatusele kindel
@@ -149,12 +189,18 @@ asendamine, kustutamine on kõik admin-only).
   deskew + `expand=True` säilitab sisu; crop normaliseeritud koordinaadid → õiged pikslid;
   vana pilt jõuab prügikasti; thumbnail regenereeritakse; tekst/JSON/sequence puutumata;
   veapiir (puuduv leht → 404, vigane crop → 400, no-op).
-- Frontend: modaali interaktsioon (pööre + kärbe → õige `{angle, crop}` payload);
-  kinnituse-samm; `onSuccess` värskendab thumbnaili.
+- Frontend: modaali interaktsioon (pööre + kärbe → õige `{angle, crop}` payload;
+  poolitamine → `{split_x}`); kinnituse-samm; tabide vahetus.
+- Frontend navigeerimine (kõige olulisem uus loogika): ← → liigutab lehte; **ankur-reegel**
+  — pärast poolitamist hüppab üle mõlema uue poole järgmise päris-skänni juurde; pärast
+  crop/rotate'i liigub +1; viimasel lehel ei lähe üle piiri; rakendamata muudatuse hoiatus
+  enne navigeerimist.
 
 ## Skoobist väljas (YAGNI)
 
-- Bulk-toimingud (per-page funktsioon jääb bulk-sõbralikuks, aga ei ehita).
+- Bulk-toimingud (per-page funktsioon jääb bulk-sõbralikuks, aga ei ehita) — terve
+  dokumendi läbitöötlemine lahendatakse hoopis navigeeritava modaaliga (üks leht korraga,
+  aga sujuvalt järjest), mitte ühe massipäringuga.
 - Mittedestruktiivne (parameetrite) ajalugu — säilitame ainult viimase varundatud pildi
   prügikastis, mitte teisenduste ahelat.
 - Perspektiivi-/trapets-korrektsioon (ainult pööre + ristkülik-kärbe).
