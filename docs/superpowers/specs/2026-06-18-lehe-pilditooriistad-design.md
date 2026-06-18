@@ -100,11 +100,24 @@ Uus kombineeritud modaal (eraldi `SplitPageModal`-ist, sest semantika erineb).
 - Props sarnased `SplitPageModal`-ile: `workId`, `pageNum`, `imageFilename`,
   `imageToken`, `onClose`, `onSuccess`.
 
-### 4. Frontend: `WorkManage.tsx` integratsioon
+### 4. Frontend: `WorkManage.tsx` integratsioon — overflow-menüü
 
-Lehe-real uus nupp (Crop-ikoon, lucide-react) `Lõika leht kaheks` (Scissors) nupu kõrvale.
-Avab `ImageEditModal`. `onSuccess` → sama värskendus nagu poolitamisel (thumbnaili
-cache-bust, lehtede uuesti laadimine).
+Praegu on pisipildi alumises servas `justify-between` 3 nuppu laiali (Lae alla · Asenda ·
+Poolita). Crop oleks 4. nupp → läheb tihedaks (eriti 5-veerulises ruudustikus). Selle
+asemel **koondatakse kõik lehe-toimingud ühte overflow-menüüsse:**
+
+- Pisipildi alumises-paremas nurgas üks `⋮` nupp (`MoreVertical`, lucide-react).
+- Klõps avab popover-menüü toimingutega (ikoon + tekst igal real):
+  - **Lae alla** (`Download`) — säilib `<a download>` linkina (sama token-URL loogika).
+  - **Asenda pilt** (`Upload`) — käivitab peidetud failisisendi (`replaceInputRef`).
+  - **Crop / pööra** (`Crop` v `Frame`) — avab `ImageEditModal`.
+  - **Lõika leht kaheks** (`Scissors`) — avab `SplitPageModal`.
+- **Kustuta** jääb eraldi üleval-paremas nurgas (`Trash2`), **lehe nr/staatus** üleval-vasakul
+  — destruktiivseim tegevus eraldi, ei peitu menüüsse.
+- Menüü sulgub väljaklõpsul (outside-click handler) ja toimingu valikul. Korraga avatud
+  ainult ühe lehe menüü (`openMenuPage: number | null` state).
+- `ImageEditModal.onSuccess` → sama värskendus nagu poolitamisel (thumbnaili cache-bust,
+  lehtede uuesti laadimine).
 
 ## Andmevoog
 
