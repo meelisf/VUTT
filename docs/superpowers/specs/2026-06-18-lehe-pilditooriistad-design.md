@@ -56,8 +56,11 @@ Uus per-page funktsioon.
 - `username: str`
 
 **Loogika (kindel, varundus-enne-muutust järjekord — arvustuse parandus):**
-1. **Valideeri sisend ja leia fail.** `find_directory_by_id` → kaust; kontrolli, et
-   `filename` kuulub teosesse (`get_sorted_images`). Puuduv → 404.
+1. **Valideeri sisend ja leia fail (sh path-traversal kaitse — arvustuse turvapunkt).**
+   `find_directory_by_id` → kaust. **Lükka tagasi**, kui `filename` sisaldab `/` või `\`
+   või `os.path.basename(filename) != filename` (400). Seejärel kontrolli, et `filename`
+   kuulub **rangelt** selle teose `get_sorted_images` nimekirja → alles siis tee failisüsteemi
+   operatsioone. Puuduv/mittekuuluv → 404. (Nii `../../midagi` ei jõua kunagi FS-operatsioonini.)
 2. **No-op kaitse.** Kui `angle == 0` ja `crop is None` → ära puutu faili, tagasta
    `{"success": True, "changed": False, "reason": "no_transform"}`. (Frontend ei tohiks
    sellist päringut üldse saata — see on kaitse.) Valideeri `crop` ∈ [0,1], `w,h > 0` ja
@@ -65,7 +68,10 @@ Uus per-page funktsioon.
 3. **Varunda ENNE muutmist.** Kopeeri praegune fail prügikasti
    `._trash/{work_id}/replaced_images/{base}_{timestamp}{ext}`. **Lisaks** kirjuta pristine
    originaal **üks kord** `._originals/{work_id}/{filename}` (ainult kui veel ei eksisteeri)
-   — vt all "Kumulatiivse kvaliteedikao märkus".
+   — vt all "Kumulatiivse kvaliteedikao märkus". **NB (arvustuse punkt):** originals-koopia
+   tehakse **enne** `exif_transpose`-i (100% muutumatu fail), seega see sisaldab veel algseid
+   EXIF-orientatsiooni andmeid. Tulevane "Reset originaalist" peab originaalile **uuesti
+   rakendama `exif_transpose`-i** enne kuvamist/kasutamist.
 4. **Ava pilt → `ImageOps.exif_transpose(raw)`** (rakenda EXIF orientatsioon pikslitele).
 5. **Värviruum.** Kui väljundformaat on JPEG ja pilt on `RGBA`/`LA`/`P` → lapenda valgele
    taustale / `convert("RGB")` (vajalik nii `fillcolor` kui JPEG-salvestuse jaoks).
@@ -75,6 +81,10 @@ Uus per-page funktsioon.
 7. **Crop pööratud pildi mõõtmetest.** `W,H = img.size` (pärast pööret); pikslid
    `(x*W, y*H, (x+w)*W, (y+h)*H)`, klampi piiridesse, `img.crop(...)`.
 8. **Salvesta ajutisse faili** (`{filename}.tmp`) **lähtefaili formaadis** (vt all).
+   **NB (arvustuse punkt):** tmp-fail tuleb kirjutada **täpselt samasse kausta**, kus on
+   originaalpilt — mitte `/tmp`-i — muidu võib `os.replace` visata `EXDEV` (cross-device
+   link), kui temp asub teisel mount-point'il. Samas kaustas on `os.replace` garanteeritult
+   atomaarne.
 9. **Atomaarne asendus** `os.replace(tmp, orig)` — väldib pooliku faili nähtavust.
 10. **Regenereeri thumbnail** (`_thumbs/_thumb_{filename}`).
 11. **Logi** `transform_image.log` (struktureeritud): timestamp, user, work_id, filename,
@@ -139,6 +149,8 @@ valest baasist, lõikab server *mujalt* kui kasutaja nägi. Nõue:
 - Frontend renderdab pööratud pildi **expand'itud bounding-box'i** (sama valem kui Pillow
   `rotate(expand=True)`: `W' = |W·cos θ| + |H·sin θ|`, `H' = |W·sin θ| + |H·cos θ|`) ja
   joonistab kärpe **selle** kasti suhtes, mitte algse pildi suhtes.
+  **NB (arvustuse punkt):** JS `Math.cos/sin` ootavad **radiaane** — teisenda
+  `θ_rad = θ_deg × π/180` enne valemisse andmist (kraadid → radiaanid).
 - Crop saadetakse **normaliseeritud pööratud-pildi koordinaatides** (`x,y,w,h ∈ [0,1]`
   pööratud W'×H' suhtes). Server rakendab pööret esimesena, siis kärpe samadest
   normaliseeritud väärtustest → identne tulemus.
@@ -183,8 +195,15 @@ Crop/rotate ja poolitamine käituvad nimekirja suhtes erinevalt — modaal peab 
 **Ühtne ankur-reegel:** enne "Rakenda" jäta meelde **järgmise lehe failinimi**
 (praegusele järgnev). Pärast `onPagesChanged` → uus `pages` jõuab propsina tagasi → leia
 selle ankur-failinime indeks → liigu sinna. Poolitamisel hüppab see õigesti üle mõlema uue
-poole järgmise päris-skänni juurde; crop/rotate'il viib lihtsalt +1 võrra edasi. Kui
-praegune oli viimane leht, jää viimasele (või sulge) ja näita "viimane leht".
+poole järgmise päris-skänni juurde; crop/rotate'il viib lihtsalt +1 võrra edasi.
+
+**Servajuht — viimane leht (arvustuse punkt):** kui praegune leht oli dokumendi viimane,
+järgmist failinime ei eksisteeri. Siis:
+- **Poolitamisel** positsioneeri end kahe uue poole **esimesele** (need on uued viimased
+  lehed; saab kohe tulemust kontrollida — haakub split-toasti "vaata uusi pooli" loogikaga).
+- **Crop/rotate'il** jää samale (nüüd töödeldud) lehele ja näita selget teadet
+  **"Kõik lehed läbi töödeldud"** + luba modaal mugavalt sulgeda. Fallback ankur, kui
+  vaja: eelmise lehe failinimi.
 
 ### 4. Frontend: `WorkManage.tsx` integratsioon — overflow-menüü
 
