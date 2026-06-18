@@ -61,10 +61,11 @@ Uus per-page funktsioon.
    või `os.path.basename(filename) != filename` (400). Seejärel kontrolli, et `filename`
    kuulub **rangelt** selle teose `get_sorted_images` nimekirja → alles siis tee failisüsteemi
    operatsioone. Puuduv/mittekuuluv → 404. (Nii `../../midagi` ei jõua kunagi FS-operatsioonini.)
-2. **No-op kaitse.** Kui `angle == 0` ja `crop is None` → ära puutu faili, tagasta
-   `{"success": True, "changed": False, "reason": "no_transform"}`. (Frontend ei tohiks
-   sellist päringut üldse saata — see on kaitse.) Valideeri `crop` ∈ [0,1], `w,h > 0` ja
-   tulemus ≥ minimaalne suurus (nt 8×8 px) → muidu 400.
+2. **No-op kaitse (float-tolerantsiga — arvustuse punkt).** Kui `abs(angle) < 1e-4` JA
+   `crop is None` → ära puutu faili, tagasta
+   `{"success": True, "changed": False, "reason": "no_transform"}`. (Range `angle == 0`
+   laseks sliderist tulnud `0.0000000003` mõttetu rekodeerimise teha.) Frontend ei tohiks
+   sellist päringut üldse saata — see on kaitse. Valideeri `crop` ∈ [0,1], `w,h > 0`.
 3. **Varunda ENNE muutmist.** Kopeeri praegune fail prügikasti
    `._trash/{work_id}/replaced_images/{base}_{timestamp}{ext}`. **Lisaks** kirjuta pristine
    originaal **üks kord** `._originals/{work_id}/{filename}` (ainult kui veel ei eksisteeri)
@@ -78,19 +79,32 @@ Uus per-page funktsioon.
 6. **Pööre** sama matemaatikaga, mida frontend preview kasutab (vt §3 par-nõue):
    `img.rotate(SIGN*angle, expand=True, fillcolor=valge)`. `expand=True` säilitab nurgad.
    **Märgi konventsioon lukustatakse aktseptantsitestiga** (§Testimine).
-7. **Crop pööratud pildi mõõtmetest.** `W,H = img.size` (pärast pööret); pikslid
-   `(x*W, y*H, (x+w)*W, (y+h)*H)`, klampi piiridesse, `img.crop(...)`.
+7. **Crop pööratud pildi mõõtmetest (min-suurus PÄRAST klampimist — arvustuse punkt).**
+   `W,H = img.size` (pärast pööret); pikslid `(x*W, y*H, (x+w)*W, (y+h)*H)`, klampi
+   piiridesse. **Alles siis** kontrolli lõplikku suurust: `right-left >= 8` JA
+   `bottom-top >= 8` → muidu 400. (Normaliseeritud `w,h` võivad tunduda kehtivad, aga
+   pärast klampimist jääda sisuliselt tühjaks.) `img.crop(...)`.
 8. **Salvesta ajutisse faili** (`{filename}.tmp`) **lähtefaili formaadis** (vt all).
    **NB (arvustuse punkt):** tmp-fail tuleb kirjutada **täpselt samasse kausta**, kus on
    originaalpilt — mitte `/tmp`-i — muidu võib `os.replace` visata `EXDEV` (cross-device
    link), kui temp asub teisel mount-point'il. Samas kaustas on `os.replace` garanteeritult
    atomaarne.
 9. **Atomaarne asendus** `os.replace(tmp, orig)` — väldib pooliku faili nähtavust.
-10. **Regenereeri thumbnail** (`_thumbs/_thumb_{filename}`).
+10. **Regenereeri thumbnail** (`_thumbs/_thumb_{filename}`). **Vea-poliitika (arvustuse
+    punkt):** kui `os.replace` õnnestus, aga thumbnaili regenereerimine ebaõnnestub, **EI
+    rollback'ita** pildimuutust (pilt on juba korrektselt asendatud; täis-rollback pärast
+    edukat replace'i oleks habras). Tagasta `thumbnail_warning: True`; frontend näitab
+    hoiatust ja lubab thumbnaili hiljem uuesti genereerida. (Backend võib enne loobumist
+    proovida regenereerimist 1× uuesti.)
 11. **Logi** `transform_image.log` (struktureeritud): timestamp, user, work_id, filename,
     angle, crop, varukoopia tee, vana mõõt → uus mõõt.
-12. `sync_work_to_meilisearch(folder_name)`.
-13. Tagasta `{"success": True, "changed": True, "filename": filename, "size": [W,H]}`.
+12. **Meilisearch: sync EI ole vajalik (arvustuse punkt).** Transform ei muuda midagi,
+    mida Meili indekseerib — failinimi, lehtede arv, tekst, JSON ja `sequence` jäävad samaks
+    (muutub ainult pildi pikslisisu + thumbnail). Seega **jäta `sync_work_to_meilisearch`
+    vahele** — see kiirendab 20-lehelist batch'i oluliselt. (Erinevus poolitamisest, mis
+    muudab failinimesid ja teksti → seal sync jääb.)
+13. Tagasta `{"success": True, "changed": True, "filename": filename, "size": [W,H],
+    "thumbnail_warning": <bool>}`.
 
 **Väljundformaat (arvustuse punkt: PNG/värviruum).** Säilita lähtefaili konteiner:
 `.jpg/.jpeg` → JPEG q95 (`convert("RGB")` enne); `.png` → PNG (kadudeta, väldib
@@ -99,11 +113,27 @@ kumulatiivset kadu nendel failidel). Failinimi ei muutu kunagi → lehe identite
 
 **Kumulatiivse kvaliteedikao märkus (arvustuse punkt).** JPEG-lehe iga transform
 dekodeerib + rekodeerib → see **EI OLE mitte-destruktiivne töövoog**, q95 kaod kuhjuvad
-mitme järjestikuse teisenduse korral. Leevendus: (a) pristine originaal säilib **üks kord**
-`._originals/{work_id}/{filename}` all, nii et algne skänn on alati puhtalt taastatav;
-(b) iga toimingu eelne versioon säilib prügikastis (undo-last). Teisendus rakendub siiski
-alati **praegusele** failile (inkrementaalne) — täielikku "rakenda originaalist uuesti"
-ahelat me YAGNI tõttu ei ehita.
+mitme järjestikuse teisenduse korral. Leevendus: (a) säilib **konkreetse lehefaili esimene
+transform-eelne versioon** `._originals/{work_id}/{filename}` all; (b) iga toimingu eelne
+versioon säilib prügikastis (undo-last). Teisendus rakendub siiski alati **praegusele**
+failile (inkrementaalne) — täielikku "rakenda originaalist uuesti" ahelat me YAGNI tõttu
+ei ehita.
+
+**`._originals` täpne tähendus (arvustuse punkt 1).** See on **konkreetse lehefaili esimene
+transform-eelne versioon — MITTE tingimata teose esmane arhiiviskänn.** Kui leht tekkis
+poolitamisest/asendamisest, on `._originals` selle lehefaili algolek, mitte algne import.
+
+**Koostoime `replace-image`-iga (arvustuse punkt 2 — loogikaauk).** Stsenaarium: leht
+transformitakse (`._originals` tekib) → kasutaja teeb sama failinime all "Asenda pilt" →
+uus transform. Vana `._originals` ei kirjutataks üle → "reset originaalist" taastaks
+**enne asendamist** olnud pildi (vale). **Lahendus:** `replace-image` endpoint peab vastava
+`._originals/{work_id}/{filename}` kirje **kustutama** (või arhiveerima), sest asendatud
+pilt on selle lehe uus pristine algolek; järgmine transform loob siis uue `._originals`.
+(See nõuab olemasoleva `replace-image` endpointi väikest muudatust.)
+
+**Orvuks jäänud `._originals` (väike koristus).** Poolitamine/kustutamine kaotab
+originaalfaili → tema `._originals` kirje jääb orvuks (kahjutu kettajääk). Võib hiljem
+koristada; ei blokeeri midagi.
 
 **Git:** pildid ei ole git-tracked → commiti pole vaja (nagu `split_page` piltidega).
 `._originals/` ja `._trash/` asuvad väljaspool teose kausta → `get_sorted_images` neid ei
@@ -159,6 +189,10 @@ valest baasist, lõikab server *mujalt* kui kasutaja nägi. Nõue:
 
 **Navigeerimine (mõlemas režiimis):**
 - ← → noole-nupud päises + klaviatuuri `ArrowLeft`/`ArrowRight`.
+- **Klahvi-kaitse (arvustuse punkt 8):** nooleklahvid navigeerivad **ainult siis, kui fookus
+  ei ole interaktiivsel kontrollil** (deskew-slider, number-input, kärpe-handle). Muidu
+  sliderist/inputist tulev ←→ ei tohi ootamatult lehte vahetada. (Kontrolli
+  `document.activeElement` / `e.target` tüüpi enne navigeerimist.)
 - Modaal saab propsiks **kogu järjestatud lehtede nimekirja** (`pages`) + jooksva indeksi.
   Pilt, token ja lehe number tulevad nimekirjast.
 - Navigeerimine lähtestab parajasti pooleli oleva (rakendamata) teisenduse — iga leht
@@ -232,7 +266,8 @@ PageImageEditorModal (klient) — jääb avatuks üle lehtede
   ┌─ Pööra & kärbi → { angle, crop } → POST /admin/work/{id}/page-image/{filename}/transform
   └─ Poolita       → { split_x }     → POST /admin/work/{id}/page/{n}/split  (n viimasest pages-st)
        → server: VARUNDA enne (trash + esmane originals) → Pillow exif→rotate(expand)→crop
-                 → ajutine fail → atomaarne os.replace → thumbnail regen → log → meili sync
+                 → tmp samas kaustas → atomaarne os.replace → thumbnail regen → log
+                 (transform EI sünki Meilit; split sünkib, sest failinimi+tekst muutuvad)
   → onPagesChanged → WorkManage laeb pages uuesti → propsina tagasi
   → modaal positsioneerib end ankur-failinime järgi → JÄRGMINE leht (ei sulgu)
 ```
@@ -263,9 +298,16 @@ asendamine, kustutamine on kõik admin-only).
   veapiir (puuduv fail → 404, vigane crop / liiga väike → 400, **no-op → `changed:False`**).
 - **Aktseptantsitest — preview ↔ server geomeetria (arvustuse kõige tähtsam):** sama
   `(angle, crop)` rakendatuna frontend preview valemiga ja serveri Pillow'ga annab
-  **sama bounding-box'i ja sama kärbitud ala**; **pöördenurga märk lukku** (+2° UI-s ⇒ pööre
-  samas suunas kui server) — sünteetiline test markeriga pildil (nt must ruut teadaolevas
-  nurgas → kontrolli, kuhu ta pärast pööret+kärbet satub).
+  **sama bounding-box'i ja sama kärbitud ala ±1–2 px tolerantsiga** (Pillow rotate teeb
+  ümardusi/filtreerib — matemaatiline ideaal ei lange pikslitäpselt kokku); **pöördenurga
+  märk lukku** (+2° UI-s ⇒ pööre samas suunas kui server) — sünteetiline test markeriga
+  pildil (nt must ruut teadaolevas nurgas → kontrolli, kuhu ta pärast pööret+kärbet satub).
+- **Replace-image + `._originals` (arvustuse loogikaauk):** test, et `replace-image`
+  kustutab/arhiveerib vastava `._originals` kirje → järgmine transform loob uue pristine
+  algoleku (mitte ei taasta enne asendamist olnud pilti).
+- **Thumbnaili-vea poliitika:** kui regen ebaõnnestub pärast edukat `os.replace`-i →
+  pilt jääb muudetuks, `thumbnail_warning: True`, mitte rollback.
+- **Frontend klahvi-kaitse:** ←→ ei vaheta lehte, kui fookus on slideril/inputil/handle'il.
 - Frontend: modaali interaktsioon (pööre + kärbe → õige `{angle, crop}` payload;
   poolitamine → `{split_x}`); kinnituse-samm; tabide vahetus.
 - Frontend navigeerimine (kõige olulisem uus loogika): ← → liigutab lehte; **ankur-reegel**
