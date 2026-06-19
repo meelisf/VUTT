@@ -93,6 +93,7 @@
     "replaceError": "Failed to replace image",
     "replaceSuccess": "Page {{num}} image replaced",
     "reorderTo": "→",
+    "reorderApply": "Apply (Enter)",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",
     "reorderError": "Failed to save page order",

@@ -93,6 +93,7 @@
     "replaceError": "Pildi asendamine ebaõnnestus",
     "replaceSuccess": "Leht {{num}} pilt asendatud",
     "reorderTo": "→",
+    "reorderApply": "Rakenda (Enter)",
     "reorderSave": "Salvesta järjekord",
     "reorderConfirm": "Oled kindel, et soovid lehekülgede järjekorda muuta?",
     "reorderError": "Järjekorra salvestamine ebaõnnestus",
