@@ -6,6 +6,7 @@ Eraldatud main.py-st parema testitavuse ja hallatavuse jaoks.
 import os
 import json
 import shutil
+from datetime import datetime
 from git import Actor
 from git.exc import GitCommandError
 from .config import BASE_DIR, get_logger
@@ -295,3 +296,125 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
 
     new_page_count = len(get_sorted_images(path))
     return {"success": True, "new_page_count": new_page_count}
+
+
+ANGLE_EPS = 1e-4   # alla selle nurka käsitleme nullina (float-müra slidersist)
+MIN_CROP_PX = 8    # minimaalne kärpe-mõõde pärast klampimist
+
+
+def _compute_crop_box(crop, w: int, h: int):
+    """Teisendab normaliseeritud kärpe (0–1) klampitud pikslikastiks (left,top,right,bottom).
+
+    Tagastab None kui crop puudub. Raise ValueError kui pärast klampimist liiga väike.
+    """
+    if crop is None:
+        return None
+    for k in ("x", "y", "w", "h"):
+        if k not in crop:
+            raise ValueError(f"crop väli '{k}' puudub")
+        if not (0.0 <= float(crop[k]) <= 1.0):
+            raise ValueError(f"crop '{k}' peab olema vahemikus [0,1]")
+    if float(crop["w"]) <= 0 or float(crop["h"]) <= 0:
+        raise ValueError("crop w,h peavad olema > 0")
+
+    left = max(0, min(w, int(round(float(crop["x"]) * w))))
+    top = max(0, min(h, int(round(float(crop["y"]) * h))))
+    right = max(0, min(w, int(round((float(crop["x"]) + float(crop["w"])) * w))))
+    bottom = max(0, min(h, int(round((float(crop["y"]) + float(crop["h"])) * h))))
+
+    if (right - left) < MIN_CROP_PX or (bottom - top) < MIN_CROP_PX:
+        raise ValueError("kärbe on pärast klampimist liiga väike")
+    return (left, top, right, bottom)
+
+
+def transform_page_image(work_id, filename, angle=0.0, crop=None, username="admin"):
+    """Pöörab ja/või kärbib lehepilti kohapeal (failinimi/tekst/JSON/sequence säilivad).
+
+    Varundab ENNE ülekirjutust (trash + esmane ._originals), kasutab atomaarset os.replace'i.
+    Tagastab no-op / changed / found:False sõnastiku; raise ValueError vigaste parameetrite korral.
+    """
+    angle = float(angle)
+
+    # No-op kaitse (float-tolerantsiga)
+    if abs(angle) < ANGLE_EPS and crop is None:
+        return {"success": True, "changed": False, "reason": "no_transform"}
+
+    # Path-traversal kaitse
+    if os.path.basename(filename) != filename or "/" in filename or "\\" in filename:
+        raise ValueError("vigane failinimi")
+
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+    if filename not in get_sorted_images(path):
+        return {"found": False}
+
+    img_path = os.path.join(path, filename)
+    base, ext = os.path.splitext(filename)
+    ext_l = ext.lower()
+
+    # 1) Varunda ENNE muutmist — trash
+    trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_images')
+    os.makedirs(trash_dir, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+    shutil.copy2(img_path, os.path.join(trash_dir, f"{base}_{timestamp}{ext}"))
+
+    # 2) Pristine originaal — ainult esimesel korral
+    orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
+    os.makedirs(orig_dir, exist_ok=True)
+    orig_backup = os.path.join(orig_dir, filename)
+    if not os.path.exists(orig_backup):
+        shutil.copy2(img_path, orig_backup)  # enne exif_transpose'i → 100% muutumatu
+
+    # 3) Teisendus Pillow'ga
+    from PIL import Image as PILImage, ImageOps
+    with PILImage.open(img_path) as raw:
+        img = ImageOps.exif_transpose(raw)
+        is_jpeg = ext_l in ('.jpg', '.jpeg')
+        if is_jpeg and img.mode in ('RGBA', 'LA', 'P'):
+            img = img.convert('RGB')
+        if abs(angle) >= ANGLE_EPS:
+            # CSS positiivne = päripäeva → Pillow vastupäeva → -angle
+            fill = (255, 255, 255) if img.mode == 'RGB' else 255
+            img = img.rotate(-angle, expand=True, fillcolor=fill)
+        box = _compute_crop_box(crop, img.width, img.height)
+        if box is not None:
+            img = img.crop(box)
+        out_w, out_h = img.size
+
+        # 4) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
+        tmp_path = img_path + '.tmp'
+        if is_jpeg:
+            img.save(tmp_path, "JPEG", quality=95)
+        else:
+            img.save(tmp_path, "PNG")
+    os.replace(tmp_path, img_path)
+    os.chmod(img_path, 0o644)
+
+    # 5) Regenereeri thumbnail — vea korral ei rollback'i
+    thumbnail_warning = False
+    try:
+        from .image_server import generate_thumbnail
+        thumbs_dir = os.path.join(path, '_thumbs')
+        os.makedirs(thumbs_dir, exist_ok=True)
+        thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
+        if os.path.exists(thumb_path):
+            os.remove(thumb_path)
+        generate_thumbnail(img_path, thumb_path)
+    except Exception as e:
+        logger.error(f"TRANSFORM: thumbnaili regen ebaõnnestus {filename}: {e}")
+        thumbnail_warning = True
+
+    # 6) Logi (struktureeritud). NB: Meilit EI sünki — failinimi/tekst/sequence ei muutu.
+    log_path = os.path.join(BASE_DIR, 'transform_image.log')
+    with open(log_path, 'a', encoding='utf-8') as lf:
+        lf.write(
+            f"{datetime.now().isoformat()} | {username} | {work_id} | {filename} | "
+            f"angle={angle} crop={crop} | -> {out_w}x{out_h}\n"
+        )
+
+    logger.info(f"TRANSFORM: {os.path.basename(path)}/{filename} ({username})")
+    return {
+        "success": True, "changed": True, "filename": filename,
+        "size": [out_w, out_h], "thumbnail_warning": thumbnail_warning,
+    }
