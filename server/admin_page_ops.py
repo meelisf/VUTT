@@ -418,3 +418,13 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, username="admi
         "success": True, "changed": True, "filename": filename,
         "size": [out_w, out_h], "thumbnail_warning": thumbnail_warning,
     }
+
+
+def clear_original_backup(work_id, filename):
+    """Kustutab pristine originaali (._originals) — kutsub replace-image, sest asendatud
+    pilt on lehe uus algolek (vt spec: replace-image ↔ originals loogikaauk)."""
+    if os.path.basename(filename) != filename or "/" in filename or "\\" in filename:
+        return
+    orig_backup = os.path.join(BASE_DIR, '._originals', work_id, filename)
+    if os.path.exists(orig_backup):
+        os.remove(orig_backup)

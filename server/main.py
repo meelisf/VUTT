@@ -45,7 +45,7 @@ from .cache import (
     get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page, transform_page_image
+from .admin_page_ops import clear_original_backup, get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page, transform_page_image
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
@@ -552,6 +552,9 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
     log_entry = f"{datetime.now().isoformat()} | {work_id} | {folder_name}/{img_name} | leht {page_num} | {user['username']}\n"
     with open(log_path, 'a', encoding='utf-8') as lf:
         lf.write(log_entry)
+
+    # Asendatud pilt on lehe uus pristine algolek → eemalda vana ._originals kirje
+    clear_original_backup(work_id, img_name)
 
     logger.info(f"REPLACE-IMG: {folder_name}/{img_name} asendatud ({user['username']})")
     sync_work_to_meilisearch(folder_name)

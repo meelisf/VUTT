@@ -84,6 +84,22 @@ def test_transform_path_traversal_rejected(tf_work):
         transform_page_image(tf_work["work_id"], "../secret.jpg", angle=90.0)
 
 
+def test_clear_original_backup_removes_pristine(tf_work):
+    """Pärast transform'i tekib ._originals; clear_original_backup eemaldab selle."""
+    from server.admin_page_ops import transform_page_image, clear_original_backup
+    transform_page_image(tf_work["work_id"], tf_work["filename"], angle=90.0, username="admin")
+    orig = tf_work["folder"].parent / "._originals" / tf_work["work_id"] / tf_work["filename"]
+    assert orig.exists()
+    clear_original_backup(tf_work["work_id"], tf_work["filename"])
+    assert not orig.exists()
+
+
+def test_clear_original_backup_ignores_traversal(tf_work):
+    from server.admin_page_ops import clear_original_backup
+    # Ei tohi visata ega midagi kustutada
+    clear_original_backup(tf_work["work_id"], "../../etc/passwd")
+
+
 def test_transform_endpoint_401_no_auth(backend_env):
     r = backend_env["client"].post("/admin/work/w1/page-image/a.jpg/transform", json={"angle": 90})
     assert r.status_code == 401
