@@ -82,3 +82,52 @@ def test_transform_path_traversal_rejected(tf_work):
     from server.admin_page_ops import transform_page_image
     with pytest.raises(ValueError):
         transform_page_image(tf_work["work_id"], "../secret.jpg", angle=90.0)
+
+
+def test_transform_endpoint_401_no_auth(backend_env):
+    r = backend_env["client"].post("/admin/work/w1/page-image/a.jpg/transform", json={"angle": 90})
+    assert r.status_code == 401
+
+
+def test_transform_endpoint_400_bad_crop(backend_env, login, monkeypatch):
+    import server.main as main
+
+    def _raise(*a, **kw):
+        raise ValueError("kärbe liiga väike")
+    monkeypatch.setattr(main, "transform_page_image", _raise)
+
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/w1/page-image/a.jpg/transform",
+        json={"angle": 0, "crop": {"x": 0, "y": 0, "w": 0.001, "h": 1}},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 400
+
+
+def test_transform_endpoint_404_unknown(backend_env, login, monkeypatch):
+    import server.main as main
+    monkeypatch.setattr(main, "transform_page_image", lambda *a, **kw: {"found": False})
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/x/page-image/a.jpg/transform",
+        json={"angle": 90},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 404
+
+
+def test_transform_endpoint_200(backend_env, login, monkeypatch):
+    import server.main as main
+    monkeypatch.setattr(
+        main, "transform_page_image",
+        lambda *a, **kw: {"success": True, "changed": True, "filename": "a.jpg", "size": [100, 200], "thumbnail_warning": False},
+    )
+    token = login("admin", "adminpass")
+    r = backend_env["client"].post(
+        "/admin/work/w1/page-image/a.jpg/transform",
+        json={"angle": 90, "crop": None},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    assert r.json()["changed"] is True
