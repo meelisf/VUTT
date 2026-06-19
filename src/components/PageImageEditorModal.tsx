@@ -7,6 +7,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { transformPageImage, CropRect } from '../services/pageService';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
+import { resizeBox, moveBox, CropHandle, Box } from '../utils/cropBoxInteraction';
 
 interface PageInfo {
   filename: string;
@@ -49,7 +50,13 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   // Kärpe-lohistuse ajutine olek (display-pikslites)
   const [cropDraft, setCropDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  const draggingCrop = useRef(false);
+  // Aktiivne interaktsioon: uue joonistamine, liigutamine või sangaga muutmine
+  const interaction = useRef<
+    | { mode: 'draw' }
+    | { mode: 'move'; startX: number; startY: number; startRect: Box }
+    | { mode: 'resize'; handle: CropHandle; startRect: Box }
+    | null
+  >(null);
   const draggingSplit = useRef(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const splitContainerRef = useRef<HTMLDivElement>(null);
@@ -95,32 +102,67 @@ const PageImageEditorModal: React.FC<Props> = ({
     };
   };
 
+  // cropRect (normaliseeritud) ↔ display-pikslite kast
+  const rectToPx = (r: CropRect): Box => ({
+    left: r.x * displayW, top: r.y * displayH, width: r.w * displayW, height: r.h * displayH,
+  });
+  const pxToRect = (b: Box): CropRect => ({
+    x: b.left / displayW, y: b.top / displayH, w: b.width / displayW, h: b.height / displayH,
+  });
+
   const onCropDown = (e: React.MouseEvent) => {
     if (!imgNatural) return;
     e.preventDefault();
-    draggingCrop.current = true;
     const p = localPoint(e);
-    setCropDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
-  };
-  const onCropMove = (e: React.MouseEvent) => {
-    if (!draggingCrop.current || !cropDraft) return;
-    const p = localPoint(e);
-    setCropDraft({ ...cropDraft, x1: p.x, y1: p.y });
-  };
-  const onCropUp = () => {
-    draggingCrop.current = false;
-    if (!cropDraft) return;
-    const left = Math.min(cropDraft.x0, cropDraft.x1);
-    const top = Math.min(cropDraft.y0, cropDraft.y1);
-    const w = Math.abs(cropDraft.x1 - cropDraft.x0);
-    const h = Math.abs(cropDraft.y1 - cropDraft.y0);
-    setCropDraft(null);
-    if (w < MIN_DRAG_PX || h < MIN_DRAG_PX) {
-      setCropRect(null);
+    const handle = (e.target as HTMLElement).dataset.handle as CropHandle | undefined;
+
+    // 1) Sang → resize
+    if (handle && cropRect) {
+      interaction.current = { mode: 'resize', handle, startRect: rectToPx(cropRect) };
       return;
     }
-    // Normaliseeri pööratud-pildi (display-box) koordinaatides
-    setCropRect({ x: left / displayW, y: top / displayH, w: w / displayW, h: h / displayH });
+    // 2) Olemasoleva kasti sisemus → move
+    if (cropRect) {
+      const b = rectToPx(cropRect);
+      if (p.x >= b.left && p.x <= b.left + b.width && p.y >= b.top && p.y <= b.top + b.height) {
+        interaction.current = { mode: 'move', startX: p.x, startY: p.y, startRect: b };
+        return;
+      }
+    }
+    // 3) Muidu → joonista uus
+    interaction.current = { mode: 'draw' };
+    setCropDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+  };
+
+  const onCropMove = (e: React.MouseEvent) => {
+    const it = interaction.current;
+    if (!it) return;
+    const p = localPoint(e);
+    if (it.mode === 'draw') {
+      setCropDraft((d) => (d ? { ...d, x1: p.x, y1: p.y } : d));
+    } else if (it.mode === 'move') {
+      setCropRect(pxToRect(moveBox(it.startRect, p.x - it.startX, p.y - it.startY, { w: displayW, h: displayH })));
+    } else {
+      setCropRect(pxToRect(resizeBox(it.startRect, it.handle, p.x, p.y, { w: displayW, h: displayH }, MIN_DRAG_PX)));
+    }
+  };
+
+  const onCropUp = () => {
+    const it = interaction.current;
+    interaction.current = null;
+    if (it?.mode === 'draw' && cropDraft) {
+      const left = Math.min(cropDraft.x0, cropDraft.x1);
+      const top = Math.min(cropDraft.y0, cropDraft.y1);
+      const w = Math.abs(cropDraft.x1 - cropDraft.x0);
+      const h = Math.abs(cropDraft.y1 - cropDraft.y0);
+      setCropDraft(null);
+      if (w < MIN_DRAG_PX || h < MIN_DRAG_PX) {
+        setCropRect(null);
+        return;
+      }
+      // Normaliseeri pööratud-pildi (display-box) koordinaatides
+      setCropRect({ x: left / displayW, y: top / displayH, w: w / displayW, h: h / displayH });
+    }
   };
 
   // Pööramisel kärbe ei kehti enam (ristkülik joonistati teise bbox-i kohta)
@@ -128,10 +170,11 @@ const PageImageEditorModal: React.FC<Props> = ({
     setAngle((a) => ((a + delta) % 360 + 360) % 360);
     setCropRect(null);
     setCropDraft(null);
+    interaction.current = null;
   };
 
   // Kuvatav kärpe-ristkülik (kas lohistuse ajal või kinnitatud)
-  const cropOverlayBox = (() => {
+  const cropOverlayBox: Box | null = (() => {
     if (cropDraft) {
       return {
         left: Math.min(cropDraft.x0, cropDraft.x1),
@@ -140,16 +183,21 @@ const PageImageEditorModal: React.FC<Props> = ({
         height: Math.abs(cropDraft.y1 - cropDraft.y0),
       };
     }
-    if (cropRect) {
-      return {
-        left: cropRect.x * displayW,
-        top: cropRect.y * displayH,
-        width: cropRect.w * displayW,
-        height: cropRect.h * displayH,
-      };
-    }
+    if (cropRect) return rectToPx(cropRect);
     return null;
   })();
+
+  // 8 sanga: nurgad + servad. cursor klassiga.
+  const CROP_HANDLES: { id: CropHandle; style: React.CSSProperties; cursor: string }[] = [
+    { id: 'nw', style: { left: 0, top: 0 }, cursor: 'nwse-resize' },
+    { id: 'n', style: { left: '50%', top: 0 }, cursor: 'ns-resize' },
+    { id: 'ne', style: { left: '100%', top: 0 }, cursor: 'nesw-resize' },
+    { id: 'e', style: { left: '100%', top: '50%' }, cursor: 'ew-resize' },
+    { id: 'se', style: { left: '100%', top: '100%' }, cursor: 'nwse-resize' },
+    { id: 's', style: { left: '50%', top: '100%' }, cursor: 'ns-resize' },
+    { id: 'sw', style: { left: 0, top: '100%' }, cursor: 'nesw-resize' },
+    { id: 'w', style: { left: 0, top: '50%' }, cursor: 'ew-resize' },
+  ];
 
   // --- Split-lohistus (split-tab) ---
   const updateSplitX = useCallback((clientX: number) => {
@@ -345,17 +393,25 @@ const PageImageEditorModal: React.FC<Props> = ({
                   onMouseLeave={onCropUp}
                 >
                   {cropOverlayBox && (
-                    <>
-                      <div className="absolute inset-0 bg-black/30 pointer-events-none" />
-                      <div
-                        className="absolute border-2 border-indigo-500 bg-transparent shadow-[0_0_0_9999px_rgba(0,0,0,0.0)] pointer-events-none"
-                        style={{
-                          left: cropOverlayBox.left, top: cropOverlayBox.top,
-                          width: cropOverlayBox.width, height: cropOverlayBox.height,
-                          boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
-                        }}
-                      />
-                    </>
+                    <div
+                      className="absolute border-2 border-indigo-500"
+                      style={{
+                        left: cropOverlayBox.left, top: cropOverlayBox.top,
+                        width: cropOverlayBox.width, height: cropOverlayBox.height,
+                        boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
+                        cursor: 'move',
+                      }}
+                    >
+                      {/* Resize-sangad (ainult kinnitatud kastil, mitte joonistamise ajal) */}
+                      {!cropDraft && CROP_HANDLES.map((hh) => (
+                        <div
+                          key={hh.id}
+                          data-handle={hh.id}
+                          className="absolute w-2.5 h-2.5 bg-white border border-indigo-600 rounded-sm"
+                          style={{ ...hh.style, transform: 'translate(-50%, -50%)', cursor: hh.cursor }}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>

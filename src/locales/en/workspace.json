@@ -133,7 +133,7 @@
       "splitDone": "Page split",
       "viewNewHalves": "View new halves",
       "thumbWarning": "Image was changed, but thumbnail update failed.",
-      "cropHint": "Drag a rectangle to set the crop",
+      "cropHint": "Drag a rectangle; resize from handles, move from inside",
       "cropReset": "Reset crop",
       "applyError": "Operation failed",
       "close": "Close"
