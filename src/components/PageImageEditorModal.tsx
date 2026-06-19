@@ -7,7 +7,8 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { transformPageImage, CropRect } from '../services/pageService';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
-import { resizeBox, moveBox, CropHandle, Box } from '../utils/cropBoxInteraction';
+import { resizeRotatedBox, CropHandle, CenterBox } from '../utils/cropBoxInteraction';
+import { rotatedCropToServerParams } from '../utils/rotatedCropParams';
 
 interface PageInfo {
   filename: string;
@@ -37,8 +38,9 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [tab, setTab] = useState<'edit' | 'split'>(initialTab);
-  const [angle, setAngle] = useState(0);
-  const [cropRect, setCropRect] = useState<CropRect | null>(null);
+  const [grossAngle, setGrossAngle] = useState(0);   // jäme orientatsioon (90/180 nupud)
+  const [boxAngle, setBoxAngle] = useState(0);        // crop-kasti kalle (deskew)
+  const [cropRect, setCropRect] = useState<CropRect | null>(null);  // telg-joondatud kasti-lokaal
   const [splitX, setSplitX] = useState(0.5);
 
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
@@ -50,11 +52,12 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   // Kärpe-lohistuse ajutine olek (display-pikslites)
   const [cropDraft, setCropDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
-  // Aktiivne interaktsioon: uue joonistamine, liigutamine või sangaga muutmine
+  // Aktiivne interaktsioon: uue joonistamine, liigutamine, sangaga muutmine või pööramine
   const interaction = useRef<
     | { mode: 'draw' }
-    | { mode: 'move'; startX: number; startY: number; startRect: Box }
-    | { mode: 'resize'; handle: CropHandle; startRect: Box }
+    | { mode: 'move'; startX: number; startY: number; startCenter: { cx: number; cy: number } }
+    | { mode: 'resize'; handle: CropHandle; startBox: CenterBox }
+    | { mode: 'rotate' }
     | null
   >(null);
   const draggingSplit = useRef(false);
@@ -66,7 +69,8 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   // Pildi vahetusel lähtesta teisendused
   const resetTransforms = useCallback(() => {
-    setAngle(0);
+    setGrossAngle(0);
+    setBoxAngle(0);
     setCropRect(null);
     setCropDraft(null);
     setSplitX(0.5);
@@ -84,9 +88,9 @@ const PageImageEditorModal: React.FC<Props> = ({
     return imageToken ? `${base}?exp=${imageToken.exp}&sig=${imageToken.sig}` : base;
   })();
 
-  // Eelvaate geomeetria (pööratud bounding-box mahutatud MAXW×MAXH-i)
+  // Eelvaate geomeetria: jäme pööre (grossAngle) rakendub PILDILE; kast tilditakse eraldi.
   const natural = imgNatural ?? { w: 4, h: 3 };
-  const expanded = expandedBoundingBox(natural.w, natural.h, angle);
+  const expanded = expandedBoundingBox(natural.w, natural.h, grossAngle);
   const fit = Math.min(MAXW / expanded.width, MAXH / expanded.height);
   const displayW = expanded.width * fit;
   const displayH = expanded.height * fit;
@@ -102,48 +106,57 @@ const PageImageEditorModal: React.FC<Props> = ({
     };
   };
 
-  // cropRect (normaliseeritud) ↔ display-pikslite kast
-  const rectToPx = (r: CropRect): Box => ({
-    left: r.x * displayW, top: r.y * displayH, width: r.w * displayW, height: r.h * displayH,
+  // cropRect (normaliseeritud, kasti-lokaal) ↔ kese-põhine display-piksli kast
+  const rectToCenterPx = (r: CropRect): CenterBox => ({
+    cx: (r.x + r.w / 2) * displayW, cy: (r.y + r.h / 2) * displayH,
+    w: r.w * displayW, h: r.h * displayH,
   });
-  const pxToRect = (b: Box): CropRect => ({
-    x: b.left / displayW, y: b.top / displayH, w: b.width / displayW, h: b.height / displayH,
+  const centerPxToRect = (b: CenterBox): CropRect => ({
+    x: (b.cx - b.w / 2) / displayW, y: (b.cy - b.h / 2) / displayH,
+    w: b.w / displayW, h: b.h / displayH,
   });
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
   const onCropDown = (e: React.MouseEvent) => {
     if (!imgNatural) return;
     e.preventDefault();
     const p = localPoint(e);
-    const handle = (e.target as HTMLElement).dataset.handle as CropHandle | undefined;
+    const target = e.target as HTMLElement;
+    const handle = target.dataset.handle as CropHandle | undefined;
 
-    // 1) Sang → resize
     if (handle && cropRect) {
-      interaction.current = { mode: 'resize', handle, startRect: rectToPx(cropRect) };
-      return;
+      interaction.current = { mode: 'resize', handle, startBox: rectToCenterPx(cropRect) };
+    } else if (target.dataset.rotate !== undefined && cropRect) {
+      interaction.current = { mode: 'rotate' };
+    } else if (target.dataset.cropbox !== undefined && cropRect) {
+      const b = rectToCenterPx(cropRect);
+      interaction.current = { mode: 'move', startX: p.x, startY: p.y, startCenter: { cx: b.cx, cy: b.cy } };
+    } else {
+      // Uue kasti joonistus on alati telg-joondatud → nulli kalle
+      setBoxAngle(0);
+      interaction.current = { mode: 'draw' };
+      setCropDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
     }
-    // 2) Olemasoleva kasti sisemus → move
-    if (cropRect) {
-      const b = rectToPx(cropRect);
-      if (p.x >= b.left && p.x <= b.left + b.width && p.y >= b.top && p.y <= b.top + b.height) {
-        interaction.current = { mode: 'move', startX: p.x, startY: p.y, startRect: b };
-        return;
-      }
-    }
-    // 3) Muidu → joonista uus
-    interaction.current = { mode: 'draw' };
-    setCropDraft({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
   };
 
   const onCropMove = (e: React.MouseEvent) => {
     const it = interaction.current;
-    if (!it) return;
+    if (!it || !cropRect && it.mode !== 'draw') return;
     const p = localPoint(e);
     if (it.mode === 'draw') {
       setCropDraft((d) => (d ? { ...d, x1: p.x, y1: p.y } : d));
-    } else if (it.mode === 'move') {
-      setCropRect(pxToRect(moveBox(it.startRect, p.x - it.startX, p.y - it.startY, { w: displayW, h: displayH })));
-    } else {
-      setCropRect(pxToRect(resizeBox(it.startRect, it.handle, p.x, p.y, { w: displayW, h: displayH }, MIN_DRAG_PX)));
+    } else if (it.mode === 'move' && cropRect) {
+      const b = rectToCenterPx(cropRect);
+      const cx = clamp(it.startCenter.cx + (p.x - it.startX), 0, displayW);
+      const cy = clamp(it.startCenter.cy + (p.y - it.startY), 0, displayH);
+      setCropRect(centerPxToRect({ ...b, cx, cy }));
+    } else if (it.mode === 'resize') {
+      setCropRect(centerPxToRect(resizeRotatedBox(it.startBox, boxAngle, it.handle, p.x, p.y, MIN_DRAG_PX)));
+    } else if (it.mode === 'rotate' && cropRect) {
+      const b = rectToCenterPx(cropRect);
+      // Kalle nii, et lokaal-üles suund osutab kursorile: atan2(dx, -dy)
+      const deg = (Math.atan2(p.x - b.cx, b.cy - p.y) * 180) / Math.PI;
+      setBoxAngle(deg);
     }
   };
 
@@ -160,30 +173,34 @@ const PageImageEditorModal: React.FC<Props> = ({
         setCropRect(null);
         return;
       }
-      // Normaliseeri pööratud-pildi (display-box) koordinaatides
       setCropRect({ x: left / displayW, y: top / displayH, w: w / displayW, h: h / displayH });
     }
   };
 
-  // Pööramisel kärbe ei kehti enam (ristkülik joonistati teise bbox-i kohta)
+  // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub)
   const rotateBy = (delta: number) => {
-    setAngle((a) => ((a + delta) % 360 + 360) % 360);
+    setGrossAngle((a) => ((a + delta) % 360 + 360) % 360);
     setCropRect(null);
     setCropDraft(null);
+    setBoxAngle(0);
     interaction.current = null;
   };
 
-  // Kuvatav kärpe-ristkülik (kas lohistuse ajal või kinnitatud)
-  const cropOverlayBox: Box | null = (() => {
+  // Kuvatav kärpe-kast: kese, mõõdud, kalle (joonistamise ajal telg-joondatud)
+  const cropOverlay: { cx: number; cy: number; w: number; h: number; angle: number } | null = (() => {
     if (cropDraft) {
       return {
-        left: Math.min(cropDraft.x0, cropDraft.x1),
-        top: Math.min(cropDraft.y0, cropDraft.y1),
-        width: Math.abs(cropDraft.x1 - cropDraft.x0),
-        height: Math.abs(cropDraft.y1 - cropDraft.y0),
+        cx: (cropDraft.x0 + cropDraft.x1) / 2,
+        cy: (cropDraft.y0 + cropDraft.y1) / 2,
+        w: Math.abs(cropDraft.x1 - cropDraft.x0),
+        h: Math.abs(cropDraft.y1 - cropDraft.y0),
+        angle: 0,
       };
     }
-    if (cropRect) return rectToPx(cropRect);
+    if (cropRect) {
+      const b = rectToCenterPx(cropRect);
+      return { cx: b.cx, cy: b.cy, w: b.w, h: b.h, angle: boxAngle };
+    }
     return null;
   })();
 
@@ -242,7 +259,21 @@ const PageImageEditorModal: React.FC<Props> = ({
     try {
       let thumbWarn = false;
       if (tab === 'edit') {
-        const r = await transformPageImage(workId, currentFilename, angle, cropRect, authToken);
+        // Jäme pööre + kasti-kalle → serveri (angle, telg-joondatud crop)
+        let sendAngle = grossAngle;
+        let sendCrop: CropRect | null = null;
+        if (cropRect) {
+          const b = rectToCenterPx(cropRect);
+          const params = rotatedCropToServerParams(
+            { cx: b.cx, cy: b.cy, w: b.w, h: b.h, angleDeg: boxAngle }, displayW, displayH,
+          );
+          sendAngle = ((grossAngle + params.angle) % 360 + 360) % 360;
+          // Klampi normaliseeritud kärbe [0,1] sisse (kaitse servast väljaulatuva kasti eest)
+          const x = clamp(params.crop.x, 0, 1);
+          const y = clamp(params.crop.y, 0, 1);
+          sendCrop = { x, y, w: clamp(params.crop.w, 0, 1 - x), h: clamp(params.crop.h, 0, 1 - y) };
+        }
+        const r = await transformPageImage(workId, currentFilename, sendAngle, sendCrop, authToken);
         thumbWarn = !!r.thumbnail_warning;
       } else {
         const res = await fetchWithTimeout(
@@ -296,7 +327,7 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   if (!current) return null;
 
-  const noEditChange = tab === 'edit' && angle === 0 && cropRect === null;
+  const noEditChange = tab === 'edit' && grossAngle === 0 && cropRect === null;
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -347,17 +378,13 @@ const PageImageEditorModal: React.FC<Props> = ({
                 <button onClick={() => rotateBy(180)} title={t('manage.editor.rotate180')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
                   <FlipVertical2 size={16} />
                 </button>
-                <div className="flex items-center gap-2 ml-2">
-                  <label className="text-xs text-gray-500">{t('manage.editor.deskew')}</label>
-                  <input
-                    type="range" min={-10} max={10} step={0.1} value={angle > 180 ? angle - 360 : angle}
-                    onChange={(e) => { setAngle(parseFloat(e.target.value)); setCropRect(null); setCropDraft(null); }}
-                    className="w-40"
-                  />
-                  <span className="text-xs text-gray-600 w-10 tabular-nums">{(angle > 180 ? angle - 360 : angle).toFixed(1)}°</span>
-                </div>
+                {cropRect && Math.abs(boxAngle) > 0.05 && (
+                  <span className="text-xs text-gray-600 ml-2 tabular-nums">
+                    {t('manage.editor.deskew')}: {boxAngle.toFixed(1)}°
+                  </span>
+                )}
                 {cropRect && (
-                  <button onClick={() => setCropRect(null)} className="text-xs text-gray-500 underline hover:text-gray-700 ml-2">
+                  <button onClick={() => { setCropRect(null); setBoxAngle(0); }} className="text-xs text-gray-500 underline hover:text-gray-700 ml-2">
                     {t('manage.editor.cropReset')}
                   </button>
                 )}
@@ -365,7 +392,7 @@ const PageImageEditorModal: React.FC<Props> = ({
 
               <p className="text-xs text-gray-400">{t('manage.editor.cropHint')}</p>
 
-              {/* Eelvaade pööratud bounding-box'iga */}
+              {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
               <div
                 className="relative bg-white shadow-inner border border-gray-200"
                 style={{ width: displayW || MAXW, height: displayH || MAXH }}
@@ -380,7 +407,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                     width: imgDispW || undefined,
                     height: imgDispH || undefined,
                     left: '50%', top: '50%',
-                    transform: `translate(-50%, -50%) rotate(${angle}deg)`,
+                    transform: `translate(-50%, -50%) rotate(${grossAngle}deg)`,
                   }}
                 />
                 {/* Kärpe-overlay (püüab hiire) */}
@@ -392,25 +419,45 @@ const PageImageEditorModal: React.FC<Props> = ({
                   onMouseUp={onCropUp}
                   onMouseLeave={onCropUp}
                 >
-                  {cropOverlayBox && (
+                  {cropOverlay && (
                     <div
+                      data-cropbox=""
                       className="absolute border-2 border-indigo-500"
                       style={{
-                        left: cropOverlayBox.left, top: cropOverlayBox.top,
-                        width: cropOverlayBox.width, height: cropOverlayBox.height,
+                        left: cropOverlay.cx - cropOverlay.w / 2,
+                        top: cropOverlay.cy - cropOverlay.h / 2,
+                        width: cropOverlay.w,
+                        height: cropOverlay.h,
+                        transform: `rotate(${cropOverlay.angle}deg)`,
+                        transformOrigin: 'center',
                         boxShadow: '0 0 0 9999px rgba(0,0,0,0.35)',
                         cursor: 'move',
                       }}
                     >
-                      {/* Resize-sangad (ainult kinnitatud kastil, mitte joonistamise ajal) */}
-                      {!cropDraft && CROP_HANDLES.map((hh) => (
-                        <div
-                          key={hh.id}
-                          data-handle={hh.id}
-                          className="absolute w-2.5 h-2.5 bg-white border border-indigo-600 rounded-sm"
-                          style={{ ...hh.style, transform: 'translate(-50%, -50%)', cursor: hh.cursor }}
-                        />
-                      ))}
+                      {/* Resize-sangad + pöördesang (ainult kinnitatud kastil) */}
+                      {!cropDraft && (
+                        <>
+                          {CROP_HANDLES.map((hh) => (
+                            <div
+                              key={hh.id}
+                              data-handle={hh.id}
+                              className="absolute w-2.5 h-2.5 bg-white border border-indigo-600 rounded-sm"
+                              style={{ ...hh.style, transform: 'translate(-50%, -50%)', cursor: hh.cursor }}
+                            />
+                          ))}
+                          {/* Pöördesang ülal keskel */}
+                          <div
+                            className="absolute w-px bg-indigo-500 pointer-events-none"
+                            style={{ left: '50%', top: -22, height: 22 }}
+                          />
+                          <div
+                            data-rotate=""
+                            title={t('manage.editor.deskew')}
+                            className="absolute w-3 h-3 bg-white border border-indigo-600 rounded-full"
+                            style={{ left: '50%', top: -22, transform: 'translate(-50%, -50%)', cursor: 'grab' }}
+                          />
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
