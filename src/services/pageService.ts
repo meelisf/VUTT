@@ -159,3 +159,29 @@ export const replyToComment = async (
   const data = await response.json();
   return data.comments || [];
 };
+
+export interface CropRect { x: number; y: number; w: number; h: number; }
+export interface TransformResult {
+  success: boolean; changed: boolean; filename?: string;
+  size?: [number, number]; thumbnail_warning?: boolean; reason?: string;
+}
+
+// Admin: pöörab/kärbib lehepilti kohapeal (failinime-põhine endpoint)
+export async function transformPageImage(
+  workId: string, filename: string, angle: number, crop: CropRect | null, token: string,
+): Promise<TransformResult> {
+  const res = await fetchWithTimeout(
+    `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/transform`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify({ angle, crop }),
+      timeout: 30000,
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
