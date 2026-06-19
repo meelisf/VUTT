@@ -114,6 +114,29 @@
       "restoring": "Taastan...",
       "restoreSuccess": "Leht {{name}} taastatud",
       "restoreError": "Taastamine ebaõnnestus"
+    },
+    "editor": {
+      "title": "Lehe pildiredaktor",
+      "tabEdit": "Pööra & kärbi",
+      "tabSplit": "Poolita",
+      "rotateLeft": "Pööra vasakule 90°",
+      "rotateRight": "Pööra paremale 90°",
+      "rotate180": "Pööra 180°",
+      "deskew": "Peenhäälestus (kraadid)",
+      "apply": "Rakenda",
+      "page": "Leht {{cur}} / {{total}}",
+      "prev": "Eelmine leht",
+      "next": "Järgmine leht",
+      "confirmBody": "Vana pilt säilib prügikastis 90 päeva. Tekst ja metaandmed jäävad muutmata.",
+      "dontAskAgain": "Ära küsi selles aknas uuesti",
+      "allDone": "Kõik lehed läbi töödeldud",
+      "splitDone": "Leht poolitatud",
+      "viewNewHalves": "Vaata uusi pooli",
+      "thumbWarning": "Pilt muudeti, aga pisipildi uuendamine ebaõnnestus.",
+      "cropHint": "Lohista ristkülik kärpe määramiseks",
+      "cropReset": "Lähtesta kärbe",
+      "applyError": "Toiming ebaõnnestus",
+      "close": "Sulge"
     }
   },
   "metadata": {
