@@ -13,12 +13,10 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
-  Download,
   Upload,
   RefreshCw,
   Scissors,
-  MoreVertical,
-  Crop,
+  CornerDownLeft,
 } from 'lucide-react';
 import Header from '../components/Header';
 import PageImageEditorModal from '../components/PageImageEditorModal';
@@ -107,12 +105,9 @@ const WorkManage: React.FC = () => {
   const [deletePageError, setDeletePageError] = useState<string | null>(null);
 
   // Pildi asendamine
-  const [replacingPage, setReplacingPage] = useState<number | null>(null);
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const [replaceSuccess, setReplaceSuccess] = useState<string | null>(null);
   const [thumbCacheBust, setThumbCacheBust] = useState<number>(Date.now());
-  const replaceInputRef = useRef<HTMLInputElement>(null);
-  const replaceTargetPage = useRef<number | null>(null);
 
   // Lehekülje lisamine
   const [showAddForm, setShowAddForm] = useState(false);
@@ -144,7 +139,6 @@ const WorkManage: React.FC = () => {
 
   // Pildi HMAC token piiratud teoste allalaadimiseks
   const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
-  const [openMenuPage, setOpenMenuPage] = useState<number | null>(null);
   const [editorTarget, setEditorTarget] = useState<{ index: number; tab: 'edit' | 'split' } | null>(null);
 
   const isAdmin = user?.role === 'admin';
@@ -205,15 +199,6 @@ const WorkManage: React.FC = () => {
     }
   };
 
-  // Sulge pisipildi ⋮-menüü klõpsuga väljaspool
-  useEffect(() => {
-    if (openMenuPage === null) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('.page-menu-root')) setOpenMenuPage(null);
-    };
-    document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
-  }, [openMenuPage]);
 
   useEffect(() => {
     if (!workId || !authToken) return;
@@ -274,6 +259,17 @@ const WorkManage: React.FC = () => {
       });
       return next;
     });
+  };
+
+  // Rakendab käsitsi trükitud järjekorranumbri (Enter / blur / ↵-nupp). Tühjendab ootel-väärtuse.
+  const commitReorderInput = (filename: string, fallbackPos: number) => {
+    const raw = inputValues[filename];
+    if (raw === undefined) return;
+    const parsed = parseInt(raw, 10);
+    const newPos = isNaN(parsed) ? (draftPositions[filename] ?? fallbackPos)
+      : Math.max(1, Math.min(pages.length, parsed));
+    applyInsert(filename, newPos);
+    setInputValues(prev => { const next = { ...prev }; delete next[filename]; return next; });
   };
 
   const handleReorderSave = async () => {
@@ -341,44 +337,35 @@ const WorkManage: React.FC = () => {
     }
   };
 
+  // Asendab ühe lehe pildi. Viskab vea edasi, et kutsuja (redaktori-modaal)
+  // saaks oma UI-s vea näidata ja eelvaadet mitte värskendada.
   const handleReplaceImage = async (file: File, pageNum: number) => {
-    if (!workId || !authToken) return;
-    setReplacingPage(pageNum);
+    if (!workId || !authToken) throw new Error('Not authorized');
     setReplaceError(null);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
+    const formData = new FormData();
+    formData.append('file', file);
 
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image`,
-        { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.status === 'success') {
-        // Cache bust + success teade
-        setThumbCacheBust(Date.now());
-        setReplaceSuccess(t('manage.replaceSuccess', { num: pageNum }));
-        setTimeout(() => setReplaceSuccess(null), 4000);
-        
-        // Salvesta sessionStorage'isse, et Workspace teaks cache'i tühistada
-        try {
-          const key = `${workId}/${pageNum}`;
-          const existing = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
-          existing[key] = Date.now();
-          sessionStorage.setItem('vutt_replaced_images', JSON.stringify(existing));
-        } catch { /* ignore storage errors */ }
-        
-        await loadPages();
-      } else {
-        setReplaceError(t('manage.replaceError'));
-      }
-    } catch {
-      setReplaceError(t('manage.replaceError'));
-    } finally {
-      setReplacingPage(null);
-    }
+    const res = await fetchWithTimeout(
+      `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image`,
+      { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(t('manage.replaceError'));
+
+    // Õnnestus: cache-bust + sessionStorage (Workspace tühistab cache'i) + lehtede uuesti laadimine
+    setThumbCacheBust(Date.now());
+    setReplaceSuccess(t('manage.replaceSuccess', { num: pageNum }));
+    setTimeout(() => setReplaceSuccess(null), 4000);
+    try {
+      const key = `${workId}/${pageNum}`;
+      const existing = JSON.parse(sessionStorage.getItem('vutt_replaced_images') || '{}');
+      existing[key] = Date.now();
+      sessionStorage.setItem('vutt_replaced_images', JSON.stringify(existing));
+    } catch { /* ignore storage errors */ }
+
+    await loadPages();
   };
 
   const handleAddPage = async () => {
@@ -484,22 +471,6 @@ const WorkManage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-
-      {/* Peidetud file input pildi asendamiseks */}
-      <input
-        ref={replaceInputRef}
-        type="file"
-        accept="image/jpeg,image/png"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file && replaceTargetPage.current !== null) {
-            handleReplaceImage(file, replaceTargetPage.current);
-          }
-          // Reset input
-          if (replaceInputRef.current) replaceInputRef.current.value = '';
-        }}
-      />
 
       <div className="max-w-4xl mx-auto px-4 py-8">
 
@@ -642,57 +613,14 @@ const WorkManage: React.FC = () => {
                         <span className={`absolute top-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(page.status)}`}>
                           {page.page_num}
                         </span>
-                        {/* Tegevuste menüü (⋮) — alumises paremas servas */}
-                        <div className="absolute bottom-1 right-1 page-menu-root">
-                          <button
-                            onClick={() => setOpenMenuPage(openMenuPage === page.page_num ? null : page.page_num)}
-                            className="p-1 bg-white/80 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded shadow-sm transition-colors"
-                            title={t('manage.editor.title')}
-                          >
-                            <MoreVertical size={14} />
-                          </button>
-                          {openMenuPage === page.page_num && (
-                            <div className="absolute bottom-full right-0 mb-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 text-sm">
-                              <a
-                                href={(() => {
-                                  const filename = page.lehekylje_pilt.split('/').pop();
-                                  const base = `${IMAGE_BASE_URL}/${workId}/${filename}`;
-                                  return imageToken
-                                    ? `${base}?exp=${imageToken.exp}&sig=${imageToken.sig}`
-                                    : base;
-                                })()}
-                                download
-                                onClick={() => setOpenMenuPage(null)}
-                                className="flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                              >
-                                <Download size={14} /> {t('manage.downloadImage')}
-                              </a>
-                              <button
-                                onClick={() => {
-                                  setOpenMenuPage(null);
-                                  replaceTargetPage.current = page.page_num;
-                                  replaceInputRef.current?.click();
-                                }}
-                                disabled={replacingPage === page.page_num}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                              >
-                                <Upload size={14} /> {t('manage.replaceImage')}
-                              </button>
-                              <button
-                                onClick={() => { setEditorTarget({ index: page.page_num - 1, tab: 'edit' }); setOpenMenuPage(null); }}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                              >
-                                <Crop size={14} /> {t('manage.editor.tabEdit')}
-                              </button>
-                              <button
-                                onClick={() => { setEditorTarget({ index: page.page_num - 1, tab: 'split' }); setOpenMenuPage(null); }}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                              >
-                                <Scissors size={14} /> {t('manage.editor.tabSplit')}
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        {/* Pildiredaktor — alumises paremas servas */}
+                        <button
+                          onClick={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
+                          className="absolute bottom-1 right-1 p-1 bg-white/80 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded shadow-sm transition-colors"
+                          title={t('manage.editor.title')}
+                        >
+                          <Scissors size={14} />
+                        </button>
                       </div>
 
                       {/* Numbriväli */}
@@ -707,15 +635,7 @@ const WorkManage: React.FC = () => {
                             // Salvesta trükitav väärtus ilma swap'ita — swap toimub alles blur/Enter peale
                             setInputValues(prev => ({ ...prev, [page.filename]: e.target.value }));
                           }}
-                          onBlur={() => {
-                            const raw = inputValues[page.filename];
-                            if (raw === undefined) return;
-                            const parsed = parseInt(raw, 10);
-                            const newPos = isNaN(parsed) ? (draftPositions[page.filename] ?? page.page_num)
-                              : Math.max(1, Math.min(pages.length, parsed));
-                            applyInsert(page.filename, newPos);
-                            setInputValues(prev => { const next = { ...prev }; delete next[page.filename]; return next; });
-                          }}
+                          onBlur={() => commitReorderInput(page.filename, page.page_num)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                             if (e.key === 'Escape') {
@@ -726,6 +646,18 @@ const WorkManage: React.FC = () => {
                             isChanged ? 'border-amber-400 bg-amber-50 font-semibold' : 'border-gray-300'
                           }`}
                         />
+                        {/* Ootel-indikaator: kinnitamata trükitud väärtus → vihje + klõpsatav rakenda */}
+                        {inputValues[page.filename] !== undefined && (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => { e.preventDefault(); commitReorderInput(page.filename, page.page_num); }}
+                            title={t('manage.reorderApply')}
+                            aria-label={t('manage.reorderApply')}
+                            className="flex-shrink-0 text-amber-600 hover:text-amber-800 leading-none"
+                          >
+                            <CornerDownLeft size={14} />
+                          </button>
+                        )}
                         <div className="flex flex-col">
                           <button
                             onClick={() => {
@@ -1035,6 +967,8 @@ const WorkManage: React.FC = () => {
             setThumbCacheBust(Date.now());
             return fresh;
           }}
+          onReplaceImage={handleReplaceImage}
+          cacheBust={thumbCacheBust}
         />
       )}
     </div>

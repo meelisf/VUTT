@@ -93,6 +93,7 @@
     "replaceError": "Failed to replace image",
     "replaceSuccess": "Page {{num}} image replaced",
     "reorderTo": "→",
+    "reorderApply": "Apply (Enter)",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",
     "reorderError": "Failed to save page order",
@@ -133,7 +134,7 @@
       "splitDone": "Page split",
       "viewNewHalves": "View new halves",
       "thumbWarning": "Image was changed, but thumbnail update failed.",
-      "cropHint": "Drag a rectangle to set the crop",
+      "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
       "cropReset": "Reset crop",
       "applyError": "Operation failed",
       "close": "Close"

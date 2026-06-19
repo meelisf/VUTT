@@ -93,6 +93,7 @@
     "replaceError": "Pildi asendamine ebaõnnestus",
     "replaceSuccess": "Leht {{num}} pilt asendatud",
     "reorderTo": "→",
+    "reorderApply": "Rakenda (Enter)",
     "reorderSave": "Salvesta järjekord",
     "reorderConfirm": "Oled kindel, et soovid lehekülgede järjekorda muuta?",
     "reorderError": "Järjekorra salvestamine ebaõnnestus",
@@ -133,7 +134,7 @@
       "splitDone": "Leht poolitatud",
       "viewNewHalves": "Vaata uusi pooli",
       "thumbWarning": "Pilt muudeti, aga pisipildi uuendamine ebaõnnestus.",
-      "cropHint": "Lohista ristkülik kärpe määramiseks",
+      "cropHint": "Lohista ristkülik; sangadest muuda suurust, seest liiguta, ülemisest nupust kalluta",
       "cropReset": "Lähtesta kärbe",
       "applyError": "Toiming ebaõnnestus",
       "close": "Sulge"
