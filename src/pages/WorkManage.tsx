@@ -17,9 +17,11 @@ import {
   Upload,
   RefreshCw,
   Scissors,
+  MoreVertical,
+  Crop,
 } from 'lucide-react';
 import Header from '../components/Header';
-import SplitPageModal from '../components/SplitPageModal';
+import PageImageEditorModal from '../components/PageImageEditorModal';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
@@ -142,7 +144,8 @@ const WorkManage: React.FC = () => {
 
   // Pildi HMAC token piiratud teoste allalaadimiseks
   const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
-  const [splitPageTarget, setSplitPageTarget] = useState<{ pageNum: number; filename: string } | null>(null);
+  const [openMenuPage, setOpenMenuPage] = useState<number | null>(null);
+  const [editorTarget, setEditorTarget] = useState<{ index: number; tab: 'edit' | 'split' } | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -152,8 +155,8 @@ const WorkManage: React.FC = () => {
     }
   }, [user, isAdmin, workId, navigate]);
 
-  const loadPages = async () => {
-    if (!workId || !authToken) return;
+  const loadPages = async (): Promise<string[]> => {
+    if (!workId || !authToken) return [];
     setLoading(true);
     setLoadError(null);
     try {
@@ -164,7 +167,9 @@ const WorkManage: React.FC = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.status === 'success') {
-        setPages(data.pages || []);
+        const loaded: PageInfo[] = data.pages || [];
+        setPages(loaded);
+        return loaded.map(p => p.lehekylje_pilt.split('/').pop() ?? '');
       } else {
         setLoadError(t('manage.loadError'));
       }
@@ -173,6 +178,7 @@ const WorkManage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+    return [];
   };
 
   const loadTrashPages = async () => {
@@ -198,6 +204,16 @@ const WorkManage: React.FC = () => {
       setTrashLoading(false);
     }
   };
+
+  // Sulge pisipildi ⋮-menüü klõpsuga väljaspool
+  useEffect(() => {
+    if (openMenuPage === null) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('.page-menu-root')) setOpenMenuPage(null);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [openMenuPage]);
 
   useEffect(() => {
     if (!workId || !authToken) return;
@@ -626,47 +642,56 @@ const WorkManage: React.FC = () => {
                         <span className={`absolute top-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(page.status)}`}>
                           {page.page_num}
                         </span>
-                        {/* Lae alla / Asenda nupud — alumises servas */}
-                        <div className="absolute bottom-1 left-1 right-1 flex justify-between">
-                          <a
-                            href={(() => {
-                              const filename = page.lehekylje_pilt.split('/').pop();
-                              const base = `${IMAGE_BASE_URL}/${workId}/${filename}`;
-                              return imageToken
-                                ? `${base}?exp=${imageToken.exp}&sig=${imageToken.sig}`
-                                : base;
-                            })()}
-                            download
-                            className="p-1 bg-white/80 hover:bg-primary-50 text-gray-400 hover:text-primary-600 rounded shadow-sm transition-colors"
-                            title={t('manage.downloadImage')}
-                          >
-                            <Download size={12} />
-                          </a>
+                        {/* Tegevuste menüü (⋮) — alumises paremas servas */}
+                        <div className="absolute bottom-1 right-1 page-menu-root">
                           <button
-                            onClick={() => {
-                              replaceTargetPage.current = page.page_num;
-                              replaceInputRef.current?.click();
-                            }}
-                            disabled={replacingPage === page.page_num}
-                            className="p-1 bg-white/80 hover:bg-primary-50 text-gray-400 hover:text-primary-600 rounded shadow-sm transition-colors disabled:opacity-50"
-                            title={t('manage.replaceImage')}
+                            onClick={() => setOpenMenuPage(openMenuPage === page.page_num ? null : page.page_num)}
+                            className="p-1 bg-white/80 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded shadow-sm transition-colors"
+                            title={t('manage.editor.title')}
                           >
-                            {replacingPage === page.page_num ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <Upload size={12} />
-                            )}
+                            <MoreVertical size={14} />
                           </button>
-                          <button
-                            onClick={() => setSplitPageTarget({
-                              pageNum: page.page_num,
-                              filename: page.lehekylje_pilt.split('/').pop() ?? '',
-                            })}
-                            className="p-1 bg-white/80 hover:bg-amber-50 text-gray-400 hover:text-amber-600 rounded shadow-sm transition-colors"
-                            title="Lõika leht kaheks"
-                          >
-                            <Scissors size={12} />
-                          </button>
+                          {openMenuPage === page.page_num && (
+                            <div className="absolute bottom-full right-0 mb-1 w-44 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-20 text-sm">
+                              <a
+                                href={(() => {
+                                  const filename = page.lehekylje_pilt.split('/').pop();
+                                  const base = `${IMAGE_BASE_URL}/${workId}/${filename}`;
+                                  return imageToken
+                                    ? `${base}?exp=${imageToken.exp}&sig=${imageToken.sig}`
+                                    : base;
+                                })()}
+                                download
+                                onClick={() => setOpenMenuPage(null)}
+                                className="flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                              >
+                                <Download size={14} /> {t('manage.downloadImage')}
+                              </a>
+                              <button
+                                onClick={() => {
+                                  setOpenMenuPage(null);
+                                  replaceTargetPage.current = page.page_num;
+                                  replaceInputRef.current?.click();
+                                }}
+                                disabled={replacingPage === page.page_num}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                              >
+                                <Upload size={14} /> {t('manage.replaceImage')}
+                              </button>
+                              <button
+                                onClick={() => { setEditorTarget({ index: page.page_num - 1, tab: 'edit' }); setOpenMenuPage(null); }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                              >
+                                <Crop size={14} /> {t('manage.editor.tabEdit')}
+                              </button>
+                              <button
+                                onClick={() => { setEditorTarget({ index: page.page_num - 1, tab: 'split' }); setOpenMenuPage(null); }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                              >
+                                <Scissors size={14} /> {t('manage.editor.tabSplit')}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -996,17 +1021,19 @@ const WorkManage: React.FC = () => {
 
       </div>
 
-      {/* Lehe lõikamise modaal */}
-      {splitPageTarget && (
-        <SplitPageModal
+      {/* Lehe pildiredaktor (pööra/kärbi + poolita) */}
+      {editorTarget && (
+        <PageImageEditorModal
           workId={workId!}
-          pageNum={splitPageTarget.pageNum}
-          imageFilename={splitPageTarget.filename}
+          pages={pages.map(p => ({ filename: p.lehekylje_pilt.split('/').pop() ?? '', page_num: p.page_num }))}
+          initialIndex={editorTarget.index}
+          initialTab={editorTarget.tab}
           imageToken={imageToken}
-          onClose={() => setSplitPageTarget(null)}
-          onSuccess={async () => {
-            setSplitPageTarget(null);
-            await loadPages();
+          onClose={() => setEditorTarget(null)}
+          onPagesChanged={async () => {
+            const fresh = await loadPages();
+            setThumbCacheBust(Date.now());
+            return fresh;
           }}
         />
       )}

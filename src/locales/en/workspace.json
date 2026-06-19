@@ -114,6 +114,29 @@
       "restoring": "Restoring...",
       "restoreSuccess": "Page {{name}} restored",
       "restoreError": "Restore failed"
+    },
+    "editor": {
+      "title": "Page image editor",
+      "tabEdit": "Rotate & crop",
+      "tabSplit": "Split",
+      "rotateLeft": "Rotate left 90°",
+      "rotateRight": "Rotate right 90°",
+      "rotate180": "Rotate 180°",
+      "deskew": "Fine-tune (degrees)",
+      "apply": "Apply",
+      "page": "Page {{cur}} / {{total}}",
+      "prev": "Previous page",
+      "next": "Next page",
+      "confirmBody": "The old image is kept in trash for 90 days. Text and metadata are unchanged.",
+      "dontAskAgain": "Don't ask again in this window",
+      "allDone": "All pages processed",
+      "splitDone": "Page split",
+      "viewNewHalves": "View new halves",
+      "thumbWarning": "Image was changed, but thumbnail update failed.",
+      "cropHint": "Drag a rectangle to set the crop",
+      "cropReset": "Reset crop",
+      "applyError": "Operation failed",
+      "close": "Close"
     }
   },
   "metadata": {

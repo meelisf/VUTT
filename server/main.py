@@ -45,7 +45,7 @@ from .cache import (
     get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-from .admin_page_ops import get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page
+from .admin_page_ops import clear_original_backup, get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page, transform_page_image
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
@@ -553,6 +553,9 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
     with open(log_path, 'a', encoding='utf-8') as lf:
         lf.write(log_entry)
 
+    # Asendatud pilt on lehe uus pristine algolek → eemalda vana ._originals kirje
+    clear_original_backup(work_id, img_name)
+
     logger.info(f"REPLACE-IMG: {folder_name}/{img_name} asendatud ({user['username']})")
     sync_work_to_meilisearch(folder_name)
     return {"status": "success", "filename": img_name}
@@ -711,6 +714,21 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
     if not result.get("found", True):
         raise HTTPException(status_code=404, detail="Teost või lehekülge ei leitud")
     return {"status": "success", "new_page_count": result["new_page_count"]}
+
+
+@app.post("/admin/work/{work_id}/page-image/{filename}/transform")
+async def admin_transform_page_image(work_id: str, filename: str, request: Request, user=Depends(require_role("admin"))):
+    """Pöörab/kärbib lehepilti kohapeal. Body: { angle: float, crop: {x,y,w,h}|null }"""
+    data = await get_json_data(request)
+    angle = data.get("angle", 0.0)
+    crop = data.get("crop")
+    try:
+        result = transform_page_image(work_id, filename, angle=angle, crop=crop, username=user["username"])
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not result.get("found", True):
+        raise HTTPException(status_code=404, detail="Teost või lehte ei leitud")
+    return result
 
 
 @app.post("/admin/work/{work_id}/reorder-pages")
