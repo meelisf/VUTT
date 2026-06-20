@@ -7,6 +7,8 @@ import os
 import json
 import shutil
 import io
+import re
+import unicodedata
 from datetime import datetime
 from git import Actor
 from git.exc import GitCommandError
@@ -17,6 +19,25 @@ from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 
 logger = get_logger(__name__)
+
+
+def natural_sort_key(name):
+    """Kanooniline loomulik-sort võti (peab JS-poolega kokku langema).
+
+    NFC-normaliseerimine, casefold, numbri/teksti-plokid (numbrid arvuna).
+    Viigi-katkestaja: originaalnimi (stabiilne determinism nt '02' vs '2').
+    Tokeniseerimine: re.split(r'(\\d+)') → numbrist algav/lõppev string annab
+    tühje elemente (nt '2.jpg' → ['', '2', '.jpg']) — JS peab käituma identselt.
+    """
+    norm = unicodedata.normalize('NFC', name).casefold()
+    tokens = re.split(r'(\d+)', norm)
+    key = []
+    for i, tok in enumerate(tokens):
+        if i % 2 == 1:           # paaritu indeks = numbriplokk
+            key.append((1, int(tok), ''))
+        else:                    # paaris indeks = tekst (sh tühjad)
+            key.append((0, 0, tok))
+    return (key, name)           # viigi-katkestaja: originaalnimi
 
 
 # Piltide maksimaalne dimensioon (px) — kaitse pilllipommide vastu
