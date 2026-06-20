@@ -225,15 +225,11 @@ const WorkManage: React.FC = () => {
     ? computeBlockMoveOrder(visiblePages, selectedFiles, moveTarget)
     : null;
 
-  // Arvuta eelvaate/vihje tekst komponendi kehas (JSX-i pesastatud narrowing ei tööta usaldusväärselt)
-  let movePreviewText: string | null = null;
+  // Vea-vihje (selgitab, miks "Liiguta" on keelatud). Positiivset eelvaadet ei kuva —
+  // ruudustik ise on WYSIWYG eelvaade. JSX-i pesastatud narrowing ei tööta usaldusväärselt,
+  // seega arvuta tekst komponendi kehas (`in`-operaator kitsendab usaldusväärselt).
   let moveHintText: string | null = null;
-  if (moveResult && 'preview' in moveResult) {
-    const pv = moveResult.preview;
-    movePreviewText = pv.kind === 'between'
-      ? t('manage.move.previewBetween', { before: pv.before, after: pv.after })
-      : pv.kind === 'start' ? t('manage.move.previewStart') : t('manage.move.previewEnd');
-  } else if (moveResult && 'reason' in moveResult) {
+  if (moveResult && 'reason' in moveResult) {
     if (moveResult.reason === 'anchorInSelection') {
       moveHintText = t('manage.move.anchorInSelection', { end: pages.length + 1 });
     } else if (moveResult.reason === 'invalidTarget') {
@@ -671,31 +667,35 @@ const WorkManage: React.FC = () => {
               <>
                 {/* Valiku-riba */}
                 {selectedFiles.size > 0 && (
-                  <div className="mx-4 mt-3 mb-1 p-3 bg-primary-50 border border-primary-200 rounded-lg flex flex-wrap items-center gap-3">
+                  <div className="mx-4 mt-3 mb-1 p-3 bg-primary-50 border border-primary-200 rounded-lg flex flex-wrap items-center gap-x-3 gap-y-2">
                     <span className="text-sm font-medium text-primary-800">{t('manage.select.count', { count: selectedFiles.size })}</span>
-                    <button onClick={handleClearSelection} className="text-xs text-primary-700 hover:underline">{t('manage.select.clear')}</button>
+                    {/* Liiguta valitud lehe [nr] järele */}
                     <div className="flex items-center gap-1.5">
-                      <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
+                      <button
+                        onClick={handleMove}
+                        disabled={moveTarget.trim() === '' || !(moveResult && moveResult.ok)}
+                        className="px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded"
+                      >{t('manage.move.button')}</button>
                       <input
                         type="text" inputMode="numeric" value={moveTarget}
                         onChange={(e) => setMoveTarget(e.target.value)}
-                        className="w-16 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
+                        placeholder={t('manage.move.placeholder')}
+                        className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
                       />
-                      <button
-                        onClick={handleMove}
-                        disabled={!(moveResult && moveResult.ok)}
-                        className="px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded"
-                      >{t('manage.move.button')}</button>
+                      <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
                     </div>
-                    {/* Elav eelvaade / vihje */}
-                    {movePreviewText && <span className="text-sm text-gray-600">{movePreviewText}</span>}
+                    {/* Vea-vihje (miks "Liiguta" keelatud) */}
                     {moveHintText && <span className="text-sm text-amber-700">{moveHintText}</span>}
-                    <button
-                      onClick={() => setBulkDeleteConfirm(true)}
-                      disabled={hasReorderChanges}
-                      title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
-                      className="ml-auto px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40"
-                    >{t('manage.bulkDelete.button')}</button>
+                    {/* Paremal: valiku tühistus + kustutus */}
+                    <div className="ml-auto flex items-center gap-3">
+                      <button onClick={handleClearSelection} className="text-sm text-primary-700 hover:underline">{t('manage.select.clear')}</button>
+                      <button
+                        onClick={() => setBulkDeleteConfirm(true)}
+                        disabled={hasReorderChanges}
+                        title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
+                        className="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40"
+                      >{t('manage.bulkDelete.button')}</button>
+                    </div>
                   </div>
                 )}
 

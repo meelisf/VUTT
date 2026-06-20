@@ -117,7 +117,8 @@
       "count": "Valitud: {{count}}"
     },
     "move": {
-      "label": "lehe järele:",
+      "label": "lehe järele",
+      "placeholder": "nr",
       "button": "Liiguta",
       "previewBetween": "→ lehtede {{before}} ja {{after}} vahele",
       "previewStart": "→ algusesse",

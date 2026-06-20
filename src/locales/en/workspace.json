@@ -117,7 +117,8 @@
       "count": "Selected: {{count}}"
     },
     "move": {
-      "label": "after page:",
+      "label": "after page",
+      "placeholder": "no.",
       "button": "Move",
       "previewBetween": "→ between pages {{before}} and {{after}}",
       "previewStart": "→ to the beginning",
