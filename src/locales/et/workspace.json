@@ -111,6 +111,32 @@
     "managePageHint": "Lehekülgede järjestus, lisamine ja kustutamine.",
     "tabPages": "Leheküljed",
     "tabTrash": "Prügikast",
+    "select": {
+      "all": "Vali kõik",
+      "clear": "Tühista valik",
+      "count": "Valitud: {{count}}"
+    },
+    "move": {
+      "label": "lehe järele:",
+      "button": "Liiguta",
+      "previewBetween": "→ lehtede {{before}} ja {{after}} vahele",
+      "previewStart": "→ algusesse",
+      "previewEnd": "→ lõppu",
+      "anchorInSelection": "Sihtleht on valikus; ploki lõppu viimiseks kasuta {{end}}.",
+      "invalidTarget": "Vigane sihtnumber.",
+      "notSavedHint": "Järjekord on eelvaates. Kinnitamiseks vajuta Salvesta järjekord."
+    },
+    "reorder": {
+      "discard": "Tühista muudatused",
+      "discardConfirm": "Tühistada kõik salvestamata järjekorra muudatused?",
+      "changedSummary": "{{count}} lehe asukoht erineb salvestatud järjekorrast"
+    },
+    "bulkDelete": {
+      "button": "Kustuta valitud",
+      "confirm": "Kustutada {{count}} lehekülge? Need liiguvad prügikasti ja on taastatavad.",
+      "conflict": "Lehekülgede nimekiri oli aegunud — midagi ei kustutatud. Nimekiri värskendati, proovi uuesti.",
+      "draftBlocked": "Enne kustutamist salvesta või tühista järjekorra muudatused."
+    },
     "tabs": {
       "replace": "Asenda leheküljed"
     },

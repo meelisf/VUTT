@@ -651,6 +651,50 @@ def delete_page_from_git(folder_name: str, base_name: str, commit_msg: str, user
         return False
 
 
+def delete_pages_from_git(folder_name, base_names, commit_msg, username="VUTT Server"):
+    """Stage'ib mitme lehe .txt ja .json kustutamise ja teeb ÜHE commiti.
+
+    .jpg-d peavad olema ENNE liigutatud prügikasti (ei ole git-tracked).
+    Commiti ebaõnnestumisel lähtestab staging'u SKOOBITULT (ainult need teed),
+    et repo ei jääks poolikusse seisu, ja viskab erindi edasi.
+
+    Returns: eemaldatud relatiivsete teede list.
+    """
+    repo = get_or_init_repo()
+    removed = []
+    for base in base_names:
+        for ext in ('.txt', '.json'):
+            rel_path = os.path.join(folder_name, base + ext)
+            abs_path = os.path.join(BASE_DIR, rel_path)
+            if os.path.exists(abs_path):
+                try:
+                    repo.index.remove([rel_path])
+                    os.remove(abs_path)
+                    removed.append(rel_path)
+                except Exception:
+                    repo.git.rm('--cached', rel_path)
+                    os.remove(abs_path)
+                    removed.append(rel_path)
+
+    if not removed:
+        return []
+
+    try:
+        actor = Actor(username, f"{username}@vutt.local")
+        repo.index.commit(commit_msg, author=actor, committer=actor)
+    except Exception:
+        # Skoobitud rollback: un-stage ainult need teed ja taasta tööpuu failid HEAD-ist.
+        try:
+            repo.git.reset('--', *removed)
+            repo.git.checkout('HEAD', '--', *removed)
+        except Exception as re:
+            logger.error(f"GIT: batch-kustutuse rollback ebaõnnestus: {re}")
+        raise
+
+    logger.info(f"GIT: batch-kustutatud {len(removed)} faili kaustast {folder_name}")
+    return removed
+
+
 def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "VUTT Server") -> bool:
     """
     Eemaldab faili gitist ja teeb commit.

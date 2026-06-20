@@ -49,6 +49,7 @@ from .admin_page_ops import (
     clear_original_backup, get_page_sequence, get_sorted_images,
     rebalance_sequences, reorder_pages, split_page, transform_page_image,
     detect_and_convert_image, write_new_page, add_pages, work_lock,
+    delete_pages,
 )
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
@@ -479,6 +480,46 @@ async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_ro
 
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "new_page_count": new_page_count}
+
+
+def _validate_base_names(base_names):
+    """Valideerib ja de-dupe'b base_names'id. Viskab ValueError vigase sisendi korral.
+
+    Path-traversal kaitse: keela tee-eraldajad, '..' ja null-byte. TÕELINE kaitse on
+    op-tasemel täpne kuuluvus get_sorted_images() hulgas — see on vaid esimene filter.
+    """
+    if not base_names or not isinstance(base_names, list):
+        raise ValueError("base_names puudub või pole list")
+    seen = set()
+    out = []
+    for b in base_names:
+        if not isinstance(b, str) or not b:
+            raise ValueError("vigane base_name")
+        if '/' in b or '\\' in b or '..' in b or '\x00' in b:
+            raise ValueError("lubamatu märk base_name'is")
+        if b not in seen:
+            seen.add(b)
+            out.append(b)
+    return out
+
+
+@app.post("/admin/work/{work_id}/delete-pages")
+async def admin_delete_pages(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Kustutab mitu lehekülge korraga (kõik-või-mitte-midagi)."""
+    try:
+        body = await request.json()
+        base_names = _validate_base_names(body.get("base_names"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Vigane päring")
+
+    result = delete_pages(work_id, base_names, username=user['username'])
+    if result["status"] == "not_found":
+        raise HTTPException(status_code=404, detail={"missing": result["missing"]})
+    if result["status"] == "conflict":
+        raise HTTPException(status_code=409, detail={"missing": result["missing"]})
+    return result
 
 
 @app.post("/admin/work/{work_id}/page/{page_num}/replace-image")

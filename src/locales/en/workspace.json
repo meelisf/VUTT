@@ -111,6 +111,32 @@
     "managePageHint": "Page order, adding and deletion.",
     "tabPages": "Pages",
     "tabTrash": "Trash",
+    "select": {
+      "all": "Select all",
+      "clear": "Clear selection",
+      "count": "Selected: {{count}}"
+    },
+    "move": {
+      "label": "after page:",
+      "button": "Move",
+      "previewBetween": "→ between pages {{before}} and {{after}}",
+      "previewStart": "→ to the beginning",
+      "previewEnd": "→ to the end",
+      "anchorInSelection": "Target page is in the selection; use {{end}} to move the block to the end.",
+      "invalidTarget": "Invalid target number.",
+      "notSavedHint": "Order is previewed. Press Save order to confirm."
+    },
+    "reorder": {
+      "discard": "Discard changes",
+      "discardConfirm": "Discard all unsaved order changes?",
+      "changedSummary": "{{count}} page(s) differ from the saved order"
+    },
+    "bulkDelete": {
+      "button": "Delete selected",
+      "confirm": "Delete {{count}} page(s)? They move to trash and can be restored.",
+      "conflict": "The page list was stale — nothing deleted. The list was refreshed, try again.",
+      "draftBlocked": "Save or discard order changes before deleting."
+    },
     "tabs": {
       "replace": "Replace pages"
     },
