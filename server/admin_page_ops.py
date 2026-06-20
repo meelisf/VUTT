@@ -475,3 +475,39 @@ def clear_original_backup(work_id, filename):
     orig_backup = os.path.join(BASE_DIR, '._originals', work_id, filename)
     if os.path.exists(orig_backup):
         os.remove(orig_backup)
+
+
+def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, seq):
+    """Kirjutab uue lehe pildi + tühja .txt + minimaalse .json kausta staging_dir.
+
+    Nimekollisiooni kontroll käib work_dir suhtes (lõplik sihtkaust). EI committi.
+    """
+    new_id = generate_nanoid()
+    filename = f"{folder_name}-{work_id}-{new_id}{ext}"
+    while os.path.exists(os.path.join(work_dir, filename)) or \
+            os.path.exists(os.path.join(staging_dir, filename)):
+        new_id = generate_nanoid()
+        filename = f"{folder_name}-{work_id}-{new_id}{ext}"
+
+    base = os.path.splitext(filename)[0]
+    img_path = os.path.join(staging_dir, filename)
+    txt_path = os.path.join(staging_dir, base + '.txt')
+    json_path = os.path.join(staging_dir, base + '.json')
+    page_meta = {'sequence': seq, 'status': 'Toores'}
+    json_str = json.dumps(page_meta, indent=2, ensure_ascii=False)
+
+    with open(img_path, 'wb') as f:
+        f.write(content)
+    os.chmod(img_path, 0o644)
+    with open(txt_path, 'w', encoding='utf-8') as f:
+        f.write('')
+    os.chmod(txt_path, 0o644)
+    with open(json_path, 'w', encoding='utf-8') as f:
+        f.write(json_str)
+    os.chmod(json_path, 0o644)
+
+    return {
+        "filename": filename, "base": base,
+        "img_path": img_path, "txt_path": txt_path, "json_path": json_path,
+        "json_str": json_str, "page_meta": page_meta,
+    }
