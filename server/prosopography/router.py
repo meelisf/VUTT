@@ -35,6 +35,8 @@ from .work_relations_ops import get_work_relations
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
 from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo, save_with_git
 from ..rate_limit import get_client_ip, check_rate_limit
+from ..utils import find_directory_by_id
+from ..access_ops import is_work_public
 
 logger = get_logger(__name__)
 
@@ -253,6 +255,49 @@ async def prosopography_facets_post(request: Request):
         ids=id_list,
         collection=data.get("collection"),
     )
+
+
+def _load_work_meta(work_id: str):
+    """Laeb teose _metadata.json ID järgi. Tagastab None kui ei leitud."""
+    folder = find_directory_by_id(work_id)
+    if not folder:
+        return None
+    meta_path = os.path.join(folder, "_metadata.json")
+    if not os.path.exists(meta_path):
+        return None
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+@router.post("/work-titles")
+async def prosopography_work_titles(request: Request):
+    """Tagastab teoste pealkirjad ID järgi (sh kaitstud kollektsioonide teosed).
+
+    Isiku lehel kasutatakse seda varuvariandina: anonüümne/õiguseta kasutaja ei
+    saa Meilisearchist kaitstud kollektsiooni teose pealkirja (tenant token
+    filtreerib `is_public = true`). Pealkiri pole salajane — kuvame selle ikkagi,
+    kuid markeerime `restricted: true`, et frontend keelaks lingi ja ütleks, et
+    teos kuulub kaitstud kollektsiooni."""
+    data = await _get_json(request)
+    work_ids = data.get("work_ids") or []
+    if not isinstance(work_ids, list):
+        raise HTTPException(status_code=400, detail="work_ids peab olema massiiv")
+    result: dict = {}
+    for wid in work_ids[:200]:
+        if not isinstance(wid, str) or wid in result:
+            continue
+        meta = _load_work_meta(wid)
+        if meta is None:
+            continue
+        result[wid] = {
+            "title": meta.get("title") or "",
+            "year": meta.get("year"),
+            "restricted": not is_work_public(meta),
+        }
+    return {"titles": result}
 
 
 @router.post("")

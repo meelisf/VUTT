@@ -149,6 +149,31 @@ export async function getPerson(personId: string, token?: string): Promise<Proso
   return resp.json();
 }
 
+/**
+ * Teoste pealkirjad ID järgi varuvariandina, kui Meilisearch neid ei tagasta
+ * (kaitstud kollektsiooni teosed anonüümsele/õiguseta kasutajale).
+ * `restricted: true` → frontend kuvab pealkirja, kuid keelab lingi.
+ */
+export async function getWorkTitles(
+  workIds: string[],
+  token?: string,
+): Promise<Record<string, { title: string; year: number | null; restricted: boolean }>> {
+  if (workIds.length === 0) return {};
+  try {
+    const resp = await fetchWithTimeout(`${BASE}/work-titles`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
+      body: JSON.stringify({ work_ids: workIds }),
+      timeout: 10000,
+    });
+    if (!resp.ok) return {};
+    const data = await resp.json();
+    return data.titles || {};
+  } catch {
+    return {};
+  }
+}
+
 export async function createPerson(data: {
   name: string;
   birth_year?: number | null;

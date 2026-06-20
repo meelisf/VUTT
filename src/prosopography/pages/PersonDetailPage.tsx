@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
-  BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw,
+  BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw, Lock,
 } from 'lucide-react';
 import { isQCode } from '../../utils/qcodeUtils';
 import { formatYearDisplay, parseYearDisplayRange } from '../../utils/yearDisplayUtils';
 import Header from '../../components/Header';
-import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePerson } from '../services/prosopographyService';
+import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePerson, getWorkTitles } from '../services/prosopographyService';
 import EntityPicker from '../../components/EntityPicker';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
@@ -239,7 +239,7 @@ const PersonDetailPage: React.FC = () => {
   const [person, setPerson] = useState<ProsopoRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; year_display: string | null; collections: string[] }>>({});
+  const [workTitles, setWorkTitles] = useState<Record<string, { title: string; year: number | null; year_display: string | null; collections: string[]; restricted?: boolean }>>({});
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(30);
   const [tagsSaving, setTagsSaving] = useState(false);
@@ -316,11 +316,20 @@ const PersonDetailPage: React.FC = () => {
               attributesToRetrieve: ['work_id', 'title', 'year', 'year_display', 'collections_hierarchy'],
               limit: BATCH,
             }).then(res => allHits.push(...res.hits)).catch(() => {});
-          })).then(() => {
-            const map: Record<string, { title: string; year: number | null; year_display: string | null; collections: string[] }> = {};
+          })).then(async () => {
+            const map: Record<string, { title: string; year: number | null; year_display: string | null; collections: string[]; restricted?: boolean }> = {};
             for (const hit of allHits) {
               if (hit.work_id && !map[hit.work_id]) {
                 map[hit.work_id] = { title: hit.title ?? hit.work_id, year: hit.year ?? null, year_display: hit.year_display ?? null, collections: hit.collections_hierarchy ?? [] };
+              }
+            }
+            // Kaitstud kollektsiooni teoseid Meilisearch ei tagasta (anon/õiguseta) —
+            // küsi pealkirjad serverist, et neidki kuvada (lingita, märkega "kaitstud").
+            const missing = uniqueWorkIds.filter((wid: string) => !map[wid]);
+            if (missing.length > 0) {
+              const fallback = await getWorkTitles(missing, token);
+              for (const [wid, info] of Object.entries(fallback)) {
+                map[wid] = { title: info.title || wid, year: info.year, year_display: null, collections: [], restricted: info.restricted };
               }
             }
             setWorkTitles(map);
@@ -671,6 +680,29 @@ const PersonDetailPage: React.FC = () => {
                 const yearLabel = formatYearDisplay(meta?.year_display, meta?.year, t);
                 const inCollection = selectedCollection && meta?.collections?.includes(selectedCollection);
                 const colorClasses = inCollection ? getCollectionColorClasses(collections[selectedCollection!]) : null;
+                // Kaitstud kollektsiooni teos: kuva pealkiri, kuid ilma lingita (ligipääs puudub)
+                if (meta?.restricted) {
+                  const restrictedLabel = t('protectedCollection', 'Kuulub kaitstud kollektsiooni');
+                  return (
+                    <div
+                      key={`${work_id}-${role}`}
+                      title={restrictedLabel}
+                      className="flex items-center justify-between py-2 -mx-1 px-1 rounded cursor-default"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Lock size={13} className="shrink-0 text-gray-400" />
+                        <span className="text-sm text-gray-500 truncate">{title}</span>
+                        {yearLabel && <span className="text-xs shrink-0 text-gray-400">{yearLabel}</span>}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-3">
+                        <span className="text-xs px-1.5 py-0.5 rounded text-gray-400 bg-gray-100 truncate max-w-[10rem]" title={restrictedLabel}>
+                          {restrictedLabel}
+                        </span>
+                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{roleLabel}</span>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <Link
                     key={`${work_id}-${role}`}

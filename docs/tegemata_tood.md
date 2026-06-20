@@ -96,3 +96,7 @@ Luua `src/components/PageThumbnail.tsx` jagatud komponent ja asendada kõik kolm
 Arhiiviviidetel puudub inglise keel praegu.
 
 main.py on hiigelsuureks kasvanud
+
+kui ei ole sisse logitud või puudub õigus, siis kaitstud kollektsiooni kuuluvate teoste pealkirju isiku juures ei näidata ja on vaid nanoid. peaks siiski ikkagi pealkirja näitama, aga link lihtsalt peaks ütlema, et teos kuulub kaitstud kollektisooni. Nt https://vutt.utlib.ut.ee/persons/vutt:P4ovkgk puhul
+
+
