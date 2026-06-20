@@ -9,6 +9,7 @@ import shutil
 import io
 import re
 import unicodedata
+import uuid
 from datetime import datetime
 from git import Actor
 from git.exc import GitCommandError
@@ -582,3 +583,176 @@ def allocate_sequences(existing_seqs: list, after_page_num: int, n: int) -> dict
         return {"new_seqs": [seq_before + gap * k // (n + 1) for k in range(1, n + 1)],
                 "renumber": None}
     return renumber_all()
+
+
+# --- Bulk-lehe lisamise limiidid ---
+MAX_FILES_PER_REQUEST = 20
+MAX_REQUEST_BYTES = 200 * 1024 * 1024
+MAX_SINGLE_FILE_BYTES = 50 * 1024 * 1024
+
+
+def add_pages(work_id, files, after_page_num, username):
+    """Lisab mitu pildifaili teosele valitud positsioonile (nimejärgi sorteeritud).
+
+    files: list of (filename, bytes). Tagastab dict (vt Interfaces). Viskab
+    ValueError valideerimisvigade korral; found=False kui teost pole.
+    """
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+    folder_name = os.path.basename(path)
+
+    # --- Limiidi-kontroll ---
+    if not files:
+        raise ValueError("Faile pole")
+    if len(files) > MAX_FILES_PER_REQUEST:
+        raise ValueError(f"Liiga palju faile (max {MAX_FILES_PER_REQUEST})")
+    total = 0
+    for name, content in files:
+        if len(content) > MAX_SINGLE_FILE_BYTES:
+            raise ValueError(f"Fail liiga suur: {name}")
+        total += len(content)
+    if total > MAX_REQUEST_BYTES:
+        raise ValueError("Partii kogumaht liiga suur")
+
+    # --- Vahemikukontroll ---
+    images = get_sorted_images(path)
+    page_count = len(images)
+    if not (after_page_num == -1 or 0 <= after_page_num <= page_count):
+        raise ValueError(f"Vigane positsioon: {after_page_num}")
+
+    # --- Valideeri + teisenda KÕIK enne kirjutamist ---
+    converted = []  # (orig_name, jpeg_bytes, ext)
+    for name, content in files:
+        jpeg, ext = detect_and_convert_image(content, name)   # ValueError → katki
+        converted.append((name, jpeg, ext))
+
+    # --- Sorteeri nimejärgi (backend autoriteetne) ---
+    converted.sort(key=lambda t: natural_sort_key(t[0]))
+    n = len(converted)
+
+    # --- Jaota sequence'id ---
+    existing_seqs = []
+    for i, im in enumerate(images):
+        jp = os.path.join(path, os.path.splitext(im)[0] + '.json')
+        s = get_page_sequence(jp)
+        if s == float('inf'):
+            existing_seqs.append((i + 1) * 100)
+        else:
+            existing_seqs.append(int(s))
+    alloc = allocate_sequences(existing_seqs, after_page_num, n)
+    new_seqs = alloc["new_seqs"]
+    renumber = alloc["renumber"]
+
+    # --- Temp-staging ---
+    staging = os.path.join(path, f".tmp-bulk-{uuid.uuid4().hex[:8]}")
+    os.makedirs(staging, exist_ok=True)
+    written_pages = []        # write_new_page dictid (staging-teedega)
+    moved_final = []          # lõppasukohta liigutatud teed (cleanup jaoks)
+    json_backups = {}         # olemasoleva json_path -> originaalsisu (restore jaoks)
+
+    try:
+        # Kirjuta uued lehed staging-kausta
+        for (name, jpeg, ext), seq in zip(converted, new_seqs):
+            page = write_new_page(path, staging, folder_name, work_id, jpeg, ext, seq)
+            written_pages.append(page)
+
+        # Liiguta uued failid (img+txt+json) lõppasukohta (os.replace = atomaarne/FS)
+        for page in written_pages:
+            for src in (page["img_path"], page["txt_path"], page["json_path"]):
+                dst = os.path.join(path, os.path.basename(src))
+                os.replace(src, dst)
+                moved_final.append(dst)
+
+        # Renumberdamisel: uuenda olemasolevate lehtede json sequence (säilita ülejäänu)
+        renumber_files = []   # (json_path, new_content) save_with_git jaoks
+        if renumber is not None:
+            for im, new_seq in zip(images, renumber):
+                jp = os.path.join(path, os.path.splitext(im)[0] + '.json')
+                orig = ''
+                d = {}
+                if os.path.exists(jp):
+                    with open(jp, 'r', encoding='utf-8') as f:
+                        orig = f.read()
+                    try:
+                        d = json.loads(orig)
+                    except Exception:
+                        d = {}
+                json_backups[jp] = orig
+                if 'meta_content' in d:
+                    d['meta_content']['sequence'] = new_seq
+                else:
+                    d['sequence'] = new_seq
+                new_content = json.dumps(d, indent=2, ensure_ascii=False)
+                with open(jp, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                renumber_files.append((jp, new_content))
+
+        # --- ÜKS git-commit ---
+        # primary = esimese uue lehe .txt; additional = ülejäänud txt + kõik json
+        first = written_pages[0]
+        first_txt_final = os.path.join(path, first["base"] + '.txt')
+        additional = []
+        for page in written_pages:
+            base = page["base"]
+            if page is not first:
+                additional.append((os.path.join(path, base + '.txt'), ''))
+            additional.append((os.path.join(path, base + '.json'), page["json_str"]))
+        additional.extend(renumber_files)
+
+        res = save_with_git(
+            first_txt_final, '', username,
+            message=f"Lisa {n} lehte: {folder_name} [after={after_page_num}]",
+            additional_files=additional,
+        )
+        if not res.get("success"):
+            raise RuntimeError(f"Git commit ebaõnnestus: {res.get('error')}")
+    except Exception:
+        _cleanup_bulk(staging, moved_final, json_backups)
+        raise
+    finally:
+        # Eemalda staging-kaust igal juhul (kui veel alles)
+        if os.path.isdir(staging):
+            try:
+                shutil.rmtree(staging, ignore_errors=True)
+            except Exception:
+                logger.critical(f"Bulk staging cleanup ebaõnnestus: {staging}")
+
+    # --- Meili sync (viga ei tühista juba salvestatut) ---
+    meili_warning = None
+    try:
+        sync_work_to_meilisearch(folder_name)
+    except Exception as e:
+        meili_warning = str(e)
+        logger.error(f"add_pages meili sync ebaõnnestus ({folder_name}): {e}")
+
+    inserted = [{"filename": p["filename"], "sequence": s}
+                for p, s in zip(written_pages, new_seqs)]
+    return {
+        "found": True,
+        "new_page_count": len(get_sorted_images(path)),
+        "inserted": inserted,
+        "meili_warning": meili_warning,
+    }
+
+
+def _cleanup_bulk(staging, moved_final, json_backups):
+    """Robustne cleanup: kustuta staging + lõppasukohta liigutatud uued failid,
+    taasta olemasolevad .json-id. Cleanup-viga logitakse critical-ina."""
+    try:
+        if os.path.isdir(staging):
+            shutil.rmtree(staging, ignore_errors=True)
+    except Exception:
+        logger.critical(f"Bulk cleanup: staging eemaldamine ebaõnnestus: {staging}")
+    for dst in moved_final:
+        try:
+            if os.path.exists(dst):
+                os.remove(dst)
+        except Exception:
+            logger.critical(f"Bulk cleanup: uue faili eemaldamine ebaõnnestus: {dst}")
+    for jp, orig in json_backups.items():
+        try:
+            with open(jp, 'w', encoding='utf-8') as f:
+                f.write(orig)
+        except Exception:
+            logger.critical(f"Bulk cleanup: json taastamine ebaõnnestus: {jp}")
