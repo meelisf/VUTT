@@ -480,7 +480,7 @@ def clear_original_backup(work_id, filename):
 def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, seq):
     """Kirjutab uue lehe pildi + tühja .txt + minimaalse .json kausta staging_dir.
 
-    Nimekollisiooni kontroll käib work_dir suhtes (lõplik sihtkaust). EI committi.
+    Nimekollisiooni kontroll käib nii work_dir kui staging_dir suhtes. EI committi.
     """
     new_id = generate_nanoid()
     filename = f"{folder_name}-{work_id}-{new_id}{ext}"
@@ -509,5 +509,5 @@ def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, se
     return {
         "filename": filename, "base": base,
         "img_path": img_path, "txt_path": txt_path, "json_path": json_path,
-        "json_str": json_str, "page_meta": page_meta,
+        "json_str": json_str, "page_meta": dict(page_meta),
     }

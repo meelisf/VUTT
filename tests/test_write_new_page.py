@@ -1,6 +1,7 @@
 """Testid write_new_page helperile."""
 import os
 import json
+import stat
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -25,6 +26,10 @@ def test_write_new_page_creates_three_files(tmp_path):
     assert d["sequence"] == 150
     assert d["status"] == "Toores"
     assert res["page_meta"]["sequence"] == 150
+
+    # Kontrolli õiguste (0o644)
+    for p in (res["img_path"], res["txt_path"], res["json_path"]):
+        assert stat.S_IMODE(os.stat(p).st_mode) == 0o644
 
 
 def test_write_new_page_filename_pattern(tmp_path):
