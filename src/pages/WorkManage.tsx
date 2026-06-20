@@ -417,7 +417,7 @@ const WorkManage: React.FC = () => {
         setAddAfterPage(-1);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
-      if (meiliWarned) setAddPageError(t('manage.addPagesMeiliWarning'));
+      if (meiliWarned && !cancelRef.current) setAddPageError(t('manage.addPagesMeiliWarning'));
     } catch (e: any) {
       await loadPages(); // peegelda osaline tulemus
       setAddPageError(t('manage.addPagesPartialError', { added: done, error: e.message }));
@@ -794,8 +794,10 @@ const WorkManage: React.FC = () => {
                     <div className="text-xs text-gray-600">
                       <p className="font-medium mb-1">{t('manage.addPagesPreview')}</p>
                       <ol className="list-decimal list-inside space-y-0.5">
-                        {(showAllNames ? addFiles : [...addFiles.slice(0, 10), ...addFiles.slice(-5)])
-                          .map((f, i) => <li key={i} className="truncate">{f.name}</li>)}
+                        {(showAllNames || addFiles.length <= 15
+                          ? addFiles
+                          : [...addFiles.slice(0, 10), ...addFiles.slice(-5)]
+                        ).map((f, i) => <li key={i} className="truncate">{f.name}</li>)}
                       </ol>
                       {addFiles.length > 15 && (
                         <button
