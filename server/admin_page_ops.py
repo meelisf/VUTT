@@ -511,3 +511,53 @@ def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, se
         "img_path": img_path, "txt_path": txt_path, "json_path": json_path,
         "json_str": json_str, "page_meta": dict(page_meta),
     }
+
+
+def allocate_sequences(existing_seqs: list, after_page_num: int, n: int) -> dict:
+    """Jaotab n uut sequence-väärtust valitud positsioonile.
+
+    Sisestus:
+        existing_seqs: olemasolevate lehtede sequence'id sorteeritud järjekorras (M tk).
+        after_page_num: -1=lõppu, 0=algusesse, 1..M=selle lehe järele.
+        n: kui palju uusi lehti lisa.
+
+    Väljund:
+        {"new_seqs": [n], "renumber": None|[M]}.
+        new_seqs: uute lehtede rangelt kasvavad sequence'id.
+        renumber: kui pesa mahutab, None. Kui ei mahuta,
+                  olemasolevate lehtede uued sequence'id ühendatud järjestuses.
+    """
+    m = len(existing_seqs)
+    # Sisestuspunkt P = mitu olemasolevat lehte jääb ette
+    p = m if after_page_num == -1 else after_page_num
+
+    def renumber_all():
+        """Ühendatud järjestus: ette p olemasolevat, siis n uut, siis ülejäänud."""
+        existing_new = [(i + 1) * 100 if i < p else (i + 1 + n) * 100
+                        for i in range(m)]
+        new_seqs = [(p + k) * 100 for k in range(1, n + 1)]
+        return {"new_seqs": new_seqs, "renumber": existing_new}
+
+    # Lõppu või tühja teosesse
+    if p >= m:
+        seq_before = existing_seqs[-1] if m else 0
+        return {"new_seqs": [seq_before + 100 * k for k in range(1, n + 1)],
+                "renumber": None}
+
+    # Algusesse
+    if p == 0:
+        seq_after = existing_seqs[0]
+        gap = seq_after  # alumine piir 0 (eksklusiivne)
+        if gap > n:
+            return {"new_seqs": [gap * k // (n + 1) for k in range(1, n + 1)],
+                    "renumber": None}
+        return renumber_all()
+
+    # Vahele
+    seq_before = existing_seqs[p - 1]
+    seq_after = existing_seqs[p]
+    gap = seq_after - seq_before
+    if gap > n:
+        return {"new_seqs": [seq_before + gap * k // (n + 1) for k in range(1, n + 1)],
+                "renumber": None}
+    return renumber_all()
