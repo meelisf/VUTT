@@ -69,9 +69,11 @@ Plokk `[1,2,3,4,5]` välja → ülejäänud `[6,7,8,9,10]` → aseta lehe 9 jär
 ## Liides (Leheküljed tab)
 
 **Pisipildi muutused:**
-- Lisa **märkeruut** igale pisipildile (klõps lülitab; shift-klõps = vahemik viimasest klõpsust). Valitud = rõngas/ring-esiletõst.
+- Lisa **märkeruut** igale pisipildile. Klõps lülitab; **shift-klõps = vahemik** viimasest "ankur-klõpsust" praeguseni. Valitud = rõngas/ring-esiletõst.
 - **Eemalda** segadusttekitav pisipildi number-väli + ↵-rakenda-nupp.
 - **Säilita** üles/alla nooled (üksammuline nügimine, ühemõtteline).
+
+**Shift-vahemiku valik (ruudustikus):** `pages` on juba järjestatud `page_num` järgi ja renderdatakse samas järjekorras, seega **massiivi-indeks = visuaalne järjekord** (vasakult-paremalt, ülalt-alla). Shift-vahemik = `pages` massiivi indeksid `min(anchorIdx, currentIdx)..max(...)`, MITTE renderdusjärjekord. Hoia `lastSelectedIndexRef` (viimase tava-klõpsu indeks) shift-ankruks; tühjenda valiku-tühjendusel.
 
 **Valiku-riba** (ilmub kui ≥1 valitud, lehtede ruudustiku kohale):
 - `Valitud: N`
@@ -88,6 +90,12 @@ Plokk `[1,2,3,4,5]` välja → ülejäänud `[6,7,8,9,10]` → aseta lehe 9 jär
 **Valik pärast "Liiguta":** valik **jääb alles** (samad lehed, uues asukohas), et kasutaja näeks liigutatud plokki ja saaks kohe parandada. Eeldab, et amber-eelvaade ja valiku-rõngas on selgelt eristatavad.
 
 **Üles/alla nooled:** töötavad alati **nähtaval (draft) järjekorral**, mitte algsel serveri-järjekorral — kui bulk-liigutus on tehtud, nügib nool lehte juba uues eelvaates. Nool liigutab **ainult seda üht lehte** (mitte kogu valikut), olenemata sellest, kas leht on valitud — ploki liigutamine käib ainult valiku-riba kaudu. Nii ei teki teist semantilist kihti.
+
+### Jõudlus (kuni ~500 lk ruudustik)
+
+- **Memoiseeritud kaart:** ekstrakti pisipilt-kaart eraldi `React.memo` komponendiks, mille propsid on **primitiivid** (`isSelected`, `isChanged`, `pageNum`, `src`, callbackid stabiilsete `useCallback`-idega). Nii renderdab valiku/draft'i muutus uuesti AINULT mõjutatud kaardid, mitte kõiki 500. NB: number-välja eemaldamine **vähendab** juba praegust re-render survet (praegu renderdab iga klahvivajutus `inputValues`-i kaudu kogu ruudustiku).
+- **Valiku olek:** `Set<string>` (filename); kaardile anna `isSelected={selected.has(filename)}` boolean, mitte kogu Set'i. Shift-vahemiku puhul üks `setState` (ehita uus Set), mitte 100 eraldi uuendust.
+- **Minimaalsed päringud:** bulk-kustutuse järel uuenda nimekiri ühe `loadPages()`-iga (nagu olemasolevad teed); ära tee päringut lehe kohta.
 
 **Kustutamise voog:** "Kustuta valitud" → kinnitusdialoog (N lehega) → uus `POST /admin/work/{id}/delete-pages`. Õnnestumisel värskenda + tühjenda valik. **409 Conflict** (stale UI / paralleelmuudatus) → midagi pole kustutatud; kuva teade ja **värskenda lehtede nimekiri** (kasutaja saab uuesti valida). Pehme kustutus → taastatav "Prügikast" tabist (käitumine ei muutu).
 
@@ -112,7 +120,7 @@ Olemasoleva `DELETE .../page/{page_num}`-i **tsüklis kutsumine on vigane**: pä
   5. Kustuta kõigi lehtede `.txt` + `.json` gitist **ühe commit'iga** (`repo.index.remove([...])` + üks `commit`).
   6. **Üks** `sync_work_to_meilisearch(folder_name)` kõigi järel.
   7. Tagasta `{ status, deleted: [...], new_page_count }`.
-- **Rollback / taastatavus:** kuna kõik lahendatakse ja valideeritakse **enne** ühtegi faililiigutust, on tavaline vea-aken kitsas. Kui git-commit (samm 5) ebaõnnestub pärast piltide prügikasti liigutamist (samm 4), **liiguta pildid prügikastist tagasi** (kompenseeriv samm) ja tagasta 500 — seis jääb operatsiooni-eelseks. Alternatiiv: operatsioon peab olema idempotentne nii, et sama kutse kordamine viib lõpule. Lukustatud valik: **kompenseeriv tagasiliigutus.**
+- **Rollback / taastatavus:** kuna kõik lahendatakse ja valideeritakse **enne** ühtegi faililiigutust, on tavaline vea-aken kitsas (pildi prügikasti liigutamine samal kettal = sisuliselt rename, väga kiire ja madala tõrketõenäosusega). Kui git-commit (samm 5) ebaõnnestub pärast piltide prügikasti liigutamist (samm 4), **liiguta pildid prügikastist tagasi** (kompenseeriv samm) ja tagasta 500 — seis jääb operatsiooni-eelseks. Lukustatud valik: **kompenseeriv tagasiliigutus** (mitte idempotentsus-eeldus). **Logi** liigutatavate failide nimed/teed vahetult ENNE mutatsiooni (samm 4) — kui protsess krahhib keset operatsiooni (enne kompensatsiooni), on logist administraatorile käsitsi taastamine lihtne.
 - Uus op-funktsioon `server/admin_page_ops.py::delete_pages(work_id, base_names, username)` — batch-versioon olemasolevast loogikast (taaskasutab `admin_delete_page` prügikasti- ja git-loogika osi, aga ühe commit'i ja ühe reindeksiga).
 
 ## Testitavus
