@@ -502,25 +502,13 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
     if not file:
         raise HTTPException(status_code=400, detail="Fail puudub")
 
-    # Kontrolli failitüüpi ja konverteeri PNG → JPG (enne luku võtmist)
+    # Kontrolli failitüüpi + teisenda (jagatud helper: magic-byte, mõõtmekaitse,
+    # PNG→JPG valgele taustale). Enne luku võtmist.
     content = await file.read()
-    if content[:4] == b'\xff\xd8\xff\xe0' or content[:4] == b'\xff\xd8\xff\xe1':
-        pass  # JPG on OK
-    elif content[:8] == b'\x89PNG\r\n\x1a\n':
-        # Teisenda PNG → JPG
-        try:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(content))
-            if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            buf = io.BytesIO()
-            img.save(buf, format='JPEG', quality=95)
-            content = buf.getvalue()
-        except ImportError:
-            raise HTTPException(status_code=500, detail="Pillow pole saadaval PNG teisendamiseks")
-    else:
-        raise HTTPException(status_code=400, detail="Toetatud formaadid: JPG, PNG")
+    try:
+        content, _ext = detect_and_convert_image(content, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     with work_lock(folder_name, path):
         images = get_sorted_images(path)
@@ -694,7 +682,11 @@ async def admin_add_pages(work_id: str, request: Request, user=Depends(require_r
         files.append((up.filename or "", content))
 
     try:
-        result = add_pages(work_id, files, after_page_num, user['username'])
+        # add_pages on blokeeriv (Pillow-teisendus, failikirjutus, flock, git commit) —
+        # offload threadpooli, et mitte külmutada single-worker event-loopi (vt OCR-SSH outage)
+        import asyncio
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, add_pages, work_id, files, after_page_num, user['username'])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):

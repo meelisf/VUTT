@@ -66,12 +66,17 @@ def work_lock(work_id, work_dir):
 def natural_sort_key(name):
     """Kanooniline loomulik-sort võti (peab JS-poolega kokku langema).
 
-    NFC-normaliseerimine, casefold, numbri/teksti-plokid (numbrid arvuna).
+    NFC-normaliseerimine, lower-case, numbri/teksti-plokid (numbrid arvuna).
     Viigi-katkestaja: originaalnimi (stabiilne determinism nt '02' vs '2').
     Tokeniseerimine: re.split(r'(\\d+)') → numbrist algav/lõppev string annab
     tühje elemente (nt '2.jpg' → ['', '2', '.jpg']) — JS peab käituma identselt.
+
+    NB: kasutame .lower() (mitte .casefold()), et langeda kokku JS .toLowerCase()-iga
+    (casefold on agressiivsem: 'ß'→'ss', mida JS-il pole). Eksootilise Unicode korral
+    (nt lõpp-sigma) võivad järjekorrad ikka erineda — backend on autoriteetne, frontend
+    sort on vaid eelvaate jaoks.
     """
-    norm = unicodedata.normalize('NFC', name).casefold()
+    norm = unicodedata.normalize('NFC', name).lower()
     tokens = re.split(r'(\d+)', norm)
     key = []
     for i, tok in enumerate(tokens):
@@ -646,6 +651,13 @@ def add_pages(work_id, files, after_page_num, username):
 
     files: list of (filename, bytes). Tagastab dict (vt Interfaces). Viskab
     ValueError valideerimisvigade korral; found=False kui teost pole.
+
+    Atomaarsus: üks väljakutse = ÜKS git-commit (kõik uued lehed + ümbernummerdatud
+    olemasolevad). Osalise vea korral (mõni fail kirjutatud, siis viga) teeb
+    `_cleanup_bulk` täieliku tagasipööramise. NB: frontend tükeldab suured partiid
+    (>MAX_FILES_PER_REQUEST / >MAX_REQUEST_BYTES) mitmeks päringuks — iga tükk on
+    eraldi commit, seega tükkide-ülest atomaarsust EI ole (vahepealse tüki viga jätab
+    varasemad tükid sisse). Vt WorkManage.tsx handleAddPage.
     """
     path = find_directory_by_id(work_id)
     if not path:

@@ -8,7 +8,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from PIL import Image
+from git import Actor
 import server.admin_page_ops as aps
+import server.git_ops as git_ops
 from server.admin_page_ops import add_pages, get_sorted_images
 
 
@@ -112,3 +114,70 @@ def test_meili_failure_returns_warning_not_raise(work, monkeypatch):
     res = add_pages(work["work_id"], [("a.jpg", _jpg())], after_page_num=-1, username="admin")
     assert res["meili_warning"] is not None
     assert res["new_page_count"] == 3       # leht ikka lisatud
+
+
+def test_partial_failure_rolls_back(work, monkeypatch):
+    """Renumber + git-commit ebaõnnestub → _cleanup_bulk taastab algoleku täielikult."""
+    folder = work["folder"]
+    # Sunni renumber: gap=1 (seq 100,101) → 1 fail ei mahu pessa
+    pg2 = folder / "1690-test-w1-w1-pg002.json"
+    d = json.load(open(str(pg2))); d["sequence"] = 101
+    pg2.write_text(json.dumps(d), encoding="utf-8")
+
+    before_files = set(os.listdir(folder))
+    before_pg2 = pg2.read_text()
+
+    monkeypatch.setattr(aps, "save_with_git",
+                        lambda *a, **kw: {"success": False, "error": "boom"})
+    with pytest.raises(RuntimeError):
+        add_pages(work["work_id"], [("f.jpg", _jpg())], after_page_num=1, username="admin")
+
+    # .vutt-lock jääb alles (lukufail, ootuspärane) — võrdle ilma selleta
+    after_files = set(os.listdir(folder)) - {".vutt-lock"}
+    assert after_files == before_files               # uued failid + staging eemaldatud
+    assert pg2.read_text() == before_pg2             # ümbernummerdatud json taastatud
+
+
+# --- Päris git-repo integratsioonitest (save_with_git EI ole mock'itud) ---
+
+@pytest.fixture
+def work_realgit(tmp_path, monkeypatch):
+    wid = "w1"
+    folder = tmp_path / "1690-test-w1"
+    folder.mkdir()
+    for i, seq in enumerate([100, 200], start=1):
+        base = f"1690-test-w1-w1-pg{i:03d}"
+        Image.new("RGB", (8, 8), (i, i, i)).save(str(folder / (base + ".jpg")), "JPEG")
+        (folder / (base + ".txt")).write_text("", encoding="utf-8")
+        (folder / (base + ".json")).write_text(
+            json.dumps({"sequence": seq, "status": "Valmis", "extra": "hoia alles"}),
+            encoding="utf-8")
+    (folder / "_metadata.json").write_text(json.dumps({"id": wid}), encoding="utf-8")
+
+    # Päris git-repo tmp_path-is — testib ÜHE-commiti invarianti (NB: save_with_git mock'imata)
+    monkeypatch.setattr(aps, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(git_ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(git_ops, "_git_repo", None)
+    monkeypatch.setattr(aps, "find_directory_by_id",
+                        lambda w: str(folder) if w == wid else None)
+    monkeypatch.setattr(aps, "sync_work_to_meilisearch", lambda *a: None)
+    repo = git_ops.get_or_init_repo()
+    actor = Actor("test", "test@vutt.local")
+    repo.git.add(A=True)
+    repo.index.commit("init", author=actor, committer=actor)
+    return {"folder": folder, "work_id": wid, "repo": repo}
+
+
+def test_add_pages_is_single_commit_realgit(work_realgit):
+    repo = work_realgit["repo"]
+    before = len(list(repo.iter_commits()))
+    files = [("b_scan_2.jpg", _jpg()), ("a_scan_1.jpg", _jpg())]
+    res = add_pages(work_realgit["work_id"], files, after_page_num=1, username="admin")
+
+    assert res["new_page_count"] == 4
+    after = len(list(repo.iter_commits()))
+    assert after == before + 1                       # TÄPSELT üks uus commit
+    assert not repo.is_dirty(untracked_files=False)  # tööpuu puhas (kõik committed)
+    # Uute lehtede .txt/.json on git-is jälitatud (.jpg ignoreeritud .gitignore'is)
+    tracked = repo.git.ls_files().splitlines()
+    assert sum(1 for t in tracked if t.endswith(".txt")) == 4

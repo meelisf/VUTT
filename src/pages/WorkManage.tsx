@@ -383,6 +383,8 @@ const WorkManage: React.FC = () => {
     cancelRef.current = false;
 
     const sorted = [...addFiles].sort((a, b) => naturalCompare(a.name, b.name));
+    // Iga tükk on backendis eraldi git-commit (tükkide-ülest atomaarsust ei ole):
+    // vahepealse tüki viga jätab varasemad tükid sisse → kuvame addPagesPartialError.
     const chunks = planChunks(sorted, addAfterPage, CHUNK_MAX_FILES, CHUNK_MAX_BYTES);
     const total = sorted.length;
     let done = 0;
@@ -391,6 +393,8 @@ const WorkManage: React.FC = () => {
 
     try {
       for (const chunk of chunks) {
+        // Tühistus on tüki-granulaarne: parajasti pooleliolev tükk jõuab veel
+        // serverisse committida; katkestus rakendub alles järgmise tüki ees.
         if (cancelRef.current) break;
         const formData = new FormData();
         chunk.files.forEach((f) => formData.append('file', f));

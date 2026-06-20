@@ -1,5 +1,7 @@
 // Kanooniline loomulik-sort, peab langema kokku Python natural_sort_key-ga
-// (NFC + lower + numbri/teksti-plokid, numbrid arvuna; viik → originaalnimi).
+// (NFC + toLowerCase + numbri/teksti-plokid, numbrid arvuna; viik → originaalnimi).
+// NB: Python kasutab .lower() (mitte .casefold()) sama parituse jaoks. Eksootilise
+// Unicode korral võib järjekord erineda — backend on autoriteetne, see on eelvaade.
 
 type Token = [number, number, string];   // (tüüp, arv, tekst): tekst=(0,..) num=(1,..)
 
