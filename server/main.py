@@ -45,7 +45,11 @@ from .cache import (
     get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-from .admin_page_ops import clear_original_backup, get_page_sequence, get_sorted_images, rebalance_sequences, reorder_pages, split_page, transform_page_image
+from .admin_page_ops import (
+    clear_original_backup, get_page_sequence, get_sorted_images,
+    rebalance_sequences, reorder_pages, split_page, transform_page_image,
+    detect_and_convert_image, write_new_page,
+)
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices
@@ -584,28 +588,12 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
     if not file:
         raise HTTPException(status_code=400, detail="Fail puudub")
 
-    # Kontrolli failitüüpi
+    # Kontrolli failitüüpi + teisenda (jagatud helper)
     content = await file.read()
-    if content[:4] == b'\xff\xd8\xff\xe0' or content[:4] == b'\xff\xd8\xff\xe1':
-        ext = '.jpg'
-    elif content[:8] == b'\x89PNG\r\n\x1a\n':
-        # Teisenda PNG → JPG
-        try:
-            from PIL import Image
-            import io
-            img = Image.open(io.BytesIO(content))
-            if img.mode in ('RGBA', 'LA', 'P'):
-                img = img.convert('RGB')
-            buf = io.BytesIO()
-            img.save(buf, format='JPEG', quality=95)
-            content = buf.getvalue()
-        except ImportError:
-            pass
-        ext = '.jpg'
-    elif content[:4] == b'%PDF':
-        raise HTTPException(status_code=400, detail="PDF pole toetatud, kasuta JPG/PNG")
-    else:
-        raise HTTPException(status_code=400, detail="Toetatud formaadid: JPG, PNG")
+    try:
+        content, ext = detect_and_convert_image(content, file.filename or "")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Arvuta uus sequence
     images = get_sorted_images(path)
@@ -658,34 +646,15 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
             seq_after_val = get_page_sequence(os.path.join(path, os.path.splitext(images[idx+1])[0] + '.json')) if idx + 1 < len(images) else (after_page_num + 1) * 100
             new_seq = (int(seq_before) + int(seq_after_val)) // 2
 
-    # Salvesta pildifail ainulaadse nimega ({folder_name}-{work_id}-{nanoid}, kontrolli kolliisiooni)
-    new_id = generate_nanoid()
-    new_filename = f"{folder_name}-{work_id}-{new_id}{ext}"
-    while os.path.exists(os.path.join(path, new_filename)):
-        new_id = generate_nanoid()
-        new_filename = f"{folder_name}-{work_id}-{new_id}{ext}"
-    new_img_path = os.path.join(path, new_filename)
-    with open(new_img_path, 'wb') as f:
-        f.write(content)
-    os.chmod(new_img_path, 0o644)
-
-    # Loo tühi .txt
-    base = os.path.splitext(new_filename)[0]
-    txt_path = os.path.join(path, base + '.txt')
-    with open(txt_path, 'w', encoding='utf-8') as f:
-        f.write('')
-    os.chmod(txt_path, 0o644)
-
-    # Loo minimaalne .json sequence'ga
-    json_path = os.path.join(path, base + '.json')
-    page_meta = {'sequence': new_seq, 'status': 'Toores'}
-    with open(json_path, 'w', encoding='utf-8') as f:
-        json.dump(page_meta, f, indent=2, ensure_ascii=False)
-    os.chmod(json_path, 0o644)
+    # Salvesta leht (jagatud helper; single → staging == work dir)
+    page = write_new_page(path, path, folder_name, work_id, content, ext, new_seq)
+    new_filename = page["filename"]
+    base = page["base"]
+    txt_path = page["txt_path"]
+    json_path = page["json_path"]
+    page_meta = page["page_meta"]
 
     # Git commit
-    txt_rel = os.path.join(folder_name, base + '.txt')
-    json_rel = os.path.join(folder_name, base + '.json')
     save_with_git(
         txt_path, '',
         user['username'],
