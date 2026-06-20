@@ -23,6 +23,11 @@ import PageImageEditorModal from '../components/PageImageEditorModal';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { naturalCompare } from '../utils/naturalSort';
+import { planChunks } from '../utils/bulkAddChunks';
+
+const CHUNK_MAX_FILES = 20;
+const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
 
 interface PageInfo {
   page_num: number;
@@ -112,7 +117,10 @@ const WorkManage: React.FC = () => {
   // Lehekülje lisamine
   const [showAddForm, setShowAddForm] = useState(false);
   const [addAfterPage, setAddAfterPage] = useState<number>(-1);
-  const [addFile, setAddFile] = useState<File | null>(null);
+  const [addFiles, setAddFiles] = useState<File[]>([]);
+  const [showAllNames, setShowAllNames] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  const cancelRef = useRef(false);
   const [addingPage, setAddingPage] = useState(false);
   const [addPageError, setAddPageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -369,36 +377,56 @@ const WorkManage: React.FC = () => {
   };
 
   const handleAddPage = async () => {
-    if (!workId || !authToken || !addFile) return;
+    if (!workId || !authToken || addFiles.length === 0) return;
     setAddingPage(true);
     setAddPageError(null);
+    cancelRef.current = false;
+
+    const sorted = [...addFiles].sort((a, b) => naturalCompare(a.name, b.name));
+    // Iga tükk on backendis eraldi git-commit (tükkide-ülest atomaarsust ei ole):
+    // vahepealse tüki viga jätab varasemad tükid sisse → kuvame addPagesPartialError.
+    const chunks = planChunks(sorted, addAfterPage, CHUNK_MAX_FILES, CHUNK_MAX_BYTES);
+    const total = sorted.length;
+    let done = 0;
+    let meiliWarned = false;
+    setUploadProgress({ done: 0, total });
 
     try {
-      const formData = new FormData();
-      formData.append('file', addFile);
-      formData.append('after_page_num', String(addAfterPage));
+      for (const chunk of chunks) {
+        // Tühistus on tüki-granulaarne: parajasti pooleliolev tükk jõuab veel
+        // serverisse committida; katkestus rakendub alles järgmise tüki ees.
+        if (cancelRef.current) break;
+        const formData = new FormData();
+        chunk.files.forEach((f) => formData.append('file', f));
+        formData.append('after_page_num', String(chunk.afterPageNum));
 
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/add-page`,
-        { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
+        const res = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/work/${workId}/add-pages`,
+          { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 120000 }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (data.meili_warning) meiliWarned = true;
+        done += chunk.files.length;
+        setUploadProgress({ done, total });
       }
-      const data = await res.json();
-      if (data.status === 'success') {
+
+      await loadPages();
+      if (!cancelRef.current) {
         setShowAddForm(false);
-        setAddFile(null);
+        setAddFiles([]);
         setAddAfterPage(-1);
         if (fileInputRef.current) fileInputRef.current.value = '';
-        await loadPages();
-      } else {
-        setAddPageError(t('manage.addPageError'));
       }
+      if (meiliWarned && !cancelRef.current) setAddPageError(t('manage.addPagesMeiliWarning'));
     } catch (e: any) {
-      setAddPageError(e.message || t('manage.addPageError'));
+      await loadPages(); // peegelda osaline tulemus
+      setAddPageError(t('manage.addPagesPartialError', { added: done, error: e.message }));
     } finally {
+      setUploadProgress(null);
       setAddingPage(false);
     }
   };
@@ -731,9 +759,21 @@ const WorkManage: React.FC = () => {
                       ref={fileInputRef}
                       type="file"
                       accept="image/jpeg,image/png"
-                      onChange={(e) => setAddFile(e.target.files?.[0] || null)}
+                      multiple
+                      disabled={addingPage}
+                      onChange={(e) => {
+                        const list = Array.from(e.target.files || []);
+                        list.sort((a, b) => naturalCompare(a.name, b.name));
+                        setAddFiles(list);
+                        setShowAllNames(false);
+                      }}
                       className="text-sm text-gray-700"
                     />
+                    {addFiles.length > 1 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {t('manage.addPagesFilesSelected', { count: addFiles.length })}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -741,6 +781,7 @@ const WorkManage: React.FC = () => {
                     <select
                       value={addAfterPage}
                       onChange={(e) => setAddAfterPage(Number(e.target.value))}
+                      disabled={addingPage}
                       className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white"
                     >
                       <option value={0}>{t('manage.addPageToBeginning')}</option>
@@ -753,25 +794,62 @@ const WorkManage: React.FC = () => {
                     </select>
                   </div>
 
+                  {addFiles.length > 1 && (
+                    <div className="text-xs text-gray-600">
+                      <p className="font-medium mb-1">{t('manage.addPagesPreview')}</p>
+                      <ol className="list-decimal list-inside space-y-0.5">
+                        {(showAllNames || addFiles.length <= 15
+                          ? addFiles
+                          : [...addFiles.slice(0, 10), ...addFiles.slice(-5)]
+                        ).map((f, i) => <li key={i} className="truncate">{f.name}</li>)}
+                      </ol>
+                      {addFiles.length > 15 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowAllNames((v) => !v)}
+                          className="mt-1 text-primary-600 hover:underline"
+                        >
+                          {showAllNames
+                            ? t('manage.addPagesShowLess')
+                            : t('manage.addPagesShowAll', { count: addFiles.length })}
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {addPageError && (
                     <p className="text-sm text-red-600">{addPageError}</p>
                   )}
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleAddPage}
-                      disabled={!addFile || addingPage}
+                      disabled={addFiles.length === 0 || addingPage}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded transition-colors"
                     >
                       {addingPage ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      {t('manage.addPageSubmit')}
+                      {addFiles.length > 1
+                        ? t('manage.addPagesSubmitMulti', { count: addFiles.length })
+                        : t('manage.addPageSubmit')}
                     </button>
                     <button
-                      onClick={() => { setShowAddForm(false); setAddFile(null); setAddPageError(null); }}
+                      onClick={() => { setShowAddForm(false); setAddFiles([]); setAddPageError(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                       className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
                     >
                       {t('common:buttons.cancel', 'Tühista')}
                     </button>
+                    {uploadProgress && (
+                      <div className="flex items-center gap-3 text-sm text-gray-600">
+                        <span>{t('manage.addPagesProgress', uploadProgress)}</span>
+                        <button
+                          type="button"
+                          onClick={() => { cancelRef.current = true; }}
+                          className="text-red-600 hover:underline"
+                        >
+                          {t('manage.addPagesCancel')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
