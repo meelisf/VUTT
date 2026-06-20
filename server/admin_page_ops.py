@@ -18,7 +18,7 @@ from git import Actor
 from git.exc import GitCommandError
 from PIL import Image
 from .config import BASE_DIR, get_logger
-from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git
+from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 
@@ -819,3 +819,56 @@ def _cleanup_bulk(staging, moved_final, json_backups):
                 f.write(orig)
         except Exception:
             logger.critical(f"Bulk cleanup: json taastamine ebaõnnestus: {jp}")
+
+
+def delete_pages(work_id, base_names, username):
+    """Kustutab mitu lehekülge korraga (kõik-või-mitte-midagi).
+
+    Lahendab base_names'id praeguste failide vastu; kui osa puudub → conflict,
+    midagi ei kustutata. Liigutab pildid prügikasti, kutsub batch git-kustutuse
+    ühe commitiga ja ühe Meilisearch-sünki. Git-tõrkel taastab pildid (rollback).
+    """
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"status": "not_found", "missing": list(base_names)}
+    folder_name = os.path.basename(path)
+
+    with work_lock(folder_name, path):
+        images = get_sorted_images(path)
+        # base_name → tegelik pildifaili nimi (säilitab laiendi)
+        by_base = {os.path.splitext(img)[0]: img for img in images}
+
+        missing = [b for b in base_names if b not in by_base]
+        if len(missing) == len(base_names):
+            return {"status": "not_found", "missing": missing}
+        if missing:
+            return {"status": "conflict", "missing": missing}
+
+        trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
+        os.makedirs(trash_dir, exist_ok=True)
+
+        # Logi enne mutatsiooni (käsitsi taastamiseks kui protsess krahhib)
+        logger.info(f"delete_pages: {folder_name} kustutab {base_names}")
+
+        moved = []  # (orig_path, trash_path) rollbackiks
+        for base in base_names:
+            img_name = by_base[base]
+            src = os.path.join(path, img_name)
+            dst = os.path.join(trash_dir, img_name)
+            if os.path.exists(src):
+                shutil.move(src, dst)
+                moved.append((src, dst))
+
+        try:
+            commit_msg = f"Kustuta {len(base_names)} lehte: {folder_name} [{work_id}]"
+            delete_pages_from_git(folder_name, base_names, commit_msg, username=username)
+        except Exception:
+            # Rollback: pildid prügikastist tagasi
+            for src, dst in moved:
+                if os.path.exists(dst):
+                    shutil.move(dst, src)
+            raise
+
+        sync_work_to_meilisearch(folder_name)
+        new_page_count = len(get_sorted_images(path))
+        return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count}
