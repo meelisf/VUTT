@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
-  Trash2,
   Plus,
   Loader2,
   Wrench,
@@ -11,21 +10,18 @@ import {
   RotateCcw,
   FileImage,
   ArrowUpDown,
-  ChevronUp,
-  ChevronDown,
   Upload,
   RefreshCw,
-  Scissors,
-  CornerDownLeft,
 } from 'lucide-react';
 import Header from '../components/Header';
 import PageImageEditorModal from '../components/PageImageEditorModal';
-import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
+import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
-import PageThumb from './manage/PageThumb';
+import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
+import PageCard from './manage/PageCard';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -92,9 +88,17 @@ const WorkManage: React.FC = () => {
 
   // Lehekülgede järjekorra muutmine
   const [draftPositions, setDraftPositions] = useState<Record<string, number>>({});
-  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [reorderSaving, setReorderSaving] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
+
+  // Hulgivalik + liigutamine
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [moveTarget, setMoveTarget] = useState('');
+  const lastSelectedIndexRef = useRef<number | null>(null);
+  // Bulk-kustutus
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
 
   // Teose kustutamine
   const [deleteWorkConfirm, setDeleteWorkConfirm] = useState(false);
@@ -200,10 +204,85 @@ const WorkManage: React.FC = () => {
     const init: Record<string, number> = {};
     pages.forEach(p => { init[p.filename] = p.page_num; });
     setDraftPositions(init);
-    setInputValues({});
   }, [pages]);
 
   const hasReorderChanges = pages.some(p => draftPositions[p.filename] !== p.page_num);
+
+  // Nähtav (effective) järjekord: draft kui olemas, muidu serveri page_num.
+  // Iga lehe nähtav number on tema indeks selles järjestuses + 1.
+  const visibleSorted = [...pages].sort(
+    (a, b) => (draftPositions[a.filename] ?? a.page_num) - (draftPositions[b.filename] ?? b.page_num)
+  );
+  const visiblePages: VisiblePage[] = visibleSorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
+  const visibleNumByFile: Record<string, number> = {};
+  visiblePages.forEach((vp) => { visibleNumByFile[vp.filename] = vp.visiblePageNum; });
+
+  // Mitme lehe asukoht erineb salvestatud (serveri) järjekorrast
+  const changedCount = pages.filter((p) => (draftPositions[p.filename] ?? p.page_num) !== p.page_num).length;
+
+  // Liigutamise eelvaade/valideerimine (sama util mis submit)
+  const moveResult = selectedFiles.size > 0
+    ? computeBlockMoveOrder(visiblePages, selectedFiles, moveTarget)
+    : null;
+
+  // Arvuta eelvaate/vihje tekst komponendi kehas (JSX-i pesastatud narrowing ei tööta usaldusväärselt)
+  let movePreviewText: string | null = null;
+  let moveHintText: string | null = null;
+  if (moveResult && 'preview' in moveResult) {
+    const pv = moveResult.preview;
+    movePreviewText = pv.kind === 'between'
+      ? t('manage.move.previewBetween', { before: pv.before, after: pv.after })
+      : pv.kind === 'start' ? t('manage.move.previewStart') : t('manage.move.previewEnd');
+  } else if (moveResult && 'reason' in moveResult) {
+    if (moveResult.reason === 'anchorInSelection') {
+      moveHintText = t('manage.move.anchorInSelection', { end: pages.length + 1 });
+    } else if (moveResult.reason === 'invalidTarget') {
+      moveHintText = t('manage.move.invalidTarget');
+    }
+  }
+
+  // Vali/tühista; shift = vahemik viimasest ankrust nähtaval järjekorral
+  const handleToggle = (filename: string, shiftKey: boolean) => {
+    const idx = visiblePages.findIndex((vp) => vp.filename === filename);
+    setSelectedFiles((prev) => {
+      const next = new Set(prev);
+      if (shiftKey && lastSelectedIndexRef.current !== null) {
+        const [lo, hi] = [lastSelectedIndexRef.current, idx].sort((a, b) => a - b);
+        for (let i = lo; i <= hi; i++) next.add(visiblePages[i].filename);
+      } else {
+        if (next.has(filename)) next.delete(filename); else next.add(filename);
+      }
+      return next;
+    });
+    lastSelectedIndexRef.current = idx;
+  };
+
+  const handleSelectAll = () => setSelectedFiles(new Set(pages.map((p) => p.filename)));
+  const handleClearSelection = () => { setSelectedFiles(new Set()); lastSelectedIndexRef.current = null; };
+
+  // Liiguta plokk: kirjuta uus order draftPositions-i (ei salvesta veel serverisse)
+  const handleMove = () => {
+    if (!moveResult || !moveResult.ok) return;
+    const next: Record<string, number> = {};
+    moveResult.order.forEach((fn, i) => { next[fn] = i + 1; });
+    setDraftPositions(next);
+    setMoveTarget('');
+    // valik jääb alles (samad failid, uues asukohas)
+  };
+
+  // Tühista kõik salvestamata järjekorra muudatused
+  const handleDiscardReorder = () => {
+    if (changedCount > 2 && !window.confirm(t('manage.reorder.discardConfirm'))) return;
+    const init: Record<string, number> = {};
+    pages.forEach((p) => { init[p.filename] = p.page_num; });
+    setDraftPositions(init);
+  };
+
+  // Üksiku lehe nügimine nähtaval järjekorral (nool)
+  const handleNudge = (filename: string, dir: -1 | 1) => {
+    const cur = visibleNumByFile[filename];
+    applyInsert(filename, Math.max(1, Math.min(pages.length, cur + dir)));
+  };
 
   // Insert-loogika: liigutab currentFile uuele positsioonile ja nihutab vahepealse massiivi
   const applyInsert = (currentFile: string, newPos: number) => {
@@ -224,17 +303,6 @@ const WorkManage: React.FC = () => {
       });
       return next;
     });
-  };
-
-  // Rakendab käsitsi trükitud järjekorranumbri (Enter / blur / ↵-nupp). Tühjendab ootel-väärtuse.
-  const commitReorderInput = (filename: string, fallbackPos: number) => {
-    const raw = inputValues[filename];
-    if (raw === undefined) return;
-    const parsed = parseInt(raw, 10);
-    const newPos = isNaN(parsed) ? (draftPositions[filename] ?? fallbackPos)
-      : Math.max(1, Math.min(pages.length, parsed));
-    applyInsert(filename, newPos);
-    setInputValues(prev => { const next = { ...prev }; delete next[filename]; return next; });
   };
 
   const handleReorderSave = async () => {
@@ -299,6 +367,40 @@ const WorkManage: React.FC = () => {
       setDeletePageError(t('manage.deletePageError'));
     } finally {
       setDeletingPage(null);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!workId || !authToken || selectedFiles.size === 0) return;
+    // base_name = pildifaili nimi ilma laiendita
+    const baseNames = Array.from(selectedFiles).map((fn) => {
+      const img = pages.find((p) => p.filename === fn)?.lehekylje_pilt.split('/').pop() ?? fn;
+      return img.replace(/\.[^.]+$/, '');
+    });
+    setBulkDeleting(true);
+    setBulkDeleteError(null);
+    try {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/delete-pages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({ base_names: baseNames }),
+        timeout: 30000,
+      });
+      if (res.status === 409) {
+        setBulkDeleteError(t('manage.bulkDelete.conflict'));
+        await loadPages();
+        setSelectedFiles(new Set());
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await loadPages();
+      if (trashLoaded) loadTrashPages();
+      setSelectedFiles(new Set());
+      setBulkDeleteConfirm(false);
+    } catch (e: any) {
+      setBulkDeleteError(e.message || t('manage.deletePageError'));
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -434,14 +536,6 @@ const WorkManage: React.FC = () => {
     }
   };
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case 'Valmis': return 'bg-green-100 text-green-700';
-      case 'Kontrollitud': return 'bg-blue-100 text-blue-700';
-      default: return 'bg-gray-100 text-gray-600';
-    }
-  };
-
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -538,13 +632,23 @@ const WorkManage: React.FC = () => {
               <h2 className="font-semibold text-gray-800">{t('manage.pages')}</h2>
               <div className="flex items-center gap-3">
                 {hasReorderChanges && (
-                  <button
-                    onClick={handleReorderSave}
-                    disabled={reorderSaving}
-                    className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded transition-colors"
-                  >
-                    {reorderSaving ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpDown size={13} />}
-                    {t('manage.reorderSave')}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-amber-700">{t('manage.reorder.changedSummary', { count: changedCount })}</span>
+                    <button onClick={handleDiscardReorder}
+                      className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                      {t('manage.reorder.discard')}
+                    </button>
+                    <button onClick={handleReorderSave} disabled={reorderSaving}
+                      className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded transition-colors">
+                      {reorderSaving ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpDown size={13} />}
+                      {t('manage.reorderSave')}
+                    </button>
+                  </div>
+                )}
+                {pages.length > 0 && selectedFiles.size < pages.length && (
+                  <button onClick={handleSelectAll}
+                    className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                    {t('manage.select.all')}
                   </button>
                 )}
                 <span className="text-sm text-gray-500">{pages.length} {t('manage.pagesCount', { count: pages.length })}</span>
@@ -564,112 +668,80 @@ const WorkManage: React.FC = () => {
             ) : pages.length === 0 ? (
               <p className="p-5 text-sm text-gray-400">{t('manage.noPages')}</p>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
-                {pages.map((page) => {
-                  const isChanged = draftPositions[page.filename] !== page.page_num;
-                  return (
-                    <div
-                      key={page.filename}
-                      className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
-                        isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
-                      }`}
-                    >
-                      {/* Pisipilt */}
-                      <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
-                        <PageThumb
-                          workId={workId!}
-                          src={`${IMAGE_BASE_URL}/${workId}/_thumbs/_thumb_${page.lehekylje_pilt.split('/').pop()}?v=${thumbCacheBust}`}
-                          className="w-full h-full object-cover"
-                        />
-                        {/* Kustuta nupp — paremas ülanurgas */}
-                        <button
-                          onClick={() => handleDeletePage(page.page_num)}
-                          disabled={deletingPage === page.page_num}
-                          className="absolute top-1 right-1 p-1 bg-white/80 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded shadow-sm transition-colors disabled:opacity-50"
-                          title={t('manage.deletePage')}
-                        >
-                          {deletingPage === page.page_num ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Trash2 size={12} />
-                          )}
-                        </button>
-                        {/* Staatus — vasakus ülanurgas */}
-                        <span className={`absolute top-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(page.status)}`}>
-                          {page.page_num}
-                        </span>
-                        {/* Pildiredaktor — alumises paremas servas */}
-                        <button
-                          onClick={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
-                          className="absolute bottom-1 right-1 p-1 bg-white/80 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded shadow-sm transition-colors"
-                          title={t('manage.editor.title')}
-                        >
-                          <Scissors size={14} />
-                        </button>
-                      </div>
-
-                      {/* Numbriväli */}
-                      <div className="px-1.5 py-1.5 flex items-center gap-1">
-                        <span className="text-xs text-gray-400 flex-shrink-0">{t('manage.reorderTo')}</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={pages.length}
-                          value={inputValues[page.filename] ?? (draftPositions[page.filename] ?? page.page_num)}
-                          onChange={(e) => {
-                            // Salvesta trükitav väärtus ilma swap'ita — swap toimub alles blur/Enter peale
-                            setInputValues(prev => ({ ...prev, [page.filename]: e.target.value }));
-                          }}
-                          onBlur={() => commitReorderInput(page.filename, page.page_num)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                            if (e.key === 'Escape') {
-                              setInputValues(prev => { const next = { ...prev }; delete next[page.filename]; return next; });
-                            }
-                          }}
-                          className={`flex-1 min-w-0 text-xs text-center border rounded px-1 py-0.5 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                            isChanged ? 'border-amber-400 bg-amber-50 font-semibold' : 'border-gray-300'
-                          }`}
-                        />
-                        {/* Ootel-indikaator: kinnitamata trükitud väärtus → vihje + klõpsatav rakenda */}
-                        {inputValues[page.filename] !== undefined && (
-                          <button
-                            type="button"
-                            onMouseDown={(e) => { e.preventDefault(); commitReorderInput(page.filename, page.page_num); }}
-                            title={t('manage.reorderApply')}
-                            aria-label={t('manage.reorderApply')}
-                            className="flex-shrink-0 text-amber-600 hover:text-amber-800 leading-none"
-                          >
-                            <CornerDownLeft size={14} />
-                          </button>
-                        )}
-                        <div className="flex flex-col">
-                          <button
-                            onClick={() => {
-                              const currentPos = draftPositions[page.filename] ?? page.page_num;
-                              applyInsert(page.filename, Math.max(1, currentPos - 1));
-                            }}
-                            disabled={(draftPositions[page.filename] ?? page.page_num) <= 1}
-                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              const currentPos = draftPositions[page.filename] ?? page.page_num;
-                              applyInsert(page.filename, Math.min(pages.length, currentPos + 1));
-                            }}
-                            disabled={(draftPositions[page.filename] ?? page.page_num) >= pages.length}
-                            className="text-gray-400 hover:text-gray-700 disabled:opacity-20 leading-none"
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-                        </div>
-                      </div>
+              <>
+                {/* Valiku-riba */}
+                {selectedFiles.size > 0 && (
+                  <div className="mx-4 mt-3 mb-1 p-3 bg-primary-50 border border-primary-200 rounded-lg flex flex-wrap items-center gap-3">
+                    <span className="text-sm font-medium text-primary-800">{t('manage.select.count', { count: selectedFiles.size })}</span>
+                    <button onClick={handleClearSelection} className="text-xs text-primary-700 hover:underline">{t('manage.select.clear')}</button>
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
+                      <input
+                        type="text" inputMode="numeric" value={moveTarget}
+                        onChange={(e) => setMoveTarget(e.target.value)}
+                        className="w-16 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
+                      />
+                      <button
+                        onClick={handleMove}
+                        disabled={!(moveResult && moveResult.ok)}
+                        className="px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded"
+                      >{t('manage.move.button')}</button>
                     </div>
-                  );
-                })}
-              </div>
+                    {/* Elav eelvaade / vihje */}
+                    {movePreviewText && <span className="text-sm text-gray-600">{movePreviewText}</span>}
+                    {moveHintText && <span className="text-sm text-amber-700">{moveHintText}</span>}
+                    <button
+                      onClick={() => setBulkDeleteConfirm(true)}
+                      disabled={hasReorderChanges}
+                      title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
+                      className="ml-auto px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40"
+                    >{t('manage.bulkDelete.button')}</button>
+                  </div>
+                )}
+
+                {bulkDeleteConfirm && (
+                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg flex flex-wrap items-center gap-3">
+                    <span className="text-sm text-red-800">{t('manage.bulkDelete.confirm', { count: selectedFiles.size })}</span>
+                    <button onClick={handleBulkDelete} disabled={bulkDeleting}
+                      className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded">
+                      {bulkDeleting ? <Loader2 size={13} className="animate-spin inline" /> : t('manage.bulkDelete.button')}
+                    </button>
+                    <button onClick={() => setBulkDeleteConfirm(false)}
+                      className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                      {t('common:buttons.cancel', 'Tühista')}
+                    </button>
+                  </div>
+                )}
+                {bulkDeleteError && (
+                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{bulkDeleteError}</div>
+                )}
+
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
+                  {visibleSorted.map((page) => {
+                    const vNum = visibleNumByFile[page.filename];
+                    return (
+                      <PageCard
+                        key={page.filename}
+                        workId={workId!}
+                        filename={page.filename}
+                        imageName={page.lehekylje_pilt.split('/').pop() ?? ''}
+                        visiblePageNum={vNum}
+                        status={page.status}
+                        isSelected={selectedFiles.has(page.filename)}
+                        isChanged={(draftPositions[page.filename] ?? page.page_num) !== page.page_num}
+                        thumbCacheBust={thumbCacheBust}
+                        deleting={deletingPage === page.page_num}
+                        onToggle={handleToggle}
+                        onNudge={handleNudge}
+                        onDelete={() => handleDeletePage(page.page_num)}
+                        onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
+                        canNudgeUp={vNum > 1}
+                        canNudgeDown={vNum < pages.length}
+                      />
+                    );
+                  })}
+                </div>
+              </>
             )}
 
             {reorderError && (
