@@ -48,7 +48,7 @@ from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pa
 from .admin_page_ops import (
     clear_original_backup, get_page_sequence, get_sorted_images,
     rebalance_sequences, reorder_pages, split_page, transform_page_image,
-    detect_and_convert_image, write_new_page,
+    detect_and_convert_image, write_new_page, add_pages,
 )
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
@@ -667,6 +667,37 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
 
     new_page_count = len(get_sorted_images(path))
     return {"status": "success", "new_page_count": new_page_count, "sequence": new_seq, "filename": new_filename}
+
+
+@app.post("/admin/work/{work_id}/add-pages")
+async def admin_add_pages(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Lisab teosele mitu lehekülge korraga (JPG/PNG), nimejärgi sorteeritud.
+    Body: multipart — mitu `file`-välja + after_page_num (int, 0=algusesse, -1=lõppu).
+    """
+    try:
+        form: FormData = await request.form()
+        after_page_num = int(form.get('after_page_num', -1))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
+
+    uploads = form.getlist('file')
+    if not uploads:
+        raise HTTPException(status_code=400, detail="Faile pole")
+
+    files = []
+    for up in uploads:
+        if not hasattr(up, 'read'):
+            continue
+        content = await up.read()
+        files.append((up.filename or "", content))
+
+    try:
+        result = add_pages(work_id, files, after_page_num, user['username'])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not result.get("found", True):
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    return {"status": "success", **result}
 
 
 @app.post("/admin/work/{work_id}/page/{page_num}/split")
