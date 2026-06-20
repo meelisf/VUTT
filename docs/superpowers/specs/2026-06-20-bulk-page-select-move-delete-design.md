@@ -103,8 +103,8 @@ Plokk `[1,2,3,4,5]` välja → ülejäänud `[6,7,8,9,10]` → aseta lehe 9 jär
 
 **Review + tühista enne kinnitamist (oluline ~100 lk puhul):** suure ploki liigutamisel on ülevaadet raske saada, seega:
 - ruudustiku WYSIWYG-järjekord ON eelvaade — kasutaja kerib ja kontrollib visuaalselt;
-- salvestus-nupu kõrval **summaarne indikaator**, nt *"N lehe järjekord muudetud (salvestamata)"*;
-- uus **"Tühista muudatused"** nupp (kuvatakse kui `hasReorderChanges`) — lähtestab `draftPositions` serveri-järjekorrale (kogu salvestamata draft maha, ruudustik tagasi algsesse seisu). Ei puuduta serverit;
+- salvestus-nupu kõrval **summaarne indikaator** — mõõdik on **diff serveri- vs draft-järjekorra vahel**, MITTE valitud ploki suurus (ploki liigutamine nihutab ka vahepealsete lehtede positsioone, nt 1–5 → 9 järele muudab ka 6–9 nähtavat asukohta). Tekst: *"{count} lehe asukoht erineb salvestatud järjekorrast."* (Kui tahaks näidata ploki suurust, oleks see eraldi mõõdik *"Liigutatud plokk: {count} lehte"* — ÄRA aja segamini.);
+- uus **"Tühista muudatused"** nupp (kuvatakse kui `hasReorderChanges`) — **lähtestab kogu salvestamata reorder-draft'i**: `draftPositions` → serveri-järjekord, `visiblePages` → serveri-järjekord, `hasReorderChanges` → false, amber-seis + summary kaovad, sihtnumbri eelvaade arvutatakse uuesti taastatud järjekorra põhjal. Valikut **ei pea** tühjendama (failid on samad) — võib alles jääda. Ei puuduta serverit;
 - alles **"Salvesta järjekord"** kinnitab. Salvestus-nupu juures tugev tekst, nt *"Järjekord on eelvaates. Kinnitamiseks vajuta Salvesta järjekord."*
 
 **Valik pärast "Liiguta":** valik **jääb alles** (samad lehed, uues asukohas), et kasutaja näeks liigutatud plokki ja saaks kohe parandada. Eeldab, et amber-eelvaade ja valiku-rõngas on selgelt eristatavad.
@@ -113,10 +113,12 @@ Plokk `[1,2,3,4,5]` välja → ülejäänud `[6,7,8,9,10]` → aseta lehe 9 jär
 
 ### Jõudlus (kuni ~500 lk ruudustik)
 
-- **Memoiseeritud kaart:** ekstrakti pisipilt-kaart eraldi `React.memo` komponendiks, mille propsid on **primitiivid** (`isSelected`, `isChanged`, `pageNum`, `src`). Nii renderdab valiku/draft'i muutus uuesti AINULT mõjutatud kaardid, mitte kõiki 500. NB: number-välja eemaldamine **vähendab** juba praegust re-render survet (praegu renderdab iga klahvivajutus `inputValues`-i kaudu kogu ruudustiku).
+- **Memoiseeritud kaart:** ekstrakti pisipilt-kaart eraldi `React.memo` komponendiks, mille propsid on **primitiivid** (`isSelected`, `isChanged`, `pageNum`, `src`). `React.memo` aitab **vältida nende kaartide uuesti renderdamist, mille primitiivsed propsid ei muutunud** — nt valiku-toggle renderdab uuesti ainult lülitatud kaardi. Reorder-draft'i puhul renderduvad uuesti eelkõige kaardid, mille `pageNum`/`isChanged`/asukoht tegelikult muutus (suure ploki liigutamisel võib neid olla palju — 500 puhul siiski OK). NB: number-välja eemaldamine **vähendab** juba praegust re-render survet (praegu renderdab iga klahvivajutus `inputValues`-i kaudu kogu ruudustiku).
 - **Stabiilsed callbackid:** anna kaardile **ühed stabiilsed** `useCallback`-id (`onToggle`, `onNudge` jms), MITTE iga kaardi jaoks inline-closure'it iga renderiga (see lõhuks `React.memo`). Kaart kutsub `onToggle(filename)` ise, kus `filename` on tema enda primitiivne prop. Nii püsivad callback-viited renderite vahel muutumatuna.
 - **Valiku olek:** `Set<string>` (filename); kaardile anna `isSelected={selected.has(filename)}` boolean, mitte kogu Set'i. Shift-vahemiku puhul üks `setState` (ehita uus Set), mitte 100 eraldi uuendust.
 - **Minimaalsed päringud:** bulk-kustutuse järel uuenda nimekiri ühe `loadPages()`-iga (nagu olemasolevad teed); ära tee päringut lehe kohta.
+
+**Kustutamine + salvestamata reorder-draft (lukustatud):** kui `hasReorderChanges === true`, on **"Kustuta valitud" keelatud** + vihje *"Enne kustutamist salvesta või tühista järjekorra muudatused."* Reorder on staged/eelvaates (frontend-draft), kustutus aga **kohe serverisse committitav** — neid ei tohi samas UI-seisus segada (muidu jääks `draftPositions` viitama kustutatud failidele). Kasutaja salvestab või tühistab järjekorra enne kustutamist.
 
 **Kustutamise voog:** "Kustuta valitud" → kinnitusdialoog (N lehega) → uus `POST /admin/work/{id}/delete-pages`. Õnnestumisel värskenda + tühjenda valik. **409 Conflict** (stale UI / paralleelmuudatus) → midagi pole kustutatud; kuva teade ja **värskenda lehtede nimekiri** (kasutaja saab uuesti valida). Pehme kustutus → taastatav "Prügikast" tabist (käitumine ei muutu).
 
@@ -183,6 +185,7 @@ UI: `ok:false` → nupp keelatud + vihje (`reason` järgi); `ok:true` → kuva `
 - `N` mittearv / kümnendmurd ("abc" → `invalidTarget`; "9.5" → trunkeeritud 9);
 - valitud failinimi, mida `visiblePages` hulgas pole → `invalidTarget` (mitte vaikne ignoreerimine);
 - tühi valik → `emptySelection`;
+- **kõik lehed valitud:** `N=0` või `N>pageCount` → `ok` aga `order` === praegune (no-op, sama järjekord); `N` 1..pageCount → `anchorInSelection` (anchor on paratamatult valikus). UI võib no-op'i puhul "Liiguta" keelata vihjega *"Kõik lehed on valitud; liigutamine ei muudaks järjekorda"* (pole hädavajalik);
 - **effective järjekord:** kui sisendiks antakse juba draft-järjekord (nt eelnev liigutus), siis "lehe N järele" viitab NÄHTAVALE numbrile N selles draft-järjekorras (ahel-liigutus annab ootuspärase tulemuse).
 
 **Backend — `tests/test_*`:**
@@ -203,7 +206,7 @@ Uued võtmed `src/locales/{et,en}/workspace.json` alla `manage`-sse, nt:
 - `manage.move.previewBetween`, `manage.move.previewStart`, `manage.move.previewEnd`
 - `manage.move.anchorInSelection` (vihje, sisaldab `{end}` = pageCount+1 lõppu-alternatiivi)
 - `manage.move.invalidTarget`, `manage.move.notSavedHint` ("Järjekord on eelvaates…")
-- `manage.reorder.discard` ("Tühista muudatused"), `manage.reorder.changedSummary` (count, "N lehe järjekord muudetud (salvestamata)")
+- `manage.reorder.discard` ("Tühista muudatused"), `manage.reorder.changedSummary` (count = **diff** server vs draft, "{count} lehe asukoht erineb salvestatud järjekorrast")
 - `manage.bulkDelete.button`, `manage.bulkDelete.confirm` (count)
 - `manage.bulkDelete.conflict` (409 — stale UI, värskenda ja proovi uuesti)
 
