@@ -6,15 +6,62 @@ Eraldatud main.py-st parema testitavuse ja hallatavuse jaoks.
 import os
 import json
 import shutil
+import io
 from datetime import datetime
 from git import Actor
 from git.exc import GitCommandError
+from PIL import Image
 from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
 
 logger = get_logger(__name__)
+
+
+# Piltide maksimaalne dimensioon (px) — kaitse pilllipommide vastu
+MAX_DIMENSION = 10000
+
+
+def detect_and_convert_image(content: bytes, filename: str = "") -> tuple:
+    """Tuvastab pildi tüübi magic-byte'idega ja tagastab JPEG-baidid.
+
+    JPG → tagastab sisu muutmata. PNG → teisendab JPEG-iks; läbipaistvus
+    lamendatakse VALGELE taustale (mitte must, nagu convert('RGB') üksi annaks).
+    Tagastab (bytes, '.jpg'). Viskab ValueError toetamata formaadi või liiga
+    suure pildi korral.
+    """
+    if content[:3] == b'\xff\xd8\xff':
+        kind = 'jpg'
+    elif content[:8] == b'\x89PNG\r\n\x1a\n':
+        kind = 'png'
+    elif content[:4] == b'%PDF':
+        raise ValueError(f"PDF pole toetatud (kasuta JPG/PNG): {filename}")
+    else:
+        raise ValueError(f"Toetamata formaat (lubatud JPG/PNG): {filename}")
+
+    # Mõõtmete kontroll (.size loeb päisest, ei dekodeeri kogu pilti)
+    with Image.open(io.BytesIO(content)) as probe:
+        w, h = probe.size
+        if w > MAX_DIMENSION or h > MAX_DIMENSION:
+            raise ValueError(
+                f"Pilt liiga suur ({w}x{h}px, max {MAX_DIMENSION}px): {filename}"
+            )
+
+    if kind == 'jpg':
+        return content, '.jpg'
+
+    # PNG → JPG, läbipaistvus valgele taustale
+    with Image.open(io.BytesIO(content)) as img:
+        if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+            alpha = img.convert('RGBA')
+            background = Image.new('RGBA', alpha.size, (255, 255, 255, 255))
+            flat = Image.alpha_composite(background, alpha).convert('RGB')
+        else:
+            flat = img.convert('RGB')
+        buf = io.BytesIO()
+        flat.save(buf, format='JPEG', quality=95)
+    return buf.getvalue(), '.jpg'
 
 
 def get_page_sequence(json_path: str) -> float:
