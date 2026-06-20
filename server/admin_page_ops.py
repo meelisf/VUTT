@@ -48,17 +48,19 @@ def work_lock(work_id, work_dir):
     """
     tlock = _get_thread_lock(work_id)
     tlock.acquire()
-    lockpath = os.path.join(work_dir, '.vutt-lock')
-    f = open(lockpath, 'w')
     try:
-        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
-        yield
-    finally:
+        lockpath = os.path.join(work_dir, '.vutt-lock')
+        f = open(lockpath, 'w')
         try:
-            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+            yield
         finally:
-            f.close()
-            tlock.release()
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            finally:
+                f.close()
+    finally:
+        tlock.release()
 
 
 def natural_sort_key(name):
