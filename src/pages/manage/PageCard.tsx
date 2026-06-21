@@ -59,7 +59,7 @@ const PageCard: React.FC<PageCardProps> = (p) => {
           <Check size={13} />
         </button>
         {/* Tekstita märk — üleval paremal (eraldi reocr-märgist) */}
-        {!p.hasText && p.reocrState !== 'ocr_ready' && (
+        {!p.hasText && !p.reocrState && (
           <span
             className="absolute top-1 right-1 z-10 px-1 py-0.5 rounded text-[10px] leading-none bg-amber-100 text-amber-700 border border-amber-300 shadow-sm"
             title={t('manage.reocr.badge.noText')}

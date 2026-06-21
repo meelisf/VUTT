@@ -313,11 +313,8 @@ const WorkManage: React.FC = () => {
       }
       setBatchConfirm(false);
       handleClearSelection();
-      // Käivita poll kohe (status fetch uuesti)
-      const st = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/reocr-status`,
-        { headers: getAuthHeaders(authToken), timeout: 8000 });
-      if (st.ok) setReocrStatus(await st.json());
-      setReocrPollNonce((n) => n + 1); // taaskäivitab poll-effecti (alustab pollimist)
+      // Nonce bump taaskäivitab poll-effecti (alustab pollimist), mis teeb ise status-fetchi
+      setReocrPollNonce((n) => n + 1);
     } catch (e: any) {
       setBatchError(e.message || t('manage.reocr.error'));
     }
