@@ -6,6 +6,7 @@ import json
 import os
 import threading
 from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
 from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, get_logger
 from .utils import generate_nanoid
@@ -70,6 +71,28 @@ def _write_ocr_file(slug: str, page_filename: str, text: str) -> str:
     with open(ocr_path, "w", encoding="utf-8") as f:
         f.write(text)
     return ocr_path
+
+
+def _build_batch_pages(slug: str, pages: List[Tuple[str, Optional[int]]]) -> List[Dict]:
+    """Ehitab batch-jobi per-lehe kirjed AUTORITEETSE mapping'uga.
+
+    remote_img_name/_txt_name on ainult OCR-serveri nimekonventsioon; tulemuse
+    sihtleht loetakse ALATI kirje page_filename väljast, MITTE indeksi järgi.
+    """
+    result: List[Dict] = []
+    for i, (page_filename, page_number) in enumerate(pages):
+        ext = os.path.splitext(page_filename)[1] or ".jpg"
+        base = f"{slug}_pg_{i + 1:03d}"
+        result.append({
+            "page_filename": page_filename,
+            "page_number": page_number,
+            "stem": os.path.splitext(os.path.basename(page_filename))[0],
+            "remote_img_name": f"{base}{ext}",
+            "remote_txt_name": f"{base}.txt",
+            "status": "uploading",
+            "error": None,
+        })
+    return result
 
 
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
