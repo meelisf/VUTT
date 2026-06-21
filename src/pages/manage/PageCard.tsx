@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Loader2, Scissors, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { Scissors, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
 
@@ -13,10 +13,8 @@ interface PageCardProps {
   isSelected: boolean;
   isChanged: boolean;
   thumbCacheBust: number;
-  deleting: boolean;
   onToggle: (filename: string, shiftKey: boolean) => void;
   onNudge: (filename: string, dir: -1 | 1) => void;
-  onDelete: (visiblePageNum: number) => void;
   onEdit: (visiblePageNum: number) => void;
   canNudgeUp: boolean;
   canNudgeDown: boolean;
@@ -39,14 +37,20 @@ const PageCard: React.FC<PageCardProps> = (p) => {
           : p.isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
       }`}
     >
-      <div className="relative aspect-[3/4] bg-gray-100 overflow-hidden">
-        {/* Valiku-märkeruut — vasakus ülanurgas */}
+      {/* Kogu pisipildi-ala on valiku-sihtmärk: klõps valib, Shift+klõps vahemiku.
+          select-none väldib Shift+klõpsu teksti-esiletõstu üle ruudustiku. */}
+      <div
+        className="relative aspect-[3/4] bg-gray-100 overflow-hidden cursor-pointer select-none"
+        onClick={(e) => p.onToggle(p.filename, e.shiftKey)}
+        title={t('manage.select.toggleHint')}
+      >
+        {/* Valiku-märkeruut — vasakus ülanurgas (eraldi klõpsatav, klaviatuuri jaoks) */}
         <button
-          onClick={(e) => p.onToggle(p.filename, e.shiftKey)}
+          onClick={(e) => { e.stopPropagation(); p.onToggle(p.filename, e.shiftKey); }}
           className={`absolute top-1 left-1 z-10 w-5 h-5 flex items-center justify-center rounded border shadow-sm ${
-            p.isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white/80 border-gray-300 text-transparent'
+            p.isSelected ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white/90 border-gray-600 text-transparent'
           }`}
-          title={t('manage.select.all')}
+          title={t('manage.select.toggleHint')}
           aria-pressed={p.isSelected}
         >
           <Check size={13} />
@@ -56,23 +60,14 @@ const PageCard: React.FC<PageCardProps> = (p) => {
           src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}`}
           className="w-full h-full object-cover"
         />
-        {/* Kustuta — paremas ülanurgas */}
-        <button
-          onClick={() => p.onDelete(p.visiblePageNum)}
-          disabled={p.deleting}
-          className="absolute top-1 right-1 p-1 bg-white/80 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded shadow-sm transition-colors disabled:opacity-50"
-          title={t('manage.deletePage')}
-        >
-          {p.deleting ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-        </button>
         {/* Nähtav number — all vasakul */}
         <span className={`absolute bottom-1 left-1 text-xs px-1 py-0.5 rounded leading-tight shadow-sm ${statusColor(p.status)}`}>
           {p.visiblePageNum}
         </span>
         {/* Redaktor — all paremal */}
         <button
-          onClick={() => p.onEdit(p.visiblePageNum)}
-          className="absolute bottom-1 right-1 p-1 bg-white/80 hover:bg-gray-100 text-gray-500 hover:text-gray-700 rounded shadow-sm transition-colors"
+          onClick={(e) => { e.stopPropagation(); p.onEdit(p.visiblePageNum); }}
+          className="absolute bottom-1 right-1 p-1 bg-white/90 border border-gray-600 hover:bg-gray-100 text-gray-600 hover:text-gray-800 rounded shadow-sm transition-colors"
           title={t('manage.editor.title')}
         >
           <Scissors size={14} />

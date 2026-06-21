@@ -58,10 +58,6 @@ const WorkManage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [workTitle, setWorkTitle] = useState('');
 
-  // Lehekülje kustutamine
-  const [deletingPage, setDeletingPage] = useState<number | null>(null);
-  const [deletePageError, setDeletePageError] = useState<string | null>(null);
-
   // Pildi asendamine
   const [replaceError, setReplaceError] = useState<string | null>(null);
   const [replaceSuccess, setReplaceSuccess] = useState<string | null>(null);
@@ -240,10 +236,14 @@ const WorkManage: React.FC = () => {
   // Vali/tühista; shift = vahemik viimasest ankrust nähtaval järjekorral
   const handleToggle = (filename: string, shiftKey: boolean) => {
     const idx = visiblePages.findIndex((vp) => vp.filename === filename);
+    // Loe ankur ENNE setState'i: updater jookseb hiljem (render-faasis), aga
+    // lastSelectedIndexRef.current kirjutatakse üle juba allpool — kui updater loeks
+    // refi laisalt, näeks ta uut idx-i ja vahemik kahaneks üheks elemendiks.
+    const anchor = lastSelectedIndexRef.current;
     setSelectedFiles((prev) => {
       const next = new Set(prev);
-      if (shiftKey && lastSelectedIndexRef.current !== null) {
-        const [lo, hi] = [lastSelectedIndexRef.current, idx].sort((a, b) => a - b);
+      if (shiftKey && anchor !== null) {
+        const [lo, hi] = [anchor, idx].sort((a, b) => a - b);
         for (let i = lo; i <= hi; i++) next.add(visiblePages[i].filename);
       } else {
         if (next.has(filename)) next.delete(filename); else next.add(filename);
@@ -335,34 +335,6 @@ const WorkManage: React.FC = () => {
       setReorderError(e.message || t('manage.reorderError'));
     } finally {
       setReorderSaving(false);
-    }
-  };
-
-  const handleDeletePage = async (pageNum: number) => {
-    if (!workId || !authToken) return;
-    const confirmed = window.confirm(t('manage.deletePageConfirm', { num: pageNum }));
-    if (!confirmed) return;
-
-    setDeletingPage(pageNum);
-    setDeletePageError(null);
-    try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}`,
-        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 15000 }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.status === 'success') {
-        await loadPages();
-        // Kui prügikast on laetud, uuenda ka seda
-        if (trashLoaded) loadTrashPages();
-      } else {
-        setDeletePageError(t('manage.deletePageError'));
-      }
-    } catch {
-      setDeletePageError(t('manage.deletePageError'));
-    } finally {
-      setDeletingPage(null);
     }
   };
 
@@ -730,10 +702,8 @@ const WorkManage: React.FC = () => {
                         isSelected={selectedFiles.has(page.filename)}
                         isChanged={(draftPositions[page.filename] ?? page.page_num) !== page.page_num}
                         thumbCacheBust={thumbCacheBust}
-                        deleting={deletingPage === page.page_num}
                         onToggle={handleToggle}
                         onNudge={handleNudge}
-                        onDelete={() => handleDeletePage(page.page_num)}
                         onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
                         canNudgeUp={vNum > 1}
                         canNudgeDown={vNum < pages.length}
@@ -750,11 +720,6 @@ const WorkManage: React.FC = () => {
               </div>
             )}
 
-            {deletePageError && (
-              <div className="mx-5 mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-                {deletePageError}
-              </div>
-            )}
 
             {replaceSuccess && (
               <div className="mx-5 mb-4 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">

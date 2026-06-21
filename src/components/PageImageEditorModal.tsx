@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Scissors, RotateCcw, RotateCw, FlipVertical2, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload } from 'lucide-react';
+import { X, Scissors, RotateCcw, RotateCw, FlipVertical2, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
@@ -27,9 +27,10 @@ interface Props {
   cacheBust: number;  // muutub iga pildi-mutatsiooni järel (kärbe/pööre/poolitus/asendus) → eelvaade värske
 }
 
-// Eelvaate maksimaalsed mõõdud (px) — pilt mahutatakse nendesse.
-const MAXW = 680;
-const MAXH = 540;
+// Eelvaate vaikimisi mõõdud (px) — kasutatakse ainult esimese paindeni, enne kui
+// ResizeObserver on tegeliku "lava" (saadaoleva ruumi) ära mõõtnud.
+const DEFAULT_STAGE_W = 680;
+const DEFAULT_STAGE_H = 540;
 const MIN_DRAG_PX = 8;   // alla selle ei registreeri kärbet
 
 const PageImageEditorModal: React.FC<Props> = ({
@@ -68,6 +69,16 @@ const PageImageEditorModal: React.FC<Props> = ({
   >(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+  // "Lava" = paindlik ala, kuhu pilt mahutatakse. Mõõdame selle tegeliku suuruse,
+  // et pilt mahuks alati ekraanile (ei jää modaali serva taha kitsal vertikaalruumil).
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [stage, setStage] = useState<{ w: number; h: number }>({ w: DEFAULT_STAGE_W, h: DEFAULT_STAGE_H });
+
+  // Hõljuv nupupaneel: vabalt lohistatav (piiratud lava raamiga). null = vaikeasend (parem ülanurk).
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number } | null>(null);
+  const [toolbarDragging, setToolbarDragging] = useState(false);
+  const toolbarGrab = useRef<{ offX: number; offY: number } | null>(null);
 
   const safeIndex = Math.max(0, Math.min(currentIndex, pages.length - 1));
   const current = pages[safeIndex];
@@ -89,6 +100,22 @@ const PageImageEditorModal: React.FC<Props> = ({
     resetTransforms();
   }, [current?.filename, cacheBust, resetTransforms]);
 
+  // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
+  // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
+  // Väike varu (-4 px), et piir/vari ei tekitaks ülevoolu.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = () => setStage({
+      w: Math.max(0, el.clientWidth - 4),
+      h: Math.max(0, el.clientHeight - 4),
+    });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tab]);
+
   const imageUrl = (() => {
     if (!current) return '';
     const base = `${IMAGE_BASE_URL}/${workId}/${current.filename}`;
@@ -102,14 +129,15 @@ const PageImageEditorModal: React.FC<Props> = ({
   // Eelvaate geomeetria: jäme pööre (grossAngle) rakendub PILDILE; kast tilditakse eraldi.
   const natural = imgNatural ?? { w: 4, h: 3 };
   const expanded = expandedBoundingBox(natural.w, natural.h, grossAngle);
-  const fit = Math.min(MAXW / expanded.width, MAXH / expanded.height);
+  // Mahuta lavasse; ', 1' = ära suurenda üle natiivse resolutsiooni (ei udusta).
+  const fit = Math.min(stage.w / expanded.width, stage.h / expanded.height, 1);
   const displayW = expanded.width * fit;
   const displayH = expanded.height * fit;
   const imgDispW = natural.w * fit;
   const imgDispH = natural.h * fit;
   // Ühtne pildi kuva-suurus mõlemal tabil (sõltumatu jämedast pöördest) — split kasutab seda,
   // et edit-tabiga kokku langeda. grossAngle=0 korral identne imgDispW/H-ga.
-  const baseFit = Math.min(MAXW / natural.w, MAXH / natural.h);
+  const baseFit = Math.min(stage.w / natural.w, stage.h / natural.h, 1);
   const baseDispW = natural.w * baseFit;
   const baseDispH = natural.h * baseFit;
 
@@ -230,6 +258,37 @@ const PageImageEditorModal: React.FC<Props> = ({
     setBoxAngle(0);
     interaction.current = null;
   };
+
+  // --- Hõljuva nupupaneeli lohistus ---
+  // Pide haarab paneeli; positsioon arvutatakse lava (stageRef) suhtes ja klambitakse
+  // raami sisse. Kuulame AKNAST, et lohistus ei katkeks kursori liikudes paneelilt ära.
+  const onToolbarDown = (e: React.MouseEvent) => {
+    if (!toolbarRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const tRect = toolbarRef.current.getBoundingClientRect();
+    toolbarGrab.current = { offX: e.clientX - tRect.left, offY: e.clientY - tRect.top };
+    setToolbarDragging(true);
+  };
+  const onToolbarMove = useCallback((e: MouseEvent) => {
+    if (!stageRef.current || !toolbarRef.current || !toolbarGrab.current) return;
+    const sRect = stageRef.current.getBoundingClientRect();
+    const tRect = toolbarRef.current.getBoundingClientRect();
+    const x = clamp(e.clientX - sRect.left - toolbarGrab.current.offX, 0, sRect.width - tRect.width);
+    const y = clamp(e.clientY - sRect.top - toolbarGrab.current.offY, 0, sRect.height - tRect.height);
+    setToolbarPos({ x, y });
+  }, []);
+  useEffect(() => {
+    if (!toolbarDragging) return;
+    const move = (e: MouseEvent) => onToolbarMove(e);
+    const up = () => { setToolbarDragging(false); toolbarGrab.current = null; };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', up);
+    };
+  }, [toolbarDragging, onToolbarMove]);
 
   // Kuvatav kärpe-kast: kese, mõõdud, kalle (joonistamise ajal telg-joondatud)
   const cropOverlay: { cx: number; cy: number; w: number; h: number; angle: number } | null = (() => {
@@ -403,20 +462,18 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   const noEditChange = tab === 'edit' && grossAngle === 0 && cropRect === null;
 
-  // Ühtne laadimiskast (sama suurus mõlemal tabil) — kuvame kuni naturaalmõõdud teada,
-  // et vältida pildi aspect-ratio venitamist enne täislaadimist.
+  // Laadija täidab lava — kuvame kuni naturaalmõõdud teada (väldib aspect-venitust).
   const loadingBox = (
-    <div
-      className="flex items-center justify-center bg-white shadow-inner border border-gray-200"
-      style={{ width: MAXW, height: MAXH }}
-    >
+    <div className="flex items-center justify-center bg-white shadow-inner border border-gray-200 w-full h-full">
       <Loader2 size={28} className="animate-spin text-gray-300" />
     </div>
   );
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 bg-black/60 z-[1300] flex items-center justify-center p-4">
+      {/* Kindel kõrgus (mitte ainult max-h): flex-1 "lava" vajab jaotamiseks definiitset
+          kõrgust, muidu kahaneb 0-ks ja pilt ei mahu. */}
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl flex flex-col h-[92vh] max-h-[92vh]">
 
         {/* Päis */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
@@ -472,7 +529,7 @@ const PageImageEditorModal: React.FC<Props> = ({
         </div>
 
         {/* Sisu */}
-        <div className="flex-1 overflow-auto p-4 bg-gray-50">
+        <div className="flex-1 min-h-0 overflow-hidden p-4 bg-gray-50 flex flex-col">
           {/* Peidetud laadija: mõõdab pildi naturaalmõõdud enne kuvamist (väldib aspect-venitust) */}
           {!imgNatural && (
             <img
@@ -484,34 +541,15 @@ const PageImageEditorModal: React.FC<Props> = ({
             />
           )}
           {tab === 'edit' ? (
-            <div className="flex flex-col items-center gap-4">
-              {/* Tööriistad */}
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <button onClick={() => rotateBy(-90)} title={t('manage.editor.rotateLeft')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                  <RotateCcw size={16} />
-                </button>
-                <button onClick={() => rotateBy(90)} title={t('manage.editor.rotateRight')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                  <RotateCw size={16} />
-                </button>
-                <button onClick={() => rotateBy(180)} title={t('manage.editor.rotate180')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
-                  <FlipVertical2 size={16} />
-                </button>
-                {cropRect && Math.abs(boxAngle) > 0.05 && (
-                  <span className="text-xs text-gray-600 ml-2 tabular-nums">
-                    {t('manage.editor.deskew')}: {boxAngle.toFixed(1)}°
-                  </span>
-                )}
-                {cropRect && (
-                  <button onClick={() => { setCropRect(null); setBoxAngle(0); }} className="text-xs text-gray-500 underline hover:text-gray-700 ml-2">
-                    {t('manage.editor.cropReset')}
-                  </button>
-                )}
-              </div>
+            <div className="flex flex-col items-center gap-2 h-full min-h-0 w-full">
+              <p className="text-xs text-gray-400 flex-shrink-0">{t('manage.editor.cropHint')}</p>
 
-              <p className="text-xs text-gray-400">{t('manage.editor.cropHint')}</p>
-
-              {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
-              {!imgNatural ? loadingBox : (
+              {/* Lava: mõõdetav paindlik ala, kuhu eelvaade mahutatakse. Pööramisnupud
+                  hõljuvad pildi peal (absolute) → ei söö ei kõrgust ega laiust, pilt saab
+                  kogu ruumi (sama suurus ka split-tabil). */}
+              <div ref={stageRef} className="relative flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
+                {/* Eelvaade: pilt seisab (jäme pööre), kärpe-kasti saab kallutada */}
+                {!imgNatural ? loadingBox : (
               <div
                 className="relative bg-white shadow-inner border border-gray-200"
                 style={{ width: displayW, height: displayH }}
@@ -578,12 +616,50 @@ const PageImageEditorModal: React.FC<Props> = ({
                 </div>
               </div>
               )}
+
+                {/* Tööriistad: pööramine hõljub pildi peal, vabalt lohistatav (vaikimisi parem ülanurk) */}
+                <div
+                  ref={toolbarRef}
+                  className="absolute z-20 flex flex-col items-center gap-2 p-1.5 rounded-lg bg-white/80 backdrop-blur-sm shadow-md border border-gray-200"
+                  style={toolbarPos ? { left: toolbarPos.x, top: toolbarPos.y } : { top: 8, right: 8 }}
+                >
+                  {/* Lohistuspide */}
+                  <div
+                    onMouseDown={onToolbarDown}
+                    title={t('manage.editor.dragPanel')}
+                    className={`w-full flex items-center justify-center text-gray-400 hover:text-gray-600 ${toolbarDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                  >
+                    <GripHorizontal size={14} />
+                  </div>
+                  <button onClick={() => rotateBy(-90)} title={t('manage.editor.rotateLeft')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
+                    <RotateCcw size={16} />
+                  </button>
+                  <button onClick={() => rotateBy(90)} title={t('manage.editor.rotateRight')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
+                    <RotateCw size={16} />
+                  </button>
+                  <button onClick={() => rotateBy(180)} title={t('manage.editor.rotate180')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
+                    <FlipVertical2 size={16} />
+                  </button>
+                  {cropRect && (
+                    <button onClick={() => { setCropRect(null); setBoxAngle(0); }} title={t('manage.editor.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                      <CircleX size={16} />
+                    </button>
+                  )}
+                  {cropRect && Math.abs(boxAngle) > 0.05 && (
+                    <span title={t('manage.editor.deskew')} className="text-xs text-gray-600 tabular-nums text-center">
+                      {boxAngle.toFixed(1)}°
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center">
-              <p className="text-sm text-gray-500 mb-3 self-start">
+            <div className="flex flex-col items-center h-full min-h-0 w-full">
+              <p className="text-sm text-gray-500 mb-3 self-start flex-shrink-0">
                 {t('manage.editor.tabSplit')} — <span className="font-medium text-gray-700">{Math.round(splitX * 100)}%</span>
               </p>
+              {/* Lava: sama mõõdetav ala ka poolitamise tabil */}
+              <div ref={stageRef} className="flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden">
               {!imgNatural ? loadingBox : (
               <div
                 ref={splitContainerRef}
@@ -608,6 +684,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                 </div>
               </div>
               )}
+              </div>
             </div>
           )}
         </div>

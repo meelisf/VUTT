@@ -114,7 +114,8 @@
     "select": {
       "all": "Vali kõik",
       "clear": "Tühista valik",
-      "count": "Valitud: {{count}}"
+      "count": "Valitud: {{count}}",
+      "toggleHint": "Klõpsa, et valida · Shift+klõps vahemiku jaoks"
     },
     "move": {
       "label": "lehe järele",
@@ -172,6 +173,7 @@
       "thumbWarning": "Pilt muudeti, aga pisipildi uuendamine ebaõnnestus.",
       "cropHint": "Lohista ristkülik; sangadest muuda suurust, seest liiguta, ülemisest nupust kalluta",
       "cropReset": "Lähtesta kärbe",
+      "dragPanel": "Lohista nupud teise kohta",
       "applyError": "Toiming ebaõnnestus",
       "close": "Sulge"
     }

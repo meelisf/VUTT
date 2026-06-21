@@ -114,7 +114,8 @@
     "select": {
       "all": "Select all",
       "clear": "Clear selection",
-      "count": "Selected: {{count}}"
+      "count": "Selected: {{count}}",
+      "toggleHint": "Click to select · Shift+click for a range"
     },
     "move": {
       "label": "after page",
@@ -172,6 +173,7 @@
       "thumbWarning": "Image was changed, but thumbnail update failed.",
       "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
       "cropReset": "Reset crop",
+      "dragPanel": "Drag buttons elsewhere",
       "applyError": "Operation failed",
       "close": "Close"
     }

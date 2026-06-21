@@ -97,6 +97,38 @@ Arhiiviviidetel puudub inglise keel praegu.
 
 main.py on hiigelsuureks kasvanud
 
-kui ei ole sisse logitud või puudub õigus, siis kaitstud kollektsiooni kuuluvate teoste pealkirju isiku juures ei näidata ja on vaid nanoid. peaks siiski ikkagi pealkirja näitama, aga link lihtsalt peaks ütlema, et teos kuulub kaitstud kollektisooni. Nt https://vutt.utlib.ut.ee/persons/vutt:P4ovkgk puhul
+Oleks vaja võimalust valida manage all mitu lehekülge ja need kustutada või mitu lehekülge ja need liigutada teise kohta. ✅ TEHTUD (feat/bulk-page-select-move-delete, 2026-06-21)
 
+---
 
+## Manage hulgivalik — ülevaatuse leiud (2026-06-21)
+
+Featuur (hulgivalik + liigutamine + kustutamine) on töökindel ja testitud (util 13 testi,
+server 14 testi, tsc puhas). Allesjäänud väiksed lahtised:
+
+### Bug 1: 409 conflict jätab segase kinnitusriba rippuma
+**Fail:** `src/pages/WorkManage.tsx`, `handleBulkDelete` (409-haru)
+409-harus tühjendatakse valik (`setSelectedFiles(new Set())`), aga `bulkDeleteConfirm`
+jääb `true`. Kinnituspaneel renderdub valikust sõltumatult → kuvab "Kustutada 0 lehekülge?"
+töötava nupuga, mis siis no-op'ib. **Fix:** lisa `setBulkDeleteConfirm(false)` 409-harusse.
+
+### Bug 2: lühike vale-välgatus lehtede laadimisel
+**Fail:** `src/pages/WorkManage.tsx:209, 221` (`hasReorderChanges`, `changedCount`)
+Esmarenderil on `draftPositions` tühi → `draftPositions[p.filename]` on `undefined !== page_num`
+→ `hasReorderChanges` hetkeks `true` (kuni `useEffect` rida 203 jookseb). Tähendab "Salvesta
+järjekord"-riba välgatust ja bulk-kustutuse hetkelist keelamist. Järjekord ise OK (`?? page_num`).
+**Fix:** `useMemo` või init otse `useState`-s.
+
+### Bug 3: üksik-kustutus pole draft'i ajal blokeeritud (bulk on)
+**Fail:** `src/pages/WorkManage.tsx`, `handleDeletePage`
+Bulk-kustutus on `disabled={hasReorderChanges}` (vihjega). Üksik prügikasti-nupp töötab ka
+salvestamata draft'i ajal ja `handleDeletePage → loadPages → useEffect` nullib vaikselt
+draft-järjekorra. Loogiliselt korrektne (kustutab serveri `page_num` järgi), aga kasutaja
+kaotab salvestamata järjekorra ette hoiatamata. **Fix:** sama blokeering või hoiatus.
+
+### ✅ Visuaalne: pildiredaktori modaali X kättesaamatu väiksel ekraanil (2026-06-21)
+**Fail:** `src/components/PageImageEditorModal.tsx`
+App-i `<Header>` on `sticky top-0 z-[1200]`, aga modaali ülekate oli vaid `z-50` → app-i päis
+renderdus modaali peale. Vertikaalselt tsentreeritud `max-h-[92vh]` modaali ülemine serv (X-nupp)
+libises väiksel ekraanil app-i päise taha ega olnud klikitav (Esc töötas). **Parandatud:**
+modaali ülekate `z-50` → `z-[1300]` (app-i päisest kõrgemale).
