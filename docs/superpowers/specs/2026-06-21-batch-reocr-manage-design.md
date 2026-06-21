@@ -62,8 +62,18 @@ on korraga puus. Vaja on lihtsalt hulgi-käivitajat, mis paneb N pilti korraga p
 
 ## Disain
 
-Kolm osa: (A) staatuse-ülevaade UI-s, (B) batch-käivitaja, (C) batch job-arhitektuur,
-(D) per-page staatuse poll. (E) skoobist väljas.
+Viis osa: (A) staatuse-ülevaade UI-s, (B) batch-käivitaja, (C) batch job-arhitektuur,
+(D) per-page staatuse poll + progress, (E) skoobist väljas.
+
+**Kolm sõltumatut mõistet** (kogu disain hoiab need lahus — vt eriti A ja D):
+1. **`has_text`** — lehe päris `.txt` on olemas (transkriptsioon rakendatud).
+2. **`.ocr` ootel** — uus OCR-tulemus on staging'us ülevaatamiseks valmis, AGA pole
+   veel rakendatud. **Sõltumatu `has_text`-st** — leht võib olla korraga `has_text=true`
+   JA `.ocr` ootel (re-OCR olemasoleva teksti ümbertegemiseks).
+3. **OCR töötab** — batch-job tegeleb selle lehega (uploading/processing).
+
+UI ei tohi neid kokku sulatada. Eriti: roheline märk EI tähenda "leht on korras",
+vaid **"OCR valmis ülevaatamiseks"** (vt D sõnastust).
 
 ### A. Lehe staatuse-ülevaade (eeltingimus, iseseisev väärtus)
 
@@ -73,24 +83,48 @@ Kolm osa: (A) staatuse-ülevaade UI-s, (B) batch-käivitaja, (C) batch job-arhit
   paremal), et vahelelaaditud lehed paistaksid kohe välja.
 - **Tekst olemas** — olemasolev staatuse-värviloogika (Toores/Valmis/Kontrollitud)
   jääb muutmata.
-- Valikuribasse nupp **"Vali tekstita"** — valib kõik `has_text === false` lehed ühe
-  klikiga (lisab `selectedFiles`-i). Täpselt vahelelaadimise-stsenaarium.
+- **`.ocr` ootel märk on eraldi** (vt D) — leht võib näidata korraga "tekst olemas"
+  JA "OCR ootel" (kui re-OCR on tehtud olemasolevale tekstile).
+
+**"Vali tekstita" nupu loogika täpsustus (oluline servajuht):** `has_text === false`
+võib olla tõene ka lehel, mille `.ocr` on JUBA ootel (OCR tehtud, aga rakendamata).
+Naiivne "vali kõik `has_text === false`" valiks need uuesti → topelt-OCR ootel olevale
+lehele. Seetõttu:
+- "Vali tekstita" valib lehed, kus `has_text === false` **JA** `.ocr` pole ootel
+  **JA** OCR ei tööta — st päriselt töötlemata lehed. Vajab `reocr-status` infot (D),
+  et OCR-ootel/töötavad lehed välja jätta.
+- Kui `reocr-status` pole veel laetud (esmane render), võib nupp baseeruda ainult
+  `has_text`-l ja peeneneda kui status saabub. Täpsustus implementatsiooniplaanis.
 
 `WorkManage.tsx` annab `has_text` edasi `PageCard`-ile. i18n: uued võtmed `et`+`en`.
 
-### B. Batch re-OCR käivitaja (manage valikuriba)
+### B. Batch re-OCR käivitaja (manage — eraldi sektsioon)
 
-Olemasolevasse valikuribasse (kõrvale "Liiguta"/"Kustuta") nupp
-**"Tee transkriptsioon (N)"**:
+**Paigutus (punkt: ära konkureeri olemasolevate nuppudega).** Re-OCR EI lähe samasse
+ritta "Liiguta"/"Kustuta" kõrvale — see tekitaks nupu-rohkuse ja segaduse. Selle
+asemel **omaette sektsioon** valikuriba sees, visuaalselt eristatud (nt heleroheline
+taust `bg-green-50`), paigutatuna lehekülgede-liigutamise/kustutamise osa **alla**.
+Pealkiri nt "Transkriptsioon". Nii on selge, et see on eraldi tegevusklass.
+
+Nupp **"Tee transkriptsioon (N)"**:
 
 - Mudeli valik **print / hand** (vaikimisi `print`) — sama `material_type` mis
-  per-lehe voos. Lihtne toggle/select valikuribas või kinnitusdialoogis.
-- Kinnitusdialoog ("Saadan N lehte OCR-serverisse — see võtab aega").
+  per-lehe voos. Toggle/select selles sektsioonis.
+- **Kinnitusdialoog** — peab selgelt maandama "kirjutab kohe üle" hirmu:
+  > "N lehte saadetakse uuesti OCR-i. Olemasolev tekst **ei muutu** enne, kui rakendad
+  > tulemuse Workspace'is."
+
+  Kui valikus on lehti, millel juba on tekst (`has_text === true`), lisa rida:
+  > "(M valitud lehel on juba tekst — re-OCR teeb uue versiooni ülevaatuseks, vana jääb
+  > alles kuni rakendamiseni.)"
 - Päring → uus batch-endpoint (vt C). Vastus: `job_id`.
 - Tulemused → **staging `.ocr`** (nagu praegu). Auto-rakendust EI ole — admin vaatab
   iga tulemuse Workspace'is üle ja rakendab käsitsi.
 - Nupp keelatud kui `selectedFiles.size === 0` või kui mustand-järjekorra-muudatused
   pooleli (sama loogika mis bulk-kustutusel — `hasReorderChanges`).
+
+**Tekstiga lehed valikus on LUBATUD** — re-OCR on legitiimne ümbertegemiseks. Vana
+tekst (`.txt`) jääb puutumata kuni admin rakendab `.ocr` tulemuse Workspace'is.
 
 ### C. Job-arhitektuur — üks multi-image batch job
 
@@ -106,6 +140,15 @@ failis `reocr_ops.py`:
 - Üks `job_id`, üks staging-kaust `AUTO-OCR/{mt}/{job_id}/{slug}/`.
 - Laeb **kõik N pilti** SFTP kaudu (`{slug}_pg_001.jpg .. _pg_NNN.jpg`), hoides
   per-pilt mapping'ut: `remote_img` / `remote_txt` ↔ algne `page_filename` + `stem`.
+
+**KRIITILINE — mapping peab olema job-registris autoriteetne, MITTE tuletatav
+failinime-järjekorrast.** `_pg_001/002/003` on ainult remote'i nimekonventsioon, et OCR-
+teenus failid üles leiaks. Tulemuse `.txt` → õige lehe `.ocr` seos tuleb lugeda **ainult**
+`pages[]` kirje `remote_txt` ↔ `page_filename` väljadest. EI tohi sortida remote `.txt`
+faile nime järgi ja eeldada, et N-s vastab N-ndale valitud lehele — üks väike
+sorteerimisviga kirjutaks OCR-i valele lehele. Igal pildil on registris oma eksplitsiitne
+`remote_txt` tee, mille kaudu tulemus alla laetakse ja mille kirje `page_filename`
+määrab sihtkoha.
 - Job-kirje struktuur (mälus, `_reocr_jobs`-i kõrval või sama registris `kind: "batch"`):
   ```python
   {
@@ -113,6 +156,7 @@ failis `reocr_ops.py`:
     "work_id", "slug", "username", "material_type",
     "status": "uploading" | "processing" | "done" | "error",
     "started_at", "finished_at",
+    "last_progress_at",   # uueneb iga kord kui mõni leht → ready (inactivity-timeout alus)
     "pages": [
       { "page_filename", "page_number", "stem",
         "remote_img", "remote_txt",
@@ -125,9 +169,21 @@ failis `reocr_ops.py`:
   iga pildi `.txt`-i alla **niipea kui valmis** → kirjutab vastava lehe `.ocr` faili
   (jagatud helper, vt allpool) → märgib selle lehe per-page `status="ready"`.
 - Job `status="done"` kui kõik lehed `ready`/`error`; `error` kui upload täielikult
-  ebaõnnestus. Timeout: sama `REOCR_PROCESSING_TIMEOUT` loogika per-leht või per-job.
+  ebaõnnestus.
 - OCR-teenus batchib **ise 3-kaupa** (BATCH_SIZE) — tuleb tasuta, sest kõik N pilti
   on korraga puus.
+
+**Timeout — inactivity-põhine, MITTE üks fikseeritud limiit kogu batchile.** 300-lehe
+job kestab loomulikult palju kauem kui üks leht; `REOCR_PROCESSING_TIMEOUT=1800` kogu
+batchile saadaks suure töö asjatult errorisse, kuigi see edeneb normaalselt. Selle asemel:
+- **Inactivity-timeout:** job on probleemne ainult siis, kui **X aja jooksul (nt
+  `REOCR_BATCH_INACTIVITY_TIMEOUT`, vaikimisi sama 1800s) pole ühegi veel ootel oleva lehe
+  kohta uut `.txt`-d tekkinud**. St "viimase edu" ajatempel uueneb iga kord, kui mõni
+  leht läheb `ready`-ks; timeout mõõdetakse sellest, mitte job-i algusest.
+- Kui inactivity-timeout lööb, märgitakse **ainult veel lahendamata lehed** `error`-iks
+  (juba `ready` lehed jäävad alles), job `status="error"` (osaline). Admin näeb, millised
+  said valmis ja millised mitte.
+- Per-lehe upload-timeout (SFTP edastus) jääb eraldi, lühike.
 
 **Jagatud loogika faktoreerimine:** `.ocr` faili kirjutamine ja SFTP-helperid
 (`_sftp_open`, `close_ssh`, kausta-cleanup) on praegu `start_reocr_job` /
@@ -142,29 +198,40 @@ samu helpereid.
   material_type: "print"|"hand" }` → `start_reocr_batch` → `{ job_id }`.
   Valideeri: lehed kuuluvad teosesse, list pole tühi.
 
-### D. Per-page staatus manage-lehel
+### D. Per-page staatus + progress manage-lehel
 
-Uus `GET /admin/work/{id}/reocr-status` →
+Uus `GET /admin/work/{id}/reocr-status` → hoiab kolm mõistet (vt ülal) lahus:
 ```json
 {
-  "active": { "<filename>": "uploading" | "processing" },
-  "ready":  ["<filename>", ...],
-  "errors": { "<filename>": "<msg>" }
+  "active":   { "<filename>": "uploading" | "processing" },
+  "ocr_ready": ["<filename>", ...],
+  "errors":   { "<filename>": "<msg>" },
+  "progress": { "total": 212, "ready": 37, "errors": 3, "active": true }
 }
 ```
 - `active` ← batch-job registrist (per-page sub-staatus, filtreeri `work_id` järgi).
   Ka per-lehe jooksvad jobid võib kaasata (sama `work_id`).
-- `ready` ← skanni teose kaust `.ocr` failide järgi (odav `os.listdir` + suffix).
+- `ocr_ready` ← skanni teose kaust `.ocr` failide järgi (odav `os.listdir` + suffix).
+  **NB:** see on `.ocr` ootel, sõltumatu lehe `has_text`-st — leht võib olla korraga
+  `has_text=true` JA siin nimekirjas.
 - `errors` ← batch-job per-page error-väljad.
+- `progress` ← aktiivse batch-jobi kokkuvõte (kui mõni `work_id`-le aktiivne).
 
 **Frontend (`WorkManage.tsx`):**
-- Pollib seda **ainult kui batch aktiivne** (`active` mittetühi VÕI just käivitatud),
-  intervall 3–5s, kuni kõik `done` (active tühjeneb). Lõpetab polli kui midagi aktiivset
-  pole — ei pingi serverit jõude.
-- `PageCard` saab uue `reocrState` propi: `'processing' | 'ready' | 'error' | undefined`.
-- Pisipildil:
+- Pollib seda **ainult kui batch aktiivne** (`progress.active === true` VÕI just
+  käivitatud), intervall 3–5s, kuni `active` tühjeneb. Lõpetab polli kui midagi
+  aktiivset pole — ei pingi serverit jõude.
+- **Lokaalne progress-kokkuvõte** (punkt 6) — re-OCR sektsioonis / lehe ülaosas väike
+  rida, nt **"OCR: 37/212 valmis, 3 veaga"** (`progress`-st). Annab adminile tunde, et
+  süsteem edeneb, ilma eraldi monitorita. Kuvatakse ainult kui batch aktiivne või just
+  lõppes.
+- `PageCard` saab kaks sõltumatut sisendit (mitte üks kokkusulatatud staatus):
+  - `has_text` (A-st) — "tekst olemas" / "tekstita" baasmärk.
+  - `reocrState`: `'processing' | 'ocr_ready' | 'error' | undefined`.
+- Pisipildil (märgid kuvatakse **koos**, mitte üksteist asendades):
   - **processing** → spinner-märk
-  - **ready** (.ocr olemas) → roheline "ülevaatamiseks valmis" märk
+  - **ocr_ready** → roheline märk tekstiga **"OCR valmis ülevaatamiseks"** (MITTE lihtsalt
+    "valmis" — see ei tähenda "leht on korras"). Kuvatakse ka siis kui `has_text=true`.
   - **error** → punane märk + tooltip sõnumiga
 - Klõps lehel → Workspace, kus **olemasolev `useReOcr`** tuvastab `.ocr` ja näitab
   "rakenda" nuppu (juba ehitatud, muutmata).
@@ -183,23 +250,31 @@ Manage: vali lehed (või "Vali tekstita") → "Tee transkriptsioon (N)" + print/
   → start_reocr_batch: 1 job_id, N pilti → AUTO-OCR/{mt}/{job_id}/{slug}/
   → OCR-teenus skannib puu, batchib 3-kaupa, kirjutab .txt iga pildi kõrvale
   → backend poll: iga .txt valmis → .ocr fail lehe kausta + per-page status=ready
+       (mapping AUTORITEETNE registrist, last_progress_at uueneb; inactivity-timeout)
 Manage: pollib /reocr-status (ainult aktiivse batchi ajal) → pisipildi märgid
+       + progress-kokkuvõte "OCR: 37/212 valmis, 3 veaga"
   → klõps lehel → Workspace → useReOcr näeb .ocr → "rakenda" (olemasolev voog)
 ```
 
 ## Mõjutatud failid
 
 **Backend:**
-- `server/reocr_ops.py` — `start_reocr_batch()`, batch-poll, jagatud helperid
-  (`_write_ocr_file`, `_download_txt_if_ready`), reocr-status agregeerimine.
+- `server/reocr_ops.py` — `start_reocr_batch()` (autoriteetne per-page mapping),
+  batch-poll **inactivity-timeout'iga** (uus konstant `REOCR_BATCH_INACTIVITY_TIMEOUT`,
+  vaikimisi 1800s, mõõdetud `last_progress_at`-st), jagatud helperid
+  (`_write_ocr_file`, `_download_txt_if_ready`), reocr-status + progress agregeerimine.
 - `server/main.py` — `POST /admin/work/{id}/reocr-batch`,
-  `GET /admin/work/{id}/reocr-status`.
+  `GET /admin/work/{id}/reocr-status` (sis. `progress`).
 
 **Frontend:**
-- `src/pages/WorkManage.tsx` — "Vali tekstita" nupp, "Tee transkriptsioon" nupp +
-  print/hand valik + kinnitus, reocr-status poll, `has_text`/`reocrState` edasiandmine.
-- `src/pages/manage/PageCard.tsx` — `has_text` "tekstita" marker + `reocrState` märgid.
-- `src/locales/{et,en}/*.json` — uued i18n võtmed.
+- `src/pages/WorkManage.tsx` — eraldi re-OCR sektsioon (heleroheline), "Vali tekstita"
+  nupp (**täpsustatud loogika:** jätab OCR-ootel/töötavad välja), "Tee transkriptsioon"
+  nupp + print/hand valik + kinnitusdialoog (üle-kirjutamise hoiatus), reocr-status poll,
+  progress-kokkuvõte, `has_text` + `reocrState` (kaks sõltumatut propi) edasiandmine.
+- `src/pages/manage/PageCard.tsx` — `has_text` "tekstita" marker + sõltumatud
+  `reocrState` märgid ("OCR valmis ülevaatamiseks" kuvatav ka `has_text=true` korral).
+- `src/locales/{et,en}/*.json` — uued i18n võtmed (sektsiooni pealkiri, nupud, kinnitus,
+  progress, märgid).
 
 ## Riskid / tähelepanekud
 
@@ -216,11 +291,20 @@ Manage: pollib /reocr-status (ainult aktiivse batchi ajal) → pisipildi märgid
 
 ## Testimine
 
-- Backend: `start_reocr_batch` job-registri struktuur; reocr-status agregeerimine
-  (active/ready/errors); jagatud `_write_ocr_file` ühildub per-lehe vooga.
+- Backend: `start_reocr_batch` job-registri struktuur; reocr-status + progress
+  agregeerimine (active/ocr_ready/errors); jagatud `_write_ocr_file` ühildub per-lehe
+  vooga.
+- **Mapping autoriteetsuse test (kriitiline):** simuleeri olukord, kus remote `.txt`-d
+  saabuvad **eri järjekorras** kui nad üles laeti (nt `_pg_003` valmib enne `_pg_001`)
+  → kinnita, et iga tulemus läheb registri kirje järgi õigele `page_filename`-ile, MITTE
+  saabumis-/nimejärjekorra järgi.
+- **Inactivity-timeout test:** `last_progress_at` uueneb iga `ready` korral; timeout lööb
+  ainult kui X aega ilma eduta; löömisel märgitakse ainult lahendamata lehed `error`-iks,
+  juba `ready` lehed jäävad alles.
 - Mockida SFTP (nagu olemasolevad reocr-testid, kui on) — ära tee päris OCR-serveri
   päringuid testides.
-- Frontend: "Vali tekstita" valib õiged lehed; poll käivitub/peatub õigesti;
-  pisipildi märgid vastavad reocr-status vastusele.
+- Frontend: "Vali tekstita" jätab OCR-ootel/töötavad lehed välja; poll käivitub/peatub
+  õigesti; pisipildi märgid (incl. "OCR valmis ülevaatamiseks" `has_text=true` korral)
+  vastavad reocr-status vastusele; progress-kokkuvõte näitab õigeid numbreid.
 - Manuaalne server-test: päris batch väikese teosega (vt deploy mälu — `docker exec`,
   `server_update.sh`, frontend `rsync`).
