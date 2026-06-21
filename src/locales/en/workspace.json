@@ -115,6 +115,7 @@
       "all": "Select all",
       "clear": "Clear selection",
       "count": "Selected: {{count}}",
+      "emptyHint": "Select pages to move or delete",
       "toggleHint": "Click to select · Shift+click for a range"
     },
     "move": {

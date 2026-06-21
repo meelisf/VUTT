@@ -115,6 +115,7 @@
       "all": "Vali kõik",
       "clear": "Tühista valik",
       "count": "Valitud: {{count}}",
+      "emptyHint": "Vali lehti, et liigutada või kustutada",
       "toggleHint": "Klõpsa, et valida · Shift+klõps vahemiku jaoks"
     },
     "move": {
