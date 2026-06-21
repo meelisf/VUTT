@@ -18,7 +18,7 @@ from .access_ops import can_read_work, can_write_work, is_work_public
 
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
-from .metadata_handler import build_meta_html, build_sitemap_xml
+from .metadata_handler import build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
 from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, delete_page_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
@@ -54,7 +54,7 @@ from .admin_page_ops import (
 )
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
-from .prosopography.ops import update_page_person_mentions, rebuild_indices
+from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 from .marginalia_normalize import normalize_marginalia_tags
 
@@ -2212,6 +2212,27 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
             pass
         raise
 
+@app.get("/meta/persons")
+async def persons_meta(request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/meta/persons')
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
+    return HTMLResponse(content=build_persons_meta_html())
+
+
+@app.get("/meta/person/{person_id:path}")
+async def person_meta(person_id: str, request: Request):
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/meta/person')
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
+    html = build_person_meta_html(person_id)
+    if html is None:
+        return HTMLResponse(content="<html><body>Isikut ei leitud</body></html>", status_code=404)
+    return HTMLResponse(content=html)
+
+
 @app.get("/meta/work/{work_id}")
 async def work_meta(work_id: str, request: Request):
     client_ip = get_client_ip(request)
@@ -2240,10 +2261,12 @@ async def sitemap_xml():
     from . import utils as utils_module
     now = time.time()
     if _sitemap_cache["xml"] is None or now > _sitemap_cache["expires"]:
+        person_index = _load_index()
         _sitemap_cache["xml"] = build_sitemap_xml(
             dict(utils_module.WORK_ID_CACHE),
             is_work_public,
             _load_work_metadata,
+            person_index.get("entries", []),
         )
         _sitemap_cache["expires"] = now + 3600
     return Response(content=_sitemap_cache["xml"], media_type="application/xml")

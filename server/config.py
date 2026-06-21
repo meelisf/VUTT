@@ -145,6 +145,8 @@ RATE_LIMITS = {
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
     '/meta/work': (60, 60),         # 60 bot-metaandmete päringut minutis IP kohta
+    '/meta/persons': (60, 60),      # 60 prosopograafia meta-päringut minutis IP kohta
+    '/meta/person': (60, 60),       # 60 isikukaardi meta-päringut minutis IP kohta
     '/prosopography/wikidata': (30, 60),  # 30 Wikidata-proksi päringut minutis IP kohta (anonüümne)
 }
 

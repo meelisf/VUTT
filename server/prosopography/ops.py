@@ -315,6 +315,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "floruit_year_to": floruit_year_to if isinstance(floruit_year_to, int) else None,
         "record_status": person.get("record_status", "draft"),
         "verification_level": person.get("verification_level", "draft"),
+        "updated_at": person.get("updated_at"),
         "work_count": work_count,
         "biography_snippet": _make_snippet(person),
         "image_url": person.get("image_url"),

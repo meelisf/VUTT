@@ -1,6 +1,7 @@
 import os
 import json
 import html
+from typing import Optional
 from urllib.parse import urlencode
 from .config import BASE_DIR
 from .utils import find_directory_by_id
@@ -179,19 +180,131 @@ def build_meta_html(work_id: str) -> str:
 </html>"""
 
 
+def build_persons_meta_html() -> str:
+    """Genereerib robotitele lihtsa HTML-i prosopograafia avalehe jaoks."""
+    persons_url = f"{SITE_URL}/persons"
+    title = "Isikud – VUTT prosopograafia"
+    description = "VUTT prosopograafia: varauusaegsete akadeemiliste tekstidega seotud isikud."
+    safe_title = _escape(title)
+    safe_desc = _escape(description)
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{safe_title}</title>
+    <link rel="canonical" href="{persons_url}">
+    <meta name="description" content="{safe_desc}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{persons_url}">
+    <meta property="og:title" content="{safe_title}">
+    <meta property="og:description" content="{safe_desc}">
+</head>
+<body>
+    <h1>{safe_title}</h1>
+    <p>{safe_desc}</p>
+    <p><a href="{persons_url}">{persons_url}</a></p>
+</body>
+</html>"""
+
+
+def build_person_meta_html(person_id: str) -> Optional[str]:
+    """Genereerib Google'ile ja sotsiaalmeedia robotitele isikukaardi HTML-i."""
+    from .prosopography.ops import get_person_with_works
+
+    person = get_person_with_works(person_id)
+    if not person or person.get("record_status") == "tombstone" or person.get("merged_into"):
+        return None
+
+    name = person.get("name") or {}
+    title = name.get("label") or person.get("id") or "Isik"
+    aliases = name.get("aliases") or []
+    biography = _strip_html_tags(person.get("biography") or person.get("notes") or "")
+    description_parts = []
+    if aliases:
+        description_parts.append("; ".join(str(a) for a in aliases[:5]))
+    if biography:
+        description_parts.append(biography[:180])
+    description = " — ".join(description_parts) or "VUTT prosopograafia isikukaart."
+
+    person_url = f"{SITE_URL}/persons/{_escape(person_id)}"
+    safe_title = _escape(title)
+    safe_desc = _escape(description)
+
+    dc_tags = f'    <meta name="DC.title" content="{safe_title}">\n'
+    updated = person.get("updated_at")
+    if updated:
+        dc_tags += f'    <meta name="DC.date" content="{_escape(str(updated))}">\n'
+
+    body_lines = [f"<h1>{safe_title}</h1>"]
+    if aliases:
+        body_lines.append(f"<p>{_escape('; '.join(str(a) for a in aliases))}</p>")
+
+    birth = (person.get("birth") or {}).get("date")
+    death = (person.get("death") or {}).get("date")
+    if birth or death:
+        body_lines.append(f"<p>{_escape(birth or '')}–{_escape(death or '')}</p>")
+
+    occupations = person.get("occupations") or []
+    occ_labels = [o.get("label") or o.get("occupation") for o in occupations if isinstance(o, dict) and (o.get("label") or o.get("occupation"))]
+    if occ_labels:
+        body_lines.append(f"<p>{_escape(', '.join(occ_labels))}</p>")
+    if biography:
+        body_lines.append(f"<p>{_escape(biography)}</p>")
+    body_lines.append(f'<p><a href="{person_url}">{person_url}</a></p>')
+    body_content = "\n".join(body_lines)
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{safe_title}</title>
+    <link rel="canonical" href="{person_url}">
+    <meta name="description" content="{safe_desc}">
+
+{dc_tags}    <meta property="og:type" content="profile">
+    <meta property="og:url" content="{person_url}">
+    <meta property="og:title" content="{safe_title}">
+    <meta property="og:description" content="{safe_desc}">
+</head>
+<body>
+    {body_content}
+</body>
+</html>"""
+
+
+def _strip_html_tags(text: str) -> str:
+    """Eemaldab lihtsad XML/HTML märgendid meta-kirjelduse jaoks."""
+    import re
+    return re.sub(r"<[^>]+>", "", str(text or "")).strip()
+
+
+def _sitemap_lastmod(value) -> Optional[str]:
+    """Teisendab ISO või timestamp väärtuse sitemap lastmod kuupäevaks."""
+    import datetime
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return datetime.datetime.fromtimestamp(value, datetime.timezone.utc).strftime("%Y-%m-%d")
+    text = str(value).strip()
+    if len(text) >= 10 and text[:4].isdigit():
+        return text[:10]
+    return None
+
+
 def build_sitemap_xml(
     work_id_cache: dict,
     is_work_public_fn,
     load_meta_fn,
+    person_entries: Optional[list] = None,
 ) -> str:
     """
-    Genereerib sitemap.xml kõigi avalike teoste jaoks.
+    Genereerib sitemap.xml avalike teoste ja prosopograafia jaoks.
 
     work_id_cache: {work_id: (path, mtime)} või {work_id: path}
     is_work_public_fn: callable(meta) -> bool
     load_meta_fn: callable(work_id) -> dict | None
+    person_entries: prosopography_index.json entries või None
     """
-    import datetime
 
     urls = []
     for work_id, value in work_id_cache.items():
@@ -211,9 +324,23 @@ def build_sitemap_xml(
         if not is_work_public_fn(meta):
             continue
 
-        lastmod = datetime.datetime.fromtimestamp(mtime, datetime.timezone.utc).strftime("%Y-%m-%d")
+        lastmod = _sitemap_lastmod(mtime)
         loc = f"{SITE_URL}/work/{html.escape(work_id)}"
-        urls.append(f"  <url>\n    <loc>{loc}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>")
+        lastmod_xml = f"\n    <lastmod>{lastmod}</lastmod>" if lastmod else ""
+        urls.append(f"  <url>\n    <loc>{loc}</loc>{lastmod_xml}\n  </url>")
+
+    urls.append(f"  <url>\n    <loc>{SITE_URL}/persons</loc>\n  </url>")
+
+    for person in person_entries or []:
+        if person.get("record_status") == "tombstone":
+            continue
+        person_id = person.get("id")
+        if not person_id:
+            continue
+        loc = f"{SITE_URL}/persons/{html.escape(str(person_id))}"
+        lastmod = _sitemap_lastmod(person.get("updated_at"))
+        lastmod_xml = f"\n    <lastmod>{lastmod}</lastmod>" if lastmod else ""
+        urls.append(f"  <url>\n    <loc>{loc}</loc>{lastmod_xml}\n  </url>")
 
     body = "\n".join(urls)
     return (

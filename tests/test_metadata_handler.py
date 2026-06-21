@@ -356,4 +356,21 @@ def test_sitemap_multiple_works():
 
     xml = build_sitemap_xml(cache, lambda m: True, lambda wid: metas.get(wid))
 
-    assert xml.count("<url>") == 3
+    assert xml.count("<url>") == 4
+    assert "https://vutt.utlib.ut.ee/persons" in xml
+
+
+def test_sitemap_includes_persons_and_excludes_tombstones():
+    from server.metadata_handler import build_sitemap_xml
+
+    persons = [
+        {"id": "vutt:P1", "record_status": "published", "updated_at": "2026-06-21T12:00:00Z"},
+        {"id": "vutt:P2", "record_status": "tombstone"},
+    ]
+
+    xml = build_sitemap_xml({}, lambda m: True, lambda wid: None, persons)
+
+    assert "https://vutt.utlib.ut.ee/persons" in xml
+    assert "https://vutt.utlib.ut.ee/persons/vutt:P1" in xml
+    assert "2026-06-21" in xml
+    assert "vutt:P2" not in xml

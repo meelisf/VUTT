@@ -4,6 +4,7 @@
 User-agent: *
 Allow: /$
 Allow: /work/
+Allow: /persons
 Disallow: /search
 Disallow: /register
 Disallow: /set-password
