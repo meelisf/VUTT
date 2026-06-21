@@ -176,3 +176,87 @@ def test_build_reocr_status_agregeerib(tmp_path, monkeypatch):
         assert st2["active"] == {} and st2["progress"] is None
     finally:
         del reocr_ops._reocr_batch_jobs["JB"]
+
+
+# =========================================================
+# Endpointide testid (POST /reocr-batch, GET /reocr-status)
+# Kasutatakse conftest.py fixture'id: backend_env, client, login
+# =========================================================
+
+def test_reocr_batch_validatsioon(backend_env, client, login, monkeypatch, tmp_path):
+    """404 tundmatu teose korral, 400 tühja listi ja puuduva faili korral."""
+    from server import reocr_ops
+    main = backend_env["main"]
+    work = tmp_path / "1700-teos"
+    work.mkdir()
+    (work / "a.jpg").write_bytes(b"IMG")
+    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    # Tühjendame globaalse batch-registri, et varasemad testid ei segaks
+    reocr_ops._reocr_batch_jobs.clear()
+
+    token = login("admin", "adminpass")
+    h = {"Authorization": f"Bearer {token}"}
+
+    # Tundmatu teos → 404
+    r = client.post("/admin/work/zzz/reocr-batch", json={"page_filenames": ["a.jpg"]}, headers=h)
+    assert r.status_code == 404, r.text
+
+    # Tühi faililoend → 400
+    r = client.post("/admin/work/w1/reocr-batch", json={"page_filenames": []}, headers=h)
+    assert r.status_code == 400, r.text
+
+    # Tundmatu fail → 400
+    r = client.post("/admin/work/w1/reocr-batch", json={"page_filenames": ["puudub.jpg"]}, headers=h)
+    assert r.status_code == 400, r.text
+
+
+def test_reocr_batch_aktiivne_409(backend_env, client, login, monkeypatch, tmp_path):
+    """409 kui sellel teosel käib juba aktiivne batch."""
+    main = backend_env["main"]
+    work = tmp_path / "1700-teos"
+    work.mkdir()
+    (work / "a.jpg").write_bytes(b"IMG")
+    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    # main.py kasutab otseimporti, seega patch main-moodulil
+    monkeypatch.setattr(main, "get_active_batch_for_work", lambda wid: "jid-123")
+
+    token = login("admin", "adminpass")
+    h = {"Authorization": f"Bearer {token}"}
+    r = client.post("/admin/work/w1/reocr-batch", json={"page_filenames": ["a.jpg"]}, headers=h)
+    assert r.status_code == 409, r.text
+
+
+def test_reocr_batch_auth_nouab_admini(backend_env, client):
+    """Autentimata päring → 401."""
+    r = client.post("/admin/work/w1/reocr-batch", json={"page_filenames": ["a.jpg"]})
+    assert r.status_code == 401
+
+
+def test_reocr_status_kuju(backend_env, client, login, monkeypatch, tmp_path):
+    """GET reocr-status tagastab oodatud väljad: active, ocr_ready, errors, progress."""
+    main = backend_env["main"]
+    work = tmp_path / "1700-teos"
+    work.mkdir()
+    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+
+    token = login("admin", "adminpass")
+    r = client.get("/admin/work/w1/reocr-status", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert set(body) >= {"active", "ocr_ready", "errors", "progress"}, body
+
+
+def test_reocr_status_tundmatu_teos_404(backend_env, client, login, monkeypatch):
+    """GET reocr-status tundmatu teose korral → 404."""
+    main = backend_env["main"]
+    monkeypatch.setattr(main, "find_directory_by_id", lambda w: None)
+
+    token = login("admin", "adminpass")
+    r = client.get("/admin/work/zzz/reocr-status", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 404, r.text
+
+
+def test_reocr_status_auth_nouab_admini(backend_env, client):
+    """Autentimata GET reocr-status → 401."""
+    r = client.get("/admin/work/w1/reocr-status")
+    assert r.status_code == 401
