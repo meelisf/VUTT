@@ -245,7 +245,7 @@ def _poll_batch_job(job_id: str) -> None:
             sftp.close()
         except Exception:
             pass
-    close_ssh(job_id)
+        close_ssh(job_id)
     _finalize_batch_if_complete(job)
 
 
