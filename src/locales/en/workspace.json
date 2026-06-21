@@ -152,7 +152,6 @@
         "go": "Send to OCR",
         "cancel": "Cancel"
       },
-      "started": "Batch re-OCR started.",
       "error": "Failed to start re-OCR.",
       "badge": { "noText": "no text", "processing": "OCR running", "ready": "OCR ready for review", "error": "OCR failed" }
     },

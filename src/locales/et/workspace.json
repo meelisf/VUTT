@@ -152,7 +152,6 @@
         "go": "Saada OCR-i",
         "cancel": "Tühista"
       },
-      "started": "Batch re-OCR alustatud.",
       "error": "Re-OCR alustamine ebaõnnestus.",
       "badge": { "noText": "tekstita", "processing": "OCR töötab", "ready": "OCR valmis ülevaatamiseks", "error": "OCR ebaõnnestus" }
     },

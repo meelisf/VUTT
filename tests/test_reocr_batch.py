@@ -277,3 +277,45 @@ def test_reocr_batch_lykkab_traversal_tagasi(backend_env, client, login, monkeyp
                     json={"page_filenames": ["../../state/users.json"]},
                     headers=h)
     assert r.status_code == 400
+
+
+def test_poll_batch_write_vea_korral_remote_txt_ei_kustutata(tmp_path, monkeypatch):
+    """Write-vea korral jääb remote .txt alles (andmekadu vältimiseks)."""
+    from server import reocr_ops
+
+    monkeypatch.setattr(reocr_ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(reocr_ops, "OCR_SERVER_PATH", "/srv")
+    monkeypatch.setattr(reocr_ops, "close_ssh", lambda jid: None)
+    work_dir = tmp_path / "teos"
+    work_dir.mkdir()
+
+    # Üks leht, mis on OCR-serveris valmis
+    job_id = "JOBWRITE1"
+    pages = reocr_ops._build_batch_pages("teos", [("a.jpg", 1)])
+    for e in pages:
+        e["status"] = "processing"
+    reocr_ops._reocr_batch_jobs[job_id] = {
+        "kind": "batch", "work_id": "w", "slug": "teos", "status": "processing",
+        "started_at": 0, "finished_at": None, "last_progress_at": 0,
+        "remote_staging": "AUTO-OCR/print/JOBWRITE1",
+        "remote_work": "AUTO-OCR/print/JOBWRITE1/teos", "pages": pages,
+    }
+
+    txt_abs = "/srv/AUTO-OCR/print/JOBWRITE1/teos/teos_pg_001.txt"
+    fake_sftp = _FakePollSftp({txt_abs: "OCR TEKST"})
+    monkeypatch.setattr(reocr_ops, "_sftp_open", lambda jid: fake_sftp)
+
+    # _write_ocr_file viskab erindi (nt ketas täis)
+    def _failing_write(*a, **kw):
+        raise OSError("disk full")
+    monkeypatch.setattr(reocr_ops, "_write_ocr_file", _failing_write)
+
+    reocr_ops._poll_batch_job(job_id)
+
+    # Leht peab olema error-staatuses
+    assert pages[0]["status"] == "error", f"oodati 'error', sain '{pages[0]['status']}'"
+    # Remote .txt EI tohi olla kustutatud — see on ainuke koopia OCR tulemusest
+    assert txt_abs not in fake_sftp.removed, (
+        f"remote .txt kustutati write-vea korral — andmekadu! removed={fake_sftp.removed}")
+
+    del reocr_ops._reocr_batch_jobs[job_id]

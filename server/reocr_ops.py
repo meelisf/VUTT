@@ -234,10 +234,21 @@ def _poll_batch_job(job_id: str) -> None:
             except Exception as e:
                 entry["status"] = "error"
                 entry["error"] = str(e)
-            # Korista remote pilt+txt
-            for f in (txt_abs, f"{work_abs}/{entry['remote_img_name']}"):
+            # Korista remote pilt+txt AINULT õnnestunud kirjutuse korral.
+            # Vea korral jäetakse .txt alles, et järgmine poll-ring saaks uuesti proovida.
+            if entry["status"] == "ready":
+                for f in (txt_abs, f"{work_abs}/{entry['remote_img_name']}"):
+                    try:
+                        sftp.remove(f)
+                    except Exception:
+                        pass
+        # Kui kõik lehed on lahendatud, koristame tühja remote staging-kausta
+        all_resolved = all(e["status"] in ("ready", "error") for e in job["pages"])
+        if all_resolved:
+            staging_abs = f"{OCR_SERVER_PATH}/{job['remote_staging']}"
+            for d in (work_abs, staging_abs):
                 try:
-                    sftp.remove(f)
+                    sftp.rmdir(d)
                 except Exception:
                     pass
     finally:
@@ -334,6 +345,7 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
                 ocr_ready.append(os.path.splitext(fn)[0])
     except FileNotFoundError:
         pass
+    ocr_ready.sort()  # Deterministlik järjekord
     return {"active": active, "ocr_ready": ocr_ready, "errors": errors, "progress": progress}
 
 
