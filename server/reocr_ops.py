@@ -62,6 +62,16 @@ def get_reocr_log(offset: int = 0, limit: int = 50) -> dict:
 
 logger = get_logger(__name__)
 
+
+def _write_ocr_file(slug: str, page_filename: str, text: str) -> str:
+    """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging). Tagastab tee."""
+    stem = os.path.splitext(os.path.basename(page_filename))[0]
+    ocr_path = os.path.join(BASE_DIR, slug, stem + ".ocr")
+    with open(ocr_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return ocr_path
+
+
 _reocr_jobs: dict = {}  # {job_id: {status, text, error, remote_staging, remote_work, remote_img, remote_txt}}
 _reocr_jobs_lock = threading.Lock()
 
@@ -262,11 +272,8 @@ def poll_reocr_job(job_id: str) -> dict:
         # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
         page_fn = job.get("page_filename", "")
         if page_fn:
-            stem = os.path.splitext(page_fn)[0]
-            ocr_path = os.path.join(BASE_DIR, job["slug"], stem + ".ocr")
             try:
-                with open(ocr_path, "w", encoding="utf-8") as f:
-                    f.write(text)
+                ocr_path = _write_ocr_file(job["slug"], page_fn, text)
                 logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
             except Exception as write_err:
                 logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
