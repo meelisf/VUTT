@@ -102,6 +102,80 @@ REOCR_MAX_CONCURRENT = 20   # Max korraga aktiivseid re-OCR töid
 REOCR_JOB_TTL = 86400       # Valmis/vigased tööd kustutatakse 24h pärast
 REOCR_PROCESSING_TIMEOUT = 1800  # 30 minutit — pärast seda märgitakse error
 
+REOCR_BATCH_INACTIVITY_TIMEOUT = 1800  # Batch error, kui X s pole ühegi lehe kohta uut .txt
+
+_reocr_batch_jobs: Dict = {}  # {job_id: batch-job dict}
+_reocr_batch_jobs_lock = threading.Lock()
+
+
+def get_active_batch_for_work(work_id: str) -> Optional[str]:
+    """Aktiivse (uploading/processing) batch-jobi job_id selle teose jaoks, muidu None."""
+    with _reocr_batch_jobs_lock:
+        for jid, j in _reocr_batch_jobs.items():
+            if j["work_id"] == work_id and j["status"] in ("uploading", "processing"):
+                return jid
+    return None
+
+
+def start_reocr_batch(work_id: str, slug: str, work_path: str,
+                      pages: List[Tuple[str, Optional[int]]],
+                      material_type: str = "print", username: str = "") -> str:
+    """Alustab mitme lehe batch re-OCR tööd: laeb KÕIK pildid ühte staging-kausta.
+    Loeb pildid otse work_path-ist (EI kustuta originaale). Tagastab job_id."""
+    if material_type not in ("print", "hand"):
+        material_type = "print"
+    job_id = generate_nanoid()
+    remote_staging = f"AUTO-OCR/{material_type}/{job_id}"
+    remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
+    page_entries = _build_batch_pages(slug, pages)
+    now = datetime.now().timestamp()
+
+    job = {
+        "kind": "batch",
+        "work_id": work_id,
+        "slug": slug,
+        "username": username,
+        "material_type": material_type,
+        "status": "uploading",
+        "started_at": now,
+        "finished_at": None,
+        "last_progress_at": now,
+        "remote_staging": remote_staging,
+        "remote_work": remote_work,
+        "pages": page_entries,
+    }
+    with _reocr_batch_jobs_lock:
+        _reocr_batch_jobs[job_id] = job
+
+    def _upload():
+        try:
+            sftp = _sftp_open(job_id)
+            staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
+            work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
+            for d in (staging_abs, work_abs):
+                try:
+                    sftp.stat(d)
+                except FileNotFoundError:
+                    sftp.mkdir(d)
+            for entry in page_entries:
+                src = os.path.join(work_path, entry["page_filename"])
+                sftp.put(src, f"{work_abs}/{entry['remote_img_name']}")
+                entry["status"] = "processing"
+            sftp.close()
+            job["status"] = "processing"
+            logger.info(f"Re-OCR batch {job_id}: {len(page_entries)} pilti edastatud ({slug})")
+        except Exception as e:
+            logger.error(f"Re-OCR batch {job_id} upload viga: {e}")
+            for entry in page_entries:
+                if entry["status"] in ("uploading", "processing"):
+                    entry["status"] = "error"
+                    entry["error"] = str(e)
+            job["status"] = "error"
+            job["finished_at"] = datetime.now().timestamp()
+
+    threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}").start()
+    return job_id
+
 
 def _reocr_cleanup_loop():
     """Daemon-thread: eemaldab vanad done/error re-OCR tööd mälust."""
