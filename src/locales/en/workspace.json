@@ -139,6 +139,23 @@
       "conflict": "The page list was stale — nothing deleted. The list was refreshed, try again.",
       "draftBlocked": "Save or discard order changes before deleting."
     },
+    "reocr": {
+      "section": "Transcription",
+      "selectNoText": "Select untranscribed",
+      "button": "Transcribe ({{count}})",
+      "model": { "label": "Model", "print": "Print", "hand": "Handwriting" },
+      "progress": "OCR: {{ready}}/{{total}} done, {{errors}} failed",
+      "confirm": {
+        "line1": "{{count}} pages will be re-sent to OCR.",
+        "line2": "Existing text will not change until you apply the result in the Workspace.",
+        "withText": "({{count}} selected pages already have text — re-OCR creates a new version for review; the old one stays until you apply it.)",
+        "go": "Send to OCR",
+        "cancel": "Cancel"
+      },
+      "started": "Batch re-OCR started.",
+      "error": "Failed to start re-OCR.",
+      "badge": { "noText": "no text", "processing": "OCR running", "ready": "OCR ready for review", "error": "OCR failed" }
+    },
     "tabs": {
       "replace": "Replace pages"
     },

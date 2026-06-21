@@ -22,6 +22,7 @@ import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
+import { mapReocrState, selectableNoTextFiles, ReocrStatusResponse } from '../utils/reocrStatus';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -95,6 +96,13 @@ const WorkManage: React.FC = () => {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null);
+
+  // Re-OCR batch staatus + käivitus
+  const [reocrStatus, setReocrStatus] = useState<ReocrStatusResponse | null>(null);
+  const [ocrModel, setOcrModel] = useState<'print' | 'hand'>('print');
+  const [batchConfirm, setBatchConfirm] = useState(false);
+  const [batchError, setBatchError] = useState<string | null>(null);
+  const [reocrPollNonce, setReocrPollNonce] = useState(0); // batch-käivitusel taaskäivitab poll-effecti
 
   // Teose kustutamine
   const [deleteWorkConfirm, setDeleteWorkConfirm] = useState(false);
@@ -196,6 +204,33 @@ const WorkManage: React.FC = () => {
       .catch(() => {});
   }, [workId, authToken, isAdmin]);
 
+  // Re-OCR koondstaatus: laeb korra (näitab .ocr-ootel märke), pollib ainult aktiivse batchi ajal.
+  useEffect(() => {
+    if (!workId || !authToken) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
+
+    const tick = async () => {
+      try {
+        const res = await fetchWithTimeout(
+          `${FILE_API_URL}/admin/work/${workId}/reocr-status`,
+          { headers: getAuthHeaders(authToken), timeout: 8000 },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setReocrStatus(data);
+          if (!cancelled && data.progress && data.progress.active) {
+            timer = setTimeout(tick, 4000);
+          }
+        }
+      } catch {
+        if (!cancelled) timer = setTimeout(tick, 6000);
+      }
+    };
+    tick();
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [workId, authToken, reocrPollNonce]);
+
   useEffect(() => {
     const init: Record<string, number> = {};
     pages.forEach(p => { init[p.filename] = p.page_num; });
@@ -255,6 +290,38 @@ const WorkManage: React.FC = () => {
 
   const handleSelectAll = () => setSelectedFiles(new Set(pages.map((p) => p.filename)));
   const handleClearSelection = () => { setSelectedFiles(new Set()); lastSelectedIndexRef.current = null; };
+
+  const handleSelectNoText = () =>
+    setSelectedFiles(new Set(selectableNoTextFiles(pages, reocrStatus)));
+
+  const selectedWithTextCount = Array.from(selectedFiles)
+    .filter((fn) => pages.find((p) => p.filename === fn)?.has_text).length;
+
+  const handleBatchReocr = async () => {
+    if (!workId || !authToken || selectedFiles.size === 0) return;
+    setBatchError(null);
+    try {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/reocr-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+        body: JSON.stringify({ page_filenames: Array.from(selectedFiles), material_type: ocrModel }),
+        timeout: 30000,
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || t('manage.reocr.error'));
+      }
+      setBatchConfirm(false);
+      handleClearSelection();
+      // Käivita poll kohe (status fetch uuesti)
+      const st = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/reocr-status`,
+        { headers: getAuthHeaders(authToken), timeout: 8000 });
+      if (st.ok) setReocrStatus(await st.json());
+      setReocrPollNonce((n) => n + 1); // taaskäivitab poll-effecti (alustab pollimist)
+    } catch (e: any) {
+      setBatchError(e.message || t('manage.reocr.error'));
+    }
+  };
 
   // Liiguta plokk: kirjuta uus order draftPositions-i (ei salvesta veel serverisse)
   const handleMove = () => {
@@ -619,6 +686,12 @@ const WorkManage: React.FC = () => {
                     {t('manage.select.all')}
                   </button>
                 )}
+                {pages.length > 0 && (
+                  <button onClick={handleSelectNoText}
+                    className="px-2 py-1 text-xs border border-amber-300 text-amber-700 rounded hover:bg-amber-50">
+                    {t('manage.reocr.selectNoText')}
+                  </button>
+                )}
                 <span className="text-sm text-gray-500">{pages.length} {t('manage.pagesCount', { count: pages.length })}</span>
               </div>
             </div>
@@ -688,6 +761,58 @@ const WorkManage: React.FC = () => {
                   <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{bulkDeleteError}</div>
                 )}
 
+                {/* Re-OCR sektsioon — eraldi, heleroheline, et mitte konkureerida liiguta/kustuta nuppudega */}
+                {selectedFiles.size > 0 && (
+                  <div className="mx-4 mb-1 p-3 bg-green-50 border border-green-200 rounded-lg flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <span className="text-sm font-medium text-green-800">{t('manage.reocr.section')}</span>
+                    <label className="text-sm text-gray-600">{t('manage.reocr.model.label')}:</label>
+                    <select value={ocrModel} onChange={(e) => setOcrModel(e.target.value as 'print' | 'hand')}
+                      className="text-sm border border-gray-300 rounded px-1.5 py-0.5">
+                      <option value="print">{t('manage.reocr.model.print')}</option>
+                      <option value="hand">{t('manage.reocr.model.hand')}</option>
+                    </select>
+                    <button onClick={() => setBatchConfirm(true)} disabled={hasReorderChanges}
+                      title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
+                      className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded">
+                      {t('manage.reocr.button', { count: selectedFiles.size })}
+                    </button>
+                  </div>
+                )}
+
+                {/* Re-OCR kinnitus */}
+                {batchConfirm && (
+                  <div className="mx-4 mb-2 p-3 bg-green-50 border border-green-300 rounded-lg flex flex-col gap-2">
+                    <span className="text-sm text-green-900">{t('manage.reocr.confirm.line1', { count: selectedFiles.size })} {t('manage.reocr.confirm.line2')}</span>
+                    {selectedWithTextCount > 0 && (
+                      <span className="text-xs text-green-700">{t('manage.reocr.confirm.withText', { count: selectedWithTextCount })}</span>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <button onClick={handleBatchReocr}
+                        className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded">
+                        {t('manage.reocr.confirm.go')}
+                      </button>
+                      <button onClick={() => setBatchConfirm(false)}
+                        className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
+                        {t('manage.reocr.confirm.cancel')}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {batchError && (
+                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{batchError}</div>
+                )}
+
+                {/* Progress-kokkuvõte */}
+                {reocrStatus?.progress && reocrStatus.progress.total > 0 && (
+                  <div className="mx-4 mb-2 text-sm text-green-700">
+                    {t('manage.reocr.progress', {
+                      ready: reocrStatus.progress.ready,
+                      total: reocrStatus.progress.total,
+                      errors: reocrStatus.progress.errors,
+                    })}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
                   {visibleSorted.map((page) => {
                     const vNum = visibleNumByFile[page.filename];
@@ -699,6 +824,8 @@ const WorkManage: React.FC = () => {
                         imageName={page.lehekylje_pilt.split('/').pop() ?? ''}
                         visiblePageNum={vNum}
                         status={page.status}
+                        hasText={page.has_text}
+                        reocrState={mapReocrState(page.filename, reocrStatus)}
                         isSelected={selectedFiles.has(page.filename)}
                         isChanged={(draftPositions[page.filename] ?? page.page_num) !== page.page_num}
                         thumbCacheBust={thumbCacheBust}
