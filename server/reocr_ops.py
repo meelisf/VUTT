@@ -177,6 +177,112 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     return job_id
 
 
+def _download_txt_if_ready(sftp, txt_abs: str) -> Optional[str]:
+    """Tagastab .txt sisu kui fail eksisteerib, muidu None."""
+    try:
+        sftp.stat(txt_abs)
+    except FileNotFoundError:
+        return None
+    buf = io.BytesIO()
+    sftp.getfo(txt_abs, buf)
+    return buf.getvalue().decode("utf-8", errors="replace")
+
+
+def _batch_inactive(job: Dict, now: float, timeout: int) -> bool:
+    """Kas batch on liiga kaua ilma edenemiseta (viimasest ready-st)."""
+    return (now - job.get("last_progress_at", job["started_at"])) > timeout
+
+
+def _finalize_batch_if_complete(job: Dict) -> None:
+    """Kui kõik lehed ready/error → märgi job done."""
+    if all(e["status"] in ("ready", "error") for e in job["pages"]):
+        if job["status"] != "done":
+            job["status"] = "done"
+            job["finished_at"] = datetime.now().timestamp()
+
+
+def _poll_batch_job(job_id: str) -> None:
+    """Laeb iga ootel-lehe valmis .txt alla → .ocr fail (AUTORITEETNE mapping kirjest)."""
+    job = _reocr_batch_jobs.get(job_id)
+    if not job or job["status"] != "processing":
+        return
+    pending = [e for e in job["pages"] if e["status"] == "processing"]
+    if not pending:
+        _finalize_batch_if_complete(job)
+        return
+    try:
+        sftp = _sftp_open(job_id)
+    except Exception as e:
+        logger.warning(f"Re-OCR batch {job_id} poll sftp viga: {e}")
+        return
+    work_abs = f"{OCR_SERVER_PATH}/{job['remote_work']}"
+    try:
+        for entry in pending:
+            txt_abs = f"{work_abs}/{entry['remote_txt_name']}"
+            try:
+                text = _download_txt_if_ready(sftp, txt_abs)
+            except Exception as e:
+                logger.warning(f"Re-OCR batch {job_id} {entry['page_filename']} laadimisviga: {e}")
+                continue
+            if text is None:
+                continue
+            # AUTORITEETNE: kirje page_filename määrab sihtkoha
+            try:
+                _write_ocr_file(job["slug"], entry["page_filename"], text)
+                entry["status"] = "ready"
+                job["last_progress_at"] = datetime.now().timestamp()
+            except Exception as e:
+                entry["status"] = "error"
+                entry["error"] = str(e)
+            # Korista remote pilt+txt
+            for f in (txt_abs, f"{work_abs}/{entry['remote_img_name']}"):
+                try:
+                    sftp.remove(f)
+                except Exception:
+                    pass
+    finally:
+        try:
+            sftp.close()
+        except Exception:
+            pass
+    close_ssh(job_id)
+    _finalize_batch_if_complete(job)
+
+
+def _reocr_batch_poll_loop():
+    """Daemon: kontrollib batch-töid iga 10s; inactivity-timeout märgib lahendamata lehed error-iks."""
+    import time
+    while True:
+        time.sleep(10)
+        now = datetime.now().timestamp()
+        with _reocr_batch_jobs_lock:
+            active = [(jid, j) for jid, j in _reocr_batch_jobs.items() if j["status"] == "processing"]
+            # TTL: eemalda vanad done jobid
+            stale = [jid for jid, j in _reocr_batch_jobs.items()
+                     if j["status"] in ("done", "error")
+                     and (j.get("finished_at") or 0) < now - REOCR_JOB_TTL]
+            for jid in stale:
+                del _reocr_batch_jobs[jid]
+        for jid, job in active:
+            if _batch_inactive(job, now, REOCR_BATCH_INACTIVITY_TIMEOUT):
+                with _reocr_batch_jobs_lock:
+                    for e in job["pages"]:
+                        if e["status"] in ("uploading", "processing"):
+                            e["status"] = "error"
+                            e["error"] = "Aegumine: OCR ei edenenud määratud aja jooksul."
+                    job["status"] = "done"
+                    job["finished_at"] = now
+                logger.warning(f"Re-OCR batch {jid}: inactivity-timeout")
+                continue
+            try:
+                _poll_batch_job(jid)
+            except Exception as e:
+                logger.warning(f"Re-OCR batch {jid} poll viga: {e}")
+
+
+threading.Thread(target=_reocr_batch_poll_loop, daemon=True, name="reocr-batch-poll").start()
+
+
 def _reocr_cleanup_loop():
     """Daemon-thread: eemaldab vanad done/error re-OCR tööd mälust."""
     import time

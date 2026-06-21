@@ -85,3 +85,65 @@ def test_start_reocr_batch_loob_registri_ja_laeb_pildid(tmp_path, monkeypatch):
     # Aktiivse batchi otsing
     assert reocr_ops.get_active_batch_for_work("w1") == job_id
     assert reocr_ops.get_active_batch_for_work("w2") is None
+
+
+class _FakePollSftp:
+    """Tagastab ainult valitud remote_txt-d (simuleerib OCR-i edenemist)."""
+    def __init__(self, ready_txts):
+        self.ready = dict(ready_txts)  # {txt_abs: text}
+        self.removed = []
+    def stat(self, path):
+        if path in self.ready:
+            return True
+        raise FileNotFoundError(path)
+    def getfo(self, path, buf):
+        buf.write(self.ready[path].encode("utf-8"))
+    def remove(self, path):
+        self.removed.append(path)
+    def rmdir(self, path):
+        pass
+    def close(self):
+        pass
+
+
+def test_poll_batch_mapping_on_autoriteetne_mitte_jarjekorra_pohine(tmp_path, monkeypatch):
+    from server import reocr_ops
+    monkeypatch.setattr(reocr_ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(reocr_ops, "OCR_SERVER_PATH", "/srv")
+    monkeypatch.setattr(reocr_ops, "close_ssh", lambda jid: None)
+    work_dir = tmp_path / "teos"
+    work_dir.mkdir()
+
+    # Job: leht "esimene.jpg"→pg_001, "teine.jpg"→pg_002
+    job_id = "JOB1"
+    pages = reocr_ops._build_batch_pages("teos", [("esimene.jpg", 1), ("teine.jpg", 2)])
+    for e in pages:
+        e["status"] = "processing"
+    reocr_ops._reocr_batch_jobs[job_id] = {
+        "kind": "batch", "work_id": "w", "slug": "teos", "status": "processing",
+        "started_at": 0, "finished_at": None, "last_progress_at": 0,
+        "remote_work": "AUTO-OCR/print/JOB1/teos", "pages": pages,
+    }
+
+    # Ainult pg_002 valmis (teine.jpg sisu) — pg_001 veel pole
+    monkeypatch.setattr(reocr_ops, "_sftp_open", lambda jid: _FakePollSftp(
+        {"/srv/AUTO-OCR/print/JOB1/teos/teos_pg_002.txt": "TEISE LEHE TEKST"}))
+
+    reocr_ops._poll_batch_job(job_id)
+
+    # KRIITILINE: tulemus läks teine.jpg-le (kirje järgi), mitte esimese lehe .ocr-i
+    assert (work_dir / "teine.ocr").read_text(encoding="utf-8") == "TEISE LEHE TEKST"
+    assert not (work_dir / "esimene.ocr").exists()
+    assert pages[1]["status"] == "ready" and pages[0]["status"] == "processing"
+    assert reocr_ops._reocr_batch_jobs[job_id]["last_progress_at"] > 0
+    del reocr_ops._reocr_batch_jobs[job_id]
+
+
+def test_batch_inactive_ja_finalize():
+    from server.reocr_ops import _batch_inactive, _finalize_batch_if_complete
+    job = {"started_at": 0, "last_progress_at": 100, "status": "processing",
+           "pages": [{"status": "ready"}, {"status": "error"}], "finished_at": None}
+    assert _batch_inactive(job, now=100 + 1801, timeout=1800) is True
+    assert _batch_inactive(job, now=100 + 10, timeout=1800) is False
+    _finalize_batch_if_complete(job)
+    assert job["status"] == "done" and job["finished_at"] is not None
