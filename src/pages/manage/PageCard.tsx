@@ -1,8 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Scissors, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { Scissors, ChevronUp, ChevronDown, Check, Loader2, FileCheck2, AlertCircle } from 'lucide-react';
 import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
+import { ReocrState } from '../../utils/reocrStatus';
 
 interface PageCardProps {
   workId: string;
@@ -10,6 +11,8 @@ interface PageCardProps {
   imageName: string;
   visiblePageNum: number;
   status: string;
+  hasText: boolean;
+  reocrState?: ReocrState;
   isSelected: boolean;
   isChanged: boolean;
   thumbCacheBust: number;
@@ -55,6 +58,35 @@ const PageCard: React.FC<PageCardProps> = (p) => {
         >
           <Check size={13} />
         </button>
+        {/* Tekstita märk — üleval paremal (eraldi reocr-märgist) */}
+        {!p.hasText && !p.reocrState && (
+          <span
+            className="absolute top-1 right-1 z-10 px-1 py-0.5 rounded text-[10px] leading-none bg-amber-100 text-amber-700 border border-amber-300 shadow-sm"
+            title={t('manage.reocr.badge.noText')}
+          >
+            {t('manage.reocr.badge.noText')}
+          </span>
+        )}
+        {/* Re-OCR olek — üleval paremal, märgib sõltumatult has_text-st.
+            "ocr_ready" tähendab "OCR valmis ülevaatamiseks", MITTE "leht korras". */}
+        {p.reocrState === 'processing' && (
+          <span className="absolute top-1 right-1 z-10 p-1 rounded bg-white/90 border border-gray-300 shadow-sm"
+            title={t('manage.reocr.badge.processing')}>
+            <Loader2 size={12} className="animate-spin text-gray-600" />
+          </span>
+        )}
+        {p.reocrState === 'ocr_ready' && (
+          <span className="absolute top-1 right-1 z-10 flex items-center gap-0.5 px-1 py-0.5 rounded text-[10px] leading-none bg-green-100 text-green-700 border border-green-300 shadow-sm"
+            title={t('manage.reocr.badge.ready')}>
+            <FileCheck2 size={11} /> {t('manage.reocr.badge.ready')}
+          </span>
+        )}
+        {p.reocrState === 'error' && (
+          <span className="absolute top-1 right-1 z-10 p-1 rounded bg-red-100 border border-red-300 shadow-sm"
+            title={t('manage.reocr.badge.error')}>
+            <AlertCircle size={12} className="text-red-600" />
+          </span>
+        )}
         <PageThumb
           workId={p.workId}
           src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}`}

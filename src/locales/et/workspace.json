@@ -139,6 +139,22 @@
       "conflict": "Lehekülgede nimekiri oli aegunud — midagi ei kustutatud. Nimekiri värskendati, proovi uuesti.",
       "draftBlocked": "Enne kustutamist salvesta või tühista järjekorra muudatused."
     },
+    "reocr": {
+      "section": "Transkriptsioon",
+      "selectNoText": "Vali tekstita",
+      "button": "Tee transkriptsioon ({{count}})",
+      "model": { "label": "Mudel", "print": "Trükitekst", "hand": "Käsikiri" },
+      "progress": "OCR: {{ready}}/{{total}} valmis, {{errors}} veaga",
+      "confirm": {
+        "line1": "{{count}} lehte saadetakse uuesti OCR-i.",
+        "line2": "Olemasolev tekst ei muutu enne, kui rakendad tulemuse Workspace'is.",
+        "withText": "({{count}} valitud lehel on juba tekst — re-OCR teeb uue versiooni ülevaatuseks, vana jääb alles kuni rakendamiseni.)",
+        "go": "Saada OCR-i",
+        "cancel": "Tühista"
+      },
+      "error": "Re-OCR alustamine ebaõnnestus.",
+      "badge": { "noText": "tekstita", "processing": "OCR töötab", "ready": "OCR valmis ülevaatamiseks", "error": "OCR ebaõnnestus" }
+    },
     "tabs": {
       "replace": "Asenda leheküljed"
     },

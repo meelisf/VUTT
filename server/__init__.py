@@ -81,4 +81,5 @@ from .upload_ops import (
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
     get_active_reocr_count, REOCR_MAX_CONCURRENT, get_reocr_log,
+    start_reocr_batch, get_active_batch_for_work, build_reocr_status,
 )

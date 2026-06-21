@@ -38,6 +38,7 @@ from .upload_ops import (
 from .reocr_ops import (
     start_reocr_job, poll_reocr_job, list_reocr_jobs,
     get_active_reocr_count, REOCR_MAX_CONCURRENT, get_reocr_log,
+    start_reocr_batch, get_active_batch_for_work, build_reocr_status,
 )
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
@@ -1539,6 +1540,43 @@ async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role
     if os.path.isfile(ocr_path):
         os.remove(ocr_path)
     return {"status": "success"}
+
+
+@app.post("/admin/work/{work_id}/reocr-batch")
+async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require_role("admin"))):
+    """Alustab mitme lehe batch re-OCR tööd. Tagastab job_id."""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    if get_active_batch_for_work(work_id):
+        raise HTTPException(status_code=409, detail="Sellel teosel käib juba batch re-OCR.")
+    slug = os.path.basename(path)
+    data = await get_json_data(request)
+    page_filenames = data.get("page_filenames") or []
+    if not isinstance(page_filenames, list) or not page_filenames:
+        raise HTTPException(status_code=400, detail="page_filenames puudub või tühi")
+    material_type = data.get("material_type") if data.get("material_type") in ("print", "hand") else "print"
+    pages = []
+    for fn in page_filenames:
+        # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
+        if not isinstance(fn, str) or fn != os.path.basename(fn):
+            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
+        if not os.path.isfile(os.path.join(path, fn)):
+            raise HTTPException(status_code=400, detail=f"Pilti ei leitud: {fn}")
+        pages.append((fn, None))
+    job_id = start_reocr_batch(work_id, slug, path, pages,
+                               material_type=material_type, username=user['username'])
+    return {"status": "accepted", "job_id": job_id}
+
+
+@app.get("/admin/work/{work_id}/reocr-status")
+async def admin_reocr_status_for_work(work_id: str, user=Depends(require_role("admin"))):
+    """Teose re-OCR koondstaatus manage-lehele (active/ocr_ready/errors/progress)."""
+    path = find_directory_by_id(work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    return {"status": "success", **build_reocr_status(work_id, path)}
+
 
 # =========================================================
 # AVALIKUD ANDMED JA SEO
