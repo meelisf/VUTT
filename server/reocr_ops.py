@@ -301,6 +301,42 @@ def _reocr_cleanup_loop():
 threading.Thread(target=_reocr_cleanup_loop, daemon=True, name="reocr-cleanup").start()
 
 
+def build_reocr_status(work_id: str, work_path: str) -> Dict:
+    """Koondab teose re-OCR staatuse manage-lehe jaoks. Hoiab kolm mõistet lahus:
+    active (OCR töötab), ocr_ready (.ocr ootel, stem'id), errors. progress = aktiivse
+    batchi kokkuvõte."""
+    active: Dict[str, str] = {}
+    errors: Dict[str, str] = {}
+    progress: Optional[Dict] = None
+    with _reocr_batch_jobs_lock:
+        for j in _reocr_batch_jobs.values():
+            if j["work_id"] != work_id:
+                continue
+            is_active = j["status"] in ("uploading", "processing")
+            for e in j["pages"]:
+                if e["status"] in ("uploading", "processing"):
+                    active[e["page_filename"]] = e["status"]
+                elif e["status"] == "error" and e.get("error"):
+                    errors[e["page_filename"]] = e["error"]
+            summary = {
+                "total": len(j["pages"]),
+                "ready": sum(1 for e in j["pages"] if e["status"] == "ready"),
+                "errors": sum(1 for e in j["pages"] if e["status"] == "error"),
+                "active": is_active,
+            }
+            # Eelista aktiivset batchi; muidu viimast nähtut
+            if is_active or progress is None:
+                progress = summary
+    ocr_ready: List[str] = []
+    try:
+        for fn in os.listdir(work_path):
+            if fn.endswith(".ocr"):
+                ocr_ready.append(os.path.splitext(fn)[0])
+    except FileNotFoundError:
+        pass
+    return {"active": active, "ocr_ready": ocr_ready, "errors": errors, "progress": progress}
+
+
 def _reocr_poll_loop():
     """Daemon-thread: kontrollib proaktiivselt 'processing' töid iga 10s tagant.
     Nii ei pea kasutaja olema Workspace lehel, et tulemus kätte saada.

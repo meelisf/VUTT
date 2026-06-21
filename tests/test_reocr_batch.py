@@ -147,3 +147,32 @@ def test_batch_inactive_ja_finalize():
     assert _batch_inactive(job, now=100 + 10, timeout=1800) is False
     _finalize_batch_if_complete(job)
     assert job["status"] == "done" and job["finished_at"] is not None
+
+
+def test_build_reocr_status_agregeerib(tmp_path, monkeypatch):
+    from server import reocr_ops
+    work_dir = tmp_path / "teos"
+    work_dir.mkdir()
+    (work_dir / "x.ocr").write_text("valmis", encoding="utf-8")  # ocr_ready stem
+    (work_dir / "x.jpg").write_bytes(b"i")
+
+    reocr_ops._reocr_batch_jobs["JB"] = {
+        "kind": "batch", "work_id": "w", "slug": "teos", "status": "processing",
+        "started_at": 0, "finished_at": None, "last_progress_at": 0,
+        "remote_work": "r", "pages": [
+            {"page_filename": "a.jpg", "status": "processing", "error": None},
+            {"page_filename": "b.jpg", "status": "ready", "error": None},
+            {"page_filename": "c.jpg", "status": "error", "error": "läks viltu"},
+        ],
+    }
+    try:
+        st = reocr_ops.build_reocr_status("w", str(work_dir))
+        assert st["active"] == {"a.jpg": "processing"}
+        assert st["errors"] == {"c.jpg": "läks viltu"}
+        assert "x" in st["ocr_ready"]
+        assert st["progress"] == {"total": 3, "ready": 1, "errors": 1, "active": True}
+        # Teine teos → tühi/None progress
+        st2 = reocr_ops.build_reocr_status("muu", str(work_dir))
+        assert st2["active"] == {} and st2["progress"] is None
+    finally:
+        del reocr_ops._reocr_batch_jobs["JB"]
