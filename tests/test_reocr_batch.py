@@ -260,3 +260,20 @@ def test_reocr_status_auth_nouab_admini(backend_env, client):
     """Autentimata GET reocr-status → 401."""
     r = client.get("/admin/work/w1/reocr-status")
     assert r.status_code == 401
+
+
+def test_reocr_batch_lykkab_traversal_tagasi(backend_env, client, login, monkeypatch, tmp_path):
+    """Path traversal failinimed tagasi lükatud."""
+    from server import reocr_ops, main
+    work = tmp_path / "1700-teos"
+    work.mkdir()
+    (work / "a.jpg").write_bytes(b"IMG")
+    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    reocr_ops._reocr_batch_jobs.clear()
+
+    token = login("admin", "adminpass")
+    h = {"Authorization": f"Bearer {token}"}
+    r = client.post("/admin/work/w1/reocr-batch",
+                    json={"page_filenames": ["../../state/users.json"]},
+                    headers=h)
+    assert r.status_code == 400

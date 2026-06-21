@@ -1558,6 +1558,9 @@ async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require
     material_type = data.get("material_type") if data.get("material_type") in ("print", "hand") else "print"
     pages = []
     for fn in page_filenames:
+        # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
+        if not isinstance(fn, str) or fn != os.path.basename(fn):
+            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
         if not os.path.isfile(os.path.join(path, fn)):
             raise HTTPException(status_code=400, detail=f"Pilti ei leitud: {fn}")
         pages.append((fn, None))
