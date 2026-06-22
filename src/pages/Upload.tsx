@@ -48,6 +48,7 @@ interface PollResult {
   files: FileEntry[];
   progress?: { bytes_sent: number; bytes_total: number; error?: string | null };
   error?: string;
+  stalled?: boolean;
 }
 
 interface SavedUpload {
@@ -57,6 +58,7 @@ interface SavedUpload {
   created_at: string;
   expected_pages: number | null;
   files: FileEntry[];
+  stalled?: boolean;
 }
 
 const POLL_SLOW_MS = 5000;
@@ -820,6 +822,15 @@ const Upload: React.FC = () => {
                           >
                             {t(`status.${u.status}`, u.status)}
                           </span>
+                          {u.stalled && (
+                            <span
+                              className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 align-middle"
+                              title={t('pending.stalledHint')}
+                            >
+                              <AlertTriangle size={11} />
+                              {t('pending.stalled')}
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -1224,6 +1235,14 @@ const Upload: React.FC = () => {
                   <span className="flex items-center gap-1 text-green-600 font-medium">
                     <CheckCircle size={16} />
                     {t('step3.done')}
+                  </span>
+                ) : pollResult?.stalled ? (
+                  <span
+                    className="flex items-center gap-1 text-amber-700 font-medium"
+                    title={t('pending.stalledHint')}
+                  >
+                    <AlertTriangle size={16} />
+                    {t('pending.stalled')}
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-amber-600 font-medium">

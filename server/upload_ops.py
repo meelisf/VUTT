@@ -357,6 +357,12 @@ def list_uploads() -> list:
             with open(state_file, 'r', encoding='utf-8') as f:
                 state = json.load(f)
             if state.get('status') != 'imported':
+                # Nõuandev stall-märk (ei püsi state.json-is — arvutatakse lugemisel)
+                ready = sum(1 for fl in state.get('files', []) if fl.get('has_ocr'))
+                state['stalled'] = _is_stalled(
+                    ready, state.get('expected_pages'),
+                    state.get('last_progress_at'), datetime.now().timestamp(),
+                )
                 result.append(state)
         except Exception as e:
             logger.warning(f"list_uploads: ei saa lugeda {state_file}: {e}")
@@ -636,6 +642,27 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
     return pages
 
 
+# Stall-indikaator: mitu sekundit ilma uue valmis leheta enne kui töö märgitakse
+# UI-s "kinni jäänuks" (NÕUANDEV — staatust ei muudeta, töid ei katkestata).
+# Env-st muudetav. Tahaühilduv: vanad state.json-id ilma last_progress_at-ita ei flag'i.
+UPLOAD_STALL_THRESHOLD = int(os.getenv("UPLOAD_STALL_THRESHOLD", "1800"))  # 30 min
+
+
+def _is_stalled(ready_count: int, expected_pages, last_progress_at, now_ts: float) -> bool:
+    """Kas OCR-töö paistab kinni jäänud: pole veel kõik lehed valmis JA pole
+    UPLOAD_STALL_THRESHOLD jooksul ühtegi uut valmis lehte tekkinud.
+
+    Puhtalt nõuandev — ei muuda staatusemasinat. Aeglane-aga-elav töö (kus lehed
+    aeg-ajalt juurde tulevad) EI flag'i, sest last_progress_at uueneb."""
+    if not expected_pages:
+        return False  # ilma oodatava arvuta ei saa "pooleli" defineerida (nt pildi-upload)
+    if ready_count >= expected_pages:
+        return False  # kõik valmis → staatus läheb done-iks, mitte stalled
+    if not last_progress_at:
+        return False  # baseline puudub (vana state.json) → ei flag'i
+    return (now_ts - last_progress_at) > UPLOAD_STALL_THRESHOLD
+
+
 def poll_and_sync_thumbs(upload_id: str) -> dict:
     """
     Küsib SFTP kaudu OCR serveri kausta, tuvastab valmis JPG+TXT paarid,
@@ -772,11 +799,20 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
         elif all_page_nums:
             new_status = 'reviewing'
 
+        # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
+        now_ts = datetime.now().timestamp()
+        prev_ready = sum(1 for f in state.get('files', []) if f.get('has_ocr'))
+        last_progress_at = state.get('last_progress_at')
+        # Edenes (uusi valmis lehti) VÕI puudub baseline (esimene poll) → uuenda ajatempel
+        if ready_count > prev_ready or last_progress_at is None:
+            last_progress_at = now_ts
+
         # --- Uuenda state.json ---
         with state_lock:
             s = _read_state(upload_id)
             if s:
                 s['files'] = new_files
+                s['last_progress_at'] = last_progress_at
                 if new_status != s.get('status'):
                     s['status'] = new_status
                 _write_state(upload_id, s)
@@ -788,6 +824,7 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
             "expected_pages": expected_pages,
             "files": new_files,
             "progress": upload_progress.get(upload_id, {}),
+            "stalled": _is_stalled(ready_count, expected_pages, last_progress_at, now_ts),
         }
 
     except Exception as e:

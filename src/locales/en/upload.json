@@ -9,7 +9,9 @@
   "pending": {
     "title": "Pending uploads",
     "resume": "Resume",
-    "empty": "No pending uploads"
+    "empty": "No pending uploads",
+    "stalled": "OCR stalled",
+    "stalledHint": "No new pages from OCR for over 30 minutes — the job may have stalled. Check the OCR server if needed."
   },
   "step1": {
     "title": "Work metadata",

@@ -9,7 +9,9 @@
   "pending": {
     "title": "Pooleliolevad üleslaadimised",
     "resume": "Jätka",
-    "empty": "Pooleliolevaid üleslaadimisi pole"
+    "empty": "Pooleliolevaid üleslaadimisi pole",
+    "stalled": "OCR seisab",
+    "stalledHint": "OCR pole üle 30 minuti uusi lehti tootnud — töö võib olla pooleli jäänud. Kontrolli vajadusel OCR-serverit."
   },
   "step1": {
     "title": "Teose metaandmed",
