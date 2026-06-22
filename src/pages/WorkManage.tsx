@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   RotateCcw,
   FileImage,
-  ArrowUpDown,
   Upload,
   RefreshCw,
 } from 'lucide-react';
@@ -22,6 +21,7 @@ import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
+import PageActionBar from './manage/PageActionBar';
 import { mapReocrState, selectableNoTextFiles, ReocrStatusResponse } from '../utils/reocrStatus';
 
 const CHUNK_MAX_FILES = 20;
@@ -268,6 +268,11 @@ const WorkManage: React.FC = () => {
     }
   }
 
+  // Hõljuv alumine tegevusriba nähtav ainult lehekülgede tabis, kui on valik
+  // VÕI salvestamata järjekorra-muudatus. Kasutatakse nii sisu alaserva padding'uks
+  // (et viimane pisipiltide rida ei jää riba taha) kui riba renderdamiseks.
+  const showActionBar = activeTab === 'pages' && (selectedFiles.size > 0 || hasReorderChanges);
+
   // Vali/tühista; shift = vahemik viimasest ankrust nähtaval järjekorral
   const handleToggle = (filename: string, shiftKey: boolean) => {
     const idx = visiblePages.findIndex((vp) => vp.filename === filename);
@@ -395,6 +400,9 @@ const WorkManage: React.FC = () => {
         throw new Error(err.detail || `HTTP ${res.status}`);
       }
       await loadPages();
+      // Salvestus = commit → tühjenda valik (uue protsessi eeldus). NB: Liiguta
+      // (mustand) EI tühjenda, et saaks sama plokki uuesti liigutada.
+      handleClearSelection();
     } catch (e: any) {
       setReorderError(e.message || t('manage.reorderError'));
     } finally {
@@ -583,7 +591,7 @@ const WorkManage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className={`max-w-4xl mx-auto px-4 py-8 ${showActionBar ? 'pb-36' : ''}`}>
 
         {/* Navigatsioon tagasi */}
         <div className="flex items-center gap-3 mb-6">
@@ -663,20 +671,6 @@ const WorkManage: React.FC = () => {
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-800">{t('manage.pages')}</h2>
               <div className="flex items-center gap-3">
-                {hasReorderChanges && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-amber-700">{t('manage.reorder.changedSummary', { count: changedCount })}</span>
-                    <button onClick={handleDiscardReorder}
-                      className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
-                      {t('manage.reorder.discard')}
-                    </button>
-                    <button onClick={handleReorderSave} disabled={reorderSaving}
-                      className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded transition-colors">
-                      {reorderSaving ? <Loader2 size={13} className="animate-spin" /> : <ArrowUpDown size={13} />}
-                      {t('manage.reorderSave')}
-                    </button>
-                  </div>
-                )}
                 {pages.length > 0 && selectedFiles.size < pages.length && (
                   <button onClick={handleSelectAll}
                     className="px-2 py-1 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
@@ -707,97 +701,7 @@ const WorkManage: React.FC = () => {
               <p className="p-5 text-sm text-gray-400">{t('manage.noPages')}</p>
             ) : (
               <>
-                {/* Valiku-riba — alati nähtav, pakub liiguta/kustuta võimalusi; nupud keelatud kuni midagi valitud */}
-                <div className="mx-4 mt-3 mb-1 p-3 bg-primary-50 border border-primary-200 rounded-lg flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <span className="text-sm font-medium text-primary-800">
-                      {selectedFiles.size > 0 ? t('manage.select.count', { count: selectedFiles.size }) : t('manage.select.emptyHint')}
-                    </span>
-                    {/* Liiguta valitud lehe [nr] järele */}
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={handleMove}
-                        disabled={moveTarget.trim() === '' || !(moveResult && moveResult.ok)}
-                        className="px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-40 text-white rounded"
-                      >{t('manage.move.button')}</button>
-                      <input
-                        type="text" inputMode="numeric" value={moveTarget}
-                        onChange={(e) => setMoveTarget(e.target.value)}
-                        placeholder={t('manage.move.placeholder')}
-                        className="w-14 text-sm text-center border border-gray-300 rounded px-1 py-0.5"
-                      />
-                      <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
-                    </div>
-                    {/* Vea-vihje (miks "Liiguta" keelatud) */}
-                    {moveHintText && <span className="text-sm text-amber-700">{moveHintText}</span>}
-                    {/* Paremal: valiku tühistus + kustutus */}
-                    <div className="ml-auto flex items-center gap-3">
-                      {selectedFiles.size > 0 && (
-                        <button onClick={handleClearSelection} className="text-sm text-primary-700 hover:underline">{t('manage.select.clear')}</button>
-                      )}
-                      <button
-                        onClick={() => setBulkDeleteConfirm(true)}
-                        disabled={hasReorderChanges || selectedFiles.size === 0}
-                        title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
-                        className="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40"
-                      >{t('manage.bulkDelete.button')}</button>
-                    </div>
-                  </div>
-
-                {bulkDeleteConfirm && (
-                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded-lg flex flex-wrap items-center gap-3">
-                    <span className="text-sm text-red-800">{t('manage.bulkDelete.confirm', { count: selectedFiles.size })}</span>
-                    <button onClick={handleBulkDelete} disabled={bulkDeleting}
-                      className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded">
-                      {bulkDeleting ? <Loader2 size={13} className="animate-spin inline" /> : t('manage.bulkDelete.button')}
-                    </button>
-                    <button onClick={() => setBulkDeleteConfirm(false)}
-                      className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
-                      {t('common:buttons.cancel', 'Tühista')}
-                    </button>
-                  </div>
-                )}
-                {bulkDeleteError && (
-                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{bulkDeleteError}</div>
-                )}
-
-                {/* Re-OCR sektsioon — alati nähtav, heleroheline; nupp keelatud kuni midagi valitud */}
-                <div className="mx-4 mb-1 p-3 bg-green-50 border border-green-200 rounded-lg flex flex-wrap items-center gap-x-3 gap-y-2">
-                    <span className="text-sm font-medium text-green-800">{t('manage.reocr.section')}</span>
-                    <label className="text-sm text-gray-600">{t('manage.reocr.model.label')}:</label>
-                    <select value={ocrModel} onChange={(e) => setOcrModel(e.target.value as 'print' | 'hand')}
-                      className="text-sm border border-gray-300 rounded px-1.5 py-0.5">
-                      <option value="print">{t('manage.reocr.model.print')}</option>
-                      <option value="hand">{t('manage.reocr.model.hand')}</option>
-                    </select>
-                    <button onClick={() => setBatchConfirm(true)} disabled={hasReorderChanges || selectedFiles.size === 0}
-                      title={hasReorderChanges ? t('manage.bulkDelete.draftBlocked') : ''}
-                      className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded">
-                      {t('manage.reocr.button', { count: selectedFiles.size })}
-                    </button>
-                  </div>
-
-                {/* Re-OCR kinnitus */}
-                {batchConfirm && (
-                  <div className="mx-4 mb-2 p-3 bg-green-50 border border-green-300 rounded-lg flex flex-col gap-2">
-                    <span className="text-sm text-green-900">{t('manage.reocr.confirm.line1', { count: selectedFiles.size })} {t('manage.reocr.confirm.line2')}</span>
-                    {selectedWithTextCount > 0 && (
-                      <span className="text-xs text-green-700">{t('manage.reocr.confirm.withText', { count: selectedWithTextCount })}</span>
-                    )}
-                    <div className="flex items-center gap-3">
-                      <button onClick={handleBatchReocr}
-                        className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 text-white rounded">
-                        {t('manage.reocr.confirm.go')}
-                      </button>
-                      <button onClick={() => setBatchConfirm(false)}
-                        className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50">
-                        {t('manage.reocr.confirm.cancel')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {batchError && (
-                  <div className="mx-4 mb-2 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">{batchError}</div>
-                )}
+                {/* Valiku/järjekorra tegevused on hõljuvas alumises ribas (PageActionBar) */}
 
                 {/* Progress-kokkuvõte */}
                 {reocrStatus?.progress && reocrStatus.progress.total > 0 && (
@@ -1165,6 +1069,40 @@ const WorkManage: React.FC = () => {
           }}
           onReplaceImage={handleReplaceImage}
           cacheBust={thumbCacheBust}
+        />
+      )}
+
+      {/* Hõljuv alumine kontekstiriba (valik + järjekorra tegevused) */}
+      {activeTab === 'pages' && (
+        <PageActionBar
+          selectedCount={selectedFiles.size}
+          onClearSelection={handleClearSelection}
+          moveTarget={moveTarget}
+          setMoveTarget={setMoveTarget}
+          moveCanApply={moveTarget.trim() !== '' && !!(moveResult && moveResult.ok)}
+          moveHintText={moveHintText}
+          onMove={handleMove}
+          ocrModel={ocrModel}
+          setOcrModel={setOcrModel}
+          actionsDisabled={hasReorderChanges}
+          actionsDisabledTitle={t('manage.bulkDelete.draftBlocked')}
+          onReocrClick={() => setBatchConfirm(true)}
+          batchConfirm={batchConfirm}
+          selectedWithTextCount={selectedWithTextCount}
+          onBatchGo={handleBatchReocr}
+          onBatchCancel={() => setBatchConfirm(false)}
+          batchError={batchError}
+          onDeleteClick={() => setBulkDeleteConfirm(true)}
+          bulkDeleteConfirm={bulkDeleteConfirm}
+          bulkDeleting={bulkDeleting}
+          onBulkDeleteGo={handleBulkDelete}
+          onBulkDeleteCancel={() => setBulkDeleteConfirm(false)}
+          bulkDeleteError={bulkDeleteError}
+          hasReorderChanges={hasReorderChanges}
+          changedCount={changedCount}
+          reorderSaving={reorderSaving}
+          onReorderSave={handleReorderSave}
+          onDiscardReorder={handleDiscardReorder}
         />
       )}
     </div>
