@@ -19,7 +19,7 @@ from datetime import datetime
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
 OCR_CONNECT_TIMEOUT = 10
 
-from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, get_logger
+from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
 from .utils import generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 
@@ -1484,3 +1484,61 @@ def cancel_upload(upload_id: str) -> bool:
         return False
 
 
+
+# =========================================================
+# TAUSTASÜNK — proaktiivne OCR-progressi uuendamine
+# =========================================================
+# Probleem: poll_and_sync_thumbs (state.json sünk) käivitus AINULT kui frontend
+# päris /admin/upload/{id}/status, ja frontend pollis ainult parajasti avatud
+# uploadi. Öösel lehe lahti jättes (taustatab/uni → setInterval throttle) ükski
+# päring ei käinud → state.json jäi õhtusesse seisu → hommikul "pooleli" ka hard
+# refreshi järel; alles uploadi avamine käivitas aeglase sünki. Lahendus (sama
+# muster nagu re-OCR _reocr_poll_loop): daemon-thread, mis pollib perioodiliselt
+# KÕIKI aktiivseid uploade, nii et state.json on alati värske ja öised tööd
+# jõuavad ise 'done'-ni — kasutaja ei pea olema Upload lehel.
+
+# Sünki vajavad ainult need staatused, mille puhul poll_and_sync_thumbs teeb
+# tegelikku SFTP-tööd. Ülejäänud short-circuitivad (pending/uploading/error/
+# imported/collecting_images) või on lõppseis (done) — neid pole mõtet pollida.
+_ACTIVE_SYNC_STATUSES = frozenset({'processing', 'reviewing'})
+
+# Taustasünki intervall (s). Pikem kui re-OCR oma (10s), sest upload-poll laeb
+# SFTP kaudu pisipilte (raskem) ja töid on tüüpiliselt vähe. Env-st ülekirjutatav.
+UPLOAD_SYNC_INTERVAL = int(os.getenv("UPLOAD_SYNC_INTERVAL", "60"))
+
+
+def _uploads_needing_sync(states: list) -> list:
+    """Tagastab aktiivsete uploadide id-d, mille OCR-progressi tuleb taustal sünkida."""
+    out = []
+    for s in states:
+        if s.get('status') in _ACTIVE_SYNC_STATUSES:
+            uid = s.get('id')
+            if uid:
+                out.append(uid)
+    return out
+
+
+def _upload_sync_loop():
+    """Daemon-thread: pollib perioodiliselt kõiki aktiivseid uploade, et OCR-progress
+    uueneks ka siis kui keegi pole Upload lehel. Iga viga (OCR-server maas vms) on
+    isoleeritud per-upload — poll_and_sync_thumbs püüab oma erandid ise kinni."""
+    import time
+    while True:
+        time.sleep(UPLOAD_SYNC_INTERVAL)
+        try:
+            ids = _uploads_needing_sync(list_uploads())
+        except Exception as e:
+            logger.warning(f"upload-sync: aktiivsete uploadide lugemine ebaõnnestus: {e}")
+            continue
+        for uid in ids:
+            try:
+                poll_and_sync_thumbs(uid)
+            except Exception as e:
+                logger.warning(f"upload-sync taustapoll viga ({uid}): {e}")
+
+
+# Käivita ainult kui upload-funktsionaalsus on lubatud (testides/ilma OCR-serverita
+# UPLOAD_ENABLED=false → ei tekita asjatut SFTP-koormust ega taimerit).
+if UPLOAD_ENABLED:
+    threading.Thread(target=_upload_sync_loop, daemon=True, name="upload-sync").start()
+    logger.info(f"Upload taustasünk käivitatud (intervall {UPLOAD_SYNC_INTERVAL}s)")
