@@ -146,7 +146,14 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
             </div>
 
-            {/* Re-OCR — sekundaarne (outline), vähem prominentne kui Liiguta */}
+            {/* Tühista valik */}
+            <button onClick={props.onClearSelection}
+              className="flex items-center gap-1 px-2 py-1 text-sm text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100 border-l border-gray-200 pl-3">
+              <X size={15} />
+              {t('manage.select.clear')}
+            </button>
+
+            {/* Transkribeeri — sekundaarne (outline), vähem prominentne kui Liiguta */}
             <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
               <button onClick={props.onReocrClick} disabled={props.actionsDisabled}
                 title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
@@ -162,20 +169,13 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               </select>
             </div>
 
-            {/* Kustuta + Tühista (paremal) */}
-            <div className="ml-auto flex items-center gap-2 border-l border-gray-200 pl-3">
-              <button onClick={props.onDeleteClick} disabled={props.actionsDisabled}
-                title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40">
-                <Trash2 size={14} />
-                {t('manage.bulkDelete.button')}
-              </button>
-              <button onClick={props.onClearSelection}
-                className="flex items-center gap-1 px-2 py-1 text-sm text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100">
-                <X size={15} />
-                {t('manage.select.clear')}
-              </button>
-            </div>
+            {/* Kustuta — destruktiivne, isoleeritud paremasse serva */}
+            <button onClick={props.onDeleteClick} disabled={props.actionsDisabled}
+              title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40">
+              <Trash2 size={14} />
+              {t('manage.bulkDelete.button')}
+            </button>
 
             {/* Liiguta vea-vihje (täislaiuses, ainult kui kehtetu) */}
             {props.moveHintText && (
