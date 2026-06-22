@@ -118,6 +118,9 @@
       "emptyHint": "Vali lehti, et liigutada või kustutada",
       "toggleHint": "Klõpsa, et valida · Shift+klõps vahemiku jaoks"
     },
+    "thumb": {
+      "retryHint": "Pisipilti ei õnnestunud laadida — klõpsa uuesti proovimiseks"
+    },
     "move": {
       "label": "lehe järele",
       "placeholder": "nr",

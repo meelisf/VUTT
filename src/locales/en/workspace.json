@@ -118,6 +118,9 @@
       "emptyHint": "Select pages to move or delete",
       "toggleHint": "Click to select · Shift+click for a range"
     },
+    "thumb": {
+      "retryHint": "Thumbnail failed to load — click to retry"
+    },
     "move": {
       "label": "after page",
       "placeholder": "no.",
