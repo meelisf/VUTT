@@ -144,9 +144,9 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
             </div>
 
-            {/* Tühista valik */}
+            {/* Tühista valik — punane kiri (nagu Dashboardil), pisut prominentsem */}
             <button onClick={props.onClearSelection}
-              className="flex items-center gap-1 px-2 py-1 text-sm text-gray-500 hover:text-gray-700 rounded hover:bg-gray-100 border-l border-gray-200 pl-3">
+              className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-red-600 hover:bg-red-50 rounded border-l border-gray-200 pl-3">
               <X size={15} />
               {t('manage.select.clear')}
             </button>
