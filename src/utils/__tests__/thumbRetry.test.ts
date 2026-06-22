@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { THUMB_MAX_RETRIES, thumbRetryDelay, buildThumbUrl } from '../thumbRetry';
+import { thumbRetryDelay, buildThumbUrl } from '../thumbRetry';
 
 describe('thumbRetryDelay', () => {
   it('kasvab eksponentsiaalselt (jitterita baas)', () => {
@@ -18,8 +18,8 @@ describe('thumbRetryDelay', () => {
     expect(thumbRetryDelay(1, 1)).toBe(800);
   });
 
-  it('MAX_RETRIES on mõistlik (>1, et transientne viga ei oleks püsiv)', () => {
-    expect(THUMB_MAX_RETRIES).toBeGreaterThan(1);
+  it('jätkab proovimist püsivalt — suure katsenumbri korral jääb ~5s kanti', () => {
+    expect(thumbRetryDelay(20, 0)).toBe(5000);
   });
 });
 

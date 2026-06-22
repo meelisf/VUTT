@@ -3,13 +3,12 @@
 // Taust: aeglase/ebakindla ühenduse taga (või kui serveri thumb-genereerimine
 // viibib) ebaõnnestub mõne pisipildi `<img>` laadimine transientselt. Varem
 // loobus PageThumb pärast ÜHTE katset jäädavalt → juhuslikud püsivad placeholderid
-// keset ruudustikku, kuigi täisreso pilt (käärid) laeb. Lahendus: proovi
-// transientset viga mitu korda kasvava viivitusega enne loobumist.
+// keset ruudustikku, kuigi täisreso pilt (käärid) laeb. Lahendus: <img> jääb
+// monteerituks ja proovib kasvava (kuni ~5s) viivitusega edasi, kuni õnnestub.
 
-export const THUMB_MAX_RETRIES = 4;
-
-// Kasvav viivitus (ms) koos jitteriga. Jitter on sisestatav (vaikimisi Math.random)
-// testitavuse jaoks; väldib kõigi ebaõnnestunud piltide korraga taaslaadimist.
+// Kasvav viivitus (ms) koos jitteriga, ülempiir ~5s (st pärast paari katset proovib
+// iga ~5s järel edasi). Jitter on sisestatav (vaikimisi Math.random) testitavuse
+// jaoks; väldib kõigi ebaõnnestunud piltide korraga taaslaadimist.
 export function thumbRetryDelay(attempt: number, jitter: number = Math.random()): number {
   const base = Math.min(500 * 2 ** (attempt - 1), 5000);
   return base + Math.floor(jitter * 300);
