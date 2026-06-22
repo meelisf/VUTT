@@ -350,33 +350,6 @@ const WorkManage: React.FC = () => {
     setDraftPositions(init);
   };
 
-  // Üksiku lehe nügimine nähtaval järjekorral (nool)
-  const handleNudge = (filename: string, dir: -1 | 1) => {
-    const cur = visibleNumByFile[filename];
-    applyInsert(filename, Math.max(1, Math.min(pages.length, cur + dir)));
-  };
-
-  // Insert-loogika: liigutab currentFile uuele positsioonile ja nihutab vahepealse massiivi
-  const applyInsert = (currentFile: string, newPos: number) => {
-    const currentPos = draftPositions[currentFile] ?? pages.find(p => p.filename === currentFile)?.page_num ?? newPos;
-    if (currentPos === newPos) return;
-    setDraftPositions(prev => {
-      const next = { ...prev, [currentFile]: newPos };
-      pages.forEach(p => {
-        if (p.filename === currentFile) return;
-        const pos = prev[p.filename] ?? p.page_num;
-        if (currentPos < newPos) {
-          // Liigub allapoole: vahemikus (currentPos, newPos] nihkub -1
-          if (pos > currentPos && pos <= newPos) next[p.filename] = pos - 1;
-        } else {
-          // Liigub ülespoole: vahemikus [newPos, currentPos) nihkub +1
-          if (pos >= newPos && pos < currentPos) next[p.filename] = pos + 1;
-        }
-      });
-      return next;
-    });
-  };
-
   const handleReorderSave = async () => {
     if (!workId || !authToken) return;
     const confirmed = window.confirm(t('manage.reorderConfirm'));
@@ -738,10 +711,7 @@ const WorkManage: React.FC = () => {
                         isChanged={(draftPositions[page.filename] ?? page.page_num) !== page.page_num}
                         thumbCacheBust={thumbCacheBust}
                         onToggle={handleToggle}
-                        onNudge={handleNudge}
                         onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
-                        canNudgeUp={vNum > 1}
-                        canNudgeDown={vNum < pages.length}
                       />
                     );
                   })}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Scissors, ChevronUp, ChevronDown, Check, Loader2, FileCheck2, AlertCircle } from 'lucide-react';
+import { Scissors, Check, Loader2, FileCheck2, AlertCircle } from 'lucide-react';
 import PageThumb from './PageThumb';
 import { IMAGE_BASE_URL } from '../../config';
 import { ReocrState } from '../../utils/reocrStatus';
@@ -17,10 +17,7 @@ interface PageCardProps {
   isChanged: boolean;
   thumbCacheBust: number;
   onToggle: (filename: string, shiftKey: boolean) => void;
-  onNudge: (filename: string, dir: -1 | 1) => void;
   onEdit: (visiblePageNum: number) => void;
-  canNudgeUp: boolean;
-  canNudgeDown: boolean;
 }
 
 const statusColor = (status: string) => {
@@ -104,13 +101,6 @@ const PageCard: React.FC<PageCardProps> = (p) => {
         >
           <Scissors size={14} />
         </button>
-      </div>
-      {/* Üles/alla nooled (üksammuline nügimine nähtaval järjekorral) */}
-      <div className="px-1.5 py-1 flex items-center justify-center gap-3">
-        <button onClick={() => p.onNudge(p.filename, -1)} disabled={!p.canNudgeUp}
-          className="text-gray-400 hover:text-gray-700 disabled:opacity-20"><ChevronUp size={16} /></button>
-        <button onClick={() => p.onNudge(p.filename, 1)} disabled={!p.canNudgeDown}
-          className="text-gray-400 hover:text-gray-700 disabled:opacity-20"><ChevronDown size={16} /></button>
       </div>
     </div>
   );
