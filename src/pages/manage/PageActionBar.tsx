@@ -24,9 +24,7 @@ export interface PageActionBarProps {
   moveCanApply: boolean;
   moveHintText: string | null;
   onMove: () => void;
-  // Re-OCR
-  ocrModel: 'print' | 'hand';
-  setOcrModel: (m: 'print' | 'hand') => void;
+  // Re-OCR (mudel tuletatakse teose tüübist WorkManage-s — eraldi valikut pole)
   actionsDisabled: boolean;           // hasReorderChanges → re-OCR/kustuta blokeeritud
   actionsDisabledTitle: string;
   onReocrClick: () => void;
@@ -153,28 +151,23 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               {t('manage.select.clear')}
             </button>
 
-            {/* Transkribeeri — sekundaarne (outline), vähem prominentne kui Liiguta */}
-            <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
+            {/* Transkribeeri — sekundaarne (outline), vähem prominentne kui Liiguta.
+                Mudel tuletatakse teose tüübist (WorkManage), eraldi valikut pole. */}
+            <div className="border-l border-gray-200 pl-3">
               <button onClick={props.onReocrClick} disabled={props.actionsDisabled}
                 title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
                 className="flex items-center gap-1.5 px-2.5 py-1 text-sm border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-40 rounded">
                 <RefreshCw size={13} />
                 {t('manage.reocr.button', { count: props.selectedCount })}
               </button>
-              <select value={props.ocrModel} onChange={(e) => props.setOcrModel(e.target.value as 'print' | 'hand')}
-                title={t('manage.reocr.model.label')}
-                className="text-xs text-gray-600 border border-gray-300 rounded px-1 py-1">
-                <option value="print">{t('manage.reocr.model.print')}</option>
-                <option value="hand">{t('manage.reocr.model.hand')}</option>
-              </select>
             </div>
 
-            {/* Kustuta — destruktiivne, isoleeritud paremasse serva */}
+            {/* Kustuta — destruktiivne, ainult ikoon (kinnitusmodaal tuleb niikuinii) */}
             <button onClick={props.onDeleteClick} disabled={props.actionsDisabled}
-              title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
-              className="ml-auto flex items-center gap-1.5 px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-40">
-              <Trash2 size={14} />
-              {t('manage.bulkDelete.button')}
+              title={props.actionsDisabled ? props.actionsDisabledTitle : t('manage.bulkDelete.button')}
+              aria-label={t('manage.bulkDelete.button')}
+              className="ml-auto p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40">
+              <Trash2 size={16} />
             </button>
 
             {/* Liiguta vea-vihje (täislaiuses, ainult kui kehtetu) */}

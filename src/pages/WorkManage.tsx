@@ -181,7 +181,14 @@ const WorkManage: React.FC = () => {
       body: JSON.stringify({ work_id: workId })
     })
       .then(r => r.json())
-      .then(d => { if (d.status === 'success') setWorkTitle(d.metadata?.title || workId || ''); })
+      .then(d => {
+        if (d.status === 'success') {
+          setWorkTitle(d.metadata?.title || workId || '');
+          // OCR-mudel tuletatakse teose tüübist (Q87167 = käsikiri → hand, muidu print),
+          // sama loogika nagu upload_ops.py. Eraldi mudeli-valikut UI-s pole.
+          setOcrModel(d.metadata?.type?.id === 'Q87167' ? 'hand' : 'print');
+        }
+      })
       .catch(() => {});
   }, [workId, authToken]);
 
@@ -1082,8 +1089,6 @@ const WorkManage: React.FC = () => {
           moveCanApply={moveTarget.trim() !== '' && !!(moveResult && moveResult.ok)}
           moveHintText={moveHintText}
           onMove={handleMove}
-          ocrModel={ocrModel}
-          setOcrModel={setOcrModel}
           actionsDisabled={hasReorderChanges}
           actionsDisabledTitle={t('manage.bulkDelete.draftBlocked')}
           onReocrClick={() => setBatchConfirm(true)}
