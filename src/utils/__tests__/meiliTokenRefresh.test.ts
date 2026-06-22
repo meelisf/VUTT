@@ -4,6 +4,7 @@ import {
   CHECK_INTERVAL_MS,
   REFRESH_LOOKAHEAD_MS,
   shouldRefreshToken,
+  shouldRefreshOrPromote,
 } from '../meiliTokenRefresh';
 
 describe('meiliTokenRefresh', () => {
@@ -36,5 +37,29 @@ describe('meiliTokenRefresh', () => {
     const expiresAt = TOKEN_TTL_MS;
     expect(shouldRefreshToken(0, expiresAt)).toBe(false);
     expect(shouldRefreshToken(CHECK_INTERVAL_MS, expiresAt)).toBe(false);
+  });
+});
+
+describe('shouldRefreshOrPromote', () => {
+  const fresh = TOKEN_TTL_MS; // expiresAt kaugel tulevikus, now=0 → ajapõhiselt ei vaja
+
+  it('promoteerib KOHE kui sessioon on olemas, aga index on anon (desünk)', () => {
+    // See on raporteeritud bug: öö läbi sisse logitud, index degradeerus anon-iks,
+    // sessioon (vutt_token) endiselt kehtiv → piiratud kollektsioon tühi kuni reloadini.
+    expect(shouldRefreshOrPromote(0, fresh, /*hasSession*/ true, /*isUserToken*/ false)).toBe(true);
+  });
+
+  it('ei promoteeri kui index on juba user-token ja token värske', () => {
+    expect(shouldRefreshOrPromote(0, fresh, true, true)).toBe(false);
+  });
+
+  it('ei promoteeri kui sessiooni pole (anon kasutaja jääb anoniks)', () => {
+    expect(shouldRefreshOrPromote(0, fresh, false, false)).toBe(false);
+  });
+
+  it('uuendab ajapõhiselt ka siis kui desünki pole (token aegumas)', () => {
+    const expiresAt = 1000;
+    expect(shouldRefreshOrPromote(expiresAt + 1, expiresAt, true, true)).toBe(true);
+    expect(shouldRefreshOrPromote(expiresAt + 1, expiresAt, false, false)).toBe(true);
   });
 });

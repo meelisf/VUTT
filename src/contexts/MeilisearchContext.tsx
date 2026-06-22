@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MeiliSearch, Index } from 'meilisearch';
 import { MEILI_HOST, MEILI_INDEX } from '../config';
-import { TOKEN_TTL_MS, CHECK_INTERVAL_MS, shouldRefreshToken } from '../utils/meiliTokenRefresh';
+import { TOKEN_TTL_MS, CHECK_INTERVAL_MS, shouldRefreshOrPromote } from '../utils/meiliTokenRefresh';
+
+const SESSION_TOKEN_KEY = 'vutt_token';
 
 interface MeilisearchContextValue {
   index: Index | null;
@@ -38,17 +40,19 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  // Kasutaja-tokeni värskendus. KRIITILINE: transientne viga EI TOHI degradeerida
-  // sisseloginud tabi anonüümseks. Varasem bug: iga ebaõnnestumine (võrgu-blip, 5xx/502
-  // backendi redeploy ajal, 429, tühi token) kukkus `fetchAnonToken()`-isse, mis seadis
-  // isUserToken=false → tab jäi PÜSIVALT anonüümseks (piiratud teosed nähtamatud) kuni
-  // full reloadini. Lahendus: ainult 401 (sessioon päriselt aegunud) degradeerib anon-iks;
-  // transientne viga säilitab olemasoleva kasutaja-tokeni ja proovib järgmisel tsüklil
-  // uuesti (lookahead 5min / intervall 1min = ~5 katset enne tegelikku aegumist).
+  // Kasutaja-tokeni värskendus/promotion. KRIITILINE: sessiooni olemasolu localStorage'is
+  // (mitte `isUserToken.current`) on tõeallikas. See katab KAKS juhtu:
+  //   1. Transientne viga EI TOHI degradeerida sisseloginud tabi anonüümseks (võrgu-blip,
+  //      5xx/502 redeploy ajal, 429, tühi token) — ainult 401 (sessioon päriselt aegunud)
+  //      degradeerib anon-iks; transientne säilitab olemasoleva tokeni ja proovib uuesti.
+  //   2. PROMOTION: kui index on juba anon-iks degradeerunud (nt taustatabis öö läbi), aga
+  //      sessioon on endiselt kehtiv, promoteeri tagasi user-tokeniks. Varasem bug: kord
+  //      anon-iks läinud index ei taastunud KUNAGI ilma full reloadita (initAuth) → piiratud
+  //      kollektsioon andis "teoseid ei leitud", kuigi päis näitas sisseloginud kasutajat.
   const refreshToken = useCallback(async () => {
-    if (isUserToken.current) {
+    const sessionToken = localStorage.getItem(SESSION_TOKEN_KEY) || '';
+    if (sessionToken) {
       try {
-        const sessionToken = localStorage.getItem('vutt_token') || '';
         const r = await fetch('/api/files/api/meili-token/refresh', {
           method: 'POST',
           headers: { Authorization: `Bearer ${sessionToken}` },
@@ -58,23 +62,25 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
           if (token) {
             setIndex(makeIndex(token));
             tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
+            isUserToken.current = true;
             return;
           }
+          // ok aga tühi token — transientne, säilita olemasolev index.
+          return;
         }
         // 401 = sessioon päriselt aegunud → degradeeri anon-iks.
         if (r.status === 401) {
           await fetchAnonToken();
           return;
         }
-        // Muu viga (5xx/429/tühi token) on transientne — säilita kasutaja-token,
-        // ära degradeeri. tokenExpiresAt jääb muutmata → shouldRefreshToken jääb
-        // true → uus katse järgmisel tsüklil.
+        // Muu viga (5xx/429) on transientne — säilita olemasolev index, proovi hiljem.
         return;
       } catch {
-        // Võrgu-blip — transientne, säilita kasutaja-token, proovi hiljem uuesti.
+        // Võrgu-blip — transientne, säilita olemasolev index, proovi hiljem uuesti.
         return;
       }
     }
+    // Sessiooni pole → anonüümne token.
     await fetchAnonToken();
   }, [fetchAnonToken]);
 
@@ -90,12 +96,20 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
   }, [fetchAnonToken]);
 
   useEffect(() => {
-    fetchAnonToken();
-  }, [fetchAnonToken]);
+    // Sessiooniga: lae KASUTAJA-token kohe (väldib võidujooksu UserContext.initAuth-iga,
+    // kus hiljem resolvuv anon-fetch kirjutaks user-tokeni üle → index jääks anon).
+    // Ilma sessioonita: anonüümne token.
+    if (localStorage.getItem(SESSION_TOKEN_KEY)) {
+      refreshToken();
+    } else {
+      fetchAnonToken();
+    }
+  }, [refreshToken, fetchAnonToken]);
 
   useEffect(() => {
     const maybeRefresh = () => {
-      if (shouldRefreshToken(Date.now(), tokenExpiresAt.current)) {
+      const hasSession = !!localStorage.getItem(SESSION_TOKEN_KEY);
+      if (shouldRefreshOrPromote(Date.now(), tokenExpiresAt.current, hasSession, isUserToken.current)) {
         refreshToken();
       }
     };

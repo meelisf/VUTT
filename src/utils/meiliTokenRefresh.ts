@@ -13,3 +13,19 @@ export const REFRESH_LOOKAHEAD_MS = 5 * 60 * 1000;
 export function shouldRefreshToken(now: number, expiresAt: number): boolean {
   return now > expiresAt - REFRESH_LOOKAHEAD_MS;
 }
+
+// Kas Meili-tokenit on vaja kontrollida/uuendada — ajapõhine aegumine PLUSS
+// desünki-juhtum. Raporteeritud bug: kasutaja on öö läbi sisse logitud, index
+// degradeerus taustatabis anon-iks (isUserToken=false), aga sessioon (vutt_token)
+// on endiselt kehtiv → piiratud kollektsioon andis 0 vastet ("teoseid ei leitud")
+// kuni full reloadini. Lahendus: kui sessioon on olemas, aga index on anon, proovi
+// KOHE promoteerida user-tokeniks (mitte oodata anon-tokeni ajapõhist aegumist).
+export function shouldRefreshOrPromote(
+  now: number,
+  expiresAt: number,
+  hasSession: boolean,
+  isUserToken: boolean,
+): boolean {
+  if (hasSession && !isUserToken) return true; // desünk: anon index + kehtiv sessioon
+  return shouldRefreshToken(now, expiresAt);
+}
