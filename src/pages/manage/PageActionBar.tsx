@@ -146,17 +146,17 @@ const PageActionBar: React.FC<PageActionBarProps> = (props) => {
               <label className="text-sm text-gray-600">{t('manage.move.label')}</label>
             </div>
 
-            {/* Re-OCR */}
+            {/* Re-OCR — sekundaarne (outline), vähem prominentne kui Liiguta */}
             <div className="flex items-center gap-1.5 border-l border-gray-200 pl-3">
               <button onClick={props.onReocrClick} disabled={props.actionsDisabled}
                 title={props.actionsDisabled ? props.actionsDisabledTitle : ''}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-40 text-white rounded">
-                <RefreshCw size={14} />
+                className="flex items-center gap-1.5 px-2.5 py-1 text-sm border border-green-300 text-green-700 hover:bg-green-50 disabled:opacity-40 rounded">
+                <RefreshCw size={13} />
                 {t('manage.reocr.button', { count: props.selectedCount })}
               </button>
               <select value={props.ocrModel} onChange={(e) => props.setOcrModel(e.target.value as 'print' | 'hand')}
                 title={t('manage.reocr.model.label')}
-                className="text-sm border border-gray-300 rounded px-1.5 py-1">
+                className="text-xs text-gray-600 border border-gray-300 rounded px-1 py-1">
                 <option value="print">{t('manage.reocr.model.print')}</option>
                 <option value="hand">{t('manage.reocr.model.hand')}</option>
               </select>
