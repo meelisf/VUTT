@@ -78,6 +78,8 @@ const Dashboard: React.FC = () => {
   // Multi-select režiim (ainult admin)
   const [selectMode, setSelectMode] = useState(false);
   const [selectedWorkIds, setSelectedWorkIds] = useState<Set<string>>(new Set());
+  // Viimati klikitud teose indeks nähtaval lehel — shift-valiku ankur (nagu manage-lehel)
+  const lastSelectedIndexRef = useRef<number | null>(null);
   const [showBulkCollectionPicker, setShowBulkCollectionPicker] = useState(false);
   const [showMobileCollectionPicker, setShowMobileCollectionPicker] = useState(false);
   const [showBulkTagsPicker, setShowBulkTagsPicker] = useState(false);
@@ -353,6 +355,8 @@ const Dashboard: React.FC = () => {
         if (currentPage !== 1 && !searchParams.get('page')) {
           setCurrentPage(1);
         }
+        // Uue otsingutulemuse korral on shift-valiku ankur (lehekohalik) aegunud
+        lastSelectedIndexRef.current = null;
       } catch (e: any) {
         console.error("Search failed", e);
         setError(e.message || "Tundmatu viga ühendamisel.");
@@ -369,16 +373,24 @@ const Dashboard: React.FC = () => {
   }, [index, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
-  const toggleWorkSelection = (workId: string) => {
+  // shift+klõps valib vahemiku viimasest ankrust nähtaval leheküljel (nagu manage-lehel)
+  const handleToggleSelect = (workId: string, shiftKey: boolean) => {
+    const visibleWorks = works.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const idx = visibleWorks.findIndex(w => w.work_id === workId);
+    if (idx === -1) return;
+    // Loe ankur ENNE setState'i (ref kirjutatakse allpool üle)
+    const anchor = lastSelectedIndexRef.current;
     setSelectedWorkIds(prev => {
       const next = new Set(prev);
-      if (next.has(workId)) {
-        next.delete(workId);
+      if (shiftKey && anchor !== null) {
+        const [lo, hi] = [anchor, idx].sort((a, b) => a - b);
+        for (let i = lo; i <= hi; i++) next.add(visibleWorks[i].work_id);
       } else {
-        next.add(workId);
+        if (next.has(workId)) next.delete(workId); else next.add(workId);
       }
       return next;
     });
+    lastSelectedIndexRef.current = idx;
   };
 
   const selectAllVisible = () => {
@@ -394,11 +406,13 @@ const Dashboard: React.FC = () => {
 
   const clearSelection = () => {
     setSelectedWorkIds(new Set());
+    lastSelectedIndexRef.current = null;
   };
 
   const exitSelectMode = () => {
     setSelectMode(false);
     setSelectedWorkIds(new Set());
+    lastSelectedIndexRef.current = null;
   };
 
   // Massilise kollektsiooni määramine
@@ -517,7 +531,8 @@ const Dashboard: React.FC = () => {
       <Header />
 
       <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8">
+        {/* pb reserveerib ruumi hõljuvale action bar'ile select-mode'is (ühtlustatud manage-lehega) */}
+        <div className={`max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 ${selectMode && selectedWorkIds.size > 0 ? 'pb-32 sm:pb-36' : ''}`}>
 
           {/* Error Banner */}
           {error && (
@@ -761,6 +776,8 @@ const Dashboard: React.FC = () => {
 
               const handlePageChange = (newPage: number) => {
                 setCurrentPage(newPage);
+                // Lehe vahetamisel on shift-valiku ankur (lehekohalik) aegunud
+                lastSelectedIndexRef.current = null;
                 const newParams = new URLSearchParams(searchParams);
                 if (newPage === 1) {
                   newParams.delete('page');
@@ -856,7 +873,7 @@ const Dashboard: React.FC = () => {
                               work={work}
                               selectMode={selectMode}
                               isSelected={selectedWorkIds.has(work.work_id)}
-                              onToggleSelect={() => toggleWorkSelection(work.work_id)}
+                              onToggleSelect={(shiftKey) => handleToggleSelect(work.work_id, shiftKey)}
                               isPriority={index === 0}
                             />
                           ))}
@@ -989,44 +1006,61 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Action Bar - ilmub kui teosed on valitud */}
-      {selectMode && selectedWorkIds.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 sm:px-6 py-3 rounded-full shadow-xl flex flex-wrap items-center gap-2 sm:gap-4 z-40 max-w-[95vw]">
-          <span className="font-medium">
-            {t('bulkAssign.selectedCount', { count: selectedWorkIds.size })}
-          </span>
-          <div className="h-5 w-px bg-gray-600" />
-          <button
-            onClick={() => setShowBulkCollectionPicker(true)}
-            disabled={bulkAssignLoading}
-            className="flex items-center gap-2 px-4 py-1.5 bg-primary-600 hover:bg-primary-700 rounded-full font-medium transition-colors disabled:opacity-50"
-          >
-            <FolderInput size={18} />
-            {t('bulkAssign.assignCollection')}
-          </button>
-          <button
-            onClick={() => setShowBulkTagsPicker(true)}
-            disabled={bulkAssignLoading}
-            className="flex items-center gap-2 px-4 py-1.5 bg-teal-600 hover:bg-teal-700 rounded-full font-medium transition-colors disabled:opacity-50"
-          >
-            <Tag size={18} />
-            {t('bulkAssign.assignTags')}
-          </button>
-          <button
-            onClick={() => setShowBulkGenrePicker(true)}
-            disabled={bulkAssignLoading}
-            className="flex items-center gap-2 px-4 py-1.5 bg-amber-600 hover:bg-amber-700 rounded-full font-medium transition-colors disabled:opacity-50"
-          >
-            <BookOpen size={18} />
-            {t('bulkAssign.assignGenre')}
-          </button>
-          <button
-            onClick={exitSelectMode}
-            className="text-gray-400 hover:text-white transition-colors p-1"
-            title={t('bulkAssign.exitSelect')}
-          >
-            <X size={18} />
-          </button>
+      {/* Floating Action Bar - ilmub kui teosed on valitud (ühtlustatud PageActionBar stiiliga manage-lehelt) */}
+      {selectMode && selectedWorkIds.size > 0 && !showBulkCollectionPicker && !showBulkTagsPicker && !showBulkGenrePicker && (
+        <div className="fixed bottom-0 left-0 right-0 z-[1100] flex justify-center px-3 pb-3 pointer-events-none">
+          <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-lg px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            {/* Valitud arv */}
+            <span className="text-sm font-medium text-primary-800 shrink-0">
+              {t('bulkAssign.selectedCount', { count: selectedWorkIds.size })}
+            </span>
+
+            {/* Kollektsioon */}
+            <div className="border-l border-gray-200 pl-3">
+              <button
+                onClick={() => setShowBulkCollectionPicker(true)}
+                disabled={bulkAssignLoading}
+                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                <FolderInput size={14} />
+                {t('bulkAssign.assignCollection')}
+              </button>
+            </div>
+
+            {/* Sildid */}
+            <div className="border-l border-gray-200 pl-3">
+              <button
+                onClick={() => setShowBulkTagsPicker(true)}
+                disabled={bulkAssignLoading}
+                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                <Tag size={14} />
+                {t('bulkAssign.assignTags')}
+              </button>
+            </div>
+
+            {/* Žanr */}
+            <div className="border-l border-gray-200 pl-3">
+              <button
+                onClick={() => setShowBulkGenrePicker(true)}
+                disabled={bulkAssignLoading}
+                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded transition-colors"
+              >
+                <BookOpen size={14} />
+                {t('bulkAssign.assignGenre')}
+              </button>
+            </div>
+
+            {/* Tühista valik — punane tekst (nagu manage-lehe PageActionBar) */}
+            <button
+              onClick={exitSelectMode}
+              title={t('bulkAssign.exitSelect')}
+              className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-red-600 hover:bg-red-50 rounded border-l border-gray-200 pl-3"
+            >
+              <X size={15} />
+              {t('bulkAssign.clearSelection')}
+            </button>
+          </div>
         </div>
       )}
 

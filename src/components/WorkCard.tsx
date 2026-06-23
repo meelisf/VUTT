@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Work, WorkStatus } from '../types';
-import { BookOpen, Calendar, User, CheckSquare, Square, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
+import { BookOpen, Calendar, User, ExternalLink, FolderOpen, Bookmark, MapPin, BookDown, Info, Check } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
@@ -18,7 +18,7 @@ interface WorkCardProps {
   // Multi-select režiim (optional)
   selectMode?: boolean;
   isSelected?: boolean;
-  onToggleSelect?: () => void;
+  onToggleSelect?: (shiftKey: boolean) => void;
   isPriority?: boolean;
 }
 
@@ -38,12 +38,12 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   // Kasuta denormaliseeritud teose staatust (work.work_status)
   const workStatus = work.work_status || 'Toores';
 
-  // Select mode: klikkimine kaardil lülitab valiku
+  // Select mode: klikkimine kaardil lülitab valiku (shift = vahemik)
   const handleCardClick = (e: React.MouseEvent) => {
     if (selectMode && onToggleSelect) {
       e.preventDefault();
       e.stopPropagation();
-      onToggleSelect();
+      onToggleSelect(e.shiftKey);
     }
   };
 
@@ -179,30 +179,30 @@ const WorkCard: React.FC<WorkCardProps> = ({ work, selectMode = false, isSelecte
   return (
     <div
       className={`bg-white border rounded-lg shadow-sm hover:shadow-md transition-all duration-200 flex flex-col overflow-hidden relative group/card ${
-        selectMode ? 'cursor-pointer' : ''
+        selectMode ? 'cursor-pointer select-none' : ''
       } ${
         isSelected
-          ? 'border-primary-500 ring-2 ring-primary-200'
+          ? 'border-primary-500 ring-2 ring-primary-400'
           : 'border-gray-200'
       }`}
       onClick={handleCardClick}
     >
       <div className="h-40 bg-gray-100 relative overflow-hidden">
-        {/* Checkbox select mode'is */}
+        {/* Checkbox select mode'is — ühtlustatud manage-lehe PageCard stiiliga */}
         {selectMode && (
-          <div
-            className="absolute top-2 left-2 z-10"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleSelect?.();
-            }}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onToggleSelect?.(e.shiftKey); }}
+            className={`absolute top-1 left-1 z-10 w-5 h-5 flex items-center justify-center rounded border shadow-sm transition-colors ${
+              isSelected
+                ? 'bg-primary-600 border-primary-600 text-white'
+                : 'bg-white/90 border-gray-600 text-transparent hover:border-primary-500'
+            }`}
+            title={isSelected ? t('workCard.deselect', 'Eemalda valikust') : t('workCard.select', 'Vali teos')}
+            aria-pressed={isSelected}
           >
-            {isSelected ? (
-              <CheckSquare className="w-6 h-6 text-primary-600 bg-white rounded" />
-            ) : (
-              <Square className="w-6 h-6 text-gray-400 bg-white/80 rounded hover:text-primary-500" />
-            )}
-          </div>
+            <Check size={13} />
+          </button>
         )}
         <img
           src={thumbnailSrc}
