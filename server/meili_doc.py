@@ -21,10 +21,11 @@ otsingufiltrid eeldavad neid (vt issue #16, CLAUDE.md).
 """
 import os
 import re
+import json
 
 from .utils import (
     get_label, get_id, get_all_labels, get_all_ids, get_primary_labels,
-    get_labels_by_lang,
+    get_labels_by_lang, sanitize_id, parse_year_range, normalize_genre,
 )
 from .marginalia_normalize import normalize_marginalia_tags
 
@@ -441,3 +442,233 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         doc['text_annotations_text'] = ann_text
 
     return doc
+
+
+# =========================================================
+# TEOSE METAANDMED + KÕIKIDE LEHTEDE DOKUMENDID
+# =========================================================
+
+def get_work_metadata(doc_path, dir_name, collections):
+    """Loeb teose V2 metaandmed _metadata.json-ist. Tagastab (teose_id, dict).
+
+    AINULT V2 formaat (ingliskeelsed väljad: title, year, location, publisher,
+    creators[], tags). V1 fallback (pealkiri/aasta/koht/trükkal/teose_tags/autor/
+    respondens) on eemaldatud — kõik andmed on migreeritud (issue #23
+    verifitseerimine 2026-06-24: 0 V1-teost serveris).
+
+    Vaikeväärtused ja avaldised peegeldavad live-tee inline-lugemist
+    (vt eelnev sync_work_to_meilisearch), et mõlemad teed loeksid identselt.
+    """
+    metadata_json_path = os.path.join(doc_path, '_metadata.json')
+    teose_id = sanitize_id(dir_name)
+    result = {
+        'id': None,
+        'slug': teose_id,
+        'type': None,
+        'genre': None,
+        'collections': [],
+        'collections_hierarchy': [],
+        'title': 'Pealkiri puudub',
+        'year': 0,
+        'year_display': None,
+        'year_start': 0,
+        'year_end': 0,
+        'location': None,
+        'publisher': None,
+        'creators': [],
+        'tags': [],
+        'languages': [],
+        'ester_id': None,
+        'external_url': None,
+        'archive_refs': [],
+        'shareable': False,
+    }
+
+    if not os.path.exists(metadata_json_path):
+        print(f"⚠️  Puudub _metadata.json: {dir_name}")
+        return teose_id, result
+
+    try:
+        with open(metadata_json_path, 'r', encoding='utf-8') as f:
+            meta = json.load(f)
+    except json.JSONDecodeError as e:
+        print(f"!!! SÜNTAKSI VIGA: {metadata_json_path} (rida {e.lineno})")
+        return teose_id, result
+    except Exception as e:
+        print(f"Viga _metadata.json lugemisel {metadata_json_path}: {e}")
+        return teose_id, result
+
+    result['id'] = meta.get('id')
+    result['slug'] = meta.get('slug', teose_id)
+    teose_id = result['slug']  # Kasuta slug'i teose ID-na (fallback nanoidile)
+
+    result['type'] = meta.get('type')
+    result['genre'] = meta.get('genre')
+    result['collections'] = meta.get('collections', [])
+    if result['collections']:
+        result['collections_hierarchy'] = get_collection_hierarchy(collections, result['collections'])
+
+    result['title'] = meta.get('title', 'Pealkiri puudub')
+    year = meta.get('year', 0)
+    result['year_display'] = meta.get('year_display') or None
+    _yr = parse_year_range(year, result['year_display'])
+    # Kui year puudub aga year_display annab vahemiku (nt "ca. 1750"), kasuta keskpaika.
+    if not year and _yr:
+        year = (_yr[0] + _yr[1]) // 2
+    result['year'] = year
+    result['year_start'] = _yr[0] if _yr else 0
+    result['year_end'] = _yr[1] if _yr else 0
+
+    result['location'] = meta.get('location')
+    result['publisher'] = meta.get('publisher')
+    result['tags'] = meta.get('tags', [])
+    result['creators'] = meta.get('creators', [])
+    result['languages'] = meta.get('languages', [])
+    result['ester_id'] = meta.get('ester_id')
+    result['external_url'] = meta.get('external_url')
+    result['archive_refs'] = meta.get('archive_refs') or []
+    result['shareable'] = meta.get('shareable', False)
+
+    if meta.get('series'):
+        result['series'] = meta['series']
+        result['series_title'] = meta['series'].get('title', '')
+    if meta.get('relations'):
+        result['relations'] = meta['relations']
+
+    return teose_id, result
+
+
+def build_work_documents(doc_path, dir_name, collections, people_data, archives, labels_store):
+    """Ehitab ühe teose KÕIKIDE lehekülgede Meilisearch dokumendid.
+
+    Tagastab (teose_id, [dokumendid]). See on AINUS dokumendi-ehitamise tee —
+    seda kutsuvad MÕLEMAD indekseerimisteed (issue #23):
+      - live: server/meilisearch_ops.sync_work_to_meilisearch → _upsert_work_documents;
+      - seed: scripts/1-1_consolidate_data.create_meilisearch_data_per_page → JSONL.
+    Nii on lahknemine konstruktsiooni järgi võimatu.
+
+    teose_staatus lisatakse hiljem (kutsuja poolt), sest see sõltub kõikide lehtede
+    koondstaatusest. Lehe number tuleneb pildi POSITSIOONIST sequence järgi sorteeritud
+    nimekirjas (fallback: float('inf') → lõppu, siis tähestik).
+    """
+    teose_id, doc_metadata = get_work_metadata(doc_path, dir_name, collections)
+
+    def _seq(img_name):
+        jp = os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json')
+        if os.path.exists(jp):
+            try:
+                with open(jp, 'r', encoding='utf-8') as fj:
+                    d = json.load(fj)
+                    s = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                    if s is not None:
+                        return int(s)
+            except Exception:
+                pass
+        return float('inf')
+
+    all_imgs = [f for f in os.listdir(doc_path)
+                if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+    jpg_files = sorted(all_imgs, key=lambda f: (_seq(f), f))
+    if not jpg_files:
+        return teose_id, []
+
+    # Kasuta nanoid't page ID-s (kui olemas), muidu fallback slugile.
+    work_id_for_keys = doc_metadata.get('id') or teose_id
+
+    creators = doc_metadata.get('creators', [])
+    autor, respondens = compute_autor_respondens(creators)
+
+    # Tags normaliseeritakse (vana string-andmestiku ühtlustus).
+    tags = doc_metadata.get('tags', []) or []
+    if isinstance(tags, list):
+        tags = [normalize_genre(t) for t in tags]
+
+    aliases, authors_text, publisher_aliases, tag_aliases = _compute_work_aliases(
+        creators, doc_metadata.get('publisher'), tags, people_data
+    )
+
+    series = doc_metadata.get('series')
+    work_ctx = {
+        'dir_name': dir_name,
+        'dir_path': doc_path,
+        'work_id': work_id_for_keys,
+        'title': doc_metadata.get('title', ''),
+        'autor': autor,
+        'respondens': respondens,
+        'year': doc_metadata.get('year') or 0,
+        'year_display': doc_metadata.get('year_display'),
+        'year_start': doc_metadata.get('year_start', 0),
+        'year_end': doc_metadata.get('year_end', 0),
+        'teose_lehekylgede_arv': len(jpg_files),
+        'tags': tags,
+        'tag_aliases': tag_aliases,
+        'work_collections': doc_metadata.get('collections', []),
+        'collections': collections,
+        'collections_hierarchy': doc_metadata.get('collections_hierarchy', []),
+        'shareable': doc_metadata.get('shareable', False),
+        'location': doc_metadata.get('location'),
+        'publisher': doc_metadata.get('publisher'),
+        'publisher_aliases': publisher_aliases,
+        'genre': doc_metadata.get('genre'),
+        'work_type': doc_metadata.get('type'),
+        'languages': doc_metadata.get('languages', []),
+        'creators': creators,
+        'authors_text': authors_text,
+        'people_data': people_data,
+        'labels_store': labels_store,
+        'ester_id': doc_metadata.get('ester_id'),
+        'external_url': doc_metadata.get('external_url'),
+        'series': series,
+        'series_title': doc_metadata.get('series_title', '') if series else '',
+        'relations': doc_metadata.get('relations'),
+        'archive_refs': doc_metadata.get('archive_refs') or [],
+        '_archives': archives,
+    }
+
+    pages = []
+    for page_index, jpg_filename in enumerate(jpg_files):
+        page_num = page_index + 1
+        page_id = f"{work_id_for_keys}-{page_num}"
+        base_name = os.path.splitext(jpg_filename)[0]
+
+        # Lehe tekst (.txt on autoriteet)
+        txt_path = os.path.join(doc_path, base_name + '.txt')
+        page_text = ""
+        if os.path.exists(txt_path):
+            try:
+                with open(txt_path, 'r', encoding='utf-8') as f:
+                    page_text = f.read()
+            except Exception:
+                pass
+
+        # Lehe metaandmed (annotatsioonid, staatus)
+        json_path = os.path.join(doc_path, base_name + '.json')
+        page_meta = {
+            'tags': [],
+            'comments': [],
+            'text_annotations': [],
+            'status': 'Toores',
+            'history': [],
+        }
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, 'r', encoding='utf-8') as jf:
+                    file_json = json.load(jf)
+                    source = file_json.get('meta_content', file_json)
+                    # tags-fallback: serveril on vana 'tags' väljaga lehti (OCR-artefaktid).
+                    page_meta['tags'] = source.get('page_tags', source.get('tags', []))
+                    page_meta['comments'] = source.get('comments', [])
+                    page_meta['text_annotations'] = source.get('text_annotations', [])
+                    page_meta['status'] = source.get('status', 'Toores')
+                    page_meta['history'] = source.get('history', [])
+                    # JSON text_content on fallback ainult kui .txt puudub/tühi.
+                    if not page_text and 'text_content' in file_json:
+                        page_text = file_json['text_content']
+            except Exception as e:
+                print(f"Viga JSON lugemisel {json_path}: {e}")
+
+        pages.append(_build_page_document(
+            work_ctx, page_id, page_num, page_text, page_meta, jpg_filename, txt_path
+        ))
+
+    return teose_id, pages
