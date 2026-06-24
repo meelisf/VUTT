@@ -124,8 +124,7 @@ describe('cleanCreators', () => {
 
 const baseForm = (): MetadataFormData => ({
   title: 'Testpealkiri',
-  year: 1680,
-  year_display: '',
+  yearInput: '1680',
   type: null,
   genre: [],
   tags: [],
@@ -145,18 +144,58 @@ describe('buildMetadataPayload', () => {
     expect(payload.work_id).toBe('abc123');
   });
 
-  it('tühi year_display → null', () => {
-    expect(buildMetadataPayload(baseForm(), 'x').metadata.year_display).toBeNull();
+  // --- Aasta-välja tuletamine (deriveYearFields läbi buildMetadataPayload) ---
+  it('puhas number yearInput → year number, year_display null', () => {
+    const p = buildMetadataPayload({ ...baseForm(), yearInput: '1680' }, 'x');
+    expect(p.metadata.year).toBe(1680);
+    expect(p.metadata.year_display).toBeNull();
   });
 
-  it('year_display whitespace → null', () => {
-    const form = { ...baseForm(), year_display: '   ' };
-    expect(buildMetadataPayload(form, 'x').metadata.year_display).toBeNull();
+  it('ca. kuva → year keskpaik, year_display alles', () => {
+    const p = buildMetadataPayload({ ...baseForm(), yearInput: 'ca. 1680' }, 'x');
+    expect(p.metadata.year).toBe(1680);
+    expect(p.metadata.year_display).toBe('ca. 1680');
   });
 
-  it('year_display väärtusega → trimitud string', () => {
-    const form = { ...baseForm(), year_display: '  ca. 1680  ' };
-    expect(buildMetadataPayload(form, 'x').metadata.year_display).toBe('ca. 1680');
+  it('vahemik yearInput → keskpaik, kuva alles', () => {
+    const p = buildMetadataPayload({ ...baseForm(), yearInput: '1670–1690' }, 'x');
+    expect(p.metadata.year).toBe(1680);
+    expect(p.metadata.year_display).toBe('1670–1690');
+  });
+
+  it('tühi yearInput → year 0, year_display null', () => {
+    const p = buildMetadataPayload({ ...baseForm(), yearInput: '' }, 'x');
+    expect(p.metadata.year).toBe(0);
+    expect(p.metadata.year_display).toBeNull();
+  });
+
+  it('whitespace yearInput → year 0, year_display null', () => {
+    const p = buildMetadataPayload({ ...baseForm(), yearInput: '   ' }, 'x');
+    expect(p.metadata.year).toBe(0);
+    expect(p.metadata.year_display).toBeNull();
+  });
+
+  it('reegel 4: ei parsi + muutmata existing → säilitab olemasoleva year', () => {
+    // yearInput matches existing.year_display → year säilitatakse
+    const p = buildMetadataPayload(
+      { ...baseForm(), yearInput: 'XVII saj' },
+      'x',
+      undefined,
+      { year: 1650, year_display: 'XVII saj' },
+    );
+    expect(p.metadata.year).toBe(1650);
+    expect(p.metadata.year_display).toBe('XVII saj');
+  });
+
+  it('reegel 5: ei parsi + existing aga muudetud kuva → year=0', () => {
+    const p = buildMetadataPayload(
+      { ...baseForm(), yearInput: 'XVIII saj' },
+      'x',
+      undefined,
+      { year: 1650, year_display: 'XVII saj' },
+    );
+    expect(p.metadata.year).toBe(0);
+    expect(p.metadata.year_display).toBe('XVIII saj');
   });
 
   it('tühi genre massiiv → null', () => {

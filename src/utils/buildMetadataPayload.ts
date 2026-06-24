@@ -1,10 +1,10 @@
 import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
+import { deriveYearFields } from './yearDisplayUtils';
 
 export interface MetadataFormData {
   title: string;
-  year: number;
-  year_display: string;
+  yearInput: string;          // Üks tekstilahter: puhas aasta, ca., vahemik või sajand (vt deriveYearFields)
   type: string | LinkedEntity | null;
   genre: (string | LinkedEntity)[];
   tags: (string | LinkedEntity)[];
@@ -82,18 +82,27 @@ export function cleanArchiveRefs(refs: ArchiveRef[]): ArchiveRef[] | null {
   return clean.length > 0 ? clean : null;
 }
 
-// Ehitab /update-work-metadata payload-i MetadataForm andmetest
+// Aasta-välja ühendamise invariant (vt aasta-valja-uhendamine-design.md, reegel 4):
+// `existing` = vormi avamisel (ja ESTER auto-filli järel) snap-shotitud algne
+// { year, year_display }. Kui kasutaja kuvastringi ei muuda, säilitatakse olemasolev
+// `year` isegi kui see ei parsi — väldib vaikset andmekao (hea `year` → 0).
+export type YearFieldsExisting = { year?: number; year_display?: string };
+
+// Ehitab /update-work-metadata payload-i MetadataForm andmetest.
+// `existing` (valikuline): vormi avamisel laetud algne aasta-olek reegli 4 jaoks.
 export function buildMetadataPayload(
   form: MetadataFormData,
   workId: string,
   originaalKataloog?: string | null,
+  existing?: YearFieldsExisting,
 ): MetadataPayload {
+  const { year, year_display } = deriveYearFields(form.yearInput, existing);
   const payload: MetadataPayload = {
     work_id: workId,
     metadata: {
       title: form.title,
-      year: form.year,
-      year_display: form.year_display.trim() || null,
+      year,
+      year_display: year_display || null,
       type: form.type || null,
       genre: form.genre.length > 0 ? form.genre : null,
       creators: cleanCreators(form.creators),
