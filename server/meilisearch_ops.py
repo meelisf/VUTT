@@ -123,6 +123,24 @@ def build_text_annotations_text(text_annotations):
     return " ".join(parts) if parts else None
 
 
+def _clean_search_text(page_text):
+    """Eraldab marginaalia ja puhastab mõlemad osad otsinguindeksi jaoks.
+
+    Võtab toore lehekülje teksti (raw editoritekst) ja tagastab tuple
+    (põhitekst_puhastatud, marginaalia_puhastatud), kus:
+    - põhitekst = marginaalia `<m>`-plokidest vabastatud ja vormindusmärkidest
+      puhastatud (poolitused liidetud, ws kollapseeritud) — otsinguks `lehekylje_tekst`;
+    - marginaalia = `<m>`-plokkide sisu samuti puhastatud — otsinguks `marginaalia_tekst`.
+
+    Kombineerib `split_marginalia` (eraldab plokid, sh ristuvad tägiga) ja
+    `clean_text_for_search` (eemaldab XML/markdown märgid, liidab poolitused).
+    NB: hoia SÜNKROONIS scripts/1-1_consolidate_data.py _clean_search_text-iga
+    (seed/reseed-tee pariteet — vt issue #16).
+    """
+    main_text, marginalia_text = split_marginalia(page_text)
+    return clean_text_for_search(main_text), clean_text_for_search(marginalia_text)
+
+
 def load_people_aliases():
     """Laeb inimeste aliased JSON failist."""
     if os.path.exists(PEOPLE_FILE):
@@ -508,7 +526,7 @@ def sync_work_to_meilisearch(dir_name):
                     if inverted:
                         tag_aliases.append(inverted)
 
-        main_text, marginalia_text = split_marginalia(page_text)
+        lehekylje_tekst, marginaalia_tekst = _clean_search_text(page_text)
         doc = {
             "id": page_id,
             "work_id": work_id,  # Nanoid (püsiv lühikood)
@@ -522,8 +540,8 @@ def sync_work_to_meilisearch(dir_name):
             "year_end": year_end,
             "lehekylje_number": page_num,
             "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": clean_text_for_search(main_text),   # OTSING: põhitekst ILMA marginaaliata
-            "marginaalia_tekst": clean_text_for_search(marginalia_text),  # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
+            "lehekylje_tekst": lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
+            "marginaalia_tekst": marginaalia_tekst,           # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
             "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
             "lehekylje_pilt": os.path.join(dir_name, img_name),
             "originaal_kataloog": dir_name,

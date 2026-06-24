@@ -129,7 +129,41 @@ def test_generate_work_scoped_meili_token_different_works():
 
 
 # --- split_marginalia ---
-from server.meilisearch_ops import split_marginalia, clean_text_for_search
+from server.meilisearch_ops import split_marginalia, clean_text_for_search, _clean_search_text
+
+
+# --- _clean_search_text (split_marginalia + clean_text_for_search kompositsioon) ---
+class TestCleanSearchText:
+    def test_eraldab_ja_puhastab_mõlemad_osad(self):
+        # põhitekst sisaldab XML märgendit + hyphen-poolitust; marginaalia plokk eraldi
+        raw = "welcher i\u015ft der Teuffel\n<m>Vide <i>Picrium</i></m>\nvnd Satanas."
+        main, marg = _clean_search_text(raw)
+        assert main == "welcher i\u015ft der Teuffel vnd Satanas."
+        assert marg == "Vide Picrium"   # sisemine <i> täg eemaldatud
+
+    def test_tühi_sisend(self):
+        assert _clean_search_text("") == ("", "")
+        assert _clean_search_text(None) == ("", "")
+
+    def test_inline_m_ei_liimi_sõnu(self):
+        """Wrapper (läbi split_marginalia) ei tohi 'foo<m>x</m>bar' -> 'foobar'."""
+        main, marg = _clean_search_text("foo<m>note</m>bar")
+        assert main == "foo bar"
+        assert marg == "note"
+
+    def test_hyphen_poolituse_liitmine(self):
+        """coa-\ncervare -> coacervare (üle rea poolituse liitmine)."""
+        main, _ = _clean_search_text("coa-\ncervare")
+        assert main == "coacervare"
+
+    def test_ainult_marginaalia(self):
+        """Kogu tekst on marginaalia → põhitekst tühi, marginaalia täis."""
+        main, marg = _clean_search_text("<m>terve plokk</m>")
+        assert main == ""
+        assert marg == "terve plokk"
+
+
+# --- split_marginalia (alused) ---
 
 
 class TestSplitMarginalia:
