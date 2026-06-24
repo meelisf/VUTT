@@ -8,6 +8,7 @@ Etapp 4 lisab: import_as_work, cleanup_upload.
 import json
 import os
 import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -177,6 +178,25 @@ def close_ssh(upload_id: str):
             transport.close()
         except Exception:
             pass
+
+
+def _ssh_rm_rf(upload_id: str, remote_path: str):
+    """Kustutab OCR serveris kausta rekursiivselt (`rm -rf`) SSH kanali kaudu.
+
+    remote_path peab olema serveri koostatud absoluutne tee (mitte kasutaja sisend).
+    Kasutab shlex.quote + `--`, et vältida tulevikus shell-injection lõhna/kirra
+    (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 5).
+    """
+    transport = get_or_create_ssh(upload_id)
+    chan = transport.open_session()
+    try:
+        chan.set_combine_stderr(True)
+        chan.exec_command(f"rm -rf -- {shlex.quote(remote_path)}")
+        status = chan.recv_exit_status()
+        if status != 0:
+            raise RuntimeError(f"rm -rf ebaõnnestus (exit={status}): {remote_path}")
+    finally:
+        chan.close()
 
 
 def _sftp_open(upload_id: str):
@@ -1195,12 +1215,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     # Koristame OCR serveri (mitte kriitiline)
     remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
     try:
-        transport = get_or_create_ssh(upload_id)
-        chan = transport.open_session()
-        chan.set_combine_stderr(True)
-        chan.exec_command(f'rm -rf "{remote_staging}"')
-        chan.recv_exit_status()
-        chan.close()
+        _ssh_rm_rf(upload_id, remote_staging)
         close_ssh(upload_id)
         logger.info(f"import {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
     except Exception as e:
@@ -1452,12 +1467,7 @@ async def replace_work_content(upload_id: str, target_work_id: str, metadata_upd
     # 11. Koristame OCR serveri (mitte kriitiline)
     remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
     try:
-        transport = get_or_create_ssh(upload_id)
-        chan = transport.open_session()
-        chan.set_combine_stderr(True)
-        chan.exec_command(f'rm -rf "{remote_staging}"')
-        chan.recv_exit_status()
-        chan.close()
+        _ssh_rm_rf(upload_id, remote_staging)
         close_ssh(upload_id)
         logger.info(f"replace {upload_id}: OCR serveri kaust koristatud: {remote_staging}")
     except Exception as e:
@@ -1497,12 +1507,7 @@ def cancel_upload(upload_id: str) -> bool:
     if state and state.get('status') not in ('pending', 'error'):
         remote_staging = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
         try:
-            transport = get_or_create_ssh(upload_id)
-            chan = transport.open_session()
-            chan.set_combine_stderr(True)
-            chan.exec_command(f'rm -rf "{remote_staging}"')
-            chan.recv_exit_status()
-            chan.close()
+            _ssh_rm_rf(upload_id, remote_staging)
             logger.info(f"OCR serveri kaust koristatud: {remote_staging}")
         except Exception as e:
             logger.warning(f"cancel_upload SSH koristus ebaõnnestus {upload_id}: {e}")
