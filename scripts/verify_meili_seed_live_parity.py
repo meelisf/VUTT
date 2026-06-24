@@ -25,10 +25,19 @@ import importlib.util
 import json
 import os
 import sys
+import types
 
 # Projekti juur sys.path-i, et `import server.*` töötaks ka siis kui skript
 # käivitatakse `python3 scripts/verify_...py` (cwd ei ole automaatselt path-is).
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Fake-package muster väldib server/__init__.py kõrvalefekte (FastAPI/importide
+# laviin, kasutajate cache, upload taustasünk jms) — sama võtet kasutab seed-skript.
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if 'server' not in sys.modules:
+    _server_pkg = types.ModuleType('server')
+    _server_pkg.__path__ = [os.path.join(_PROJECT_ROOT, 'server')]
+    _server_pkg.__package__ = 'server'
+    sys.modules.setdefault('server', _server_pkg)
+sys.path.insert(0, _PROJECT_ROOT)
 
 import server.meilisearch_ops as ops  # noqa: E402
 from server.utils import calculate_work_status  # noqa: E402
@@ -66,13 +75,18 @@ def main():
         with open(ops.ARCHIVES_FILE, "r", encoding="utf-8") as f:
             archives = json.load(f)
 
-    # Live dokumentide kinnipüük — index'it EI muudeta.
+    # Live dokumentide kinnipüük — index'it EI muudeta. Loaderid stub'ime samadele
+    # preloaded väärtustele, mida anname seed-teele, et jooksu ajal faili muutumine
+    # ei saaks võrdlust mõjutada.
     captured = {}
+    ops.load_collections = lambda: collections
+    ops.load_people_aliases = lambda: people
+    ops.load_labels_store = lambda: labels
     ops.send_to_meilisearch = lambda documents, wait=True: (captured.__setitem__("docs", documents) or True)
     ops._delete_extra_pages = lambda *a, **k: None
 
     base = ops.BASE_DIR
-    skip = {"prosopography", "config"}
+    skip = {"prosopography", "config", "state"}
     if args.works:
         dirs = list(args.works)
     else:
@@ -98,13 +112,18 @@ def main():
         if not live:
             continue
 
-        _, seed_pages = seed.build_work_documents(
-            os.path.join(base, d), d, collections, people, archives, labels
-        )
-        # teose_staatus lisab live _upsert-sammus; siin lisame seed-dokumentidele sama moodi.
-        st = calculate_work_status([p["status"] for p in seed_pages])
-        for p in seed_pages:
-            p["teose_staatus"] = st
+        try:
+            _, seed_pages = seed.build_work_documents(
+                os.path.join(base, d), d, collections, people, archives, labels
+            )
+            # teose_staatus lisab live _upsert-sammus; siin lisame seed-dokumentidele sama moodi.
+            st = calculate_work_status([p["status"] for p in seed_pages])
+            for p in seed_pages:
+                p["teose_staatus"] = st
+        except Exception as e:  # noqa: BLE001 — raporteeri ja jätka
+            print(f"SEED ERROR  {d}: {e!r}")
+            errors += 1
+            continue
 
         checked += 1
         if len(live) != len(seed_pages):
@@ -120,7 +139,10 @@ def main():
                     print(f"     {k}\n       LIVE= {repr(lv.get(k))[:200]}\n       SEED= {repr(sd.get(k))[:200]}")
                 break  # üks näide teose kohta piisab
 
-    print(f"\n=== Kontrollitud {checked} teost | {mismatches} erinevust | {errors} live-viga ===")
+    print(f"\n=== Kontrollitud {checked} teost | {mismatches} erinevust | {errors} viga ===")
+    if checked == 0:
+        print("VIGA: ühtegi teost ei kontrollitud (vale BASE_DIR, tühi andmekaust või liiga kitsas filter?).")
+        return 1
     return 1 if (mismatches or errors) else 0
 
 
