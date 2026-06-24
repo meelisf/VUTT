@@ -163,6 +163,53 @@ class TestCleanSearchText:
         assert marg == "terve plokk"
 
 
+# --- _compute_work_aliases (work-level aliase arvutus üks kord) ---
+from server.meilisearch_ops import _compute_work_aliases
+
+
+class TestComputeWorkAliases:
+    """Work-level aliased sõltuvad ainult metadatast, mitte lehest — arvutatakse üks kord."""
+
+    def test_authors_text_sisaldab_creator_nimesid_ja_aliaseid(self):
+        creators = [{"name": "Laurentius Ludenius", "id": "Q123", "role": "auctor"}]
+        people = {"Q123": {"primary_name": "Lorenz Luden", "aliases": ["Ludenius"], "ids": {}}}
+        aliases, authors_text, _, _ = _compute_work_aliases(creators, None, [], people)
+        assert aliases == ["Ludenius"]                       # creator alias
+        assert "Laurentius Ludenius" in authors_text         # creator nimi
+        assert "Ludenius" in authors_text                    # alias lisatud
+
+    def test_publisher_aliases_sh_inverteeritud_nimega(self):
+        """Publisher alias lisab ka invereeditud 'Pere, Ees' → 'Ees Pere'."""
+        publisher = {"label": "Trükikoda", "id": "Q777"}
+        people = {"Q777": {"aliases": ["Müller, Heinrich"]}}
+        _, _, publisher_aliases, _ = _compute_work_aliases([], publisher, [], people)
+        assert "Müller, Heinrich" in publisher_aliases
+        assert "Heinrich Müller" in publisher_aliases        # invereeditud
+
+    def test_tag_aliases_isiku_märksõnadele(self):
+        tags = [{"label": "Margin", "id": "Q500"}]
+        people = {"Q500": {"aliases": ["Ludenius"]}}
+        _, _, _, tag_aliases = _compute_work_aliases([], None, tags, people)
+        assert tag_aliases == ["Ludenius"]
+
+    def test_tühi_sisend(self):
+        """Tühjad creators/publisher/tags ja tühi register → kõik tühjad."""
+        aliases, authors_text, publisher_aliases, tag_aliases = _compute_work_aliases([], None, [], {})
+        assert aliases == [] and authors_text == []
+        assert publisher_aliases == [] and tag_aliases == []
+
+    def test_olematu_id_aliaseid_ei_leita(self):
+        """ID mis pole people registeris → aliaseid ei lisata."""
+        creators = [{"name": "Tundmatu", "id": "Q999"}]
+        aliases, authors_text, publisher_aliases, tag_aliases = _compute_work_aliases(
+            creators, {"id": "Q888"}, [{"id": "Q777"}], {"Q123": {"aliases": ["x"]}}
+        )
+        assert aliases == []                                  # Q999 pole registeris
+        assert authors_text == ["Tundmatu"]                  # nimi jääb
+        assert publisher_aliases == []                        # Q888 pole registeris
+        assert tag_aliases == []                              # Q777 pole registeris
+
+
 # --- split_marginalia (alused) ---
 
 

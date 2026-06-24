@@ -214,6 +214,46 @@ def normalize_creator(creator, people_data):
     return canonical_name, best_id
 
 
+def _compute_work_aliases(creators, publisher, tags, people_data):
+    """Arvutab work-level aliased ja authors_text ühe teose jaoks.
+
+    Need väärtused sõltuvad AINULT teose metadatast (creators/publisher/tags +
+    people register), mitte konkreetsest lehest — seega arvutatakse üks kord
+    enne lehtede tsüklit, mitte igal lehel uuesti (vt issue #16 refaktoor).
+
+    Tagastab (aliases, authors_text, publisher_aliases, tag_aliases):
+    - aliases: kõikide creatorite nimevariandid (+ invereedid 'Pere, Ees' → 'Ees Pere');
+    - authors_text: creatorite nimed + aliased (otsingu jaoks, nt 'Lorenz' → 'Laurentius');
+    - publisher_aliases: trükkali nimevariandid;
+    - tag_aliases: isiku-märksõnade nimevariandid (nt 'Ludenius' → 'Luden').
+    """
+    aliases = get_creator_aliases(creators, people_data)
+    authors_text = [c['name'] for c in creators if c.get('name')] + aliases
+
+    # Trükkali aliased (trükkalid on ka mitme nimega)
+    publisher_aliases = []
+    pub_id = get_id(publisher)
+    if pub_id and people_data.get(pub_id):
+        for alias in people_data[pub_id].get('aliases', []):
+            publisher_aliases.append(alias)
+            inverted = _invert_name(alias)
+            if inverted:
+                publisher_aliases.append(inverted)
+
+    # Märksõna aliased (isiku märksõnade nimevariandid)
+    tag_aliases = []
+    for tag in tags if isinstance(tags, list) else []:
+        tag_id = get_id(tag) if isinstance(tag, dict) else None
+        if tag_id and people_data.get(tag_id):
+            for alias in people_data[tag_id].get('aliases', []):
+                tag_aliases.append(alias)
+                inverted = _invert_name(alias)
+                if inverted:
+                    tag_aliases.append(inverted)
+
+    return aliases, authors_text, publisher_aliases, tag_aliases
+
+
 def load_collections():
     """Laeb kollektsioonide hierarhia."""
     if os.path.exists(COLLECTIONS_FILE):
@@ -451,6 +491,12 @@ def sync_work_to_meilisearch(dir_name):
     people_data = load_people_aliases()
     labels_store = load_labels_store()
 
+    # Work-level aliased (creators/publisher/tags) sõltuvad ainult metadatast, mitte lehest
+    # — arvutatakse üks kord, mitte igal lehel (vt issue #16 refaktoor).
+    aliases, authors_text, publisher_aliases, tag_aliases = _compute_work_aliases(
+        creators, publisher, tags, people_data
+    )
+
     for i, img_name in enumerate(images):
         page_num = i + 1
         page_id = f"{work_id}-{page_num}"
@@ -498,33 +544,6 @@ def sync_work_to_meilisearch(dir_name):
 
     # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
         page_tags_data = page_meta.get('tags', [])
-
-        # Kasuta eellaetud people_data (laetud enne tsüklit)
-        aliases = get_creator_aliases(creators, people_data)
-
-        # authors_text sisaldab nüüd ka aliaseid, et otsing leiaks "Lorenz" kui nimi on "Laurentius"
-        authors_text = [c['name'] for c in creators if c.get('name')] + aliases
-
-        # Trükkali aliased (trükkalid on ka mitme nimega)
-        publisher_aliases = []
-        pub_id = get_id(publisher)
-        if pub_id and people_data.get(pub_id):
-            for alias in people_data[pub_id].get('aliases', []):
-                publisher_aliases.append(alias)
-                inverted = _invert_name(alias)
-                if inverted:
-                    publisher_aliases.append(inverted)
-
-        # Märksõna aliased (isiku märksõnade nimevariandid, nt Ludenius → Luden)
-        tag_aliases = []
-        for tag in tags if isinstance(tags, list) else []:
-            tag_id = get_id(tag) if isinstance(tag, dict) else None
-            if tag_id and people_data.get(tag_id):
-                for alias in people_data[tag_id].get('aliases', []):
-                    tag_aliases.append(alias)
-                    inverted = _invert_name(alias)
-                    if inverted:
-                        tag_aliases.append(inverted)
 
         lehekylje_tekst, marginaalia_tekst = _clean_search_text(page_text)
         doc = {
