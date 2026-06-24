@@ -456,6 +456,14 @@ def get_work_metadata(doc_path, dir_name, collections):
     respondens) on eemaldatud — kõik andmed on migreeritud (issue #23
     verifitseerimine 2026-06-24: 0 V1-teost serveris).
 
+    NB: kui _metadata.json puudub või on tühi, ei genereerita siin default-metadata-t
+    (nanoid + pealkiri nimest). Varasem live-tee tegi seda (`generate_default_metadata`),
+    aga seda kaitset hoiavad nüüd teised teed, mis LUOVAD teose enne sünkroonimist:
+    `metadata_watcher_loop` (jälgib piltidega kaustu) ja `import_as_work` (upload).
+    Seega sync-i jõudmisel on _metadata.json alati olemas koos nanoid'iga. Puuduva faili
+    korral tagastatakse id=None (work_id fallback'ub slugile) — pariteet säilib, sest
+    mõlemad teed kasutavad sama get_work_metadata-t.
+
     Vaikeväärtused ja avaldised peegeldavad live-tee inline-lugemist
     (vt eelnev sync_work_to_meilisearch), et mõlemad teed loeksid identselt.
     """
