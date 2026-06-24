@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-06-24
 **Issue seos:** Phase 0 = #31 (parse_year_range parandused) — ✅ tehtud (commit 0f12cae)
-**Staatus:** disain kinnitatud, Phase 0 valmis, kõik otsused tehtud, ootab Phase 1 implementatsiooniplaani
+**Staatus:** disain kinnitatud, Phase 0 valmis, Phase 1 valmis (commit c71ba54), kõik otsused tehtud
 
 ## Probleem
 
@@ -94,7 +94,7 @@ mõlemas peeglis (`server/utils.py` + `src/utils/yearDisplayUtils.ts`):
 4. Serveri andmekontroll: 0 sajandi-mustrit / 0 reverse-vahemikku tootmises
    (kinnitab, et tegu robustsus-parandusega, mitte olemasoleva data parandusega). ✅
 
-### Phase 1 — üks sisendväli + tuletamine + validatsioon
+### Phase 1 — üks sisendväli + tuletamine + validatsioon — ✅ TEHTUD (commit c71ba54)
 
 **Tuletamisfunktsioon.** Uus puhas funktsioon `deriveYearFields(raw, existing?)` (vt
 signatuur ja reeglid ülal) failis `src/utils/yearDisplayUtils.ts`, kasutab olemasolevat
@@ -170,10 +170,21 @@ aastafiltris (year=0).
 
 - **Parseri peegelduvus.** `parse_year_range` (Python) ja `parseYearDisplayRange` (TS)
   peavad jääma samaväärseks. Phase 0 muudatused tuleb teha MÕLEMASSE; testid mõlemal pool.
-- **Upload-tee (PARANDATUD ARUSAAM).** `UploadMetaForm` EI kasuta praegu `buildMetadataPayload`-i
+- **Upload-tee (PARANDATUD ARUSAAM).** `UploadMetaForm` EI kasutanud `buildMetadataPayload`-i
   — ehitab payloadi inline (`:214–229`), oma `MetaForm` (`year: string`), eraldi staging-endpoint.
   Phase 1 peab selle teadlikult katma (vt write-path inventuur Phase 1-s), muidu lekib vana
   kahe-välja loogika upload-teel.
+  - **IMPLEMENTEERITUD (c71ba54):** valiti spec-i variant (b) — `deriveYearFields` kutse
+    inline-ehitajas, MITTE `buildMetadataPayload` refactor. Põhjus: upload PATCH endpoint
+    (`/admin/upload/{id}/meta` → `update_upload_meta`) võtab **lame** `updates` dicti
+    (top-level väljad), erinevalt `/update-work-metadata` pesastatud `{work_id, metadata}`
+    kujust. `buildMetadataPayload` tagastab pesastatud kuju ja ei sobi otse. Ühine
+    `deriveYearFields` + jagatud `clean*` helperid saavutavad unifikatsioonieesmärgi (üks
+    tuletus-/puhastusloogika) ilma vale payloadi kuju surumata.
+  - **Backend parandus (eelnev viga):** `update_upload_meta` lubatud hulk EI sisaldanud
+    `year_display`-it → sõeluti vaikselt välja, nii et `import_as_work` (mis loeb
+    `year_display`-i `OPTIONAL_META_FIELDS`-st) ei saanud seda kunagi. Lisatud `year_display`
+    lubatud hulka.
 - **Andmemuutust pole** — olemasolevad teosed jäävad oma `year`/`year_display`
   väärtustega; vaid uued redigeerimised läbivad ühtse välja.
 - **Autoriteetsuse piir (OTSUSTATUD: frontend-only).** Derivatsioon elab ainult
