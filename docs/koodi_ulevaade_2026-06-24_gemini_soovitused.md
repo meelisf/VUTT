@@ -295,7 +295,7 @@ Seal on vana `INSTRUCTION_OLD` prompt plokk-kommentaarina. Kui seda ei kasutata 
 
 ## Soovitatav implementatsioonijärjekord
 
-### Kiire madala riskiga PR — ✅ tehtud (#14)
+### Kiire madala riskiga PR — ✅ tehtud & merge'itud (#14)
 
 1. ✅ Kustutada vana OCR prompt plokk või tõsta dokumentatsiooni.
 2. ✅ Lisada `_ssh_rm_rf` helper + asendada 3 `exec_command` kohta.
@@ -304,19 +304,19 @@ Seal on vana `INSTRUCTION_OLD` prompt plokk-kommentaarina. Kui seda ei kasutata 
    - `get_work_meta_direct` faililugemine `run_in_threadpool` kaudu.
 4. ✅ Lisada `check_rate_limit` testid.
 
-**PR:** https://github.com/meelisf/VUTT/pull/14 (484… +5 testi)
+**PR:** https://github.com/meelisf/VUTT/pull/14 — ✅ merge'itud main-i (`ef3a481`).
 
 ### Eraldi PR-id / issue-d
 
-1. ✅ `trash_ops.py` ja `poll_reocr_job` testid — **PR #15** (+16 testi).
-2. 🔵 `sync_work_to_meilisearch` fixture/snapshot-test + refaktooring — **issue #16** (eeltöö: snapshot-test).
+1. ✅ `trash_ops.py` ja `poll_reocr_job` testid — **PR #15** ✅ merge'itud main-i (`95199f3`).
+2. 🔵 `sync_work_to_meilisearch` fixture/snapshot-test + refaktooring — **issue #16** (eeltöö: snapshot-test; **järgmine loogiline alguspunkt**).
 3. 🔵 `save_and_transfer_to_ocr` järkjärguline refaktooring — **issue #17**.
 4. 🔵 `crossLang*Map` eemaldamine pärast serveri Meilisearchi andmekontrolli — **issue #18** (blokeeriv: serveri andmekontroll).
 5. 🔵 Ülejäänud testilüngad (frontend teenused, registration username, `parse_year_range` edge case'id) — **issue #19**.
 
 ### Konfiguratsioonikontroll (koodimuudatuseta)
 
-- Leid 6: kontrollida `ssh vutt`-iga `.env` (`VUTT_ENV=production` + reaalsed saladused). Mitte koodimuudatus — toiming serveris.
+- ✅ Leid 6: **kinnitatud**. Serveri `.env`: `VUTT_ENV=production`, `IMAGE_TOKEN_SECRET` ja `MEILI_MASTER_KEY` on reaalsed väärtused (mitte vaikeväärtused). Backend jookseb — `check_production_secrets()` startup-kontroll läks läbi. Mitte koodimuudatus.
 
 ---
 
