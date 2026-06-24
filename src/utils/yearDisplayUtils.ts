@@ -57,6 +57,63 @@ export function parseYearDisplayRange(
   return null;
 }
 
+/** Puhas number (3–4 kohaline) — varauusaja aastad. 1–2 kohaline (nt "80", "0")
+ *  langeb reeglile 3 (ei parsi → pehme hoiatus + year=0), sest VUTT korpus on
+ *  4-kohalised aastad ja 1–2 kohaline on praktikas viga (vt aasta-välja disain). */
+const PURE_YEAR_RE = /^\d{3,4}$/;
+
+/**
+ * Tuletab `{ year, year_display }` ühest tekstilahtrist (aasta-välja ühendamine).
+ * Kasutab `parseYearDisplayRange`-i. Puhas funktsioon — ei puuduta DOM-i.
+ *
+ * Reeglid (sisend `value = raw.trim()`):
+ *  1. tühi                          → { year: 0, year_display: "" }
+ *  2. puhas 3–4-kohaline number     → { year: n, year_display: "" }
+ *  3. parsib (range !== null)       → { year: (start+end)>>1, year_display: value }
+ *  4. ei parsi + value===existing.year_display + existing.year olemas
+ *                                   → { year: existing.year, year_display: value } (säilita)
+ *  5. ei parsi + uus/muudetud       → { year: 0, year_display: value }
+ *
+ * Reegel 4 kaitseb vaikse andmekao eest: kui olemasoleval teosel on käsitsi korras
+ * `year` parssimata kuva kõrval ja kasutaja dateeringut ei puuduta, ei nullita `year`-it.
+ * Säilitamine kehtib AINULT muutmata kuva korral — muudetud string tuletatakse uuesti.
+ */
+export function deriveYearFields(
+  raw: string,
+  existing?: { year?: number; year_display?: string }
+): { year: number; year_display: string } {
+  const value = (raw ?? '').trim();
+
+  // 1. tühi → kuupäevata teos on legitiimne
+  if (value === '') {
+    return { year: 0, year_display: '' };
+  }
+
+  // 2. puhas 3–4-kohaline aasta → number, kuva tühjaks (kuvatakse numbrina)
+  const pure = value.match(PURE_YEAR_RE);
+  if (pure) {
+    return { year: parseInt(value, 10), year_display: '' };
+  }
+
+  // 3. parsib kuvastringist → keskpaik (sortimise stabiilsus, vt meili_doc.py:524)
+  const range = parseYearDisplayRange(null, value);
+  if (range) {
+    return { year: (range.start + range.end) >> 1, year_display: value };
+  }
+
+  // 4. ei parsi, aga kuva muutmata ja olemasolev year olemas → säilita
+  if (
+    existing &&
+    typeof existing.year === 'number' && existing.year &&
+    value === (existing.year_display ?? '').trim()
+  ) {
+    return { year: existing.year, year_display: value };
+  }
+
+  // 5. ei parsi + uus/muudetud → year=0, kuva toorelt
+  return { year: 0, year_display: value };
+}
+
 // Inglise järgarvu sufiks: 1st, 2nd, 3rd, 4th … 11th–13th erandid, 21st jne
 function enOrdinal(n: number): string {
   const r10 = n % 10;
