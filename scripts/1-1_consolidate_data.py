@@ -119,6 +119,18 @@ def clean_text_for_search(text):
     return text
 
 
+def _clean_search_text(page_text):
+    """Eraldab marginaalia ja puhastab mõlemad osad otsinguindeksi jaoks.
+
+    Võtab toore lehekülje teksti ja tagastab tuple
+    (põhitekst_puhastatud, marginaalia_puhastatud).
+    NB: hoia SÜNKROONIS server/meilisearch_ops.py _clean_search_text-iga
+    (live vs seed/reseed-tee pariteet — vt issue #16).
+    """
+    main_text, marginalia_text = split_marginalia(page_text)
+    return clean_text_for_search(main_text), clean_text_for_search(marginalia_text)
+
+
 def calculate_work_status(page_statuses):
     """Arvutab teose koondstaatuse lehekülgede staatuste põhjal."""
     if not page_statuses:
@@ -506,7 +518,7 @@ def create_meilisearch_data_per_page():
                 last_mod = int(os.path.getmtime(os.path.join(doc_path, jpg_filename)) * 1000)
 
             image_path = os.path.join(dir_name, jpg_filename)
-            main_text, marginalia_text = split_marginalia(page_text)
+            lehekylje_tekst, marginaalia_tekst = _clean_search_text(page_text)
 
             # Meilisearch dokument (v2/v3 formaat)
             meili_doc = {
@@ -568,8 +580,8 @@ def create_meilisearch_data_per_page():
                 # Lehekülje andmed
                 'teose_lehekylgede_arv': teose_lehekylgede_arv,
                 'lehekylje_number': page_index + 1,
-                'lehekylje_tekst': clean_text_for_search(main_text),   # OTSING: põhitekst ILMA marginaaliata
-                'marginaalia_tekst': clean_text_for_search(marginalia_text),  # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
+                'lehekylje_tekst': lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
+                'marginaalia_tekst': marginaalia_tekst,           # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
                 'text_content': page_text,                          # REDAKTORI JAOKS (algne tekst koos kõigi märkidega)
                 'lehekylje_pilt': image_path,
                 'originaal_kataloog': dir_name,
