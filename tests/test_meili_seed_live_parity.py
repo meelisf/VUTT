@@ -105,18 +105,22 @@ def _write_metadata(work_dir: Path, **overrides):
     (work_dir / "_metadata.json").write_text(json.dumps(meta, ensure_ascii=False), encoding="utf-8")
 
 
-def _write_page(work_dir: Path, base: str, *, txt: str, sequence: int, status: str,
-                page_tags=None, comments=None, text_annotations=None):
+def _write_page(work_dir: Path, base: str, *, txt: str, sequence, status: str,
+                page_tags=None, comments=None, text_annotations=None, text_content=None):
     (work_dir / f"{base}.jpg").write_bytes(b"\xff\xd8jpeg")
     (work_dir / f"{base}.txt").write_text(txt, encoding="utf-8")
-    (work_dir / f"{base}.json").write_text(json.dumps({
-        "sequence": sequence,
+    page_json = {
         "status": status,
         "page_tags": page_tags or [],
         "comments": comments or [],
         "text_annotations": text_annotations or [],
         "history": [],
-    }, ensure_ascii=False), encoding="utf-8")
+    }
+    if sequence is not None:
+        page_json["sequence"] = sequence
+    if text_content is not None:
+        page_json["text_content"] = text_content
+    (work_dir / f"{base}.json").write_text(json.dumps(page_json, ensure_ascii=False), encoding="utf-8")
 
 
 def _build_fixture(tmp_path, **meta_overrides):
@@ -211,6 +215,37 @@ def test_seed_ja_live_ilma_seeriata(tmp_path, monkeypatch):
         assert seed_doc == live_clean
         assert "series" not in seed_doc
         assert "relations" not in seed_doc
+
+
+def test_seed_ja_live_sequence_fallback_ja_text_content_fallback(tmp_path, monkeypatch):
+    """Seed peab järgima live'i lehesortimist ja text_content fallback'i.
+
+    Regressioon: seed kasutas varem sequence-puudumisel kunstlikku alpha_pos*100
+    väärtust (live kasutab inf → lõppu) ja JSON text_content kirjutas .txt üle
+    (live kasutab seda ainult siis, kui .txt puudub/tühi).
+    """
+    work_dir = tmp_path / SLUG
+    work_dir.mkdir()
+    _write_metadata(work_dir)
+    _write_page(
+        work_dir, f"{SLUG}-{WORK_ID}-a-unseq",
+        txt="TXT unsequenced", sequence=None, status="Toores",
+    )
+    _write_page(
+        work_dir, f"{SLUG}-{WORK_ID}-b-seq",
+        txt="TXT sequenced", sequence=300, status="Toores", text_content="JSON sequenced",
+    )
+    for base in (f"{SLUG}-{WORK_ID}-a-unseq", f"{SLUG}-{WORK_ID}-b-seq"):
+        os.utime(work_dir / f"{base}.txt", (1_000_000, 1_000_000))
+
+    live = _live_docs(tmp_path, monkeypatch)
+    seed_docs = _seed_docs(work_dir)
+
+    assert [d["lehekylje_pilt"] for d in seed_docs] == [d["lehekylje_pilt"] for d in live]
+    assert seed_docs[0]["text_content"] == "TXT sequenced"
+    for live_doc, seed_doc in zip(live, seed_docs):
+        live_clean = {k: v for k, v in live_doc.items() if k != "teose_staatus"}
+        assert seed_doc == live_clean
 
 
 def test_seed_ja_live_minimaalne_metadata(tmp_path, monkeypatch):

@@ -248,14 +248,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
 
     all_imgs = [f for f in os.listdir(doc_path)
                 if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
-    alpha_sorted = sorted(all_imgs)
-    alpha_pos = {f: i for i, f in enumerate(alpha_sorted)}
-
-    def _eff_seq(img_name):
-        s = _seq(img_name)
-        return (alpha_pos[img_name] + 1) * 100 if s == float('inf') else s
-
-    jpg_files = sorted(all_imgs, key=lambda f: (_eff_seq(f), f))
+    jpg_files = sorted(all_imgs, key=lambda f: (_seq(f), f))
     if not jpg_files:
         return teose_id, []
 
@@ -351,7 +344,8 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
                     page_meta['text_annotations'] = source.get('text_annotations', [])
                     page_meta['status'] = source.get('status', 'Toores')
                     page_meta['history'] = source.get('history', [])
-                    if 'text_content' in file_json and file_json['text_content']:
+                    # Live-tee pariteet: JSON text_content on fallback ainult siis, kui .txt puudub/tühi.
+                    if not page_text and 'text_content' in file_json:
                         page_text = file_json['text_content']
             except Exception as e:
                 print(f"Viga JSON lugemisel {json_path}: {e}")
