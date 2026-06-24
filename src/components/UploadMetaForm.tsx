@@ -385,20 +385,23 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">
             {t('workspace:metadata.colophon', 'Kolofoon')}
           </h4>
-          {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields) */}
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">
-              {t('workspace:metadata.year')}
-            </label>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-              placeholder={t('workspace:metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
-              value={form.yearInput}
-              onChange={(e) => setForm({ ...form, yearInput: e.target.value })}
-            />
-            {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
-            <YearInputPreview value={form.yearInput} existing={existingYearRef.current} />
+          {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields).
+              Poole laiusega (grid'i vasak veerg), nagu MetadataModal-is. */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">
+                {t('workspace:metadata.year')}
+              </label>
+              <input
+                type="text"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                placeholder={t('workspace:metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
+                value={form.yearInput}
+                onChange={(e) => setForm({ ...form, yearInput: e.target.value })}
+              />
+              {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
+              <YearInputPreview value={form.yearInput} existing={existingYearRef.current} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <EntityPicker
