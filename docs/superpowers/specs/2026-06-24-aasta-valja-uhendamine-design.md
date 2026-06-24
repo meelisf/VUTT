@@ -1,8 +1,8 @@
 # Aasta-väljade ühendamine üheks sisendiks
 
 **Kuupäev:** 2026-06-24
-**Issue seos:** sõltub #31 (parse_year_range parandused)
-**Staatus:** disain kinnitatud, ootab implementatsiooniplaani
+**Issue seos:** Phase 0 = #31 (parse_year_range parandused) — ✅ tehtud (commit 0f12cae)
+**Staatus:** disain kinnitatud, Phase 0 valmis, ootab Phase 1 implementatsiooniplaani
 
 ## Probleem
 
@@ -18,8 +18,10 @@ Nende eraldi käsitsi hoidmine ei anna sisulist väärtust: parsimisloogika
 ## Eesmärk
 
 Kasutajale jääb **üks nähtav tekstilahter** (praegune `year_display`). Numbriline
-`year`-sisend eemaldatakse UI-st. Numbrilised väljad (`year`, `year_start`,
-`year_end`) **tuletatakse** sisendist. Olemasolevad andmed jäävad muutmata,
+`year`-sisend eemaldatakse UI-st. `year` (number) **tuletatakse sisendist
+salvestamisel**. `year_start`/`year_end` **tuletatakse endiselt backend'is
+indekseerimisel** (`meili_doc.py`, muutmata) ega ole `_metadata.json`/payloadi
+väljad — neid see disain ei puuduta. Olemasolevad andmed jäävad muutmata,
 migratsiooni ega reindeksit ei vajata.
 
 ## Andmemudel — "tark sisend, duaalne salvestus"
@@ -38,11 +40,30 @@ Tuletamise reegel sisendstringist `raw`:
 | `"17. saj"` | 1650 (keskpaik) | `"17. saj"` |
 | `"1601–1700"` | 1650 (keskpaik) | `"1601–1700"` |
 | `""` (tühi) | 0 | `""` |
-| `"XVII saj"` (ei parsi) | 0 | `"XVII saj"` |
+| `"XVII saj"` (ei parsi, **uus** väärtus) | 0 | `"XVII saj"` |
+| `"XVII saj"` (ei parsi, **muutmata** + olemasolev `year=1650`) | 1650 (säilitatud) | `"XVII saj"` |
 
-**Reegel:** `/^\d{1,4}$/` → puhas number, `year_display=""`. Muidu → `year_display=raw`,
-`year =` keskpaik `(start+end)//2` funktsioonist `parseYearDisplayRange(null, raw)`,
-või `0` kui ei parsi.
+**Funktsiooni signatuur:**
+```ts
+deriveYearFields(
+  raw: string,
+  existing?: { year?: number; year_display?: string },
+): { year: number; year_display: string }
+```
+
+**Reegel** (sisend alati `value = raw.trim()` enne regex'i ja salvestust):
+1. `value === ""` → `{ year: 0, year_display: "" }`
+2. `/^\d{1,4}$/.test(value)` → puhas number: `{ year: parseInt(value), year_display: "" }`
+3. parsib (`parseYearDisplayRange(null, value) !== null`) → `{ year: (start+end)>>1, year_display: value }`
+4. **ei parsi, AGA `value === existing?.year_display?.trim()` ja `existing.year` olemas**
+   → säilita vana: `{ year: existing.year, year_display: value }`
+5. ei parsi ja uus/muudetud väärtus → `{ year: 0, year_display: value }`
+
+**Põhjus reeglile 4 (vaikse rikkumise vastu):** olemasolevas kirjes võib olla käsitsi
+korras `year` parssimata `year_display` kõrval (nt `{ year: 1650, year_display: "XVII saj" }`).
+Kui kasutaja redigeerib mõnda muud välja ega puuduta dateeringut, EI tohi seda `year`-it
+vaikselt nullida. Säilitamine kehtib AINULT kui kuvastring on muutmata — kui kasutaja
+muudab stringi, tuletatakse uuesti (reegel 5).
 
 **Järjepidevus:** sajand käsitletakse oma vahemikuna ja `year` tuletatakse sama
 reegliga nagu iga vahemik. "17. saj" = (1601, 1700) → keskpaik 1650, identne
@@ -55,34 +76,41 @@ Esialgne "UI nüüd + skeemikustutus hiljem" plaan **lahustub**: kuna `year` jä
 legitiimseks salvestuseks puhaste aastate jaoks, eraldi skeemikustutuse faasi pole
 vaja. Jääb kaks faasi:
 
-### Phase 0 — parser (#31), eeltingimus
+### Phase 0 — parser (#31), eeltingimus — ✅ TEHTUD (commit 0f12cae)
 
 `parse_year_range` saab numbrilise `year`-i ainsaks tuleallikaks, seega #31 vead
-tuleb parandada ENNE, et servajuhud ei korrumpeeriks tuletatud `year`-it. Mõlemas
-peeglis (`server/utils.py` + `src/utils/yearDisplayUtils.ts`):
+tuli parandada ENNE, et servajuhud ei korrumpeeriks tuletatud `year`-it. Tehtud
+mõlemas peeglis (`server/utils.py` + `src/utils/yearDisplayUtils.ts`):
 
 1. **Tagurpidi vahemik:** `(years[0], years[-1])` → `(min(years), max(years))`.
-   "1690-1670" → (1670, 1690).
-2. **Sajandivahemik:** uus muster `^(\d{1,2})\.?\s*[-–]\s*(\d{1,2})\.?\s*saj`
-   → `((N-1)*100+1, M*100)`. "17.-19. saj" → (1601, 1900).
-3. Uuenda lukustatud testid `test_peatatud_reverse_vahemik_on_sortimata` ja
-   `test_peatatud_sajandite_vahemik_tagastab_none` (`tests/test_year_range.py`) +
-   `src/utils/__tests__/yearDisplayUtils.test.ts`, et nad kinnitaksid uut käitumist.
+   "1690-1670" → (1670, 1690). ✅
+2. **Sajandivahemik:** uus muster (`_CENTURY_RANGE_RE`)
+   → `((N-1)*100+1, M*100)`. "17.-19. saj" → (1601, 1900). ✅
+3. Lukustatud testid `test_peatatud_*` (`tests/test_year_range.py`) +
+   `src/utils/__tests__/yearDisplayUtils.test.ts` uuendatud uut käitumist kinnitama;
+   +16 testi, kõik rohelised. ✅
+4. Serveri andmekontroll: 0 sajandi-mustrit / 0 reverse-vahemikku tootmises
+   (kinnitab, et tegu robustsus-parandusega, mitte olemasoleva data parandusega). ✅
 
 ### Phase 1 — üks sisendväli + tuletamine + validatsioon
 
-**Tuletamisfunktsioon.** Uus puhas funktsioon `deriveYearFields(raw): { year, year_display }`
-failis `src/utils/yearDisplayUtils.ts`, kasutab olemasolevat `parseYearDisplayRange`-i.
+**Tuletamisfunktsioon.** Uus puhas funktsioon `deriveYearFields(raw, existing?)` (vt
+signatuur ja reeglid ülal) failis `src/utils/yearDisplayUtils.ts`, kasutab olemasolevat
+`parseYearDisplayRange`-i.
 
 **Kutsumiskoht.** `buildMetadataPayload` (`src/utils/buildMetadataPayload.ts`) — üks
 autoriteetne, juba testitud puhas funktsioon. `MetadataFormData` väli
-`year: number; year_display: string` → asendub ühe `yearInput: string`-iga; payloadi
-ehitamisel kutsutakse `deriveYearFields(yearInput)`.
+`year: number; year_display: string` → asendub ühe `yearInput: string`-iga. Payloadi
+ehitamisel kutsutakse `deriveYearFields(yearInput, existing)`, kus `existing` on vormi
+avamisel laetud algsed `{ year, year_display }` (reegel 4 säilitamiseks);
+`buildMetadataPayload` saab `existing` lisaparameetrina.
 
 **UI muudatused:**
 - `src/components/MetadataModal.tsx` — eemalda numbriline `year`-input, jäta üks
-  tekstilahter. Eeltäitmine redigeerimisel: `year_display || String(year) || ''`.
-  Placeholder nt `"1680, ca. 1680, 1670–1690, 17. saj"`.
+  tekstilahter. Eeltäitmine redigeerimisel: `year_display || (year ? String(year) : '')`
+  (väldib `year=0` korral lahtrisse `"0"` tekkimist). Säilita vormi avamisel algsed
+  `year`/`year_display` (vaja reegel 4 jaoks). Placeholder nt
+  `"1680, ca. 1680, 1670–1690, 17. saj"`.
 - `src/components/UploadMetaForm.tsx` — sama (üleslaadimise viisard).
 
 **Live-eelvaade + pehme validatsioon.** Lahtri all üks komponent, kolm olekut
@@ -121,3 +149,11 @@ aastafiltris (year=0).
   loogika; backend `import_as_work` salvestab payloadis tulnud `year`+`year_display`.
 - **Andmemuutust pole** — olemasolevad teosed jäävad oma `year`/`year_display`
   väärtustega; vaid uued redigeerimised läbivad ühtse välja.
+- **Autoriteetsuse piir (LAHTINE OTSUS).** Kui derivatsioon on ainult frontend'i
+  `buildMetadataPayload`-s, kehtib invariant (sh reegel 4 vaikse rikkumise vastu) ainult
+  **UI kaudu salvestamisel**. API otsekutse võiks saata vastuolulise `year` + `year_display`.
+  Praktikas on metaandmete kirjutaja ainult admin/editor-UI. Kaks varianti:
+  **(A)** jätta frontend-only ja sõnastada invariant "UI kaudu salvestamisel"; või
+  **(B)** lisada sama derivatsioon/kontroll backend'i ainsasse lehtrisse
+  `save_work_metadata` (`metadata_ops.py`), kus on ligi ka olemasolev `_metadata.json`
+  (reegel 4 robustsem) — tõeline invariant, aga lisab kolmanda peegli (Python).
