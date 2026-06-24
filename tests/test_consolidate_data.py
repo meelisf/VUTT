@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 # Laeb skripti moodulina (ei ole package, kasutame importlib)
 _script_path = PROJECT_ROOT / "scripts" / "1-1_consolidate_data.py"
@@ -185,34 +186,30 @@ class TestConfigDirPath:
 
 
 # --- get_labels_by_lang koos labels_store toega ---
+# NB (issue #23): get_labels_by_lang, split_marginalia ja clean_text_for_search EI ole
+# enam 1-1_consolidate_data.py-s defineeritud — kaardistusloogika koondati
+# server/utils.py-sse ja server/meili_doc.py-sse, mida seed- ja live-tee mõlemad
+# impordivad. Testid kontrollivad nüüd kanoonilist allikat.
 
 class TestLabelsStore:
-    """Kontrollib, et skript kasutab labels_store kanoonilisi silte."""
-
-    def _load(self):
-        spec = importlib.util.spec_from_file_location("consolidate_data", _script_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
+    """Kontrollib, et kanooniline get_labels_by_lang kasutab labels_store silte."""
 
     def test_get_labels_by_lang_uses_labels_store(self):
-        mod = self._load()
+        from server.utils import get_labels_by_lang
         entity = {'id': 'Q999', 'label': 'Vana Silt', 'labels': {'et': 'Vana Silt'}}
         labels_store = {'Q999': {'et': 'Kanooniline Silt'}}
-        result = mod.get_labels_by_lang(entity, 'et', labels_store)
+        result = get_labels_by_lang(entity, 'et', labels_store)
         assert result == ['Kanooniline Silt'], (
             f"labels_store-ist peaks tulema 'Kanooniline Silt', sain: {result}"
         )
 
 
-# --- split_marginalia üksiktestid ---
+# --- split_marginalia üksiktestid (kanooniline: server.meili_doc) ---
 
 class TestSplitMarginalia:
     def _fns(self):
-        spec = importlib.util.spec_from_file_location("consolidate_data", _script_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod.split_marginalia, mod.clean_text_for_search
+        from server.meili_doc import split_marginalia, clean_text_for_search
+        return split_marginalia, clean_text_for_search
 
     def test_eraldab_ja_fraas_liitub(self):
         split_marginalia, clean = self._fns()
