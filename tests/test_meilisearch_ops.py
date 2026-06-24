@@ -210,6 +210,71 @@ class TestComputeWorkAliases:
         assert tag_aliases == []                              # Q777 pole registeris
 
 
+# --- _upsert_work_documents (tsüklile järgnev saatmise + kustutamise samm) ---
+from server.meilisearch_ops import _upsert_work_documents
+import server.meilisearch_ops as ops
+
+
+class TestUpsertWorkDocuments:
+    """Teose koondstaatuse arvutamine + Meilisearchi saatmine + üleliigse kustutamine.
+
+    Need testid mockivad send_to_meilisearch / _delete_extra_pages / calculate_work_status
+    ei eksisteeri — calculate_work_status on puhas (vt tests/test_transform_page.py või
+    siin otse), send/delete mockitakse kinnipüüdmiseks.
+    """
+
+    def test_tühi_dokumentide_list_tagastab_none(self, monkeypatch):
+        """Tühjad dokumendid → ei saateta, tagastab None (varajane väljumine)."""
+        sent = []
+        monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: sent.extend(docs) or True)
+        deleted = []
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: deleted.append((wid, n)))
+        assert _upsert_work_documents("W1", "slug", [], []) is None
+        assert sent == [] and deleted == []   # midagi ei tehtud
+
+    def test_kandis_teose_staatus_kõikidele_dokumentidele(self, monkeypatch):
+        """Segatud lehtede staatused → 'Töös' kantakse igale dokumendile."""
+        sent = []
+        monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: sent.extend(docs) or True)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        docs = [{"id": "W1-1"}, {"id": "W1-2"}]
+        result = _upsert_work_documents("W1", "slug", docs, ["Toores", "Valmis"])
+        assert result is True
+        # mõlemale dokumendile lisati sama koondstaatus
+        assert docs[0]["teose_staatus"] == "Töös"
+        assert docs[1]["teose_staatus"] == "Töös"
+        # saadetud dokumendid sisaldavad teose_staatus välja
+        assert all("teose_staatus" in d for d in sent)
+
+    def test_kõik_valmis_annab_valmis(self, monkeypatch):
+        monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: True)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        docs = [{"id": "W1-1"}]
+        _upsert_work_documents("W1", "slug", docs, ["Valmis"])
+        assert docs[0]["teose_staatus"] == "Valmis"
+
+    def test_saadab_ja_kustutab_üleliigse_pärast_lisamist(self, monkeypatch):
+        """Kõigepealt saatmine, siis kustutamine (järgnevus — mitte ümberpöördult)."""
+        order = []
+        monkeypatch.setattr(ops, "send_to_meilisearch",
+                            lambda docs, wait=True: order.append("send") or True)
+        monkeypatch.setattr(ops, "_delete_extra_pages",
+                            lambda wid, n: order.append("delete") or None)
+        docs = [{"id": "W1-1"}, {"id": "W1-2"}, {"id": "W1-3"}]
+        _upsert_work_documents("W1", "slug", docs, ["Toores"] * 3)
+        # järgnevus: kustutamine peab toimuma PÄRAST saatmist (et vältida downtime-akent)
+        assert order == ["send", "delete"]
+        # _delete_extra_pages sai õige new_count (dokumentide arv)
+        assert len(docs) == 3
+
+    def test_tagastab_send_tulemi(self, monkeypatch):
+        """Tagastab send_to_meilisearch tulemi (edastus võib ebaõnnestuda)."""
+        monkeypatch.setattr(ops, "send_to_meilisearch", lambda docs, wait=True: False)
+        monkeypatch.setattr(ops, "_delete_extra_pages", lambda wid, n: None)
+        result = _upsert_work_documents("W1", "slug", [{"id": "W1-1"}], ["Toores"])
+        assert result is False
+
+
 # --- split_marginalia (alused) ---
 
 

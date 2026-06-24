@@ -722,20 +722,10 @@ def sync_work_to_meilisearch(dir_name):
         )
         documents.append(doc)
 
-    # 3. Arvuta teose koondstaatus
-    teose_staatus = calculate_work_status(page_statuses)
-    for doc in documents:
-        doc['teose_staatus'] = teose_staatus
-
-    # 4. Saada uued dokumendid Meilisearchi (upsert — uuendab olemasolevad, lisab uued)
-    # Kustutame PÄRAST lisamist ainult need dokumendid mis jäid üle (leheküljed kustutati).
-    # NB: Ära kustuta enne lisamist — sellel ajal oleks teos otsinguks kättesaamatu (race condition).
+    # 3. Arvuta teose koondstaatus, saada Meilisearchi ja kustuta üleliigne.
+    # tsüklile järgnev samm on eraldatud _upsert_work_documents (vt issue #16 refaktoor).
     if documents and work_id:
-        new_count = len(documents)
-        logger.info(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
-        result = send_to_meilisearch(documents)
-        _delete_extra_pages(work_id, new_count)
-        return result
+        return _upsert_work_documents(work_id, slug, documents, page_statuses)
 
 
 def _delete_extra_pages(work_id, new_count):
@@ -779,6 +769,33 @@ def _delete_extra_pages(work_id, new_count):
                 logger.info(f"Kustutatud üleliigsed leheküljed (work_id={work_id}, new_count={new_count})")
     except Exception as e:
         logger.error(f"Viga üleliigsete lehekülgede kustutamisel: {e}")
+
+
+def _upsert_work_documents(work_id, slug, documents, page_statuses):
+    """Lisab teose koondstaatuse kõikidele dokumentidele ja saadab Meilisearchi.
+
+    Teostab tsüklile järgneva sammu (vt issue #16 refaktoor):
+    1. arvutab teose koondstaatuse kõikide lehtede staatustest
+       (Toores/Valmis/Töös — vt utils.calculate_work_status);
+    2. kannab selle igale dokumendile (teose_staatus väli);
+    3. saadab uued dokumendid upsert'ina (send_to_meilisearch);
+    4. kustutab üleliigsed (kustutatud) leheküljed PÄRAST lisamist
+       (_delete_extra_pages — ärge kustuta enne, muidu teos on hetkeks otsinguks kättesaamatu).
+
+    Tagastab send_to_meilisearch tulemi (True/False) või None kui dokumendid puuduvad.
+    """
+    if not documents:
+        return None
+
+    teose_staatus = calculate_work_status(page_statuses)
+    for doc in documents:
+        doc['teose_staatus'] = teose_staatus
+
+    new_count = len(documents)
+    logger.info(f"AUTOMAATNE SÜNK: Teos {slug} ({new_count} lk), staatus: {teose_staatus}")
+    result = send_to_meilisearch(documents)
+    _delete_extra_pages(work_id, new_count)
+    return result
 
 
 def delete_work_from_meilisearch(work_id):
