@@ -35,20 +35,30 @@ Funktsioonis on koos mitu vastutust:
 
 See pole otsene bug, aga muudatuste regressioonirisk on kõrge.
 
-**Soovitus:** enne refaktooringut lisa fixture/snapshot-test, mis fikseerib ühe väikese teose Meilisearchi dokumendi väljad:
-- `lehekylje_tekst` vs `text_content`;
-- `type_ids` / `genre_ids`;
-- `authors_text` aliastega;
-- collection fields;
-- aasta vahemik (`parse_year_range`).
+> **✅ Eeltöö tehtud (PR #20, merged).** `tests/test_meilisearch_sync_snapshot.py` (15 testi)
+> lukustab live-tee väljundi — mutatsioonitestiga verifitseeritud (inline `<m>` ja hyphen-poolituse
+> regressioonid tabatakse). **Refaktoor on nüüd turvaline.**
+>
+> **⚠️ Lahtine: seed-tee pariteet.** Snapshot katab ainult live-tee (`meilisearch_ops.py`).
+> `scripts/1-1_consolidate_data.py` (seed/reseed) sisaldab paralleelset kaardistusloogikat ja
+> läheb live-teega ajalooliselt lahku. Refaktoorimisel **peab sama muudatus minema ka sinna**
+> (muidu `./scripts/server_seed_data.sh` reseed regresseerub vaikselt). Valikud:
+> 1. refaktoori järel serveris reseed + diff üks teos live vs seed, VÕI
+> 2. laienda snapshot-testi katma sama fiksiivse teose seed-skripti väljundit (eelistatud).
+>
+> **NB (leitud refaktooris):** koodibaas kasutab vana ortograafiat — `teose_lehekylgede_arv`,
+> `lehekylje_number`, `lehekylje_tekst`, `lehekylje_pilt` (kõik `y`, mitte `l`). Neid väljanimesid
+> **ei tohi** ümber nimetada (otsingufiltrid `lehekylje_number = 1` eeldavad neid; ümbernimetamine
+> nõuab täielikku reindekseerimist, vt `CLAUDE.md`).
 
-Seejärel refaktoori väiksemateks abifunktsioonideks, nt:
+**Refaktooriplaan:** eralda väiksemateks abifunktsioonideks:
 - `_build_page_document(...)`;
 - `_clean_search_text(...)`;
 - `_load_work_index_context(...)`;
 - `_upsert_work_documents(...)`.
 
-**Prioriteet:** keskmine. Planeerida eraldi PR/issue-na.
+**Prioriteet:** keskmine. Issue #16 — järgmine loogiline alguspunkt. Vaata issue kommentaari
+seed-tee hoiatuse jaoks.
 
 ---
 
@@ -309,7 +319,7 @@ Seal on vana `INSTRUCTION_OLD` prompt plokk-kommentaarina. Kui seda ei kasutata 
 ### Eraldi PR-id / issue-d
 
 1. ✅ `trash_ops.py` ja `poll_reocr_job` testid — **PR #15** ✅ merge'itud main-i (`95199f3`).
-2. 🔵 `sync_work_to_meilisearch` fixture/snapshot-test + refaktooring — **issue #16** (eeltöö: snapshot-test; **järgmine loogiline alguspunkt**).
+2. 🔵 `sync_work_to_meilisearch` refaktooring — **issue #16** (✅ snapshot-tehtud PR #20; refaktoor eesootab, vt seed-tee hoiatus; **järgmine loogiline alguspunkt**).
 3. 🔵 `save_and_transfer_to_ocr` järkjärguline refaktooring — **issue #17**.
 4. 🔵 `crossLang*Map` eemaldamine pärast serveri Meilisearchi andmekontrolli — **issue #18** (blokeeriv: serveri andmekontroll).
 5. 🔵 Ülejäänud testilüngad (frontend teenused, registration username, `parse_year_range` edge case'id) — **issue #19**.
