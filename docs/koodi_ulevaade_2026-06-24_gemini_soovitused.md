@@ -275,12 +275,12 @@ Reaalselt puuduvad või vajavad täiendust:
 | `check_rate_limit` | `server/rate_limit.py:101` | ✅ tehtud (#14) — 5 testi `tests/test_login_throttle.py`-s |
 | `trash_ops.py` | `server/trash_ops.py` | ✅ tehtud (#15) — 9 testi `tests/test_trash_ops.py` |
 | `poll_reocr_job` | `server/reocr_ops.py:466` | ✅ tehtud (#15) — 7 testi `tests/test_reocr_poll.py` |
-| `fetchWithTimeout` | `src/utils/fetchWithTimeout.ts` | testida timeout/abort/error handling |
-| `entityLabelsService.ts` | `src/services/entityLabelsService.ts` | fetch-mock testid |
-| `collectionService.ts` | `src/services/collectionService.ts` | fetch-mock testid + värvide helperid kui katmata |
-| `workService.ts` | `src/services/workService.ts` | fetch-mock testid |
-| username derivation | `server/registration.py:117,122,149` | testida `_base_username_from_email`, `_next_available_username`, `suggest_username_for_email` |
-| `parse_year_range` edge case’id | `server/utils.py:121`, `tests/test_year_range.py` | lisada puuduvad piirjuhtumid, kui neid tuvastatakse |
+| `fetchWithTimeout` | `src/utils/fetchWithTimeout.ts` | ✅ tehtud (#19) — 8 testi: timeout/abort/väline signal/headers |
+| `entityLabelsService.ts` | `src/services/entityLabelsService.ts` | ✅ tehtud (#19) — 5 testi: cache/dedup/viga |
+| `collectionService.ts` | `src/services/collectionService.ts` | ✅ tehtud (#19) — 19 testi: värvid/hierarhia/puu + fetch cache/viga |
+| `workService.ts` | `src/services/workService.ts` | ✅ tehtud (#19) — 9 testi: getWorkStatuses/getWorkMetadata (mock index) |
+| username derivation | `server/registration.py:117,122,149` | ✅ tehtud (#19) — 26 testi `tests/test_registration_username.py` |
+| `parse_year_range` edge case’id | `server/utils.py:121`, `tests/test_year_range.py` | ✅ tehtud (#19) — +12 edge case'i; leiti 2 varjatud viga (vt all) |
 
 **`check_rate_limit` soovitatud testid:**
 - tundmatu endpoint → `(True, 0)`;
@@ -290,6 +290,12 @@ Reaalselt puuduvad või vajavad täiendust:
 - eri IP-d ja endpointid on isoleeritud.
 
 **Prioriteet:** madal. Testid võib jagada eraldi PR-i.
+
+> **✅ Tehtud (PR #19):** Kõik ülalolevad lüngad kaetud. Kokku **+79 testi** (backend 38 + frontend 41), 0 koodimuudatust.
+>
+> **Varjatud leiud `parse_year_range`-s (lukustatud testidega, väärt follow-up-issue-t):**
+> 1. **Tagurpidi vahemik** `"1690-1670"` → `(1690, 1670)` — `year_start > year_end`, rikub aastafiltrit. Reaalses andmes ebatõenäoline.
+> 2. **Sajandite vahemik** `"17.-19. saj"` → `None` (regexp ei taba; work langeb year 0-sse). Väärt kontrollida serveri andmetes, kas selliseid teoseid esineb.
 
 ---
 
@@ -322,7 +328,7 @@ Seal on vana `INSTRUCTION_OLD` prompt plokk-kommentaarina. Kui seda ei kasutata 
 2. 🔵 `sync_work_to_meilisearch` refaktooring — **issue #16** (✅ snapshot-tehtud PR #20; refaktoor eesootab, vt seed-tee hoiatus; **järgmine loogiline alguspunkt**).
 3. 🔵 `save_and_transfer_to_ocr` järkjärguline refaktooring — **issue #17**.
 4. 🔵 `crossLang*Map` eemaldamine pärast serveri Meilisearchi andmekontrolli — **issue #18** (blokeeriv: serveri andmekontroll).
-5. 🔵 Ülejäänud testilüngad (frontend teenused, registration username, `parse_year_range` edge case'id) — **issue #19**.
+5. ✅ Ülejäänud testilüngad (frontend teenused, registration username, `parse_year_range` edge case'id) — **issue #19** ✅ tehtud (+95 testi; leidis 2 varjatud `parse_year_range` viga — vt Leid 8).
 
 ### Konfiguratsioonikontroll (koodimuudatuseta)
 
