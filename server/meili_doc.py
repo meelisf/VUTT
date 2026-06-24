@@ -309,6 +309,15 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
     creators = work_ctx['creators']
     tags = work_ctx['tags']
 
+    # Normaliseeri tühi location/publisher → None (mitte '').
+    # _metadata.json-is võib location/publisher olla tühi string '' — seed-tee
+    # get_work_metadata teisendab selle `or`-iga None-iks, live-tee jättis '' alles
+    # → *_object väljad lahknesid (issue #23 verifitseerimine leidis 51 teost).
+    # Ühtlustame ÜHES kohas → mõlemad teed annavad None. Flat väljad (get_label jms)
+    # ei muutu, sest get_label('') == get_label(None) == ''.
+    location = work_ctx['location'] or None
+    publisher = work_ctx['publisher'] or None
+
     doc = {
         "id": page_id,
         "work_id": work_ctx['work_id'],  # Nanoid (püsiv lühikood)
@@ -359,14 +368,14 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
             for c in work_ctx['work_collections']
         ) if work_ctx['work_collections'] else True,
         "shareable": work_ctx['shareable'],
-        "location": get_label(work_ctx['location']),
-        "location_object": work_ctx['location'],
-        "location_id": get_id(work_ctx['location']),
-        "location_search": get_all_labels(work_ctx['location']),
-        "publisher": get_label(work_ctx['publisher']),
-        "publisher_object": work_ctx['publisher'],
-        "publisher_id": get_id(work_ctx['publisher']),
-        "publisher_search": get_all_labels(work_ctx['publisher']) + work_ctx['publisher_aliases'],
+        "location": get_label(location),
+        "location_object": location,
+        "location_id": get_id(location),
+        "location_search": get_all_labels(location),
+        "publisher": get_label(publisher),
+        "publisher_object": publisher,
+        "publisher_id": get_id(publisher),
+        "publisher_search": get_all_labels(publisher) + work_ctx['publisher_aliases'],
         "genre": get_label(work_ctx['genre']),
         "genre_et": get_labels_by_lang(work_ctx['genre'], 'et', labels_store),
         "genre_en": get_labels_by_lang(work_ctx['genre'], 'en', labels_store),

@@ -248,6 +248,21 @@ def test_seed_ja_live_sequence_fallback_ja_text_content_fallback(tmp_path, monke
         assert seed_doc == live_clean
 
 
+def test_seed_ja_live_tyhi_location_publisher(tmp_path, monkeypatch):
+    """Tühi string location/publisher → MÕLEMAD teed annavad location_object/publisher_object = None.
+
+    Regressioon (issue #23 server-verifitseerimine, 51 teost): live jättis '' alles,
+    seed teisendas None-iks → *_object lahknes. Nüüd normaliseeritud _build_page_document-is."""
+    work_dir = _build_fixture(tmp_path, location="", publisher="")
+    live = _live_docs(tmp_path, monkeypatch)
+    seed_docs = _seed_docs(work_dir)
+    for live_doc, seed_doc in zip(live, seed_docs):
+        live_clean = {k: v for k, v in live_doc.items() if k != "teose_staatus"}
+        assert seed_doc == live_clean
+        assert seed_doc["location_object"] is None
+        assert seed_doc["publisher_object"] is None
+
+
 def test_seed_ja_live_minimaalne_metadata(tmp_path, monkeypatch):
     """Minimaalne teos (ainult id/slug/title, ei type/languages/year) — defaultide pariteet.
 
