@@ -130,10 +130,13 @@ kutsub `deriveYearFields(yearInput, existing)`.
   autoriteetse tee; alternatiiv (lisa vaid `deriveYearFields`-i kutse inline-ehitajasse) jätab
   loogika dubleerituks ja laseb upload-teel uuesti lahkneda. NB: eraldi staging-endpoint säilib.
 
-**Live-eelvaade + pehme validatsioon.** Lahtri all üks komponent, kolm olekut
-(`parseYearDisplayRange(null, raw)` põhjal):
-- **parsib** → neutraalne: "→ 1601–1700" (või "→ 1680" kui start==end)
-- **ei parsi** (mittetühi, tagastab null) → merevaik hoiatus: "⚠ Ei oska aastat
+**Live-eelvaade + pehme validatsioon.** Lahtri all üks komponent, mis peegeldab
+**`deriveYearFields(raw, existing)`-i — SAMA tõeallikas mis salvestus** (ei kutsu
+`parseYearDisplayRange`-i otse, muidu lahkneksid nt 3-kohaline `"800"` või reegel 4
+säilitatud `year`). Kolm olekut:
+- **tuletab `year > 0`** → neutraalne: "→ 1601–1700" (filtrivahemik `parseYearDisplayRange`-st)
+  või "→ 800" (üksik tuletatud `year`, kui vahemikku pole)
+- **`year = 0`** (mittetühi) → merevaik hoiatus: "⚠ Ei oska aastat
   tuletada — formaadid: 1680, ca. 1680, 1670–1690, 17. saj"
 - **tühi** → vaikne (kuupäevata teos on legitiimne)
 

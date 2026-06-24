@@ -398,7 +398,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               onChange={(e) => setForm({ ...form, yearInput: e.target.value })}
             />
             {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
-            <YearInputPreview value={form.yearInput} />
+            <YearInputPreview value={form.yearInput} existing={existingYearRef.current} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <EntityPicker

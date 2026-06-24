@@ -13,7 +13,7 @@ import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
 import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMetadataPayload';
-import { parseYearDisplayRange } from '../utils/yearDisplayUtils';
+import { parseYearDisplayRange, deriveYearFields } from '../utils/yearDisplayUtils';
 import ArchiveSelect from './ArchiveSelect';
 
 interface MetadataModalProps {
@@ -140,26 +140,33 @@ export const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collecti
 
 /**
  * Aasta-lahtri live-eelvaade + pehme validatsioon (aasta-välja ühendamine).
- * Kolm olekut `parseYearDisplayRange(null, value)` põhjal:
- *  - parsib    → neutraalne: "→ 1601–1700" (või "→ 1680" kui start==end)
- *  - ei parsi → merevaik hoiatus (EI blokeeri salvestamist — ajalooliselt legitiimsed formaadid)
- *  - tühi      → vaikne (kuupäevata teos on legitiimne)
+ * Peegeldab `deriveYearFields`-i — SAMA tõeallikas mis salvestus — et eelvaade ei
+ * lahkneks salvestatavast väärtusest (nt 3-kohaline "800" või reegel 4 säilitatud `year`).
+ * Kolm olekut:
+ *  - tuletab `year > 0`    → neutraalne: "→ 1670–1690" (filtrivahemik) või "→ 800" (üksik)
+ *  - `year = 0` (mittetühi) → merevaik hoiatus (EI blokeeri salvestamist — ajaloolised formaadid)
+ *  - tühi                   → vaikne (kuupäevata teos on legitiimne)
  */
-export const YearInputPreview: React.FC<{ value: string }> = ({ value }) => {
+export const YearInputPreview: React.FC<{ value: string; existing?: YearFieldsExisting }> = ({ value, existing }) => {
   const { t } = useTranslation(['workspace', 'common']);
   const trimmed = (value ?? '').trim();
   if (!trimmed) return null;  // tühi → vaikne
 
-  const range = parseYearDisplayRange(null, trimmed);
-  if (!range) {
-    // ei parsi (mittetühi) → pehme hoiatus
+  // Tuletame sama loogikaga mis salvestus (reegel 4: säilitatud year arvestab existing-it)
+  const { year } = deriveYearFields(trimmed, existing);
+  if (!year) {
+    // ei tuleta aastat (mittetühi) → pehme hoiatus
     return (
       <p className="mt-1 text-xs text-amber-600">
         {t('metadata.yearInputWarn', '⚠ Ei oska aastat tuletada — formaadid: 1680, ca. 1680, 1670–1690, 17. saj')}
       </p>
     );
   }
-  const preview = range.start === range.end ? String(range.start) : `${range.start}–${range.end}`;
+  // Näita filtrivahemikku kui parser annab (informatiivsem), muidu tuletatud üksik `year`
+  const range = parseYearDisplayRange(null, trimmed);
+  const preview = range
+    ? (range.start === range.end ? String(range.start) : `${range.start}–${range.end}`)
+    : String(year);
   return <p className="mt-1 text-xs text-gray-400">→ {preview}</p>;
 };
 
@@ -582,7 +589,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 onChange={e => setMetaForm({ ...metaForm, yearInput: e.target.value })}
               />
               {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
-              <YearInputPreview value={metaForm.yearInput} />
+              <YearInputPreview value={metaForm.yearInput} existing={existingYearRef.current} />
             </div>
             {/* Rida 2: Koht ja trükkal */}
             <div className="grid grid-cols-2 gap-3">
