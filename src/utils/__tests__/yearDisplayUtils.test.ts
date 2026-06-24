@@ -40,6 +40,28 @@ describe('parseYearDisplayRange', () => {
   it('sajand võidab numeric-fallbacki', () => {
     expect(parseYearDisplayRange(1850, '19. saj')).toEqual({ start: 1801, end: 1900 });
   });
+
+  // Uus: sajandite vahemik (issue #31)
+  it('sajandite vahemik "17.-19. saj"', () => {
+    expect(parseYearDisplayRange(null, '17.-19. saj')).toEqual({ start: 1601, end: 1900 });
+  });
+  it('sajandite vahemik ilma punktita "17-19. saj"', () => {
+    expect(parseYearDisplayRange(null, '17-19. saj')).toEqual({ start: 1601, end: 1900 });
+  });
+  it('sajandite vahemik tühikutega', () => {
+    expect(parseYearDisplayRange(null, '17. - 19. saj')).toEqual({ start: 1601, end: 1900 });
+  });
+  it('tagurpidi sajandite vahemik normaliseeritakse', () => {
+    expect(parseYearDisplayRange(null, '19.-17. saj')).toEqual({ start: 1601, end: 1900 });
+  });
+  it('sajandite vahemik võidab numeric-fallbacki', () => {
+    expect(parseYearDisplayRange(1850, '17.-19. saj')).toEqual({ start: 1601, end: 1900 });
+  });
+
+  // Uus: tagurpidi aastavahemik normaliseeritakse (issue #31)
+  it('tagurpidi vahemik normaliseeritakse', () => {
+    expect(parseYearDisplayRange(null, '1690-1670')).toEqual({ start: 1670, end: 1690 });
+  });
 });
 
 // Mock-t: tagastab võtme ja parameetrid kontrollitaval kujul

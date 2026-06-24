@@ -114,6 +114,10 @@ def pick_best_label(labels_dict, lang):
 
 # Sajandimuster: "19. saj", "19. sajand", "19 saj" (stringi algusest, trimmituna)
 _CENTURY_RE = re.compile(r'^(\d{1,2})\.?\s*saj', re.IGNORECASE)
+# Sajandite vahemik: "17.-19. saj", "17-19. saj", "17. – 19. saj" (vt issue #31).
+# Eraldi muster, kontrollitakse ENNE _CENTURY_RE-d, sest üksik-sajandi muster
+# (ankerdatud, nõuab 'saj' kohe pärast numbrit) ei taba vahemikku.
+_CENTURY_RANGE_RE = re.compile(r'^(\d{1,2})\.?\s*[-\u2013\u2014]\s*(\d{1,2})\.?\s*saj', re.IGNORECASE)
 _YEAR4_RE = re.compile(r'\d{4}')
 _APPROX_RE = re.compile(r'\bca\.?\b', re.IGNORECASE)
 
@@ -121,20 +125,29 @@ _APPROX_RE = re.compile(r'\bca\.?\b', re.IGNORECASE)
 def parse_year_range(year, year_display) -> Optional[Tuple[int, int]]:
     """Tuletab teose aastavahemiku (year_start, year_end) filtreerimise jaoks.
 
-    "19. saj"   -> (1801, 1900)   N. sajand = (N-1)*100+1 ... N*100
-    "ca. 1750"  -> (1740, 1760)
-    "1670-1690" -> (1670, 1690)
-    "1750"      -> (1750, 1750)
+    "19. saj"      -> (1801, 1900)   N. sajand = (N-1)*100+1 ... N*100
+    "17.-19. saj"  -> (1601, 1900)   sajandite vahemik: 17. saj algusest kuni 19. saj lõpuni
+    "ca. 1750"     -> (1740, 1760)
+    "1670-1690"    -> (1670, 1690)   aastad sorititakse (vt issue #31)
+    "1690-1670"    -> (1670, 1690)   tagurpidi vahemik normaliseeritakse
+    "1750"         -> (1750, 1750)
     Tagastab None kui aastat ei tuvastata.
     NB: peegelloogika frontendis: src/utils/yearDisplayUtils.ts parseYearDisplayRange
     """
     if year_display:
         s = str(year_display).strip()
+        # Sajandite vahemik kõigepealt (üksik-sajandi muster seda ei taba)
+        mr = _CENTURY_RANGE_RE.match(s)
+        if mr:
+            c1, c2 = sorted((int(mr.group(1)), int(mr.group(2))))
+            return ((c1 - 1) * 100 + 1, c2 * 100)
         m = _CENTURY_RE.match(s)
         if m:
             c = int(m.group(1))
             return ((c - 1) * 100 + 1, c * 100)
-        years = [int(y) for y in _YEAR4_RE.findall(s)]
+        # Aastad sorititakse, et tagurpidi vahemik ("1690-1670") annaks
+        # (1670, 1690), mitte (1690, 1670) — year_start peab <= year_end (vt issue #31)
+        years = sorted(int(y) for y in _YEAR4_RE.findall(s))
         if len(years) >= 2:
             return (years[0], years[-1])
         if len(years) == 1:

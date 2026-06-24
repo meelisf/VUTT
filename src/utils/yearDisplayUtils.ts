@@ -10,6 +10,10 @@ import type { TFunction } from 'i18next';
 
 // Sajandimuster: "19. saj", "19. sajand", "19 saj" (stringi algusest, trimmituna)
 export const CENTURY_RE = /^(\d{1,2})\.?\s*saj/i;
+// Sajandite vahemik: "17.-19. saj", "17-19. saj", "17. – 19. saj" (vt issue #31).
+// Kontrollitakse ENNE CENTURY_RE-d, sest üksik-sajandi muster (ankerdatud,
+// nõuab 'saj' kohe pärast numbrit) vahemikku ei taba.
+export const CENTURY_RANGE_RE = /^(\d{1,2})\.?\s*[-\u2013\u2014]\s*(\d{1,2})\.?\s*saj/i;
 
 export function parseYearDisplayRange(
   numericYear: number | string | null | undefined,
@@ -18,6 +22,17 @@ export function parseYearDisplayRange(
   const numeric = Number(numericYear) || 0;
 
   if (yearDisplay) {
+    // Sajandite vahemik kõigepealt (üksik-sajandi muster seda ei taba)
+    const crm = yearDisplay.trim().match(CENTURY_RANGE_RE);
+    if (crm) {
+      const c1 = Number(crm[1]);
+      const c2 = Number(crm[2]);
+      const cLo = Math.min(c1, c2);
+      const cHi = Math.max(c1, c2);
+      // 17.-19. saj → 17. saj algusest (1601) kuni 19. saj lõpuni (1900)
+      return { start: (cLo - 1) * 100 + 1, end: cHi * 100 };
+    }
+
     const cm = yearDisplay.trim().match(CENTURY_RE);
     if (cm) {
       // N. sajand = (N-1)*100+1 … N*100 (ajaloolaste konventsioon: 19. saj = 1801–1900)
@@ -26,8 +41,9 @@ export function parseYearDisplayRange(
     }
 
     const isApprox = /\bca\.?\b/i.test(yearDisplay);
-    const years = [...yearDisplay.matchAll(/\d{4}/g)].map(m => Number(m[0]));
-
+    // Aastad sorititakse, et tagurpidi vahemik ("1690-1670") annaks
+    // (1670, 1690), mitte (1690, 1670) — start peab <= end (vt issue #31)
+    const years = [...yearDisplay.matchAll(/\d{4}/g)].map(m => Number(m[0])).sort((a, b) => a - b);
     if (years.length >= 2) {
       return { start: years[0], end: years[years.length - 1] };
     }
