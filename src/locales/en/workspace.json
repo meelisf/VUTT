@@ -205,8 +205,6 @@
     "author": "Author",
     "respondens": "Respondens",
     "year": "Year",
-    "yearDisplay": "Display year",
-    "yearDisplayPlaceholder": "e.g. ca. 1680, 1670–1690 or 19. saj",
     "yearInputPlaceholder": "1680, ca. 1680, 1670–1690, 17. saj",
     "yearInputWarn": "⚠ Cannot parse year — formats: 1680, ca. 1680, 1670–1690, 17. saj",
     "place": "Place",

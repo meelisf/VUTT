@@ -44,7 +44,19 @@ export const getWorkStatuses = async (index: Index, workIds: string[]): Promise<
 };
 
 // Töölaud: Saa teose metaandmed
-export const getWorkMetadata = async (index: Index, workId: string): Promise<Work | undefined> => {
+/**
+ * `getWorkMetadata` tagastus: `Work` + workspace tagasiühilduvuse legacy väljad,
+ * mis lisatakse runtime'is (inglisekeelsed compat-nimed, ei kuulu rangesse `Work`-i).
+ * @deprecated legacy väljad — uues koodis kasuta `creators`/`year`/`work_id`.
+ */
+export type WorkMetadataResult = Work & {
+  catalog_name?: string;
+  author?: string;
+  respondens?: string;
+  aasta?: number | null;
+};
+
+export const getWorkMetadata = async (index: Index, workId: string): Promise<WorkMetadataResult | undefined> => {
   try {
     // Otsime work_id (nanoid) järgi
     const response = await index.search('', {
@@ -73,7 +85,7 @@ export const getWorkMetadata = async (index: Index, workId: string): Promise<Wor
       author: hit.autor || (hit.creators?.[0]?.name) || '',
       respondens: hit.respondens || (hit.creators?.find((c: any) => c.role === 'respondens')?.name),
       aasta: hit.aasta ?? hit.year,
-    } as Work;
+    } as WorkMetadataResult;
   } catch (e) {
     console.error("Work Metadata Error:", e);
     return undefined;

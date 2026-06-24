@@ -94,7 +94,7 @@ describe('getWorkMetadata', () => {
       }),
     } as any;
 
-    const result = await getWorkMetadata(index, 'w') as any;
+    const result = await getWorkMetadata(index, 'w');
     expect(result?.catalog_name).toBe('kataloog-1');
     expect(result?.author).toBe('Autorius');
     expect(result?.aasta).toBe(1700);
@@ -110,7 +110,7 @@ describe('getWorkMetadata', () => {
         }],
       }),
     } as any;
-    const result = await getWorkMetadata(index, 'w') as any;
+    const result = await getWorkMetadata(index, 'w');
     expect(result?.author).toBe('Lorenz');
   });
 
@@ -120,7 +120,7 @@ describe('getWorkMetadata', () => {
         hits: [{ work_id: 'w', title: 'T', year: 1690 }],
       }),
     } as any;
-    const result = await getWorkMetadata(index, 'w') as any;
+    const result = await getWorkMetadata(index, 'w');
     expect(result?.aasta).toBe(1690);
   });
 
