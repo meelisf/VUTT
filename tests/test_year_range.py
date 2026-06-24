@@ -80,7 +80,6 @@ def test_kolm_aastat_votab_esimene_ja_viimane():
     # Mitmest aastast võetakse esimene ja viimane (vahemik)
     assert parse_year_range(None, "1670, 1680, 1690") == (1670, 1690)
 
-
 def test_ca_ilma_punktita():
     # "ca 1750" (ilma punktita) → samuti approx ±10
     assert parse_year_range(None, "ca 1750") == (1740, 1760)
@@ -131,24 +130,50 @@ def test_bool_year_coerceitakse_int_ks():
 # Need testid fikseerivad PRAEGUSE käitumise regressioonikaitsena. Kui neid
 # parandada (vt all), tuleb ka vastav test uuendada.
 
-def test_peatatud_reverse_vahemik_on_sortimata():
-    """Tagurpidi vahemik "1690-1670" annab (1690, 1670) — year_start > year_end.
+def test_reverse_vahemik_normaliseeritakse():
+    """Tagurpidi vahemik "1690-1670" normaliseeritakse (1670, 1690). (issue #31)
 
-    POTENTSIAALNE VIGA: _YEAR4_RE.findall tagastab [1690, 1670] ja kood võtab
-    (years[0], years[-1]) sortimata. See võib jätta year_start > year_end,
-    mis rikkub aastavahemiku filtrite loogikat. Reaalses andmes ebatõenäoline
-    (sisend on harva tagurpidi), aga väärt follow-up-i.
+    Varasemalt tagastas _YEAR4_RE.findall + (years[0], years[-1]) sortimata tulemi
+    (1690, 1670) → year_start > year_end, mis rikkus aastavahemiku filtrit.
+    Nüüd aastad sorteeritakse, nii et year_start <= year_end alati.
     """
-    assert parse_year_range(None, "1690-1670") == (1690, 1670)
+    assert parse_year_range(None, "1690-1670") == (1670, 1690)
 
 
-def test_peatatud_sajandite_vahemik_tagastab_none():
-    """"Sajandite vahemik "17.-19. saj" tagastab None.
+def test_reverse_vahemik_en_dash():
+    """Tagurpidi vahemik en-dashi'ga samuti normaliseeritakse."""
+    assert parse_year_range(None, "1690–1670") == (1670, 1690)
 
-    POTENTSIAALNE VIGA: _CENTURY_RE (ankerdatud ^) tabab ainult esimest sajandit
-    ja eeldab kohe 'saj' järel; "17.-19. saj" ei klapi, _YEAR4_RE ei leia
-    4-kohalisi (19 on 2-kohaline) → kogu display langeb läbi → tulem None.
-    Tulemuseks year_start=year_end=0 (rippub kutsujast), mis rikkub filtrit.
-    Väärt follow-up-i, kui selliseid teoseid serveris esineb.
+
+def test_sajandite_vahemik():
+    """Sajandite vahemik "17.-19. saj" → (1601, 1900) (issue #31).
+
+    Varasemalt tagastas None: _CENTURY_RE ei taba vahemikku (nõuab 'saj' kohe
+    pärast numbrit), _YEAR4_RE ei leia 4-kohalisi (19 on 2-kohaline). Nüüd eraldi
+    _CENTURY_RANGE_RE muster: 17. saj algusest (1601) kuni 19. saj lõpuni (1900).
     """
-    assert parse_year_range(None, "17.-19. saj") is None
+    assert parse_year_range(None, "17.-19. saj") == (1601, 1900)
+
+
+def test_sajandite_vahemik_ilma_punktita():
+    assert parse_year_range(None, "17-19. saj") == (1601, 1900)
+
+
+def test_sajandite_vahemik_tuhikutega():
+    assert parse_year_range(None, "17. - 19. saj") == (1601, 1900)
+
+
+def test_sajandite_vahemik_sorteeritakse():
+    # Tagurpidi sajandite vahemik normaliseeritakse (c_lo, c_hi)
+    assert parse_year_range(None, "19.-17. saj") == (1601, 1900)
+
+
+def test_sajandite_vahemik_voidab_aastat():
+    # year_display domineerib year parametri üle
+    assert parse_year_range(1850, "17.-19. saj") == (1601, 1900)
+
+
+def test_uksik_sajand_ikka_tooab():
+    # Regressioon: vahemiku lisamine ei tohi muuta üksik-sajandi käitumist
+    assert parse_year_range(None, "19. saj") == (1801, 1900)
+    assert parse_year_range(None, "9. saj") == (801, 900)
