@@ -282,3 +282,27 @@ def test_seed_ja_live_minimaalne_metadata(tmp_path, monkeypatch):
     assert len(live) == len(seed_docs) == 1
     live_clean = {k: v for k, v in live[0].items() if k != "teose_staatus"}
     assert seed_docs[0] == live_clean
+
+
+def test_seed_ja_live_puuduv_metadata_json(tmp_path, monkeypatch):
+    """Puuduva _metadata.json korral jäävad mõlemad teed pariteeti (id=None → fallback slugile).
+
+    Varasem live-tee kutsus siin `generate_default_metadata`-i (genereeris nanoid +
+    pealkirja nimest), uus ühine get_work_metadata seda ei tee. See on tahtlik: kaitse
+    _metadata.json-i loomise vastu kuulub nüüd metadata_watcher_loop / import_as_work-le
+    (need loovad _metadata.json-i koos nanoid'iga enne sync-i). Siin lukustame, et
+    mõlemad teed annavad puuduva faili korral SAMASUGUSE dokumendi (id=None).
+    """
+    work_dir = tmp_path / SLUG
+    work_dir.mkdir()
+    # NB: _metadata.json puudub tahtlikult
+    _write_page(work_dir, f"{SLUG}-001", txt="tekst", sequence=100, status="Toores")
+    os.utime(work_dir / f"{SLUG}-001.txt", (1_000_000, 1_000_000))
+
+    live = _live_docs(tmp_path, monkeypatch)
+    seed_docs = _seed_docs(work_dir)
+    assert len(live) == len(seed_docs) == 1
+    # work_id fallback'ub slugile (sanitize_id(SLUG)), sest id puudub
+    assert live[0]["work_id"] == seed_docs[0]["work_id"]
+    live_clean = {k: v for k, v in live[0].items() if k != "teose_staatus"}
+    assert seed_docs[0] == live_clean

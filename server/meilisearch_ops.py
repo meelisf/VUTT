@@ -57,7 +57,7 @@ from .meili_doc import (
     M_CONTENT_RE, split_marginalia, clean_text_for_search, build_text_annotations_text,
     _clean_search_text, _invert_name, get_creator_aliases, normalize_creator,
     _compute_work_aliases, get_collection_hierarchy, _build_page_document,
-    compute_autor_respondens,
+    compute_autor_respondens, get_work_metadata, build_work_documents,
 )
 
 
@@ -170,25 +170,16 @@ def sync_work_to_meilisearch(dir_name):
     """
     Sünkroonib ühe teose kõik leheküljed Meilisearchi.
     Loeb andmed failisüsteemist (_metadata.json, pildid, .txt, .json).
+
+    Dokumendid ehitatakse JAGATUD funktsiooniga meili_doc.build_work_documents —
+    täpselt sama, mida kasutab seed/reseed-tee (scripts/1-1_consolidate_data.py).
+    See on AINUS dokumendi-ehitamise tee → live ja seed EI SAA lahkneda (issue #23).
+    Siin jääb ainult live-spetsiifiline I/O-saba: konfig laadimine + upsert Meili API-le.
     """
     dir_path = os.path.join(BASE_DIR, dir_name)
     if not os.path.exists(dir_path):
         logger.warning(f"SÜNK: Kausta ei leitud: {dir_path}")
         return False
-
-    # 1. Lae teose metaandmed
-    meta_path = os.path.join(dir_path, '_metadata.json')
-    metadata = {}
-    if os.path.exists(meta_path):
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                metadata = json.load(f)
-        except Exception as e:
-            logger.error(f"SÜNK: Viga metaandmete lugemisel: {e}")
-            return False
-
-    if not metadata:
-        metadata = generate_default_metadata(dir_name)
 
     # Lae arhiivide register (arhiivi nimed otsinguteksti jaoks)
     _archives = {}
@@ -199,180 +190,21 @@ def sync_work_to_meilisearch(dir_name):
         except Exception:
             pass
 
-    # Metaandmed (v3 formaat: LinkedEntity objektid)
-    work_id = metadata.get('id')  # Nanoid (püsiv lühikood)
-    slug = metadata.get('slug', sanitize_id(dir_name))
-    title = metadata.get('title', 'Pealkiri puudub')
-    year = metadata.get('year', 0)
-    year_display = metadata.get('year_display') or None
-    year_range = parse_year_range(year, year_display)
-    # Kui year puudub aga year_display annab vahemiku (nt "ca. 1750", "19. saj"),
-    # kasuta sortimisväärtusena vahemiku keskpaika
-    if not year and year_range:
-        year = (year_range[0] + year_range[1]) // 2
-    year_start = year_range[0] if year_range else 0
-    year_end = year_range[1] if year_range else 0
-
-    # Autor ja respondens creators massiivist (jagatud loogika — vt meili_doc, issue #23)
-    creators = metadata.get('creators', [])
-    autor, respondens = compute_autor_respondens(creators)
-
-    # Tags (LinkedEntity objektide massiiv või stringid)
-    tags = metadata.get('tags', [])
-    if isinstance(tags, list):
-        tags = [normalize_genre(t) for t in tags]
-
-    # Kollektsioonid (uus formaat: massiiv)
-    work_collections = metadata.get('collections', [])
     collections = load_collections()
-    collections_hierarchy = get_collection_hierarchy(collections, work_collections)
-
-    ester_id = metadata.get('ester_id')
-    external_url = metadata.get('external_url')
-    series = metadata.get('series')
-    series_title = series.get('title', '') if isinstance(series, dict) else ''
-    relations = metadata.get('relations')
-    archive_refs = metadata.get('archive_refs') or []
-    location = metadata.get('location')
-    publisher = metadata.get('publisher')
-    work_type = metadata.get('type')
-    genre = metadata.get('genre')
-    languages = metadata.get('languages', [])
-
-    # 2. Leia leheküljed (pildid)
-    # NB: Lehekülje number (page_num) tuleneb pildi POSITSIOONIST SEQUENCE järgi sorteeritud
-    # nimekirjas, MITTE failinimest. Sequence on .json failis (100, 200, 300...).
-    # Tähestikuline sort on fallback kui sequence puudub.
-    def _get_page_sequence(img_name):
-        json_path = os.path.join(dir_path, os.path.splitext(img_name)[0] + '.json')
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    d = json.load(f)
-                    seq = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                    if seq is not None:
-                        return int(seq)
-            except Exception:
-                pass
-        return float('inf')  # fallback: lõppu
-
-    images_list = [f for f in os.listdir(dir_path) if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
-    images = sorted(images_list, key=lambda f: (_get_page_sequence(f), f))
-    if not images:
-        logger.warning(f"SÜNK: Pilte ei leitud kaustas: {dir_name}")
-        return False
-
-    documents = []
-    page_statuses = []
-
-    # Dokumendi ID = nanoid + lehekülje number (nt "cymbv7-1")
-    if not work_id:
-        logger.warning(f"HOIATUS: Teosel {dir_name} puudub nanoid (_metadata.json 'id' väli)")
-        work_id = slug  # Fallback slugile
-
-    # Lae inimeste aliased ja kanooniilised labelid ÜKS KORD enne tsüklit
     people_data = load_people_aliases()
     labels_store = load_labels_store()
 
-    # Work-level aliased (creators/publisher/tags) sõltuvad ainult metadatast, mitte lehest
-    # — arvutatakse üks kord, mitte igal lehel (vt issue #16 refaktoor).
-    aliases, authors_text, publisher_aliases, tag_aliases = _compute_work_aliases(
-        creators, publisher, tags, people_data
+    # Ehita kõik lehe-dokumendid jagatud teel.
+    teose_id, documents = build_work_documents(
+        dir_path, dir_name, collections, people_data, _archives, labels_store
     )
+    if not documents:
+        logger.warning(f"SÜNK: Pilte/dokumente ei leitud kaustas: {dir_name}")
+        return False
 
-    # Teose-tasandi kontekst (konstantsed väärtused üle kõikide lehtede).
-    # Ehitatakse üks kord ja antakse _build_page_document-ile (vt issue #16).
-    work_ctx = {
-        'dir_name': dir_name,
-        'dir_path': dir_path,
-        'work_id': work_id,
-        'title': title,
-        'autor': autor,
-        'respondens': respondens,
-        'year': year,
-        'year_display': year_display,
-        'year_start': year_start,
-        'year_end': year_end,
-        'teose_lehekylgede_arv': len(images),
-        'tags': tags,
-        'tag_aliases': tag_aliases,
-        'work_collections': work_collections,
-        'collections': collections,
-        'collections_hierarchy': collections_hierarchy,
-        'shareable': metadata.get('shareable', False),
-        'location': location,
-        'publisher': publisher,
-        'publisher_aliases': publisher_aliases,
-        'genre': genre,
-        'work_type': work_type,
-        'languages': languages,
-        'creators': creators,
-        'authors_text': authors_text,
-        'people_data': people_data,
-        'labels_store': labels_store,
-        'ester_id': ester_id,
-        'external_url': external_url,
-        'series': series,
-        'series_title': series_title,
-        'relations': relations,
-        'archive_refs': archive_refs,
-        '_archives': _archives,
-    }
-
-    for i, img_name in enumerate(images):
-        page_num = i + 1
-        page_id = f"{work_id}-{page_num}"
-        base_name = os.path.splitext(img_name)[0]
-
-        # Tekst
-        txt_path = os.path.join(dir_path, base_name + '.txt')
-        page_text = ""
-        if os.path.exists(txt_path):
-            try:
-                with open(txt_path, 'r', encoding='utf-8') as f:
-                    page_text = f.read()
-            except Exception:
-                pass
-
-        # Lehekülje meta (status, tags, comments)
-        json_path = os.path.join(dir_path, base_name + '.json')
-        page_meta = {
-            'status': 'Toores',
-            'tags': [],
-            'comments': [],
-            'text_annotations': [],
-            'history': []
-        }
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    p_data = json.load(f)
-                    # Toeta nii vana kui uut formaati (meta_content wrapper)
-                    source = p_data.get('meta_content', p_data)
-                    page_meta['status'] = source.get('status', 'Toores')
-                    # tags-fallback: serveril on 35 lehekülge vana 'tags' väljaga (OCR-artefaktid, stringid, mitte Q-objektid).
-                    # Eemaldada pärast nende lehekülgede migreerimist või puhastamist.
-                    page_meta['tags'] = source.get('page_tags', source.get('tags', []))
-                    page_meta['comments'] = source.get('comments', [])
-                    page_meta['text_annotations'] = source.get('text_annotations', [])
-                    page_meta['history'] = source.get('history', [])
-                    # Kui JSON-is on tekst ja failis pole, kasuta JSON-it
-                    if not page_text and 'text_content' in p_data:
-                        page_text = p_data['text_content']
-            except Exception:
-                pass
-
-        page_statuses.append(page_meta['status'])
-
-        doc = _build_page_document(
-            work_ctx, page_id, page_num, page_text, page_meta, img_name, txt_path
-        )
-        documents.append(doc)
-
-    # 3. Arvuta teose koondstaatus, saada Meilisearchi ja kustuta üleliigne.
-    # tsüklile järgnev samm on eraldatud _upsert_work_documents (vt issue #16 refaktoor).
-    if documents and work_id:
-        return _upsert_work_documents(work_id, slug, documents, page_statuses)
+    work_id = documents[0]['work_id']
+    page_statuses = [d['status'] for d in documents]
+    return _upsert_work_documents(work_id, teose_id, documents, page_statuses)
 
 
 def _delete_extra_pages(work_id, new_count):
