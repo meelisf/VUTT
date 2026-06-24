@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-06-24
 **Issue seos:** Phase 0 = #31 (parse_year_range parandused) — ✅ tehtud (commit 0f12cae)
-**Staatus:** disain kinnitatud, Phase 0 valmis, ootab Phase 1 implementatsiooniplaani
+**Staatus:** disain kinnitatud, Phase 0 valmis, kõik otsused tehtud, ootab Phase 1 implementatsiooniplaani
 
 ## Probleem
 
@@ -149,11 +149,9 @@ aastafiltris (year=0).
   loogika; backend `import_as_work` salvestab payloadis tulnud `year`+`year_display`.
 - **Andmemuutust pole** — olemasolevad teosed jäävad oma `year`/`year_display`
   väärtustega; vaid uued redigeerimised läbivad ühtse välja.
-- **Autoriteetsuse piir (LAHTINE OTSUS).** Kui derivatsioon on ainult frontend'i
-  `buildMetadataPayload`-s, kehtib invariant (sh reegel 4 vaikse rikkumise vastu) ainult
-  **UI kaudu salvestamisel**. API otsekutse võiks saata vastuolulise `year` + `year_display`.
-  Praktikas on metaandmete kirjutaja ainult admin/editor-UI. Kaks varianti:
-  **(A)** jätta frontend-only ja sõnastada invariant "UI kaudu salvestamisel"; või
-  **(B)** lisada sama derivatsioon/kontroll backend'i ainsasse lehtrisse
-  `save_work_metadata` (`metadata_ops.py`), kus on ligi ka olemasolev `_metadata.json`
-  (reegel 4 robustsem) — tõeline invariant, aga lisab kolmanda peegli (Python).
+- **Autoriteetsuse piir (OTSUSTATUD: frontend-only).** Derivatsioon elab ainult
+  frontend'i `buildMetadataPayload`-s. Invariant (sh reegel 4 vaikse rikkumise vastu)
+  kehtib **UI kaudu salvestamisel** — ainus reaalne metaandmete kirjutaja on admin/editor-UI
+  (YAGNI: muid API-kirjutajaid pole). Backend'i ei muudeta, kolmandat Python-peeglit ei lisata.
+  *Tuleviku-hardening, kui tekib muid kirjutajaid:* sama derivatsioon/kontroll
+  `save_work_metadata`-sse (`metadata_ops.py`), kus on ligi olemasolev `_metadata.json`.
