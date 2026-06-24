@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request, HTTPException, Depends, status, Background
 from fastapi.datastructures import FormData
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, NOTIFICATIONS_DIR, get_logger, ARCHIVES_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
@@ -135,6 +136,23 @@ def _load_work_metadata(work_id: str):
             return json.load(f)
     except Exception:
         return None
+
+
+def _read_work_meta_direct_sync(work_id: str, original_path: str):
+    """Loeb teose _metadata.json blokeeriva I/O-na (kutsutud threadpoolist).
+
+    Lahutatud /get-work-metadata endpointist, et sync faililugemine ei blokeeriks
+    event loopi (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 4).
+    """
+    path = find_directory_by_id(work_id) or os.path.join(BASE_DIR, os.path.basename(original_path or ''))
+    meta_path = os.path.join(path, '_metadata.json')
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
 
 
 def _get_optional_user(request: Request):
@@ -1155,11 +1173,10 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
 @app.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
-    path = find_directory_by_id(data.get('work_id')) or os.path.join(BASE_DIR, os.path.basename(data.get('original_path', '')))
-    meta_path = os.path.join(path, '_metadata.json')
-    if os.path.exists(meta_path):
-        with open(meta_path, 'r', encoding='utf-8') as f: return {"status": "success", "metadata": json.load(f)}
-    return {"status": "success", "metadata": {}}
+    # Faililugemine threadpoolis, et mitte blokeerida event loopi
+    # (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 4).
+    metadata = await run_in_threadpool(_read_work_meta_direct_sync, data.get('work_id'), data.get('original_path', ''))
+    return {"status": "success", "metadata": metadata}
 
 @app.post("/get-metadata-suggestions")
 async def metadata_suggestions(request: Request, user=Depends(require_role("editor"))):
@@ -1850,8 +1867,13 @@ def _find_works_with_archive(archive_id: str):
     return results
 
 @app.get("/admin/collections/{collection_id}/works-count")
-async def admin_collection_works_count(collection_id: str, user=Depends(require_role("admin"))):
-    """Tagastab mitu teost on antud kollektsioonis."""
+def admin_collection_works_count(collection_id: str, user=Depends(require_role("admin"))):
+    """Tagastab mitu teost on antud kollektsioonis.
+
+    Tavaline (mitte-async) endpoint: FastAPI jooksutab selle threadpoolis, nii et
+    _find_works_with_collection sync faililugemine ei blokeeri event loopi
+    (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 4).
+    """
     count = len(_find_works_with_collection(collection_id))
     return {"status": "success", "count": count}
 
