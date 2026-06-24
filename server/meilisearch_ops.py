@@ -254,6 +254,145 @@ def _compute_work_aliases(creators, publisher, tags, people_data):
     return aliases, authors_text, publisher_aliases, tag_aliases
 
 
+def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_name, txt_path):
+    """Ehitab ühe lehekülje Meilisearch dokumendi.
+
+    work_ctx sisaldab teose-tasandi konstantseid väärtusi (konstantsed üle kõikide
+    lehtede — ehitatud üks kord enne lehtede tsüklit sync_work_to_meilisearch-is).
+    Lehe-spetsiifilised sisendid (page_num/page_text/page_meta/img_name/txt_path)
+    eraldi, sest need muutuvad lehe kaupa.
+
+    NB: Meilisearchi väljanimesid (vanem 'y'-ortograafia: lehekylje_tekst,
+    teose_lehekylgede_arv jne) EI TOHI ümber nimetada — otsingufiltrid eeldavad
+    neid (vt issue #16). Hoia SÜNKROONIS scripts/1-1_consolidate_data.py-ga (issue #23).
+    """
+    page_tags_data = page_meta.get('tags', [])
+    lehekylje_tekst, marginaalia_tekst = _clean_search_text(page_text)
+
+    dir_name = work_ctx['dir_name']
+    dir_path = work_ctx['dir_path']
+    labels_store = work_ctx['labels_store']
+    people_data = work_ctx['people_data']
+    creators = work_ctx['creators']
+    tags = work_ctx['tags']
+
+    doc = {
+        "id": page_id,
+        "work_id": work_ctx['work_id'],  # Nanoid (püsiv lühikood)
+        "title": work_ctx['title'],
+        "autor": work_ctx['autor'],      # Filtreerimiseks (jääb)
+        "respondens": work_ctx['respondens'],  # Filtreerimiseks (jääb)
+        "aasta": work_ctx['year'],       # Filtreerimiseks ja sortimiseks (jääb)
+        "year": work_ctx['year'],
+        "year_display": work_ctx['year_display'],
+        "year_start": work_ctx['year_start'],  # Filtreerimiseks (vahemike kattuvus)
+        "year_end": work_ctx['year_end'],
+        "lehekylje_number": page_num,
+        "teose_lehekylgede_arv": work_ctx['teose_lehekylgede_arv'],
+        "lehekylje_tekst": lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
+        "marginaalia_tekst": marginaalia_tekst,           # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
+        "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
+        "lehekylje_pilt": os.path.join(dir_name, img_name),
+        "originaal_kataloog": dir_name,
+        "status": page_meta['status'],
+        "page_tags": get_primary_labels(page_tags_data),                          # Eesti label, capitalize_first (teose tags-iga ühtlane)
+        "page_tags_et": get_labels_by_lang(page_tags_data, 'et', labels_store), # Eesti label, capitalize_first
+        "page_tags_en": get_labels_by_lang(page_tags_data, 'en', labels_store), # Inglise label, capitalize_first
+        "page_tags_ids": get_all_ids(page_tags_data),              # Q-koodid (filtreeritav, nagu tags_ids)
+        "page_tags_suggest_et": [
+            f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
+            for t in page_tags_data
+        ],
+        "page_tags_suggest_en": [
+            f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
+            for t in page_tags_data
+        ],
+        "page_tags_object": page_tags_data,
+        "has_annotations": bool(page_tags_data or page_meta['comments'] or page_meta['text_annotations']),
+        "comments": page_meta['comments'],
+        "text_annotations": page_meta['text_annotations'],
+        "history": page_meta['history'],
+        "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
+        "tags": get_primary_labels(tags),
+        "tags_et": get_labels_by_lang(tags, 'et', labels_store),
+        "tags_en": get_labels_by_lang(tags, 'en', labels_store),
+        "tags_object": tags,
+        "tags_search": get_all_labels(tags) + work_ctx['tag_aliases'],
+        "tags_ids": get_all_ids(tags),
+        "collections": work_ctx['work_collections'],
+        "collections_hierarchy": work_ctx['collections_hierarchy'],
+        "is_public": any(
+            work_ctx['collections'].get(c, {}).get("visibility", "public") == "public"
+            for c in work_ctx['work_collections']
+        ) if work_ctx['work_collections'] else True,
+        "shareable": work_ctx['shareable'],
+        "location": get_label(work_ctx['location']),
+        "location_object": work_ctx['location'],
+        "location_id": get_id(work_ctx['location']),
+        "location_search": get_all_labels(work_ctx['location']),
+        "publisher": get_label(work_ctx['publisher']),
+        "publisher_object": work_ctx['publisher'],
+        "publisher_id": get_id(work_ctx['publisher']),
+        "publisher_search": get_all_labels(work_ctx['publisher']) + work_ctx['publisher_aliases'],
+        "genre": get_label(work_ctx['genre']),
+        "genre_et": get_labels_by_lang(work_ctx['genre'], 'et', labels_store),
+        "genre_en": get_labels_by_lang(work_ctx['genre'], 'en', labels_store),
+        "genre_object": work_ctx['genre'],
+        "genre_search": get_all_labels(work_ctx['genre']),
+        "genre_ids": get_all_ids(work_ctx['genre']),
+        "type": get_label(work_ctx['work_type']),
+        "type_et": get_labels_by_lang(work_ctx['work_type'], 'et', labels_store),
+        "type_en": get_labels_by_lang(work_ctx['work_type'], 'en', labels_store),
+        "type_object": work_ctx['work_type'],
+        "type_ids": get_all_ids(work_ctx['work_type']),
+        "languages": work_ctx['languages'],
+        "creators": creators,
+        "authors_text": work_ctx['authors_text'],
+        "author_names": list(dict.fromkeys(
+            name for c in creators
+            if c.get('name') and c.get('role') != 'respondens'
+            for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
+        )),
+        "respondens_names": list(dict.fromkeys(
+            name for c in creators
+            if c.get('name') and c.get('role') == 'respondens'
+            for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
+        )),
+        "creator_ids": [normalize_creator(c, people_data)[1] for c in creators if c.get('id')]
+        # NB: pealkiri, koht, trükkal eemaldatud - kasuta title, location, publisher
+    }
+
+    if work_ctx['ester_id']:
+        doc['ester_id'] = work_ctx['ester_id']
+    if work_ctx['external_url']:
+        doc['external_url'] = work_ctx['external_url']
+
+    if work_ctx['archive_refs']:
+        doc['archive_refs'] = work_ctx['archive_refs']
+        # Denormaliseeritud otsingutekst: kood + arhiivi täisnimi + viide
+        parts = []
+        for ref in work_ctx['archive_refs']:
+            if not isinstance(ref, dict):
+                continue
+            archive_id = ref.get('archive_id', '')
+            if archive_id:
+                parts.append(archive_id)
+                archive_name = work_ctx['_archives'].get(archive_id, {}).get('name', '')
+                if archive_name:
+                    parts.append(archive_name)
+            if ref.get('reference'):
+                parts.append(ref['reference'])
+        if parts:
+            doc['archive_refs_text'] = ' '.join(parts)
+
+    text_anns = page_meta.get('text_annotations') or []
+    ann_text = build_text_annotations_text(text_anns)
+    if ann_text is not None:
+        doc['text_annotations_text'] = ann_text
+
+    return doc
+
+
 def load_collections():
     """Laeb kollektsioonide hierarhia."""
     if os.path.exists(COLLECTIONS_FILE):
@@ -497,6 +636,42 @@ def sync_work_to_meilisearch(dir_name):
         creators, publisher, tags, people_data
     )
 
+    # Teose-tasandi kontekst (konstantsed väärtused üle kõikide lehtede).
+    # Ehitatakse üks kord ja antakse _build_page_document-ile (vt issue #16).
+    work_ctx = {
+        'dir_name': dir_name,
+        'dir_path': dir_path,
+        'work_id': work_id,
+        'title': title,
+        'autor': autor,
+        'respondens': respondens,
+        'year': year,
+        'year_display': year_display,
+        'year_start': year_start,
+        'year_end': year_end,
+        'teose_lehekylgede_arv': len(images),
+        'tags': tags,
+        'tag_aliases': tag_aliases,
+        'work_collections': work_collections,
+        'collections': collections,
+        'collections_hierarchy': collections_hierarchy,
+        'shareable': metadata.get('shareable', False),
+        'location': location,
+        'publisher': publisher,
+        'publisher_aliases': publisher_aliases,
+        'genre': genre,
+        'work_type': work_type,
+        'languages': languages,
+        'creators': creators,
+        'authors_text': authors_text,
+        'people_data': people_data,
+        'labels_store': labels_store,
+        'ester_id': ester_id,
+        'external_url': external_url,
+        'archive_refs': archive_refs,
+        '_archives': _archives,
+    }
+
     for i, img_name in enumerate(images):
         page_num = i + 1
         page_id = f"{work_id}-{page_num}"
@@ -542,124 +717,9 @@ def sync_work_to_meilisearch(dir_name):
 
         page_statuses.append(page_meta['status'])
 
-    # NB: page_meta['tags'] sisaldab lehekülje märksõnu (loetud page_tags väljalt)
-        page_tags_data = page_meta.get('tags', [])
-
-        lehekylje_tekst, marginaalia_tekst = _clean_search_text(page_text)
-        doc = {
-            "id": page_id,
-            "work_id": work_id,  # Nanoid (püsiv lühikood)
-            "title": title,
-            "autor": autor,      # Filtreerimiseks (jääb)
-            "respondens": respondens,  # Filtreerimiseks (jääb)
-            "aasta": year,       # Filtreerimiseks ja sortimiseks (jääb)
-            "year": year,
-            "year_display": year_display,
-            "year_start": year_start,  # Filtreerimiseks (vahemike kattuvus)
-            "year_end": year_end,
-            "lehekylje_number": page_num,
-            "teose_lehekylgede_arv": len(images),
-            "lehekylje_tekst": lehekylje_tekst,               # OTSING: põhitekst ILMA marginaaliata
-            "marginaalia_tekst": marginaalia_tekst,           # OTSING: marginaalia eraldi väljal (alati olemas, ka tühjana — attributesToSearchOn nõuab)
-            "text_content": page_text,                             # REDAKTOR: algne tekst koos kõigi märkidega
-            "lehekylje_pilt": os.path.join(dir_name, img_name),
-            "originaal_kataloog": dir_name,
-            "status": page_meta['status'],
-            "page_tags": get_primary_labels(page_tags_data),                          # Eesti label, capitalize_first (teose tags-iga ühtlane)
-            "page_tags_et": get_labels_by_lang(page_tags_data, 'et', labels_store), # Eesti label, capitalize_first
-            "page_tags_en": get_labels_by_lang(page_tags_data, 'en', labels_store), # Inglise label, capitalize_first
-            "page_tags_ids": get_all_ids(page_tags_data),              # Q-koodid (filtreeritav, nagu tags_ids)
-            "page_tags_suggest_et": [
-                f"{(get_labels_by_lang(t, 'et', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
-                for t in page_tags_data
-            ],
-            "page_tags_suggest_en": [
-                f"{(get_labels_by_lang(t, 'en', labels_store) or [''])[0]}|||{t.get('id') or '' if isinstance(t, dict) else ''}"
-                for t in page_tags_data
-            ],
-            "page_tags_object": page_tags_data,
-            "has_annotations": bool(page_tags_data or page_meta['comments'] or page_meta['text_annotations']),
-            "comments": page_meta['comments'],
-            "text_annotations": page_meta['text_annotations'],
-            "history": page_meta['history'],
-            "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
-            "tags": get_primary_labels(tags),
-            "tags_et": get_labels_by_lang(tags, 'et', labels_store),
-            "tags_en": get_labels_by_lang(tags, 'en', labels_store),
-            "tags_object": tags,
-            "tags_search": get_all_labels(tags) + tag_aliases,
-            "tags_ids": get_all_ids(tags),
-            "collections": work_collections,
-            "collections_hierarchy": collections_hierarchy,
-            "is_public": any(
-                collections.get(c, {}).get("visibility", "public") == "public"
-                for c in work_collections
-            ) if work_collections else True,
-            "shareable": metadata.get("shareable", False),
-            "location": get_label(location),
-            "location_object": location,
-            "location_id": get_id(location),
-            "location_search": get_all_labels(location),
-            "publisher": get_label(publisher),
-            "publisher_object": publisher,
-            "publisher_id": get_id(publisher),
-            "publisher_search": get_all_labels(publisher) + publisher_aliases,
-            "genre": get_label(genre),
-            "genre_et": get_labels_by_lang(genre, 'et', labels_store),
-            "genre_en": get_labels_by_lang(genre, 'en', labels_store),
-            "genre_object": genre,
-            "genre_search": get_all_labels(genre),
-            "genre_ids": get_all_ids(genre),
-            "type": get_label(work_type),
-            "type_et": get_labels_by_lang(work_type, 'et', labels_store),
-            "type_en": get_labels_by_lang(work_type, 'en', labels_store),
-            "type_object": work_type,
-            "type_ids": get_all_ids(work_type),
-            "languages": languages,
-            "creators": creators,
-            "authors_text": authors_text,
-            "author_names": list(dict.fromkeys(
-                name for c in creators
-                if c.get('name') and c.get('role') != 'respondens'
-                for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
-            )),
-            "respondens_names": list(dict.fromkeys(
-                name for c in creators
-                if c.get('name') and c.get('role') == 'respondens'
-                for name in ([normalize_creator(c, people_data)[0], c['name']] if normalize_creator(c, people_data)[0] != c['name'] else [c['name']])
-            )),
-            "creator_ids": [normalize_creator(c, people_data)[1] for c in creators if c.get('id')]
-            # NB: pealkiri, koht, trükkal eemaldatud - kasuta title, location, publisher
-        }
-
-        if ester_id:
-            doc['ester_id'] = ester_id
-        if external_url:
-            doc['external_url'] = external_url
-
-        if archive_refs:
-            doc['archive_refs'] = archive_refs
-            # Denormaliseeritud otsingutekst: kood + arhiivi täisnimi + viide
-            parts = []
-            for ref in archive_refs:
-                if not isinstance(ref, dict):
-                    continue
-                archive_id = ref.get('archive_id', '')
-                if archive_id:
-                    parts.append(archive_id)
-                    archive_name = _archives.get(archive_id, {}).get('name', '')
-                    if archive_name:
-                        parts.append(archive_name)
-                if ref.get('reference'):
-                    parts.append(ref['reference'])
-            if parts:
-                doc['archive_refs_text'] = ' '.join(parts)
-
-        text_anns = page_meta.get('text_annotations') or []
-        ann_text = build_text_annotations_text(text_anns)
-        if ann_text is not None:
-            doc['text_annotations_text'] = ann_text
-
+        doc = _build_page_document(
+            work_ctx, page_id, page_num, page_text, page_meta, img_name, txt_path
+        )
         documents.append(doc)
 
     # 3. Arvuta teose koondstaatus
