@@ -343,7 +343,7 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
     if not _valid_upload_id(upload_id):
         return False
     allowed = {
-        'title', 'year', 'collections', 'languages',
+        'title', 'year', 'year_display', 'collections', 'languages',
         'type', 'genre',
         'creators', 'location',
         'publisher', 'tags',

@@ -12,7 +12,8 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
-import { buildMetadataPayload } from '../utils/buildMetadataPayload';
+import { buildMetadataPayload, type YearFieldsExisting } from '../utils/buildMetadataPayload';
+import { parseYearDisplayRange } from '../utils/yearDisplayUtils';
 import ArchiveSelect from './ArchiveSelect';
 
 interface MetadataModalProps {
@@ -29,8 +30,7 @@ interface MetadataModalProps {
 
 interface MetadataForm {
   title: string;
-  year: number;
-  year_display: string;                // Kuvatav aasta (nt "ca. 1680"), tühi = kasuta year numbrit
+  yearInput: string;                  // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
   genre: (string | LinkedEntity)[];  // Mitu žanrit
   tags: (string | LinkedEntity)[];
@@ -138,6 +138,31 @@ export const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collecti
   );
 };
 
+/**
+ * Aasta-lahtri live-eelvaade + pehme validatsioon (aasta-välja ühendamine).
+ * Kolm olekut `parseYearDisplayRange(null, value)` põhjal:
+ *  - parsib    → neutraalne: "→ 1601–1700" (või "→ 1680" kui start==end)
+ *  - ei parsi → merevaik hoiatus (EI blokeeri salvestamist — ajalooliselt legitiimsed formaadid)
+ *  - tühi      → vaikne (kuupäevata teos on legitiimne)
+ */
+export const YearInputPreview: React.FC<{ value: string }> = ({ value }) => {
+  const { t } = useTranslation(['workspace', 'common']);
+  const trimmed = (value ?? '').trim();
+  if (!trimmed) return null;  // tühi → vaikne
+
+  const range = parseYearDisplayRange(null, trimmed);
+  if (!range) {
+    // ei parsi (mittetühi) → pehme hoiatus
+    return (
+      <p className="mt-1 text-xs text-amber-600">
+        {t('metadata.yearInputWarn', '⚠ Ei oska aastat tuletada — formaadid: 1680, ca. 1680, 1670–1690, 17. saj')}
+      </p>
+    );
+  }
+  const preview = range.start === range.end ? String(range.start) : `${range.start}–${range.end}`;
+  return <p className="mt-1 text-xs text-gray-400">→ {preview}</p>;
+};
+
 const MetadataModal: React.FC<MetadataModalProps> = ({
   isOpen,
   onClose,
@@ -156,8 +181,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
   const [metaForm, setMetaForm] = useState<MetadataForm>({
     title: '',
-    year: 0,
-    year_display: '',
+    yearInput: '',
     type: null,
     genre: [],
     tags: [],
@@ -187,6 +211,11 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const dragOffset = useRef<{ x: number; y: number } | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+
+  // Aasta-välja invariant (reegel 4): vormi avamisel (ja ESTER auto-filli järel)
+  // snap-shotitud algne { year, year_display }. Kui kasutaja kuvastringi ei muuda,
+  // säilitatakse olemasolev `year` isegi kui see ei parsi (väldib vaikset andmekao).
+  const existingYearRef = useRef<YearFieldsExisting>({});
 
   const handleDragStart = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -226,10 +255,14 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     }
 
     // Algväärtused page/work objektidest
+    const initYear = work?.year || page.year || page.aasta || 0;
+    const initYearDisplay = work?.year_display || page.year_display || '';
+    // Üks tekstilahter: kuva eelistatult, muidu number (0-st ei teki "0" lahtris)
+    const initYearInput = initYearDisplay || (initYear ? String(initYear) : '');
+    existingYearRef.current = { year: initYear, year_display: initYearDisplay };
     setMetaForm({
       title: work?.title || page.title || '',
-      year: work?.year || page.year || page.aasta || 0,
-      year_display: work?.year_display || page.year_display || '',
+      yearInput: initYearInput,
       type: work?.type || page.type || null,
       genre: (() => { const g = work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
       tags: work?.tags || page.tags || [],
@@ -334,8 +367,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
 
         setMetaForm({
           title: title,
-          year: year ? parseInt(year) : 0,
-          year_display: m.year_display || '',
+          yearInput: m.year_display || (year ? String(year) : ''),
           type: m.type || null,
           genre: (() => { const g = m.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
           tags: Array.isArray(tags) ? tags : [],
@@ -348,6 +380,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           collections: Array.isArray(m.collections) ? m.collections : [],
           archive_refs: Array.isArray(m.archive_refs) ? m.archive_refs : [],
         });
+        // Re-set existing snap-shot pärast ESTER/server auto-filli, et ka
+        // auto-fillitud `year` säiliks, kui kasutaja kuvastringi ei muuda (reegel 4).
+        existingYearRef.current = { year: year ? parseInt(year) : 0, year_display: m.year_display || '' };
       }
     } catch (e) {
       console.error("Viga metaandmete laadimisel failiserverist:", e);
@@ -359,7 +394,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     setSaveStatus('idle');
 
     try {
-      const payload = buildMetadataPayload(metaForm, workId, page.originaal_kataloog);
+      const payload = buildMetadataPayload(metaForm, workId, page.originaal_kataloog, existingYearRef.current);
 
       const response = await fetchWithTimeout(`${FILE_API_URL}/update-work-metadata`, {
         method: 'POST',
@@ -535,27 +570,19 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           {/* Grupp 2: Kolofoon */}
           <div className="border border-gray-200 rounded-lg p-3 space-y-3 bg-gray-50/50">
             <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">{t('metadata.colophon', 'Kolofoon')}</h4>
-            {/* Rida 1: Aasta */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.year')}</label>
-                <input
-                  type="number"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  value={metaForm.year || ''}
-                  onChange={e => setMetaForm({ ...metaForm, year: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.yearDisplay')}</label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                  placeholder={t('metadata.yearDisplayPlaceholder', 'nt ca. 1680')}
-                  value={metaForm.year_display}
-                  onChange={e => setMetaForm({ ...metaForm, year_display: e.target.value })}
-                />
-              </div>
+            {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields) */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.year')}</label>
+              <input
+                type="text"
+                inputMode="text"
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+                placeholder={t('metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
+                value={metaForm.yearInput}
+                onChange={e => setMetaForm({ ...metaForm, yearInput: e.target.value })}
+              />
+              {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
+              <YearInputPreview value={metaForm.yearInput} />
             </div>
             {/* Rida 2: Koht ja trükkal */}
             <div className="grid grid-cols-2 gap-3">

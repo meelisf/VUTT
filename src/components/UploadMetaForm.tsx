@@ -4,18 +4,20 @@
  * Laadib hetke meta /admin/upload/{id}/meta GET kaudu, salvestab PATCH kaudu.
  * EntityPicker välju kasutatakse linked data tagamiseks (Wikidata, VIAF, GND).
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Save, Plus, Trash2, X, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Creator, CreatorRole, ArchiveRef } from '../types';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { Collections, getVocabularies, Vocabularies } from '../services/collectionService';
 import EntityPicker, { PeopleRegisterEntry } from './EntityPicker';
-import { CollectionDropdown } from './MetadataModal';
+import { CollectionDropdown, YearInputPreview } from './MetadataModal';
 import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { getLabel } from '../utils/metadataUtils';
+import { deriveYearFields } from '../utils/yearDisplayUtils';
+import { cleanCreators, cleanTags, cleanEsterId, cleanArchiveRefs } from '../utils/buildMetadataPayload';
 import ArchiveSelect from './ArchiveSelect';
 
 interface UploadMetaFormProps {
@@ -35,8 +37,7 @@ interface UploadMetaFormProps {
 
 interface MetaForm {
   title: string;
-  year: string;
-  year_display: string;
+  yearInput: string;          // Üks tekstilahter: 1680 | ca. 1680 | 1670–1690 | 17. saj (vt deriveYearFields)
   type: string | LinkedEntity | null;
   genre: (string | LinkedEntity)[];
   tags: (string | LinkedEntity)[];
@@ -57,8 +58,7 @@ interface SuggestionItem {
 
 const EMPTY_FORM: MetaForm = {
   title: '',
-  year: '',
-  year_display: '',
+  yearInput: '',
   type: null,
   genre: [],
   tags: [],
@@ -89,9 +89,14 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
   const [form, setForm] = useState<MetaForm>({
     ...EMPTY_FORM,
     title: initialTitle,
-    year: initialYear,
+    yearInput: initialYear,
     collections: initialCollections,
   });
+
+  // Aasta-välja invariant (reegel 4): staging-meta laadimisel snap-shotitud algne
+  // { year, year_display }. Kui kasutaja kuvastringi ei muuda, säilitatakse olemasolev
+  // `year` isegi kui see ei parsi (väldib vaikset andmekao).
+  const existingYearRef = useRef<{ year?: number; year_display?: string }>({});
 
   const [vocabularies, setVocabularies] = useState<Vocabularies | null>(null);
   const [peopleRegister, setPeopleRegister] = useState<PeopleRegisterEntry[]>([]);
@@ -122,11 +127,15 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
         if (!r.ok || cancelled) return;
         const d = await r.json();
         const m = d.meta || {};
+        const metaYear = Number(m.year) || 0;
+        const metaYearDisplay = m.year_display || '';
+        // Üks tekstilahter: kuva eelistatult, muidu number (0-st ei teki "0" lahtris)
+        const yearInput = metaYearDisplay || (metaYear ? String(metaYear) : '') || initialYear;
+        existingYearRef.current = { year: metaYear, year_display: metaYearDisplay };
         if (!cancelled) {
           setForm({
             title: m.title || initialTitle,
-            year: String(m.year || initialYear || ''),
-            year_display: m.year_display || '',
+            yearInput,
             type: m.type ?? null,
             genre: (() => {
               const g = m.genre;
@@ -199,33 +208,23 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
     setSaveOk(false);
     setSaveError('');
 
-    const cleanCreators = form.creators
-      .filter((c) => c.name.trim() !== '')
-      .map((c) => ({ name: c.name.trim(), role: c.role, id: c.id, source: c.source }));
-
-    const cleanTags = form.tags.filter((t) =>
-      typeof t === 'string' ? t.trim() !== '' : !!t.label
-    );
-
-    let cleanEsterId = form.ester_id.trim();
-    const esterMatch = cleanEsterId.match(/record=(b\d+)/);
-    if (esterMatch) cleanEsterId = esterMatch[1];
+    const { year, year_display } = deriveYearFields(form.yearInput, existingYearRef.current);
 
     const payload: Record<string, unknown> = {
       title: form.title.trim(),
-      year: form.year,
-      year_display: form.year_display.trim() || null,
+      year,
+      year_display: year_display || null,
       type: form.type || null,
       genre: form.genre.length > 0 ? form.genre : null,
-      tags: cleanTags,
+      tags: cleanTags(form.tags),
       location: form.location,
       publisher: form.publisher,
-      creators: cleanCreators,
+      creators: cleanCreators(form.creators),
       languages: form.languages,
       collections: form.collections,
-      ester_id: cleanEsterId || null,
+      ester_id: cleanEsterId(form.ester_id),
       external_url: form.external_url.trim() || null,
-      archive_refs: form.archive_refs.filter(r => r.archive_id || r.reference),
+      archive_refs: cleanArchiveRefs(form.archive_refs),
     };
 
     try {
@@ -386,32 +385,20 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
           <h4 className="text-xs font-bold text-gray-600 uppercase -mt-1">
             {t('workspace:metadata.colophon', 'Kolofoon')}
           </h4>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                {t('workspace:metadata.year')}
-              </label>
-              <input
-                type="number"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                value={form.year}
-                min={1200}
-                max={1800}
-                onChange={(e) => setForm({ ...form, year: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">
-                {t('workspace:metadata.yearDisplay')}
-              </label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                placeholder={t('workspace:metadata.yearDisplayPlaceholder', 'nt ca. 1680')}
-                value={form.year_display}
-                onChange={(e) => setForm({ ...form, year_display: e.target.value })}
-              />
-            </div>
+          {/* Aasta — üks tekstilahter (aasta-välja ühendamine, vt deriveYearFields) */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">
+              {t('workspace:metadata.year')}
+            </label>
+            <input
+              type="text"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
+              placeholder={t('workspace:metadata.yearInputPlaceholder', '1680, ca. 1680, 1670–1690, 17. saj')}
+              value={form.yearInput}
+              onChange={(e) => setForm({ ...form, yearInput: e.target.value })}
+            />
+            {/* Live-eelvaade / pehme validatsioon (EI blokeeri salvestamist) */}
+            <YearInputPreview value={form.yearInput} />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <EntityPicker
