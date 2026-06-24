@@ -262,9 +262,9 @@ Reaalselt puuduvad või vajavad täiendust:
 
 | Teema | Viide | Soovitus |
 |-------|-------|----------|
-| `check_rate_limit` | `server/rate_limit.py:101` | lisada testid olemasolevasse `tests/test_login_throttle.py` |
-| `trash_ops.py` | `server/trash_ops.py` | lisada baas-testid prügikasti operatsioonidele |
-| `poll_reocr_job` | `server/reocr_ops.py:466` | lisada test mockitud OCR/SFTP olekutega |
+| `check_rate_limit` | `server/rate_limit.py:101` | ✅ tehtud (#14) — 5 testi `tests/test_login_throttle.py`-s |
+| `trash_ops.py` | `server/trash_ops.py` | ✅ tehtud (#15) — 9 testi `tests/test_trash_ops.py` |
+| `poll_reocr_job` | `server/reocr_ops.py:466` | ✅ tehtud (#15) — 7 testi `tests/test_reocr_poll.py` |
 | `fetchWithTimeout` | `src/utils/fetchWithTimeout.ts` | testida timeout/abort/error handling |
 | `entityLabelsService.ts` | `src/services/entityLabelsService.ts` | fetch-mock testid |
 | `collectionService.ts` | `src/services/collectionService.ts` | fetch-mock testid + värvide helperid kui katmata |
@@ -295,21 +295,28 @@ Seal on vana `INSTRUCTION_OLD` prompt plokk-kommentaarina. Kui seda ei kasutata 
 
 ## Soovitatav implementatsioonijärjekord
 
-### Kiire madala riskiga PR
+### Kiire madala riskiga PR — ✅ tehtud (#14)
 
-1. Kustutada vana OCR prompt plokk või tõsta dokumentatsiooni.
-2. Lisada `_ssh_rm_rf` helper + asendada 3 `exec_command` kohta.
-3. Parandada blocking-I/O endpointid:
+1. ✅ Kustutada vana OCR prompt plokk või tõsta dokumentatsiooni.
+2. ✅ Lisada `_ssh_rm_rf` helper + asendada 3 `exec_command` kohta.
+3. ✅ Parandada blocking-I/O endpointid:
    - `admin_collection_works_count` → `def`;
    - `get_work_meta_direct` faililugemine `run_in_threadpool` kaudu.
-4. Lisada `check_rate_limit` testid.
+4. ✅ Lisada `check_rate_limit` testid.
 
-### Eraldi PR-id
+**PR:** https://github.com/meelisf/VUTT/pull/14 (484… +5 testi)
 
-1. `trash_ops.py` ja `poll_reocr_job` testid.
-2. `sync_work_to_meilisearch` fixture/snapshot-test + refaktooring.
-3. `save_and_transfer_to_ocr` järkjärguline refaktooring.
-4. `crossLang*Map` eemaldamine pärast serveri Meilisearchi andmekontrolli.
+### Eraldi PR-id / issue-d
+
+1. ✅ `trash_ops.py` ja `poll_reocr_job` testid — **PR #15** (+16 testi).
+2. 🔵 `sync_work_to_meilisearch` fixture/snapshot-test + refaktooring — **issue #16** (eeltöö: snapshot-test).
+3. 🔵 `save_and_transfer_to_ocr` järkjärguline refaktooring — **issue #17**.
+4. 🔵 `crossLang*Map` eemaldamine pärast serveri Meilisearchi andmekontrolli — **issue #18** (blokeeriv: serveri andmekontroll).
+5. 🔵 Ülejäänud testilüngad (frontend teenused, registration username, `parse_year_range` edge case'id) — **issue #19**.
+
+### Konfiguratsioonikontroll (koodimuudatuseta)
+
+- Leid 6: kontrollida `ssh vutt`-iga `.env` (`VUTT_ENV=production` + reaalsed saladused). Mitte koodimuudatus — toiming serveris.
 
 ---
 
