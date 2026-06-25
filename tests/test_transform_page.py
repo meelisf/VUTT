@@ -106,11 +106,11 @@ def test_transform_endpoint_401_no_auth(backend_env):
 
 
 def test_transform_endpoint_400_bad_crop(backend_env, login, monkeypatch):
-    import server.main as main
+    from server.routers import pages as pages_router
 
     def _raise(*a, **kw):
         raise ValueError("kärbe liiga väike")
-    monkeypatch.setattr(main, "transform_page_image", _raise)
+    monkeypatch.setattr(pages_router, "transform_page_image", _raise)
 
     token = login("admin", "adminpass")
     r = backend_env["client"].post(
@@ -122,8 +122,8 @@ def test_transform_endpoint_400_bad_crop(backend_env, login, monkeypatch):
 
 
 def test_transform_endpoint_404_unknown(backend_env, login, monkeypatch):
-    import server.main as main
-    monkeypatch.setattr(main, "transform_page_image", lambda *a, **kw: {"found": False})
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "transform_page_image", lambda *a, **kw: {"found": False})
     token = login("admin", "adminpass")
     r = backend_env["client"].post(
         "/admin/work/x/page-image/a.jpg/transform",
@@ -134,9 +134,9 @@ def test_transform_endpoint_404_unknown(backend_env, login, monkeypatch):
 
 
 def test_transform_endpoint_200(backend_env, login, monkeypatch):
-    import server.main as main
+    from server.routers import pages as pages_router
     monkeypatch.setattr(
-        main, "transform_page_image",
+        pages_router, "transform_page_image",
         lambda *a, **kw: {"success": True, "changed": True, "filename": "a.jpg", "size": [100, 200], "thumbnail_warning": False},
     )
     token = login("admin", "adminpass")
