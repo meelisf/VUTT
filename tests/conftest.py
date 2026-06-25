@@ -88,14 +88,36 @@ def backend_env(tmp_path, monkeypatch):
     monkeypatch.setattr(registration, "PENDING_REGISTRATIONS_FILE", str(pending_registrations_file))
     monkeypatch.setattr(registration, "INVITE_TOKENS_FILE", str(invite_tokens_file))
 
-    monkeypatch.setattr(main, "COLLECTIONS_FILE", str(collections_file))
-    monkeypatch.setattr(main, "ARCHIVES_FILE", str(archives_file))
-    monkeypatch.setattr(main, "USER_SETTINGS_DIR", str(user_settings_dir))
-    monkeypatch.setattr(main, "UPLOADS_DIR", str(uploads_dir))
+    # Refaktoreering Faas 0 (docs/REFACTOR_main_py_2026-06-25.md): ``main.py``-s
+    # defineeritud konstandid (COLLECTIONS_FILE, ARCHIVES_FILE, ...) rändavad
+    # faaside käigus routers/*.py-sse. ``_patch_config_const`` patchib neid
+    # kõigis asjakohastes moodulites ühe helperiga JA nõuab, et vähemalt üks
+    # moodul konstandi omaks (turvavõrk vaikse testi-katkemise vastu).
+    #
+    # NB: praegusel hetkel on reaalne omanik ``server.main`` (+ UPLOADS_DIR-i
+    # jaoks ``server.upload_ops``) — need read on teadlik skafold: kui mõni faas
+    # konstandi routerisse tõstab, lisatakse vastav moodul siia loetellu (main
+    # jääb samuti, sest jätab re-eksporti kuni kõik viited uuenevad).
+    # ``server.work_meta`` pole siin, sest see impordib ainult BASE_DIR (mitte
+    # ühtegi neist konstantidest) — tõstaksime selle siia alles siis, kui work_meta
+    # hakkaks mõnda neist importima.
     monkeypatch.setattr(main, "invalidate_cache", lambda: None)
+    _patch_config_const(
+        monkeypatch,
+        {
+            "COLLECTIONS_FILE": str(collections_file),
+            "ARCHIVES_FILE": str(archives_file),
+            "USER_SETTINGS_DIR": str(user_settings_dir),
+        },
+        modules=["server.main"],
+    )
+    _patch_config_const(
+        monkeypatch,
+        {"UPLOADS_DIR": str(uploads_dir)},
+        modules=["server.main", "server.upload_ops"],
+    )
 
     upload_ops = importlib.import_module("server.upload_ops")
-    monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(uploads_dir))
     upload_ops.upload_progress.clear()
 
     rate_limit._rate_limit_store.clear()
@@ -125,6 +147,34 @@ def backend_env(tmp_path, monkeypatch):
     auth.sessions.clear()
     rate_limit._rate_limit_store.clear()
     upload_ops.upload_progress.clear()
+
+
+def _patch_config_const(monkeypatch, name_value: dict, *, modules):
+    """Patchib konstandi(d) vaid moodulites, mis seda TEGELIKULT impordivad.
+
+    Refaktoreering Faas 0 infra (docs/REFACTOR_main_py_2026-06-25.md).
+    ``modules`` on otsiruum: helper patchib ainult need moodulid, mis konstandi
+    ``hasattr`` kaudu omavad (``raising=True`` vaikimisi — iga omanik peab ikka
+    eksisteerima). Mitte-omanikke ignoreeritakse (nende jaoks ei looda
+    fantoomatribuute).
+
+    Turvavõrk (peamine): kui konstant on KÕIGIST loetletud moodulitest eemaldatud
+    — nt keegi tõstis selle routerisse, aga unustas siia mooduli juurde lisada —
+    viskab see ``AttributeError``. Ilma selleta patchituks vaikse no-op-ina ja
+    testid jookseksid päris produktsiooni konstandi vastu. See on just see signaal,
+    mida see refaktoreering lubab vältida (vaikne testi-katkemine).
+    """
+    for name, value in name_value.items():
+        loaded = [importlib.import_module(m) for m in modules]
+        owners = [m for m in loaded if hasattr(m, name)]
+        if not owners:
+            raise AttributeError(
+                f"Konstant {name!r} puudub kõikidest moodulitest {modules!r} — "
+                f"mingi refaktoreeringu faas on selle eemaldanud ilma conftesti "
+                f"moodulite loetelu uuendamata (vaikse testi-katkemise kaitse)."
+            )
+        for mod in owners:
+            monkeypatch.setattr(mod, name, value)
 
 
 @pytest.fixture
