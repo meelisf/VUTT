@@ -30,19 +30,9 @@ from .registration import (
     update_registration_status, create_invite_token, validate_invite_token,
     create_user_from_invite, suggest_username_for_email
 )
-# Backward-compat re-eksport Faas 2 jaoks: upload/re-OCR endpointid elavad
-# routerites, aga vanad testid/skriptid võivad neid nimesid veel main.py-st importida.
-from .upload_ops import (
-    sanitize_slug, create_upload, update_upload_meta,
-    list_uploads, get_upload, mark_page_deleted, cancel_upload,
-    save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs,
-    import_as_work, replace_work_content, _valid_upload_id,
-)
-from .reocr_ops import (
-    start_reocr_job, poll_reocr_job, list_reocr_jobs,
-    get_active_reocr_count, REOCR_MAX_CONCURRENT, get_reocr_log,
-    start_reocr_batch, get_active_batch_for_work, build_reocr_status,
-)
+# NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
+# (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
+# server/__init__.py kaudu otse ops-moodulitest, seega main.py ei impordi neid.
 from .cache import (
     get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
     get_cached_people_register, get_cached_suggestions, invalidate_cache,
