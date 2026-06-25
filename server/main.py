@@ -16,11 +16,11 @@ from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, gen
 from .access_ops import can_read_work, can_write_work, is_work_public
 
 logger = get_logger(__name__)
-from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, _ensure_filterable_attributes, update_collection_is_public_async
+from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch_async, _ensure_filterable_attributes, update_collection_is_public_async
 from .metadata_handler import build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
-from .people_ops import process_creators_metadata, process_person_fields_metadata
+from .people_ops import process_person_fields_metadata
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
-from .git_ops import run_git_fsck, save_with_git, get_recent_commits, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
+from .git_ops import run_git_fsck, save_with_git, get_recent_commits, get_file_git_history, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import delete_user_sessions, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
