@@ -1,6 +1,5 @@
 import os
 import json
-import shutil
 import threading
 import unicodedata
 import uuid
@@ -17,17 +16,13 @@ from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, gen
 from .access_ops import can_read_work, can_write_work, is_work_public
 
 logger = get_logger(__name__)
-from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch, sync_work_to_meilisearch_async, delete_work_from_meilisearch, _ensure_filterable_attributes, update_collection_is_public_async
+from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch_async, _ensure_filterable_attributes, update_collection_is_public_async
 from .metadata_handler import build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
-from .people_ops import process_creators_metadata, process_person_fields_metadata, get_refresh_status, refresh_all_people_safe
+from .people_ops import process_person_fields_metadata
 from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
-from .git_ops import run_git_fsck, save_with_git, get_recent_commits, delete_work_from_git, clear_git_failures, get_git_failures, get_file_git_history, get_file_diff, get_file_at_commit, get_commit_diff, get_or_init_repo
-from .auth import get_all_users, update_user_role, delete_user, delete_user_sessions, load_users, save_users
+from .git_ops import run_git_fsck, save_with_git, get_recent_commits, get_file_git_history, get_file_at_commit, get_commit_diff, get_or_init_repo
+from .auth import delete_user_sessions, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
-from .registration import (
-    load_pending_registrations, get_registration_by_id,
-    update_registration_status, create_invite_token
-)
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
 # server/__init__.py kaudu otse ops-moodulitest, seega main.py ei impordi neid.
@@ -36,7 +31,6 @@ from .cache import (
     get_cached_people_register, get_cached_suggestions, invalidate_cache,
     get_cached_archives,
 )
-from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
 # get_sorted_images on jätkuvalt kasutusel download endpointides; lehekülgede
 # halduse endpointid + nende ops-importid elavad nüüd server/routers/pages.py-s.
 from .admin_page_ops import get_sorted_images
@@ -46,6 +40,7 @@ from .routers.upload import router as upload_router
 from .routers.reocr import router as reocr_router
 from .routers.pages import router as pages_router
 from .routers.auth import router as auth_router
+from .routers.admin import router as admin_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 from .marginalia_normalize import normalize_marginalia_tags
@@ -76,6 +71,7 @@ app.include_router(upload_router)
 app.include_router(reocr_router)
 app.include_router(pages_router)
 app.include_router(auth_router)
+app.include_router(admin_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -103,139 +99,6 @@ from .deps import optional_user as _get_optional_user
 # viewer-token, shareable, download, SEO meta ja collections ligipääsukontrollis.
 from .work_meta import load_work_metadata as _load_work_metadata
 from .work_meta import read_work_meta_direct_sync as _read_work_meta_direct_sync
-
-# =========================================================
-# ADMIN JA HALDUS (POST)
-# =========================================================
-
-@app.post("/admin/registrations")
-async def admin_registrations(user=Depends(require_role("admin"))):
-    return {"status": "success", "registrations": load_pending_registrations()["registrations"]}
-
-@app.post("/admin/registrations/approve")
-async def approve_registration(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    reg = get_registration_by_id(data.get('registration_id'))
-    if not reg or reg["status"] != "pending": raise HTTPException(status_code=400, detail="Vigane taotlus")
-    update_registration_status(reg["id"], "approved", user["username"])
-    token_data = create_invite_token(reg["email"], reg["name"], user["username"], username=reg.get("username"))
-    return {
-        "status": "success",
-        "invite_token": token_data['token'],
-        "invite_url": f"/set-password?token={token_data['token']}",
-        "expires_at": token_data['expires_at'],
-        "email": token_data['email'],
-        "username": token_data['username'],
-        "name": token_data['name'],
-    }
-
-@app.post("/admin/registrations/reject")
-async def reject_registration(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    reg = update_registration_status(data.get('registration_id'), "rejected", user["username"])
-    if not reg: raise HTTPException(status_code=400, detail="Vigane taotlus")
-    return {"status": "success"}
-
-@app.post("/admin/users")
-async def admin_users(user=Depends(require_role("admin"))):
-    return {"status": "success", "users": get_all_users()}
-
-@app.post("/admin/users/update-role")
-async def admin_update_role(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    success, message = update_user_role(data.get('username'), data.get('new_role'), user)
-    if not success: raise HTTPException(status_code=400, detail=message)
-    return {"status": "success"}
-
-@app.post("/admin/users/delete")
-async def admin_delete_user(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    success, message = delete_user(data.get('username'), user)
-    if not success: raise HTTPException(status_code=400, detail=message)
-    return {"status": "success"}
-
-@app.post("/admin/trash")
-async def admin_trash(user=Depends(require_role("admin"))):
-    return {"status": "success", "items": list_deleted_works()}
-
-@app.post("/admin/trash/{work_id}/restore")
-async def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
-    res = restore_deleted_work(work_id, username=user['username'])
-    if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
-    return {"status": "success", "title": res.get('title')}
-
-@app.get("/admin/work/{work_id}/metadata")
-async def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
-    """Tagastab teose _metadata.json sisu."""
-    path = find_directory_by_id(work_id)
-    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    meta_path = os.path.join(path, '_metadata.json')
-    if not os.path.exists(meta_path): raise HTTPException(status_code=404, detail="Metaandmete fail puudub")
-    with open(meta_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-@app.get("/admin/work/{work_id}/trash-pages")
-async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
-    """Loetleb teose kustutatud leheküljed."""
-    path = find_directory_by_id(work_id)
-    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    return {"status": "success", "pages": list_deleted_pages(work_id, os.path.basename(path))}
-
-@app.post("/admin/work/{work_id}/trash-pages/{filename}/restore")
-async def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("admin"))):
-    """Taastab kustutatud lehekülje prügikastist."""
-    path = find_directory_by_id(work_id)
-    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    res = restore_deleted_page(work_id, os.path.basename(path), filename, username=user['username'])
-    if not res['ok']: raise HTTPException(status_code=400, detail=res['error'])
-    return {"status": "success"}
-
-@app.post("/admin/git-failures")
-async def admin_git_failures(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    if data.get('action') == 'clear':
-        clear_git_failures()
-        return {"status": "success"}
-    return {"status": "success", "failures": get_git_failures()}
-
-@app.post("/admin/git-health")
-async def admin_git_health(user=Depends(require_role("admin"))):
-    return {"status": "success", "git_ok": run_git_fsck()["ok"]}
-
-@app.post("/admin/people-refresh")
-async def admin_people_refresh(user=Depends(require_role("admin"))):
-    threading.Thread(target=refresh_all_people_safe, daemon=True).start()
-    return {"status": "success"}
-
-@app.post("/admin/people-refresh-status")
-async def admin_people_refresh_status(user=Depends(require_role("admin"))):
-    return {"status": "success", **get_refresh_status()}
-
-@app.delete("/admin/work/{work_id}")
-async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
-    path = find_directory_by_id(work_id)
-    if not path: raise HTTPException(status_code=404, detail="Teost ei leitud")
-    folder_name = os.path.basename(path)
-    title = work_id
-    try:
-        meta_path = os.path.join(path, '_metadata.json')
-        if os.path.exists(meta_path):
-            with open(meta_path, 'r', encoding='utf-8') as f: title = json.load(f).get('title', work_id)
-    except Exception: pass
-
-    trash_dir = os.path.join(BASE_DIR, '._trash', work_id)
-    os.makedirs(trash_dir, exist_ok=True)
-    for fname in os.listdir(path):
-        if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
-            shutil.move(os.path.join(path, fname), os.path.join(trash_dir, fname))
-    
-    shutil.rmtree(path)
-    delete_work_from_git(folder_name, title, work_id, username=user['username'])
-    delete_work_from_meilisearch(work_id)
-    from .prosopography.ops import update_work_collections
-    update_work_collections(work_id, [])
-    build_work_id_cache()
-    return {"status": "success"}
 
 # =========================================================
 # TOIMETAMINE JA SALVESTAMINE
