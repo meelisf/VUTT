@@ -59,6 +59,10 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   // Kärpe-lohistuse ajutine olek (display-pikslites)
   const [cropDraft, setCropDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  // "Kleepuv" kärpe-suurus: viimati kasutatud kasti normaliseeritud mõõt. Iga uue lehe
+  // avamisel ilmub sama suur tühi kast keskele (asukohta/kallet ei taastata). Ref, mitte
+  // state → ei tekita re-render'it ega püsi üle modaali sulgemise. CircleX nullib selle.
+  const lastCropSizeRef = useRef<{ w: number; h: number } | null>(null);
   // Aktiivne interaktsioon: uue joonistamine, liigutamine, sangaga muutmine või pööramine
   const interaction = useRef<
     | { mode: 'draw' }
@@ -96,9 +100,22 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   // Lähtesta teisendused + mõõda uuesti, kui leht vahetub VÕI pildi sisu muutub
   // (cacheBust uueneb iga mutatsiooni järel — nt kärbe muudab kuvasuhet).
+  // Kohe pärast lähtestust taasta "kleepuv" kärpe-suurus tsentreeritud kastina (kui
+  // mõni varem oli) — samas efektis, et boxAngle jääks garanteeritult 0.
   useEffect(() => {
     resetTransforms();
+    if (lastCropSizeRef.current) {
+      const w = Math.min(Math.max(lastCropSizeRef.current.w, 0.01), 0.98);
+      const h = Math.min(Math.max(lastCropSizeRef.current.h, 0.01), 0.98);
+      setCropRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h });
+    }
   }, [current?.filename, cacheBust, resetTransforms]);
+
+  // Jäta meelde viimati kasutatud kärpe-suurus. onCropUp viskab MIN_DRAG_PX-st väiksemad
+  // kastid ära (cropRect=null) → liiga väikest kogemata kasti ei salvestata.
+  useEffect(() => {
+    if (cropRect) lastCropSizeRef.current = { w: cropRect.w, h: cropRect.h };
+  }, [cropRect]);
 
   // Mõõda lava tegelik suurus (uueneb akna/modaali muutudes ja tabi vahetusel).
   // Korraga on mountitud ainult ühe tabi lava → re-attach [tab] muutudes.
@@ -641,7 +658,7 @@ const PageImageEditorModal: React.FC<Props> = ({
                     <FlipVertical2 size={16} />
                   </button>
                   {cropRect && (
-                    <button onClick={() => { setCropRect(null); setBoxAngle(0); }} title={t('manage.editor.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                    <button onClick={() => { setCropRect(null); setBoxAngle(0); lastCropSizeRef.current = null; }} title={t('manage.editor.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
                       <CircleX size={16} />
                     </button>
                   )}

@@ -192,7 +192,7 @@
       "viewNewHalves": "View new halves",
       "thumbWarning": "Image was changed, but thumbnail update failed.",
       "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
-      "cropReset": "Reset crop",
+      "cropReset": "Remove crop box and forget last used size",
       "dragPanel": "Drag buttons elsewhere",
       "applyError": "Operation failed",
       "close": "Close"

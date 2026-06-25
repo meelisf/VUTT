@@ -34,13 +34,30 @@ Kasutaja lohistab selle õigesse kohta ja vajadusel kallutab.
    `{ w: cropRect.w, h: cropRect.h }` ref'i. Suurus jääb meelde joonistamisel, suuruse
    muutmisel ja rakendamisel.
 
-3. **Taastamine:** olemasolevas reset-effektis (`[current?.filename, cacheBust]`) pärast
-   `resetTransforms()` — kui `lastCropSizeRef.current` on olemas, sea tsentreeritud kast:
-   `{ x: (1 - w) / 2, y: (1 - h) / 2, w, h }`. `boxAngle` jääb 0 (resetTransforms nullis).
-   Esimesel avamisel on ref tühi → kasti ei teki (nagu praegu).
+3. **Taastamine:** olemasolevas reset-effektis (`[current?.filename, cacheBust]`) **kohe
+   pärast** `resetTransforms()` (samas efektis, et `boxAngle` jääks garanteeritult 0 ega
+   ükski vana nurga-olek taastuks):
+   ```
+   resetTransforms()
+   if (lastCropSizeRef.current) {
+     const w = Math.min(Math.max(lastCropSizeRef.current.w, 0.01), 0.98)
+     const h = Math.min(Math.max(lastCropSizeRef.current.h, 0.01), 0.98)
+     setCropRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h })
+   }
+   ```
+   **Clamp [0.01, 0.98]** kaitseb imeliku/vahepealse oleku eest — kast ei saa kogemata
+   üle ääre ulatuda. Esimesel avamisel on ref tühi → kasti ei teki (nagu praegu).
 
 4. **Selge "unustamine":** CircleX (kärpe-reset) nupp nullib lisaks `cropRect`/`boxAngle`-le
    ka `lastCropSizeRef.current = null` → lõpetab kleepumise, järgmine leht algab puhtalt.
+   Tooltip täpsustatakse (`cropReset` locale): "Eemalda kärpekast ja unusta viimati
+   kasutatud suurus" / "Remove crop box and forget last used size".
+
+**Märkus püüdmise semantika kohta:** `useEffect([cropRect])` salvestab iga `cropRect`
+muutuse peale. See on aktsepteeritav, sest joonistamise lõpetamine (`onCropUp`) viskab
+`MIN_DRAG_PX`-st väiksemad kastid ära (`setCropRect(null)`) → liiga väikest kogemata kasti
+ei salvestata. Suuruse muutmisel kirjutab viimane (lõplik) olek vahepealsed üle, seega
+navigeerimise hetkeks hoiab ref õiget lõppsuurust.
 
 ## Mida tahtlikult EI tehta
 
@@ -62,5 +79,7 @@ Kasutaja lohistab selle õigesse kohta ja vajadusel kallutab.
 Manuaalne (väike puhtalt-frontend muudatus, normaliseeritud geomeetria):
 1. Kärbi leht → Rakenda → kontrolli, et järgmisel lehel on sama suur kast keskel, kalleta.
 2. Liigu käsitsi ←/→ → sama suur kast ilmub.
-3. Vajuta CircleX → kast kaob, järgmine leht algab puhtalt.
-4. Esmaavamine: kasti ei ole enne esimest kärbet.
+3. **Muuda kärpekasti suurust lehel A, ÄRA rakenda, liigu käsitsi lehele B → lehel B
+   ilmub viimane suurus keskele** (kinnitab, et suurus jääb meelde ka ilma rakendamiseta).
+4. Vajuta CircleX → kast kaob, järgmine leht algab puhtalt.
+5. Esmaavamine: kasti ei ole enne esimest kärbet.
