@@ -42,13 +42,13 @@ def env(backend_env, monkeypatch):
 
 
 def set_work(monkeypatch, meta):
-    import server.main as main
-    monkeypatch.setattr(main, "_load_work_metadata", lambda work_id: meta if meta.get("work_id") == work_id else None)
+    from server.routers import public as public_router
+    monkeypatch.setattr(public_router, "_load_work_metadata", lambda work_id: meta if meta.get("work_id") == work_id else None)
 
 
 def test_viewer_token_404_unknown_work(env, monkeypatch):
-    import server.main as main
-    monkeypatch.setattr(main, "_load_work_metadata", lambda work_id: None)
+    from server.routers import public as public_router
+    monkeypatch.setattr(public_router, "_load_work_metadata", lambda work_id: None)
 
     r = env["client"].get("/work/unknown/viewer-token")
     assert r.status_code == 404
