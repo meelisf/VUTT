@@ -47,14 +47,14 @@ def test_patch_const_raises_across_all_listed_modules(monkeypatch):
 def test_patch_const_succeeds_when_at_least_one_module_owns(monkeypatch):
     """Konstandi olemasolu vähemalt ühes moodulis → patch õnnestub."""
     from tests.conftest import _patch_config_const
-    from server import main
+    from server.routers import collections as collections_router
 
     _patch_config_const(
         monkeypatch,
         {"COLLECTIONS_FILE": "/tmp/test-collections-xyz"},
-        modules=["server.main"],
+        modules=["server.routers.collections"],
     )
-    assert main.COLLECTIONS_FILE == "/tmp/test-collections-xyz"
+    assert collections_router.COLLECTIONS_FILE == "/tmp/test-collections-xyz"
 
 
 def test_patch_const_patches_all_owners(monkeypatch):
