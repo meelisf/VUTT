@@ -23,6 +23,8 @@ def backend_env(tmp_path, monkeypatch):
     state_dir.mkdir()
     user_settings_dir = state_dir / "user_settings"
     user_settings_dir.mkdir()
+    notifications_dir = state_dir / "notifications"
+    notifications_dir.mkdir()
     uploads_dir = tmp_path / "uploads"
     uploads_dir.mkdir()
 
@@ -108,8 +110,9 @@ def backend_env(tmp_path, monkeypatch):
             "COLLECTIONS_FILE": str(collections_file),
             "ARCHIVES_FILE": str(archives_file),
             "USER_SETTINGS_DIR": str(user_settings_dir),
+            "NOTIFICATIONS_DIR": str(notifications_dir),
         },
-        modules=["server.main"],
+        modules=["server.main", "server.notifications_ops"],
     )
     _patch_config_const(
         monkeypatch,
@@ -140,6 +143,7 @@ def backend_env(tmp_path, monkeypatch):
             "collections_file": collections_file,
             "archives_file": archives_file,
             "user_settings_dir": user_settings_dir,
+            "notifications_dir": notifications_dir,
             "uploads_dir": uploads_dir,
             "upload_ops": upload_ops,
         }
