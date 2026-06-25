@@ -1,8 +1,8 @@
+import json
 import os
 
 from .config import USER_SETTINGS_DIR
 from .utils import atomic_write_json
-import json
 
 
 def get_user_settings_path(username: str) -> str:
