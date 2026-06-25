@@ -149,7 +149,7 @@ export const CollectionDropdown: React.FC<CollectionDropdownProps> = ({ collecti
  */
 export const YearInputPreview: React.FC<{ value: string; existing?: YearFieldsExisting }> = ({ value, existing }) => {
   const { t } = useTranslation(['workspace', 'common']);
-  const trimmed = (value ?? '').trim();
+  const trimmed = String(value ?? '').trim();  // value võib olla number (resume) — String() väldib crashi
   if (!trimmed) return null;  // tühi → vaikne
 
   // Tuletame sama loogikaga mis salvestus (reegel 4: säilitatud year arvestab existing-it)
