@@ -96,10 +96,9 @@ def backend_env(tmp_path, monkeypatch):
     # kõigis asjakohastes moodulites ühe helperiga JA nõuab, et vähemalt üks
     # moodul konstandi omaks (turvavõrk vaikse testi-katkemise vastu).
     #
-    # NB: praegusel hetkel on reaalne omanik ``server.main`` (+ UPLOADS_DIR-i
-    # jaoks ``server.upload_ops``) — need read on teadlik skafold: kui mõni faas
-    # konstandi routerisse tõstab, lisatakse vastav moodul siia loetellu (main
-    # jääb samuti, sest jätab re-eksporti kuni kõik viited uuenevad).
+    # NB: konstandi routerisse tõstmisel lisatakse vastav moodul siia loetellu.
+    # Näiteks Faas 2 tõstab upload-endpointid ``server.routers.upload`` alla,
+    # seega UPLOADS_DIR patchitakse nii ops-moodulis kui routeris.
     # ``server.work_meta`` pole siin, sest see impordib ainult BASE_DIR (mitte
     # ühtegi neist konstantidest) — tõstaksime selle siia alles siis, kui work_meta
     # hakkaks mõnda neist importima.
@@ -117,7 +116,7 @@ def backend_env(tmp_path, monkeypatch):
     _patch_config_const(
         monkeypatch,
         {"UPLOADS_DIR": str(uploads_dir)},
-        modules=["server.main", "server.upload_ops"],
+        modules=["server.main", "server.upload_ops", "server.routers.upload"],
     )
 
     upload_ops = importlib.import_module("server.upload_ops")
