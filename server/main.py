@@ -30,6 +30,8 @@ from .registration import (
     update_registration_status, create_invite_token, validate_invite_token,
     create_user_from_invite, suggest_username_for_email
 )
+# Backward-compat re-eksport Faas 2 jaoks: upload/re-OCR endpointid elavad
+# routerites, aga vanad testid/skriptid võivad neid nimesid veel main.py-st importida.
 from .upload_ops import (
     sanitize_slug, create_upload, update_upload_meta,
     list_uploads, get_upload, mark_page_deleted, cancel_upload,
@@ -57,6 +59,8 @@ from .admin_page_ops import (
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
 from .routers.notifications import router as notifications_router
+from .routers.upload import router as upload_router
+from .routers.reocr import router as reocr_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 from .marginalia_normalize import normalize_marginalia_tags
@@ -83,6 +87,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="VUTT API", version="1.0.0", lifespan=lifespan)
 app.include_router(prosopography_router, prefix="/prosopography")
 app.include_router(notifications_router)
+app.include_router(upload_router)
+app.include_router(reocr_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -1027,226 +1033,6 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
         )
     _invalidate_all_caches()
     return {"status": "success"}
-
-# =========================================================
-# UPLOAD JA OCR (GET status, POST files/import, DELETE cancel)
-# =========================================================
-
-@app.get("/admin/uploads")
-async def admin_uploads(user=Depends(require_role("admin"))):
-    if not UPLOAD_ENABLED: raise HTTPException(status_code=503)
-    return {"status": "success", "uploads": list_uploads()}
-
-@app.post("/admin/upload/create")
-async def admin_upload_create(request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    # Saniteeri slug alati (ka kliendi antud) — väldib path traversal'i import_as_work-is.
-    # sanitize_slug on idempotentne, seega juba korrektne slug ei muutu.
-    slug = sanitize_slug(data.get('slug') or data.get('title', ''))
-    data['slug'] = slug
-    return {"status": "success", "upload": create_upload(data)}
-
-@app.get("/admin/upload/{upload_id}/status")
-def admin_upload_status(upload_id: str, user=Depends(require_role("admin"))):
-    # SÜNKROONNE def (mitte async) — FastAPI jooksutab selle threadpoolis, et
-    # poll_and_sync_thumbs'i blokeeriv SFTP/SSH EI külmutaks event-loopi (ja
-    # seeläbi kogu saiti), kui OCR-server on kättesaamatu (2026-06-13 outage).
-    # poll_and_sync_thumbs tagastab oma "status" välja (upload olek: pending/processing/done jne)
-    # mis kirjutab üle siinsest "success" — seega tagastatav "status" on upload olek, mitte HTTP wrapper
-    return poll_and_sync_thumbs(upload_id)
-
-@app.get("/admin/upload/{upload_id}/thumb/{page_num}")
-async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require_role("admin"))):
-    if not _valid_upload_id(upload_id): raise HTTPException(status_code=400, detail="Vigane upload_id")
-    path = os.path.join(UPLOADS_DIR, upload_id, 'thumbs', f"{page_num:03d}.jpg")
-    if not os.path.isfile(path): raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/jpeg")
-
-@app.post("/admin/upload/{upload_id}/files")
-async def admin_upload_files(upload_id: str, request: Request, user=Depends(require_role("admin"))):
-    if not _valid_upload_id(upload_id): raise HTTPException(status_code=400, detail="Vigane upload_id")
-    x_pg, x_total = int(request.headers.get('X-Page-Number', '0')), int(request.headers.get('X-Total-Pages', '0'))
-    tmp_path = f"/tmp/vutt-upload-{upload_id}-pg{x_pg}" if x_pg > 0 else f"/tmp/vutt-upload-{upload_id}"
-    try:
-        with open(tmp_path, 'wb') as f:
-            async for chunk in request.stream():
-                f.write(chunk)
-        import asyncio
-        loop = asyncio.get_running_loop()
-        if x_pg > 0:
-            pages = await loop.run_in_executor(None, add_image_page, upload_id, tmp_path, x_pg, x_total)
-        else:
-            pages = await loop.run_in_executor(None, save_and_transfer_to_ocr, upload_id, tmp_path)
-        return {"status": "accepted", "upload_id": upload_id, "expected_pages": pages}
-    except ValueError as e:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-        logger.error(f"Üleslaadimise viga ({upload_id}): {e}")
-        raise HTTPException(status_code=500, detail="Serveri viga faili töötlemisel")
-
-@app.post("/admin/upload/{upload_id}/import")
-async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
-    try:
-        res = import_as_work(upload_id, username=user['username'])
-        build_work_id_cache()
-        return {"status": "success", **res}
-    except ValueError as e: raise HTTPException(status_code=400, detail=str(e))
-
-@app.post("/admin/upload/{upload_id}/replace-work/{work_id}")
-async def admin_upload_replace_work(
-    upload_id: str,
-    work_id: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-    user=Depends(require_role("admin")),
-):
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    metadata_updates = (data.get("metadata_updates") or {}) if isinstance(data, dict) else {}
-    res = await replace_work_content(
-        upload_id,
-        work_id,
-        metadata_updates,
-        user['username'],
-        background_tasks,
-    )
-    return {"status": "success", **res}
-
-@app.get("/admin/upload/{upload_id}/meta")
-async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin"))):
-    state = get_upload(upload_id)
-    if not state:
-        raise HTTPException(status_code=404, detail="Upload ei leitud")
-    return {"status": "success", "meta": state.get("meta", {})}
-
-@app.patch("/admin/upload/{upload_id}/meta")
-async def admin_upload_update_meta(upload_id: str, request: Request, user=Depends(require_role("admin"))):
-    data = await get_json_data(request)
-    if not update_upload_meta(upload_id, data):
-        raise HTTPException(status_code=404, detail="Upload ei leitud")
-    return {"status": "success"}
-
-@app.delete("/admin/upload/{upload_id}")
-async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
-    if cancel_upload(upload_id): return {"status": "success"}
-    raise HTTPException(status_code=500)
-
-# =========================================================
-# RE-OCR — olemasoleva lehekülje uuesti transkribeerimine
-# =========================================================
-
-@app.post("/admin/work/{work_id}/reocr-page")
-async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_role("admin"))):
-    """Alustab lehekülje pildi re-OCR tööd. Tagastab job_id pollimiseks."""
-    if get_active_reocr_count() >= REOCR_MAX_CONCURRENT:
-        raise HTTPException(status_code=429, detail=f"Liiga palju korraga ({REOCR_MAX_CONCURRENT} max). Proovi hetke pärast uuesti.")
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teos ei leitud")
-    slug = os.path.basename(path)
-    data = await get_json_data(request)
-    page_filename = data.get("page_filename")
-    if not page_filename:
-        raise HTTPException(status_code=400, detail="page_filename puudub")
-    img_path = os.path.join(path, page_filename)
-    if not os.path.isfile(img_path):
-        raise HTTPException(status_code=404, detail="Pilti ei leitud")
-    page_number = data.get("page_number")
-    meta_path = os.path.join(path, '_metadata.json')
-    ocr_model = 'print'
-    if os.path.isfile(meta_path):
-        with open(meta_path, 'r', encoding='utf-8') as _mf:
-            _meta = json.load(_mf)
-        if isinstance(_meta.get('type'), dict) and _meta['type'].get('id') == 'Q87167':
-            ocr_model = 'hand'
-    tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
-    shutil.copy2(img_path, tmp_path)
-    job_id = start_reocr_job(work_id, slug, tmp_path, page_filename=page_filename, page_number=page_number, username=user['username'], material_type=ocr_model)
-    return {"status": "accepted", "job_id": job_id}
-
-@app.get("/admin/reocr/{job_id}/status")
-async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
-    """Küsib re-OCR töö staatust. Küsida korduvalt kuni done/error."""
-    return {"status": "success", **poll_reocr_job(job_id)}
-
-@app.get("/admin/reocr/jobs")
-async def admin_reocr_jobs(user=Depends(require_role("admin"))):
-    """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
-    return {"status": "success", "jobs": list_reocr_jobs()}
-
-@app.get("/admin/reocr/log")
-async def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require_role("admin"))):
-    """Tagastab re-OCR ajalogi (püsiv, uuemad ees)."""
-    return {"status": "success", **get_reocr_log(offset, limit)}
-
-@app.get("/admin/work/{work_id}/page-ocr")
-async def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
-    """Tagastab lehekülje .ocr faili sisu, kui see eksisteerib."""
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teos ei leitud")
-    stem = os.path.splitext(os.path.basename(filename))[0]
-    ocr_path = os.path.join(path, stem + ".ocr")
-    if not os.path.isfile(ocr_path):
-        raise HTTPException(status_code=404, detail=".ocr fail puudub")
-    with open(ocr_path, "r", encoding="utf-8") as f:
-        text = f.read()
-    return {"status": "success", "text": text}
-
-@app.delete("/admin/work/{work_id}/page-ocr")
-async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
-    """Kustutab lehekülje .ocr faili (tulemus rakendatud või tagasi lükatud)."""
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teos ei leitud")
-    stem = os.path.splitext(os.path.basename(filename))[0]
-    ocr_path = os.path.join(path, stem + ".ocr")
-    if os.path.isfile(ocr_path):
-        os.remove(ocr_path)
-    return {"status": "success"}
-
-
-@app.post("/admin/work/{work_id}/reocr-batch")
-async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require_role("admin"))):
-    """Alustab mitme lehe batch re-OCR tööd. Tagastab job_id."""
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teost ei leitud")
-    if get_active_batch_for_work(work_id):
-        raise HTTPException(status_code=409, detail="Sellel teosel käib juba batch re-OCR.")
-    slug = os.path.basename(path)
-    data = await get_json_data(request)
-    page_filenames = data.get("page_filenames") or []
-    if not isinstance(page_filenames, list) or not page_filenames:
-        raise HTTPException(status_code=400, detail="page_filenames puudub või tühi")
-    material_type = data.get("material_type") if data.get("material_type") in ("print", "hand") else "print"
-    pages = []
-    for fn in page_filenames:
-        # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
-        if not isinstance(fn, str) or fn != os.path.basename(fn):
-            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
-        if not os.path.isfile(os.path.join(path, fn)):
-            raise HTTPException(status_code=400, detail=f"Pilti ei leitud: {fn}")
-        pages.append((fn, None))
-    job_id = start_reocr_batch(work_id, slug, path, pages,
-                               material_type=material_type, username=user['username'])
-    return {"status": "accepted", "job_id": job_id}
-
-
-@app.get("/admin/work/{work_id}/reocr-status")
-async def admin_reocr_status_for_work(work_id: str, user=Depends(require_role("admin"))):
-    """Teose re-OCR koondstaatus manage-lehele (active/ocr_ready/errors/progress)."""
-    path = find_directory_by_id(work_id)
-    if not path:
-        raise HTTPException(status_code=404, detail="Teost ei leitud")
-    return {"status": "success", **build_reocr_status(work_id, path)}
-
 
 # =========================================================
 # AVALIKUD ANDMED JA SEO

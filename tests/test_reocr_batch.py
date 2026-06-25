@@ -186,11 +186,11 @@ def test_build_reocr_status_agregeerib(tmp_path, monkeypatch):
 def test_reocr_batch_validatsioon(backend_env, client, login, monkeypatch, tmp_path):
     """404 tundmatu teose korral, 400 tühja listi ja puuduva faili korral."""
     from server import reocr_ops
-    main = backend_env["main"]
+    from server.routers import reocr as reocr_router
     work = tmp_path / "1700-teos"
     work.mkdir()
     (work / "a.jpg").write_bytes(b"IMG")
-    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    monkeypatch.setattr(reocr_router, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
     # Tühjendame globaalse batch-registri, et varasemad testid ei segaks
     reocr_ops._reocr_batch_jobs.clear()
 
@@ -212,13 +212,13 @@ def test_reocr_batch_validatsioon(backend_env, client, login, monkeypatch, tmp_p
 
 def test_reocr_batch_aktiivne_409(backend_env, client, login, monkeypatch, tmp_path):
     """409 kui sellel teosel käib juba aktiivne batch."""
-    main = backend_env["main"]
+    from server.routers import reocr as reocr_router
     work = tmp_path / "1700-teos"
     work.mkdir()
     (work / "a.jpg").write_bytes(b"IMG")
-    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
-    # main.py kasutab otseimporti, seega patch main-moodulil
-    monkeypatch.setattr(main, "get_active_batch_for_work", lambda wid: "jid-123")
+    monkeypatch.setattr(reocr_router, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    # router kasutab otseimporti, seega patch router-moodulil
+    monkeypatch.setattr(reocr_router, "get_active_batch_for_work", lambda wid: "jid-123")
 
     token = login("admin", "adminpass")
     h = {"Authorization": f"Bearer {token}"}
@@ -234,10 +234,10 @@ def test_reocr_batch_auth_nouab_admini(backend_env, client):
 
 def test_reocr_status_kuju(backend_env, client, login, monkeypatch, tmp_path):
     """GET reocr-status tagastab oodatud väljad: active, ocr_ready, errors, progress."""
-    main = backend_env["main"]
+    from server.routers import reocr as reocr_router
     work = tmp_path / "1700-teos"
     work.mkdir()
-    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    monkeypatch.setattr(reocr_router, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
 
     token = login("admin", "adminpass")
     r = client.get("/admin/work/w1/reocr-status", headers={"Authorization": f"Bearer {token}"})
@@ -248,8 +248,8 @@ def test_reocr_status_kuju(backend_env, client, login, monkeypatch, tmp_path):
 
 def test_reocr_status_tundmatu_teos_404(backend_env, client, login, monkeypatch):
     """GET reocr-status tundmatu teose korral → 404."""
-    main = backend_env["main"]
-    monkeypatch.setattr(main, "find_directory_by_id", lambda w: None)
+    from server.routers import reocr as reocr_router
+    monkeypatch.setattr(reocr_router, "find_directory_by_id", lambda w: None)
 
     token = login("admin", "adminpass")
     r = client.get("/admin/work/zzz/reocr-status", headers={"Authorization": f"Bearer {token}"})
@@ -264,11 +264,12 @@ def test_reocr_status_auth_nouab_admini(backend_env, client):
 
 def test_reocr_batch_lykkab_traversal_tagasi(backend_env, client, login, monkeypatch, tmp_path):
     """Path traversal failinimed tagasi lükatud."""
-    from server import reocr_ops, main
+    from server import reocr_ops
+    from server.routers import reocr as reocr_router
     work = tmp_path / "1700-teos"
     work.mkdir()
     (work / "a.jpg").write_bytes(b"IMG")
-    monkeypatch.setattr(main, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
+    monkeypatch.setattr(reocr_router, "find_directory_by_id", lambda w: str(work) if w == "w1" else None)
     reocr_ops._reocr_batch_jobs.clear()
 
     token = login("admin", "adminpass")

@@ -58,19 +58,21 @@ def test_patch_const_succeeds_when_at_least_one_module_owns(monkeypatch):
 
 
 def test_patch_const_patches_all_owners(monkeypatch):
-    """Kui konstant on mitmes moodulis (nt UPLOADS_DIR main-is + upload_ops-is),
-    patchitakse mõlemad."""
+    """Kui konstant on mitmes moodulis (nt UPLOADS_DIR main-is + upload_ops-is + upload-routeris),
+    patchitakse kõik."""
     from tests.conftest import _patch_config_const
     from server import main
     import server.upload_ops as upload_ops
+    import server.routers.upload as upload_router
 
     _patch_config_const(
         monkeypatch,
         {"UPLOADS_DIR": "/tmp/test-uploads-xyz"},
-        modules=["server.main", "server.upload_ops"],
+        modules=["server.main", "server.upload_ops", "server.routers.upload"],
     )
     assert main.UPLOADS_DIR == "/tmp/test-uploads-xyz"
     assert upload_ops.UPLOADS_DIR == "/tmp/test-uploads-xyz"
+    assert upload_router.UPLOADS_DIR == "/tmp/test-uploads-xyz"
 
 
 def test_patch_const_ignores_non_owners_without_creating_phantoms(monkeypatch):
@@ -82,7 +84,7 @@ def test_patch_const_ignores_non_owners_without_creating_phantoms(monkeypatch):
     _patch_config_const(
         monkeypatch,
         {"UPLOADS_DIR": "/tmp/test-uploads-xyz"},
-        modules=["server.main", "server.work_meta"],  # work_meta ei oma UPLOADS_DIR-i
+        modules=["server.upload_ops", "server.work_meta"],  # work_meta ei oma UPLOADS_DIR-i
     )
     # work_meta peab jääma puutumata: ei UPLOADS_DIR-i atribuuti ega muudatust
     assert not hasattr(work_meta, "UPLOADS_DIR"), (
