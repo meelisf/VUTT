@@ -38,9 +38,9 @@ from .cache import (
     get_cached_archives,
 )
 from .trash_ops import list_deleted_works, restore_deleted_work, list_deleted_pages, restore_deleted_page
-# get_sorted_images on jätkuvalt kasutusel download endpointides; _validate_base_names
-# jääb Faas 3 ajal backward-compat re-ekspordiks testidele/importijatele.
-from .admin_page_ops import get_sorted_images, _validate_base_names
+# get_sorted_images on jätkuvalt kasutusel download endpointides; lehekülgede
+# halduse endpointid + nende ops-importid elavad nüüd server/routers/pages.py-s.
+from .admin_page_ops import get_sorted_images
 from .prosopography.router import router as prosopography_router
 from .routers.notifications import router as notifications_router
 from .routers.upload import router as upload_router
