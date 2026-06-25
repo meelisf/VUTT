@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse, Response
 from starlette.concurrency import run_in_threadpool
 
-from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, USER_SETTINGS_DIR, get_logger, ARCHIVES_FILE
+from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, COLLECTIONS_FILE, get_logger, ARCHIVES_FILE
 from .utils import build_work_id_cache, find_directory_by_id, metadata_lock, generate_nanoid, atomic_write_json
 from .access_ops import can_read_work, can_write_work, is_work_public
 
@@ -41,6 +41,7 @@ from .routers.reocr import router as reocr_router
 from .routers.pages import router as pages_router
 from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
+from .routers.user_settings import router as user_settings_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 from .marginalia_normalize import normalize_marginalia_tags
@@ -72,6 +73,7 @@ app.include_router(reocr_router)
 app.include_router(pages_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+app.include_router(user_settings_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -854,67 +856,6 @@ async def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=D
     if qcodes:
         background_tasks.add_task(enrich_entity_labels_async_qcodes, qcodes)
     return {"queued": len(qcodes)}
-
-# =========================================================
-# KASUTAJA SEADED (state/user_settings/{username}.json)
-# =========================================================
-
-def _get_user_settings_path(username: str) -> str:
-    """Tagastab kasutaja seadete faili tee."""
-    return os.path.join(USER_SETTINGS_DIR, f"{username}.json")
-
-def _load_user_settings(username: str) -> dict:
-    """Laeb kasutaja seaded failist."""
-    path = _get_user_settings_path(username)
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-def _save_user_settings(username: str, settings: dict):
-    """Salvestab kasutaja seaded faili."""
-    os.makedirs(USER_SETTINGS_DIR, exist_ok=True)
-    path = _get_user_settings_path(username)
-    atomic_write_json(path, settings)
-
-@app.get("/user-settings")
-async def get_user_settings(request: Request, user=Depends(get_user)):
-    """Tagastab kasutaja kõik seaded."""
-    settings = _load_user_settings(user['username'])
-    return {"status": "success", "settings": settings}
-
-@app.post("/user-settings")
-async def save_user_settings(request: Request, user=Depends(get_user)):
-    """Salvestab kasutaja seaded (keel, vaiketab, erimärgid jne)."""
-    data = await get_json_data(request)
-    settings = _load_user_settings(user['username'])
-    # Uuenda ainult lubatud väljad
-    allowed_fields = ['language', 'default_tab', 'characters']
-    for field in allowed_fields:
-        if field in data:
-            settings[field] = data[field]
-    _save_user_settings(user['username'], settings)
-    return {"status": "success", "settings": settings}
-
-@app.get("/user-chars")
-async def get_user_chars(request: Request, user=Depends(get_user)):
-    """Tagastab kasutaja kohandatud erimärgid."""
-    settings = _load_user_settings(user['username'])
-    chars = settings.get('characters', [])
-    is_custom = len(chars) > 0
-    return {"status": "success", "characters": chars, "is_custom": is_custom}
-
-@app.post("/user-chars")
-async def save_user_chars(request: Request, user=Depends(get_user)):
-    """Salvestab kasutaja kohandatud erimärgid."""
-    data = await get_json_data(request)
-    settings = _load_user_settings(user['username'])
-    if data.get('reset'):
-        settings.pop('characters', None)
-    else:
-        settings['characters'] = data.get('characters', [])
-    _save_user_settings(user['username'], settings)
-    return {"status": "success", "reset": bool(data.get('reset'))}
 
 @app.get("/download/{work_id}")
 async def download_work(request: Request, work_id: str, content: str = "both"):
