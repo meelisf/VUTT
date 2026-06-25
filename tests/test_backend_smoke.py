@@ -341,16 +341,15 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
     POST /save peab käivitama update_page_person_mentions background task-i
     kui meta_content sisaldab work_id välja.
     """
-    import server.main as main_mod
+    from server.routers import editing as editing_router
 
     # Mock sõltuvused mis vajavad git/filesystem/meilisearch
-    monkeypatch.setattr(main_mod, "save_with_git", lambda *a, **kw: {"commit_hash": "abc12345"})
-    monkeypatch.setattr(main_mod, "sync_work_to_meilisearch_async", lambda *a: None)
-    monkeypatch.setattr(main_mod, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(editing_router, "save_with_git", lambda *a, **kw: {"commit_hash": "abc12345"})
+    monkeypatch.setattr(editing_router, "sync_work_to_meilisearch_async", lambda *a: None)
+    monkeypatch.setattr(editing_router, "BASE_DIR", str(tmp_path))
 
     calls = []
-    # update_page_person_mentions imporditakse main.py-sse Task 4 implementatsioonis
-    monkeypatch.setattr(main_mod, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir)))
+    monkeypatch.setattr(editing_router, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir)))
 
     token = login("editor", "editorpass")
     response = client.post("/save", headers={"Authorization": f"Bearer {token}"}, json={
