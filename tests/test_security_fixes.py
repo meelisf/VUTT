@@ -62,26 +62,24 @@ def test_meta_work_rate_limit_returns_retry_after(backend_env, monkeypatch):
 
 def test_sitemap_uses_snapshot_not_live_cache(monkeypatch):
     """sitemap_xml endpoint kasutab dict snapshot'i, mitte otseviita WORK_ID_CACHE-le."""
-    import importlib
-    import server.main as main_mod
+    from server.routers import public as public_router
     import server.utils as utils_mod
 
     captured_args = []
 
-    original = main_mod.build_sitemap_xml
+    original = public_router.build_sitemap_xml
 
     def capturing_build(cache, *args, **kwargs):
         captured_args.append(cache)
         return original(cache, *args, **kwargs)
 
-    monkeypatch.setattr(main_mod, "build_sitemap_xml", capturing_build)
-    monkeypatch.setattr(main_mod, "_sitemap_cache", {"xml": None, "expires": 0.0})
+    monkeypatch.setattr(public_router, "build_sitemap_xml", capturing_build)
+    monkeypatch.setattr(public_router, "_sitemap_cache", {"xml": None, "expires": 0.0})
 
-    original_cache = utils_mod.WORK_ID_CACHE
     monkeypatch.setattr(utils_mod, "WORK_ID_CACHE", {"w1": "/data/w1", "w2": "/data/w2"})
 
     import asyncio
-    asyncio.run(main_mod.sitemap_xml())
+    asyncio.run(public_router.sitemap_xml())
 
     assert captured_args, "build_sitemap_xml ei kutsutud"
     passed_cache = captured_args[0]
