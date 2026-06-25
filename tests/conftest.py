@@ -80,6 +80,7 @@ def backend_env(tmp_path, monkeypatch):
     auth = importlib.import_module("server.auth")
     registration = importlib.import_module("server.registration")
     main = importlib.import_module("server.main")
+    cache_invalidation = importlib.import_module("server.cache_invalidation")
     rate_limit = importlib.import_module("server.rate_limit")
 
     monkeypatch.setattr(auth, "USERS_FILE", str(users_file))
@@ -102,15 +103,19 @@ def backend_env(tmp_path, monkeypatch):
     # ``server.work_meta`` pole siin, sest see impordib ainult BASE_DIR (mitte
     # ühtegi neist konstantidest) — tõstaksime selle siia alles siis, kui work_meta
     # hakkaks mõnda neist importima.
-    monkeypatch.setattr(main, "invalidate_cache", lambda: None)
+    monkeypatch.setattr(cache_invalidation, "invalidate_cache", lambda: None)
     _patch_config_const(
         monkeypatch,
         {
             "COLLECTIONS_FILE": str(collections_file),
             "ARCHIVES_FILE": str(archives_file),
-            "NOTIFICATIONS_DIR": str(notifications_dir),
         },
-        modules=["server.main", "server.notifications_ops"],
+        modules=["server.routers.collections"],
+    )
+    _patch_config_const(
+        monkeypatch,
+        {"NOTIFICATIONS_DIR": str(notifications_dir)},
+        modules=["server.notifications_ops"],
     )
     _patch_config_const(
         monkeypatch,

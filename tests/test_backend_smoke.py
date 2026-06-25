@@ -576,8 +576,8 @@ def test_update_archive_not_found_returns_404(client, login, backend_env):
 
 
 def test_delete_archive_removes_from_file(client, login, backend_env, monkeypatch):
-    import server.main as main_mod
-    monkeypatch.setattr(main_mod, "_find_works_with_archive", lambda _: [])
+    from server.routers import collections as collections_router
+    monkeypatch.setattr(collections_router, "_find_works_with_archive", lambda _: [])
     token = login("admin", "adminpass")
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -589,9 +589,9 @@ def test_delete_archive_removes_from_file(client, login, backend_env, monkeypatc
 
 
 def test_delete_archive_in_use_returns_409(client, login, backend_env, monkeypatch):
-    import server.main as main_mod
+    from server.routers import collections as collections_router
     monkeypatch.setattr(
-        main_mod, "_find_works_with_archive",
+        collections_router, "_find_works_with_archive",
         lambda _: [("/data/teos1/_metadata.json", {"title": "Teos 1"})]
     )
     token = login("admin", "adminpass")
@@ -604,9 +604,9 @@ def test_delete_archive_in_use_returns_409(client, login, backend_env, monkeypat
 
 
 def test_delete_archive_force_removes_despite_usage(client, login, backend_env, monkeypatch):
-    import server.main as main_mod
+    from server.routers import collections as collections_router
     monkeypatch.setattr(
-        main_mod, "_find_works_with_archive",
+        collections_router, "_find_works_with_archive",
         lambda _: [("/data/teos1/_metadata.json", {"title": "Teos 1"})]
     )
     token = login("admin", "adminpass")
