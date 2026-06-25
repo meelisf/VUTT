@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, sync_work_to_meilisearch_async, _ensure_filterable_attributes, update_collection_is_public_async
 from .metadata_handler import build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
 from .people_ops import process_person_fields_metadata
-from .entity_labels_ops import load_entity_labels, enrich_entity_labels_async, enrich_entity_labels_async_qcodes, refresh_all_entity_labels
+from .entity_labels_ops import enrich_entity_labels_async, enrich_entity_labels_async_qcodes
 from .git_ops import run_git_fsck, save_with_git, get_recent_commits, get_file_git_history, get_file_at_commit, get_commit_diff, get_or_init_repo
 from .auth import delete_user_sessions, load_users, save_users
 from .rate_limit import get_client_ip, check_rate_limit
@@ -27,8 +27,7 @@ from .rate_limit import get_client_ip, check_rate_limit
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
 # server/__init__.py kaudu otse ops-moodulitest, seega main.py ei impordi neid.
 from .cache import (
-    get_cached_collections, get_cached_vocabularies, get_cached_people_aliases,
-    get_cached_people_register, get_cached_suggestions, invalidate_cache,
+    get_cached_collections, get_cached_suggestions, invalidate_cache,
     get_cached_archives,
 )
 # get_sorted_images on jätkuvalt kasutusel download endpointides; lehekülgede
@@ -42,6 +41,7 @@ from .routers.pages import router as pages_router
 from .routers.auth import router as auth_router
 from .routers.admin import router as admin_router
 from .routers.user_settings import router as user_settings_router
+from .routers.public_registries import router as public_registries_router
 from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
 from .metadata_ops import save_work_metadata, bulk_update_field, ALLOWED_METADATA_FIELDS
 from .marginalia_normalize import normalize_marginalia_tags
@@ -74,6 +74,7 @@ app.include_router(pages_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(user_settings_router)
+app.include_router(public_registries_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -808,54 +809,6 @@ async def get_viewer_token(work_id: str, request: Request):
     ).hexdigest()
     return {"token": meili_token, "image_exp": image_exp, "image_sig": image_sig}
 
-
-@app.get("/vocabularies")
-async def vocabularies(): return {"status": "success", "vocabularies": get_cached_vocabularies()}
-
-@app.get("/people-aliases")
-async def people_aliases(): return {"status": "success", "aliases": get_cached_people_aliases()}
-
-@app.get("/people-register")
-async def people_register(): return {"status": "success", "people": get_cached_people_register()}
-
-@app.get("/entity-labels")
-async def entity_labels(): return load_entity_labels()
-
-@app.post("/admin/refresh-entity-labels")
-async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
-    """Värskendab kõik labels.json Q-koodid Wikidatast (admin)."""
-    count = refresh_all_entity_labels()
-    return {"updated": count}
-
-@app.post("/admin/enrich-page-tag-labels")
-async def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
-    """Rikastab kõik lehekülje-tagide Q-koodid labels.json-i (retroaktiivselt).
-
-    Skannib kõik lehekülje JSON-failid, kogub Q-koodid page_tags väljalt
-    ja lisab puuduvad labels.json-i taustal.
-    """
-    def collect_page_tag_qcodes():
-        qcodes = set()
-        for entry in os.scandir(BASE_DIR):
-            if not entry.is_dir():
-                continue
-            try:
-                for f in os.scandir(entry.path):
-                    if not f.name.endswith('.json') or f.name == '_metadata.json' or f.name.startswith('_'):
-                        continue
-                    with open(f.path, 'r', encoding='utf-8') as fh:
-                        page = json.load(fh)
-                    for t in page.get('page_tags', []):
-                        if isinstance(t, dict) and isinstance(t.get('id'), str) and t['id'].startswith('Q'):
-                            qcodes.add(t['id'])
-            except Exception:
-                pass
-        return qcodes
-
-    qcodes = collect_page_tag_qcodes()
-    if qcodes:
-        background_tasks.add_task(enrich_entity_labels_async_qcodes, qcodes)
-    return {"queued": len(qcodes)}
 
 @app.get("/download/{work_id}")
 async def download_work(request: Request, work_id: str, content: str = "both"):
