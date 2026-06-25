@@ -63,7 +63,16 @@ def get_notifications_path(username: str) -> str:
 
 
 def load_notifications(username: str) -> list:
-    """Laeb kasutaja teavitused. Tagastab ``[]`` kui faili pole või sisu on vigane."""
+    """Laeb kasutaja teavitused. Tagastab ``[]`` kui faili pole või sisu on vigane.
+
+    NB (teadlik resilience-paranus, mitte puhas tõstmine main.py-st): algne
+    ``_load_notifications`` ei pakkunud ``json.load`` ümber try/except-i —
+    korrumpeerunud teavituste-fail andis käsitlemata erindi → HTTP 500. Siin
+    neelatakse see ja tagastatakse ``[]``: ühe kasutaja katkine teatistefail
+    ei tohi lammutada kogu teavituste funktsionaalsust (GET /notifications,
+    teatiste saatmine). Kaetud testiga
+    ``test_load_notifications_returns_empty_for_corrupt_json``.
+    """
     path = get_notifications_path(username)
     if not os.path.exists(path):
         return []
