@@ -24,7 +24,7 @@ from .routers.public_registries import router as public_registries_router
 from .routers.public import router as public_router
 from .routers.editing import router as editing_router
 from .routers.collections import router as collections_router
-from .prosopography.ops import update_page_person_mentions, rebuild_indices, _load_index
+from .prosopography.ops import rebuild_indices
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
