@@ -17,6 +17,9 @@ from ..registration import (
     validate_invite_token,
 )
 
+# TODO: server/routers/auth.py (HTTP endpointid) ja server/auth.py (auth core)
+# on sarnase nimega. Pärast main.py routeriteks jagamist kaaluda eraldi cleanup'is
+# server/auth.py ümbernimetamist nt auth_ops.py/auth_service.py-ks.
 logger = get_logger(__name__)
 router = APIRouter()
 
