@@ -54,7 +54,7 @@ interface PollResult {
 interface SavedUpload {
   id: string;
   status: string;
-  meta: { title: string; year: string; slug: string; type?: { id: string; label: string; source: string; labels?: Record<string, string> } };
+  meta: { title: string; year: string | number; slug: string; type?: { id: string; label: string; source: string; labels?: Record<string, string> } };
   created_at: string;
   expected_pages: number | null;
   files: FileEntry[];
