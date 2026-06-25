@@ -108,10 +108,14 @@ def backend_env(tmp_path, monkeypatch):
         {
             "COLLECTIONS_FILE": str(collections_file),
             "ARCHIVES_FILE": str(archives_file),
-            "USER_SETTINGS_DIR": str(user_settings_dir),
             "NOTIFICATIONS_DIR": str(notifications_dir),
         },
         modules=["server.main", "server.notifications_ops"],
+    )
+    _patch_config_const(
+        monkeypatch,
+        {"USER_SETTINGS_DIR": str(user_settings_dir)},
+        modules=["server.user_settings_ops"],
     )
     _patch_config_const(
         monkeypatch,
