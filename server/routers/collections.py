@@ -196,7 +196,6 @@ async def admin_collection_users(collection_id: str, user=Depends(require_role("
 @router.post("/admin/collections")
 async def admin_create_collection(request: Request, user=Depends(require_role("admin"))):
     """Loob uue kollektsiooni. Body: {id, name_et, name_en, parent?, color?, is_virtual?}"""
-    import re
     body = await request.json()
     collection_id = body.get("id", "").strip()
     name_et = body.get("name_et", "").strip()
