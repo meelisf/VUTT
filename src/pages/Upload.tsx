@@ -702,7 +702,9 @@ const Upload: React.FC = () => {
   function handleResume(saved: SavedUpload) {
     setUploadId(saved.id);
     setTitle(saved.meta.title);
-    setYear(saved.meta.year);
+    // saved.meta.year võib backendist tulla numbrina, kuigi tüüp ütleb string
+    // — year-olek on alati string, muidu YearInputPreview .trim() crashib
+    setYear(saved.meta.year != null ? String(saved.meta.year) : '');
     setSlug(saved.meta.slug);
     setWorkType(saved.meta.type?.id === 'Q87167' ? TYPE_HAND : TYPE_PRINT);
     setSlugManual(true);
