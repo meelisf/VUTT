@@ -27,8 +27,8 @@ def test_validate_base_names_empty_raises():
 
 # --- Endpoint staatuse-mapping (autenditud, delete_pages mock'itud) ---
 def test_endpoint_success_200(backend_env, client, login, monkeypatch):
-    main = backend_env["main"]
-    monkeypatch.setattr(main, "delete_pages",
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "delete_pages",
                         lambda wid, bn, username: {"status": "success", "deleted": bn, "new_page_count": 0})
     token = login("admin", "adminpass")
     r = client.post("/admin/work/w1/delete-pages", json={"base_names": ["pg1"]},
@@ -38,8 +38,8 @@ def test_endpoint_success_200(backend_env, client, login, monkeypatch):
 
 
 def test_endpoint_conflict_409(backend_env, client, login, monkeypatch):
-    main = backend_env["main"]
-    monkeypatch.setattr(main, "delete_pages", lambda *a, **k: {"status": "conflict", "missing": ["x"]})
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "delete_pages", lambda *a, **k: {"status": "conflict", "missing": ["x"]})
     token = login("admin", "adminpass")
     r = client.post("/admin/work/w1/delete-pages", json={"base_names": ["pg1"]},
                     headers={"Authorization": f"Bearer {token}"})
@@ -47,8 +47,8 @@ def test_endpoint_conflict_409(backend_env, client, login, monkeypatch):
 
 
 def test_endpoint_not_found_404(backend_env, client, login, monkeypatch):
-    main = backend_env["main"]
-    monkeypatch.setattr(main, "delete_pages", lambda *a, **k: {"status": "not_found", "missing": ["x"]})
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "delete_pages", lambda *a, **k: {"status": "not_found", "missing": ["x"]})
     token = login("admin", "adminpass")
     r = client.post("/admin/work/w1/delete-pages", json={"base_names": ["pg1"]},
                     headers={"Authorization": f"Bearer {token}"})

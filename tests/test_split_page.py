@@ -190,8 +190,8 @@ def test_split_endpoint_403_editor(backend_env, login):
 
 
 def test_split_endpoint_404_unknown_work(backend_env, login, monkeypatch):
-    import server.main as main
-    monkeypatch.setattr(main, "split_page", lambda *a, **kw: {"found": False})
+    from server.routers import pages as pages_router
+    monkeypatch.setattr(pages_router, "split_page", lambda *a, **kw: {"found": False})
 
     token = login("admin", "adminpass")
     r = backend_env["client"].post(
@@ -203,12 +203,12 @@ def test_split_endpoint_404_unknown_work(backend_env, login, monkeypatch):
 
 
 def test_split_endpoint_400_invalid_split_x(backend_env, login, monkeypatch):
-    import server.main as main
+    from server.routers import pages as pages_router
 
     def _raise(*a, **kw):
         raise ValueError("split_x peab olema vahemikus [0.05, 0.95]")
 
-    monkeypatch.setattr(main, "split_page", _raise)
+    monkeypatch.setattr(pages_router, "split_page", _raise)
 
     token = login("admin", "adminpass")
     r = backend_env["client"].post(
@@ -220,9 +220,9 @@ def test_split_endpoint_400_invalid_split_x(backend_env, login, monkeypatch):
 
 
 def test_split_endpoint_200_success(backend_env, login, monkeypatch):
-    import server.main as main
+    from server.routers import pages as pages_router
     monkeypatch.setattr(
-        main, "split_page", lambda *a, **kw: {"success": True, "new_page_count": 2}
+        pages_router, "split_page", lambda *a, **kw: {"success": True, "new_page_count": 2}
     )
 
     token = login("admin", "adminpass")
