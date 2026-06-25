@@ -88,14 +88,30 @@ def backend_env(tmp_path, monkeypatch):
     monkeypatch.setattr(registration, "PENDING_REGISTRATIONS_FILE", str(pending_registrations_file))
     monkeypatch.setattr(registration, "INVITE_TOKENS_FILE", str(invite_tokens_file))
 
-    monkeypatch.setattr(main, "COLLECTIONS_FILE", str(collections_file))
-    monkeypatch.setattr(main, "ARCHIVES_FILE", str(archives_file))
-    monkeypatch.setattr(main, "USER_SETTINGS_DIR", str(user_settings_dir))
-    monkeypatch.setattr(main, "UPLOADS_DIR", str(uploads_dir))
+    # Refaktoreering Faas 0 (docs/REFACTOR_main_py_2026-06-25.md): varem patchiti
+    # konstandid (COLLECTIONS_FILE, ARCHIVES_FILE, USER_SETTINGS_DIR, UPLOADS_DIR)
+    # ainult server.main-is ja server.upload_ops-is. Kuna konstandid imporditakse
+    # nüüd ka deps.py-sse ja work_meta.py-sse (ja hilisemates faasides
+    # routers/*.py-sse), patchitakse neid kõigis asjakohastes moodulites ühe
+    # helperiga, et testid ei sõltuks sellest, millises moodulis konstant elab.
+    # invalidate_cache on eraldi (funktsioon, mitte konstant).
     monkeypatch.setattr(main, "invalidate_cache", lambda: None)
+    _patch_config_const(
+        monkeypatch,
+        {
+            "COLLECTIONS_FILE": str(collections_file),
+            "ARCHIVES_FILE": str(archives_file),
+            "USER_SETTINGS_DIR": str(user_settings_dir),
+        },
+        modules=["server.main", "server.work_meta"],
+    )
+    _patch_config_const(
+        monkeypatch,
+        {"UPLOADS_DIR": str(uploads_dir)},
+        modules=["server.main", "server.upload_ops"],
+    )
 
     upload_ops = importlib.import_module("server.upload_ops")
-    monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(uploads_dir))
     upload_ops.upload_progress.clear()
 
     rate_limit._rate_limit_store.clear()
@@ -125,6 +141,21 @@ def backend_env(tmp_path, monkeypatch):
     auth.sessions.clear()
     rate_limit._rate_limit_store.clear()
     upload_ops.upload_progress.clear()
+
+
+def _patch_config_const(monkeypatch, name_value: dict, *, modules):
+    """Patchib konstandi(d) kõikides antud moodulites.
+
+    Refaktoreering Faas 0 infra: ``backend_env`` varem patchis ``COLLECTIONS_FILE``
+    jms ainult ``server.main``-is ja ``server.upload_ops``-is. Kuna konstandid
+    imporditakse nüüd ka ``deps.py``-sse ja ``work_meta.py``-sse (ja hilisemates
+    faasides ``routers/*.py``-sse), tagab see helper, et patch kehtib kõikjal,
+    kuhu konstant imporditakse. ``raising=False`` lubab mooduleid, kus nimet pole.
+    """
+    for mod_name in modules:
+        mod = importlib.import_module(mod_name)
+        for name, value in name_value.items():
+            monkeypatch.setattr(mod, name, value, raising=False)
 
 
 @pytest.fixture

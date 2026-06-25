@@ -87,6 +87,30 @@ def natural_sort_key(name):
     return (key, name)           # viigi-katkestaja: originaalnimi
 
 
+def _validate_base_names(base_names):
+    """Valideerib ja de-dupe'b base_names'id. Viskab ValueError vigase sisendi korral.
+
+    Path-traversal kaitse: keela tee-eraldajad, '..' ja null-byte. TÕELINE kaitse on
+    op-tasemel täpne kuuluvus get_sorted_images() hulgas — see on vaid esimene filter.
+
+    Tõstetud main.py-st Faas 0 refaktoreiringus; loomulik kodu siin (admin lehe
+    operatsioonide juures). main.py jätab backward-compat re-eksporti.
+    """
+    if not base_names or not isinstance(base_names, list):
+        raise ValueError("base_names puudub või pole list")
+    seen = set()
+    out = []
+    for b in base_names:
+        if not isinstance(b, str) or not b:
+            raise ValueError("vigane base_name")
+        if '/' in b or '\\' in b or '..' in b or '\x00' in b:
+            raise ValueError("lubamatu märk base_name'is")
+        if b not in seen:
+            seen.add(b)
+            out.append(b)
+    return out
+
+
 # Piltide maksimaalne dimensioon (px) — kaitse pilllipommide vastu
 MAX_DIMENSION = 10000
 

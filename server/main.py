@@ -52,6 +52,7 @@ from .admin_page_ops import (
     rebalance_sequences, reorder_pages, split_page, transform_page_image,
     detect_and_convert_image, write_new_page, add_pages, work_lock,
     delete_pages,
+    _validate_base_names,
 )
 from .image_server import generate_thumbnail
 from .prosopography.router import router as prosopography_router
@@ -93,80 +94,20 @@ app.add_middleware(
 # AUTENTIMISE DEPENDENCY
 # =========================================================
 
-async def get_user(request: Request, min_role: str = "contributor"):
-    """
-    Ühtne autentimine. Järjekord:
-    1. Authorization: Bearer <token> header (eelistatud)
-    2. query-param 'token' (ainult <img src> tüüpi GET-id, nt upload thumb)
-    """
-    token = None
+# =========================================================
+# AUTENTIMISE DEPENDENCY (ühine — server/deps.py)
+# =========================================================
+# Refaktoreeringu Faas 0: funktsioonid on tõstetud server/deps.py-sse, et
+# luua üks tõene allikas kõigile domeeni-routeritele (vt
+# docs/REFACTOR_main_py_2026-06-25.md). Siin jäetakse backward-compat
+# re-eksport, sest osa main.py endpointe ja teste viitab neile nimedele.
+from .deps import get_user, require_role, get_json_data
+from .deps import optional_user as _get_optional_user
 
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:].strip()
-
-    if not token:
-        token = request.query_params.get("token")
-
-    if not token:
-        raise HTTPException(status_code=401, detail="Autentimine nõutud")
-
-    user, error = require_token({"auth_token": token}, min_role=min_role)
-    if error: raise HTTPException(status_code=401, detail=error["message"])
-    return user
-
-def require_role(role: str):
-    async def role_dependency(request: Request):
-        return await get_user(request, min_role=role)
-    return role_dependency
-
-async def get_json_data(request: Request):
-    return await request.json()
-
-def _load_work_metadata(work_id: str):
-    """Laeb teose _metadata.json. Tagastab None kui ei leitud."""
-    folder = find_directory_by_id(work_id)
-    if not folder:
-        return None
-    meta_path = os.path.join(folder, '_metadata.json')
-    if not os.path.exists(meta_path):
-        return None
-    try:
-        with open(meta_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def _read_work_meta_direct_sync(work_id: str, original_path: str):
-    """Loeb teose _metadata.json blokeeriva I/O-na (kutsutud threadpoolist).
-
-    Lahutatud /get-work-metadata endpointist, et sync faililugemine ei blokeeriks
-    event loopi (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 4).
-    """
-    path = find_directory_by_id(work_id) or os.path.join(BASE_DIR, os.path.basename(original_path or ''))
-    meta_path = os.path.join(path, '_metadata.json')
-    if os.path.exists(meta_path):
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-
-def _get_optional_user(request: Request):
-    """Tagastab autentitud kasutaja või None anonüümsele."""
-    token_str = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-    if not token_str:
-        return None
-    session = get_session(token_str)
-    if not session:
-        return None
-    username = session["user"]["username"]
-    users = load_users()
-    user_data = users.get(username, {})
-    return {**session["user"], "allowed_collections": user_data.get("allowed_collections", [])}
+# Teose _metadata.json lugemine (ühine — server/work_meta.py). Kasutatakse
+# viewer-token, shareable, download, SEO meta ja collections ligipääsukontrollis.
+from .work_meta import load_work_metadata as _load_work_metadata
+from .work_meta import read_work_meta_direct_sync as _read_work_meta_direct_sync
 
 # =========================================================
 # KASUTAJAD JA SESSIOONID
@@ -499,27 +440,6 @@ async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_ro
 
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "new_page_count": new_page_count}
-
-
-def _validate_base_names(base_names):
-    """Valideerib ja de-dupe'b base_names'id. Viskab ValueError vigase sisendi korral.
-
-    Path-traversal kaitse: keela tee-eraldajad, '..' ja null-byte. TÕELINE kaitse on
-    op-tasemel täpne kuuluvus get_sorted_images() hulgas — see on vaid esimene filter.
-    """
-    if not base_names or not isinstance(base_names, list):
-        raise ValueError("base_names puudub või pole list")
-    seen = set()
-    out = []
-    for b in base_names:
-        if not isinstance(b, str) or not b:
-            raise ValueError("vigane base_name")
-        if '/' in b or '\\' in b or '..' in b or '\x00' in b:
-            raise ValueError("lubamatu märk base_name'is")
-        if b not in seen:
-            seen.add(b)
-            out.append(b)
-    return out
 
 
 @app.post("/admin/work/{work_id}/delete-pages")
