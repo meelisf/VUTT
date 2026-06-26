@@ -6,12 +6,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 
 from ..access_ops import can_read_work, can_write_work, is_work_public
 from ..admin_page_ops import get_sorted_images
-from ..cache_invalidation import _sitemap_cache
+from ..cache import get_cached_collections
+from ..cache_invalidation import _sitemap_cache, _home_cache
 from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
-from ..metadata_handler import build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
+from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
 from ..metadata_ops import save_work_metadata
-from ..prosopography.ops import _load_index
+from ..prosopography.ops import _load_index, _load_work_collections, get_person_with_works, get_persons_for_work
 from ..rate_limit import check_rate_limit, get_client_ip
 from ..utils import find_directory_by_id
 from ..work_meta import load_work_metadata as _load_work_metadata
@@ -206,13 +207,37 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
             pass
         raise
 
+@router.get("/meta/home")
+async def home_meta(request: Request):
+    """Bot-koduleht: kollektsioonide kaupa grupeeritud teosed + isikute-hub.
+    Linkgraafi peamine jaotuspunkt (iga avalik teos 1 hüppe kaugusel /-st)."""
+    import time
+    from .. import utils as utils_module
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, '/meta/home')
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
+    now = time.time()
+    if _home_cache["html"] is None or now > _home_cache["expires"]:
+        _home_cache["html"] = build_home_meta_html(
+            dict(utils_module.WORK_ID_CACHE),
+            is_work_public,
+            _load_work_metadata,
+            _load_work_collections(),
+            get_cached_collections() or {},
+        )
+        _home_cache["expires"] = now + 3600
+    return HTMLResponse(content=_home_cache["html"])
+
+
 @router.get("/meta/persons")
 async def persons_meta(request: Request):
     client_ip = get_client_ip(request)
     allowed, retry_after = check_rate_limit(client_ip, '/meta/persons')
     if not allowed:
         return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
-    return HTMLResponse(content=build_persons_meta_html())
+    entries = _load_index().get("entries", [])
+    return HTMLResponse(content=build_persons_meta_html(entries))
 
 
 @router.get("/meta/person/{person_id:path}")
@@ -221,7 +246,21 @@ async def person_meta(person_id: str, request: Request):
     allowed, retry_after = check_rate_limit(client_ip, '/meta/person')
     if not allowed:
         return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
-    html = build_person_meta_html(person_id)
+    # Resolvi isiku AVALIKUD teosed ristviidete jaoks (linkgraaf isik↔teos)
+    work_links = []
+    person = get_person_with_works(person_id)
+    if person:
+        seen = set()
+        for w in person.get("works", []):
+            wid = w.get("work_id")
+            if not wid or wid in seen:
+                continue
+            seen.add(wid)
+            meta = _load_work_metadata(wid)
+            if meta is None or not is_work_public(meta):
+                continue
+            work_links.append({"work_id": wid, "title": meta.get("title") or wid})
+    html = build_person_meta_html(person_id, work_links=work_links)
     if html is None:
         return HTMLResponse(content="<html><body>Isikut ei leitud</body></html>", status_code=404)
     return HTMLResponse(content=html)
@@ -238,7 +277,9 @@ async def work_meta(work_id: str, request: Request):
         user = _get_optional_user(request)
         if not can_read_work(meta, user):
             return HTMLResponse(content="<html><body>Ligipääs keelatud</body></html>", status_code=403)
-    return HTMLResponse(content=build_meta_html(work_id))
+    # Loojate isikukaardid ristviidete jaoks (linkgraaf teos↔isik)
+    creator_persons = get_persons_for_work(work_id)
+    return HTMLResponse(content=build_meta_html(work_id, creator_persons=creator_persons))
 
 @router.get("/sitemap.xml")
 async def sitemap_xml():

@@ -470,6 +470,43 @@ def get_person_with_works(person_id: str) -> Optional[dict]:
     return person
 
 
+_work_to_persons_cache = {"map": None, "expires": 0.0}
+_WORK_TO_PERSONS_TTL = 300  # sekundit
+
+
+def _build_work_to_persons() -> dict:
+    """Pöörab person_to_works → {work_id: [{id, label}]}, label isikuindeksist."""
+    ptw = _load_person_to_works()
+    index = _load_index()
+    labels = {e.get("id"): (e.get("label") or e.get("name") or e.get("id"))
+              for e in index.get("entries", [])}
+    result: dict = {}
+    for person_id, entries in ptw.items():
+        label = labels.get(person_id, person_id)
+        seen_works = set()
+        for entry in entries or []:
+            wid = entry.get("work_id")
+            if not wid or wid in seen_works:
+                continue
+            seen_works.add(wid)
+            result.setdefault(wid, []).append({"id": person_id, "label": label})
+    return result
+
+
+def get_persons_for_work(work_id: str) -> list:
+    """Tagastab teose loojate isikukaardid [{id, label}] (cache'itud pöördindeks).
+
+    Kasutatakse bot-HTML ristviidetes (teos → loojate isikukaardid).
+    """
+    import time
+    now = time.time()
+    cache = _work_to_persons_cache
+    if cache["map"] is None or now > cache["expires"]:
+        cache["map"] = _build_work_to_persons()
+        cache["expires"] = now + _WORK_TO_PERSONS_TTL
+    return cache["map"].get(work_id, [])
+
+
 def create_person(data: dict, username: str) -> dict:
     """
     Loob uue prosopograafia kirje.
