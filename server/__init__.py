@@ -75,6 +75,8 @@ from .upload_ops import (
     save_and_transfer_to_ocr, add_image_page, poll_and_sync_thumbs, get_ocr_status,
     # Etapp 4: import VUTT-i
     import_as_work,
+    # Taustasünk-loop starter (kutsutakse main.py lifespan'ist, mitte import-kõrvalmõjuna)
+    start_upload_sync_loop,
 )
 
 # Re-OCR operatsioonid (olemasoleva lehekülje uuesti transkribeerimine)
