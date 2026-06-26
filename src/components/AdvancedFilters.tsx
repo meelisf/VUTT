@@ -182,9 +182,39 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
     loadVocabularies();
   }, []);
 
-  // TODO: crossLangTypeMap ja crossLangGenreMap on eemaldatavad kui kõigil teostel
-  // on type_ids ja genre_ids indekseeritud. Kontrollida: Meilisearch filter
-  // 'type_ids NOT EXISTS OR type_ids IS EMPTY' — kui 0 tulemust, saab eemaldada.
+  // ─────────────────────────────────────────────────────────────────────
+  // crossLangTypeMap / crossLangGenreMap — MIKS NEID EI EEMALDATA (issue #18)
+  // ─────────────────────────────────────────────────────────────────────
+  // Need on label→label keelteülsed tõlketabelid (nt "Jutlus" → "Sermon"):
+  // teise keele label → praeguse keele label. Need on `resolveFilterValue`
+  // VIIMANE fallback (vt src/utils/filterNormalization.ts) ja aktiveeruvad
+  // AINULT siis, kui selectedValue on LABEL (mitte Q-kood) — st vana või
+  // jagatud URL ?genre=Jutlus avatakse teises keeles UI-s.
+  //
+  // Varasem TODO ("eemaldatav kui kõigil teostel type_ids/genre_ids indekseeritud")
+  // EI OLE kehtiv — see segas kaks sõltumatut asja:
+  //  1. Facetide keeleneutraalsus (genre_ids Q-koodid vs genre_et/genre_en) —
+  //     lahendatud juba migratsiooniga 78bb94c. Sellest sõltub facetite
+  //     duplikaatide vältimine.
+  //  2. CrossLang-map — lahendab label-SISENDI keelt (vanad URL-id). Sellest
+  //     EI sõltu andmete terviklus; type_ids/genre_ids terviklus on asjasse
+  //     puutumatu eeltingimus. (Tegelikult pole see isegi saavutatav: 16 teosel
+  //     on tühi type_ids ja 33-l tühi genre_ids, sest neil puudub tüüp/žanr
+  //     lähtemetaandmetes — reindeks ei aita.)
+  //
+  // Mis juhtuks ilma mapideta (testitud filterNormalization.test.ts järgi):
+  //  - Otsingu õigsus: ikka õige — serveri buildGenreFilter("Jutlus") on juba
+  //    bilinguaalne OR (genre_et="Jutlus" OR genre_en="Jutlus") (vt filterUtils.ts).
+  //  - Pilli highlight: ikka õige — resolveItemValue → labelToId → Q-kood.
+  //  - URL-i normaliseerimine: ikka Q-koodiks — Dashboard write-back genreLabelToId.
+  //  - Aktiivfiltri pilli KUVAMINE: väike kosmeetiline tagasilangus — vana
+  //    teisekeelse URL-i korral näitab pill teise keele labelit (nt "Jutlus"
+  //    inglise UI-s) kuni kasutaja filtrit muudab (self-heal effect enam ei tööta).
+  //
+  // Järeldus: mapid ei tee pahavara (testidega kaetud) ja mõjutavad ainult ühte
+  // väikest kosmeetilist detaili ühes äärejuhtumis. Eemaldamise vaev + väike
+  // regressioon ei kaalu üles. Jätame alles. Kui kõik vanad labelipõhised URL-id
+  // kunagi kaovad, saab uuesti hinnata.
 
   // Keelteülene tõlketabel: teise keele väärtus → praeguse keele väärtus
   const crossLangGenreMap = useMemo(() => {
