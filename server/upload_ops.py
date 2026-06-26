@@ -15,6 +15,7 @@ import subprocess
 import threading
 import unicodedata
 from datetime import datetime
+from typing import Optional
 
 # OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
@@ -443,125 +444,89 @@ def _detect_file_type(path: str) -> str:
     return 'unknown'
 
 
-def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
-    """
-    Edastab faili OCR serverisse SFTP kaudu.
+# =========================================================
+# SFTP TRANSFER (etapp 2): PDF/pildi edastamine OCR serverisse
+#
+# save_and_transfer_to_ocr dispatchib failitüübi järgi kahte haru:
+#   - pilt (JPEG/PNG/TIFF) → _prepare_image_upload + _sftp_transfer_image
+#   - PDF                  → _prepare_pdf_upload  + _sftp_transfer_pdf
+# Ühised helperid (_set_upload_state, _init_upload_progress, _sftp_progress_cb,
+# _ensure_remote_dirs, _close_sftp_and_unlink) jagavad state/progress ja SFTP
+# raamistikku, mida mõlemad taustalõimed kasutavad.
+# =========================================================
 
-    - PDF: pdfinfo → lehekülgede arv → staging kausta → OCR server lõhub ise lahti
-    - JPG/PNG: pannakse otse remote work kausta {slug}_pg_001.jpg nimega
-      (OCR server leiab pildi rglob-iga ja teeb OCR-i ilma PDF-i lahti lõhkumata)
+def _safe_unlink(path: str):
+    """Kustutab faili, ignoreerides vigu (ajutised failid, juba kustutatud)."""
+    try:
+        os.unlink(path)
+    except Exception:
+        pass
 
-    Tagastab expected_pages (int).
-    Tõstab ValueError kui fail on vigane või toetamata formaadis.
+
+def _set_upload_state(upload_id: str, *, status: Optional[str] = None, **extra):
+    """Uuendab state.json välju upload-i luku all (thread-turvaline).
+
+    Kasutatakse taustalõimedes staatusemasina uuendamiseks:
+    edu → status='processing', viga → status='error' + error_message.
+    Kui state on vahepeal kadunud (import/kustutus), ei tee midagi (idempotentne).
     """
     state_lock = _get_upload_lock(upload_id)
     with state_lock:
-        state = _read_state(upload_id)
-    if not state:
-        raise ValueError(f"Upload {upload_id} ei leitud")
+        s = _read_state(upload_id)
+        if not s:
+            return
+        if status is not None:
+            s['status'] = status
+        for key, value in extra.items():
+            s[key] = value
+        _write_state(upload_id, s)
 
-    year = state['meta']['year']
-    slug = state['meta']['slug']
 
-    # --- Tuvasta faili tüüp ---
-    file_type = _detect_file_type(tmp_path)
+def _init_upload_progress(upload_id: str, tmp_path: str) -> int:
+    """Lähtestab mälupõhise SFTP progressi (bytes_total = faili suurus).
+    Tagastab faili suuruse baitides. Kutsutud sünkroonselt enne taustalõime
+    käivitamist."""
+    file_size = os.path.getsize(tmp_path)
+    upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
+    return file_size
 
-    if file_type in ('jpeg', 'png', 'tiff'):
-        # Pildi puhul: laadi otse remote work kausta, OCR server teeb ise üles
-        pages = 1
-        file_size = os.path.getsize(tmp_path)
-        upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
 
-        remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
-        remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
-        remote_img_name = f"{slug}_pg_001.jpg"
+def _sftp_progress_cb(upload_id: str):
+    """Loob SFTP put() callback'i, mis uuendab upload_progress mäludikti."""
+    def _progress(transferred, total):
+        upload_progress[upload_id]['bytes_sent'] = transferred
+        upload_progress[upload_id]['bytes_total'] = total
+    return _progress
 
-        with state_lock:
-            s = _read_state(upload_id)
-            s['expected_pages'] = pages
-            s['status'] = 'uploading'
-            _write_state(upload_id, s)
 
-        def _sftp_transfer_image():
-            sftp = None
-            try:
-                sftp = _sftp_open(upload_id)
-                # Loo staging + work kaustad
-                for remote_dir in (remote_staging_abs, remote_work_abs):
-                    try:
-                        sftp.stat(remote_dir)
-                    except FileNotFoundError:
-                        sftp.mkdir(remote_dir)
-
-                remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
-                remote_dst = f"{remote_work_abs}/{remote_img_name}"
-
-                def _progress(transferred, total):
-                    upload_progress[upload_id]['bytes_sent'] = transferred
-                    upload_progress[upload_id]['bytes_total'] = total
-
-                # Konverteeri JPEG-iks kui PNG või TIFF
-                if file_type in ('png', 'tiff'):
-                    from PIL import Image
-                    conv_path = tmp_path + '.conv.jpg'
-                    with Image.open(tmp_path) as img:
-                        img.convert('RGB').save(conv_path, 'JPEG', quality=95)
-                    sftp.put(conv_path, remote_tmp, callback=_progress)
-                    os.unlink(conv_path)
-                else:
-                    sftp.put(tmp_path, remote_tmp, callback=_progress)
-
-                # Kustuta sihtfail kui see juba eksisteerib (uuesti üleslaadimine)
-                try:
-                    sftp.stat(remote_dst)
-                    sftp.unlink(remote_dst)
-                except FileNotFoundError:
-                    pass
-                sftp.rename(remote_tmp, remote_dst)
-                logger.info(f"Pilt edastatud OCR serverisse: {upload_id} ({remote_img_name})")
-
-                with state_lock:
-                    s = _read_state(upload_id)
-                    if s:
-                        s['status'] = 'processing'
-                        _write_state(upload_id, s)
-
-            except Exception as e:
-                logger.error(f"SFTP pilt {upload_id}: {e}")
-                upload_progress[upload_id]['error'] = str(e)
-                with state_lock:
-                    s = _read_state(upload_id)
-                    if s:
-                        s['status'] = 'error'
-                        s['error_message'] = str(e)
-                        _write_state(upload_id, s)
-            finally:
-                if sftp:
-                    try:
-                        sftp.close()
-                    except Exception:
-                        pass
-                try:
-                    os.unlink(tmp_path)
-                except Exception:
-                    pass
-
-        thread = threading.Thread(target=_sftp_transfer_image, daemon=True, name=f"sftp-img-{upload_id}")
-        thread.start()
-        return pages
-
-    elif file_type == 'unknown':
+def _ensure_remote_dirs(sftp, remote_dirs):
+    """Loob OCR-serveri kaustad kui need puuduvad (idempotentne)."""
+    for remote_dir in remote_dirs:
         try:
-            os.unlink(tmp_path)
+            sftp.stat(remote_dir)
+        except FileNotFoundError:
+            sftp.mkdir(remote_dir)
+
+
+def _close_sftp_and_unlink(sftp, tmp_path: str):
+    """Taustalõime finally-puhastus: sulge SFTP seanss ja kustuta ajutine fail."""
+    if sftp:
+        try:
+            sftp.close()
         except Exception:
             pass
-        raise ValueError(
-            "Toetamata failivorming. Palun laadi üles PDF, JPG, PNG või TIFF fail."
-        )
+    _safe_unlink(tmp_path)
 
-    # file_type == 'pdf' → tavapärane PDF flow allpool
 
-    # --- Loe lehekülgede arv pdfinfo abil ---
+def _count_pdf_pages(tmp_path: str) -> int:
+    """Loeb PDF-i lehekülgede arvu pdfinfo abil.
+
+    Tõstab ValueError kui:
+      - PDF on vigane (pdfinfo viga) — tmp_path kustutatakse;
+      - lehekülgede arvu ei leidu pdfinfo väljundist;
+      - pdfinfo pole paigaldatud (FileNotFoundError);
+      - pdfinfo aegub (TimeoutExpired).
+    """
     try:
         result = subprocess.run(
             ['pdfinfo', tmp_path],
@@ -569,10 +534,7 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
         )
         if result.returncode != 0:
             logger.error(f"pdfinfo viga: {result.stderr}")
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+            _safe_unlink(tmp_path)
             raise ValueError(
                 f"Vigane PDF — fail ei ole korrektne PDF-dokument (pdfinfo viga). "
                 f"Kontrolli, et laadid üles õige faili."
@@ -586,79 +548,159 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
         if pages is None:
             logger.error(f"pdfinfo väljundis puudus 'Pages:': {result.stdout}")
             raise ValueError("PDF lehekülgede arvu ei õnnestunud tuvastada")
+        return pages
 
     except FileNotFoundError:
         raise ValueError("pdfinfo pole paigaldatud (apt install poppler-utils)")
     except subprocess.TimeoutExpired:
         raise ValueError("PDF analüüs võttis liiga kaua — fail on liiga suur või kahjustatud")
 
-    # --- Uuenda state.json ja progress ---
-    file_size = os.path.getsize(tmp_path)
-    upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
 
-    with state_lock:
-        state = _read_state(upload_id)
-        state['expected_pages'] = pages
-        state['status'] = 'uploading'
-        _write_state(upload_id, state)
+def _prepare_image_upload(state: dict) -> tuple:
+    """Arvutab pildi-upload'i (alati 1 leht) remote teed.
 
-    # Remote teed (OCR_SERVER_PATH on absoluutne tee OCR serveris)
+    Tagastab: (pages, remote_dirs, remote_tmp, remote_dst, remote_img_name).
+    """
+    slug = state['meta']['slug']
     remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
-    remote_pdf_name = f"{slug}.pdf"
-    remote_pdf_tmp_name = f"{slug}.pdf.tmp"
+    remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+    remote_img_name = f"{slug}_pg_001.jpg"
+    remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
+    remote_dst = f"{remote_work_abs}/{remote_img_name}"
+    remote_dirs = (remote_staging_abs, remote_work_abs)
+    return 1, remote_dirs, remote_tmp, remote_dst, remote_img_name
 
-    # --- Daemon thread SFTP edastuseks ---
-    def _sftp_transfer():
-        sftp = None
+
+def _prepare_pdf_upload(state: dict, tmp_path: str) -> tuple:
+    """Arvutab PDF-upload'i remote teed (pärast pdfinfo lehekülgede loendust).
+
+    Tagastab: (pages, remote_dirs, remote_tmp, remote_dst).
+    """
+    pages = _count_pdf_pages(tmp_path)
+    slug = state['meta']['slug']
+    remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
+    remote_tmp = f"{remote_staging_abs}/{slug}.pdf.tmp"
+    remote_dst = f"{remote_staging_abs}/{slug}.pdf"
+    remote_dirs = (remote_staging_abs,)
+    return pages, remote_dirs, remote_tmp, remote_dst
+
+
+def _sftp_transfer_image(upload_id: str, tmp_path: str, file_type: str,
+                          remote_dirs, remote_tmp: str, remote_dst: str,
+                          remote_img_name: str):
+    """Taustalõime sihtfunktsioon: edastab üksiku pildi OCR-serverisse.
+
+    PNG/TIFF konvertitakse Pillow'ga JPEG-iks; sihtfail eemaldatakse kui see
+    juba eksisteerib (uuesti üleslaadimine). Edukorral state → 'processing',
+    veakorral state → 'error' + error_message.
+    """
+    sftp = None
+    try:
+        sftp = _sftp_open(upload_id)
+        _ensure_remote_dirs(sftp, remote_dirs)
+
+        # Konverteeri JPEG-iks kui PNG või TIFF
+        if file_type in ('png', 'tiff'):
+            from PIL import Image
+            conv_path = tmp_path + '.conv.jpg'
+            with Image.open(tmp_path) as img:
+                img.convert('RGB').save(conv_path, 'JPEG', quality=95)
+            sftp.put(conv_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
+            os.unlink(conv_path)
+        else:
+            sftp.put(tmp_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
+
+        # Kustuta sihtfail kui see juba eksisteerib (uuesti üleslaadimine)
         try:
-            sftp = _sftp_open(upload_id)
+            sftp.stat(remote_dst)
+            sftp.unlink(remote_dst)
+        except FileNotFoundError:
+            pass
+        sftp.rename(remote_tmp, remote_dst)
+        logger.info(f"Pilt edastatud OCR serverisse: {upload_id} ({remote_img_name})")
 
-            # Loo staging kaust OCR serveris
-            try:
-                sftp.stat(remote_staging_abs)
-            except FileNotFoundError:
-                sftp.mkdir(remote_staging_abs)
+        _set_upload_state(upload_id, status='processing')
 
-            remote_tmp = f"{remote_staging_abs}/{remote_pdf_tmp_name}"
-            remote_pdf = f"{remote_staging_abs}/{remote_pdf_name}"
+    except Exception as e:
+        logger.error(f"SFTP pilt {upload_id}: {e}")
+        upload_progress[upload_id]['error'] = str(e)
+        _set_upload_state(upload_id, status='error', error_message=str(e))
+    finally:
+        _close_sftp_and_unlink(sftp, tmp_path)
 
-            def _progress(transferred, total):
-                upload_progress[upload_id]['bytes_sent'] = transferred
-                upload_progress[upload_id]['bytes_total'] = total
 
-            sftp.put(tmp_path, remote_tmp, callback=_progress)
-            sftp.rename(remote_tmp, remote_pdf)
+def _sftp_transfer_pdf(upload_id: str, tmp_path: str,
+                        remote_dirs, remote_tmp: str, remote_dst: str,
+                        pages: int, file_size: int):
+    """Taustalõime sihtfunktsioon: edastab PDF-i OCR-serverisse (OCR server
+    lõhub ise lehekülgedeks). Edukorral state → 'processing', veakorral
+    state → 'error' + error_message.
+    """
+    sftp = None
+    try:
+        sftp = _sftp_open(upload_id)
+        _ensure_remote_dirs(sftp, remote_dirs)
 
-            logger.info(f"SFTP upload valmis: {upload_id} ({pages} lk, {file_size} B)")
+        sftp.put(tmp_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
+        sftp.rename(remote_tmp, remote_dst)
 
-            with state_lock:
-                s = _read_state(upload_id)
-                if s:
-                    s['status'] = 'processing'
-                    _write_state(upload_id, s)
+        logger.info(f"SFTP upload valmis: {upload_id} ({pages} lk, {file_size} B)")
 
-        except Exception as e:
-            logger.error(f"SFTP transfer {upload_id}: {e}")
-            upload_progress[upload_id]['error'] = str(e)
-            with state_lock:
-                s = _read_state(upload_id)
-                if s:
-                    s['status'] = 'error'
-                    s['error_message'] = str(e)
-                    _write_state(upload_id, s)
-        finally:
-            if sftp:
-                try:
-                    sftp.close()
-                except Exception:
-                    pass
-            try:
-                os.unlink(tmp_path)
-            except Exception:
-                pass
+        _set_upload_state(upload_id, status='processing')
 
-    thread = threading.Thread(target=_sftp_transfer, daemon=True, name=f"sftp-{upload_id}")
-    thread.start()
+    except Exception as e:
+        logger.error(f"SFTP transfer {upload_id}: {e}")
+        upload_progress[upload_id]['error'] = str(e)
+        _set_upload_state(upload_id, status='error', error_message=str(e))
+    finally:
+        _close_sftp_and_unlink(sftp, tmp_path)
+
+
+def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
+    """
+    Edastab faili OCR serverisse SFTP kaudu.
+
+    - PDF: pdfinfo → lehekülgede arv → staging kaust → OCR server lõhub ise lahti
+    - JPG/PNG: pannakse otse remote work kausta {slug}_pg_001.jpg nimega
+      (OCR server leiab pildi rglob-iga ja teeb OCR-i ilma PDF-i lahti lõhkumata)
+
+    Tagastab expected_pages (int).
+    Tõstab ValueError kui fail on vigane või toetamata formaadis.
+    """
+    with _get_upload_lock(upload_id):
+        state = _read_state(upload_id)
+    if not state:
+        raise ValueError(f"Upload {upload_id} ei leitud")
+
+    file_type = _detect_file_type(tmp_path)
+
+    if file_type in ('jpeg', 'png', 'tiff'):
+        # Pildi puhul: laadi otse remote work kausta, OCR server teeb ise üles
+        pages, remote_dirs, remote_tmp, remote_dst, remote_img_name = _prepare_image_upload(state)
+        _init_upload_progress(upload_id, tmp_path)
+        _set_upload_state(upload_id, status='uploading', expected_pages=pages)
+        threading.Thread(
+            target=_sftp_transfer_image,
+            args=(upload_id, tmp_path, file_type, remote_dirs, remote_tmp, remote_dst, remote_img_name),
+            daemon=True, name=f"sftp-img-{upload_id}",
+        ).start()
+        return pages
+
+    if file_type == 'unknown':
+        _safe_unlink(tmp_path)
+        raise ValueError(
+            "Toetamata failivorming. Palun laadi üles PDF, JPG, PNG või TIFF fail."
+        )
+
+    # file_type == 'pdf' → tavapärane PDF flow allpool
+    pages, remote_dirs, remote_tmp, remote_dst = _prepare_pdf_upload(state, tmp_path)
+    file_size = _init_upload_progress(upload_id, tmp_path)
+    _set_upload_state(upload_id, status='uploading', expected_pages=pages)
+    threading.Thread(
+        target=_sftp_transfer_pdf,
+        args=(upload_id, tmp_path, remote_dirs, remote_tmp, remote_dst, pages, file_size),
+        daemon=True, name=f"sftp-{upload_id}",
+    ).start()
     return pages
 
 
