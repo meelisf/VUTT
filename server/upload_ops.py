@@ -15,6 +15,7 @@ import subprocess
 import threading
 import unicodedata
 from datetime import datetime
+from typing import Optional
 
 # OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
@@ -462,7 +463,7 @@ def _safe_unlink(path: str):
         pass
 
 
-def _set_upload_state(upload_id: str, *, status: str = None, **extra):
+def _set_upload_state(upload_id: str, *, status: Optional[str] = None, **extra):
     """Uuendab state.json välju upload-i luku all (thread-turvaline).
 
     Kasutatakse taustalõimedes staatusemasina uuendamiseks:
