@@ -205,11 +205,15 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   // Mis juhtuks ilma mapideta (testitud filterNormalization.test.ts järgi):
   //  - Otsingu õigsus: ikka õige — serveri buildGenreFilter("Jutlus") on juba
   //    bilinguaalne OR (genre_et="Jutlus" OR genre_en="Jutlus") (vt filterUtils.ts).
-  //  - Pilli highlight: ikka õige — resolveItemValue → labelToId → Q-kood.
   //  - URL-i normaliseerimine: ikka Q-koodiks — Dashboard write-back genreLabelToId.
-  //  - Aktiivfiltri pilli KUVAMINE: väike kosmeetiline tagasilangus — vana
-  //    teisekeelse URL-i korral näitab pill teise keele labelit (nt "Jutlus"
-  //    inglise UI-s) kuni kasutaja filtrit muudab (self-heal effect enam ei tööta).
+  //  - Aktiivfiltri pilli KUVAMINE + facet-listi highlight: väike kosmeetiline
+  //    tagasilangus. Praegu töötab highlight crossLangMap-i KAUDU: effectiveSelected*
+  //    käivitab self-heal efekti (allpool), mis kirjutab selectedValue ümber praeguse
+  //    keele labeliks, ja ALLES SIIS leiab resolveItemValue → labelToId → Q-koodi.
+  //    Ilma mapideta jääks self-heal käivitamata → resolveItemValue tagastaks võõr-
+  //    labeli korral null (facet-pill ilma highlightita) ja aktiivfiltri pill näitaks
+  //    teise keele labelit (nt "Jutlus" inglise UI-s) kuni kasutaja filtrit muudab.
+  //    Mõlemad on kosmeetilised; otsingu õigsust ei mõjuta (bilinguaalne OR ülal).
   //
   // Järeldus: mapid ei tee pahavara (testidega kaetud) ja mõjutavad ainult ühte
   // väikest kosmeetilist detaili ühes äärejuhtumis. Eemaldamise vaev + väike
