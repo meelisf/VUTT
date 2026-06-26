@@ -1621,8 +1621,18 @@ def _upload_sync_loop():
                 logger.warning(f"upload-sync taustapoll viga ({uid}): {e}")
 
 
-# Käivita ainult kui upload-funktsionaalsus on lubatud (testides/ilma OCR-serverita
-# UPLOAD_ENABLED=false → ei tekita asjatut SFTP-koormust ega taimerit).
-if UPLOAD_ENABLED:
+def start_upload_sync_loop():
+    """Käivita upload taustasünk daemon-thread. Kutsutakse main.py lifespan'ist,
+    et see jookseks AINULT API-protsessis (uvicorn server.main).
+
+    NB: EI käivita seda import-kõrvalmõjuna. `python3 -m server.image_server`
+    impordib enne `server` paketi (server/__init__.py → upload_ops), nii et
+    moodulitaseme käivitus tekitaks teise, asjatu upload-sync threadi ka
+    pildiserveri protsessis (topelt SFTP-poll iga 60s + state.json võistlus).
+
+    Käivitatakse ainult kui upload-funktsionaalsus on lubatud (testides/ilma
+    OCR-serverita UPLOAD_ENABLED=false → ei tekita asjatut SFTP-koormust)."""
+    if not UPLOAD_ENABLED:
+        return
     threading.Thread(target=_upload_sync_loop, daemon=True, name="upload-sync").start()
     logger.info(f"Upload taustasünk käivitatud (intervall {UPLOAD_SYNC_INTERVAL}s)")
