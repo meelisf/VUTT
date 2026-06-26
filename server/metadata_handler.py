@@ -73,8 +73,12 @@ def _build_coins(meta: dict) -> str:
     return urlencode(params)
 
 
-def build_meta_html(work_id: str) -> str:
-    """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega."""
+def build_meta_html(work_id: str, creator_persons=None) -> str:
+    """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega.
+
+    creator_persons: eel-resolvitud [{id, label}] loojate isikukaardid (route filtreerib)
+    — lingitakse ristviidetena. Tagasi-lingid kodu/isikud lisatakse alati (linkgraaf).
+    """
     found_path = find_directory_by_id(work_id)
 
     title = "VUTT - Varauusaegsete tekstide töölaud"
@@ -147,7 +151,19 @@ def build_meta_html(work_id: str) -> str:
         reference = ref.get("reference", "")
         body_lines.append(f"<p>{_escape(archive_id)}{' ' + _escape(reference) if reference else ''}</p>")
 
+    # Ristviited loojate isikukaartidele (linkgraaf teos↔isik)
+    for person in creator_persons or []:
+        pid = person.get("id")
+        plabel = person.get("label") or pid
+        if pid:
+            person_url = f"{SITE_URL}/persons/{_escape(pid)}"
+            body_lines.append(f'<p><a href="{person_url}">{_escape(plabel)}</a></p>')
+
     body_lines.append(f'<p><a href="{work_url}">{work_url}</a></p>')
+    # Tagasi-lingid hub-lehtedele (alati — jaotab crawl-graafi)
+    body_lines.append(
+        f'<nav><a href="{SITE_URL}/">VUTT</a> · <a href="{SITE_URL}/persons">Isikud</a></nav>'
+    )
     body_content = "\n".join(body_lines)
 
     return f"""<!DOCTYPE html>
@@ -180,13 +196,36 @@ def build_meta_html(work_id: str) -> str:
 </html>"""
 
 
-def build_persons_meta_html() -> str:
-    """Genereerib robotitele lihtsa HTML-i prosopograafia avalehe jaoks."""
+def build_persons_meta_html(person_entries=None) -> str:
+    """Genereerib robotitele prosopograafia avalehe (isikute-hub).
+
+    person_entries: prosopography_index entries [{id, label, record_status?, merged_into?}].
+    Lingitakse kõik mitte-tombstone/merged isikud (iga isik 1 hüppe kaugusel /persons-st).
+    None → ainult self-link (tahaühilduv).
+    """
     persons_url = f"{SITE_URL}/persons"
     title = "Isikud – VUTT prosopograafia"
     description = "VUTT prosopograafia: varauusaegsete akadeemiliste tekstidega seotud isikud."
     safe_title = _escape(title)
     safe_desc = _escape(description)
+
+    body_lines = [f"<h1>{safe_title}</h1>", f"<p>{safe_desc}</p>"]
+    link_items = []
+    for entry in person_entries or []:
+        if entry.get("record_status") == "tombstone" or entry.get("merged_into"):
+            continue
+        pid = entry.get("id")
+        if not pid:
+            continue
+        label = entry.get("label") or entry.get("name") or pid
+        url = f"{persons_url}/{_escape(pid)}"
+        link_items.append(f'  <li><a href="{url}">{_escape(label)}</a></li>')
+    if link_items:
+        body_lines.append("<ul>\n" + "\n".join(link_items) + "\n</ul>")
+    body_lines.append(f'<p><a href="{persons_url}">{persons_url}</a></p>')
+    body_lines.append(f'<nav><a href="{SITE_URL}/">VUTT</a></nav>')
+    body_content = "\n".join(body_lines)
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -200,15 +239,90 @@ def build_persons_meta_html() -> str:
     <meta property="og:description" content="{safe_desc}">
 </head>
 <body>
-    <h1>{safe_title}</h1>
-    <p>{safe_desc}</p>
-    <p><a href="{persons_url}">{persons_url}</a></p>
+    {body_content}
 </body>
 </html>"""
 
 
-def build_person_meta_html(person_id: str) -> Optional[str]:
-    """Genereerib Google'ile ja sotsiaalmeedia robotitele isikukaardi HTML-i."""
+def build_home_meta_html(work_id_cache, is_work_public_fn, load_meta_fn, work_collections, collections) -> str:
+    """Genereerib bottidele crawl'itava bot-kodulehe (linkgraafi peamine jaotuspunkt).
+
+    Iteerib teosed (nagu sitemap), filtreerib avalikud, grupeerib `<h2>` alla
+    kollektsiooni et-label järgi; ilma kollektsioonita teosed "Muu" alla.
+    Iga teos `<a href=/work/{id}>` — iga avalik teos 1 hüppe kaugusel /-st.
+
+    work_id_cache: {work_id: (path, mtime)} või {work_id: path}
+    work_collections: {work_id: [collection_id]} (work_collections_index.json)
+    collections: {collection_id: {"name": {"et":..}, ...}} (collections.json)
+    """
+    title = "VUTT – Varauusaegsete tekstide töölaud"
+    description = "Tartu Ülikooli varauusaegsete akadeemiliste tekstide register: teosed ja isikud."
+    safe_title = _escape(title)
+    safe_desc = _escape(description)
+    home_url = f"{SITE_URL}/"
+
+    MUU = "￿"  # sorteerub viimaseks
+    # Grupeeri avalikud teosed kollektsiooni kaupa
+    groups = {}  # group_key (et-label) -> [(title, year, work_id)]
+    for work_id in work_id_cache:
+        meta = load_meta_fn(work_id)
+        if meta is None or not is_work_public_fn(meta):
+            continue
+        w_title = meta.get("title") or work_id
+        w_year = meta.get("year")
+        col_ids = work_collections.get(work_id) or []
+        # Esimene tuntud kollektsioon määrab grupi; muidu "Muu"
+        group_label = MUU
+        for cid in col_ids:
+            cfg = collections.get(cid)
+            if cfg:
+                name = cfg.get("name") or {}
+                group_label = name.get("et") or name.get("en") or cid
+                break
+        groups.setdefault(group_label, []).append((w_title, w_year, work_id))
+
+    body_lines = [f"<h1>{safe_title}</h1>", f"<p>{safe_desc}</p>"]
+
+    def _sort_key(k):
+        return (1, "") if k == MUU else (0, k.casefold())
+
+    for group_label in sorted(groups, key=_sort_key):
+        heading = "Muu" if group_label == MUU else group_label
+        body_lines.append(f"<h2>{_escape(heading)}</h2>")
+        body_lines.append("<ul>")
+        for w_title, w_year, work_id in sorted(groups[group_label], key=lambda t: str(t[0]).casefold()):
+            url = f"{SITE_URL}/work/{_escape(work_id)}"
+            year_str = f" {_escape(str(w_year))}" if w_year else ""
+            body_lines.append(f'  <li><a href="{url}">{_escape(w_title)}</a>{year_str}</li>')
+        body_lines.append("</ul>")
+
+    body_lines.append(f'<p><a href="{SITE_URL}/persons">Isikud →</a></p>')
+    body_content = "\n".join(body_lines)
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{safe_title}</title>
+    <link rel="canonical" href="{home_url}">
+    <meta name="description" content="{safe_desc}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{home_url}">
+    <meta property="og:title" content="{safe_title}">
+    <meta property="og:description" content="{safe_desc}">
+</head>
+<body>
+    {body_content}
+</body>
+</html>"""
+
+
+def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
+    """Genereerib Google'ile ja sotsiaalmeedia robotitele isikukaardi HTML-i.
+
+    work_links: eel-resolvitud [{work_id, title}] isiku AVALIKUD teosed (route filtreerib)
+    — lingitakse ristviidetena. Tagasi-lingid isikud/kodu lisatakse alati (linkgraaf).
+    """
     from .prosopography.ops import get_person_with_works
 
     person = get_person_with_works(person_id)
@@ -250,7 +364,25 @@ def build_person_meta_html(person_id: str) -> Optional[str]:
         body_lines.append(f"<p>{_escape(', '.join(occ_labels))}</p>")
     if biography:
         body_lines.append(f"<p>{_escape(biography)}</p>")
+
+    # Ristviited isiku avalikele teostele (linkgraaf isik↔teos)
+    if work_links:
+        body_lines.append("<h2>Teosed</h2>")
+        body_lines.append("<ul>")
+        for w in work_links:
+            wid = w.get("work_id")
+            if not wid:
+                continue
+            wtitle = w.get("title") or wid
+            url = f"{SITE_URL}/work/{_escape(wid)}"
+            body_lines.append(f'  <li><a href="{url}">{_escape(wtitle)}</a></li>')
+        body_lines.append("</ul>")
+
     body_lines.append(f'<p><a href="{person_url}">{person_url}</a></p>')
+    # Tagasi-lingid hub-lehtedele (alati)
+    body_lines.append(
+        f'<nav><a href="{SITE_URL}/persons">Isikud</a> · <a href="{SITE_URL}/">VUTT</a></nav>'
+    )
     body_content = "\n".join(body_lines)
 
     return f"""<!DOCTYPE html>
