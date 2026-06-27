@@ -259,12 +259,15 @@ const WorkManage: React.FC = () => {
   // Nähtav (effective) järjekord: draft kui olemas, muidu serveri page_num.
   // Iga lehe nähtav number on tema indeks selles järjestuses + 1.
   // useMemo: tagab stabiilse identiteedi, et fookus-effect ei käivitu iga renderi järel.
-  const visiblePages: VisiblePage[] = useMemo(() => {
-    const sorted = [...pages].sort(
+  const visibleSorted = useMemo(() => {
+    return [...pages].sort(
       (a, b) => (draftPositions[a.filename] ?? a.page_num) - (draftPositions[b.filename] ?? b.page_num)
     );
-    return sorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
   }, [pages, draftPositions]);
+
+  const visiblePages: VisiblePage[] = useMemo(() => {
+    return visibleSorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
+  }, [visibleSorted]);
 
   const visibleNumByFile: Record<string, number> = useMemo(() => {
     const map: Record<string, number> = {};
