@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { parseFocusParam, buildBackToEditorPath } from '../utils/manageDeeplink';
 import {
   ArrowLeft,
   Plus,
@@ -52,6 +53,11 @@ const WorkManage: React.FC = () => {
   const { workId } = useParams<{ workId: string }>();
   const navigate = useNavigate();
   const { user, authToken } = useUser();
+  const [searchParams] = useSearchParams();
+  const focus = parseFocusParam(searchParams.get('focus'));
+  const focusedCardRef = useRef<HTMLDivElement | null>(null);
+  const [highlightedNum, setHighlightedNum] = useState<number | null>(null);
+  const handledFocusRef = useRef<number | null>(null);
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('pages');
   const [pages, setPages] = useState<PageInfo[]>([]);
@@ -254,6 +260,26 @@ const WorkManage: React.FC = () => {
   const visiblePages: VisiblePage[] = visibleSorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
   const visibleNumByFile: Record<string, number> = {};
   visiblePages.forEach((vp) => { visibleNumByFile[vp.filename] = vp.visiblePageNum; });
+
+  // Fookus-effect: kerib ja tõstab esile fookus-kaardi ainult esmasel laadimisel.
+  // handledFocusRef guard väldib korduvat kerimist ka React StrictMode kahekordse
+  // effect-käivituse ja kasutaja hilisemate järjekorra-muudatuste korral.
+  useEffect(() => {
+    if (focus == null) return;
+    if (loading) return;                           // oota kuni lehed laetud
+    if (handledFocusRef.current === focus) return; // ainult kord (sh StrictMode)
+    // Kontrolli, et fookus-leht on nähtavas listis
+    const exists = Object.values(visibleNumByFile).includes(focus);
+    if (!exists) { handledFocusRef.current = focus; return; }
+    handledFocusRef.current = focus;
+    // Keri pärast renderit (aspect-[3/4] → kõrgused stabiilsed, üks rAF piisab)
+    requestAnimationFrame(() => {
+      focusedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    setHighlightedNum(focus);
+    const tid = setTimeout(() => setHighlightedNum(null), 2000);
+    return () => clearTimeout(tid);
+  }, [focus, loading, visibleNumByFile]);
 
   // Mitme lehe asukoht erineb salvestatud (serveri) järjekorrast
   const changedCount = pages.filter((p) => (draftPositions[p.filename] ?? p.page_num) !== p.page_num).length;
@@ -576,11 +602,11 @@ const WorkManage: React.FC = () => {
         {/* Navigatsioon tagasi */}
         <div className="flex items-center gap-3 mb-6">
           <button
-            onClick={() => navigate(`/work/${workId}/1`)}
+            onClick={() => navigate(buildBackToEditorPath(workId!, focus))}
             className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             <ArrowLeft size={16} />
-            {t('manage.backToWork')}
+            {focus != null ? t('manage.backToPage', { n: focus }) : t('manage.backToWork')}
           </button>
         </div>
 
@@ -697,9 +723,12 @@ const WorkManage: React.FC = () => {
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
                   {visibleSorted.map((page) => {
                     const vNum = visibleNumByFile[page.filename];
+                    const isFocused = focus != null && vNum === focus;
                     return (
                       <PageCard
                         key={page.filename}
+                        ref={isFocused ? focusedCardRef : undefined}
+                        isFocused={isFocused && highlightedNum === focus}
                         workId={workId!}
                         filename={page.filename}
                         imageName={page.lehekylje_pilt.split('/').pop() ?? ''}

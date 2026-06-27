@@ -69,6 +69,7 @@
   "manage": {
     "title": "Lehekülgede haldus",
     "backToWork": "Tagasi teosele",
+    "backToPage": "Tagasi lehele {{n}}",
     "manageWork": "Halda teost",
     "pages": "Leheküljed",
     "pagesCount_one": "lehekülg",
