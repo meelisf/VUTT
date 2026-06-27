@@ -123,6 +123,11 @@ const Workspace: React.FC = () => {
     // Kontrollime, et number oleks valiidne ja piires (kui lehekülgede arv on teada)
     if (!isNaN(newPage) && newPage >= 1 && (totalPages === 0 || newPage <= totalPages)) {
       if (newPage !== currentPageNum) {
+        if (hasUnsavedChanges) {
+          setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`, { replace: true }));
+          setInputPage(currentPageNum.toString());
+          return;
+        }
         navigate(`/work/${workId}/${newPage}`, { replace: true });
       }
     } else {
@@ -281,8 +286,12 @@ const Workspace: React.FC = () => {
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
+    if (hasUnsavedChanges) {
+      setPendingNavigation(() => () => navigate(`/work/${workId}/${pageNum}`, { replace: true }));
+      return;
+    }
     navigate(`/work/${workId}/${pageNum}`, { replace: true });
-  }, [navigate, workId]);
+  }, [hasUnsavedChanges, navigate, workId]);
 
   const navigatePage = useCallback((delta: number) => {
     if (!workId) return;

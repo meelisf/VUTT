@@ -128,6 +128,7 @@ const baseForm = (): MetadataFormData => ({
   type: null,
   genre: [],
   tags: [],
+  notes: '',
   location: '',
   publisher: '',
   creators: [],

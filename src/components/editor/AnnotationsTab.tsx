@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -506,6 +506,17 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Teose märkused */}
+            {work.notes && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <StickyNote size={12} />
+                  {t('metadata.notes', 'Märkused')}
+                </span>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{work.notes}</p>
               </div>
             )}
 
