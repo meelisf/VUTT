@@ -69,6 +69,7 @@
   "manage": {
     "title": "Page management",
     "backToWork": "Back to work",
+    "backToPage": "Back to page {{n}}",
     "manageWork": "Manage work",
     "pages": "Pages",
     "pagesCount_one": "page",
