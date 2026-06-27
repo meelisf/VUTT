@@ -34,6 +34,7 @@ interface MetadataForm {
   type: string | LinkedEntity | null;  // LinkedEntity Wikidata linkimiseks
   genre: (string | LinkedEntity)[];  // Mitu žanrit
   tags: (string | LinkedEntity)[];
+  notes: string;
   location: string | LinkedEntity;
   publisher: string | LinkedEntity;
   creators: Creator[];
@@ -192,6 +193,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
     type: null,
     genre: [],
     tags: [],
+    notes: '',
     location: '',
     publisher: '',
     creators: [],
@@ -273,6 +275,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       type: work?.type || page.type || null,
       genre: (() => { const g = work?.genre ?? page.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
       tags: work?.tags || page.tags || [],
+      notes: work?.notes || page.notes || '',
       location: work?.location || page.location || '',
       publisher: work?.publisher || page.publisher || '',
       creators: work?.creators || page.creators || initialCreators,
@@ -378,6 +381,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           type: m.type || null,
           genre: (() => { const g = m.genre; return Array.isArray(g) ? g : (g ? [g] : []); })(),
           tags: Array.isArray(tags) ? tags : [],
+          notes: m.notes || '',
           location: location || '',
           publisher: publisher || '',
           creators: creators,
@@ -421,6 +425,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           genre: m.genre as LinkedEntity[] | null,
           creators: m.creators,
           tags: m.tags as LinkedEntity[],
+          notes: m.notes,
           languages: metaForm.languages,
           location: m.location as LinkedEntity | null,
           publisher: m.publisher as LinkedEntity | null,
@@ -787,6 +792,18 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <p className="text-[10px] text-gray-400 mt-1 italic">
                 {t('metadata.tagsHint')}
               </p>
+            </div>
+
+            {/* Teose märkused */}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{t('metadata.notes', 'Märkused')}</label>
+              <textarea
+                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none resize-y"
+                rows={4}
+                value={metaForm.notes}
+                onChange={e => setMetaForm({ ...metaForm, notes: e.target.value })}
+                placeholder={t('metadata.notesPlaceholder', 'Vabatekstilised märkused teose kohta...')}
+              />
             </div>
           </div>
 

@@ -8,6 +8,7 @@ export interface MetadataFormData {
   type: string | LinkedEntity | null;
   genre: (string | LinkedEntity)[];
   tags: (string | LinkedEntity)[];
+  notes: string;
   location: string | LinkedEntity;
   publisher: string | LinkedEntity;
   creators: Creator[];
@@ -35,6 +36,7 @@ export interface MetadataPayload {
     genre: (string | LinkedEntity)[] | null;
     creators: CleanedCreator[];
     tags: (string | LinkedEntity)[];
+    notes: string | null;
     languages: string[] | null;
     location: string | LinkedEntity;
     publisher: string | LinkedEntity;
@@ -107,6 +109,7 @@ export function buildMetadataPayload(
       genre: form.genre.length > 0 ? form.genre : null,
       creators: cleanCreators(form.creators),
       tags: cleanTags(form.tags),
+      notes: form.notes.trim() || null,
       languages: form.languages.length > 0 ? form.languages : null,
       location: form.location,
       publisher: form.publisher,

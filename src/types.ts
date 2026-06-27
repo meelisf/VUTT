@@ -118,8 +118,9 @@ export interface Work {
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];  // Denormaliseeritud otsinguks
 
-  // Märksõnad ja keeled
+  // Märksõnad, märkused ja keeled
   tags?: LinkedEntity[];    // Märksõnad (LinkedEntity objektid)
+  notes?: string | null;    // Teose vabatekstilised märkused
   languages?: string[];     // Keeled (ISO 639-3: lat, deu, est, ...)
 
   // Seosed
@@ -236,6 +237,7 @@ export interface Page {
   creators?: Creator[];     // Kõik isikud koos rollidega
   authors_text?: string[];
   tags?: LinkedEntity[];
+  notes?: string | null;
   languages?: string[];
   series?: Series;
   series_title?: string;
@@ -315,6 +317,7 @@ export interface ContentSearchHit {
   creators?: Creator[];
   authors_text?: string[];
   tags?: LinkedEntity[];
+  notes?: string | null;
   page_tags?: (string | LinkedEntity)[]; // Per-page tags
 
   comments?: Annotation[];

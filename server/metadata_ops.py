@@ -15,7 +15,7 @@ from .prosopography.ops import update_person_to_works, ensure_prosopo_stubs, upd
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
-    "title", "year", "year_display", "location", "publisher", "creators", "tags",
+    "title", "year", "year_display", "location", "publisher", "creators", "tags", "notes",
     "collections", "type", "genre", "languages", "ester_id", "external_url",
     "series", "relations", "archive_refs", "shareable",
 }

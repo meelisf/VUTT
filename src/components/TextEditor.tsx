@@ -100,7 +100,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [savedState, setSavedState] = useState({
     status: page.status,
     comments: page.comments,
-    page_tags: page.page_tags,
+    page_tags: page.page_tags || [],
+    text_annotations: page.text_annotations || [],
   });
 
   // CM6 refs
@@ -134,17 +135,17 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const hasUnsavedChanges = useMemo(() => {
     if (isDirty) return true;
     if (status !== savedState.status) return true;
-    // page_tags: string[] shallow compare
-    if (page_tags.length !== savedState.page_tags.length) return true;
-    if (page_tags.some((t, i) => t !== savedState.page_tags[i])) return true;
+    // page_tags: string/LinkedEntity[] võrdlus sisulise JSON-kuju järgi
+    if (JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags)) return true;
     // comments: Annotation[] shallow compare (id + text + replies)
     if (comments.length !== savedState.comments.length) return true;
     if (comments.some((c, i) => {
       const saved = savedState.comments[i];
       return c.id !== saved?.id || c.text !== saved?.text || JSON.stringify(c.replies || []) !== JSON.stringify(saved.replies || []);
     })) return true;
+    if (JSON.stringify(textAnnotations) !== JSON.stringify(savedState.text_annotations)) return true;
     return false;
-  }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments]);
+  }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments, textAnnotations, savedState.text_annotations]);
 
   // --- Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit ---
   useEffect(() => {
@@ -350,7 +351,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setComments(page.comments);
     setTextAnnotations(page.text_annotations || []);
     setPageTags(page.page_tags || []);
-    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags });
+    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
     setIsDirty(false);
 
     const view = viewRef.current;
@@ -418,7 +419,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
     try {
       await onSave(updatedPage);
-      setSavedState({ status, comments, page_tags });
+      setSavedState({ status, comments, page_tags, text_annotations: textAnnotations });
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
@@ -427,7 +428,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [page, status, comments, page_tags, onSave]);
+  }, [page, status, comments, page_tags, textAnnotations, onSave]);
 
   // Annotatsioonide kohene salvestus (möödub state async viivitusest)
   const handleSaveAnnotations = useCallback(async (updatedComments: Annotation[]) => {
@@ -435,10 +436,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     isSavingRef.current = true;
     setIsSaving(true);
     const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments: updatedComments, page_tags };
+    const updatedPage: Page = { ...page, text_content: text, status, comments: updatedComments, page_tags, text_annotations: textAnnotations };
     try {
       await onSave(updatedPage);
-      setSavedState({ status, comments: updatedComments, page_tags });
+      setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
       setIsDirty(false);
     } catch (e: any) {
       console.error('Save error:', e);
@@ -447,7 +448,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       isSavingRef.current = false;
       setIsSaving(false);
     }
-  }, [page, status, page_tags, onSave]);
+  }, [page, status, page_tags, textAnnotations, onSave]);
 
   const handleReplyToComment = useCallback(async (commentId: string, replyText: string) => {
     if (!authToken) {
@@ -455,8 +456,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
     const updatedComments = await replyToComment(page, commentId, replyText, authToken);
     setComments(updatedComments);
-    setSavedState({ status, comments: updatedComments, page_tags });
-  }, [authToken, page, status, page_tags, t]);
+    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
+  }, [authToken, page, status, page_tags, textAnnotations, t]);
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
@@ -801,7 +802,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: updated };
     try {
       await onSave(updatedPage);
-      setSavedState({ status, comments, page_tags });
+      setSavedState({ status, comments, page_tags, text_annotations: updated });
       setIsDirty(false);
     } catch (e: any) {
       setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
@@ -820,7 +821,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     try {
       await onSave(updatedPage);
       setTextAnnotations(updatedTextAnnotations);
-      setSavedState({ status, comments, page_tags });
+      setSavedState({ status, comments, page_tags, text_annotations: updatedTextAnnotations });
       setIsDirty(false);
     } catch (e: any) {
       setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));

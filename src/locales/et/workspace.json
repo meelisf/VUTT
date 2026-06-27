@@ -213,6 +213,8 @@
     "tags": "Teose märksõnad",
     "tagsHint": "Komaga eraldatud",
     "tagsPlaceholder": "nt: teoloogia, poleemika",
+    "notes": "Märkused",
+    "notesPlaceholder": "Vabatekstilised märkused teose kohta...",
     "collection": "Kollektsioon",
     "noCollection": "— Määramata —",
     "esterId": "ESTER ID",

@@ -362,6 +362,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "tags_object": tags,
         "tags_search": get_all_labels(tags) + work_ctx['tag_aliases'],
         "tags_ids": get_all_ids(tags),
+        "notes": work_ctx.get('notes'),
         "collections": work_ctx['work_collections'],
         "collections_hierarchy": work_ctx['collections_hierarchy'],
         "is_public": any(
@@ -485,6 +486,7 @@ def get_work_metadata(doc_path, dir_name, collections):
         'publisher': None,
         'creators': [],
         'tags': [],
+        'notes': None,
         'languages': [],
         'ester_id': None,
         'external_url': None,
@@ -530,6 +532,7 @@ def get_work_metadata(doc_path, dir_name, collections):
     result['location'] = meta.get('location')
     result['publisher'] = meta.get('publisher')
     result['tags'] = meta.get('tags', [])
+    result['notes'] = meta.get('notes') or None
     result['creators'] = meta.get('creators', [])
     result['languages'] = meta.get('languages', [])
     result['ester_id'] = meta.get('ester_id')
@@ -609,6 +612,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
         'year_end': doc_metadata.get('year_end', 0),
         'teose_lehekylgede_arv': len(jpg_files),
         'tags': tags,
+        'notes': doc_metadata.get('notes'),
         'tag_aliases': tag_aliases,
         'work_collections': doc_metadata.get('collections', []),
         'collections': collections,

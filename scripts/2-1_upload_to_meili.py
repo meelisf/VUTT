@@ -50,6 +50,7 @@ def main():
             'publisher_search',
             'genre_search',
             'tags_search',
+            'notes',
             'series_title',
             'lehekylje_tekst',
             'marginaalia_tekst',

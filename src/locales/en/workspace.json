@@ -213,6 +213,8 @@
     "tags": "Work keywords",
     "tagsHint": "Separate with comma",
     "tagsPlaceholder": "e.g. theology, polemic",
+    "notes": "Notes",
+    "notesPlaceholder": "Free-text notes about the work...",
     "collection": "Collection",
     "noCollection": "— Unassigned —",
     "esterId": "ESTER ID",
