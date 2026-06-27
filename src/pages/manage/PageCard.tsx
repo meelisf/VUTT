@@ -18,6 +18,7 @@ interface PageCardProps {
   thumbCacheBust: number;
   onToggle: (filename: string, shiftKey: boolean) => void;
   onEdit: (visiblePageNum: number) => void;
+  isFocused?: boolean;
 }
 
 const statusColor = (status: string) => {
@@ -28,12 +29,14 @@ const statusColor = (status: string) => {
   }
 };
 
-const PageCard: React.FC<PageCardProps> = (p) => {
+const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
   return (
     <div
+      ref={ref}
       className={`relative flex flex-col rounded-lg border overflow-hidden bg-white ${
-        p.isSelected ? 'border-primary-500 ring-2 ring-primary-400'
+        p.isFocused ? 'ring-2 ring-blue-500 motion-safe:animate-pulse'
+          : p.isSelected ? 'border-primary-500 ring-2 ring-primary-400'
           : p.isChanged ? 'border-amber-400 ring-1 ring-amber-300' : 'border-gray-200'
       }`}
     >
@@ -104,6 +107,8 @@ const PageCard: React.FC<PageCardProps> = (p) => {
       </div>
     </div>
   );
-};
+});
+
+PageCard.displayName = 'PageCard';
 
 export default React.memo(PageCard);
