@@ -120,6 +120,10 @@ const WorkManage: React.FC = () => {
   const [imageToken, setImageToken] = useState<{ exp: number; sig: string } | null>(null);
   const [editorTarget, setEditorTarget] = useState<{ index: number; tab: 'edit' | 'split' } | null>(null);
 
+  const MIN_COLS = 3;
+  const MAX_COLS = 10;
+  const [gridCols, setGridCols] = useState(5);
+
   const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
@@ -720,7 +724,31 @@ const WorkManage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 p-4">
+                <div className="flex items-center gap-2 px-4 pt-2 text-sm text-gray-600">
+                  <button
+                    onClick={() => setGridCols((c) => Math.max(c - 1, MIN_COLS))}
+                    disabled={gridCols <= MIN_COLS}
+                    className="px-2 py-0.5 border rounded disabled:opacity-40"
+                    title="Suuremad pisipildid"
+                  >−</button>
+                  <input
+                    type="range"
+                    min={MIN_COLS}
+                    max={MAX_COLS}
+                    value={MAX_COLS + MIN_COLS - gridCols}
+                    onChange={(e) => setGridCols(MAX_COLS + MIN_COLS - Number(e.target.value))}
+                  />
+                  <button
+                    onClick={() => setGridCols((c) => Math.min(c + 1, MAX_COLS))}
+                    disabled={gridCols >= MAX_COLS}
+                    className="px-2 py-0.5 border rounded disabled:opacity-40"
+                    title="Väiksemad pisipildid"
+                  >+</button>
+                </div>
+                <div
+                  className="grid gap-3 p-4"
+                  style={{ gridTemplateColumns: `repeat(${gridCols}, 1fr)` }}
+                >
                   {visibleSorted.map((page) => {
                     const vNum = visibleNumByFile[page.filename];
                     const isFocused = focus != null && vNum === focus;
