@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { parseFocusParam, buildBackToEditorPath } from '../utils/manageDeeplink';
@@ -258,12 +258,19 @@ const WorkManage: React.FC = () => {
 
   // Nähtav (effective) järjekord: draft kui olemas, muidu serveri page_num.
   // Iga lehe nähtav number on tema indeks selles järjestuses + 1.
-  const visibleSorted = [...pages].sort(
-    (a, b) => (draftPositions[a.filename] ?? a.page_num) - (draftPositions[b.filename] ?? b.page_num)
-  );
-  const visiblePages: VisiblePage[] = visibleSorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
-  const visibleNumByFile: Record<string, number> = {};
-  visiblePages.forEach((vp) => { visibleNumByFile[vp.filename] = vp.visiblePageNum; });
+  // useMemo: tagab stabiilse identiteedi, et fookus-effect ei käivitu iga renderi järel.
+  const visiblePages: VisiblePage[] = useMemo(() => {
+    const sorted = [...pages].sort(
+      (a, b) => (draftPositions[a.filename] ?? a.page_num) - (draftPositions[b.filename] ?? b.page_num)
+    );
+    return sorted.map((p, i) => ({ filename: p.filename, visiblePageNum: i + 1 }));
+  }, [pages, draftPositions]);
+
+  const visibleNumByFile: Record<string, number> = useMemo(() => {
+    const map: Record<string, number> = {};
+    visiblePages.forEach((vp) => { map[vp.filename] = vp.visiblePageNum; });
+    return map;
+  }, [visiblePages]);
 
   // Fookus-effect: kerib ja tõstab esile fookus-kaardi ainult esmasel laadimisel.
   // handledFocusRef guard väldib korduvat kerimist ka React StrictMode kahekordse
@@ -737,6 +744,7 @@ const WorkManage: React.FC = () => {
                     max={MAX_COLS}
                     value={MAX_COLS + MIN_COLS - gridCols}
                     onChange={(e) => setGridCols(MAX_COLS + MIN_COLS - Number(e.target.value))}
+                    aria-label="Veergude arv"
                   />
                   <button
                     onClick={() => setGridCols((c) => Math.min(c + 1, MAX_COLS))}
