@@ -23,10 +23,12 @@ import LoginModal from '../components/LoginModal';
 import { getLabel } from '../utils/metadataUtils';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { FILE_API_URL, MEILI_HOST, MEILI_INDEX } from '../config';
+import { buildManageLink } from '../utils/manageDeeplink';
 
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
+  const isAdmin = user?.role === 'admin';
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
   const [viewerToken, setViewerToken] = useState<string | null>(null);
@@ -551,7 +553,14 @@ const Workspace: React.FC = () => {
         <div className="w-full h-1/2 md:w-1/2 md:h-full border-b md:border-b-0 md:border-r border-gray-300 relative bg-slate-900">
           {/* Lisame errori käsitluse pildile, juhuks kui pildiserver ei tööta */}
           {page.image_url ? (
-            <ImageViewer src={currentImageSrc} pageNum={page.page_number} onGridView={handleOpenGridView} onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)} />
+            <ImageViewer
+              src={currentImageSrc}
+              pageNum={page.page_number}
+              onGridView={handleOpenGridView}
+              onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)}
+              isAdmin={isAdmin}
+              onManage={() => navigate(buildManageLink(workId!, page.page_number))}
+            />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
               Pilt puudub
