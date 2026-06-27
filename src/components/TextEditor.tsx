@@ -100,7 +100,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [savedState, setSavedState] = useState({
     status: page.status,
     comments: page.comments,
-    page_tags: page.page_tags,
+    page_tags: page.page_tags || [],
     text_annotations: page.text_annotations || [],
   });
 
@@ -351,7 +351,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setComments(page.comments);
     setTextAnnotations(page.text_annotations || []);
     setPageTags(page.page_tags || []);
-    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags, text_annotations: page.text_annotations || [] });
+    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
     setIsDirty(false);
 
     const view = viewRef.current;

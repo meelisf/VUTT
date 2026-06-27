@@ -425,7 +425,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
           genre: m.genre as LinkedEntity[] | null,
           creators: m.creators,
           tags: m.tags as LinkedEntity[],
-          notes: m.notes ?? null,
+          notes: m.notes,
           languages: metaForm.languages,
           location: m.location as LinkedEntity | null,
           publisher: m.publisher as LinkedEntity | null,
