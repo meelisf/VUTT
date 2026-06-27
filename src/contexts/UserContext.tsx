@@ -126,6 +126,9 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             applySettings(settings);
           } catch {}
         } else {
+          // LocalStorage'is oli token, kuid server ütles, et see enam ei kehti.
+          // Jätame põhjuse alles, et piiratud vaated saaksid pakkuda uuesti sisselogimist.
+          setSessionExpired(true);
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(STORAGE_KEY);
           localStorage.removeItem(SETTINGS_KEY);
@@ -155,13 +158,12 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
       if (!result) {
-        // Server kinnitas et token on aegunud — degradeeri VAIKSELT anonüümseks,
-        // täpselt nagu initAuth teeb lehe laadimisel/refreshil. Avalik vaade
-        // (teosed, isikud) jääb kättesaadavaks; sisselogimist küsitakse alles
-        // autenditud toimingul (nt salvestus → handleSave 401 → LoginModal).
-        // NB: EI sea setSessionExpired(true) — blokeeriv modaal jättis kasutaja
-        // avalikku sisu vaadates "token expired" akna taha lõksu (ainult hard
-        // refresh, mis läbib initAuth vaikse tee, päästis).
+        // Server kinnitas, et token on aegunud — degradeeri anonüümseks,
+        // kuid jäta UI-le teadmine, et põhjus oli sessiooni aegumine.
+        // NB: sessionExpired EI tohi avada globaalset blokeerivat modaali;
+        // vaated kasutavad seda kontekstipõhiselt (nt piiratud teose juures
+        // näidatakse "logi uuesti sisse", avalik sisu jääb kättesaadavaks).
+        setSessionExpired(true);
         setUser(null);
         setAuthToken(null);
         clearUserToken();
@@ -195,6 +197,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (data.status === 'success' && data.user && data.token) {
         setUser(data.user);
         setAuthToken(data.token);
+        setSessionExpired(false);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data.user));
         localStorage.setItem(TOKEN_KEY, data.token);
         if (data.meili_token) {
@@ -226,6 +229,7 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setUser(null);
     setAuthToken(null);
+    setSessionExpired(false);
     clearUserToken();
     setUserSettings({});
     localStorage.removeItem(STORAGE_KEY);

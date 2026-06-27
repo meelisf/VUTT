@@ -56,6 +56,12 @@
     "notLoggedIn": "You must be logged in to save.",
     "tokenMissing": "You must be logged in to save. Please log out and log in again."
   },
+  "errors": {
+    "accessDenied": "Access denied.",
+    "sessionExpiredProtectedWork": "Your session has expired. Please sign in again to view this work.",
+    "loginRequiredProtectedWork": "This work belongs to a restricted collection. Please sign in to view it.",
+    "pageNotFound": "Page not found. The pages of this document may have been reordered or deleted. Try going to the beginning of the work."
+  },
   "management": {
     "title": "Work management",
     "deleteWork": "Delete work",

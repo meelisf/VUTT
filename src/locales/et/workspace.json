@@ -56,6 +56,12 @@
     "notLoggedIn": "Salvestamiseks pead olema sisse logitud.",
     "tokenMissing": "Salvestamiseks pead olema sisse logitud. Palun logi välja ja uuesti sisse."
   },
+  "errors": {
+    "accessDenied": "Ligipääs keelatud.",
+    "sessionExpiredProtectedWork": "Sinu sessioon on aegunud. Selle teose vaatamiseks logi uuesti sisse.",
+    "loginRequiredProtectedWork": "See teos asub piiratud ligipääsuga kollektsioonis. Vaatamiseks logi sisse.",
+    "pageNotFound": "Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele."
+  },
   "management": {
     "title": "Teose haldus",
     "deleteWork": "Kustuta teos",
