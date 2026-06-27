@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Download, LayoutGrid } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface ImageViewerProps {
@@ -7,9 +7,11 @@ interface ImageViewerProps {
   pageNum?: number;
   onGridView?: () => void;
   onNavigate?: (direction: 'prev' | 'next') => void;
+  isAdmin?: boolean;
+  onManage?: () => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onNavigate }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onNavigate, isAdmin, onManage }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -183,7 +185,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
             className="p-2 text-white hover:bg-white/20 rounded transition-colors"
             title="Taasta vaade"
           >
-            <RotateCcw size={20} />
+            <Maximize2 size={20} />
           </button>
           {onGridView && (
             <>
@@ -196,6 +198,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
                 <LayoutGrid size={20} />
               </button>
             </>
+          )}
+          {isAdmin && onManage && (
+            <button
+              onClick={onManage}
+              className="p-2 text-white hover:bg-white/20 rounded transition-colors"
+              title="Halda lehte"
+            >
+              <Scissors size={20} />
+            </button>
           )}
           <div className="w-px bg-white/20 mx-1"></div>
           <button
