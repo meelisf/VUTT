@@ -41,6 +41,7 @@ const Workspace: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorRequiresLogin, setErrorRequiresLogin] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
   const [work, setWork] = useState<Work | undefined>(undefined);
   const [editorChanges, setEditorChanges] = useState(false);
@@ -146,6 +147,7 @@ const Workspace: React.FC = () => {
       }
       setLoading(true);
       setError(null);
+      setErrorRequiresLogin(false);
       try {
         let [pageData, workData] = await Promise.all([
           getPage(effectiveIndex, workId, currentPageNum),
@@ -169,14 +171,23 @@ const Workspace: React.FC = () => {
             }
             return; // effectiveIndex uuendub → useEffect käivitub uuesti
           } else if (r.status === 403) {
-            setError(t('errors.accessDenied', { defaultValue: "Ligipääs keelatud." }));
+            if (sessionExpired) {
+              setError(t('errors.sessionExpiredProtectedWork'));
+              setErrorRequiresLogin(true);
+              setShowLoginModal(true);
+            } else if (!user) {
+              setError(t('errors.loginRequiredProtectedWork'));
+              setErrorRequiresLogin(true);
+            } else {
+              setError(t('errors.accessDenied', { defaultValue: "Ligipääs keelatud." }));
+            }
             setLoading(false);
             return;
           }
         }
 
         if (!pageData) {
-          setError("Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele.");
+          setError(t('errors.pageNotFound', { defaultValue: "Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele." }));
         } else {
           setPage(pageData);
           setCurrentStatus(pageData.status);
@@ -211,7 +222,7 @@ const Workspace: React.FC = () => {
       }
     };
     loadData();
-  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, t]);
+  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, sessionExpired, user, t]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
@@ -334,12 +345,22 @@ const Workspace: React.FC = () => {
             Debug: WorkID: {workId}, Page: {currentPageNum}
           </div>
           <div className="flex gap-3 justify-center">
-            <button
-              onClick={() => navigate(`/work/${workId}/1`, { replace: true })}
-              className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-            >
-              {t('workspace:navigation.toFirstPage', 'Mine teose algusesse')}
-            </button>
+            {errorRequiresLogin ? (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+              >
+                <LogIn size={16} />
+                {t('auth:login.title')}
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate(`/work/${workId}/1`, { replace: true })}
+                className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
+              >
+                {t('workspace:navigation.toFirstPage', 'Mine teose algusesse')}
+              </button>
+            )}
             <button
               onClick={() => navigate('/')}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
@@ -661,12 +682,12 @@ const Workspace: React.FC = () => {
 
       {/* Login modaal (sessioon aegunud või käsitsi avatud) */}
       <LoginModal
-        isOpen={showLoginModal || sessionExpired}
+        isOpen={showLoginModal}
         onClose={() => {
           setShowLoginModal(false);
           clearSessionExpired();
         }}
-        message={sessionExpired ? t('auth:sessionExpired') : undefined}
+        message={sessionExpired ? t('errors.sessionExpiredProtectedWork') : undefined}
       />
     </div>
   );

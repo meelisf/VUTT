@@ -136,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({
       {children}
 
       <LoginModal
-        isOpen={showLoginModal || sessionExpired}
+        isOpen={showLoginModal}
         onClose={() => {
           setShowLoginModal(false);
           clearSessionExpired();
