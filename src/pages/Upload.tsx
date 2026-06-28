@@ -26,40 +26,20 @@ import { buildReplaceUploadPayload } from '../utils/buildReplaceUploadPayload';
 import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
-
-// ---------------------------------------------------------------------------
-// Tüübid
-// ---------------------------------------------------------------------------
-
-interface FileEntry {
-  page: number;
-  filename: string;
-  has_ocr: boolean;
-  deleted: boolean;
-}
-
-interface PollResult {
-  status: string;
-  ready: number;
-  total: number;
-  expected_pages: number | null;
-  files: FileEntry[];
-  progress?: { bytes_sent: number; bytes_total: number; error?: string | null };
-  error?: string;
-  stalled?: boolean;
-}
-
-interface SavedUpload {
-  id: string;
-  status: string;
-  meta: { title: string; year: string | number; slug: string; type?: { id: string; label: string; source: string; labels?: Record<string, string> } };
-  created_at: string;
-  expected_pages: number | null;
-  files: FileEntry[];
-  stalled?: boolean;
-}
+import type { FileEntry, PollResult, SavedUpload } from './upload/types';
+import {
+  ApiError,
+  createUpload,
+  deleteUpload,
+  getReplaceWorkMetadata,
+  getUploadStatus,
+  importUpload,
+  listUploads,
+  replaceWorkUpload,
+  uploadImagePage,
+  uploadSingleFile,
+} from './upload/uploadApi';
 
 const POLL_SLOW_MS = 5000;
 const POLL_FAST_MS = 2000;
@@ -272,12 +252,7 @@ const Upload: React.FC = () => {
     (async () => {
       try {
         // 1. Lae teose metaandmed
-        const metaRes = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/work/${rid}/metadata`,
-          { headers: getAuthHeaders(authToken) }
-        );
-        if (!metaRes.ok) throw new Error(`Metaandmete laadimine ebaõnnestus (HTTP ${metaRes.status})`);
-        const meta = await metaRes.json();
+        const meta = await getReplaceWorkMetadata(rid, authToken);
 
         const fetchedTitle: string = meta.title || '';
         const fetchedYear: string = meta.year ? String(meta.year) : '';
@@ -295,15 +270,7 @@ const Upload: React.FC = () => {
 
         // 2. Loo upload staging automaatselt
         // Asendamise voog jätab Step 1 vahele — type tuleb asendatava teose metaandmetest (backend loeb ise)
-        const createRes = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify(buildReplaceUploadPayload(meta, rid)),
-        });
-        const createData = await createRes.json();
-        if (!createRes.ok) {
-          throw new Error(createData.message || `Upload loomine ebaõnnestus (HTTP ${createRes.status})`);
-        }
+        const createData = await createUpload(buildReplaceUploadPayload(meta, rid), authToken);
 
         // 3. Eduka loomise korral hüppa samm 2-sse
         setUploadId(createData.upload.id);
@@ -321,8 +288,7 @@ const Upload: React.FC = () => {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!authToken) return;
-    fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, { headers: getAuthHeaders(authToken) })
-      .then((r) => r.json())
+    listUploads(authToken)
       .then((d) => setPendingUploads(d.uploads || []))
       .catch(() => {})
       .finally(() => setLoadingPending(false));
@@ -358,12 +324,7 @@ const Upload: React.FC = () => {
     async (id: string) => {
       if (!authToken) return;
       try {
-        const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${id}/status`,
-          { headers: getAuthHeaders(authToken) }
-        );
-        if (!r.ok) return;
-        const d: PollResult = await r.json();
+        const d: PollResult = await getUploadStatus(id, authToken);
         setPollResult(d);
         if (['processing', 'reviewing', 'done'].includes(d.status)) {
           setStep(3);
@@ -405,32 +366,28 @@ const Upload: React.FC = () => {
 
     try {
       while (attempts < 3) {
-        const r = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/create`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({
+        try {
+          const d = await createUpload({
             title: title.trim(),
             year: year.trim(),
             slug: candidateSlug,
             collections: selectedCollection ? [selectedCollection] : [],
             replace_work_id: replaceWorkId || null,
             type: workType,
-          }),
-        });
-        const d = await r.json();
-        if (r.ok) {
+          }, authToken);
           // Backend küpsetab work_id slug'i → kuva reaalne kaustanimi (data/{slug}-{work_id}/)
           if (d.upload?.meta?.slug) setSlug(d.upload.meta.slug);
           setUploadId(d.upload.id);
           setStep(2);
           return;
-        }
-        if (d.conflict) {
-          candidateSlug = `${slug}-${randSuffix()}`;
-          attempts++;
-        } else {
-          setStep1Error(d.message || t('errors.createFailed'));
-          return;
+        } catch (e) {
+          if (e instanceof ApiError && e.data && typeof e.data === 'object' && (e.data as { conflict?: boolean }).conflict) {
+            candidateSlug = `${slug}-${randSuffix()}`;
+            attempts++;
+          } else {
+            setStep1Error(e instanceof Error ? e.message : t('errors.createFailed'));
+            return;
+          }
         }
       }
       // 3 katset ebaõnnestus (väga ebatõenäoline)
@@ -461,30 +418,10 @@ const Upload: React.FC = () => {
     startPolling(uploadId, POLL_FAST_MS);
 
     try {
-      const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/upload/${uploadId}/files`,
-        {
-          method: 'POST',
-          headers: { 'X-Filename': encodeURIComponent(file.name), ...getAuthHeaders(authToken) },
-          body: file,
-          timeout: 300_000, // 5 min suurtele failidele
-        }
-      );
-      if (r.status === 413) {
-        setUploadError(t('errors.fileTooLarge'));
-        setFileUploading(false);
-        stopPolling();
-        return;
-      }
-      const d = await r.json();
-      if (!r.ok) {
-        setUploadError(d.detail || d.message || t('errors.uploadFailed'));
-        setFileUploading(false);
-        stopPolling();
-      }
+      await uploadSingleFile(uploadId, file, authToken);
       // 202 — SFTP transfer algas taustal, polling jätkab
-    } catch {
-      setUploadError(t('errors.uploadFailed'));
+    } catch (e) {
+      setUploadError(e instanceof ApiError && e.status === 413 ? t('errors.fileTooLarge') : t('errors.uploadFailed'));
       setFileUploading(false);
       stopPolling();
     }
@@ -502,33 +439,9 @@ const Upload: React.FC = () => {
     for (let i = 0; i < files.length; i++) {
       setMultiCurrentNum(i + 1);
       try {
-        const r = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/upload/${uploadId}/files`,
-          {
-            method: 'POST',
-            headers: {
-              'X-Filename': encodeURIComponent(files[i].name),
-              'X-Page-Number': String(i + 1),
-              'X-Total-Pages': String(files.length),
-              ...getAuthHeaders(authToken),
-            },
-            body: files[i],
-            timeout: 300_000,
-          }
-        );
-        if (r.status === 413) {
-          setUploadError(t('errors.fileTooLarge'));
-          setFileUploading(false);
-          return;
-        }
-        const d = await r.json();
-        if (!r.ok) {
-          setUploadError(d.detail || d.message || t('errors.uploadFailed'));
-          setFileUploading(false);
-          return;
-        }
-      } catch {
-        setUploadError(t('errors.uploadFailed'));
+        await uploadImagePage(uploadId, files[i], i + 1, files.length, authToken);
+      } catch (e) {
+        setUploadError(e instanceof ApiError && e.status === 413 ? t('errors.fileTooLarge') : t('errors.uploadFailed'));
         setFileUploading(false);
         return;
       }
@@ -579,26 +492,13 @@ const Upload: React.FC = () => {
     setImportLoading(true);
     setImportError('');
     try {
-      const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/upload/${uploadId}/import`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({}),
-          timeout: 60_000,
-        }
-      );
-      const d = await r.json();
-      if (!r.ok) {
-        setImportError(d.message || t('step3.importError'));
-        return;
-      }
+      const d = await importUpload(uploadId, authToken);
       stopPolling();
       setFileUploading(false);
       // Suuna tööle
       navigate(`/work/${d.work_id}`);
-    } catch {
-      setImportError(t('step3.importError'));
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : t('step3.importError'));
     } finally {
       setImportLoading(false);
     }
@@ -612,25 +512,12 @@ const Upload: React.FC = () => {
     setImportLoading(true);
     setImportError('');
     try {
-      const r = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/upload/${uploadId}/replace-work/${replaceWorkId}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ metadata_updates: {} }),
-          timeout: 30_000,
-        }
-      );
-      const d = await r.json();
-      if (!r.ok) {
-        setImportError(d.message || t('step3.importError'));
-        return;
-      }
+      const d = await replaceWorkUpload(uploadId, replaceWorkId, authToken);
       stopPolling();
       setFileUploading(false);
       navigate(`/work/${d.work_id}/1`);
-    } catch {
-      setImportError(t('step3.importError'));
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : t('step3.importError'));
     } finally {
       setImportLoading(false);
     }
@@ -659,8 +546,7 @@ const Upload: React.FC = () => {
     setReplaceWorkTitle(null);
     // Värskenda pooleliolevate nimekirja
     if (authToken) {
-      fetchWithTimeout(`${FILE_API_URL}/admin/uploads`, { headers: getAuthHeaders(authToken) })
-        .then((r) => r.json())
+      listUploads(authToken)
         .then((d) => setPendingUploads(d.uploads || []))
         .catch(() => {});
     }
@@ -673,10 +559,7 @@ const Upload: React.FC = () => {
     if (!window.confirm(t('cancelConfirm'))) return;
     stopPolling();
     if (uploadId && authToken) {
-      await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(authToken),
-      }).catch(() => {});
+      await deleteUpload(uploadId, authToken).catch(() => {});
     }
     setUploadId(null);
     setStep(1);
@@ -847,10 +730,7 @@ const Upload: React.FC = () => {
                         <button
                           onClick={async () => {
                             if (!window.confirm(t('cancelConfirm'))) return;
-                            await fetchWithTimeout(
-                              `${FILE_API_URL}/admin/upload/${u.id}`,
-                              { method: 'DELETE', headers: getAuthHeaders(authToken) }
-                            ).catch(() => {});
+                            await deleteUpload(u.id, authToken).catch(() => {});
                             setPendingUploads((prev) => prev.filter((p) => p.id !== u.id));
                           }}
                           className={`text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
