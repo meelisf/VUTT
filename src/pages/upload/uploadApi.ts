@@ -3,7 +3,6 @@ import { apiDelete, apiGet, apiPost, ApiError } from '../../services/apiClient';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import type {
   PollResult,
-  UploadCreatePayload,
   UploadCreateResponse,
   UploadImportResponse,
   UploadListResponse,
@@ -25,7 +24,7 @@ export function getReplaceWorkMetadata(workId: string, token: string | null): Pr
   return apiGet<WorkMetadataForReplace>(`/admin/work/${workId}/metadata`, { token });
 }
 
-export function createUpload(payload: UploadCreatePayload | unknown, token: string | null): Promise<UploadCreateResponse> {
+export function createUpload<T = unknown>(payload: T, token: string | null): Promise<UploadCreateResponse> {
   return apiPost<UploadCreateResponse>('/admin/upload/create', payload, { token });
 }
 
@@ -37,14 +36,14 @@ export function getUploadStatus(uploadId: string, token: string | null): Promise
   return apiGet<PollResult>(`/admin/upload/${uploadId}/status`, { token });
 }
 
-export async function uploadSingleFile(uploadId: string, file: File, token: string | null): Promise<unknown> {
+export async function uploadSingleFile(uploadId: string, file: File, token: string | null): Promise<void> {
   const response = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/files`, {
     method: 'POST',
     headers: { 'X-Filename': encodeURIComponent(file.name), ...getAuthHeaders(token) },
     body: file,
     timeout: 300_000,
   });
-  return parseUploadResponse(response);
+  await parseUploadResponse(response);
 }
 
 export async function uploadImagePage(
@@ -53,7 +52,7 @@ export async function uploadImagePage(
   pageNumber: number,
   totalPages: number,
   token: string | null,
-): Promise<unknown> {
+): Promise<void> {
   const response = await fetchWithTimeout(`${FILE_API_URL}/admin/upload/${uploadId}/files`, {
     method: 'POST',
     headers: {
@@ -65,7 +64,7 @@ export async function uploadImagePage(
     body: file,
     timeout: 300_000,
   });
-  return parseUploadResponse(response);
+  await parseUploadResponse(response);
 }
 
 export function importUpload(uploadId: string, token: string | null): Promise<UploadImportResponse> {

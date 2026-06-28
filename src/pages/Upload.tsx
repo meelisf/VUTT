@@ -304,6 +304,16 @@ const Upload: React.FC = () => {
   // ---------------------------------------------------------------------------
   // Samm 2 — faili üleslaadimine
   // ---------------------------------------------------------------------------
+  /** Tõlgib faili üleslaadimise API vea kasutajale näidatavaks teateks.
+   *  413 → fail liiga suur; muu ApiError → serveri detailne teade (nt SFTP
+   *  timeout); võrguviga → üldine teade. */
+  function uploadErrorMessage(e: unknown): string {
+    if (e instanceof ApiError) {
+      return e.status === 413 ? t('errors.fileTooLarge') : e.message;
+    }
+    return t('errors.uploadFailed');
+  }
+
   async function handleFileUpload(file: File) {
     if (!uploadId || !authToken) return;
     setUploadError('');
@@ -323,7 +333,7 @@ const Upload: React.FC = () => {
       await uploadSingleFile(uploadId, file, authToken);
       // 202 — SFTP transfer algas taustal, polling jätkab
     } catch (e) {
-      setUploadError(e instanceof ApiError && e.status === 413 ? t('errors.fileTooLarge') : t('errors.uploadFailed'));
+      setUploadError(uploadErrorMessage(e));
       setFileUploading(false);
       stopPolling();
     }
@@ -343,7 +353,7 @@ const Upload: React.FC = () => {
       try {
         await uploadImagePage(uploadId, files[i], i + 1, files.length, authToken);
       } catch (e) {
-        setUploadError(e instanceof ApiError && e.status === 413 ? t('errors.fileTooLarge') : t('errors.uploadFailed'));
+        setUploadError(uploadErrorMessage(e));
         setFileUploading(false);
         return;
       }
