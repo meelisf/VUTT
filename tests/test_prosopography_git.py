@@ -302,16 +302,13 @@ def test_migration_script(tmp_path):
     # Initsialiseeri git repo data/ all
     repo = git.Repo.init(str(tmp_path / "data"))
 
-    from pathlib import Path
-    PROJECT_ROOT_PATH = Path("/home/mf/LLM/VUTT")
-
     with patch("server.config.PROSOPOGRAPHY_DIR", str(data_config / "prosopography")), \
          patch("server.config.STATE_DIR", str(tmp_path / "state")), \
          patch("server.git_ops.get_or_init_repo", return_value=repo), \
          patch("server.git_ops.BASE_DIR", str(tmp_path / "data")):
         spec = importlib.util.spec_from_file_location(
             "migrate",
-            str(PROJECT_ROOT_PATH / "scripts" / "migrate_prosopography_to_git.py")
+            str(PROJECT_ROOT / "scripts" / "migrate_prosopography_to_git.py")
         )
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
