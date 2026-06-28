@@ -208,6 +208,7 @@
       "thumbWarning": "Image was changed, but thumbnail update failed.",
       "cropHint": "Drag a rectangle; resize from handles, move from inside, tilt from the top knob",
       "cropReset": "Remove crop box and forget last used size",
+      "perspectiveReset": "Reset perspective corners",
       "dragPanel": "Drag buttons elsewhere",
       "applyError": "Operation failed",
       "close": "Close"

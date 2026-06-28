@@ -765,6 +765,11 @@ const PageImageEditorModal: React.FC<Props> = ({
                   >
                     <Frame size={16} />
                   </button>
+                  {perspective && quad && (
+                    <button onClick={() => setQuad(defaultQuad(0.05))} title={t('manage.editor.perspectiveReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                      <CircleX size={16} />
+                    </button>
+                  )}
                   {cropRect && !perspective && (
                     <button onClick={() => { setCropRect(null); setBoxAngle(0); lastCropSizeRef.current = null; }} title={t('manage.editor.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
                       <CircleX size={16} />

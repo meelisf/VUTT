@@ -208,6 +208,7 @@
       "thumbWarning": "Pilt muudeti, aga pisipildi uuendamine ebaõnnestus.",
       "cropHint": "Lohista ristkülik; sangadest muuda suurust, seest liiguta, ülemisest nupust kalluta",
       "cropReset": "Eemalda kärpekast ja unusta viimati kasutatud suurus",
+      "perspectiveReset": "Lähtesta perspektiivinurgad",
       "dragPanel": "Lohista nupud teise kohta",
       "applyError": "Toiming ebaõnnestus",
       "close": "Sulge"
