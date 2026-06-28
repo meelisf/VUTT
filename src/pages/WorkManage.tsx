@@ -778,6 +778,7 @@ const WorkManage: React.FC = () => {
                         isSelected={selectedFiles.has(page.filename)}
                         isChanged={(draftPositions[page.filename] ?? page.page_num) !== page.page_num}
                         thumbCacheBust={thumbCacheBust}
+                        imageToken={imageToken}
                         onToggle={handleToggle}
                         onEdit={() => setEditorTarget({ index: page.page_num - 1, tab: 'edit' })}
                       />

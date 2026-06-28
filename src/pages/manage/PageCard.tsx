@@ -16,6 +16,7 @@ interface PageCardProps {
   isSelected: boolean;
   isChanged: boolean;
   thumbCacheBust: number;
+  imageToken?: { exp: number; sig: string } | null;
   onToggle: (filename: string, shiftKey: boolean) => void;
   onEdit: (visiblePageNum: number) => void;
   isFocused?: boolean;
@@ -31,6 +32,7 @@ const statusColor = (status: string) => {
 
 const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
   const { t } = useTranslation(['workspace', 'common']);
+  const imageTokenQuery = p.imageToken ? `&exp=${p.imageToken.exp}&sig=${p.imageToken.sig}` : '';
   return (
     <div
       ref={ref}
@@ -89,7 +91,7 @@ const PageCard = React.forwardRef<HTMLDivElement, PageCardProps>((p, ref) => {
         )}
         <PageThumb
           workId={p.workId}
-          src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}`}
+          src={`${IMAGE_BASE_URL}/${p.workId}/_thumbs/_thumb_${p.imageName}?v=${p.thumbCacheBust}${imageTokenQuery}`}
           className="w-full h-full object-cover"
         />
         {/* Nähtav number — all vasakul */}

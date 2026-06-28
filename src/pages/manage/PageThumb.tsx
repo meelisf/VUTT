@@ -28,6 +28,7 @@ const PageThumb: React.FC<{ workId: string; src: string; className: string }> = 
   }, [src]);
 
   const imgSrc = buildThumbUrl(src, tokenQuery, nonce);
+  const srcHasImageToken = src.includes('exp=') && src.includes('sig=');
 
   const scheduleReload = (delay: number) => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -36,8 +37,7 @@ const PageThumb: React.FC<{ workId: string; src: string; className: string }> = 
 
   const handleError = async () => {
     // 1) Esimene viga: ehk piiratud teos → proovi signeeritud viewer-tokenit.
-    if (!tokenTriedRef.current && workId) {
-      tokenTriedRef.current = true;
+    if (!srcHasImageToken && !tokenTriedRef.current && workId) {
       try {
         const r = await fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
           headers: getAuthHeaders(authToken),
@@ -46,11 +46,17 @@ const PageThumb: React.FC<{ workId: string; src: string; className: string }> = 
         if (r.ok) {
           const d = await r.json();
           if (d.image_exp && d.image_sig) {
+            tokenTriedRef.current = true;
             setTokenQuery(`&exp=${d.image_exp}&sig=${d.image_sig}`);
             return;
           }
         }
-      } catch { /* kukub allolevasse transientse retry-loogikasse */ }
+        // Kui server ütleb päriselt "ei" (nt õigust pole), pole mõtet iga retry'ga tokenit uuesti küsida.
+        // Võrgu/timeout'i catch jätab lipu false'iks, et järgmine taustakatse prooviks uuesti.
+        if (r.status === 401 || r.status === 403 || r.status === 404) {
+          tokenTriedRef.current = true;
+        }
+      } catch { /* transientne võrgutõrge — järgmine retry proovib tokenit uuesti */ }
     }
     // 2) Transientne viga (aeglane ühendus / serveri thumb-genereerimise viivitus):
     //    JÄTKA proovimist kasvava (kuni ~5s) viivitusega — <img> jääb monteerituks,
