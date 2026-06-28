@@ -206,19 +206,29 @@ const WorkManage: React.FC = () => {
     if (isAdmin) loadPages();
   }, [workId, authToken, isAdmin]);
 
+  // Pildi viewer-token piiratud teoste thumbnailide jaoks. Server-tokeni TTL on 1h
+  // (public.py), seega värskendame seda perioodiliselt — muidu aeguks token pikalt
+  // lahti oleval manage-lehel ja thumbid jääksid 403-lõputusse retry'sse (token on
+  // src-is, PageThumb ei küsi seda ise uuesti). Värske token → src muutub → reload.
   useEffect(() => {
     if (!workId || !authToken || !isAdmin) return;
-    fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-      headers: getAuthHeaders(authToken),
-      timeout: 10000,
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.image_exp && d?.image_sig) {
-          setImageToken({ exp: d.image_exp, sig: d.image_sig });
-        }
+    let cancelled = false;
+    const fetchToken = () => {
+      fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
+        headers: getAuthHeaders(authToken),
+        timeout: 10000,
       })
-      .catch(() => {});
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (!cancelled && d?.image_exp && d?.image_sig) {
+            setImageToken({ exp: d.image_exp, sig: d.image_sig });
+          }
+        })
+        .catch(() => {});
+    };
+    fetchToken();
+    const timer = setInterval(fetchToken, 45 * 60 * 1000); // 45 min < 1h TTL
+    return () => { cancelled = true; clearInterval(timer); };
   }, [workId, authToken, isAdmin]);
 
   // Re-OCR koondstaatus: laeb korra (näitab .ocr-ootel märke), pollib ainult aktiivse batchi ajal.

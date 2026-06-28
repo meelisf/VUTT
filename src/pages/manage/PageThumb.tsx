@@ -50,10 +50,11 @@ const PageThumb: React.FC<{ workId: string; src: string; className: string }> = 
             setTokenQuery(`&exp=${d.image_exp}&sig=${d.image_sig}`);
             return;
           }
-        }
-        // Kui server ütleb päriselt "ei" (nt õigust pole), pole mõtet iga retry'ga tokenit uuesti küsida.
-        // Võrgu/timeout'i catch jätab lipu false'iks, et järgmine taustakatse prooviks uuesti.
-        if (r.status === 401 || r.status === 403 || r.status === 404) {
+          // 200, aga token puudub (nt avalik teos) → tokenist pole abi, ära küsi iga retry'ga uuesti.
+          tokenTriedRef.current = true;
+        } else if (r.status === 401 || r.status === 403 || r.status === 404) {
+          // Server ütleb päriselt "ei" (õigust pole / teost pole) → ära küsi iga retry'ga uuesti.
+          // Võrgu/timeout'i catch jätab lipu false'iks, et järgmine taustakatse prooviks uuesti.
           tokenTriedRef.current = true;
         }
       } catch { /* transientne võrgutõrge — järgmine retry proovib tokenit uuesti */ }
