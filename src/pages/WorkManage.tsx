@@ -736,10 +736,10 @@ const WorkManage: React.FC = () => {
 
                 <div className="flex items-center gap-2 px-4 pt-2 text-sm text-gray-600">
                   <button
-                    onClick={() => setGridCols((c) => Math.max(c - 1, MIN_COLS))}
-                    disabled={gridCols <= MIN_COLS}
+                    onClick={() => setGridCols((c) => Math.min(c + 1, MAX_COLS))}
+                    disabled={gridCols >= MAX_COLS}
                     className="px-2 py-0.5 border rounded disabled:opacity-40"
-                    title="Suuremad pisipildid"
+                    title="Väiksemad pisipildid"
                   >−</button>
                   <input
                     type="range"
@@ -750,10 +750,10 @@ const WorkManage: React.FC = () => {
                     aria-label="Veergude arv"
                   />
                   <button
-                    onClick={() => setGridCols((c) => Math.min(c + 1, MAX_COLS))}
-                    disabled={gridCols >= MAX_COLS}
+                    onClick={() => setGridCols((c) => Math.max(c - 1, MIN_COLS))}
+                    disabled={gridCols <= MIN_COLS}
                     className="px-2 py-0.5 border rounded disabled:opacity-40"
-                    title="Väiksemad pisipildid"
+                    title="Suuremad pisipildid"
                   >+</button>
                 </div>
                 <div
