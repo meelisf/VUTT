@@ -8,6 +8,7 @@ import os
 import json
 import shutil
 import io
+import math
 import re
 import threading
 import unicodedata
@@ -423,6 +424,18 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
             ]
         )
 
+        # Populeeri MÕLEMA poole ._originals poolituseelse topeltlehega, et
+        # "Taasta originaal" tooks kummalt poolelt terve topeltlehe tagasi.
+        # Eelista originaali enda ._originals-it (pristine enne kõike) kui olemas.
+        orig_dir = os.path.join(BASE_DIR, '._originals', work_id)
+        os.makedirs(orig_dir, exist_ok=True)
+        existing_orig = os.path.join(orig_dir, orig_filename)
+        src_original = existing_orig if os.path.exists(existing_orig) else orig_img_path
+        for half in (left_filename, right_filename):
+            dest = os.path.join(orig_dir, half)
+            if not os.path.exists(dest):
+                shutil.copy2(src_original, dest)
+
         # Liiguta originaali .jpg prügikasti (ei ole git-tracked)
         trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'pages')
         os.makedirs(trash_dir, exist_ok=True)
@@ -445,6 +458,56 @@ def split_page(work_id: str, page_num: int, split_x: float, username: str) -> di
 
 ANGLE_EPS = 1e-4   # alla selle nurka käsitleme nullina (float-müra slidersist)
 MIN_CROP_PX = 8    # minimaalne kärpe-mõõde pärast klampimist
+QUAD_MIN_EDGE = 0.02   # minimaalne quad serva pikkus (normaliseeritud)
+QUAD_MIN_OUT_PX = 8    # minimaalne perspektiivi väljundmõõt pikslites
+
+
+def dist(a, b) -> float:
+    """Eukleidiline kaugus kahe (x,y) punkti vahel."""
+    return math.hypot(b[0] - a[0], b[1] - a[1])
+
+
+def _validate_quad(quad):
+    """Valideerib perspektiivi nelinurga ja tagastab 4 (x,y) tuple'it [0..1].
+
+    Nõuded: täpselt 4 punkti; lõplikud arvud; [0,1]; iga serv ≥ QUAD_MIN_EDGE;
+    kumer (mitte bow-tie/concave). Raise ValueError igal rikkumisel.
+    """
+    if not isinstance(quad, (list, tuple)) or len(quad) != 4:
+        raise ValueError("quad peab olema täpselt 4 punkti")
+    pts = []
+    for p in quad:
+        if isinstance(p, dict):
+            x, y = p.get("x"), p.get("y")
+        elif isinstance(p, (list, tuple)) and len(p) == 2:
+            x, y = p
+        else:
+            raise ValueError("quad punkt peab olema {x,y} või [x,y]")
+        x, y = float(x), float(y)
+        if not (math.isfinite(x) and math.isfinite(y)):
+            raise ValueError("quad punkt peab olema lõplik arv")
+        if not (0.0 <= x <= 1.0 and 0.0 <= y <= 1.0):
+            raise ValueError("quad punkt peab olema vahemikus [0,1]")
+        pts.append((x, y))
+    # Serva pikkused
+    for i in range(4):
+        if dist(pts[i], pts[(i + 1) % 4]) < QUAD_MIN_EDGE:
+            raise ValueError("quad serv on liiga lühike")
+    # Kumerus: kõigi ristkorrutiste märk peab olema järjepidev
+    sign = 0
+    for i in range(4):
+        ax, ay = pts[i]
+        bx, by = pts[(i + 1) % 4]
+        cx, cy = pts[(i + 2) % 4]
+        cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx)
+        if abs(cross) < 1e-9:
+            continue
+        s = 1 if cross > 0 else -1
+        if sign == 0:
+            sign = s
+        elif s != sign:
+            raise ValueError("quad peab olema kumer (mitte bow-tie)")
+    return pts
 
 
 def _compute_crop_box(crop, w: int, h: int):
@@ -472,16 +535,20 @@ def _compute_crop_box(crop, w: int, h: int):
     return (left, top, right, bottom)
 
 
-def transform_page_image(work_id, filename, angle=0.0, crop=None, username="admin"):
-    """Pöörab ja/või kärbib lehepilti kohapeal (failinimi/tekst/JSON/sequence säilivad).
+def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, username="admin"):
+    """Pöörab, kärbib ja/või sirgestab lehepilti kohapeal (failinimi/tekst/JSON/sequence säilivad).
 
     Varundab ENNE ülekirjutust (trash + esmane ._originals), kasutab atomaarset os.replace'i.
     Tagastab no-op / changed / found:False sõnastiku; raise ValueError vigaste parameetrite korral.
     """
     angle = float(angle)
 
+    if quad is not None and crop is not None:
+        raise ValueError("quad ja crop ei saa olla korraga")
+    quad_pts = _validate_quad(quad) if quad is not None else None
+
     # No-op kaitse (float-tolerantsiga)
-    if abs(angle) < ANGLE_EPS and crop is None:
+    if abs(angle) < ANGLE_EPS and crop is None and quad is None:
         return {"success": True, "changed": False, "reason": "no_transform"}
 
     # Path-traversal kaitse
@@ -521,13 +588,27 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, username="admi
             is_jpeg = ext_l in ('.jpg', '.jpeg')
             if is_jpeg and img.mode in ('RGBA', 'LA', 'P'):
                 img = img.convert('RGB')
+            fill = (255, 255, 255) if img.mode == 'RGB' else 255
             if abs(angle) >= ANGLE_EPS:
                 # CSS positiivne = päripäeva → Pillow vastupäeva → -angle
-                fill = (255, 255, 255) if img.mode == 'RGB' else 255
                 img = img.rotate(-angle, expand=True, fillcolor=fill)
-            box = _compute_crop_box(crop, img.width, img.height)
-            if box is not None:
-                img = img.crop(box)
+            if quad_pts is not None:
+                # Perspektiivi sirgestus: quad ([0..1] rotated-raamis) → ristkülik
+                W, H = img.width, img.height
+                pxs = [(x * W, y * H) for (x, y) in quad_pts]
+                TL, TR, BR, BL = pxs
+                out_w = round((dist(TL, TR) + dist(BL, BR)) / 2)
+                out_h = round((dist(TL, BL) + dist(TR, BR)) / 2)
+                if out_w < QUAD_MIN_OUT_PX or out_h < QUAD_MIN_OUT_PX:
+                    raise ValueError("quad väljund on liiga väike")
+                # Image.QUAD data: UL, LL, LR, UR (Pillow konventsioon)
+                data = [TL[0], TL[1], BL[0], BL[1], BR[0], BR[1], TR[0], TR[1]]
+                img = img.transform((out_w, out_h), PILImage.QUAD, data,
+                                    resample=PILImage.BICUBIC, fillcolor=fill)
+            else:
+                box = _compute_crop_box(crop, img.width, img.height)
+                if box is not None:
+                    img = img.crop(box)
             out_w, out_h = img.size
 
             # 4) Salvesta tmp-faili SAMAS kaustas (EXDEV kaitse), siis atomaarne replace
@@ -558,7 +639,7 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, username="admi
         with open(log_path, 'a', encoding='utf-8') as lf:
             lf.write(
                 f"{datetime.now().isoformat()} | {username} | {work_id} | {filename} | "
-                f"angle={angle} crop={crop} | -> {out_w}x{out_h}\n"
+                f"angle={angle} crop={crop} quad={quad} | -> {out_w}x{out_h}\n"
             )
 
         logger.info(f"TRANSFORM: {folder_name}/{filename} ({username})")
@@ -576,6 +657,74 @@ def clear_original_backup(work_id, filename):
     orig_backup = os.path.join(BASE_DIR, '._originals', work_id, filename)
     if os.path.exists(orig_backup):
         os.remove(orig_backup)
+
+
+def restore_original_page_image(work_id, filename, username="admin"):
+    """Taastab lehe ._originals pristine pildi praeguse faili kohale (ainult .jpg).
+
+    Tekst/JSON/sequence/failinimi muutumatud. ._originals JÄÄB alles → korduvalt
+    taastatav. Tagastab no_original kui originaali pole; found:False tundmatu töö korral.
+    """
+    # Path-traversal kaitse
+    if os.path.basename(filename) != filename or "/" in filename or "\\" in filename:
+        raise ValueError("vigane failinimi")
+
+    path = find_directory_by_id(work_id)
+    if not path:
+        return {"found": False}
+
+    orig_backup = os.path.join(BASE_DIR, '._originals', work_id, filename)
+    if not os.path.exists(orig_backup):
+        return {"success": True, "restored": False, "reason": "no_original"}
+
+    folder_name = os.path.basename(path)
+    with work_lock(folder_name, path):
+        img_path = os.path.join(path, filename)
+        if filename not in get_sorted_images(path):
+            return {"found": False}
+
+        base, ext = os.path.splitext(filename)
+
+        # 1) Varunda praegune → trash
+        trash_dir = os.path.join(BASE_DIR, '._trash', work_id, 'replaced_images')
+        os.makedirs(trash_dir, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+        if os.path.exists(img_path):
+            shutil.copy2(img_path, os.path.join(trash_dir, f"{base}_{timestamp}{ext}"))
+
+        # 2) Kopeeri originaal tmp → atomaarne replace (._originals JÄÄB)
+        tmp_path = img_path + '.tmp'
+        shutil.copy2(orig_backup, tmp_path)
+        os.replace(tmp_path, img_path)
+        os.chmod(img_path, 0o644)
+
+        # 3) Regenereeri thumbnail
+        thumbnail_warning = False
+        try:
+            from .image_server import generate_thumbnail
+            thumbs_dir = os.path.join(path, '_thumbs')
+            os.makedirs(thumbs_dir, exist_ok=True)
+            thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+            generate_thumbnail(img_path, thumb_path)
+        except Exception as e:
+            logger.error(f"RESTORE: thumbnaili regen ebaõnnestus {filename}: {e}")
+            thumbnail_warning = True
+
+        # 4) Logi
+        log_path = os.path.join(BASE_DIR, 'transform_image.log')
+        with open(log_path, 'a', encoding='utf-8') as lf:
+            lf.write(
+                f"{datetime.now().isoformat()} | {username} | {work_id} | {filename} | "
+                f"restore_original | -> restored\n"
+            )
+
+        logger.info(f"RESTORE: {folder_name}/{filename} ({username})")
+        return {
+            "success": True, "restored": True, "filename": filename,
+            "thumbnail_warning": thumbnail_warning,
+        }
 
 
 def write_new_page(work_dir, staging_dir, folder_name, work_id, content, ext, seq):
