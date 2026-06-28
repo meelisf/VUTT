@@ -17,22 +17,22 @@ import {
   Info,
   ListTodo,
 } from 'lucide-react';
-import Header from '../components/Header';
-import StepIndicator from './upload/components/StepIndicator';
-import UploadStepMeta from './upload/components/UploadStepMeta';
-import UploadStepTransfer from './upload/components/UploadStepTransfer';
-import UploadStepReview from './upload/components/UploadStepReview';
-import { TYPE_HAND, TYPE_PRINT } from './upload/constants';
-import { useUploadWizard } from './upload/useUploadWizard';
-import { useUser } from '../contexts/UserContext';
-import { useCollection } from '../contexts/CollectionContext';
-import { getLangCode } from '../utils/getLangCode';
+import Header from '../../components/Header';
+import StepIndicator from './components/StepIndicator';
+import UploadStepMeta from './components/UploadStepMeta';
+import UploadStepTransfer from './components/UploadStepTransfer';
+import UploadStepReview from './components/UploadStepReview';
+import { TYPE_HAND, TYPE_PRINT } from './constants';
+import { useUploadWizard } from './useUploadWizard';
+import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
+import { getLangCode } from '../../utils/getLangCode';
 
 // ---------------------------------------------------------------------------
 // Peakomponent
 // ---------------------------------------------------------------------------
 
-const Upload: React.FC = () => {
+const UploadPage: React.FC = () => {
   const { t, i18n } = useTranslation(['upload', 'common']);
   const { user, authToken, isLoading: authLoading } = useUser();
   const { collections } = useCollection();
@@ -296,4 +296,4 @@ const Upload: React.FC = () => {
   );
 };
 
-export default Upload;
+export default UploadPage;

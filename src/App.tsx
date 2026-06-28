@@ -26,7 +26,7 @@ const SearchPage = lazyRetry(() => import('./pages/SearchPage'));
 const Register = lazyRetry(() => import('./pages/Register'));
 const SetPassword = lazyRetry(() => import('./pages/SetPassword'));
 const Admin = lazyRetry(() => import('./pages/Admin'));
-const Upload = lazyRetry(() => import('./pages/Upload'));
+const Upload = lazyRetry(() => import('./pages/upload/UploadPage'));
 const Review = lazyRetry(() => import('./pages/Review'));
 const Notifications = lazyRetry(() => import('./pages/Notifications'));
 const WorkManage = lazyRetry(() => import('./pages/WorkManage'));
