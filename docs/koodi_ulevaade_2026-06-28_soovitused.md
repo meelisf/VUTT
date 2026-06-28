@@ -176,7 +176,7 @@ Lisada järk-järgult:
 1. **P0: nginx rate-limit live rollout `/meili/` ja `/api/images/`**
 2. **P0: SafeHtml wrapper ja `dangerouslySetInnerHTML` guard-test**
 3. **P0: upload size / megapixel / PDF page piirangud**
-4. **P0: CI quality gate (`pytest`, `typecheck`, `vitest`, `build`)**
+4. ~~**P0: CI quality gate (`pytest`, `typecheck`, `vitest`, `build`)**~~ — tehtud GitHub Actions workflow'na (`.github/workflows/ci.yml`)
 5. **P1: `upload_ops.py` split väiksemateks mooduliteks**
 6. **P1: `Upload.tsx` split hookideks ja sammukomponentideks**
 7. **P1: keskne frontend `apiClient.ts`**
