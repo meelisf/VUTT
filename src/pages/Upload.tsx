@@ -11,7 +11,6 @@ import {
   Upload as UploadIcon,
   ChevronLeft,
   CheckCircle,
-  Clock,
   Loader2,
   Trash2,
   AlertTriangle,
@@ -20,15 +19,14 @@ import {
   ListTodo,
 } from 'lucide-react';
 import Header from '../components/Header';
-import UploadMetaForm from '../components/UploadMetaForm';
 import UploadStepMeta from './upload/components/UploadStepMeta';
 import UploadStepTransfer from './upload/components/UploadStepTransfer';
+import UploadStepReview from './upload/components/UploadStepReview';
 import { buildReplaceUploadPayload } from '../utils/buildReplaceUploadPayload';
-import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { getLangCode } from '../utils/getLangCode';
-import type { FileEntry, PollResult, SavedUpload, UploadType } from './upload/types';
+import type { PollResult, SavedUpload, UploadType } from './upload/types';
 import {
   ApiError,
   createUpload,
@@ -117,56 +115,6 @@ const StepIndicator: React.FC<{ step: 1 | 2 | 3; labels: [string, string, string
     })}
   </div>
 );
-
-/** Ühe lehe pisipilt ülevaatuse ruudustikus */
-const ThumbCard: React.FC<{
-  entry: FileEntry;
-  uploadId: string;
-  authToken: string;
-  t: (key: string) => string;
-}> = ({ entry, uploadId, authToken, t }) => {
-  const thumbUrl = `${FILE_API_URL}/admin/upload/${uploadId}/thumb/${entry.page}?token=${authToken}`;
-
-  return (
-    <div
-      className={`relative rounded-lg overflow-hidden border-2 transition-all ${
-        entry.has_ocr
-          ? 'border-green-400'
-          : 'border-yellow-300'
-      }`}
-    >
-      {/* Pisipilt */}
-      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center overflow-hidden">
-        {entry.has_ocr ? (
-          <img
-            src={thumbUrl}
-            alt={`Lk ${entry.page}`}
-            className="w-full h-full object-contain"
-            loading="lazy"
-          />
-        ) : (
-          <Loader2 size={24} className="text-yellow-500 animate-spin" />
-        )}
-      </div>
-
-      {/* Staatusriba */}
-      <div
-        className={`px-2 py-1 text-xs font-medium flex items-center justify-between ${
-          entry.has_ocr
-            ? 'bg-green-50 text-green-700'
-            : 'bg-yellow-50 text-yellow-700'
-        }`}
-      >
-        <span>Lk {entry.page}</span>
-        <span>
-          {entry.has_ocr
-            ? t('step3.ocrReady')
-            : t('step3.ocrProcessing')}
-        </span>
-      </div>
-    </div>
-  );
-};
 
 // ---------------------------------------------------------------------------
 // Peakomponent
@@ -829,136 +777,30 @@ const Upload: React.FC = () => {
         {/* SAMM 3: Ülevaatus                                                   */}
         {/* ------------------------------------------------------------------ */}
         {step === 3 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-semibold text-gray-900">{t('step3.title')}</h2>
-              <div className="flex items-center gap-2 text-sm">
-                {status === 'done' ? (
-                  <span className="flex items-center gap-1 text-green-600 font-medium">
-                    <CheckCircle size={16} />
-                    {t('step3.done')}
-                  </span>
-                ) : pollResult?.stalled ? (
-                  <span
-                    className="flex items-center gap-1 text-amber-700 font-medium"
-                    title={t('pending.stalledHint')}
-                  >
-                    <AlertTriangle size={16} />
-                    {t('pending.stalled')}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-amber-600 font-medium">
-                    <Clock size={16} />
-                    {t('step3.processing')}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* OCR statistika */}
-            <div className="flex gap-4 text-sm text-gray-600 mb-4">
-              <span>
-                {t('step3.readyCount')
-                  .replace('{{ready}}', String(readyCount))
-                  .replace('{{total}}', String(filesWithLocalDeleted.filter((f) => !f.deleted).length))}
-              </span>
-              {pollResult?.expected_pages && (
-                <span className="text-gray-400">
-                  {t('step3.expectedPages').replace('{{n}}', String(pollResult.expected_pages))}
-                </span>
-              )}
-            </div>
-
-            {/* Metaandmete muutmine OCR ootamise ajal ja pärast */}
-            {uploadId && authToken && (
-              <UploadMetaForm
-                uploadId={uploadId}
-                authToken={authToken}
-                userRole={user?.role || 'contributor'}
-                collections={collections}
-                initialTitle={title}
-                initialYear={year}
-                initialCollections={selectedCollection ? [selectedCollection] : []}
-                replaceWorkId={replaceWorkId}
-                replaceWorkTitle={replaceWorkTitle}
-              />
-            )}
-
-            {/* Info: OCR käib taustal, saab lahkuda */}
-            {fileUploading && !ocrTimedOut && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
-                <Info size={16} className="shrink-0 mt-0.5" />
-                <span>{t('step3.canLeaveNote', { time: estimatedTime })}</span>
-              </div>
-            )}
-
-            {/* OCR timeout hoiatus */}
-            {ocrTimedOut && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
-                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                <span>{t('step3.timeoutWarning')}</span>
-              </div>
-            )}
-
-            {/* Pisipiltide ruudustik */}
-            {filesWithLocalDeleted.length === 0 ? (
-              <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
-                <Loader2 size={20} className="animate-spin mr-2" />
-                <span>{t('step2.processing')}</span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-6">
-                {filesWithLocalDeleted.map((entry) =>
-                  uploadId && authToken ? (
-                    <ThumbCard
-                      key={entry.page}
-                      entry={entry}
-                      uploadId={uploadId}
-                      authToken={authToken}
-                      t={(key) => t(key)}
-                    />
-                  ) : null
-                )}
-              </div>
-            )}
-
-            {/* Impordi nupp */}
-            {importError && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                <AlertTriangle size={14} className="inline mr-1" />
-                {importError}
-              </div>
-            )}
-            {replaceWorkId && replaceWorkTitle ? (
-              <button
-                onClick={handleReplaceImport}
-                disabled={!canImport}
-                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
-                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-              >
-                {importLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <AlertTriangle size={16} />
-                )}
-                {t('replaceWork.replaceBtn', { title: replaceWorkTitle ?? '' })}
-              </button>
-            ) : (
-              <button
-                onClick={handleImport}
-                disabled={!canImport}
-                title={canImport ? '' : status !== 'done' ? t('step3.importDisabledOcr') : t('step3.importDisabled')}
-                className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
-              >
-                {importLoading ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={16} />
-                )}
-                {t('step3.importBtn')}
-              </button>
-            )}
-          </div>
+          <UploadStepReview
+            status={status}
+            pollResult={pollResult}
+            readyCount={readyCount}
+            filesWithLocalDeleted={filesWithLocalDeleted}
+            uploadId={uploadId}
+            authToken={authToken}
+            userRole={user?.role || 'contributor'}
+            collections={collections}
+            title={title}
+            year={year}
+            selectedCollection={selectedCollection}
+            replaceWorkId={replaceWorkId}
+            replaceWorkTitle={replaceWorkTitle}
+            fileUploading={fileUploading}
+            ocrTimedOut={ocrTimedOut}
+            estimatedTime={estimatedTime}
+            importError={importError}
+            canImport={canImport}
+            importLoading={importLoading}
+            onImport={handleImport}
+            onReplaceImport={handleReplaceImport}
+            t={t}
+          />
         )}
 
         {/* Alumised nupud (samm 2 ja 3) */}
