@@ -10,7 +10,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Upload as UploadIcon,
   ChevronLeft,
-  CheckCircle,
   Loader2,
   Trash2,
   AlertTriangle,
@@ -19,14 +18,17 @@ import {
   ListTodo,
 } from 'lucide-react';
 import Header from '../components/Header';
+import StepIndicator from './upload/components/StepIndicator';
 import UploadStepMeta from './upload/components/UploadStepMeta';
 import UploadStepTransfer from './upload/components/UploadStepTransfer';
 import UploadStepReview from './upload/components/UploadStepReview';
+import { TYPE_HAND, TYPE_PRINT, POLL_FAST_MS, POLL_SLOW_MS, OCR_MS_PER_PAGE, OCR_TIMEOUT_MS_FALLBACK } from './upload/constants';
+import { ocrEstimate, sanitizeSlug } from './upload/utils';
 import { buildReplaceUploadPayload } from '../utils/buildReplaceUploadPayload';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { getLangCode } from '../utils/getLangCode';
-import type { PollResult, SavedUpload, UploadType } from './upload/types';
+import type { PollResult, SavedUpload } from './upload/types';
 import {
   ApiError,
   createUpload,
@@ -39,82 +41,6 @@ import {
   uploadImagePage,
   uploadSingleFile,
 } from './upload/uploadApi';
-
-const POLL_SLOW_MS = 5000;
-const POLL_FAST_MS = 2000;
-const OCR_TIMEOUT_MS_FALLBACK = 2 * 60 * 60 * 1000; // 2 tundi (kui lehekülgede arv teadmata)
-const OCR_MS_PER_PAGE = 60 * 1000; // ~60 sek/lk (konservatiivne, timeout'i jaoks)
-const OCR_PAGES_PER_MIN = 2.5; // Reaalne OCR kiirus lehekülgi minutis (ajahinnangu kuvamiseks)
-
-/** Arvutab OCR ajahinnangu lehekülgede arvu põhjal. */
-function ocrEstimate(pages: number | null | undefined): string {
-  if (!pages) return '~10 min';
-  const mins = Math.ceil(pages / OCR_PAGES_PER_MIN);
-  return `~${mins} min`;
-}
-
-const TYPE_PRINT: UploadType = { id: 'Q1261026', label: 'trükis',   source: 'wikidata', labels: { et: 'trükis',   en: 'printed matter' } };
-const TYPE_HAND: UploadType  = { id: 'Q87167',  label: 'käsikiri', source: 'wikidata', labels: { et: 'käsikiri', en: 'manuscript' } };
-
-// ---------------------------------------------------------------------------
-// Slug utiliit (peegeldab serveri sanitize_slug)
-// ---------------------------------------------------------------------------
-const SLUG_MAX_LEN = 80;
-
-function sanitizeSlug(text: string): string {
-  return (
-    text
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .slice(0, SLUG_MAX_LEN)
-      .replace(/-+$/g, '') || 'teos'
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Komponendid
-// ---------------------------------------------------------------------------
-
-/** Sammuindikaator ülaosas */
-const StepIndicator: React.FC<{ step: 1 | 2 | 3; labels: [string, string, string] }> = ({
-  step,
-  labels,
-}) => (
-  <div className="flex items-center gap-0 mb-8">
-    {labels.map((label, i) => {
-      const num = (i + 1) as 1 | 2 | 3;
-      const active = num === step;
-      const done = num < step;
-      return (
-        <React.Fragment key={num}>
-          <div className="flex items-center gap-2">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-colors ${
-                done
-                  ? 'bg-green-500 border-green-500 text-white'
-                  : active
-                  ? 'bg-primary-600 border-primary-600 text-white'
-                  : 'bg-white border-gray-300 text-gray-400'
-              }`}
-            >
-              {done ? <CheckCircle size={14} /> : num}
-            </div>
-            <span
-              className={`text-sm font-medium ${
-                active ? 'text-primary-700' : done ? 'text-green-600' : 'text-gray-400'
-              }`}
-            >
-              {label}
-            </span>
-          </div>
-          {i < 2 && <div className="flex-1 h-0.5 bg-gray-200 mx-3" />}
-        </React.Fragment>
-      );
-    })}
-  </div>
-);
 
 // ---------------------------------------------------------------------------
 // Peakomponent
@@ -232,16 +158,24 @@ const Upload: React.FC = () => {
     })();
   }, [authToken]);
 
+  const loadPendingUploads = useCallback(async () => {
+    if (!authToken) return;
+    try {
+      const data = await listUploads(authToken);
+      setPendingUploads(data.uploads || []);
+    } catch {
+      // Pooleliolevate nimekiri pole kriitiline — vaikime ajutised vead maha.
+    } finally {
+      setLoadingPending(false);
+    }
+  }, [authToken]);
+
   // ---------------------------------------------------------------------------
   // Laadi pooleliolevad üleslaadimised
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!authToken) return;
-    listUploads(authToken)
-      .then((d) => setPendingUploads(d.uploads || []))
-      .catch(() => {})
-      .finally(() => setLoadingPending(false));
-  }, [authToken]);
+    loadPendingUploads();
+  }, [loadPendingUploads]);
 
   // ---------------------------------------------------------------------------
   // Slug auto-genereerimine pealkirjast
@@ -255,6 +189,25 @@ const Upload: React.FC = () => {
   }, [slug, year]);
 
   function handleReplaceDismiss() {
+    setReplaceWorkId(null);
+    setReplaceWorkTitle(null);
+  }
+
+  function resetWizardState() {
+    setUploadId(null);
+    setStep(1);
+    setPollResult(null);
+    setFileUploading(false);
+    setTitle('');
+    setYear('');
+    setWorkType(TYPE_PRINT);
+    setSlug('');
+    setSlugManual(false);
+    setLocalDeleted(new Set());
+    setOcrStartedAt(null);
+    setPendingMultiFiles([]);
+    setMultiCurrentNum(0);
+    setMultiTotalNum(0);
     setReplaceWorkId(null);
     setReplaceWorkTitle(null);
   }
@@ -477,28 +430,9 @@ const Upload: React.FC = () => {
   // ---------------------------------------------------------------------------
   function handleClose() {
     stopPolling();
-    setUploadId(null);
-    setStep(1);
-    setPollResult(null);
-    setFileUploading(false);
-    setTitle('');
-    setYear('');
-    setWorkType(TYPE_PRINT);
-    setSlug('');
-    setSlugManual(false);
-    setLocalDeleted(new Set());
-    setOcrStartedAt(null);
-    setPendingMultiFiles([]);
-    setMultiCurrentNum(0);
-    setMultiTotalNum(0);
-    setReplaceWorkId(null);
-    setReplaceWorkTitle(null);
+    resetWizardState();
     // Värskenda pooleliolevate nimekirja
-    if (authToken) {
-      listUploads(authToken)
-        .then((d) => setPendingUploads(d.uploads || []))
-        .catch(() => {});
-    }
+    loadPendingUploads();
   }
 
   // ---------------------------------------------------------------------------
@@ -510,22 +444,7 @@ const Upload: React.FC = () => {
     if (uploadId && authToken) {
       await deleteUpload(uploadId, authToken).catch(() => {});
     }
-    setUploadId(null);
-    setStep(1);
-    setPollResult(null);
-    setFileUploading(false);
-    setTitle('');
-    setYear('');
-    setWorkType(TYPE_PRINT);
-    setSlug('');
-    setSlugManual(false);
-    setLocalDeleted(new Set());
-    setOcrStartedAt(null);
-    setPendingMultiFiles([]);
-    setMultiCurrentNum(0);
-    setMultiTotalNum(0);
-    setReplaceWorkId(null);
-    setReplaceWorkTitle(null);
+    resetWizardState();
   }
 
   // ---------------------------------------------------------------------------
