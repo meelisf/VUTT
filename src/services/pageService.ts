@@ -7,6 +7,7 @@ import { FILE_API_URL } from '../config';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { checkMixedContent, normalizePage } from './meiliService';
 import type { Index } from 'meilisearch';
+import type { Quad4 } from '../utils/perspectiveQuad';
 
 // Abifunktsioon failisüsteemi salvestamiseks
 const saveToFileSystem = async (page: Page, original_catalog: string, image_url: string, authToken?: string): Promise<boolean> => {
@@ -166,16 +167,44 @@ export interface TransformResult {
   size?: [number, number]; thumbnail_warning?: boolean; reason?: string;
 }
 
-// Admin: pöörab/kärbib lehepilti kohapeal (failinime-põhine endpoint)
+// Admin: pöörab/kärbib/sirgestab lehepilti kohapeal (failinime-põhine endpoint)
 export async function transformPageImage(
   workId: string, filename: string, angle: number, crop: CropRect | null, token: string,
+  quad?: Quad4,
 ): Promise<TransformResult> {
+  const body = quad ? { angle, quad } : { angle, crop };
   const res = await fetchWithTimeout(
     `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/transform`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
-      body: JSON.stringify({ angle, crop }),
+      body: JSON.stringify(body),
+      timeout: 30000,
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface RestoreResult {
+  success: boolean;
+  restored: boolean;
+  reason?: string;
+  thumbnail_warning?: boolean;
+}
+
+// Admin: taastab lehe pildi ._originals pristine versiooni (ainult pilt)
+export async function restoreOriginalPageImage(
+  workId: string, filename: string, token: string,
+): Promise<RestoreResult> {
+  const res = await fetchWithTimeout(
+    `${FILE_API_URL}/admin/work/${workId}/page-image/${encodeURIComponent(filename)}/restore-original`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(token) },
       timeout: 30000,
     },
   );

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { X, Scissors, RotateCcw, RotateCw, FlipVertical2, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX } from 'lucide-react';
+import { X, Scissors, RotateCcw, RotateCw, FlipVertical2, Crop, Loader2, AlertTriangle, ChevronLeft, ChevronRight, Check, Upload, GripHorizontal, CircleX, Frame, Undo2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { FILE_API_URL, IMAGE_BASE_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
-import { transformPageImage, CropRect } from '../services/pageService';
+import { transformPageImage, restoreOriginalPageImage, CropRect } from '../services/pageService';
 import { expandedBoundingBox } from '../utils/imageTransformGeometry';
 import { computeNextAnchor, resolveIndexAfter } from '../utils/pageNavAnchor';
 import { resizeRotatedBox, CropHandle, CenterBox } from '../utils/cropBoxInteraction';
 import { rotatedCropToServerParams } from '../utils/rotatedCropParams';
+import { defaultQuad, quadFromCropRect, quadToDisplayPx, quadPtFromDisplayPx, Quad4 } from '../utils/perspectiveQuad';
 
 interface PageInfo {
   filename: string;
@@ -45,11 +46,15 @@ const PageImageEditorModal: React.FC<Props> = ({
   const [boxAngle, setBoxAngle] = useState(0);        // crop-kasti kalle (deskew)
   const [cropRect, setCropRect] = useState<CropRect | null>(null);  // telg-joondatud kasti-lokaal
   const [splitX, setSplitX] = useState(0.5);
+  const [perspective, setPerspective] = useState(false);   // perspektiivirežiim
+  const [quad, setQuad] = useState<Quad4 | null>(null);     // 4 nurka [0..1]
 
   const [imgNatural, setImgNatural] = useState<{ w: number; h: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [skipConfirm, setSkipConfirm] = useState(false);
   const [dragging, setDragging] = useState(false);            // kärbe-interaktsioon aktiivne
   const [splitDragging, setSplitDragging] = useState(false);  // poolitusjoone lohistus aktiivne
@@ -69,6 +74,7 @@ const PageImageEditorModal: React.FC<Props> = ({
     | { mode: 'move'; startX: number; startY: number; startCenter: { cx: number; cy: number } }
     | { mode: 'resize'; handle: CropHandle; startBox: CenterBox }
     | { mode: 'rotate' }
+    | { mode: 'corner'; idx: number }
     | null
   >(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -93,6 +99,8 @@ const PageImageEditorModal: React.FC<Props> = ({
     setBoxAngle(0);
     setCropRect(null);
     setCropDraft(null);
+    setPerspective(false);
+    setQuad(null);
     setSplitX(0.5);
     setImgNatural(null);
     setError(null);
@@ -189,6 +197,18 @@ const PageImageEditorModal: React.FC<Props> = ({
     e.preventDefault();
     const p = localPoint(e);
     const target = e.target as HTMLElement;
+
+    if (perspective && quad) {
+      const ci = target.dataset.corner;
+      if (ci !== undefined) {
+        interaction.current = { mode: 'corner', idx: Number(ci) };
+        setDragging(true);
+        return;
+      }
+      // Perspektiivirežiimis ei joonista uut kasti — ainult nurki lohistab.
+      return;
+    }
+
     const handle = target.dataset.handle as CropHandle | undefined;
 
     if (handle && cropRect) {
@@ -209,8 +229,13 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   const onCropMove = (e: { clientX: number; clientY: number }) => {
     const it = interaction.current;
-    if (!it || !cropRect && it.mode !== 'draw') return;
+    if (!it || (it.mode !== 'draw' && it.mode !== 'corner' && !cropRect)) return;
     const p = localPoint(e);
+    if (it.mode === 'corner' && quad) {
+      const np = quadPtFromDisplayPx(p.x, p.y, displayW, displayH);
+      setQuad(quad.map((q, i) => (i === it.idx ? np : q)) as Quad4);
+      return;
+    }
     if (it.mode === 'draw') {
       setCropDraft((d) => (d ? { ...d, x1: p.x, y1: p.y } : d));
     } else if (it.mode === 'move' && cropRect) {
@@ -267,12 +292,23 @@ const PageImageEditorModal: React.FC<Props> = ({
     };
   }, [dragging]);
 
-  // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub)
+  // Perspektiivi lüliti: ON → quad olemasolevast kärpest või vaikenelinurk; OFF → quad=null.
+  const togglePerspective = () => {
+    setPerspective((on) => {
+      if (on) { setQuad(null); return false; }
+      setQuad(cropRect ? quadFromCropRect(cropRect) : defaultQuad(0.05));
+      return true;
+    });
+  };
+
+  // Jäme 90°/180° pööre rakendub PILDILE; kärbe/kalle lähtestatakse (display-raam muutub).
+  // Perspektiivirežiimis lähtestatakse quad vaikenelinurgaks (me ei teisenda nurki).
   const rotateBy = (delta: number) => {
     setGrossAngle((a) => ((a + delta) % 360 + 360) % 360);
     setCropRect(null);
     setCropDraft(null);
     setBoxAngle(0);
+    if (perspective) setQuad(defaultQuad(0.05));
     interaction.current = null;
   };
 
@@ -393,22 +429,28 @@ const PageImageEditorModal: React.FC<Props> = ({
     try {
       let thumbWarn = false;
       if (tab === 'edit') {
-        // Jäme pööre + kasti-kalle → serveri (angle, telg-joondatud crop)
-        let sendAngle = grossAngle;
-        let sendCrop: CropRect | null = null;
-        if (cropRect) {
-          const b = rectToCenterPx(cropRect);
-          const params = rotatedCropToServerParams(
-            { cx: b.cx, cy: b.cy, w: b.w, h: b.h, angleDeg: boxAngle }, displayW, displayH,
-          );
-          sendAngle = ((grossAngle + params.angle) % 360 + 360) % 360;
-          // Klampi normaliseeritud kärbe [0,1] sisse (kaitse servast väljaulatuva kasti eest)
-          const x = clamp(params.crop.x, 0, 1);
-          const y = clamp(params.crop.y, 0, 1);
-          sendCrop = { x, y, w: clamp(params.crop.w, 0, 1 - x), h: clamp(params.crop.h, 0, 1 - y) };
+        if (perspective && quad) {
+          // Perspektiiv: jäme pööre + quad (deskew boxAngle EI kasutata).
+          const r = await transformPageImage(workId, currentFilename, grossAngle, null, authToken, quad);
+          thumbWarn = !!r.thumbnail_warning;
+        } else {
+          // Jäme pööre + kasti-kalle → serveri (angle, telg-joondatud crop).
+          let sendAngle = grossAngle;
+          let sendCrop: CropRect | null = null;
+          if (cropRect) {
+            const b = rectToCenterPx(cropRect);
+            const params = rotatedCropToServerParams(
+              { cx: b.cx, cy: b.cy, w: b.w, h: b.h, angleDeg: boxAngle }, displayW, displayH,
+            );
+            sendAngle = ((grossAngle + params.angle) % 360 + 360) % 360;
+            // Klampi normaliseeritud kärbe [0,1] sisse (kaitse servast väljaulatuva kasti eest)
+            const x = clamp(params.crop.x, 0, 1);
+            const y = clamp(params.crop.y, 0, 1);
+            sendCrop = { x, y, w: clamp(params.crop.w, 0, 1 - x), h: clamp(params.crop.h, 0, 1 - y) };
+          }
+          const r = await transformPageImage(workId, currentFilename, sendAngle, sendCrop, authToken);
+          thumbWarn = !!r.thumbnail_warning;
         }
-        const r = await transformPageImage(workId, currentFilename, sendAngle, sendCrop, authToken);
-        thumbWarn = !!r.thumbnail_warning;
       } else {
         const res = await fetchWithTimeout(
           `${FILE_API_URL}/admin/work/${workId}/page/${current.page_num}/split`,
@@ -459,6 +501,29 @@ const PageImageEditorModal: React.FC<Props> = ({
     }
   };
 
+  // Taasta lehe ._originals pristine pilt (destruktiivne: kõik pildimuudatused kaovad).
+  // Restore puudutab AINULT pilti; tekst/JSON jäävad. Poolitatud poolel → topeltlehekülg.
+  const doRestoreOriginal = async () => {
+    if (!authToken || !current) return;
+    setShowRestoreConfirm(false);
+    setRestoring(true);
+    setError(null);
+    setToast(null);
+    try {
+      const r = await restoreOriginalPageImage(workId, current.filename, authToken);
+      if (!r.restored && r.reason === 'no_original') {
+        setToast({ text: t('manage.editor.noOriginal') });
+        return;
+      }
+      await onPagesChanged();
+      setToast({ text: t('manage.editor.restoreDone') });
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t('manage.editor.restoreError'));
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   // Asenda lehe pilt (harv: parema kvaliteediga skann). Edu korral lähtesta teisendused
   // ja cache-busti eelvaade; viga näita modaalis.
   const onReplaceFile = async (file: File) => {
@@ -477,7 +542,7 @@ const PageImageEditorModal: React.FC<Props> = ({
 
   if (!current) return null;
 
-  const noEditChange = tab === 'edit' && grossAngle === 0 && cropRect === null;
+  const noEditChange = tab === 'edit' && grossAngle === 0 && cropRect === null && !(perspective && quad);
 
   // Laadija täidab lava — kuvame kuni naturaalmõõdud teada (väldib aspect-venitust).
   const loadingBox = (
@@ -502,6 +567,15 @@ const PageImageEditorModal: React.FC<Props> = ({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowRestoreConfirm(true)}
+              disabled={restoring || saving || replacing}
+              title={t('manage.editor.restoreOriginal')}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-50 transition-colors"
+            >
+              {restoring ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}
+              {t('manage.editor.restoreOriginal')}
+            </button>
             {/* Asenda pilt (harv: parema kvaliteediga skann) */}
             <input
               ref={replaceInputRef}
@@ -559,7 +633,9 @@ const PageImageEditorModal: React.FC<Props> = ({
           )}
           {tab === 'edit' ? (
             <div className="flex flex-col items-center gap-2 h-full min-h-0 w-full">
-              <p className="text-xs text-gray-400 flex-shrink-0">{t('manage.editor.cropHint')}</p>
+              <p className="text-xs text-gray-400 flex-shrink-0">
+                {perspective ? t('manage.editor.perspectiveHint') : t('manage.editor.cropHint')}
+              </p>
 
               {/* Lava: mõõdetav paindlik ala, kuhu eelvaade mahutatakse. Pööramisnupud
                   hõljuvad pildi peal (absolute) → ei söö ei kõrgust ega laiust, pilt saab
@@ -589,7 +665,32 @@ const PageImageEditorModal: React.FC<Props> = ({
                   className="absolute inset-0 cursor-crosshair"
                   onMouseDown={onCropDown}
                 >
-                  {cropOverlay && (
+                  {perspective && quad ? (
+                    <svg
+                      className="absolute inset-0 w-full h-full overflow-visible"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      <polygon
+                        points={quadToDisplayPx(quad, displayW, displayH).map((p) => `${p.x},${p.y}`).join(' ')}
+                        fill="rgba(99,102,241,0.15)"
+                        stroke="rgb(99,102,241)"
+                        strokeWidth={2}
+                      />
+                      {quadToDisplayPx(quad, displayW, displayH).map((p, i) => (
+                        <circle
+                          key={i}
+                          data-corner={i}
+                          cx={p.x}
+                          cy={p.y}
+                          r={7}
+                          fill="white"
+                          stroke="rgb(99,102,241)"
+                          strokeWidth={2}
+                          style={{ pointerEvents: 'auto', cursor: 'grab' }}
+                        />
+                      ))}
+                    </svg>
+                  ) : cropOverlay && (
                     <div
                       data-cropbox=""
                       className="absolute border-2 border-indigo-500"
@@ -657,12 +758,24 @@ const PageImageEditorModal: React.FC<Props> = ({
                   <button onClick={() => rotateBy(180)} title={t('manage.editor.rotate180')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100">
                     <FlipVertical2 size={16} />
                   </button>
-                  {cropRect && (
+                  <button
+                    onClick={togglePerspective}
+                    title={t('manage.editor.perspective')}
+                    className={`p-2 rounded border ${perspective ? 'border-indigo-600 bg-indigo-50 text-indigo-700' : 'border-gray-300 bg-white hover:bg-gray-100'}`}
+                  >
+                    <Frame size={16} />
+                  </button>
+                  {perspective && quad && (
+                    <button onClick={() => setQuad(defaultQuad(0.05))} title={t('manage.editor.perspectiveReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
+                      <CircleX size={16} />
+                    </button>
+                  )}
+                  {cropRect && !perspective && (
                     <button onClick={() => { setCropRect(null); setBoxAngle(0); lastCropSizeRef.current = null; }} title={t('manage.editor.cropReset')} className="p-2 rounded border border-gray-300 bg-white hover:bg-gray-100 text-gray-500 hover:text-gray-700">
                       <CircleX size={16} />
                     </button>
                   )}
-                  {cropRect && Math.abs(boxAngle) > 0.05 && (
+                  {cropRect && !perspective && Math.abs(boxAngle) > 0.05 && (
                     <span title={t('manage.editor.deskew')} className="text-xs text-gray-600 tabular-nums text-center">
                       {boxAngle.toFixed(1)}°
                     </span>
@@ -731,6 +844,26 @@ const PageImageEditorModal: React.FC<Props> = ({
                 <input type="checkbox" checked={skipConfirm} onChange={(e) => setSkipConfirm(e.target.checked)} />
                 {t('manage.editor.dontAskAgain')}
               </label>
+            </div>
+          )}
+
+          {showRestoreConfirm && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded space-y-2">
+              <p className="text-sm text-amber-800">{t('manage.editor.restoreConfirmBody')}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={doRestoreOriginal}
+                  className="px-3 py-1 text-sm bg-amber-600 hover:bg-amber-700 text-white rounded"
+                >
+                  {t('manage.editor.restoreOriginal')}
+                </button>
+                <button
+                  onClick={() => setShowRestoreConfirm(false)}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100"
+                >
+                  {t('manage.editor.cancel')}
+                </button>
+              </div>
             </div>
           )}
 

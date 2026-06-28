@@ -15,6 +15,7 @@ from ..admin_page_ops import (
     get_sorted_images,
     rebalance_sequences,
     reorder_pages,
+    restore_original_page_image,
     split_page,
     transform_page_image,
     work_lock,
@@ -359,12 +360,25 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
 
 @router.post("/admin/work/{work_id}/page-image/{filename}/transform")
 async def admin_transform_page_image(work_id: str, filename: str, request: Request, user=Depends(require_role("admin"))):
-    """Pöörab/kärbib lehepilti kohapeal. Body: { angle: float, crop: {x,y,w,h}|null }"""
+    """Pöörab/kärbib/sirgestab lehepilti kohapeal. Body: { angle, crop|null, quad|null }"""
     data = await get_json_data(request)
     angle = data.get("angle", 0.0)
     crop = data.get("crop")
+    quad = data.get("quad")
     try:
-        result = transform_page_image(work_id, filename, angle=angle, crop=crop, username=user["username"])
+        result = transform_page_image(work_id, filename, angle=angle, crop=crop, quad=quad, username=user["username"])
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not result.get("found", True):
+        raise HTTPException(status_code=404, detail="Teost või lehte ei leitud")
+    return result
+
+
+@router.post("/admin/work/{work_id}/page-image/{filename}/restore-original")
+async def admin_restore_original_page_image(work_id: str, filename: str, user=Depends(require_role("admin"))):
+    """Taastab lehe pildi ._originals pristine versiooni."""
+    try:
+        result = restore_original_page_image(work_id, filename, username=user["username"])
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):

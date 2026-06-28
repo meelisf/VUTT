@@ -235,3 +235,53 @@ def test_split_endpoint_200_success(backend_env, login, monkeypatch):
     data = r.json()
     assert data["status"] == "success"
     assert data["new_page_count"] == 2
+
+
+def test_split_populates_originals_for_both_halves(work_dir):
+    from PIL import Image as PILImage
+    from server.admin_page_ops import split_page, get_sorted_images
+
+    split_page(work_dir["work_id"], 1, 0.5, "testadmin")
+    folder = work_dir["folder"]
+    images = get_sorted_images(str(folder))
+    orig_dir = folder.parent / "._originals" / work_dir["work_id"]
+
+    for half in images:
+        op = orig_dir / half
+        assert op.exists(), f"._originals puudub: {half}"
+        with PILImage.open(str(op)) as im:
+            assert (im.width, im.height) == (200, 100)
+
+
+def test_split_half_restore_returns_double_page(work_dir):
+    from PIL import Image as PILImage
+    from server.admin_page_ops import split_page, restore_original_page_image, get_sorted_images
+
+    split_page(work_dir["work_id"], 1, 0.5, "testadmin")
+    folder = work_dir["folder"]
+    images = get_sorted_images(str(folder))
+    half = images[0]
+    r = restore_original_page_image(work_dir["work_id"], half, username="testadmin")
+    assert r["restored"] is True
+    with PILImage.open(str(folder / half)) as im:
+        assert im.width == 200
+
+
+def test_split_prefers_existing_originals(work_dir):
+    """Kui originaalil oli juba ._originals, kasutab seda (pristine eelistus)."""
+    from server.admin_page_ops import split_page, get_sorted_images
+    from PIL import Image as PILImage
+
+    folder = work_dir["folder"]
+    wid = work_dir["work_id"]
+    orig_dir = folder.parent / "._originals" / wid
+    orig_dir.mkdir(parents=True, exist_ok=True)
+    orig_name = "1690-test-work-testwork1-pg001.jpg"
+    PILImage.new("RGB", (200, 100), color=(255, 0, 0)).save(str(orig_dir / orig_name), "JPEG", quality=95)
+
+    split_page(wid, 1, 0.5, "testadmin")
+    images = get_sorted_images(str(folder))
+    for half in images:
+        with PILImage.open(str(orig_dir / half)) as im:
+            r, g, b = im.getpixel((100, 50))
+            assert r > 200 and g < 60 and b < 60
