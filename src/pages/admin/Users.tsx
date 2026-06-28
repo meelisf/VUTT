@@ -8,9 +8,8 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import Header from '../../components/Header';
-import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { apiPost } from '../../services/apiClient';
 
 interface User {
   username: string;
@@ -19,6 +18,12 @@ interface User {
   role: 'contributor' | 'editor' | 'admin';
   created_at: string | null;
   allowed_collections?: string[];
+}
+
+interface UsersResponse {
+  status: 'success' | 'error';
+  users?: User[];
+  message?: string;
 }
 
 const UsersPage: React.FC = () => {
@@ -49,16 +54,10 @@ const UsersPage: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-
-      const data = await response.json();
+      const data = await apiPost<UsersResponse>('/admin/users', {}, { token: authToken });
 
       if (data.status === 'success') {
-        setUsers(data.users);
+        setUsers(data.users || []);
       } else {
         setUsersError(data.message || t('users.loadError'));
       }
@@ -75,16 +74,10 @@ const UsersPage: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/update-role`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          username,
-          new_role: newRole
-        })
-      });
-
-      const data = await response.json();
+      const data = await apiPost<UsersResponse>('/admin/users/update-role', {
+        username,
+        new_role: newRole
+      }, { token: authToken });
 
       if (data.status === 'success') {
         setUsers(users.map(u =>
@@ -109,15 +102,9 @@ const UsersPage: React.FC = () => {
     setUsersError(null);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/users/delete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          username
-        })
-      });
-
-      const data = await response.json();
+      const data = await apiPost<UsersResponse>('/admin/users/delete', {
+        username
+      }, { token: authToken });
 
       if (data.status === 'success') {
         setUsers(users.filter(u => u.username !== username));

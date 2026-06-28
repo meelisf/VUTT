@@ -15,10 +15,9 @@ import {
   ChevronLeft
 } from 'lucide-react';
 import Header from '../../components/Header';
-import { FILE_API_URL } from '../../config';
 import { useUser } from '../../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { deriveUsernameFromEmail } from '../../utils/username';
+import { apiPost } from '../../services/apiClient';
 
 interface Registration {
   id: string;
@@ -39,6 +38,17 @@ interface InviteResult {
   email: string;
   username?: string;
   name: string;
+}
+
+interface RegistrationsResponse {
+  status: 'success' | 'error';
+  registrations?: Registration[];
+  message?: string;
+}
+
+interface RegistrationActionResponse extends InviteResult {
+  status: 'success' | 'error';
+  message?: string;
 }
 
 const Registrations: React.FC = () => {
@@ -70,16 +80,10 @@ const Registrations: React.FC = () => {
     setError(null);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({})
-      });
-
-      const data = await response.json();
+      const data = await apiPost<RegistrationsResponse>('/admin/registrations', {}, { token: authToken });
 
       if (data.status === 'success') {
-        setRegistrations(data.registrations);
+        setRegistrations(data.registrations || []);
       } else {
         setError(data.message || 'Viga taotluste laadimisel');
       }
@@ -96,15 +100,9 @@ const Registrations: React.FC = () => {
     setInviteResult(null);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/approve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          registration_id: regId
-        })
-      });
-
-      const data = await response.json();
+      const data = await apiPost<RegistrationActionResponse>('/admin/registrations/approve', {
+        registration_id: regId
+      }, { token: authToken });
 
       if (data.status === 'success') {
         setInviteResult({
@@ -131,15 +129,9 @@ const Registrations: React.FC = () => {
     setProcessingId(regId);
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/admin/registrations/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({
-          registration_id: regId
-        })
-      });
-
-      const data = await response.json();
+      const data = await apiPost<RegistrationActionResponse>('/admin/registrations/reject', {
+        registration_id: regId
+      }, { token: authToken });
 
       if (data.status === 'success') {
         await loadRegistrations();
