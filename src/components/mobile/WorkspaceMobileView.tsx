@@ -18,6 +18,7 @@ import { getCollectionColorClasses, getCollectionHierarchy } from '../../service
 import { renderVuttMarkup } from '../../utils/renderVuttMarkup';
 import { getLangCode } from '../../utils/getLangCode';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
+import SafeHtml from '../SafeHtml';
 
 interface WorkspaceMobileViewProps {
   page: Page;
@@ -281,9 +282,10 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
         ) : activeTab === 'text' ? (
           <div className="h-full overflow-y-auto bg-white px-4 pt-3 pb-16">
             {page.text_content ? (
-              <div
+              <SafeHtml
+                kind="generated"
+                html={renderVuttMarkup(page.text_content)}
                 className="whitespace-pre-wrap font-serif text-gray-800 leading-relaxed text-base"
-                dangerouslySetInnerHTML={{ __html: renderVuttMarkup(page.text_content) }}
               />
             ) : (
               <div className="whitespace-pre-wrap font-serif text-gray-400 leading-relaxed text-base">

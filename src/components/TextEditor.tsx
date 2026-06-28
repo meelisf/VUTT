@@ -30,6 +30,7 @@ import { createVuttSearchPanel } from './editor/VuttSearchPanel';
 import { findContainer, findInnerPairs } from './editor/wrapTagUtils';
 import { useSpecialChars } from './editor/useSpecialChars';
 import { useReOcr } from './editor/useReOcr';
+import SafeHtml from './SafeHtml';
 
 interface TextEditorProps {
   page: Page;
@@ -1124,9 +1125,10 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
                       <X size={20} />
                     </button>
                   </div>
-                  <div
+                  <SafeHtml
+                    kind="trusted"
+                    html={transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>`}
                     className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-                    dangerouslySetInnerHTML={{ __html: transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>` }}
                   />
                 </div>
               </div>

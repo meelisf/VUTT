@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
+import SafeHtml from './SafeHtml';
 
 // Line-by-Line Strict Renderer with Stateful Styling
 // This component guarantees 1:1 alignment with the editor's gutter numbers
@@ -232,8 +233,10 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
             }}
         >
             {renderedLines.map((line, index) => (
-                <div
+                <SafeHtml
                     key={index}
+                    kind="generated"
+                    html={line.html}
                     className={line.className}
                     style={{
                         height: '1.7em', // STRICT HEIGHT ENFORCEMENT
@@ -243,7 +246,6 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({ content }) => {
                         width: 'fit-content', // Allow horizontal growth
                         minWidth: '100%'
                     }}
-                    dangerouslySetInnerHTML={{ __html: line.html }}
                 />
             ))}
         </div>

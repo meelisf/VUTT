@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Loader2 } from 'lucide-react';
 import { mergePlaces } from '../../prosopography/services/prosopographyService';
 import type { PlaceEntry } from '../../prosopography/types';
-import { escapeHtml } from '../../utils/sanitizeHtml';
+import SafeHtml from '../../components/SafeHtml';
 
 interface PlacesMergeModalProps {
   sourceKey: string;
@@ -75,9 +75,11 @@ const PlacesMergeModal: React.FC<PlacesMergeModalProps> = ({
           </button>
         </div>
 
-        <p
+        <SafeHtml
+          as="div"
+          kind="translation"
           className="text-sm text-gray-600 mb-4"
-          dangerouslySetInnerHTML={{ __html: t('places.mergeDescription', { source: escapeHtml(sourceName) }) }}
+          html={t('places.mergeDescription', { source: sourceName })}
         />
 
         {error && <p className="mb-3 text-xs text-red-600">{error}</p>}

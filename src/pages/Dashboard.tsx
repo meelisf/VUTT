@@ -13,6 +13,7 @@ import { useMeiliIndex } from '../contexts/MeilisearchContext';
 import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import CollectionInfoBanner from '../components/CollectionInfoBanner';
+import SafeHtml from '../components/SafeHtml';
 import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
@@ -998,9 +999,10 @@ const Dashboard: React.FC = () => {
                 <X size={20} />
               </button>
             </div>
-            <div
+            <SafeHtml
+              kind="trusted"
+              html={aboutHtml || `<p>${t('common:labels.loading')}</p>`}
               className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-              dangerouslySetInnerHTML={{ __html: aboutHtml || `<p>${t('common:labels.loading')}</p>` }}
             />
           </div>
         </div>

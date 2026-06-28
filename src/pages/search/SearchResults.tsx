@@ -13,7 +13,7 @@ import { getPageThumbUrl, getAuthorDisplay } from './searchUtils';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { parseYearDisplayRange, formatYearDisplay } from '../../utils/yearDisplayUtils';
-import { sanitizeHighlight } from '../../utils/sanitizeHtml';
+import SafeHtml from '../../components/SafeHtml';
 import {
     Search, Loader2, AlertTriangle, ChevronDown, ChevronUp,
     ChevronLeft, ChevronRight, User, Calendar, Tag, MessageSquare,
@@ -186,14 +186,19 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 <div className="flex gap-3">
                     <div className="flex-1 min-w-0">
                         {(scopeParam === 'all' || scopeParam === 'original') && snippet && (
-                            <div
+                            <SafeHtml
+                                kind="highlight"
+                                html={snippet}
+                                allowBr
                                 className="text-sm text-gray-800 leading-relaxed font-serif bg-white p-2 rounded border border-gray-100 shadow-sm"
-                                dangerouslySetInnerHTML={{ __html: sanitizeHighlight(snippet, { allowBr: true }) }}
                             />
                         )}
                         {(scopeParam === 'all' || scopeParam === 'original') && showMarginalia && (
-                            <div className="text-xs text-stone-600 leading-relaxed font-serif bg-stone-50 border-l-2 border-stone-300 p-2 mt-1 rounded-r"
-                                dangerouslySetInnerHTML={{ __html: sanitizeHighlight(marginaliaSnippet!, { allowBr: true }) }}
+                            <SafeHtml
+                                kind="highlight"
+                                html={marginaliaSnippet!}
+                                allowBr
+                                className="text-xs text-stone-600 leading-relaxed font-serif bg-stone-50 border-l-2 border-stone-300 p-2 mt-1 rounded-r"
                             />
                         )}
                         {(hasHighlightedTags || showRawTags) && (
@@ -208,7 +213,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                     : formattedTags?.filter((tag: string) => tag.includes('<em')).map((tagHtml: string, idx: number) => (
                                         <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 border border-primary-100 text-primary-800 text-xs rounded-full">
                                             <Tag size={10} />
-                                            <span dangerouslySetInnerHTML={{ __html: sanitizeHighlight(tagHtml) }} />
+                                            <SafeHtml as="span" kind="highlight" html={tagHtml} />
                                         </span>
                                     ))
                                 }
@@ -224,7 +229,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                                         </div>
                                         {showRawComments
                                             ? <div>{comment.text}</div>
-                                            : <div dangerouslySetInnerHTML={{ __html: sanitizeHighlight(comment.text) }} />
+                                            : <SafeHtml kind="highlight" html={comment.text} />
                                         }
                                     </div>
                                 ))}
@@ -308,7 +313,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                         // Teose piires otsing
                         <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                             <div className="flex items-start justify-between gap-4 mb-3">
-                                <span className="text-sm" dangerouslySetInnerHTML={{ __html: t('status.foundMatchesInWork', { count: results.totalHits }) }} />
+                                <SafeHtml as="span" kind="translation" className="text-sm" html={t('status.foundMatchesInWork', { count: results.totalHits })} />
                                 <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded shrink-0">
                                     {t('results.pageOf', { current: results.page, total: results.totalPages })}
                                 </span>
@@ -334,11 +339,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                     ) : (
                         // Tavaline otsing
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-                            <span dangerouslySetInnerHTML={{
-                                __html: queryParam
+                            <SafeHtml
+                                as="span"
+                                kind="translation"
+                                html={queryParam
                                     ? t('status.foundInWorks', { hits: results.totalHits, works: uniqueWorksCount })
                                     : t('status.foundWorks', { count: uniqueWorksCount })
-                            }} />
+                                }
+                            />
                             <span className="text-gray-500 font-mono text-xs bg-gray-100 px-2 py-1 rounded">
                                 {t('results.pageOf', { current: results.page, total: results.totalPages })}
                             </span>
