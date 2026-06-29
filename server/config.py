@@ -144,6 +144,8 @@ RATE_LIMITS = {
     '/login': (5, 60),              # 5 katset minutis
     '/register': (6, 3600),         # 6 taotlust tunnis
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
+    '/reset/validate': (10, 300),       # 10 valideerimist 5 min jooksul IP kohta
+    '/reset/set-password': (5, 300),    # 5 katset 5 min jooksul (nagu invite)
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
     '/meta/work': (60, 60),         # 60 bot-metaandmete päringut minutis IP kohta
     '/meta/persons': (60, 60),      # 60 prosopograafia meta-päringut minutis IP kohta
