@@ -30,6 +30,9 @@
     "noResults": "No works found matching the selected criteria.",
     "checkData": "Check if Meilisearch has data and if the year range is correct.",
     "restoreDefaults": "Restore defaults",
+    "protectedLoggedOut": "This is a protected collection. Log in to see its works.",
+    "protectedNoAccess": "This is a protected collection and you may not have access to it.",
+    "viewAllWorks": "View all works",
     "loadingShelf": "Loading bookshelf..."
   },
   "error": {

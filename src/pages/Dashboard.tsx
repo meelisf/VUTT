@@ -6,11 +6,12 @@ import { getCollectionColorClasses } from '../services/collectionService';
 import { Work, WorkStatus } from '../types';
 import WorkCard from '../components/WorkCard';
 import Header from '../components/Header';
+import LoginModal from '../components/LoginModal';
 import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import CollectionInfoBanner from '../components/CollectionInfoBanner';
 import SafeHtml from '../components/SafeHtml';
@@ -87,8 +88,14 @@ const Dashboard: React.FC = () => {
   const [showBulkGenrePicker, setShowBulkGenrePicker] = useState(false);
   const [bulkAssignLoading, setBulkAssignLoading] = useState(false);
   const [refreshCounter, setRefreshCounter] = useState(0);  // Triggers re-fetch
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const isAdmin = user?.role === 'admin';
+
+  // Kas valitud kollektsioon on kaitstud — tühja tulemuse korral on põhjus
+  // tõenäoliselt ligipääsupuudus (mitte andmete/filtrite probleem).
+  const selectedCollectionObj = selectedCollection ? collections[selectedCollection] : null;
+  const isRestrictedCollection = selectedCollectionObj?.visibility === 'restricted';
 
   // Sünkroonib selectedCollection → URL ?collection= param (Context → URL suund)
   useCollectionUrlSync(selectedCollection, setSearchParams);
@@ -929,24 +936,52 @@ const Dashboard: React.FC = () => {
                     </>
                   ) : (
                     <div className="text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
-                      <p className="text-gray-400 text-lg">{t('results.noResults')}</p>
-                      {!error && (
-                        <div className="mt-2 text-sm text-gray-400">
-                          {t('results.checkData')}
-                        </div>
+                      {isRestrictedCollection ? (
+                        <>
+                          <div className="text-primary-500 mb-3 flex justify-center"><Lock size={32} /></div>
+                          <p className="text-gray-600 text-lg max-w-md mx-auto px-4">
+                            {!user ? t('results.protectedLoggedOut') : t('results.protectedNoAccess')}
+                          </p>
+                          <div className="mt-4 flex flex-wrap gap-3 justify-center">
+                            {!user && (
+                              <button
+                                onClick={() => setShowLoginModal(true)}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                              >
+                                <LogIn size={16} />
+                                {t('auth:login.title')}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => setSelectedCollection(null)}
+                              className="px-4 py-2 text-primary-600 font-medium hover:underline"
+                            >
+                              {t('results.viewAllWorks')}
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-400 text-lg">{t('results.noResults')}</p>
+                          {!error && (
+                            <div className="mt-2 text-sm text-gray-400">
+                              {t('results.checkData')}
+                            </div>
+                          )}
+                          <button
+                            onClick={() => {
+                              setInputValue('');
+                              setYearStart('');
+                              setYearEnd('');
+                              setSort('recent');
+                              setSearchParams({});
+                            }}
+                            className="mt-4 text-primary-600 font-medium hover:underline"
+                          >
+                            {t('results.restoreDefaults')}
+                          </button>
+                        </>
                       )}
-                      <button
-                        onClick={() => {
-                          setInputValue('');
-                          setYearStart('');
-                          setYearEnd('');
-                          setSort('recent');
-                          setSearchParams({});
-                        }}
-                        className="mt-4 text-primary-600 font-medium hover:underline"
-                      >
-                        {t('results.restoreDefaults')}
-                      </button>
                     </div>
                   )}
                 </>
@@ -1101,6 +1136,9 @@ const Dashboard: React.FC = () => {
           selectedCount={selectedWorkIds.size}
         />
       )}
+
+      {/* Login modaal (kaitstud kollektsiooni tühi tulemus) */}
+      <LoginModal isOpen={showLoginModal} onClose={() => setShowLoginModal(false)} />
     </div>
   );
 };
