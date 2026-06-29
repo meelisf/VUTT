@@ -188,6 +188,17 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # Sitemap: dünaamiline XML backendist. KOHUSTUSLIK exact-match (`= `),
+    # muidu langeb `location /` SPA-fallbacki ja Google saab HTML-i
+    # ("Your Sitemap appears to be an HTML page"). NB: robots.txt keelab
+    # `/api/`, seega sitemap PEAB olema serveeritav juurtee alt (mitte
+    # `/api/files/sitemap.xml`).
+    location = /sitemap.xml {
+        proxy_pass http://127.0.0.1:8002/sitemap.xml;
+        proxy_set_header Host $host;
+        add_header Cache-Control "no-cache";
+    }
+
     # API Proxy (Dockerisse)
     location /api/files/ {
         proxy_pass http://127.0.0.1:8002/;
