@@ -121,6 +121,59 @@ def test_list_persons_collection_filters(tmp_path):
     assert res["total"] == 1
 
 
+def test_person_collections_returns_works_own_collections(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    # w1 → c-child, w2 → c-other; tagastatakse teose ENDA kollektsioonid (ilma hierarhia laienduseta)
+    wc_file.write_text(json.dumps({"w1": ["c-child"], "w2": ["c-other"]}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({
+        "vutt:Pmulti":  [{"work_id": "w1", "role": "creator"}, {"work_id": "w2", "role": "mentioned"}],
+        "vutt:Pnowork": [],
+    }), encoding="utf-8")
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)):
+        assert ops._person_collections("vutt:Pmulti") == ["c-child", "c-other"]
+        assert ops._person_collections("vutt:Pnowork") == []
+        assert ops._person_collections("vutt:Punknown") == []
+
+
+def test_map_markers_includes_focus_for_related_to(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
+    # Fookus-isik kuulub 'c-other'-isse, kuid valitud on 'parent' (c-other pole järglane)
+    wc_file.write_text(json.dumps({"w1": ["c-other"]}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({"vutt:Pfocus": [{"work_id": "w1", "role": "creator"}]}), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": [
+        {"id": "vutt:Pfocus", "label": "Focus Inimene", "sort_name": "focus", "record_status": "published"},
+    ]}), encoding="utf-8")
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+         mock.patch.object(ops, "get_person_relation_network_ids", return_value=["vutt:Pfocus"]), \
+         mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
+        res = ops.get_person_map_markers(related_to="vutt:Pfocus", collection="parent")
+
+    assert res["focus"]["id"] == "vutt:Pfocus"
+    assert res["focus"]["label"] == "Focus Inimene"
+    assert res["focus"]["collections"] == ["c-other"]
+    # 'parent' ei hõlma 'c-other'-it → kõik filtreeritakse välja
+    assert res["markers"] == []
+
+
+def test_map_markers_no_focus_without_related_to(tmp_path):
+    ops = _ops(tmp_path)
+    idx_file = tmp_path / "idx.json"
+    idx_file.write_text(json.dumps({"entries": []}), encoding="utf-8")
+    with mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)):
+        res = ops.get_person_map_markers()
+    assert "focus" not in res
+
+
 def test_save_work_metadata_updates_collections_even_when_call_ptw_false(tmp_path):
     metadata_ops = importlib.import_module("server.metadata_ops")
     ops = importlib.import_module("server.prosopography.ops")

@@ -248,7 +248,12 @@
     "markerCount": "{{count}} places",
     "mappedCount": "{{mapped}} / {{total}} persons on map",
     "withoutCoordinates": "{{count}} persons without coordinates",
-    "shiftedMarker": "Marker slightly shifted to avoid overlap."
+    "shiftedMarker": "Marker slightly shifted to avoid overlap.",
+    "thisPerson": "This person",
+    "collectionHintNamed": "{{name}} belongs to a different collection than the one currently selected (“{{selected}}”). Switch collection to see their relations.",
+    "collectionHintGeneric": "The selected collection (“{{selected}}”) contains none of this person's relations.",
+    "switchToCollection": "Open “{{name}}”",
+    "showAllCollections": "Show all collections"
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",

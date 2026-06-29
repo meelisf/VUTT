@@ -166,6 +166,20 @@ def _persons_in_collection(collection_id: str) -> set:
     }
 
 
+def _person_collections(person_id: str) -> list:
+    """Kollektsioonid (teose ENDA omad, ilma hierarhia laienduseta), kuhu isiku
+    teosed kuuluvad. Dedup, esmaesinemise järjekord säilib. Kasutatakse
+    seoste-kaardi vihjes, kui valitud kollektsioon isiku võrgustiku välja filtreerib."""
+    wc = _load_work_collections()
+    ptw = _load_person_to_works()
+    result: list = []
+    for entry in ptw.get(person_id, ()):
+        for cid in wc.get(entry.get("work_id"), ()):
+            if cid not in result:
+                result.append(cid)
+    return result
+
+
 def _load_person_aliases() -> dict:
     if os.path.exists(PERSON_ALIASES_FILE):
         try:
@@ -956,12 +970,26 @@ def get_person_map_markers(
         markers_by_place.values(),
         key=lambda m: (-m["count"], (m.get("place_key") or "").lower()),
     )
-    return {
+    response = {
         "markers": markers,
         "total_persons": len(entries),
         "mapped_persons": sum(m["count"] for m in markers),
         "without_coordinates": without_coordinates,
     }
+    # Seoste-kaardi vihje jaoks: fookus-isiku nimi + kollektsioonid, kuhu ta ise
+    # kuulub. Frontend kuvab nende põhjal selgituse, kui valitud kollektsioon
+    # isiku võrgustiku tühjaks filtreeris.
+    if related_to:
+        focus_label = next(
+            (e.get("label") for e in _load_index().get("entries", []) if e.get("id") == related_to),
+            None,
+        )
+        response["focus"] = {
+            "id": related_to,
+            "label": focus_label,
+            "collections": _person_collections(related_to),
+        }
+    return response
 
 
 def _structured_relation_ids(person: Optional[dict]) -> list[str]:

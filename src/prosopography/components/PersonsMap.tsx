@@ -5,6 +5,7 @@ import { LatLngBoundsExpression, divIcon } from 'leaflet';
 import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
 import { Loader2, MapPin, Users } from 'lucide-react';
 import { fetchPersonMapMarkers } from '../services/prosopographyService';
+import { useCollection } from '../../contexts/CollectionContext';
 import type { ProsopoMapMarker, ProsopoMapResponse } from '../types';
 
 interface PersonsMapProps {
@@ -98,6 +99,7 @@ const FitMapToMarkers: React.FC<{ markers: ProsopoMapMarker[]; focusPlace?: stri
 
 const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
+  const { setSelectedCollection, getCollectionName } = useCollection();
   const lang = i18n.language?.slice(0, 2) ?? 'et';
   const [data, setData] = useState<ProsopoMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -136,9 +138,50 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
   }
 
   if (!data || data.markers.length === 0) {
+    // Vihje: kui seoste-kaart on tühi valitud kollektsiooni tõttu, selgita miks
+    // ja paku kollektsiooni vahetamist (vt fix: related_to + kollektsioon).
+    const selected = filters.related_to ? filters.collection : undefined;
+    const focusName = data?.focus?.label || t('map.thisPerson', 'See isik');
+    const otherCollections = (data?.focus?.collections ?? []).filter(c => c !== selected);
+    const lng = lang === 'en' ? 'en' : 'et';
+
     return (
-      <div className="h-[420px] bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-400 text-sm">
-        {t('map.noMarkers', 'Kaardile kantavaid päritolukohti ei leitud.')}
+      <div className="min-h-[420px] bg-white border border-gray-200 rounded-xl flex flex-col items-center justify-center gap-3 text-center px-6 py-10">
+        <MapPin size={22} className="text-gray-300" />
+        <p className="text-gray-500 text-sm">{t('map.noMarkers', 'Kaardile kantavaid päritolukohti ei leitud.')}</p>
+        {selected && (
+          <div className="max-w-md space-y-3">
+            <p className="text-sm text-gray-600">
+              {otherCollections.length > 0
+                ? t('map.collectionHintNamed', '{{name}} kuulub teise kollektsiooni kui praegu valitud („{{selected}}"). Tema seoste nägemiseks vaheta kollektsiooni.', {
+                    name: focusName,
+                    selected: getCollectionName(selected, lng),
+                  })
+                : t('map.collectionHintGeneric', 'Valitud kollektsioonis („{{selected}}") pole selle isiku seoseid.', {
+                    selected: getCollectionName(selected, lng),
+                  })}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {otherCollections.map(c => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setSelectedCollection(c)}
+                  className="rounded-full border border-primary-300 bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-100 transition-colors"
+                >
+                  {t('map.switchToCollection', 'Ava „{{name}}"', { name: getCollectionName(c, lng) })}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setSelectedCollection(null)}
+                className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                {t('map.showAllCollections', 'Näita kõiki kollektsioone')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

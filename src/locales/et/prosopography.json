@@ -248,7 +248,12 @@
     "markerCount": "{{count}} kohta",
     "mappedCount": "{{mapped}} / {{total}} isikut kaardil",
     "withoutCoordinates": "{{count}} isikul puudub koordinaat",
-    "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud."
+    "shiftedMarker": "Marker on kattuvuse vältimiseks veidi nihutatud.",
+    "thisPerson": "See isik",
+    "collectionHintNamed": "{{name}} kuulub teise kollektsiooni kui praegu valitud („{{selected}}\"). Tema seoste nägemiseks vaheta kollektsiooni.",
+    "collectionHintGeneric": "Valitud kollektsioonis („{{selected}}\") pole selle isiku seoseid.",
+    "switchToCollection": "Ava „{{name}}\"",
+    "showAllCollections": "Näita kõiki kollektsioone"
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
