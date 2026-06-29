@@ -109,6 +109,8 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 | `src/services/collectionService.ts` | Collection helpers, color classes |
 | `src/contexts/CollectionContext.tsx` | Collection state (React Context) |
 | `src/components/EntityPicker.tsx` | Wikidata linked data picker |
+| `src/components/MarkdownEditor.tsx` | Markdown-redaktor (nupuriba + eelvaade) vabateksti väljadele |
+| `src/components/MarkdownView.tsx` | Turvaline markdown-renderdaja (allow-list, ei luba toorest HTML-i) |
 | `server/main.py` | FastAPI backend, kõik endpointid |
 | `server/auth.py` | Autentimine, rollid, sessioonid |
 | `server/git_ops.py` | Git version control |
@@ -248,6 +250,35 @@ meili/consolidate `split_marginalia`. Olemasolevate failide koristus:
 — `TextEditor.tsx` copy-handler eemaldab tagid. **Sihtkoht määrab vormingu**: marginaaliasse
 (avatud plokk) kleepides → marginaalia, põhiteksti → tavatekst. Üle ploki-piiri kustutus
 avatud plokis liidab `<m>` plokid; jäänused koristab salvestamisel `strip_empty_tags`.
+
+## Markdown-redaktor (Märkmed / Elulugu)
+
+Vabateksti väljade (prosopograafia **Märkmed** ja **Elulugu**) jaoks on eraldi,
+**domeeni-neutraalne** markdown-redaktor. EI OLE seotud transkriptsiooni CodeMirror-
+editoriga (`VuttMarkupExtension`) — see kasutab XML-tägisid, siin on tavaline markdown.
+Salvestus on tavaline markdown-string (`notes`/`biography` `_metadata.json`-is); backend/
+andmemudel/migratsioon ei muutu.
+
+**Komponendid (`src/components/`):**
+- `markdownEditorHelpers.ts` — puhtad tekstiteisendused (`applyWrap`, `applyLinePrefix`,
+  `looksLikeUrl`, `linkPrefillFromSelection`, `insertLink`, `normalizeLinkUrl`); DOM-vabad,
+  unit-testitud (`__tests__/markdownEditorHelpers.test.ts`)
+- `MarkdownEditor.tsx` — nupuriba (Paks/Kursiiv/Pealkiri/Link/Loend/`?`), Kirjuta/Eelvaade
+  tabid (vaikimisi Kirjuta), lingi-popover (valikupõhine eeltäide + fookusehaldus),
+  autosuurus (jäetakse vahele kui kasutaja on käsitsi suurust muutnud). API:
+  `{ value, onChange, placeholder?, minRows?, id?, disabled? }`
+- `MarkdownView.tsx` — `react-markdown` + `remark-gfm`, **allow-list** (`allowedElements`
+  + `unwrapDisallowed`); tagastab `null` tühja sisu korral
+
+**Turvalisus (KRIITILINE):** ainult markdown, **EI kasuta `rehype-raw`-i** → toores HTML
+escape'itud. Renderduv DOM on piiratud: `p, strong, em, del, a, ul, ol, li, h1-h3,
+blockquote, code, br`. Lingid `_blank`/`noopener`; react-markdowni `urlTransform` lubab
+ainult kindlaid protokolle (`javascript:` blokeeritud). GFM on sees AINULT autolinkimiseks
+— tabelid/footnote'd/tasklist'id ei renderdu struktuurina (tekst säilib `unwrapDisallowed`-ga).
+
+**Stiil:** `.vutt-md` klass `src/index.css`-is (eraldi transkriptsiooni `.markdown-preview`-st).
+**i18n:** `common` namespace, võti `markdownEditor`. **Nupud v1 ainult lisavad süntaksit**
+(pole toggle-eemaldust). Disain/plaan: `docs/superpowers/{specs,plans}/2026-06-29-markdown-notes-editor*`.
 
 ## i18n
 
