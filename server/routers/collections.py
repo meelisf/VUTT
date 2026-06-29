@@ -90,7 +90,7 @@ async def delete_archive(archive_id: str, force: bool = False, user=Depends(requ
     return {"status": "success"}
 
 @router.put("/admin/collections/{collection_id}")
-async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+async def admin_update_collection(collection_id: str, request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
     """Uuendab kollektsiooni description, description_long, color ja visibility välju."""
     body = await request.json()
     description = body.get("description")      # { et, en }
@@ -194,7 +194,7 @@ async def admin_collection_users(collection_id: str, user=Depends(require_role("
     }
 
 @router.post("/admin/collections")
-async def admin_create_collection(request: Request, user=Depends(require_role("admin"))):
+async def admin_create_collection(request: Request, user=Depends(require_role("superadmin"))):
     """Loob uue kollektsiooni. Body: {id, name_et, name_en, parent?, color?, is_virtual?}"""
     body = await request.json()
     collection_id = body.get("id", "").strip()
@@ -296,7 +296,7 @@ def admin_collection_works_count(collection_id: str, user=Depends(require_role("
     return {"status": "success", "count": count}
 
 @router.delete("/admin/collections/{collection_id}")
-async def admin_delete_collection(collection_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+async def admin_delete_collection(collection_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
     """Kustutab kollektsiooni ja eemaldab selle ID kõigi teoste metaandmetest. Keeldub kui on alamkollektsioone."""
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}

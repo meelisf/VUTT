@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,12 +16,13 @@ import {
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
 import { apiPost } from '../../services/apiClient';
+import { ROLE_LEVELS, canManageUser, assignableRoles, roleLevel } from '../../utils/roleUtils';
 
 interface User {
   username: string;
   name: string;
   email: string;
-  role: 'contributor' | 'editor' | 'admin';
+  role: 'contributor' | 'editor' | 'admin' | 'superadmin';
   created_at: string | null;
   allowed_collections?: string[];
 }
@@ -30,8 +32,6 @@ interface UsersResponse {
   users?: User[];
   message?: string;
 }
-
-const ROLE_LEVEL: Record<string, number> = { contributor: 0, editor: 1, admin: 2 };
 
 const UsersPage: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
@@ -44,17 +44,20 @@ const UsersPage: React.FC = () => {
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
+  // Vajalik, sest tabeli ümbris on overflow-x-auto, mis lõikaks absolute-menüü "nurga taha".
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [resetResult, setResetResult] = useState<{ username: string; name: string; reset_url: string } | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) {
+    if (!userLoading && (!user || roleLevel(user.role) < ROLE_LEVELS.admin)) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
 
   useEffect(() => {
-    if (authToken && user?.role === 'admin') {
+    if (authToken && user && roleLevel(user.role) >= ROLE_LEVELS.admin) {
       loadUsers();
     }
   }, [authToken, user]);
@@ -159,13 +162,33 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  // Sulge kebab-menüü klõpsul mujale
+  // Sulge kebab-menüü klõpsul mujale või kerimisel (fixed-positsioon triiviks muidu ankrust eemale)
   useEffect(() => {
-    if (!openMenu) return;
-    const close = () => setOpenMenu(null);
+    if (!openMenu && !deleteConfirm) return;
+    const close = () => { setOpenMenu(null); setDeleteConfirm(null); };
     document.addEventListener('click', close);
-    return () => document.removeEventListener('click', close);
-  }, [openMenu]);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('click', close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [openMenu, deleteConfirm]);
+
+  // Arvuta fixed-positsioon ankru järgi: joondu nupu paremasse serva, keera üles kui aken on all otsas
+  const popoverStyle = (width: number, estHeight: number): React.CSSProperties => {
+    const margin = 8;
+    const rect = anchorRect;
+    if (!rect) return { display: 'none' };
+    let left = rect.right - width;
+    if (left < margin) left = margin;
+    let top = rect.bottom + 4;
+    if (top + estHeight > window.innerHeight - margin) {
+      top = Math.max(margin, rect.top - estHeight - 4);
+    }
+    return { position: 'fixed', top, left, width };
+  };
 
   const formatDate = (isoString: string) => {
     return new Date(isoString).toLocaleDateString('et-EE', {
@@ -185,7 +208,7 @@ const UsersPage: React.FC = () => {
     );
   }
 
-  if (user.role !== 'admin') return null;
+  if (roleLevel(user.role) < ROLE_LEVELS.admin) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -252,136 +275,161 @@ const UsersPage: React.FC = () => {
               {t('users.empty')}
             </div>
           ) : (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-x-auto">
-              <table className="w-full min-w-[640px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.name')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.username')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.email')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.role')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">{t('users.created')}</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Piiratud kogud</th>
-                    <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">{t('users.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {users.map((u) => {
-                    const isCurrentUser = u.username === user?.username;
-                    const isProcessing = roleUpdating === u.username;
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {users.map((u) => {
+                const isCurrentUser = u.username === user?.username;
+                const isProcessing = roleUpdating === u.username;
+                const canReset = isCurrentUser || canManageUser(user.role, u.role);
+                const canManage = canManageUser(user.role, u.role);
+                const canDelete = !isCurrentUser && canManage;
 
-                    return (
-                      <tr key={u.username} className={`hover:bg-gray-50 ${isCurrentUser ? 'bg-primary-50' : ''}`}>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          <div className="flex items-center gap-2">
-                            {u.name}
-                            {isCurrentUser && (
-                              <span className="text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
-                                {t('users.you')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 font-mono">{u.username}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{u.email || '-'}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {isCurrentUser ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-                              {t(`common:roles.${u.role}`)}
+                return (
+                  <div
+                    key={u.username}
+                    className={`relative flex flex-col rounded-lg border p-4 transition-colors ${
+                      isCurrentUser ? 'border-primary-300 bg-primary-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                    }`}
+                  >
+                    {/* Identiteet: nimi + kasutajanimi + e-post; tegevuste kebab paremas ülanurgas */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900 truncate">{u.name}</span>
+                          {isCurrentUser && (
+                            <span className="flex-shrink-0 text-xs bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded">
+                              {t('users.you')}
                             </span>
-                          ) : (
-                            <select
-                              value={u.role}
-                              onChange={(e) => handleRoleChange(u.username, e.target.value)}
-                              disabled={isProcessing}
-                              className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
-                            >
-                              <option value="contributor">{t('common:roles.contributor')}</option>
-                              <option value="editor">{t('common:roles.editor')}</option>
-                              <option value="admin">{t('common:roles.admin')}</option>
-                            </select>
                           )}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-600">
-                          {u.created_at ? formatDate(u.created_at) : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-gray-400">
-                          {u.allowed_collections && u.allowed_collections.length > 0
-                            ? u.allowed_collections.join(', ')
-                            : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right relative">
-                          {(() => {
-                            const canReset = isCurrentUser || (ROLE_LEVEL[u.role] ?? 0) < (ROLE_LEVEL[user.role] ?? 0);
-                            const canDelete = !isCurrentUser;
-                            if (!canReset && !canDelete) return <span className="text-gray-400">-</span>;
-                            return (
-                              <div className="inline-block" onClick={(e) => e.stopPropagation()}>
+                        </div>
+                        <div className="mt-0.5 font-mono text-xs text-gray-500 truncate">{u.username}</div>
+                        <div className="text-sm text-gray-600 truncate">{u.email || '-'}</div>
+                      </div>
+
+                      {(canReset || canDelete) && (
+                        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={(e) => {
+                              setDeleteConfirm(null);
+                              if (openMenu === u.username) {
+                                setOpenMenu(null);
+                              } else {
+                                setAnchorRect(e.currentTarget.getBoundingClientRect());
+                                setOpenMenu(u.username);
+                              }
+                            }}
+                            disabled={isProcessing}
+                            className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50"
+                            aria-haspopup="menu"
+                            aria-expanded={openMenu === u.username}
+                            title={t('users.actionsMenu')}
+                          >
+                            {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
+                          </button>
+                          {openMenu === u.username && createPortal(
+                            <div
+                              role="menu"
+                              style={popoverStyle(176, 96)}
+                              className="z-50 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-left"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => { if (e.key === 'Escape') setOpenMenu(null); }}
+                            >
+                              {canReset && (
                                 <button
-                                  onClick={() => setOpenMenu(openMenu === u.username ? null : u.username)}
-                                  disabled={isProcessing}
-                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50"
-                                  aria-haspopup="menu"
-                                  aria-expanded={openMenu === u.username}
-                                  title={t('users.actionsMenu')}
+                                  role="menuitem"
+                                  onClick={() => handleResetPassword(u.username)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                                 >
-                                  {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
+                                  <KeyRound size={15} /> {t('users.resetPassword')}
                                 </button>
-                                {openMenu === u.username && (
-                                  <div
-                                    role="menu"
-                                    className="absolute right-4 z-10 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-left"
-                                    onKeyDown={(e) => { if (e.key === 'Escape') setOpenMenu(null); }}
-                                  >
-                                    {canReset && (
-                                      <button
-                                        role="menuitem"
-                                        onClick={() => handleResetPassword(u.username)}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                      >
-                                        <KeyRound size={15} /> {t('users.resetPassword')}
-                                      </button>
-                                    )}
-                                    {canDelete && (
-                                      <button
-                                        role="menuitem"
-                                        onClick={() => { setOpenMenu(null); setDeleteConfirm(u.username); }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                                      >
-                                        <Trash2 size={15} /> {t('users.delete')}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                                {deleteConfirm === u.username && (
-                                  <div className="absolute right-4 z-10 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left w-56">
-                                    <p className="text-xs text-red-600 mb-2">{t('users.confirmDelete')}</p>
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={() => handleDeleteUser(u.username)}
-                                        disabled={isProcessing}
-                                        className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
-                                      >
-                                        {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
-                                      </button>
-                                      <button
-                                        onClick={() => setDeleteConfirm(null)}
-                                        className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
-                                      >
-                                        {t('users.no')}
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                              )}
+                              {canDelete && (
+                                <button
+                                  role="menuitem"
+                                  onClick={() => { setOpenMenu(null); setDeleteConfirm(u.username); }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 size={15} /> {t('users.delete')}
+                                </button>
+                              )}
+                            </div>,
+                            document.body
+                          )}
+                          {deleteConfirm === u.username && createPortal(
+                            <div
+                              style={popoverStyle(224, 96)}
+                              className="z-50 w-56 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <p className="text-xs text-red-600 mb-2">{t('users.confirmDelete')}</p>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleDeleteUser(u.username)}
+                                  disabled={isProcessing}
+                                  className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                                >
+                                  {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm(null)}
+                                  className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
+                                >
+                                  {t('users.no')}
+                                </button>
                               </div>
-                            );
-                          })()}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            </div>,
+                            document.body
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tähtsad väljad: roll + piiratud kogud */}
+                    <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500">{t('users.role')}</span>
+                        {isCurrentUser || !canManage ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs"
+                            title={!isCurrentUser && !canManage ? t('users.noPermissionManage') : undefined}
+                          >
+                            {t(`common:roles.${u.role}`)}
+                          </span>
+                        ) : (
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.username, e.target.value)}
+                            disabled={isProcessing}
+                            className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                          >
+                            {assignableRoles(user.role).map((r) => (
+                              <option key={r} value={r}>{t(`common:roles.${r}`)}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">Piiratud kogud</span>
+                        {u.allowed_collections && u.allowed_collections.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {u.allowed_collections.map((c) => (
+                              <span key={c} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400 mt-0.5">—</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Vähemoluline: loodud-kuupäev */}
+                    <div className="mt-3 text-xs text-gray-400">
+                      {t('users.created')}: {u.created_at ? formatDate(u.created_at) : '-'}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </section>

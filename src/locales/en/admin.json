@@ -51,7 +51,8 @@
     "resetLinkHint": "Copy the link and send it to the user. The link is valid for 24 hours.",
     "copyLink": "Copy link",
     "linkCopied": "Copied!",
-    "resetError": "Failed to create password reset link"
+    "resetError": "Failed to create password reset link",
+    "noPermissionManage": "You don't have permission to manage a user of equal or higher level"
   },
   "pending": {
     "title": "Pending Edits",

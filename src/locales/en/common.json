@@ -43,7 +43,8 @@
   "roles": {
     "admin": "Administrator",
     "editor": "Editor",
-    "contributor": "Contributor"
+    "contributor": "Contributor",
+    "superadmin": "Superadministrator"
   },
   "labels": {
     "page": "Page",

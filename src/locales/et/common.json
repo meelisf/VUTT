@@ -43,7 +43,8 @@
   "roles": {
     "admin": "Administraator",
     "editor": "Toimetaja",
-    "contributor": "Kaastööline"
+    "contributor": "Kaastööline",
+    "superadmin": "Superadministraator"
   },
   "labels": {
     "page": "Lk",
