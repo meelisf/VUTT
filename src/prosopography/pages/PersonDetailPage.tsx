@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import ReactMarkdown from 'react-markdown';
+import MarkdownView from '../../components/MarkdownView';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
   BookOpen, User, BookMarked, Users, StickyNote, Map, History, RotateCcw, Lock,
@@ -638,9 +638,7 @@ const PersonDetailPage: React.FC = () => {
         {person.biography && (
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
             <CardHeader icon={<BookMarked size={18} />} title={t('biography', 'Elulugu')} />
-            <div className="markdown-preview text-sm text-gray-800 leading-relaxed">
-              <ReactMarkdown>{person.biography}</ReactMarkdown>
-            </div>
+            <MarkdownView content={person.biography} className="text-sm text-gray-800 leading-relaxed" />
           </div>
         )}
 
@@ -747,7 +745,7 @@ const PersonDetailPage: React.FC = () => {
         {person.notes && (
           <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
             <CardHeader icon={<StickyNote size={18} />} title={t('notes', 'Märkmed')} />
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{person.notes}</p>
+            <MarkdownView content={person.notes} className="text-sm text-gray-700" />
           </div>
         )}
 

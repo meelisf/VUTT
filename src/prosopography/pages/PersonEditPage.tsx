@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'reac
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
 import Header from '../../components/Header';
+import MarkdownEditor from '../../components/MarkdownEditor';
 import EntityPicker from '../../components/EntityPicker';
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
@@ -592,14 +593,13 @@ const PersonEditPage: React.FC = () => {
         {/* ── Elulugu ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">
-            {t('biography', 'Elulugu')} <span className="font-normal lowercase">(markdown)</span>
+            {t('biography', 'Elulogo')}
           </label>
-          <textarea
+          <MarkdownEditor
             value={draft.biography}
-            onChange={e => set({ biography: e.target.value })}
-            rows={8}
+            onChange={v => set({ biography: v })}
+            minRows={8}
             placeholder={t('form.biographyPlaceholder')}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y font-mono leading-relaxed"
           />
         </div>
 
@@ -837,12 +837,11 @@ const PersonEditPage: React.FC = () => {
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-1">
               {t('notes', 'Märkmed')}
             </label>
-            <textarea
+            <MarkdownEditor
               value={draft.notes}
-              onChange={e => set({ notes: e.target.value })}
-              rows={3}
+              onChange={v => set({ notes: v })}
+              minRows={3}
               placeholder={t('form.notesPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y"
             />
           </div>
         </CollapsibleSection>
