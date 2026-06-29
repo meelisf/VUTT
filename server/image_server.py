@@ -258,6 +258,13 @@ def get_or_create_page_thumbnail(work_path, thumb_filename):
 
 
 class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def send_error(self, code, message=None, explain=None):
+        # Ära cache'i 403/404 vastuseid. Muidu võib brauser jätta piiratud teose
+        # signeerimata _thumb päringu 403 vastuse 24h vahemällu ja WorkCard ei pruugi
+        # pildi-tokeniga retry järel ennast usaldusväärselt taastada.
+        self._no_cache_response = True
+        return super().send_error(code, message, explain)
+
     def end_headers(self):
         # CORS
         origin = self.headers.get('Origin')
@@ -266,8 +273,11 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Access-Control-Allow-Credentials', 'true')
 
         self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        # Cache 24h
-        self.send_header('Cache-Control', 'public, max-age=86400')
+        if getattr(self, '_no_cache_response', False):
+            self.send_header('Cache-Control', 'no-store')
+        else:
+            # Cache 24h
+            self.send_header('Cache-Control', 'public, max-age=86400')
         return super().end_headers()
 
     def do_GET(self):

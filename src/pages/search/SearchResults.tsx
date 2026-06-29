@@ -23,19 +23,28 @@ import {
 const PageThumbnail: React.FC<{ workId: string; src: string; className: string }> = ({ workId, src, className }) => {
     const { authToken } = useUser();
     const [imgSrc, setImgSrc] = useState(src);
+    const [needsToken, setNeedsToken] = useState(false);
     const triedRef = useRef(false);
 
     useEffect(() => {
         setImgSrc(src);
+        setNeedsToken(false);
         triedRef.current = false;
     }, [src]);
 
-    const handleError = async () => {
+    const requestImageToken = React.useCallback(async () => {
         if (triedRef.current || !workId) return;
+
+        // AuthContext taastub lehe laadimisel asünkroonselt; protected pildi 403 võib
+        // jõuda enne authToken state'i. Kasuta localStorage fallback'i ja ära märgi
+        // katset tehtuks enne, kui token on tegelikult olemas.
+        const token = authToken || localStorage.getItem('vutt_token');
+        if (!token) return;
+
         triedRef.current = true;
         try {
             const response = await fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-                headers: getAuthHeaders(authToken),
+                headers: getAuthHeaders(token),
                 timeout: 10000,
             });
             if (!response.ok) return;
@@ -43,8 +52,18 @@ const PageThumbnail: React.FC<{ workId: string; src: string; className: string }
             if (data.image_exp && data.image_sig) {
                 const sep = src.includes('?') ? '&' : '?';
                 setImgSrc(`${src}${sep}exp=${data.image_exp}&sig=${data.image_sig}`);
+                setNeedsToken(false);
             }
         } catch { /* thumbnail jääb tühjaks */ }
+    }, [authToken, src, workId]);
+
+    useEffect(() => {
+        if (needsToken) void requestImageToken();
+    }, [needsToken, requestImageToken]);
+
+    const handleError = () => {
+        setNeedsToken(true);
+        void requestImageToken();
     };
 
     return <img src={imgSrc} alt="" loading="lazy" className={className} onError={handleError} />;
