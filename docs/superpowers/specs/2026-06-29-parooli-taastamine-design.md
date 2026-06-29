@@ -56,12 +56,21 @@ Aegumine: `created_at + 24h` (lühem kui invite 48h — turvalisem).
 
 Funktsioonid:
 - `create_reset_token(username, created_by)` — kontrollib, et kasutaja on olemas;
-  **invalideerib sama kasutaja varasemad kasutamata reset-tokenid** (üks aktiivne korraga);
-  loob uue. Olematu kasutaja → viga.
+  **passiivne puhastus:** eemaldab failist kirjed, mille `expires_at` on > 7 päeva vana
+  (hoiab faili väikese ilma croonita); **invalideerib sama kasutaja varasemad kasutamata
+  reset-tokenid** (üks aktiivne korraga); loob uue. Olematu kasutaja → viga.
 - `validate_reset_token(token)` → `(token_data, error)` — kehtivuse kontroll (olemas,
   mitte kasutatud, mitte aegunud).
 - `_validate_and_consume_token(token)` — atomaarne consume (lukuga, `used=True` +
   `used_at`) + `_unconsume_token(token)` rollback (peegeldab invite'i).
+
+**Konkurentsus / faililukud:** moodul kasutab oma `reset_tokens_lock` (`threading.RLock`)
+ja `atomic_write_json` (write-to-temp-and-rename) — sama muster nagu `registration.py`.
+Server jookseb single-worker uvicorniga, seega threading-lukk on piisav; portalocker'i
+(mitme protsessi lukk) pole vaja. `complete_password_reset` puudutab kahte faili kahe
+eri lukuga: KÕIGEPEALT consume `reset_tokens.json` (`reset_tokens_lock`), SEEJÄREL
+`save_users` (`users_lock`); kui kasutaja salvestus ebaõnnestub → `_unconsume_token`
+rollback (nagu invite'is).
 - `complete_password_reset(token, new_password)`:
   1. `validate_password_strength(new_password)` (taaskasuta `registration.py`-st).
   2. Atomaarne consume.
@@ -77,9 +86,18 @@ kogemata kasutajat välja.
 ### 2. Backend — endpointid
 
 `server/routers/admin.py` (admin-õigus, `require_role("admin")`):
-- `POST /admin/users/reset-password` — body `{username}`. Lubatud KÕIGILE kasutajatele
-  (sh `meelis` superadmin — admin peab saama enda parooli taastada; operatsioon on ohutu,
-  kuna kasutaja ise seab uue). Tagastab:
+- `POST /admin/users/reset-password` — body `{username}`.
+
+  **Privileegide kontroll (kaitse eskaleerumise eest):** admin EI tohi lähtestada endast
+  kõrgema VÕI võrdse privileegiga kasutajat, v.a iseendale. Rolli-hierarhia
+  `{contributor:0, editor:1, admin:2}`:
+  - admin saab lähtestada iseennast (sh enda parooli);
+  - admin saab lähtestada madalama rolli (editor, contributor);
+  - admin EI saa lähtestada teist admini (võrdne) → 403.
+
+  Seetõttu jääb `meelis` (samuti `admin`-roll) kaitstuks üldreegli kaudu — teine admin ei
+  saa tema parooli lähtestada, ainult ta ise. Eraldi `meelis`-hardcode'i pole vaja
+  (erinevalt `update_user_role`/`delete_user`-ist). Tagastab:
   ```json
   { "status": "success",
     "reset_url": "/set-password?token=<uuid>&reset=1",
@@ -87,18 +105,25 @@ kogemata kasutajat välja.
     "username": "...", "name": "..." }
   ```
 
-`server/routers/auth.py` (avalik, rate-limited — sama muster nagu `/invite/*`):
+`server/routers/auth.py` (avalik, rate-limited):
 - `GET /reset/{token}` — valideerib, tagastab `{status, valid, username, name, expires_at}`.
   Töötab ainult kehtiva tokeniga; ei lekita rohkem kui vaja.
+  **Rate-limited** (`get_client_ip` + `check_rate_limit`) — väldib tokenite brute-force'imist
+  ja kasutajanime lekkimist. NB: see on teadlik parandus invite-mustri suhtes — olemasolev
+  `GET /invite/{token}` (`check_invite`) EI ole praegu rate-limited.
 - `POST /reset/set-password` — body `{token, password}`, kutsub `complete_password_reset`.
   Rate-limit: `get_client_ip` + `check_rate_limit` (sama muster nagu `/invite/set-password`).
 
-Aegunud tokenite eraldi koristust pole vaja (nagu invite'idki — valideerimisel hüljatakse).
+Aegunud tokenite eraldi koristust pole vaja (passiivne puhastus toimub `create_reset_token`-is,
+vt eespool — valideerimisel hüljatakse niikuinii).
 
 ### 3. Frontend
 
-**`src/pages/admin/Users.tsx`** — iga kasutaja rea "Tegevused" veergu lisandub
-"Taasta parool" nupp (`KeyRound` ikoon, kustutusnupu kõrvale):
+**`src/pages/admin/Users.tsx`** — "Tegevused" veergu lisandub "Taasta parool" nupp
+(`KeyRound` ikoon, kustutusnupu kõrvale). **Nähtav ainult lubatud sihtmärkidele:**
+madalama rolliga kasutaja (editor/contributor) VÕI iseenda rida; teiste adminite real
+nuppu ei kuvata (peegeldab backend-i privileegikontrolli — backend on autoriteet, UI
+ainult peidab). Nupp:
 - Klikk → `POST /admin/users/reset-password` → modaal/inline-paneel näitab täislinki
   (`window.location.origin + reset_url`) + "Kopeeri link" nupp (sama muster nagu
   `Registrations.tsx` invite-lingi puhul, `linkCopied` state).
@@ -121,8 +146,18 @@ pole vaja.
 - Token ühekordne (`used` + atomaarne consume + rollback).
 - Parooli vahetusel invalideeritakse kasutaja sessioonid.
 - Vana token sama kasutaja kohta tühistatakse uue genereerimisel.
-- Rate-limit avalikel `/reset/*` endpointidel.
+- **Privileegide eskaleerumise kaitse:** admin ei saa lähtestada võrdse/kõrgema privileegiga
+  kasutajat (sh teist admini ega `meelis`-t) — ainult madalamaid ja iseennast.
+- **Rate-limit MÕLEMAL avalikul endpointil** — nii `GET /reset/{token}` kui
+  `POST /reset/set-password`.
 - Avalik `GET /reset/{token}` töötab ainult kehtiva tokeniga.
+
+## Aktsepteeritud piirangud
+
+- **Admini self-lockout:** kuna iseteenindust ("unustasin parooli") esialgu ei ole, peab
+  parooli unustanud ja sisse logida mittesaaval adminil olema teine admin (kes genereerib
+  lingi) VÕI otsene serveri-ligipääs (`state/users.json` käsitsi). Teadlik piirang kuni
+  SMTP + iseteenindus lisatakse.
 
 ## SMTP-valmidus
 
@@ -138,9 +173,14 @@ pole vaja.
 - `validate_reset_token`: kehtiv, aegunud, kasutatud, olematu.
 - Atomaarne consume (üks edukas, teine "juba kasutatud").
 - Varasema tokeni tühistamine uue loomisel.
+- Passiivne puhastus: > 7 päeva vanad kirjed eemaldatakse uue tokeni loomisel.
 - `complete_password_reset`: muudab bcrypt-hashi + invalideerib sessioonid.
 - Parooli-tugevuse keeldumine (lühike / liiga lihtne).
 - Salvestamise rollback (`_unconsume_token`).
+- **Privileegide kontroll** (endpoint-tasandil): admin → editor/contributor OK; admin →
+  teine admin 403; admin → iseennast OK.
+- **Rate-limit** GET `/reset/{token}` ja POST `/reset/set-password` (vajadusel testitav,
+  kui rate-limit on testikeskkonnas aktiivne).
 
 Olemasolevat invite-voogu need ei puuduta (eraldi moodul + hoidla).
 
