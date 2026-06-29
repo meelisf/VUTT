@@ -11,7 +11,8 @@ from typing import Callable
 from .utils import metadata_lock
 from .git_ops import save_with_git
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
-from .prosopography.ops import update_person_to_works, ensure_prosopo_stubs, update_work_collections
+from .prosopography.indices import update_person_to_works, update_work_collections
+from .prosopography.person_crud import ensure_prosopo_stubs
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {

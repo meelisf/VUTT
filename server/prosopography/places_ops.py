@@ -251,7 +251,9 @@ async def _propagate_place_change(place_key: str) -> None:
     Pärast places.json muutmist uuendab kõik mõjutatud isikute indeksikirjed.
     Käivitatakse background task-ina.
     """
-    from .ops import _load_index, _index_entry_from_person, get_person
+    from .indices import _load_index
+    from .person_search import _index_entry_from_person
+    from .person_crud import get_person
     from ..config import PROSOPOGRAPHY_INDEX_FILE
 
     places = _load_places_cache(force_reload=True)
@@ -280,7 +282,9 @@ async def _propagate_place_merge(source_key: str, target_key: str) -> None:
     Pärast kohade ühendamist uuendab nii source kui target isikud indeksis.
     Source isikute failid ütlevad nüüd target_key — indeks peab järele jõudma.
     """
-    from .ops import _load_index, _index_entry_from_person, get_person
+    from .indices import _load_index
+    from .person_search import _index_entry_from_person
+    from .person_crud import get_person
     from ..config import PROSOPOGRAPHY_INDEX_FILE
 
     places = _load_places_cache(force_reload=True)

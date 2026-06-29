@@ -10,26 +10,22 @@ from fastapi.responses import FileResponse
 from ..auth import require_token
 from ..config import get_logger
 from ..entity_labels_ops import enrich_entity_labels_from_person_async
-from .ops import (
+from .person_crud import (
     get_person,
-    get_person_with_works,
     create_person,
     update_person,
-    list_persons,
-    get_person_map_markers,
-    get_person_facets,
-    get_relation_type_suggestions,
     add_identifier,
     apply_enrichment,
-    merge_person,
-    delete_person,
-    rebuild_indices,
     upload_person_image,
     get_person_image_path,
     delete_person_image,
     bulk_update_occupation,
     _safe_nanoid,
 )
+from .person_search import list_persons, get_person_map_markers, get_person_facets
+from .relations import get_person_with_works, get_relation_type_suggestions
+from .merge_ops import merge_person, delete_person
+from .indices import rebuild_indices
 from .reciprocal_ops import sync_reciprocals
 from .work_relations_ops import get_work_relations
 from .places_ops import get_places, get_places_meta, put_place, search_places_wikidata, fetch_place_wikidata, _propagate_place_change, _propagate_place_merge, refresh_all_place_labels, merge_places, delete_place, put_group, delete_group, auto_assign_group_parents
@@ -515,7 +511,7 @@ async def person_diff(person_id: str, commit: str, user=Depends(_require_role("e
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail="JSON parse viga")
 
-    from .ops import compute_person_diff
+    from .git_history import compute_person_diff
     return {"status": "ok", "changes": compute_person_diff(before, after)}
 
 
@@ -523,7 +519,7 @@ async def person_diff(person_id: str, commit: str, user=Depends(_require_role("e
 async def person_restore(person_id: str, request: Request, user=Depends(_require_role("admin"))):
     """Taastab isikukaardi antud commit-i seisule. Teeb uue git commit-i."""
     from ..config import PROSOPOGRAPHY_DIR
-    from .ops import _update_index_entry, _update_aliases_entry
+    from .indices import _update_index_entry, _update_aliases_entry
     from datetime import datetime, timezone
 
     data = await request.json()
