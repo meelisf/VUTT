@@ -30,6 +30,9 @@
     "noResults": "Valitud kriteeriumitele vastavaid teoseid ei leitud.",
     "checkData": "Kontrolli, kas Meilisearchis on andmeid ja kas aastaarvud on õiged.",
     "restoreDefaults": "Taasta vaikeseaded",
+    "protectedLoggedOut": "See on kaitstud kollektsioon. Logi sisse, et selle teoseid näha.",
+    "protectedNoAccess": "See on kaitstud kollektsioon ja sul ei pruugi olla sellele ligipääsu.",
+    "viewAllWorks": "Vaata kõiki teoseid",
     "loadingShelf": "Laen riiulit..."
   },
   "error": {
