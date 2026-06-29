@@ -13,7 +13,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 
-from .auth import load_users
+from .auth import delete_user_sessions, hash_password, load_users, save_users
 from .config import RESET_TOKENS_FILE, get_logger
 from .registration import validate_password_strength  # taaskasuta paroolipoliitikat
 from .utils import atomic_write_json
@@ -184,3 +184,55 @@ def _unconsume_token(token: str) -> None:
                 save_reset_tokens(data)
                 logger.warning(f"Reset-token taastatud (kasutamata): {token[:8]}…")
                 return
+
+
+def complete_password_reset(token: str, new_password: str) -> Tuple[Optional[Dict], Optional[str]]:
+    """Seab tokeni põhjal olemasolevale kasutajale uue parooli.
+
+    Edu ainult kui MÕLEMAD õnnestuvad: hash-vahetus JA sessioonide invalideerimine.
+    Veal rollback (vana hash taastatakse, token unconsume'itakse).
+    Tagastab ``({"username": str}, None)`` õnnestumisel, muidu ``(None, error)``.
+    """
+    # 1. Paroolipoliitika ENNE consume'i (vigane parool ei tohi tokenit tarbida)
+    pw_error = validate_password_strength(new_password)
+    if pw_error:
+        return None, pw_error
+
+    # 2. Atomaarne consume
+    token_data, error = _validate_and_consume_token(token)
+    if error:
+        return None, error
+
+    username = token_data["username"]
+
+    # 3. Sea uus hash (loe vana välja rollbacki jaoks)
+    users = load_users()
+    if username not in users:
+        _unconsume_token(token)
+        return None, "Kasutajat ei leitud"
+    old_hash = users[username].get("password_hash")
+    users[username]["password_hash"] = hash_password(new_password)
+    try:
+        save_users(users)
+    except Exception as e:
+        _unconsume_token(token)
+        logger.error(f"Reset: parooli salvestus ebaõnnestus ({username}): {e}")
+        return None, "Parooli salvestamine ebaõnnestus, palun proovi uuesti"
+
+    # 4. Invalideeri sessioonid — turvainvariant: peavad kaduma
+    try:
+        delete_user_sessions(username)
+    except Exception as e:
+        # Rollback: taasta vana hash, vabasta token
+        try:
+            users = load_users()
+            users[username]["password_hash"] = old_hash
+            save_users(users)
+        except Exception as e2:
+            logger.error(f"Reset: hash-rollback ebaõnnestus ({username}): {e2}")
+        _unconsume_token(token)
+        logger.error(f"Reset: sessioonide invalideerimine ebaõnnestus ({username}): {e}")
+        return None, "Parooli lähtestamine ebaõnnestus, palun proovi uuesti"
+
+    logger.info(f"Parool lähtestatud kasutajale {username}")
+    return {"username": username}, None

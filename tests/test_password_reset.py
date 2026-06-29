@@ -123,3 +123,60 @@ def test_passiivne_puhastus_eemaldab_vanad(reset_env):
     data2 = pr.load_reset_tokens()
     tokens = [t["token"] for t in data2["tokens"]]
     assert old["token"] not in tokens  # > 7 päeva vana eemaldatud
+
+
+def test_complete_reset_muudab_hashi_ja_kustutab_sessioonid(reset_env, monkeypatch):
+    import server.auth as auth
+    # Loo aktiivne sessioon kasutajale mari
+    auth.sessions.clear()
+    auth.sessions["tok-mari"] = {"user": {"username": "mari"}, "created_at": datetime.now().isoformat()}
+    token_data, _ = pr.create_reset_token("mari", "admin")
+
+    result, error = pr.complete_password_reset(token_data["token"], "uusparool1234")
+    assert error is None
+    assert result["username"] == "mari"
+    # Uus hash on bcrypt
+    users = auth.load_users()
+    assert users["mari"]["password_hash"].startswith("$2b$")
+    assert auth.bcrypt.checkpw(b"uusparool1234", users["mari"]["password_hash"].encode())
+    # Sessioon kustutatud
+    assert "tok-mari" not in auth.sessions
+
+
+def test_complete_reset_nork_parool_keeldub(reset_env):
+    token_data, _ = pr.create_reset_token("mari", "admin")
+    result, error = pr.complete_password_reset(token_data["token"], "lyhike")
+    assert result is None
+    assert error is not None
+    # Token EI tohi olla tarbitud (parool ei läbinud poliitikat enne consume'i)
+    got, e = pr.validate_reset_token(token_data["token"])
+    assert e is None and got is not None
+
+
+def test_complete_reset_sessiooni_kustutus_ebaonnestub_taastab_hashi(reset_env, monkeypatch):
+    import server.auth as auth
+    auth.load_users()  # cache
+    old_hash = auth.load_users()["mari"]["password_hash"]
+    token_data, _ = pr.create_reset_token("mari", "admin")
+
+    def boom(_username):
+        raise RuntimeError("sessiooni kustutus ebaõnnestus")
+    monkeypatch.setattr(pr, "delete_user_sessions", boom)
+
+    result, error = pr.complete_password_reset(token_data["token"], "uusparool1234")
+    assert result is None
+    assert error is not None
+    # Vana hash taastatud
+    assert auth.load_users()["mari"]["password_hash"] == old_hash
+    # Token unconsume'itud
+    got, e = pr.validate_reset_token(token_data["token"])
+    assert e is None and got is not None
+
+
+def test_complete_reset_kahe_jarjestikuse_lingi_esimene_kehtetu(reset_env):
+    first, _ = pr.create_reset_token("mari", "admin")
+    second, _ = pr.create_reset_token("mari", "admin")
+    r1, e1 = pr.complete_password_reset(first["token"], "uusparool1234")
+    assert r1 is None and e1 is not None  # superseded
+    r2, e2 = pr.complete_password_reset(second["token"], "uusparool1234")
+    assert e2 is None and r2["username"] == "mari"
