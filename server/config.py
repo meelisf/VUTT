@@ -80,6 +80,7 @@ STATE_DIR = _STATE_DIR  # Ekspordi kasutamiseks teistes moodulites
 USERS_FILE = os.path.join(_STATE_DIR, "users.json")
 PENDING_REGISTRATIONS_FILE = os.path.join(_STATE_DIR, "pending_registrations.json")
 INVITE_TOKENS_FILE = os.path.join(_STATE_DIR, "invite_tokens.json")
+RESET_TOKENS_FILE = os.path.join(_STATE_DIR, "reset_tokens.json")
 REOCR_LOG_FILE = os.path.join(_STATE_DIR, "reocr_log.json")
 
 # Konfiguratsioonifailid — data/config/ kaustas (sisemises gitis)
@@ -143,6 +144,8 @@ RATE_LIMITS = {
     '/login': (5, 60),              # 5 katset minutis
     '/register': (6, 3600),         # 6 taotlust tunnis
     '/invite/set-password': (5, 300),  # 5 katset 5 minuti jooksul
+    '/reset/validate': (10, 300),       # 10 valideerimist 5 min jooksul IP kohta
+    '/reset/set-password': (5, 300),    # 5 katset 5 min jooksul (nagu invite)
     '/download': (20, 60),          # 20 allalaadimist minutis IP kohta
     '/meta/work': (60, 60),         # 60 bot-metaandmete päringut minutis IP kohta
     '/meta/persons': (60, 60),      # 60 prosopograafia meta-päringut minutis IP kohta

@@ -291,6 +291,11 @@ def update_user_role(username, new_role, admin_user):
     # user-hetktõmmist) — sama muster nagu delete_user. Kasutaja peab uuesti sisse logima.
     invalidated = delete_user_sessions(username)
 
+    # Tühista kasutaja pooleliolevad reset-tokenid (race-kaitse: rolli muutus võib
+    # muuta privileegi-invarianti). Lazy import — väldib ring-importi password_reset ↔ auth.
+    from .password_reset import revoke_user_reset_tokens
+    revoke_user_reset_tokens(username, "role_changed")
+
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}. Invalideeritud {invalidated} sessiooni.")
     return True, "Roll muudetud"
 
@@ -326,6 +331,9 @@ def delete_user(username, admin_user):
 
     # Eemalda kasutaja aktiivsed sessioonid (lukuga, vt delete_user_sessions)
     removed = delete_user_sessions(username)
+
+    from .password_reset import revoke_user_reset_tokens
+    revoke_user_reset_tokens(username, "user_deleted")
 
     print(f"Admin '{admin_user['username']}' kustutas kasutaja '{username}' ({deleted_name}). Eemaldatud {removed} sessiooni.")
     return True, "Kasutaja kustutatud"

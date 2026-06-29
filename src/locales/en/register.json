@@ -40,6 +40,10 @@
     "usernamePreview": "Your username is",
     "submit": "Save password",
     "success": "Password set! You can now log in.",
+    "resetTitle": "Set a new password",
+    "resetSubtitle": "Choose a new strong password for your account",
+    "resetWelcome": "Hello, {{name}}! Set a new password for your account.",
+    "resetSuccess": "Password updated! You can now log in with the new password.",
     "errors": {
       "passwordRequired": "Password is required",
       "passwordTooShort": "Password must be at least 12 characters",

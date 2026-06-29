@@ -17,6 +17,7 @@ from ..registration import (
     load_pending_registrations,
     update_registration_status,
 )
+from ..password_reset import create_reset_token
 from ..trash_ops import list_deleted_pages, list_deleted_works, restore_deleted_page, restore_deleted_work
 from ..utils import build_work_id_cache, find_directory_by_id
 
@@ -77,6 +78,41 @@ async def admin_delete_user(request: Request, user=Depends(require_role("admin")
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success"}
+
+
+@router.post("/admin/users/reset-password")
+async def admin_reset_password(request: Request, user=Depends(require_role("admin"))):
+    """Genereerib olemasolevale kasutajale ühekordse parooli-taastamise lingi.
+
+    Privileegide eskaleerumise kaitse: admin ei tohi lähtestada võrdse/kõrgema
+    õigusega kasutajat (sh teist admini), v.a iseennast.
+    """
+    from ..auth import load_users
+    data = await get_json_data(request)
+    target = (data.get("username") or "").strip()
+    if not target:
+        raise HTTPException(status_code=400, detail="Kasutajanimi puudub")
+
+    users = load_users()
+    if target not in users:
+        raise HTTPException(status_code=404, detail="Kasutajat ei leitud")
+
+    role_hierarchy = {"contributor": 0, "editor": 1, "admin": 2}
+    acting_level = role_hierarchy.get(user.get("role", "contributor"), 0)
+    target_level = role_hierarchy.get(users[target].get("role", "contributor"), 0)
+    if target != user["username"] and target_level >= acting_level:
+        raise HTTPException(status_code=403, detail="Ei saa lähtestada võrdse või kõrgema õigusega kasutajat")
+
+    token_data, error = create_reset_token(target, user["username"])
+    if not token_data:
+        raise HTTPException(status_code=400, detail=error)
+    return {
+        "status": "success",
+        "reset_url": f"/set-password?token={token_data['token']}&reset=1",
+        "expires_at": token_data["expires_at"],
+        "username": token_data["username"],
+        "name": token_data["name"],
+    }
 
 
 @router.post("/admin/trash")

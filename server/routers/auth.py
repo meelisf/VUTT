@@ -16,6 +16,7 @@ from ..registration import (
     suggest_username_for_email,
     validate_invite_token,
 )
+from ..password_reset import complete_password_reset, validate_reset_token
 
 # TODO: server/routers/auth.py (HTTP endpointid) ja server/auth.py (auth core)
 # on sarnase nimega. Pärast main.py routeriteks jagamist kaaluda eraldi cleanup'is
@@ -167,3 +168,37 @@ async def set_password(request: Request):
     if not new_user:
         raise HTTPException(status_code=400, detail=error)
     return {"status": "success", "username": new_user["username"]}
+
+
+@router.post("/reset/validate")
+async def reset_validate(request: Request):
+    """Valideerib parooli-reset tokeni (POST body, MITTE URL — token logidest väljas)."""
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, "/reset/validate")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "valid": False, "message": "Liiga palju päringuid"})
+    data = await request.json()
+    token_data, error = validate_reset_token((data.get("token") or "").strip())
+    if token_data:
+        return {
+            "status": "success",
+            "valid": True,
+            "username": token_data["username"],
+            "name": token_data["name"],
+            "expires_at": token_data["expires_at"],
+        }
+    return {"status": "error", "valid": False, "message": error}
+
+
+@router.post("/reset/set-password")
+async def reset_set_password(request: Request):
+    """Seab reset-tokeni põhjal olemasolevale kasutajale uue parooli."""
+    client_ip = get_client_ip(request)
+    allowed, retry_after = check_rate_limit(client_ip, "/reset/set-password")
+    if not allowed:
+        return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"})
+    data = await request.json()
+    result, error = complete_password_reset((data.get("token") or "").strip(), data.get("password", ""))
+    if not result:
+        raise HTTPException(status_code=400, detail=error)
+    return {"status": "success", "username": result["username"]}
