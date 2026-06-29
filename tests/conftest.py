@@ -31,6 +31,7 @@ def backend_env(tmp_path, monkeypatch):
     users_file = state_dir / "users.json"
     pending_registrations_file = state_dir / "pending_registrations.json"
     invite_tokens_file = state_dir / "invite_tokens.json"
+    reset_tokens_file = state_dir / "reset_tokens.json"
     collections_file = state_dir / "collections.json"
 
     users_file.write_text(
@@ -58,6 +59,7 @@ def backend_env(tmp_path, monkeypatch):
     )
     pending_registrations_file.write_text('{"registrations": []}', encoding="utf-8")
     invite_tokens_file.write_text('{"tokens": []}', encoding="utf-8")
+    reset_tokens_file.write_text('{"tokens": []}', encoding="utf-8")
     collections_file.write_text(
         json.dumps(
             {
@@ -79,6 +81,7 @@ def backend_env(tmp_path, monkeypatch):
 
     auth = importlib.import_module("server.auth")
     registration = importlib.import_module("server.registration")
+    password_reset = importlib.import_module("server.password_reset")
     main = importlib.import_module("server.main")
     cache_invalidation = importlib.import_module("server.cache_invalidation")
     rate_limit = importlib.import_module("server.rate_limit")
@@ -90,6 +93,7 @@ def backend_env(tmp_path, monkeypatch):
     monkeypatch.setattr(registration, "USERS_FILE", str(users_file))
     monkeypatch.setattr(registration, "PENDING_REGISTRATIONS_FILE", str(pending_registrations_file))
     monkeypatch.setattr(registration, "INVITE_TOKENS_FILE", str(invite_tokens_file))
+    monkeypatch.setattr(password_reset, "RESET_TOKENS_FILE", str(reset_tokens_file))
 
     # Refaktoreering Faas 0 (docs/REFACTOR_main_py_2026-06-25.md): ``main.py``-s
     # defineeritud konstandid (COLLECTIONS_FILE, ARCHIVES_FILE, ...) rändavad
@@ -148,6 +152,8 @@ def backend_env(tmp_path, monkeypatch):
             "state_dir": state_dir,
             "users_file": users_file,
             "invite_tokens_file": invite_tokens_file,
+            "reset_tokens_file": reset_tokens_file,
+            "password_reset": password_reset,
             "collections_file": collections_file,
             "archives_file": archives_file,
             "user_settings_dir": user_settings_dir,
