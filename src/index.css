@@ -355,6 +355,14 @@ hr.page-break::before {
   background: transparent;
 }
 
+/* Leaflet seab sisemistele kihtidele/kontrollidele z-index kuni 1000. Ilma oma
+   stacking-kontekstita ulatuvad need modaalide (nt kollektsiooni valija, z-50) ja
+   muu UI alt välja. isolation: isolate hoiab kõik Leafleti z-indeksid kaardi enda
+   konteksti sees, nii et kaart püsib modaalide all. */
+.leaflet-container {
+  isolation: isolate;
+}
+
 .vutt-map-marker {
   display: flex;
   align-items: center;
