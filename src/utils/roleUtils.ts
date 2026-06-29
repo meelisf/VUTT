@@ -17,6 +17,16 @@ export function roleLevel(role: string): number {
   return lvl === undefined ? -1 : lvl;
 }
 
+/**
+ * Kas roll on vähemalt minRole tasemel? KASUTA seda täpse `role === 'admin'`
+ * võrdluse asemel — superadmin loeb adminiks (ja administ kõrgemaks), muidu
+ * kukub superadmin admin-funktsioonidest välja. `undefined`/tundmatu → false.
+ */
+export function isAtLeast(role: string | undefined | null, minRole: Role): boolean {
+  if (!role) return false;
+  return roleLevel(role) >= ROLE_LEVELS[minRole];
+}
+
 export function canManageUser(actorRole: string, targetRole: string): boolean {
   return roleLevel(targetRole) < roleLevel(actorRole);
 }

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { Bell, Check, ChevronLeft, Loader2, Reply, Send } from 'lucide-react';
@@ -111,8 +112,8 @@ const Notifications: React.FC = () => {
   const [replyingTo, setReplyingTo] = useState<UserNotification | null>(null);
   const [sending, setSending] = useState(false);
 
-  const canSend = user?.role === 'editor' || user?.role === 'admin';
-  const canSendAll = user?.role === 'admin';
+  const canSend = isAtLeast(user?.role, 'editor');
+  const canSendAll = isAtLeast(user?.role, 'admin');
   const unreadCount = useMemo(() => notifications.filter(item => !isSentNotification(item) && !item.read_at).length, [notifications]);
   const filteredRecipients = useMemo(() => {
     const query = recipientFilter.trim().toLowerCase();

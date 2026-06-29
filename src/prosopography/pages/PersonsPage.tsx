@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Map, List } from 'lucide-react';
@@ -114,15 +115,15 @@ const PersonsPage: React.FC = () => {
   const [showMergeModal, setShowMergeModal] = useState(false);
 
 
-  const isAdmin = user?.role === 'admin';
-  const canEdit = user && (user.role === 'editor' || user.role === 'admin');
+  const isAdmin = isAtLeast(user?.role, 'admin');
+  const canEdit = isAtLeast(user?.role, 'editor');
   const token = authToken ?? '';
   const effectiveSelectedCollection = useMemo(() => {
     if (!selectedCollection) return null;
     const collection = collections[selectedCollection];
     if (!collection) return null;
     if (collection.visibility !== 'restricted') return selectedCollection;
-    if (user?.role === 'admin') return selectedCollection;
+    if (isAtLeast(user?.role, 'admin')) return selectedCollection;
     return user?.allowed_collections?.includes(selectedCollection) ? selectedCollection : null;
   }, [collections, selectedCollection, user]);
 

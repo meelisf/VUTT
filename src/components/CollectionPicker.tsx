@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { Library, ChevronRight, ChevronDown, X, Check, FolderOpen } from 'lucide-react';
 import { useCollection } from '../contexts/CollectionContext';
@@ -103,7 +104,7 @@ const CollectionPicker: React.FC<CollectionPickerProps> = ({
 
   // Filtreeri kollektsioonid kasutaja ligipääsu järgi
   const visibleCollections = useMemo(() => {
-    if (user?.role === 'admin') return collections;
+    if (isAtLeast(user?.role, 'admin')) return collections;
     const allowed = new Set(user?.allowed_collections ?? []);
     return Object.fromEntries(
       Object.entries(collections).filter(([id, col]) =>

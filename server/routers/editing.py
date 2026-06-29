@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_write_work
+from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
 from ..config import BASE_DIR
@@ -130,9 +131,9 @@ async def metadata_suggestions(request: Request, user=Depends(require_role("edit
 
 @router.get("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
-    f_user = request.query_params.get('user') if user['role'] == 'admin' else user['username']
+    f_user = request.query_params.get('user') if is_at_least(user['role'], 'admin') else user['username']
     res = get_recent_commits(username=f_user, limit=int(request.query_params.get('limit', 30)), skip=int(request.query_params.get('offset', 0)))
-    return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": user['role'] == 'admin'}
+    return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_at_least(user['role'], 'admin')}
 
 @router.post("/git-history")
 async def git_history(request: Request, user=Depends(require_role("editor"))):

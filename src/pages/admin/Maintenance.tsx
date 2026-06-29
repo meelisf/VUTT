@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { RefreshCw, ChevronLeft, Wrench, Pencil, Trash2 } from 'lucide-react';
@@ -38,7 +39,7 @@ const Maintenance: React.FC = () => {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   React.useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) {
+    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
@@ -170,7 +171,7 @@ const Maintenance: React.FC = () => {
   };
 
   if (userLoading || !user) return null;
-  if (user.role !== 'admin') return null;
+  if (!isAtLeast(user.role, 'admin')) return null;
 
   const actions = [
     {

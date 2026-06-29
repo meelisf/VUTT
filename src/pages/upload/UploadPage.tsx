@@ -5,6 +5,7 @@
  * see fail ainult renderdab sammud ja pooleliolevate nimekirja.
  */
 import React, { useEffect } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -46,7 +47,7 @@ const UploadPage: React.FC = () => {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (authLoading) return;
-    if (!user || user.role !== 'admin') navigate('/');
+    if (!user || !isAtLeast(user.role, 'admin')) navigate('/');
   }, [user, navigate, authLoading]);
 
   // Kollektsioonide loend (sortimine nime järgi)

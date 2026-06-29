@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -347,7 +348,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
     }
   };
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAtLeast(user?.role, 'admin');
   const canLoad = Date.now() - lastLoadTime >= RATE_LIMIT_MS;
 
   const [slugCopied, setSlugCopied] = useState(false);
@@ -573,7 +574,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
       )}
 
       {/* Jagamine — editor ja admin */}
-      {(user?.role === 'editor' || user?.role === 'admin') && work && hasRestrictedCollection && (
+      {(isAtLeast(user?.role, 'editor')) && work && hasRestrictedCollection && (
         <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
             <Link size={15} className="text-gray-400" />

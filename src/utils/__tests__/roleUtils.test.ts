@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { roleLevel, canManageUser, canAssignRole, assignableRoles, ROLE_LEVELS } from '../roleUtils';
+import { roleLevel, canManageUser, canAssignRole, assignableRoles, isAtLeast, ROLE_LEVELS } from '../roleUtils';
 
 describe('roleUtils', () => {
   it('hierarhia neli taset', () => {
@@ -24,5 +24,13 @@ describe('roleUtils', () => {
   it('assignableRoles filter', () => {
     expect(assignableRoles('admin')).toEqual(['contributor', 'editor']);
     expect(assignableRoles('superadmin')).toEqual(['contributor', 'editor', 'admin']);
+  });
+  it('isAtLeast: superadmin loeb adminiks', () => {
+    expect(isAtLeast('superadmin', 'admin')).toBe(true);
+    expect(isAtLeast('admin', 'admin')).toBe(true);
+    expect(isAtLeast('editor', 'admin')).toBe(false);
+    expect(isAtLeast('superadmin', 'editor')).toBe(true);
+    expect(isAtLeast(undefined, 'admin')).toBe(false);
+    expect(isAtLeast(null, 'admin')).toBe(false);
   });
 });

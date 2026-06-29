@@ -45,6 +45,13 @@ def is_valid_role(role: str) -> bool:
     return role in ROLE_HIERARCHY
 
 
+def is_at_least(role: str, min_role: str) -> bool:
+    """Kas roll on vähemalt min_role tasemel? Taseme-põhine võimekuse-kontroll.
+    KASUTA seda täpse `role == "admin"` võrdluse asemel — superadmin loeb adminiks
+    (ja administ kõrgemaks), muidu kukub superadmin admin-funktsioonidest välja."""
+    return role_level(role) >= role_level(min_role)
+
+
 def can_manage_user(actor_role: str, target_role: str) -> bool:
     """Kas actor tohib target-kasutajat üldse puutuda (reset / kustutus / rollimuutus)?
     Sihtmärgi praegune tase peab olema RANGELT madalam actor tasemest."""

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { parseFocusParam, buildBackToEditorPath } from '../utils/manageDeeplink';
@@ -124,7 +125,7 @@ const WorkManage: React.FC = () => {
   const MAX_COLS = 10;
   const [gridCols, setGridCols] = useState(5);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAtLeast(user?.role, 'admin');
 
   useEffect(() => {
     if (user && !isAdmin) {

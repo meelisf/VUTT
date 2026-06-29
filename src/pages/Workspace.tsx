@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
@@ -28,7 +29,7 @@ import { buildManageLink } from '../utils/manageDeeplink';
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
   const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAtLeast(user?.role, 'admin');
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
   const [viewerToken, setViewerToken] = useState<string | null>(null);
@@ -641,7 +642,7 @@ const Workspace: React.FC = () => {
             work={work}
             onSave={handleSave}
             onUnsavedChanges={setEditorChanges}
-            onOpenMetaModal={user?.role === 'admin' ? openMetaModal : undefined}
+            onOpenMetaModal={isAtLeast(user?.role, 'admin') ? openMetaModal : undefined}
             readOnly={!user}
             statusDirty={statusDirty}
             currentStatus={currentStatus}

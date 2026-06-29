@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Loader2, ChevronLeft } from 'lucide-react';
@@ -12,7 +13,7 @@ const Collections: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) {
+    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
@@ -25,7 +26,7 @@ const Collections: React.FC = () => {
     );
   }
 
-  if (user.role !== 'admin') return null;
+  if (!isAtLeast(user.role, 'admin')) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

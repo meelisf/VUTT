@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote } from 'lucide-react';
@@ -75,7 +76,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const [savingReplyId, setSavingReplyId] = useState<string | null>(null);
   const highlightedCommentId = new URLSearchParams(location.search).get('comment');
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAtLeast(user?.role, 'admin');
   
   // Arhiivide register (nimed kuvamiseks)
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import MarkdownView from '../../components/MarkdownView';
@@ -245,8 +246,8 @@ const PersonDetailPage: React.FC = () => {
   const [tagsSaving, setTagsSaving] = useState(false);
 
   const token = authToken ?? '';
-  const canEdit = user && (user.role === 'editor' || user.role === 'admin');
-  const isAdmin = user?.role === 'admin';
+  const canEdit = isAtLeast(user?.role, 'editor');
+  const isAdmin = isAtLeast(user?.role, 'admin');
 
   const [history, setHistory] = useState<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);

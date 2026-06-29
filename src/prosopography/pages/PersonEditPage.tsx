@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ArrowLeftRight, Save, X, Loader2, ImagePlus, Trash2, ExternalLink } from 'lucide-react';
@@ -75,8 +76,8 @@ const PersonEditPage: React.FC = () => {
   const [imageDragOver, setImageDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const canEdit = user && (user.role === 'editor' || user.role === 'admin');
-  const isAdmin = user?.role === 'admin';
+  const canEdit = isAtLeast(user?.role, 'editor');
+  const isAdmin = isAtLeast(user?.role, 'admin');
 
   // Kustutamine
   const [deleteOpen, setDeleteOpen] = useState(false);

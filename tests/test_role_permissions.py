@@ -12,11 +12,13 @@ from server.auth import (
     ROLE_HIERARCHY,
     role_level,
     is_valid_role,
+    is_at_least,
     can_manage_user,
     can_assign_role,
     can_change_role,
     has_superadmin,
 )
+from server.access_ops import can_read_work
 
 
 def test_hierarchy_has_four_tiers():
@@ -74,6 +76,30 @@ def test_can_change_role_requires_both():
     assert can_change_role("admin", "admin", "contributor") is False
     # superadmin: tohib admini editoriks alandada
     assert can_change_role("superadmin", "admin", "editor") is True
+
+
+def test_is_at_least_superadmin_counts_as_admin():
+    # KRIITILINE: superadmin peab läbima admin-taseme võimekuse-kontrollid
+    assert is_at_least("superadmin", "admin") is True
+    assert is_at_least("admin", "admin") is True
+    assert is_at_least("editor", "admin") is False
+    assert is_at_least("superadmin", "editor") is True
+
+
+def test_superadmin_can_read_restricted_work(monkeypatch):
+    # Regressioon: superadmin ei tohi piiratud teosest välja kukkuda (nagu admin saab).
+    # is_work_public loeb kollektsiooni-konfist — märgi "secret-coll" piiratuks.
+    import server.access_ops as access_ops
+    monkeypatch.setattr(access_ops, "get_cached_collections",
+                        lambda: {"secret-coll": {"visibility": "restricted"}})
+    work = {"collections": ["secret-coll"]}
+    admin = {"role": "admin", "allowed_collections": []}
+    superadmin = {"role": "superadmin", "allowed_collections": []}
+    editor = {"role": "editor", "allowed_collections": []}
+    assert can_read_work(work, admin) is True
+    assert can_read_work(work, superadmin) is True
+    # editorit ei päästa allowed_collections (tühi) → piiratud teost ei loe
+    assert can_read_work(work, editor) is False
 
 
 def test_has_superadmin():

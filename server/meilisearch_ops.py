@@ -493,7 +493,8 @@ def generate_meili_token(user=None, ttl_seconds: int = 3600) -> str:
 
     base_filter = "is_public = true"
 
-    if user and user.get("role") == "admin":
+    from .auth import is_at_least  # lokaalne: väldib import-järjekorra üllatusi suures moodulis
+    if user and is_at_least(user.get("role", "contributor"), "admin"):
         search_rules = {"teosed": {}}
     else:
         allowed = (user or {}).get("allowed_collections", [])
