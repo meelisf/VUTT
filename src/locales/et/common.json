@@ -199,5 +199,21 @@
     "message": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
     "leave": "Lahku ilma salvestamata",
     "stay": "Jää"
+  },
+  "markdownEditor": {
+    "bold": "Paks",
+    "italic": "Kursiiv",
+    "heading": "Pealkiri",
+    "link": "Lisa link",
+    "list": "Loend",
+    "help": "Vormindusabi",
+    "write": "Kirjuta",
+    "preview": "Eelvaade",
+    "helpText": "Toetab markdownit: **paks**, *kursiiv*, ## Pealkiri, [link](url), - loend",
+    "linkText": "Lingi tekst",
+    "linkUrl": "URL",
+    "emptyPreview": "Pole midagi näidata",
+    "boldPlaceholder": "paks tekst",
+    "italicPlaceholder": "kursiiv"
   }
 }

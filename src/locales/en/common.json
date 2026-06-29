@@ -199,5 +199,21 @@
     "message": "You have unsaved changes. Are you sure you want to leave?",
     "leave": "Leave without saving",
     "stay": "Stay"
+  },
+  "markdownEditor": {
+    "bold": "Bold",
+    "italic": "Italic",
+    "heading": "Heading",
+    "link": "Insert link",
+    "list": "List",
+    "help": "Formatting help",
+    "write": "Write",
+    "preview": "Preview",
+    "helpText": "Supports markdown: **bold**, *italic*, ## Heading, [link](url), - list",
+    "linkText": "Link text",
+    "linkUrl": "URL",
+    "emptyPreview": "Nothing to preview",
+    "boldPlaceholder": "bold text",
+    "italicPlaceholder": "italic"
   }
 }
