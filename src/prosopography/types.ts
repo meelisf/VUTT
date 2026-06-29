@@ -91,6 +91,13 @@ export interface ProsopoMapResponse {
   total_persons: number;
   mapped_persons: number;
   without_coordinates: number;
+  // Ainult related_to päringul: fookus-isiku nimi + kollektsioonid, kuhu ta kuulub.
+  // Kasutatakse tühja-teate vihjes, kui valitud kollektsioon võrgustiku välja filtreeris.
+  focus?: {
+    id: string;
+    label: string | null;
+    collections: string[];
+  };
 }
 
 export interface HistoricalDate {
