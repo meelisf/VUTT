@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -37,13 +38,13 @@ const Trash: React.FC = () => {
   const [isRestoreError, setIsRestoreError] = useState(false);
 
   useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) {
+    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
 
   useEffect(() => {
-    if (authToken && user?.role === 'admin' && !trashLoaded) {
+    if (authToken && isAtLeast(user?.role, 'admin') && !trashLoaded) {
       loadTrash();
     }
   }, [authToken, user]);
@@ -110,7 +111,7 @@ const Trash: React.FC = () => {
     );
   }
 
-  if (user.role !== 'admin') return null;
+  if (!isAtLeast(user.role, 'admin')) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">

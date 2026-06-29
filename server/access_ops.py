@@ -1,4 +1,5 @@
 from .cache import get_cached_collections
+from .auth import is_at_least
 from typing import Optional
 
 
@@ -26,7 +27,7 @@ def can_read_work(work_metadata: dict, user: Optional[dict]) -> bool:
         return True
     if user is None:
         return False
-    if user.get("role") == "admin":
+    if is_at_least(user.get("role", "contributor"), "admin"):
         return True
     allowed = set(user.get("allowed_collections", []))
     work_collections = set(work_metadata.get("collections", []))

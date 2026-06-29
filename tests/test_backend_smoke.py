@@ -3,6 +3,18 @@ import json
 import unittest.mock
 
 
+def _seed_superadmin(backend_env):
+    auth = backend_env["auth"]
+    users = auth.load_users()
+    users["root"] = {
+        "password_hash": auth.hash_password("rootpass"),
+        "name": "Root",
+        "role": "superadmin",
+        "created_at": "2026-01-01T00:00:00",
+    }
+    auth.save_users(users)
+
+
 def test_login_and_verify_token_roundtrip(client, login):
     token = login("admin", "adminpass")
 
@@ -70,7 +82,8 @@ def test_invite_set_password_consumes_token_once(client, backend_env):
 
 
 def test_admin_collection_update_writes_json(client, login, backend_env):
-    token = login("admin", "adminpass")
+    _seed_superadmin(backend_env)
+    token = login("root", "rootpass")
     headers = {"Authorization": f"Bearer {token}"}
 
     response = client.put(
@@ -441,8 +454,9 @@ def test_public_meili_token_endpoint(client, backend_env):
 
 
 def test_collection_visibility_update(client, login, backend_env):
-    """Admin saab kollektsiooni visibility muuta."""
-    token = login("admin", "adminpass")
+    """Superadmin saab kollektsiooni visibility muuta."""
+    _seed_superadmin(backend_env)
+    token = login("root", "rootpass")
     headers = {"Authorization": f"Bearer {token}"}
 
     response = client.put(

@@ -5,7 +5,7 @@ import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..auth import delete_user, get_all_users, update_user_role
+from ..auth import can_manage_user, delete_user, get_all_users, update_user_role
 from ..config import BASE_DIR
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
@@ -97,10 +97,7 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
     if target not in users:
         raise HTTPException(status_code=404, detail="Kasutajat ei leitud")
 
-    role_hierarchy = {"contributor": 0, "editor": 1, "admin": 2}
-    acting_level = role_hierarchy.get(user.get("role", "contributor"), 0)
-    target_level = role_hierarchy.get(users[target].get("role", "contributor"), 0)
-    if target != user["username"] and target_level >= acting_level:
+    if target != user["username"] and not can_manage_user(user["role"], users[target].get("role", "contributor")):
         raise HTTPException(status_code=403, detail="Ei saa lähtestada võrdse või kõrgema õigusega kasutajat")
 
     token_data, error = create_reset_token(target, user["username"])

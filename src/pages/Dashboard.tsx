@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { searchWorks, FacetDistribution } from '../services/searchService';
 import { isQCode } from '../utils/qcodeUtils';
@@ -90,7 +91,7 @@ const Dashboard: React.FC = () => {
   const [refreshCounter, setRefreshCounter] = useState(0);  // Triggers re-fetch
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = isAtLeast(user?.role, 'admin');
 
   // Kas valitud kollektsioon on kaitstud — tühja tulemuse korral on põhjus
   // tõenäoliselt ligipääsupuudus (mitte andmete/filtrite probleem).

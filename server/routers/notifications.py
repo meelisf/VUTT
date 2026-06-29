@@ -26,7 +26,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 
 from ..config import BASE_DIR
 from ..deps import get_user, require_role, get_json_data
-from ..auth import get_all_users
+from ..auth import get_all_users, role_level
 from ..git_ops import save_with_git
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..notifications_ops import (
@@ -155,10 +155,7 @@ async def get_notification_recipients(user=Depends(require_role("editor"))):
         for account in get_all_users()
         if account.get("username")
     ]
-    users.sort(key=lambda account: (
-        0 if account.get("username") == "meelis" else 1,
-        (account.get("name") or account.get("username") or "").lower(),
-    ))
+    users.sort(key=lambda account: (account.get("name") or account.get("username") or "").lower())
     return {"status": "success", "users": users}
 
 
@@ -198,7 +195,7 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
     }
 
     if recipient_mode == "all":
-        if user.get("role") != "admin":
+        if role_level(user.get("role", "contributor")) < role_level("admin"):
             raise HTTPException(status_code=403, detail="Kõigile teavitamine on lubatud ainult administraatorile")
         recipients = sorted(users_by_username.keys())
         notification_type = "system"
@@ -206,7 +203,7 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
         recipients = sorted([
             account.get("username")
             for account in get_all_users()
-            if account.get("role") == "admin" and account.get("username")
+            if role_level(account.get("role", "contributor")) >= role_level("admin") and account.get("username")
         ])
         notification_type = "review_request"
     elif recipient_mode == "multiple":

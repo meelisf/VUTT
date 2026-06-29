@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, Loader2, Search, Plus, Settings, X } from 'lucide-react';
@@ -45,7 +46,7 @@ const Places: React.FC = () => {
   >({});
 
   useEffect(() => {
-    if (!userLoading && (!user || user.role !== 'admin')) navigate('/');
+    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) navigate('/');
   }, [user, userLoading, navigate]);
 
   useEffect(() => {
@@ -143,7 +144,7 @@ const Places: React.FC = () => {
     );
   }
 
-  if (user.role !== 'admin') return null;
+  if (!isAtLeast(user.role, 'admin')) return null;
 
   const selectedEntry = selectedKey ? places[selectedKey] : null;
 

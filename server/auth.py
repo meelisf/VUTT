@@ -7,10 +7,13 @@ import hashlib
 import uuid
 import threading
 import time
+import logging
 import bcrypt
 from datetime import datetime
 from .config import USERS_FILE, SESSION_DURATION
 from .utils import atomic_write_json
+
+logger = logging.getLogger(__name__)
 
 # Sessioonide hoidla (token -> user info)
 # NB: Serveri restart kustutab kõik sessioonid
@@ -19,6 +22,68 @@ _sessions_lock = threading.Lock()
 
 # Sessioonide puhastamise intervall (sekundites)
 SESSION_CLEANUP_INTERVAL = 300  # 5 minutit
+
+# =========================================================
+# ROLLIDE HIERARHIA — üks tõeallikas
+# =========================================================
+# contributor < editor < admin < superadmin. Eriõigus tuleb AINULT rollist,
+# mitte kasutajanimest.
+ROLE_HIERARCHY = {"contributor": 0, "editor": 1, "admin": 2, "superadmin": 3}
+
+
+def role_level(role: str) -> int:
+    """Tagastab rolli numbrilise taseme. Viskab ValueError tundmatu rolli peal.
+    EI KUNAGI vaikselt tasemeks 0 — tundmatu roll on viga, mitte madal õigus."""
+    try:
+        return ROLE_HIERARCHY[role]
+    except KeyError:
+        raise ValueError(f"Tundmatu roll: {role!r}")
+
+
+def is_valid_role(role: str) -> bool:
+    """Kas roll on hierarhias? Kasuta API-sisendi valideerimiseks enne role_level-i."""
+    return role in ROLE_HIERARCHY
+
+
+def is_at_least(role: str, min_role: str) -> bool:
+    """Kas roll on vähemalt min_role tasemel? Taseme-põhine võimekuse-kontroll.
+    KASUTA seda täpse `role == "admin"` võrdluse asemel — superadmin loeb adminiks
+    (ja administ kõrgemaks), muidu kukub superadmin admin-funktsioonidest välja."""
+    return role_level(role) >= role_level(min_role)
+
+
+def can_manage_user(actor_role: str, target_role: str) -> bool:
+    """Kas actor tohib target-kasutajat üldse puutuda (reset / kustutus / rollimuutus)?
+    Sihtmärgi praegune tase peab olema RANGELT madalam actor tasemest."""
+    return role_level(target_role) < role_level(actor_role)
+
+
+def can_assign_role(actor_role: str, new_role: str) -> bool:
+    """Kas actor tohib MÄÄRATA rolli new_role? Lagi: rangelt madalam actor tasemest."""
+    return role_level(new_role) < role_level(actor_role)
+
+
+def can_change_role(actor_role: str, target_role: str, new_role: str) -> bool:
+    """Rollimuutus = tohib target-i puutuda JA tohib uut rolli määrata."""
+    return can_manage_user(actor_role, target_role) and can_assign_role(actor_role, new_role)
+
+
+def has_superadmin(users: dict) -> bool:
+    """Kas users-dictis on vähemalt üks superadmin? Startup-checki jaoks."""
+    return any(u.get("role") == "superadmin" for u in users.values())
+
+
+def warn_if_no_superadmin() -> bool:
+    """Logib WARNING-u, kui üheski kasutajas pole superadmin rolli.
+    Tagastab True, kui superadmin eksisteerib. Ei paranda automaatselt."""
+    users = load_users()
+    if has_superadmin(users):
+        return True
+    logger.warning(
+        "ÜHTEGI superadmin rolliga kasutajat pole — admini- ja kollektsioonihalduse "
+        "funktsioonid on lukus, kuni keegi seemendatakse superadminiks (users.json)."
+    )
+    return False
 
 
 def _cleanup_expired_sessions():
@@ -61,7 +126,7 @@ def _load_users_from_file():
     if not os.path.exists(USERS_FILE):
         print(f"HOIATUS: Kasutajate fail puudub: {USERS_FILE}")
         print("Loo users.json fail koos kasutajatega. Näide:")
-        print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "admin"}}')
+        print('  {"admin": {"password_hash": "<sha256>", "name": "Admin", "role": "contributor"}}')
         print("Parooli hashi saad: echo -n 'parool' | sha256sum")
         return {}
 
@@ -137,7 +202,7 @@ def verify_user(username, password):
     return {
         "username": username,
         "name": users[username]["name"],
-        "role": users[username].get("role", "user"),
+        "role": users[username].get("role", "contributor"),
         "allowed_collections": users[username].get("allowed_collections", []),
     }
 
@@ -210,14 +275,9 @@ def require_token(data, min_role=None):
         user = session["user"]
 
     # Rollide hierarhia kontroll
-    # contributor = kaastööline (muudatused vajavad ülevaatust)
-    # editor = toimetaja (muudatused rakenduvad kohe, saab kinnitada)
-    # admin = administraator (kõik õigused)
     if min_role:
-        role_hierarchy = {'contributor': 0, 'editor': 1, 'admin': 2}
-        user_level = role_hierarchy.get(user['role'], 0)
-        required_level = role_hierarchy.get(min_role, 0)
-        if user_level < required_level:
+        # role_level viskab tundmatu rolli peal — fail-closed, mitte vaikne madal õigus
+        if role_level(user['role']) < role_level(min_role):
             return None, {"status": "error", "message": f"Vajab vähemalt '{min_role}' õigusi"}
 
     return user, None
@@ -259,31 +319,31 @@ def update_user_role(username, new_role, admin_user):
 
     Args:
         username: Muudetava kasutaja kasutajanimi
-        new_role: Uus roll ('contributor', 'editor', 'admin')
+        new_role: Uus roll ('contributor', 'editor', 'admin', 'superadmin')
         admin_user: Admin kasutaja, kes muudatuse teeb
 
     Returns:
         (success: bool, message: str)
     """
-    # Kontrolli rolli kehtivust
-    valid_roles = ['contributor', 'editor', 'admin']
-    if new_role not in valid_roles:
-        return False, f"Vigane roll. Lubatud: {', '.join(valid_roles)}"
+    # Valideeri sissetulev roll ENNE taseme-arvutust
+    if not is_valid_role(new_role):
+        return False, f"Vigane roll. Lubatud: {', '.join(ROLE_HIERARCHY.keys())}"
 
-    # Admin ei saa oma rolli muuta
+    # Admin ei saa oma rolli muuta (lukustumis-kaitse)
     if username == admin_user["username"]:
         return False, "Ei saa muuta enda rolli"
-
-    # Superadmini rolli ei saa muuta
-    if username == "meelis":
-        return False, "Selle kasutaja rolli ei saa muuta"
 
     users = load_users()
 
     if username not in users:
         return False, "Kasutajat ei leitud"
 
-    old_role = users[username].get("role", "contributor")
+    target_current = users[username].get("role", "contributor")
+    # Invariant: tohib target-i puutuda JA tohib uut rolli määrata
+    if not can_change_role(admin_user["role"], target_current, new_role):
+        return False, "Pole õigust seda kasutajat sellele rollile määrata"
+
+    old_role = target_current
     users[username]["role"] = new_role
     save_users(users)
 
@@ -311,20 +371,19 @@ def delete_user(username, admin_user):
     Returns:
         (success: bool, message: str)
     """
-    # Admin ei saa ennast kustutada
+    # Admin ei saa ennast kustutada (lukustumis-kaitse)
     if username == admin_user["username"]:
         return False, "Ei saa kustutada ennast"
-
-    # Superadmini ei saa kustutada
-    if username == "meelis":
-        return False, "Seda kasutajat ei saa kustutada"
 
     users = load_users()
 
     if username not in users:
         return False, "Kasutajat ei leitud"
 
-    # Eemalda kasutaja
+    # Invariant: tohib kustutada ainult rangelt madalamat taset
+    if not can_manage_user(admin_user["role"], users[username].get("role", "contributor")):
+        return False, "Pole õigust seda kasutajat kustutada"
+
     deleted_name = users[username].get("name", username)
     del users[username]
     save_users(users)

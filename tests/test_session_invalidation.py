@@ -43,12 +43,32 @@ def test_delete_user_sessions_targets_only_username(auth):
 def test_update_user_role_invalidates_sessions(auth):
     _add_session(auth, "tb", "bob")
     admin = {"username": "alice", "role": "admin"}
-    ok, _ = auth.update_user_role("bob", "admin", admin)
+    # editor -> contributor on valiidne (admin tohib editorit puutuda ja contributoriks määrata)
+    ok, _ = auth.update_user_role("bob", "contributor", admin)
     assert ok is True
     # Bob peab uuesti sisse logima — sessioon kustutatud
     assert "tb" not in auth.sessions
     # Roll on uuendatud
-    assert auth._users_cache["bob"]["role"] == "admin"
+    assert auth._users_cache["bob"]["role"] == "contributor"
+
+
+def test_admin_cannot_demote_another_admin(auth):
+    # alice (admin) EI tohi teist admini (carol) puutuda
+    auth._users_cache["carol"] = {"name": "Carol", "role": "admin", "allowed_collections": []}
+    _add_session(auth, "tc", "carol")
+    admin = {"username": "alice", "role": "admin"}
+    ok, msg = auth.update_user_role("carol", "editor", admin)
+    assert ok is False
+    assert msg
+    # Carol sessioon EI tohi olla invalideeritud (operatsioon blokeeriti)
+    assert "tc" in auth.sessions
+
+
+def test_superadmin_can_demote_admin(auth):
+    auth._users_cache["carol"] = {"name": "Carol", "role": "admin", "allowed_collections": []}
+    root = {"username": "root", "role": "superadmin"}
+    ok, _ = auth.update_user_role("carol", "editor", root)
+    assert ok is True
 
 
 def test_delete_user_removes_sessions(auth):

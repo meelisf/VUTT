@@ -51,7 +51,8 @@
     "resetLinkHint": "Kopeeri link ja saada kasutajale. Link kehtib 24 tundi.",
     "copyLink": "Kopeeri link",
     "linkCopied": "Kopeeritud!",
-    "resetError": "Parooli-taastamise lingi loomine ebaõnnestus"
+    "resetError": "Parooli-taastamise lingi loomine ebaõnnestus",
+    "noPermissionManage": "Sul ei ole õigust hallata sama või kõrgema taseme kasutajat"
   },
   "pending": {
     "title": "Ootel muudatused",

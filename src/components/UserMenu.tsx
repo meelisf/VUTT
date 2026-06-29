@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Settings, History, Shield, LogOut, ChevronDown, Bell } from 'lucide-react';
@@ -44,7 +45,7 @@ const UserMenu: React.FC = () => {
   }, [user, authToken, refreshTick]);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin' || !authToken) {
+    if (!user || !isAtLeast(user.role, 'admin') || !authToken) {
       setPendingRegistrationCount(0);
       return;
     }
@@ -137,7 +138,7 @@ const UserMenu: React.FC = () => {
               {t('common:nav.settings')}
             </Link>
 
-            {user.role !== 'admin' && (
+            {!isAtLeast(user.role, 'admin') && (
               <Link
                 to="/review"
                 onClick={() => setShowMenu(false)}
@@ -148,7 +149,7 @@ const UserMenu: React.FC = () => {
               </Link>
             )}
 
-            {user.role === 'admin' && (
+            {isAtLeast(user.role, 'admin') && (
               <Link
                 to="/admin"
                 onClick={() => setShowMenu(false)}

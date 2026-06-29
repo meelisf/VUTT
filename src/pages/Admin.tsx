@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { isAtLeast } from '../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { UserPlus, Users, Upload, Library, History, Trash2, Wrench, MapPin } from 'lucide-react';
@@ -26,7 +27,7 @@ const Admin: React.FC = () => {
   const [uploadCount, setUploadCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
+    if (!user || !isAtLeast(user.role, 'admin')) {
       navigate('/');
       return;
     }
@@ -56,7 +57,7 @@ const Admin: React.FC = () => {
       .catch(() => {});
   }, [authToken]);
 
-  if (!user || user.role !== 'admin') return null;
+  if (!user || !isAtLeast(user.role, 'admin')) return null;
 
   const cards: AdminCard[] = [
     {

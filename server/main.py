@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI):
         raise SystemExit(1)
     build_work_id_cache()
     run_git_fsck()
+    from .auth import warn_if_no_superadmin
+    warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
