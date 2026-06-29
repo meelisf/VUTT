@@ -119,12 +119,28 @@ vt eespool — valideerimisel hüljatakse niikuinii).
 
 ### 3. Frontend
 
-**`src/pages/admin/Users.tsx`** — "Tegevused" veergu lisandub "Taasta parool" nupp
-(`KeyRound` ikoon, kustutusnupu kõrvale). **Nähtav ainult lubatud sihtmärkidele:**
-madalama rolliga kasutaja (editor/contributor) VÕI iseenda rida; teiste adminite real
-nuppu ei kuvata (peegeldab backend-i privileegikontrolli — backend on autoriteet, UI
-ainult peidab). Nupp:
-- Klikk → `POST /admin/users/reset-password` → modaal/inline-paneel näitab täislinki
+**`src/pages/admin/Users.tsx` — tegevuste tulba ümberkujundus (kebab-menüü).**
+
+Praegune probleem: tabelis on 7 tulpa (`min-w-[640px]` + `overflow-x-auto`), reaalne sisu
+on laiem kui `max-w-5xl` konteiner → parempoolseim "Tegevused" tulp jääb akna serva taha.
+Teise tegevusnupu lisamine süvendaks seda.
+
+**Lahendus:** asenda inline tegevusnupud ühe kompaktse kebab-ikooniga (`MoreVertical`
+lucide'ist), mis avab rípsmenüü:
+- **Taasta parool** (`KeyRound`) — nähtav ainult lubatud sihtmärkidele (vt allpool).
+- **Kustuta** (`Trash2`) — senine kustutus + kinnitusaste kolib menüüsse.
+
+See koondab kõik rea-tegevused ühte kitsasse tulpa (skaleerub, kui tegevusi lisandub) ja
+vabastab horisontaalruumi. Kebab-menüü vajab klikk-väljaspool-sulgemist ja
+positsioneerimist (üks `openMenu: username | null` state; klikk mujale sulgeb).
+
+**"Taasta parool" nähtavus** (peegeldab backend-i privileegikontrolli — backend on
+autoriteet, UI ainult peidab): nähtav madalama rolliga kasutajale (editor/contributor)
+VÕI iseenda real; teiste adminite real mitte. (Iseenda real "Kustuta" jääb peidetuks nagu
+praegu; seega iseenda real on menüüs ainult "Taasta parool".)
+
+**"Taasta parool" voog:**
+- Klikk → `POST /admin/users/reset-password` → modaal näitab täislinki
   (`window.location.origin + reset_url`) + "Kopeeri link" nupp (sama muster nagu
   `Registrations.tsx` invite-lingi puhul, `linkCopied` state).
 - Näitab aegumisaega ("Link kehtib 24h"). Eraldi kinnitusastet pole vaja (ohutu).
