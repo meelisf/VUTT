@@ -44,7 +44,14 @@
     "loadError": "Error loading users",
     "connectionError": "Failed to connect to server",
     "roleChangeError": "Failed to change role",
-    "deleteError": "Failed to delete"
+    "deleteError": "Failed to delete",
+    "actionsMenu": "Actions",
+    "resetPassword": "Reset password",
+    "resetLinkGenerated": "Password reset link created",
+    "resetLinkHint": "Copy the link and send it to the user. The link is valid for 24 hours.",
+    "copyLink": "Copy link",
+    "linkCopied": "Copied!",
+    "resetError": "Failed to create password reset link"
   },
   "pending": {
     "title": "Pending Edits",

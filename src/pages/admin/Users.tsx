@@ -5,7 +5,11 @@ import {
   Users,
   Loader2,
   Trash2,
-  ChevronLeft
+  ChevronLeft,
+  MoreVertical,
+  KeyRound,
+  Copy,
+  CheckCircle
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
@@ -26,6 +30,8 @@ interface UsersResponse {
   message?: string;
 }
 
+const ROLE_LEVEL: Record<string, number> = { contributor: 0, editor: 1, admin: 2 };
+
 const UsersPage: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken, isLoading: userLoading } = useUser();
@@ -36,6 +42,9 @@ const UsersPage: React.FC = () => {
   const [usersError, setUsersError] = useState<string | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ username: string; name: string; reset_url: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (!userLoading && (!user || user.role !== 'admin')) {
@@ -119,6 +128,44 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  const handleResetPassword = async (username: string) => {
+    setOpenMenu(null);
+    setRoleUpdating(username);
+    setUsersError(null);
+    setResetResult(null);
+    setLinkCopied(false);
+    try {
+      const data = await apiPost<{ status: string; reset_url?: string; username?: string; name?: string; message?: string }>(
+        '/admin/users/reset-password', { username }, { token: authToken });
+      if (data.status === 'success' && data.reset_url) {
+        setResetResult({ username: data.username || username, name: data.name || '', reset_url: data.reset_url });
+      } else {
+        setUsersError(data.message || t('users.resetError'));
+      }
+    } catch (e) {
+      console.error('Reset password error:', e);
+      setUsersError(t('users.resetError'));
+    } finally {
+      setRoleUpdating(null);
+    }
+  };
+
+  const copyResetLink = () => {
+    if (resetResult) {
+      navigator.clipboard.writeText(`${window.location.origin}${resetResult.reset_url}`);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  // Sulge kebab-menüü klõpsul mujale
+  useEffect(() => {
+    if (!openMenu) return;
+    const close = () => setOpenMenu(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [openMenu]);
+
   const formatDate = (isoString: string) => {
     return new Date(isoString).toLocaleDateString('et-EE', {
       day: '2-digit',
@@ -157,6 +204,33 @@ const UsersPage: React.FC = () => {
           {usersError && (
             <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {usersError}
+            </div>
+          )}
+
+          {resetResult && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-green-800">{t('users.resetLinkGenerated')}</h3>
+                  <p className="text-sm text-green-700 mt-1">
+                    {resetResult.name} (<span className="font-mono">{resetResult.username}</span>)
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">{t('users.resetLinkHint')}</p>
+                  <div className="mt-3 flex items-center gap-2">
+                    <code className="flex-1 bg-white px-3 py-2 rounded border border-green-300 text-sm text-gray-800 overflow-x-auto">
+                      {window.location.origin}{resetResult.reset_url}
+                    </code>
+                    <button
+                      onClick={copyResetLink}
+                      className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-1 whitespace-nowrap"
+                    >
+                      {linkCopied ? <CheckCircle size={16} /> : <Copy size={16} />}
+                      {linkCopied ? t('users.linkCopied') : t('users.copyLink')}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -227,41 +301,72 @@ const UsersPage: React.FC = () => {
                             ? u.allowed_collections.join(', ')
                             : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right">
-                          {isCurrentUser ? (
-                            <span className="text-gray-400">-</span>
-                          ) : deleteConfirm === u.username ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-xs text-red-600">{t('users.confirmDelete')}</span>
-                              <button
-                                onClick={() => handleDeleteUser(u.username)}
-                                disabled={isProcessing}
-                                className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
-                              >
-                                {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(null)}
-                                disabled={isProcessing}
-                                className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400 disabled:opacity-50"
-                              >
-                                {t('users.no')}
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteConfirm(u.username)}
-                              disabled={isProcessing}
-                              className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
-                              title={t('users.delete')}
-                            >
-                              {isProcessing ? (
-                                <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={16} />
-                              )}
-                            </button>
-                          )}
+                        <td className="px-4 py-3 text-sm text-right relative">
+                          {(() => {
+                            const canReset = isCurrentUser || (ROLE_LEVEL[u.role] ?? 0) < (ROLE_LEVEL[user.role] ?? 0);
+                            const canDelete = !isCurrentUser;
+                            if (!canReset && !canDelete) return <span className="text-gray-400">-</span>;
+                            return (
+                              <div className="inline-block" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setOpenMenu(openMenu === u.username ? null : u.username)}
+                                  disabled={isProcessing}
+                                  className="p-1 text-gray-500 hover:bg-gray-100 rounded disabled:opacity-50"
+                                  aria-haspopup="menu"
+                                  aria-expanded={openMenu === u.username}
+                                  title={t('users.actionsMenu')}
+                                >
+                                  {isProcessing ? <Loader2 size={16} className="animate-spin" /> : <MoreVertical size={16} />}
+                                </button>
+                                {openMenu === u.username && (
+                                  <div
+                                    role="menu"
+                                    className="absolute right-4 z-10 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg py-1 text-left"
+                                    onKeyDown={(e) => { if (e.key === 'Escape') setOpenMenu(null); }}
+                                  >
+                                    {canReset && (
+                                      <button
+                                        role="menuitem"
+                                        onClick={() => handleResetPassword(u.username)}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                      >
+                                        <KeyRound size={15} /> {t('users.resetPassword')}
+                                      </button>
+                                    )}
+                                    {canDelete && (
+                                      <button
+                                        role="menuitem"
+                                        onClick={() => { setOpenMenu(null); setDeleteConfirm(u.username); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                                      >
+                                        <Trash2 size={15} /> {t('users.delete')}
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                                {deleteConfirm === u.username && (
+                                  <div className="absolute right-4 z-10 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-left w-56">
+                                    <p className="text-xs text-red-600 mb-2">{t('users.confirmDelete')}</p>
+                                    <div className="flex gap-2">
+                                      <button
+                                        onClick={() => handleDeleteUser(u.username)}
+                                        disabled={isProcessing}
+                                        className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50"
+                                      >
+                                        {isProcessing ? <Loader2 size={12} className="animate-spin" /> : t('users.yes')}
+                                      </button>
+                                      <button
+                                        onClick={() => setDeleteConfirm(null)}
+                                        className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400"
+                                      >
+                                        {t('users.no')}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                       </tr>
                     );

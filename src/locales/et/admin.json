@@ -44,7 +44,14 @@
     "loadError": "Viga kasutajate laadimisel",
     "connectionError": "Serveriga ühendamine ebaõnnestus",
     "roleChangeError": "Rolli muutmine ebaõnnestus",
-    "deleteError": "Kustutamine ebaõnnestus"
+    "deleteError": "Kustutamine ebaõnnestus",
+    "actionsMenu": "Tegevused",
+    "resetPassword": "Taasta parool",
+    "resetLinkGenerated": "Parooli-taastamise link loodud",
+    "resetLinkHint": "Kopeeri link ja saada kasutajale. Link kehtib 24 tundi.",
+    "copyLink": "Kopeeri link",
+    "linkCopied": "Kopeeritud!",
+    "resetError": "Parooli-taastamise lingi loomine ebaõnnestus"
   },
   "pending": {
     "title": "Ootel muudatused",
