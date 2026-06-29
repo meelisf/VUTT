@@ -353,8 +353,12 @@ const Workspace: React.FC = () => {
       <>
       <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle size={48} /></div>
-          <h2 className="text-xl font-bold text-gray-800 mb-2">{t('common:errors.unknownError')}</h2>
+          <div className={`mb-4 flex justify-center ${errorRequiresLogin ? 'text-primary-500' : 'text-red-500'}`}>
+            {errorRequiresLogin ? <LogIn size={48} /> : <AlertTriangle size={48} />}
+          </div>
+          <h2 className="text-xl font-bold text-gray-800 mb-2">
+            {errorRequiresLogin ? t('common:errors.loginRequiredTitle') : t('common:errors.unknownError')}
+          </h2>
           <p className="text-gray-600 mb-6">{error || t('common:errors.unknownError')}</p>
           <div className="text-xs bg-gray-100 p-2 rounded mb-4 text-left font-mono overflow-auto max-h-32">
             Debug: WorkID: {workId}, Page: {currentPageNum}
