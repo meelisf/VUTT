@@ -12,7 +12,8 @@ from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
 from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
 from ..metadata_ops import save_work_metadata
-from ..prosopography.ops import _load_index, _load_work_collections, get_person_with_works, get_persons_for_work
+from ..prosopography.indices import _load_index, _load_work_collections
+from ..prosopography.relations import get_person_with_works, get_persons_for_work
 from ..rate_limit import check_rate_limit, get_client_ip
 from ..utils import find_directory_by_id
 from ..work_meta import load_work_metadata as _load_work_metadata

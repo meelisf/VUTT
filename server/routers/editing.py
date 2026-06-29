@@ -24,7 +24,7 @@ from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_field, save_work_metadata
 from ..people_ops import process_person_fields_metadata
-from ..prosopography.ops import update_page_person_mentions
+from ..prosopography.relations import update_page_person_mentions
 from ..utils import find_directory_by_id
 from ..work_meta import read_work_meta_direct_sync as _read_work_meta_direct_sync
 

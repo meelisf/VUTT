@@ -1199,7 +1199,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
 
     # Asenda Wikidata Q-koodid vutt:P ID-dega (loo stub kaardid vajadusel)
     try:
-        from .prosopography.ops import ensure_prosopo_stubs
+        from .prosopography.person_crud import ensure_prosopo_stubs
         metadata = {**metadata, **{
             k: v for k, v in ensure_prosopo_stubs(metadata, username).items()
             if k in ("creators", "tags", "publisher")
@@ -1222,7 +1222,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
 
     # Person-to-works indeks (uus teos võib juba sisaldada creators/tags isikuid)
     try:
-        from .prosopography.ops import update_person_to_works, update_work_collections
+        from .prosopography.indices import update_person_to_works, update_work_collections
         update_person_to_works(
             work_id,
             metadata.get("creators", []),
