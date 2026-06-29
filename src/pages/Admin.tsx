@@ -17,6 +17,7 @@ interface AdminCard {
   href: string;
   count?: number;
   countColor?: string;
+  superadminOnly?: boolean;
 }
 
 const Admin: React.FC = () => {
@@ -87,6 +88,7 @@ const Admin: React.FC = () => {
       icon: <Library size={18} className="text-violet-600" />,
       group: t('admin:groups.settings'),
       href: '/admin/collections',
+      superadminOnly: true,
     },
     {
       key: 'changes',
@@ -119,7 +121,7 @@ const Admin: React.FC = () => {
       <Header showSearchButton={false} pageTitle="Admin" />
       <div className="max-w-5xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          {cards.map(card => (
+          {cards.filter(card => !card.superadminOnly || isAtLeast(user.role, 'superadmin')).map(card => (
             <Link
               key={card.key}
               to={card.href}

@@ -13,7 +13,7 @@ const Collections: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!userLoading && (!user || !isAtLeast(user.role, 'admin'))) {
+    if (!userLoading && (!user || !isAtLeast(user.role, 'superadmin'))) {
       navigate('/');
     }
   }, [user, userLoading, navigate]);
@@ -26,7 +26,7 @@ const Collections: React.FC = () => {
     );
   }
 
-  if (!isAtLeast(user.role, 'admin')) return null;
+  if (!isAtLeast(user.role, 'superadmin')) return null;
 
   return (
     <div className="min-h-screen bg-gray-50">
