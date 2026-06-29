@@ -209,7 +209,7 @@
     "help": "Formatting help",
     "write": "Write",
     "preview": "Preview",
-    "helpText": "Supports markdown: **bold**, *italic*, # Heading, [link](url), - list",
+    "helpText": "Supports markdown: **bold**, *italic*, ## Heading, [link](url), - list",
     "linkText": "Link text",
     "linkUrl": "URL",
     "emptyPreview": "Nothing to preview",

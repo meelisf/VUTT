@@ -209,7 +209,7 @@
     "help": "Vormindusabi",
     "write": "Kirjuta",
     "preview": "Eelvaade",
-    "helpText": "Toetab markdownit: **paks**, *kursiiv*, # Pealkiri, [link](url), - loend",
+    "helpText": "Toetab markdownit: **paks**, *kursiiv*, ## Pealkiri, [link](url), - loend",
     "linkText": "Lingi tekst",
     "linkUrl": "URL",
     "emptyPreview": "Pole midagi näidata",
