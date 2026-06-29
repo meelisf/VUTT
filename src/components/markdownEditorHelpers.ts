@@ -72,6 +72,14 @@ export function linkPrefillFromSelection(selected: string): LinkPrefill {
   return { linkText: selected, url: '', focusField: trimmed ? 'url' : 'text' };
 }
 
+// Normaliseerib lingi-URL-i: protokollita www.-aadressile lisab https://,
+// et markdown ei tekitaks katkist suhtelist linki ([x](www.foo) → href="www.foo").
+export function normalizeLinkUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^www\./i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
 // Lisab markdown-lingi [label](url), asendades valiku. Kursor jääb lingi järele.
 export function insertLink(
   text: string,
@@ -80,7 +88,7 @@ export function insertLink(
   label: string,
   url: string,
 ): SelectionResult {
-  const safeUrl = url.trim();
+  const safeUrl = normalizeLinkUrl(url);
   const safeLabel = label || safeUrl || 'link';
   const inserted = `[${safeLabel}](${safeUrl})`;
   const newText = text.slice(0, start) + inserted + text.slice(end);

@@ -593,7 +593,7 @@ const PersonEditPage: React.FC = () => {
         {/* ── Elulugu ── */}
         <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-5">
           <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">
-            {t('biography', 'Elulogo')}
+            {t('biography', 'Elulugu')}
           </label>
           <MarkdownEditor
             value={draft.biography}

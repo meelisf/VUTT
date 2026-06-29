@@ -87,4 +87,12 @@ describe('insertLink', () => {
     const r = insertLink('', 0, 0, '', 'http://x');
     expect(r.text).toBe('[http://x](http://x)');
   });
+  it('prepends https:// to protocol-less www. urls (avoids broken relative link)', () => {
+    const r = insertLink('site', 0, 4, 'site', 'www.example.com');
+    expect(r.text).toBe('[site](https://www.example.com)');
+  });
+  it('leaves urls that already have a protocol untouched', () => {
+    const r = insertLink('site', 0, 4, 'site', 'https://www.example.com');
+    expect(r.text).toBe('[site](https://www.example.com)');
+  });
 });

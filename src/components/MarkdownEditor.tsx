@@ -38,15 +38,34 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const linkTextRef = useRef<HTMLInputElement>(null);
   const linkUrlRef = useRef<HTMLInputElement>(null);
 
+  // Autosuuruse olek: viimati programmiliselt seatud kõrgus + kas kasutaja on
+  // käsitsi suurust muutnud (siis autosuurus enam ei sekku).
+  const autoHeightRef = useRef<number | null>(null);
+  const userResizedRef = useRef(false);
+
   // Dünaamiline kõrgus: kasvab sisuga kuni MAX_HEIGHT, siis scroll.
+  // Jätame vahele, kui kasutaja on tekstiala käsitsi suurust muutnud.
   useLayoutEffect(() => {
     const ta = textareaRef.current;
-    if (!ta || tab !== 'write') return;
+    if (!ta || tab !== 'write' || userResizedRef.current) return;
     ta.style.height = 'auto';
     const next = Math.min(ta.scrollHeight, MAX_HEIGHT);
     ta.style.height = `${next}px`;
     ta.style.overflowY = ta.scrollHeight > MAX_HEIGHT ? 'auto' : 'hidden';
+    autoHeightRef.current = next;
   }, [value, tab]);
+
+  // Käsitsi suuruse muutmise tuvastus: kui pärast hiire vabastust on tekstiala
+  // kõrgus muutunud võrreldes viimati programmiliselt seatuga, lülitame
+  // autosuuruse välja ja lubame kerimise (et sisu ei jääks peitu).
+  const handleTextareaMouseUp = () => {
+    const ta = textareaRef.current;
+    if (!ta || autoHeightRef.current === null) return;
+    if (Math.abs(ta.offsetHeight - autoHeightRef.current) > 1) {
+      userResizedRef.current = true;
+      ta.style.overflowY = 'auto';
+    }
+  };
 
   const getSel = () => {
     const ta = textareaRef.current;
@@ -116,6 +135,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     applyResult(insertLink(value, start, end, linkText, linkUrl));
   };
 
+  // Tabi vahetus sulgeb avatud lingi-popoveri (muidu jääks see kuva üle hõljuma).
+  const switchTab = (next: 'write' | 'preview') => {
+    setLinkOpen(false);
+    setTab(next);
+  };
+
   const toolBtn = 'p-1.5 rounded hover:bg-gray-200 disabled:opacity-40';
   const editingDisabled = disabled || tab === 'preview';
 
@@ -132,8 +157,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
           <button type="button" onClick={() => setShowHelp(v => !v)} title={t('markdownEditor.help')} className={`${toolBtn} text-gray-500`}><HelpCircle size={16} /></button>
         </div>
         <div className="flex items-center gap-1 text-xs">
-          <button type="button" onClick={() => setTab('write')} className={`px-2 py-1 rounded ${tab === 'write' ? 'bg-white border border-gray-300 font-medium' : 'text-gray-500'}`}>{t('markdownEditor.write')}</button>
-          <button type="button" onClick={() => setTab('preview')} className={`px-2 py-1 rounded ${tab === 'preview' ? 'bg-white border border-gray-300 font-medium' : 'text-gray-500'}`}>{t('markdownEditor.preview')}</button>
+          <button type="button" onClick={() => switchTab('write')} className={`px-2 py-1 rounded ${tab === 'write' ? 'bg-white border border-gray-300 font-medium' : 'text-gray-500'}`}>{t('markdownEditor.write')}</button>
+          <button type="button" onClick={() => switchTab('preview')} className={`px-2 py-1 rounded ${tab === 'preview' ? 'bg-white border border-gray-300 font-medium' : 'text-gray-500'}`}>{t('markdownEditor.preview')}</button>
         </div>
       </div>
 
@@ -154,6 +179,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
             placeholder={placeholder}
             rows={minRows}
             onChange={e => onChange(e.target.value)}
+            onMouseUp={handleTextareaMouseUp}
             className="w-full px-3 py-2 text-sm border border-gray-300 rounded-b focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y font-mono leading-relaxed block"
           />
         ) : (
