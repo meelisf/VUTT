@@ -180,3 +180,38 @@ def test_complete_reset_kahe_jarjestikuse_lingi_esimene_kehtetu(reset_env):
     assert r1 is None and e1 is not None  # superseded
     r2, e2 = pr.complete_password_reset(second["token"], "uusparool1234")
     assert e2 is None and r2["username"] == "mari"
+
+
+def test_rolli_muutus_tuhistab_reset_tokenid(reset_env):
+    import server.auth as auth
+    token_data, _ = pr.create_reset_token("juku", "admin")
+    admin = {"username": "admin", "role": "admin"}
+    ok, _ = auth.update_user_role("juku", "editor", admin)
+    assert ok
+    _, error = pr.validate_reset_token(token_data["token"])
+    assert error is not None  # tühistatud
+
+
+def test_kustutus_tuhistab_reset_tokenid(reset_env):
+    import server.auth as auth
+    token_data, _ = pr.create_reset_token("juku", "admin")
+    admin = {"username": "admin", "role": "admin"}
+    ok, _ = auth.delete_user("juku", admin)
+    assert ok
+    _, error = pr.validate_reset_token(token_data["token"])
+    assert error is not None
+
+
+def test_looja_kustutamine_ei_tuhista_sihtmargi_tokenit(reset_env):
+    # Invariant on sihtmärgi-, mitte looja-põhine: kui tokeni LOONUD admin
+    # kustutatakse, jääb sihtmärgi token kehtima.
+    import server.auth as auth
+    # Lisa teine admin "admin2" kasutajate hulka
+    users = auth.load_users()
+    users["admin2"] = {"password_hash": "z", "name": "Admin Two", "role": "editor"}
+    auth.save_users(users)
+    token_data, _ = pr.create_reset_token("mari", "admin2")  # looja = admin2
+    admin = {"username": "admin", "role": "admin"}
+    auth.delete_user("admin2", admin)  # kustuta looja
+    got, error = pr.validate_reset_token(token_data["token"])  # mari token kehtib
+    assert error is None and got is not None
