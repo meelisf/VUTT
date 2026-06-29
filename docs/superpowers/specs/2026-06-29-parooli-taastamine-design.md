@@ -48,19 +48,34 @@ Token-kirje:
   "created_at": "...",
   "expires_at": "...",
   "created_by": "<admin username>",
-  "used": false
+  "used": false,
+  "used_at": null,
+  "revoked": false,
+  "revoked_at": null,
+  "revocation_reason": null
 }
 ```
+
+**`used` vs `revoked` eristus:** `used` = kasutaja kasutas lingi ära (parool vahetatud);
+`revoked` = token tühistati enne kasutust. `revocation_reason` ∈ `"superseded"` (uus link
+loodi sama kasutajale), `"role_changed"` (kasutaja edutati), `"user_deleted"`. Nii on
+admin-debug'is ja testides selge, KAS link kasutati või tühistati. Valideerimine hülgab
+mõlemad, aga eri veateadetega ("Link on juba kasutatud" vs "Link on tühistatud").
 
 Aegumine: `created_at + 24h` (lühem kui invite 48h — turvalisem).
 
 Funktsioonid:
 - `create_reset_token(username, created_by)` — kontrollib, et kasutaja on olemas;
-  **passiivne puhastus:** eemaldab failist kirjed, mille `expires_at` on > 7 päeva vana
-  (hoiab faili väikese ilma croonita); **invalideerib sama kasutaja varasemad kasutamata
-  reset-tokenid** (üks aktiivne korraga); loob uue. Olematu kasutaja → viga.
+  **passiivne puhastus:** eemaldab failist kirjed, mille `expires_at` on rohkem kui 7 päeva
+  minevikus (hoiab faili väikese ilma croonita); **tühistab sama kasutaja varasemad
+  kasutamata reset-tokenid** (`revoked=True`, `revocation_reason="superseded"` — üks aktiivne
+  korraga); loob uue. Olematu kasutaja → viga.
 - `validate_reset_token(token)` → `(token_data, error)` — kehtivuse kontroll (olemas,
-  mitte kasutatud, mitte aegunud).
+  mitte kasutatud, mitte tühistatud, mitte aegunud).
+- `revoke_user_reset_tokens(username, reason)` — tühistab kasutaja kõik kasutamata tokenid.
+  Kutsutakse `create_reset_token`-ist (`"superseded"`) ning **`update_user_role`-ist
+  (edutamisel, `"role_changed"`) ja `delete_user`-ist (`"user_deleted"`)** — vt allpool
+  "Rolli muutuse / kustutuse race".
 - `_validate_and_consume_token(token)` — atomaarne consume (lukuga, `used=True` +
   `used_at`) + `_unconsume_token(token)` rollback (peegeldab invite'i).
 
@@ -74,14 +89,37 @@ rollback (nagu invite'is).
 - `complete_password_reset(token, new_password)`:
   1. `validate_password_strength(new_password)` (taaskasuta `registration.py`-st).
   2. Atomaarne consume.
-  3. Sea uus bcrypt-hash (`hash_password`) olemasolevale kasutajale, `save_users`.
+  3. Loe vana hash välja (rollbacki jaoks); sea uus bcrypt-hash (`hash_password`)
+     olemasolevale kasutajale, `save_users`.
   4. **Invalideeri kasutaja kõik aktiivsed sessioonid** (`delete_user_sessions` —
      sunnib uue parooliga uuesti sisse logima).
-  5. Salvestamise ebaõnnestumisel → `_unconsume_token` rollback.
+  5. Veateed (vt allpool).
+
+**Veatee (sessioonide invalideerimine).** Turvainvariant nõuab, et pärast edukat resetit
+poleks vanu sessioone alles. Seetõttu loetakse operatsioon edukaks **ainult kui MÕLEMAD**
+— hash-vahetus JA sessioonide invalideerimine — õnnestuvad:
+- Kui `save_users` (samm 3) ebaõnnestub → `_unconsume_token` rollback, tagasta viga.
+- Kui `delete_user_sessions` (samm 4) ebaõnnestub → **taasta vana hash** (`save_users`
+  vana hashiga), `_unconsume_token` rollback, tagasta viga. **Mitte kunagi vaikset
+  `success`-i**, kui sessioonid võivad alles olla.
+- (`delete_user_sessions` on puhtalt mälusisene lukuga operatsioon — praktikas ei kuku,
+  aga invariant peab koodis eksplitsiitne olema, mitte eeldusel.)
 
 **Turvainvariant:** lingi genereerimisel vana parool EI muutu ja sessioonid jäävad alles
 — parool vahetub alles siis, kui kasutaja lingi kaudu uue seab. Nii ei lukusta admin
 kogemata kasutajat välja.
+
+**Rolli muutuse / kustutuse race (peidetud servajuhtum).** Privileegikontroll toimub
+tokeni LOOMISEL, kuid sihtkasutaja roll võib muutuda enne tokeni kasutamist. Näide: admin
+loob editorile reset-tokeni, editor edutatakse vahepeal adminiks → token jääks aktiivseks
+ja rikuks invariandi "admin ei saa teise admini parooli lähtestada". **Lahendus tühistada
+token sihtmärgi poolelt** (mitte `created_by`-põhise taaskontrolliga, mis on hapram —
+looja võib vahepeal kustutuda/alaneda):
+- `update_user_role(username, …)` (olemasolev — invalideerib juba sessioone) kutsub LISAKS
+  `revoke_user_reset_tokens(username, "role_changed")`. (Lihtsuse mõttes igal rollimuutusel,
+  mitte ainult edutamisel — kasutamata reset-token pole pärast rollimuutust niikuinii enam
+  usaldatav.)
+- `delete_user(username, …)` kutsub `revoke_user_reset_tokens(username, "user_deleted")`.
 
 ### 2. Backend — endpointid
 
@@ -106,16 +144,25 @@ kogemata kasutajat välja.
   ```
 
 `server/routers/auth.py` (avalik, rate-limited):
-- `GET /reset/{token}` — valideerib, tagastab `{status, valid, username, name, expires_at}`.
-  Töötab ainult kehtiva tokeniga; ei lekita rohkem kui vaja.
-  **Rate-limited** (`get_client_ip` + `check_rate_limit`) — väldib tokenite brute-force'imist
-  ja kasutajanime lekkimist. NB: see on teadlik parandus invite-mustri suhtes — olemasolev
-  `GET /invite/{token}` (`check_invite`) EI ole praegu rate-limited.
+- `POST /reset/validate` — body `{token}` (MITTE `GET /reset/{token}`). Tagastab
+  `{status, valid, username, name, expires_at}`. Töötab ainult kehtiva tokeniga; ei lekita
+  rohkem kui vaja. **Põhjus POST + body:** reset-token on tundlikum kui invite (olemasoleva
+  konto ülevõtt) — URL-tee (`GET /reset/{token}`) paljundaks tokeni API access-logidesse,
+  reverse-proxy-logidesse ja brauseri ajalukku. POST body hoiab tokeni logidest väljas.
+  (Erineb teadlikult invite-mustrist, kus `GET /invite/{token}`.)
 - `POST /reset/set-password` — body `{token, password}`, kutsub `complete_password_reset`.
-  Rate-limit: `get_client_ip` + `check_rate_limit` (sama muster nagu `/invite/set-password`).
+
+**Rate-limit MÕLEMAL endpointil** (`get_client_ip` + `check_rate_limit`, sama muster nagu
+`/invite/set-password`). **Võti = IP + endpoint, MITTE KUNAGI token** — vastasel juhul
+saaks ründaja iga uue juhutokeniga limiidist mööda. Väldib tokenite brute-force'imist ja
+kasutajanime lekkimist.
 
 Aegunud tokenite eraldi koristust pole vaja (passiivne puhastus toimub `create_reset_token`-is,
 vt eespool — valideerimisel hüljatakse niikuinii).
+
+**Infra-märkus:** kaaluda tokenite redigeerimist nginx/uvicorn access-logidest. Lingi enda
+sees on token paratamatu, kuid POST-body valideerimine hoiab selle vähemalt API-logi
+päringuteedest väljas.
 
 ### 3. Frontend
 
@@ -134,6 +181,11 @@ See koondab kõik rea-tegevused ühte kitsasse tulpa (skaleerub, kui tegevusi li
 vabastab horisontaalruumi. Kebab-menüü vajab klikk-väljaspool-sulgemist ja
 positsioneerimist (üks `openMenu: username | null` state; klikk mujale sulgeb).
 
+**Ligipääsetavus (märkida implementatsiooniplaani):** kebab-nupul `aria-haspopup="menu"`
+ja `aria-expanded`; menüü avatav klaviatuurilt (Enter/Space) ja suletav `Esc`-iga; fookus
+liigub menüü esimesele kirjele avamisel. Ei pea disaini raskeks ajama, aga baas-a11y peab
+olema.
+
 **"Taasta parool" nähtavus** (peegeldab backend-i privileegikontrolli — backend on
 autoriteet, UI ainult peidab): nähtav madalama rolliga kasutajale (editor/contributor)
 VÕI iseenda real; teiste adminite real mitte. (Iseenda real "Kustuta" jääb peidetuks nagu
@@ -147,7 +199,8 @@ praegu; seega iseenda real on menüüs ainult "Taasta parool".)
 
 **`src/pages/SetPassword.tsx`** — taaskasutame. Reset-režiim tuvastatakse
 `searchParams.get('reset') === '1'` järgi:
-- Reset: `GET /reset/{token}` valideerimiseks, `POST /reset/set-password` submitiks.
+- Reset: `POST /reset/validate` (body `{token}`) valideerimiseks, `POST /reset/set-password`
+  submitiks.
 - Invite (senine): `GET /invite/{token}` + `POST /invite/set-password`.
 - Tekstid kohanduvad: invite = "Tere tulemast!", reset = "Sea uus parool".
 - Uued i18n võtmed `et`/`en` (`register.json`, kus SetPassword tekstid praegu elavad —
@@ -159,21 +212,27 @@ pole vaja.
 ## Turvalisus
 
 - Reset-token = UUID4 (sama entroopia kui invite/sessioon).
-- Token ühekordne (`used` + atomaarne consume + rollback).
-- Parooli vahetusel invalideeritakse kasutaja sessioonid.
-- Vana token sama kasutaja kohta tühistatakse uue genereerimisel.
+- Token ühekordne (`used` + atomaarne consume + rollback); eristatud `revoked`-ist.
+- Parooli vahetusel invalideeritakse kasutaja sessioonid (vt veatee — success ainult kui
+  mõlemad õnnestuvad).
+- Varasem token sama kasutaja kohta tühistatakse uue genereerimisel (`superseded`).
+- Sihtkasutaja rolli muutus / kustutus tühistab tema kasutamata reset-tokenid (race-kaitse).
 - **Privileegide eskaleerumise kaitse:** admin ei saa lähtestada võrdse/kõrgema privileegiga
   kasutajat (sh teist admini ega `meelis`-t) — ainult madalamaid ja iseennast.
-- **Rate-limit MÕLEMAL avalikul endpointil** — nii `GET /reset/{token}` kui
-  `POST /reset/set-password`.
-- Avalik `GET /reset/{token}` töötab ainult kehtiva tokeniga.
+- **Rate-limit MÕLEMAL avalikul endpointil** (`POST /reset/validate`, `POST /reset/set-password`),
+  võti IP + endpoint, mitte token.
+- Token ei satu API access-logi päringuteedesse (POST-body, mitte URL-tee).
 
 ## Aktsepteeritud piirangud
 
-- **Admini self-lockout:** kuna iseteenindust ("unustasin parooli") esialgu ei ole, peab
-  parooli unustanud ja sisse logida mittesaaval adminil olema teine admin (kes genereerib
-  lingi) VÕI otsene serveri-ligipääs (`state/users.json` käsitsi). Teadlik piirang kuni
-  SMTP + iseteenindus lisatakse.
+- **Admini self-lockout (Variant A):** range reegel kehtib — ükski admin ei saa teist
+  admini lähtestada. Seega parooli unustanud ja sisse logida mittesaav admin vajab **otsest
+  serveri-ligipääsu / käsitsi reset'i** `state/users.json`-is (nt `hash_password` käsitsi
+  genereeritud hash). Teadlik piirang.
+- **Tuleviku-suund (Variant B, EI implementeerita praegu):** korrektsem lahendus oleks eraldi
+  **owner/superadmin roll** (kõrgeim, asendaks `meelis`-hardcode'i), kes ainsana saaks
+  adminitele reset-linke luua. See on suurem tükk (uus roll rolli-hierarhiasse, migratsioon,
+  UI, testid) ja jääb eraldi tööks. Kuni siis kehtib Variant A.
 
 ## SMTP-valmidus
 
@@ -188,15 +247,25 @@ pole vaja.
 - Olematu kasutaja → viga.
 - `validate_reset_token`: kehtiv, aegunud, kasutatud, olematu.
 - Atomaarne consume (üks edukas, teine "juba kasutatud").
-- Varasema tokeni tühistamine uue loomisel.
-- Passiivne puhastus: > 7 päeva vanad kirjed eemaldatakse uue tokeni loomisel.
+- Varasema tokeni tühistamine uue loomisel (`revoked`, `revocation_reason="superseded"`).
+- Passiivne puhastus: > 7 päeva minevikus aegunud kirjed eemaldatakse uue tokeni loomisel.
 - `complete_password_reset`: muudab bcrypt-hashi + invalideerib sessioonid.
 - Parooli-tugevuse keeldumine (lühike / liiga lihtne).
 - Salvestamise rollback (`_unconsume_token`).
 - **Privileegide kontroll** (endpoint-tasandil): admin → editor/contributor OK; admin →
   teine admin 403; admin → iseennast OK.
-- **Rate-limit** GET `/reset/{token}` ja POST `/reset/set-password` (vajadusel testitav,
+- **Rate-limit** `POST /reset/validate` ja `POST /reset/set-password` (vajadusel testitav,
   kui rate-limit on testikeskkonnas aktiivne).
+- **Race: sihtmärgi roll muutub pärast tokeni loomist** — `update_user_role` tühistab
+  kasutaja kasutamata tokenid (`role_changed`); seejärel `validate`/`complete` annab
+  "tühistatud" vea.
+- **Race: tokeni loonud admin kustutatakse/alandatakse enne kasutust** — token jääb kehtima
+  (invariant on sihtmärgi-, mitte looja-põhine); reset õnnestub.
+- **`delete_user` tühistab sihtmärgi tokenid** (`user_deleted`).
+- **`delete_user_sessions` ebaõnnestub pärast hash-vahetust** → vana hash taastatakse,
+  token unconsume'itakse, tagastatakse viga (mitte success).
+- **Kaks järjestikust reset-linki:** esimene muutub kehtetuks (`superseded`) ja annab õige
+  veateate; teine töötab.
 
 Olemasolevat invite-voogu need ei puuduta (eraldi moodul + hoidla).
 
