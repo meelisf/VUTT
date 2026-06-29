@@ -334,8 +334,23 @@ const Workspace: React.FC = () => {
     );
   }
 
+  // Login modaal jagatud nii vea- kui tavavaate vahel. Vearee varajane return
+  // (allpool) jättis modaali muidu monteerimata → "logi sisse" nupp ei avanud
+  // midagi (väljalogitud kasutaja piiratud teosel).
+  const loginModal = (
+    <LoginModal
+      isOpen={showLoginModal}
+      onClose={() => {
+        setShowLoginModal(false);
+        clearSessionExpired();
+      }}
+      message={sessionExpired ? t('errors.sessionExpiredProtectedWork') : undefined}
+    />
+  );
+
   if (error || !page) {
     return (
+      <>
       <div className="h-screen w-screen flex items-center justify-center bg-gray-50">
         <div className="text-center max-w-md p-8 bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="text-red-500 mb-4 flex justify-center"><AlertTriangle size={48} /></div>
@@ -370,6 +385,8 @@ const Workspace: React.FC = () => {
           </div>
         </div>
       </div>
+      {loginModal}
+      </>
     );
   }
 
@@ -681,14 +698,7 @@ const Workspace: React.FC = () => {
       />
 
       {/* Login modaal (sessioon aegunud või käsitsi avatud) */}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => {
-          setShowLoginModal(false);
-          clearSessionExpired();
-        }}
-        message={sessionExpired ? t('errors.sessionExpiredProtectedWork') : undefined}
-      />
+      {loginModal}
     </div>
   );
 };
