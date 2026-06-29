@@ -26,13 +26,39 @@ def list_deleted_works():
         return []
 
     repo = get_or_init_repo()
-    deleted_works = []
 
+    # ÜKS git log läbi kogu ajaloo kõigi teose-kustutamise commitide kohta.
+    # (Varem: eraldi git log iga prügikasti kausta kohta → O(N × täisajalugu);
+    #  139 kausta ~10.6s, mis ületas kliendi 10s timeout'i. Nüüd üks pass ~0.1s.)
+    delete_commits = {}  # work_id -> (commit_hash, title)
+    try:
+        log_output = repo.git.log('--all', '--oneline', '--grep', 'Kustuta teos:').strip()
+        for line in log_output.split('\n'):
+            if not line:
+                continue
+            commit_hash, _, commit_msg = line.partition(' ')
+            # Greedy pealkiri + lõpuankur, et brackets pealkirjas ei segaks work_id parsimist
+            m = re.match(r'Kustuta teos: (.+) \[([^\]]+)\]\s*$', commit_msg)
+            if not m:
+                continue
+            work_id = m.group(2)
+            # git log on uusim-ees: hoia esimene (uusim) kirje work_id kohta
+            if work_id not in delete_commits:
+                delete_commits[work_id] = (commit_hash, m.group(1))
+    except Exception as e:
+        logger.warning(f"TRASH: git log ebaõnnestus: {e}")
+
+    deleted_works = []
     for entry in os.scandir(TRASH_DIR):
         if not entry.is_dir():
             continue
 
         work_id = entry.name
+        if work_id not in delete_commits:
+            # Ei leitud teose kustutamise committi — ainult leheküljed kustutati, mitte teos
+            continue
+
+        commit_hash, title = delete_commits[work_id]
         jpg_count = sum(
             1 for f in os.listdir(entry.path)
             if f.lower().endswith(('.jpg', '.jpeg', '.png'))
@@ -40,42 +66,19 @@ def list_deleted_works():
 
         item = {
             'work_id': work_id,
-            'title': work_id,
+            'title': title,
             'deleted_at': None,
             'deleted_by': None,
-            'commit_hash': None,
+            'commit_hash': commit_hash,
             'jpg_count': jpg_count,
         }
 
         try:
-            # Otsi ainult "Kustuta teos:" commite — välistab kustutatud lehekülgede kirjed
-            log_output = repo.git.log(
-                '--all', '--oneline',
-                '--grep', f'Kustuta teos:.*\\[{work_id}\\]'
-            ).strip()
-            if not log_output:
-                # Ei leitud teose kustutamise committi — ainult leheküljed kustutati, mitte teos
-                continue
-
-            # Võta esimene rida (uusim commit)
-            first_line = log_output.split('\n')[0]
-            commit_hash = first_line.split(' ', 1)[0]
-            commit_msg = first_line.split(' ', 1)[1] if ' ' in first_line else ''
-
-            title_match = re.match(
-                r'Kustuta teos: (.+?) \[' + re.escape(work_id) + r'\]',
-                commit_msg
-            )
-            if title_match:
-                item['title'] = title_match.group(1)
-
             commit = repo.commit(commit_hash)
-            item['commit_hash'] = commit_hash
             item['deleted_at'] = commit.committed_datetime.isoformat()
             item['deleted_by'] = commit.author.name
         except Exception as e:
-            logger.warning(f"TRASH: Ei leidnud commiti teosel {work_id}: {e}")
-            continue
+            logger.warning(f"TRASH: commit {commit_hash} lugemine ebaõnnestus teosel {work_id}: {e}")
 
         deleted_works.append(item)
 
