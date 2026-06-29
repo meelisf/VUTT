@@ -40,6 +40,10 @@
     "usernamePreview": "Sinu kasutajanimi on",
     "submit": "Salvesta parool",
     "success": "Parool seadistatud! Võid nüüd sisse logida.",
+    "resetTitle": "Sea uus parool",
+    "resetSubtitle": "Vali oma kontole uus tugev parool",
+    "resetWelcome": "Tere, {{name}}! Sea oma kontole uus parool.",
+    "resetSuccess": "Parool uuendatud! Võid nüüd uue parooliga sisse logida.",
     "errors": {
       "passwordRequired": "Parool on kohustuslik",
       "passwordTooShort": "Parool peab olema vähemalt 12 tähemärki",

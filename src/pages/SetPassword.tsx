@@ -8,7 +8,7 @@ import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 
 interface TokenInfo {
   valid: boolean;
-  email: string;
+  email?: string;
   username?: string;
   name: string;
   expires_at: string;
@@ -18,6 +18,7 @@ const SetPassword: React.FC = () => {
   const { t } = useTranslation(['register', 'common']);
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
+  const isReset = searchParams.get('reset') === '1';
 
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -43,7 +44,13 @@ const SetPassword: React.FC = () => {
       }
 
       try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/invite/${token}`);
+        const response = isReset
+          ? await fetchWithTimeout(`${FILE_API_URL}/reset/validate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token }),
+            })
+          : await fetchWithTimeout(`${FILE_API_URL}/invite/${token}`);
         const data = await response.json();
 
         if (data.status === 'success' && data.valid) {
@@ -66,7 +73,7 @@ const SetPassword: React.FC = () => {
     };
 
     validateToken();
-  }, [token, t]);
+  }, [token, isReset, t]);
 
   const validateForm = (): string | null => {
     if (!password) {
@@ -109,7 +116,8 @@ const SetPassword: React.FC = () => {
     setErrorMessage('');
 
     try {
-      const response = await fetchWithTimeout(`${FILE_API_URL}/invite/set-password`, {
+      const endpoint = isReset ? `${FILE_API_URL}/reset/set-password` : `${FILE_API_URL}/invite/set-password`;
+      const response = await fetchWithTimeout(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password })
@@ -172,7 +180,7 @@ const SetPassword: React.FC = () => {
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">{t('setPassword.success')}</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">{isReset ? t('setPassword.resetSuccess') : t('setPassword.success')}</h1>
           <p className="text-gray-600 mb-2">
             Sinu kasutajanimi: <strong className="text-primary-700">{createdUsername}</strong>
           </p>
@@ -214,12 +222,12 @@ const SetPassword: React.FC = () => {
             <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Key className="w-7 h-7 text-primary-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('setPassword.title')}</h1>
-            <p className="text-gray-500 mt-1">{t('setPassword.subtitle')}</p>
+            <h1 className="text-2xl font-bold text-gray-900">{isReset ? t('setPassword.resetTitle') : t('setPassword.title')}</h1>
+            <p className="text-gray-500 mt-1">{isReset ? t('setPassword.resetSubtitle') : t('setPassword.subtitle')}</p>
             {tokenInfo && (
               <div className="mt-2 space-y-2">
                 <p className="text-sm text-primary-600">
-                  Tere tulemast, {tokenInfo.name}!
+                  {isReset ? t('setPassword.resetWelcome', { name: tokenInfo.name }) : `Tere tulemast, ${tokenInfo.name}!`}
                 </p>
                 {tokenInfo.username && (
                   <div className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
