@@ -62,6 +62,7 @@
   "errors": {
     "connectionFailed": "Failed to connect to server",
     "unknownError": "Unknown error",
+    "loginRequiredTitle": "Login required",
     "loginFailed": "Login failed",
     "boundaryTitle": "Something went wrong",
     "boundaryDescription": "An unexpected error occurred in the application. Try reloading the page.",
