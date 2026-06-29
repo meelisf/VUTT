@@ -9,7 +9,8 @@ import {
   MoreVertical,
   KeyRound,
   Copy,
-  CheckCircle
+  CheckCircle,
+  X
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
@@ -230,6 +231,14 @@ const UsersPage: React.FC = () => {
                     </button>
                   </div>
                 </div>
+                <button
+                  onClick={() => setResetResult(null)}
+                  className="text-green-600 hover:text-green-800 flex-shrink-0"
+                  title={t('common:buttons.close')}
+                  aria-label={t('common:buttons.close')}
+                >
+                  <X size={18} />
+                </button>
               </div>
             </div>
           )}
