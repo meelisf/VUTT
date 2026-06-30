@@ -18,24 +18,24 @@ Eesmärk: koondada järgmised soovitatavad sammud pärast `server/main.py` refak
 
 ### P0 — teha enne suuremaid uusi featuure
 
-| Teema | Miks | Soovitus |
-|---|---|---|
-| `/meili/` ja `/api/images/` rate-limit live-kontroll | Avalik otsing ja pildid on kõige lihtsam DoS/kraapimise pind | Viia lõpuni `docs/security_review_2026-06-09.md` M1/M2: dedicated nginx limit zone, helde burst, live-test devtoolsiga |
-| Frontendi XSS/HTML renderdamise inventuur | `dangerouslySetInnerHTML` on sihilikult kasutusel, aga vajab keskset poliitikat | Luba ainult 2 teed: `sanitizeHighlight()` otsinguhighlightideks ja staatilised trusted HTML failid. Lisa lint/grep-test, mis keelab uued kasutused ilma põhjenduseta |
-| Uploadi failisuuruse ja pildide decompression bomb piirang | Admin-only, kuid kõige kallim sisend CPU/mälu mõttes | Lisa backendis max PDF/image size, Pillow `MAX_IMAGE_PIXELS`, magic-byte järel mõõtmete kontroll; nginx `client_max_body_size` dokumenteerida |
-| Auth-token localStorage risk | XSS korral võetakse token üle | Hinnata üleminekut HttpOnly SameSite Secure cookie sessioonile või vähemalt lühem access-token + serveripoolne sessioon; säilitada Bearer ajutise ühilduvusena |
-| Automaatne kvaliteedivärav | Praegu on testid head, aga lint/format pole standardiseeritud | Lisa CI-sse: `npm run typecheck`, `npm test`, `npm run build`, `pytest tests/`; lisada ESLint + Python ruff järk-järgult |
+| Staatus | Teema | Miks | Soovitus |
+|---|---|---|---|
+| ✅ #61 | `/meili/` ja `/api/images/` rate-limit live-kontroll | Avalik otsing ja pildid on kõige lihtsam DoS/kraapimise pind | Viia lõpuni `docs/security_review_2026-06-09.md` M1/M2: dedicated nginx limit zone, helde burst, live-test devtoolsiga |
+| ✅ #62 | Frontendi XSS/HTML renderdamise inventuur | `dangerouslySetInnerHTML` on sihilikult kasutusel, aga vajab keskset poliitikat | Luba ainult 2 teed: `sanitizeHighlight()` otsinguhighlightideks ja staatilised trusted HTML failid. Lisa lint/grep-test, mis keelab uued kasutused ilma põhjenduseta |
+| 🔲 #63 | Uploadi failisuuruse ja pildide decompression bomb piirang | Admin-only, kuid kõige kallim sisend CPU/mälu mõttes | Lisa backendis max PDF/image size, Pillow `MAX_IMAGE_PIXELS`, magic-byte järel mõõtmete kontroll; nginx `client_max_body_size` dokumenteerida |
+| ⏸ defer | Auth-token localStorage risk | XSS korral võetakse token üle | **Edasi lükatud, aktsepteeritud risk** (vt "Otsustatud" all). Hinnata üleminekut HttpOnly SameSite Secure cookie sessioonile või vähemalt lühem access-token + serveripoolne sessioon; säilitada Bearer ajutise ühilduvusena |
+| ✅ #64 | Automaatne kvaliteedivärav | Praegu on testid head, aga lint/format pole standardiseeritud | Lisa CI-sse: `npm run typecheck`, `npm test`, `npm run build`, `pytest tests/`; lisada ESLint + Python ruff järk-järgult |
 
 ### P1 — järgmine refaktori laine
 
-| Fail / ala | Praegune risk | Soovitus |
-|---|---|---|
-| `server/prosopography/ops.py` (~1933 rida) | Palju eri vastutusi ühes moodulis | Jaota: `person_crud.py`, `person_search.py`, `relations.py`, `indices.py`, `merge_ops.py`, `git_history.py` |
-| `server/upload_ops.py` (~1638 rida) | Staging, SFTP, PDF/image, import, polling ühes failis | Jaota: `upload_state.py`, `ocr_client.py`, `file_detection.py`, `import_work.py`, `thumbs.py` |
-| `src/pages/Upload.tsx` (~1406 rida) | UI olekumasin + API + render samas failis | Tee `useUploadWizard`, `UploadStepMeta`, `UploadStepTransfer`, `UploadStepReview`, `uploadApi.ts` |
-| `src/components/TextEditor.tsx` (~1377 rida) | Editorikäitumine, copy/paste, save, toolbar, layout koos | Eralda hooks: `useEditorState`, `useEditorSave`, `useCopyPastePlainMarkup`, `EditorToolbar`, `EditorStatusBar` |
-| `src/pages/Dashboard.tsx`, `WorkManage.tsx` | Bulk-toimingud ja API korduvad | Ühtne `workApi.ts` + väiksemad komponendid; bulk ops utiliit/service |
-| Frontendi API-kutsed | Tokeni lugemine ja `fetch` kordub paljudes failides | Keskne `apiClient.ts`: JSON parsing, timeout, auth header, 401 käsitlus, veateated |
+| Staatus | Fail / ala | Praegune risk | Soovitus |
+|---|---|---|---|
+| ✅ #68 | `server/prosopography/ops.py` (~1933 rida) | Palju eri vastutusi ühes moodulis | Jaota: `person_crud.py`, `person_search.py`, `relations.py`, `indices.py`, `merge_ops.py`, `git_history.py` |
+| 🔲 #65 | `server/upload_ops.py` (~1638 rida) | Staging, SFTP, PDF/image, import, polling ühes failis | Jaota: `upload_state.py`, `ocr_client.py`, `file_detection.py`, `import_work.py`, `thumbs.py` |
+| ✅ #66 | `src/pages/Upload.tsx` (~1406 rida) | UI olekumasin + API + render samas failis | Tee `useUploadWizard`, `UploadStepMeta`, `UploadStepTransfer`, `UploadStepReview`, `uploadApi.ts` |
+| ❓ | `src/components/TextEditor.tsx` (~1377 rida) | Editorikäitumine, copy/paste, save, toolbar, layout koos | Eralda hooks: `useEditorState`, `useEditorSave`, `useCopyPastePlainMarkup`, `EditorToolbar`, `EditorStatusBar` |
+| ❓ | `src/pages/Dashboard.tsx`, `WorkManage.tsx` | Bulk-toimingud ja API korduvad | Ühtne `workApi.ts` + väiksemad komponendid; bulk ops utiliit/service |
+| ✅ #67 | Frontendi API-kutsed | Tokeni lugemine ja `fetch` kordub paljudes failides | Keskne `apiClient.ts`: JSON parsing, timeout, auth header, 401 käsitlus, veateated |
 
 ### P2 — jõudlus ja opereeritavus
 
@@ -173,13 +173,24 @@ Lisada järk-järgult:
 
 ## Soovitatud GitHub issue'd
 
-1. **P0: nginx rate-limit live rollout `/meili/` ja `/api/images/`**
-2. **P0: SafeHtml wrapper ja `dangerouslySetInnerHTML` guard-test**
-3. **P0: upload size / megapixel / PDF page piirangud**
-4. ~~**P0: CI quality gate (`pytest`, `typecheck`, `vitest`, `build`)**~~ — tehtud GitHub Actions workflow'na (`.github/workflows/ci.yml`)
-5. **P1: `upload_ops.py` split väiksemateks mooduliteks**
-6. **P1: `Upload.tsx` split hookideks ja sammukomponentideks**
-7. **P1: keskne frontend `apiClient.ts`**
-8. **P1: `prosopography/ops.py` domeenipõhine jaotus**
-9. **P2: Meilisearch päringute mõõtmine ja debounce/abort otsingus**
-10. **P2: backend health/status taustatöödele ja queue-dele**
+> Seisu ülevaade 2026-06-30. ✅ = tehtud (issue suletud, koodis verifitseeritud), 🔲 = lahtine issue, ❓ = issuet pole veel tehtud (vt allpool "Arutamiseks").
+
+1. ~~**P0: nginx rate-limit live rollout `/meili/` ja `/api/images/`**~~ — ✅ tehtud (issue #61 suletud)
+2. ~~**P0: SafeHtml wrapper ja `dangerouslySetInnerHTML` guard-test**~~ — ✅ tehtud (issue #62 suletud; `src/components/SafeHtml.tsx`, `src/utils/sanitizeHtml.ts`, `src/utils/__tests__/dangerouslySetInnerHTMLGuard.test.ts`)
+3. 🔲 **P0: upload size / megapixel / PDF page piirangud** — lahtine issue #63 (ümbernimetatud "upload safety guardrails ilma lehekülgede arvu piiranguta"); koodis pole veel `MAX_IMAGE_PIXELS` ega body-size piiranguid
+4. ~~**P0: CI quality gate (`pytest`, `typecheck`, `vitest`, `build`)**~~ — ✅ tehtud (issue #64 suletud; `.github/workflows/ci.yml`)
+5. 🔲 **P1: `upload_ops.py` split väiksemateks mooduliteks** — lahtine issue #65 (fail endiselt ~1638 rida)
+6. ~~**P1: `Upload.tsx` split hookideks ja sammukomponentideks**~~ — ✅ tehtud (issue #66 suletud; `src/pages/upload/`)
+7. ~~**P1: keskne frontend `apiClient.ts`**~~ — ✅ tehtud (issue #67 suletud; `src/services/apiClient.ts`)
+8. ~~**P1: `prosopography/ops.py` domeenipõhine jaotus**~~ — ✅ tehtud (issue #68 suletud; `person_crud.py`, `person_search.py`, `relations.py`, `indices.py`, `merge_ops.py`, `git_history.py`)
+9. 🔲 **P2: Meilisearch päringute mõõtmine ja debounce/abort otsingus** — issue #87 loodud (2026-06-30)
+10. 🔲 **P2: backend health/status taustatöödele ja queue-dele** — issue #88 loodud (2026-06-30); ainult baas `/health` (`main.py:115`) olemas
+
+Lisaks lahtine: 🔲 **P2: eemalda `prosopography/_legacy_ops` compatibility kiht** (issue #73).
+
+### Otsustatud (2026-06-30)
+
+- **#87 (P2) Meilisearch debounce/AbortController** — issue loodud, lahtine.
+- **#88 (P2) Taustatööde health/status endpoint** — issue loodud, lahtine.
+- **#89 (P1) TextEditor.tsx / Dashboard.tsx / WorkManage.tsx split + `workApi.ts`** — issue loodud, lahtine.
+- **Auth-token → HttpOnly cookie sessioon** (P0 turvasoovitus, vt "Sessioonid ja tokenid") — **edasi lükatud, aktsepteeritud risk.** Põhjendus: token on lühiealine (24h) serveripoolne opaque UUID, mitte JWT; XSS-pind on juba tugevalt kaitstud (`SafeHtml` #62, markdown allow-list, ei `rehype-raw`-i, DOMPurify); HttpOnly cookie ei peata XSS-i ennast, vaid ainult tokeni eksfiltratsiooni, ja tooks kaasa uue CSRF-ründepinna fragiilses auth-voos (vrd dokumenteeritud `LoginModal`/`sessionExpired` intsident). **Uuesti vaadata, kui:** lisandub rikkalik HTML/upload-sisestuse pind, avalik iseregistreerimine laieneb, või lisandub palju kolmanda osapoole skripte. Siht juhul: HttpOnly + `SameSite=Lax` + CSRF-tokenid mutatsioonidele, Bearer ajutise ühilduvusena.
