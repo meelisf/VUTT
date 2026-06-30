@@ -97,6 +97,11 @@ const Dashboard: React.FC = () => {
   // tõenäoliselt ligipääsupuudus (mitte andmete/filtrite probleem).
   const selectedCollectionObj = selectedCollection ? collections[selectedCollection] : null;
   const isRestrictedCollection = selectedCollectionObj?.visibility === 'restricted';
+  // Kaitstud-kogu tühja tulemuse eriteadet näita ainult siis, kui kasutajal pole ligipääsu.
+  // Adminidel on Meilisearchis piiranguta token; tavakasutajal piisab allowed_collections kirjest.
+  const hasRestrictedCollectionAccess = !isRestrictedCollection || isAdmin || (
+    !!selectedCollection && !!user?.allowed_collections?.includes(selectedCollection)
+  );
 
   // Sünkroonib selectedCollection → URL ?collection= param (Context → URL suund)
   useCollectionUrlSync(selectedCollection, setSearchParams);
@@ -937,7 +942,7 @@ const Dashboard: React.FC = () => {
                     </>
                   ) : (
                     <div className="text-center py-16 bg-white rounded-xl border border-gray-200 border-dashed">
-                      {isRestrictedCollection ? (
+                      {isRestrictedCollection && !hasRestrictedCollectionAccess ? (
                         <>
                           <div className="text-primary-500 mb-3 flex justify-center"><Lock size={32} /></div>
                           <p className="text-gray-600 text-lg max-w-md mx-auto px-4">
