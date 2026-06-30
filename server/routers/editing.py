@@ -11,6 +11,11 @@ from ..access_ops import can_write_work
 from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
+from ..comment_history_ops import (
+    apply_comment_restore,
+    build_comment_history,
+    find_comment_in_content,
+)
 from ..config import BASE_DIR
 from ..deps import get_json_data, get_user, require_role
 from ..entity_labels_ops import enrich_entity_labels_async, enrich_entity_labels_async_qcodes
@@ -149,6 +154,101 @@ async def commit_diff(request: Request, user=Depends(require_role("editor"))):
     diff_res = get_commit_diff(commit_hash, filepaths=clean_path)
     if not diff_res or not diff_res.get('diff'): diff_res = get_commit_diff(commit_hash)
     return {"status": "success", **diff_res} if diff_res else {"status": "error"}
+
+def _validate_page_paths(data):
+    """Tuletab + valideerib catalog/filename/json-teed (ühine history+restore).
+
+    Returns (catalog, filename, json_relpath, json_path, txt_path) või tõstab 400.
+    """
+    raw_file = data.get('file_name', '')
+    if not raw_file or os.path.basename(raw_file) != raw_file:
+        raise HTTPException(status_code=400, detail="Vigane failinimi")
+    catalog = os.path.basename(data.get('original_path', ''))
+    if not catalog:
+        raise HTTPException(status_code=400, detail="Vigane tee")
+    json_filename = os.path.splitext(raw_file)[0] + ".json"
+    json_relpath = os.path.join(catalog, json_filename)
+    json_path = os.path.join(BASE_DIR, catalog, json_filename)
+    txt_path = os.path.join(BASE_DIR, catalog, raw_file)
+    # Path traversal kaitse: tulemus peab jääma BASE_DIR-i
+    base_real = os.path.realpath(BASE_DIR)
+    if not os.path.realpath(json_path).startswith(base_real + os.sep):
+        raise HTTPException(status_code=400, detail="Tee väljaspool lubatud kataloogi")
+    return catalog, raw_file, json_relpath, json_path, txt_path
+
+
+def _read_current_comments(json_path):
+    """Loeb praeguse comments-massiivi kettalt (toetab meta_content wrapperit)."""
+    if not os.path.exists(json_path):
+        return []
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    source = data.get('meta_content', data) if isinstance(data, dict) else {}
+    comments = source.get('comments', []) if isinstance(source, dict) else []
+    return comments or []
+
+
+@router.post("/page-comments/history")
+async def page_comments_history(request: Request, user=Depends(require_role("editor"))):
+    data = await get_json_data(request)
+    _catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(data)
+    current = _read_current_comments(json_path)
+    result = await run_in_threadpool(build_comment_history, json_relpath, current)
+    return {"status": "success", **result}
+
+
+@router.post("/page-comments/restore")
+async def page_comments_restore(
+    request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))
+):
+    data = await get_json_data(request)
+    mode = data.get('mode')
+    comment_id = data.get('comment_id')
+    commit_hash = data.get('commit_hash')
+    if mode not in ("version", "deleted") or not comment_id or not commit_hash:
+        raise HTTPException(status_code=400, detail="Vigased parameetrid")
+
+    catalog, _filename, json_relpath, json_path, txt_path = _validate_page_paths(data)
+
+    # commit_hash peab kuuluma SELLE faili ajalukku (mitte suvaline git-objekt)
+    history = get_file_git_history(json_relpath, max_count=500)
+    valid = {h['full_hash'] for h in history} | {h['hash'] for h in history}
+    if commit_hash not in valid:
+        raise HTTPException(status_code=400, detail="Commit ei kuulu selle faili ajalukku")
+
+    content = get_file_at_commit(json_relpath, commit_hash)
+    if content is None:
+        raise HTTPException(status_code=400, detail="Commitist ei leitud faili")
+    restored = find_comment_in_content(content, comment_id)
+    if restored is None:
+        raise HTTPException(status_code=404, detail="Kommentaari ei leitud sellest commitist")
+
+    if not os.path.exists(json_path):
+        raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
+    with open(json_path, 'r', encoding='utf-8') as f:
+        cur_data = json.load(f)
+    source = cur_data['meta_content'] if (
+        isinstance(cur_data, dict) and isinstance(cur_data.get('meta_content'), dict)
+    ) else cur_data
+    current = source.get('comments', []) or []
+
+    new_comments, error = apply_comment_restore(current, restored, mode)
+    if error is not None:
+        raise HTTPException(status_code=error[0], detail=error[1])
+    source['comments'] = new_comments
+
+    # .txt jääb muutmata (taastame ainult kommentaari)
+    with open(txt_path, 'r', encoding='utf-8') as f:
+        txt = f.read()
+
+    save_with_git(
+        txt_path, txt, user['username'],
+        message=f"Restore comment {comment_id}: {commit_hash[:8]}",
+        additional_files=[(json_path, json.dumps(cur_data, indent=2, ensure_ascii=False))],
+    )
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    return {"status": "success", "comments": new_comments}
+
 
 @router.post("/git-restore")
 async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
