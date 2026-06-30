@@ -316,6 +316,8 @@
     "saveEdit": "Save",
     "cancelEdit": "Cancel",
     "commentHistory": "History",
+    "versionHistory": "Version history",
+    "editedComments": "Edited comments",
     "restoreText": "Restore this text",
     "restoreComment": "Restore comment",
     "deletedComments": "Deleted comments",
