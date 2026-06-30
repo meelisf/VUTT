@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import Header from '../../components/Header';
 import { useUser } from '../../contexts/UserContext';
+import { useCollection } from '../../contexts/CollectionContext';
 import { apiPost } from '../../services/apiClient';
 import { ROLE_LEVELS, canManageUser, assignableRoles, roleLevel } from '../../utils/roleUtils';
 
@@ -36,12 +37,29 @@ interface UsersResponse {
 const UsersPage: React.FC = () => {
   const { t } = useTranslation(['admin', 'common']);
   const { user, authToken, isLoading: userLoading } = useUser();
+  const { collections } = useCollection();
   const navigate = useNavigate();
+
+  // Restricted-kollektsioonid {id, name} kujul, sorditud nime järgi (kuvamiseks).
+  // allowed_collections mõjutab ligipääsu AINULT restricted-kogude puhul.
+  const restrictedCollections = React.useMemo(
+    () =>
+      Object.entries(collections)
+        .filter(([, c]) => c.visibility === 'restricted')
+        .map(([id, c]) => ({ id, name: c.name?.et || id }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'et')),
+    [collections]
+  );
+
+  // Lahenda kollektsiooni id → kuvanimi (fallback toore id)
+  const collectionName = (id: string): string => collections[id]?.name?.et || id;
 
   const [users, setUsers] = useState<User[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [roleUpdating, setRoleUpdating] = useState<string | null>(null);
+  // Per-kasutaja salvestamis-indikaator kollektsioonide muutmisel
+  const [collectionsUpdating, setCollectionsUpdating] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   // Ankru-ristkülik portaliga renderdatud menüü/kinnituse positsioneerimiseks.
@@ -129,6 +147,31 @@ const UsersPage: React.FC = () => {
       setUsersError(t('users.connectionError'));
     } finally {
       setRoleUpdating(null);
+    }
+  };
+
+  const handleCollectionsChange = async (username: string, nextAllowedCollections: string[]) => {
+    setCollectionsUpdating(username);
+    setUsersError(null);
+    try {
+      const data = await apiPost<{ status: string; allowed_collections?: string[]; message?: string }>(
+        '/admin/users/update-collections',
+        { username, allowed_collections: nextAllowedCollections },
+        { token: authToken }
+      );
+      if (data.status === 'success') {
+        // Serveri vastus on tõe allikas (server sanitiseerib) — ära kasuta optimistlikku nimekirja
+        setUsers(users.map(u =>
+          u.username === username ? { ...u, allowed_collections: data.allowed_collections || [] } : u
+        ));
+      } else {
+        setUsersError(data.message || t('users.collectionsUpdateFailed'));
+      }
+    } catch (e) {
+      console.error('Collections change error:', e);
+      setUsersError(t('users.collectionsUpdateFailed'));
+    } finally {
+      setCollectionsUpdating(null);
     }
   };
 
@@ -408,18 +451,76 @@ const UsersPage: React.FC = () => {
                         )}
                       </div>
                       <div className="flex items-start gap-2">
-                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">Piiratud kogud</span>
-                        {u.allowed_collections && u.allowed_collections.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {u.allowed_collections.map((c) => (
-                              <span key={c} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
-                                {c}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400 mt-0.5">—</span>
-                        )}
+                        <span className="w-24 flex-shrink-0 text-xs font-medium text-gray-500 mt-1">
+                          {t('users.restrictedCollections')}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          {(() => {
+                            const assigned = u.allowed_collections || [];
+                            const editable = canManage;
+                            const isUpdating = collectionsUpdating === u.username;
+                            // Kogud, mida kasutajal veel pole (lisamise dropdowni jaoks)
+                            const available = restrictedCollections.filter(rc => !assigned.includes(rc.id));
+
+                            // Read-only vaade (mitte-hallatav kasutaja / iseennast)
+                            if (!editable) {
+                              return assigned.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {assigned.map((c) => (
+                                    <span key={c} className="text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                                      {collectionName(c)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-sm text-gray-400">—</span>
+                              );
+                            }
+
+                            // Muudetav vaade: chip'id (× eemalda) + lisamise dropdown
+                            return (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {assigned.length > 0 ? (
+                                  assigned.map((c) => (
+                                    <span key={c} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">
+                                      {collectionName(c)}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCollectionsChange(u.username, assigned.filter(x => x !== c))}
+                                        disabled={isUpdating}
+                                        className="hover:text-blue-900 disabled:opacity-50"
+                                        title={t('users.removeCollection', { name: collectionName(c) })}
+                                        aria-label={t('users.removeCollection', { name: collectionName(c) })}
+                                      >
+                                        <X size={12} />
+                                      </button>
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-sm text-gray-400">—</span>
+                                )}
+                                {isUpdating && <Loader2 size={12} className="animate-spin text-gray-400" />}
+                                {restrictedCollections.length === 0 ? (
+                                  <span className="text-xs text-gray-400">{t('users.noRestrictedCollections')}</span>
+                                ) : available.length > 0 ? (
+                                  <select
+                                    value=""
+                                    onChange={(e) => {
+                                      if (e.target.value) handleCollectionsChange(u.username, [...assigned, e.target.value]);
+                                    }}
+                                    disabled={isUpdating}
+                                    className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+                                  >
+                                    <option value="">+ {t('users.addCollection')}</option>
+                                    {available.map((rc) => (
+                                      <option key={rc.id} value={rc.id}>{rc.name}</option>
+                                    ))}
+                                  </select>
+                                ) : null}
+                              </div>
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
 
