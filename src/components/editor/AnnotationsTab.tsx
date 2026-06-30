@@ -31,6 +31,13 @@ interface AnnotationsTabProps {
   setPageTags: (tags: (string | LinkedEntity)[]) => void;
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
+  // Teavitab parenti salvestamata mustand-tekstist (uus kommentaar / kommentaari muutmine),
+  // et lehelt lahkumise hoiatus käivituks ka enne "Lisa kommentaar" nuppu.
+  onDraftChange?: (hasDraft: boolean) => void;
+  // Parent saab siit kätte funktsiooni, mis liidab mustandi kommentaaride hulka ja
+  // tühjendab mustandi (kasutatakse "Salvesta ja lahku" ajal). Tagastab uue
+  // kommentaaride massiivi (mille parent salvestab) või null, kui mustandit polnud.
+  flushRef?: React.MutableRefObject<(() => Annotation[] | null) | null>;
   onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
   // Kommentaarid on serveris juba salvestatud (restore-endpoint commitis) — sünkroni
   // ainult lokaalne + salvestatud baasseis, ÄRA tee teist /save commitit.
@@ -54,6 +61,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   setPageTags,
   comments,
   setComments,
+  onDraftChange,
+  flushRef,
   onSaveAnnotations,
   onCommentsRestored,
   onReplyToComment,
@@ -131,6 +140,48 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     const el = document.getElementById(`comment-${highlightedCommentId}`);
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [highlightedCommentId, comments]);
+
+  // Salvestamata mustand-tekst (uus kommentaar VÕI kommentaari muutmine) → teavita
+  // parenti, et lahkumise hoiatus käivituks. Ainult need kaks: nad on lihtsalt
+  // kommentaaride massiivi liidetavad, seega "Salvesta ja lahku" oskab neid säilitada.
+  useEffect(() => {
+    onDraftChange?.(Boolean(newComment.trim() || editingText.trim()));
+  }, [newComment, editingText, onDraftChange]);
+
+  // Komponendi eemaldamisel (nt tabi vahetus) nulli mustand-lipp, et see ei jääks toppama.
+  useEffect(() => () => onDraftChange?.(false), [onDraftChange]);
+
+  // Registreeri flush: liidab mustandi kommentaaridesse ja tühjendab mustandi-välja.
+  // Sünkroonne ja puhas (massiivi-teisendus) → parent saab tagastatud massiivi ühe
+  // /save'iga kettale kirjutada, ilma state-async võistlusteta.
+  useEffect(() => {
+    if (!flushRef) return;
+    flushRef.current = () => {
+      let merged = comments;
+      let changed = false;
+      if (editingCommentId && editingText.trim()) {
+        merged = merged.map(c => c.id === editingCommentId ? { ...c, text: editingText } : c);
+        changed = true;
+      }
+      if (newComment.trim()) {
+        merged = [...merged, {
+          id: Date.now().toString(),
+          text: newComment,
+          author: user?.name || 'Anonüümne',
+          author_username: user?.username,
+          created_at: new Date().toISOString(),
+        }];
+        changed = true;
+      }
+      if (!changed) return null;
+      setNewComment('');
+      setEditingCommentId(null);
+      setEditingText('');
+      onDraftChange?.(false);
+      return merged;
+    };
+    return () => { if (flushRef) flushRef.current = null; };
+  }, [flushRef, comments, editingCommentId, editingText, newComment, user, onDraftChange]);
 
   // Lae kõik olemasolevad märksõnad Meilisearchist
   useEffect(() => {

@@ -29,6 +29,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   const [tab, setTab] = useState<'write' | 'preview'>('write');
   const [showHelp, setShowHelp] = useState(false);
 
+  // Tabi vahetusel salvestatud valik, et fookus+kursor säiliks 'write'-i naasmisel.
+  const tabSelRef = useRef<{ start: number; end: number } | null>(null);
+
   // Lingi-popover
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkText, setLinkText] = useState('');
@@ -80,7 +83,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
       if (!ta) return;
-      ta.focus();
+      // preventScroll: muidu keriks ümbritsev overflow-y-auto konteiner
+      // fookuse peale tekstiala juurde ("kuva hüppab märkmete juurde").
+      ta.focus({ preventScroll: true });
       ta.setSelectionRange(res.start, res.end);
     });
   };
@@ -124,7 +129,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
     requestAnimationFrame(() => {
       const ta = textareaRef.current;
       if (!ta) return;
-      ta.focus();
+      ta.focus({ preventScroll: true });
       ta.setSelectionRange(savedSel.current.start, savedSel.current.end);
     });
   };
@@ -136,10 +141,25 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
   };
 
   // Tabi vahetus sulgeb avatud lingi-popoveri (muidu jääks see kuva üle hõljuma).
+  // 'write' → 'preview' minekul jätame valiku meelde, et tagasi tulles fookus säiliks.
   const switchTab = (next: 'write' | 'preview') => {
+    if (next === 'preview' && tab === 'write') {
+      tabSelRef.current = getSel();
+    }
     setLinkOpen(false);
     setTab(next);
   };
+
+  // 'write'-i naasmisel taasta fookus + valik (preventScroll, et kuva ei hüppaks).
+  useLayoutEffect(() => {
+    if (tab !== 'write' || !tabSelRef.current) return;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const { start, end } = tabSelRef.current;
+    tabSelRef.current = null;
+    ta.focus({ preventScroll: true });
+    ta.setSelectionRange(start, end);
+  }, [tab]);
 
   const toolBtn = 'p-1.5 rounded hover:bg-gray-200 disabled:opacity-40';
   const editingDisabled = disabled || tab === 'preview';
