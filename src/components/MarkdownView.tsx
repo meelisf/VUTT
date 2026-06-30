@@ -1,8 +1,9 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
-// Piiratud, turvaline markdown-renderdus (märkmed, elulugu jms).
+// Piiratud, turvaline markdown-renderdus (märkmed, elulugu, kommentaarid).
 // Ainult markdown — toores HTML escape'itud (ei kasuta rehype-raw'd).
 // Renderduv DOM on allow-listitud; keelatud elementide tekst säilib (unwrapDisallowed).
 const ALLOWED_ELEMENTS = [
@@ -15,14 +16,18 @@ const ALLOWED_ELEMENTS = [
 interface MarkdownViewProps {
   content: string;
   className?: string;
+  // softBreaks: single newline → <br> (remark-breaks). Vajalik vanade plain-text
+  // kommentaaride reavahetuste säilitamiseks. Prosopo ei kasuta (vaikimisi false).
+  softBreaks?: boolean;
 }
 
-const MarkdownView: React.FC<MarkdownViewProps> = ({ content, className }) => {
+const MarkdownView: React.FC<MarkdownViewProps> = ({ content, className, softBreaks }) => {
   if (!content || !content.trim()) return null;
+  const remarkPlugins = softBreaks ? [remarkGfm, remarkBreaks] : [remarkGfm];
   return (
     <div className={['vutt-md', className].filter(Boolean).join(' ')}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         allowedElements={ALLOWED_ELEMENTS}
         unwrapDisallowed
         components={{
