@@ -21,8 +21,8 @@ import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FILE_API_URL } from '../config';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { bulkAssignCollection, bulkAssignGenre, bulkAssignTags } from '../services/workApi';
 import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
@@ -436,20 +436,7 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-collection`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          auth_token: token,
-          work_ids: Array.from(selectedWorkIds),
-          // null = "Määramata" → set puhastab kõik; päris kollektsioon → add lisab olemasolevate kõrvale
-          mode: collectionId === null ? 'set' : 'add',
-          collection_id: collectionId
-        }),
-        timeout: 30000
-      });
-
-      const result = await response.json();
+      const result = await bulkAssignCollection(token, Array.from(selectedWorkIds), collectionId);
       if (result.status === 'success') {
         // Tühjenda valik ja uuenda otsing
         setSelectedWorkIds(new Set());
@@ -475,19 +462,7 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-tags`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          auth_token: token,
-          work_ids: Array.from(selectedWorkIds),
-          tags,
-          mode
-        }),
-        timeout: 30000
-      });
-
-      const result = await response.json();
+      const result = await bulkAssignTags(token, Array.from(selectedWorkIds), tags, mode);
       if (result.status === 'success') {
         setSelectedWorkIds(new Set());
         setSelectMode(false);
@@ -511,19 +486,7 @@ const Dashboard: React.FC = () => {
     setBulkAssignLoading(true);
     try {
       const token = localStorage.getItem('vutt_token');
-      const response = await fetchWithTimeout(`${FILE_API_URL}/works/bulk-genre`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({
-          auth_token: token,
-          work_ids: Array.from(selectedWorkIds),
-          genre,
-          mode: genre ? 'add' : 'set'
-        }),
-        timeout: 30000
-      });
-
-      const result = await response.json();
+      const result = await bulkAssignGenre(token, Array.from(selectedWorkIds), genre);
       if (result.status === 'success') {
         setSelectedWorkIds(new Set());
         setSelectMode(false);

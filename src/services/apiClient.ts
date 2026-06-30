@@ -69,10 +69,19 @@ async function apiRequest<T>(
 
   let requestBody: BodyInit | undefined;
   if (body !== undefined) {
-    headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
-    requestBody = headers['Content-Type'] === 'application/json'
-      ? JSON.stringify(body)
-      : body as BodyInit;
+    const isBodyInit = body instanceof FormData
+      || body instanceof URLSearchParams
+      || body instanceof Blob
+      || typeof body === 'string';
+
+    if (isBodyInit) {
+      requestBody = body as BodyInit;
+    } else {
+      headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
+      requestBody = headers['Content-Type'] === 'application/json'
+        ? JSON.stringify(body)
+        : body as BodyInit;
+    }
   }
 
   const response = await fetchWithTimeout(buildUrl(path, options.baseUrl), {
