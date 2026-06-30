@@ -52,7 +52,12 @@
     "copyLink": "Copy link",
     "linkCopied": "Copied!",
     "resetError": "Failed to create password reset link",
-    "noPermissionManage": "You don't have permission to manage a user of equal or higher level"
+    "noPermissionManage": "You don't have permission to manage a user of equal or higher level",
+    "restrictedCollections": "Restricted collections",
+    "addCollection": "add collection",
+    "removeCollection": "Remove {{name}}",
+    "noRestrictedCollections": "No restricted collections",
+    "collectionsUpdateFailed": "Failed to update collections"
   },
   "pending": {
     "title": "Pending Edits",

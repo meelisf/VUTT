@@ -52,7 +52,12 @@
     "copyLink": "Kopeeri link",
     "linkCopied": "Kopeeritud!",
     "resetError": "Parooli-taastamise lingi loomine ebaõnnestus",
-    "noPermissionManage": "Sul ei ole õigust hallata sama või kõrgema taseme kasutajat"
+    "noPermissionManage": "Sul ei ole õigust hallata sama või kõrgema taseme kasutajat",
+    "restrictedCollections": "Piiratud kogud",
+    "addCollection": "lisa kogu",
+    "removeCollection": "Eemalda {{name}}",
+    "noRestrictedCollections": "Piiratud kogusid pole",
+    "collectionsUpdateFailed": "Kollektsioonide uuendamine ebaõnnestus"
   },
   "pending": {
     "title": "Ootel muudatused",

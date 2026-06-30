@@ -5,7 +5,7 @@ import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..auth import can_manage_user, delete_user, get_all_users, update_user_role
+from ..auth import can_manage_user, delete_user, get_all_users, update_user_allowed_collections, update_user_role
 from ..config import BASE_DIR
 from ..deps import get_json_data, require_role
 from ..git_ops import clear_git_failures, delete_work_from_git, get_git_failures, run_git_fsck
@@ -69,6 +69,18 @@ async def admin_update_role(request: Request, user=Depends(require_role("admin")
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success"}
+
+
+@router.post("/admin/users/update-collections")
+async def admin_update_collections(request: Request, user=Depends(require_role("admin"))):
+    data = await get_json_data(request)
+    # NB: anna allowed_collections muutmatult edasi (tüübikontroll on helperis,
+    # et see kehtiks ka otseses ühiktestis); vastus sisaldab serveris salvestatud nimekirja
+    success, message, allowed = update_user_allowed_collections(
+        data.get("username"), data.get("allowed_collections", []), user)
+    if not success:
+        raise HTTPException(status_code=400, detail=message)
+    return {"status": "success", "allowed_collections": allowed}
 
 
 @router.post("/admin/users/delete")
