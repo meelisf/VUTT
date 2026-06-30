@@ -390,6 +390,12 @@ hr.page-break::before {
 .vutt-md {
   overflow-wrap: break-word;
 }
+
+/* Kommentaaride markdown: pikad URL-id ei tohi layout'i lõhkuda */
+.vutt-md-comment {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .vutt-md h1 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0; }
 .vutt-md h2 { font-size: 1.25rem; font-weight: 700; margin: 0.5rem 0; }
 .vutt-md h3 { font-size: 1.1rem; font-weight: 600; margin: 0.5rem 0; }

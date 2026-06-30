@@ -154,7 +154,11 @@
       "section": "Transcription",
       "selectNoText": "Select untranscribed",
       "button": "Transcribe ({{count}})",
-      "model": { "label": "Model", "print": "Print", "hand": "Handwriting" },
+      "model": {
+        "label": "Model",
+        "print": "Print",
+        "hand": "Handwriting"
+      },
       "progress": "OCR: {{ready}}/{{total}} done, {{errors}} failed",
       "confirm": {
         "line1": "{{count}} pages will be re-sent to OCR.",
@@ -164,7 +168,12 @@
         "cancel": "Cancel"
       },
       "error": "Failed to start re-OCR.",
-      "badge": { "noText": "no text", "processing": "OCR running", "ready": "OCR ready for review", "error": "OCR failed" }
+      "badge": {
+        "noText": "no text",
+        "processing": "OCR running",
+        "ready": "OCR ready for review",
+        "error": "OCR failed"
+      }
     },
     "tabs": {
       "replace": "Replace pages"
@@ -305,7 +314,15 @@
     "replyPlaceholder": "Write a reply...",
     "sendReply": "Send reply",
     "saveEdit": "Save",
-    "cancelEdit": "Cancel"
+    "cancelEdit": "Cancel",
+    "commentHistory": "History",
+    "restoreText": "Restore this text",
+    "restoreComment": "Restore comment",
+    "deletedComments": "Deleted comments",
+    "noDeletedComments": "No deleted comments found",
+    "noOlderVersions": "No earlier versions",
+    "historyTruncated": "Showing history of the last 100 commits.",
+    "restoreError": "Restore failed"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"

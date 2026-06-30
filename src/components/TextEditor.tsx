@@ -451,6 +451,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, status, page_tags, textAnnotations, onSave]);
 
+  // Kommentaari taastamine: restore-endpoint on kettale juba committinud, seega
+  // sünkroni ainult lokaalne + salvestatud baasseis (mitte teist /save commitit).
+  const handleCommentsRestored = useCallback((updatedComments: Annotation[]) => {
+    setComments(updatedComments);
+    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
+  }, [status, page_tags, textAnnotations]);
+
   const handleReplyToComment = useCallback(async (commentId: string, replyText: string) => {
     if (!authToken) {
       throw new Error(t('saveError.tokenMissing'));
@@ -1144,6 +1151,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             comments={comments}
             setComments={setComments}
             onSaveAnnotations={handleSaveAnnotations}
+            onCommentsRestored={handleCommentsRestored}
             onReplyToComment={handleReplyToComment}
             readOnly={readOnly || false}
             user={user}

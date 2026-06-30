@@ -154,7 +154,11 @@
       "section": "Transkriptsioon",
       "selectNoText": "Vali tekstita",
       "button": "Transkribeeri ({{count}})",
-      "model": { "label": "Mudel", "print": "Trükitekst", "hand": "Käsikiri" },
+      "model": {
+        "label": "Mudel",
+        "print": "Trükitekst",
+        "hand": "Käsikiri"
+      },
       "progress": "OCR: {{ready}}/{{total}} valmis, {{errors}} veaga",
       "confirm": {
         "line1": "{{count}} lehte saadetakse uuesti OCR-i.",
@@ -164,7 +168,12 @@
         "cancel": "Tühista"
       },
       "error": "Re-OCR alustamine ebaõnnestus.",
-      "badge": { "noText": "tekstita", "processing": "OCR töötab", "ready": "OCR valmis ülevaatamiseks", "error": "OCR ebaõnnestus" }
+      "badge": {
+        "noText": "tekstita",
+        "processing": "OCR töötab",
+        "ready": "OCR valmis ülevaatamiseks",
+        "error": "OCR ebaõnnestus"
+      }
     },
     "tabs": {
       "replace": "Asenda leheküljed"
@@ -305,7 +314,15 @@
     "replyPlaceholder": "Kirjuta vastus...",
     "sendReply": "Saada vastus",
     "saveEdit": "Salvesta",
-    "cancelEdit": "Tühista"
+    "cancelEdit": "Tühista",
+    "commentHistory": "Ajalugu",
+    "restoreText": "Taasta see tekst",
+    "restoreComment": "Taasta kommentaar",
+    "deletedComments": "Kustutatud kommentaarid",
+    "noDeletedComments": "Kustutatud kommentaare ei leitud",
+    "noOlderVersions": "Varasemaid versioone ei ole",
+    "historyTruncated": "Näidatakse viimase 100 commiti ajalugu.",
+    "restoreError": "Taastamine ebaõnnestus"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote, History as HistoryIcon } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -19,6 +19,9 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
+import { fetchCommentHistory, restoreComment, CommentHistory } from '../../services/commentHistoryService';
+import MarkdownEditor from '../MarkdownEditor';
+import MarkdownView from '../MarkdownView';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -28,6 +31,9 @@ interface AnnotationsTabProps {
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
   onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
+  // Kommentaarid on serveris juba salvestatud (restore-endpoint commitis) — sünkroni
+  // ainult lokaalne + salvestatud baasseis, ÄRA tee teist /save commitit.
+  onCommentsRestored?: (comments: Annotation[]) => void;
   onReplyToComment?: (commentId: string, replyText: string) => Promise<void>;
   readOnly: boolean;
   user: any;
@@ -48,6 +54,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   comments,
   setComments,
   onSaveAnnotations,
+  onCommentsRestored,
   onReplyToComment,
   readOnly,
   user,
@@ -74,9 +81,15 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [savingReplyId, setSavingReplyId] = useState<string | null>(null);
+  const [commentHistory, setCommentHistory] = useState<CommentHistory | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
+  const [deletedCardOpen, setDeletedCardOpen] = useState(false);
   const highlightedCommentId = new URLSearchParams(location.search).get('comment');
 
   const isAdmin = isAtLeast(user?.role, 'admin');
+  const canRestore = isAtLeast(user?.role, 'editor');
   
   // Arhiivide register (nimed kuvamiseks)
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
@@ -212,6 +225,36 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       setReplyError(e.message || t('common:errors.unknownError'));
     } finally {
       setSavingReplyId(null);
+    }
+  };
+
+  const ensureHistory = async () => {
+    if (commentHistory || historyLoading) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      setCommentHistory(await fetchCommentHistory(_page, authToken || undefined));
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const doRestore = async (
+    mode: 'version' | 'deleted', commentId: string, commitHash: string,
+  ) => {
+    try {
+      const updated = await restoreComment(
+        _page, { mode, comment_id: commentId, commit_hash: commitHash }, authToken || undefined,
+      );
+      // Restore-endpoint juba committis kettale — sünkroni ainult seis, ilma teise salvestuseta.
+      if (onCommentsRestored) onCommentsRestored(updated);
+      else setComments(updated);
+      setCommentHistory(null);
+      setOpenHistoryId(null);
+    } catch (e) {
+      setHistoryError(e instanceof Error ? e.message : t('info.restoreError'));
     }
   };
 
@@ -846,15 +889,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             >
               {editingCommentId === comment.id ? (
                 <div className="space-y-2">
-                  <textarea
+                  <MarkdownEditor
                     value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
-                    rows={6}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') { setEditingCommentId(null); setEditingText(''); }
-                    }}
+                    onChange={setEditingText}
+                    minRows={6}
                   />
                   <div className="flex gap-2 justify-end">
                     <button
@@ -876,7 +914,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </div>
               ) : (
                 <>
-                  <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 whitespace-pre-wrap">{comment.text}</p>
+                  <div className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 vutt-md-comment">
+                    <MarkdownView content={comment.text} softBreaks />
+                  </div>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <span className="font-semibold text-primary-700">{comment.author}</span>
                     <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
@@ -885,7 +925,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     <div className="mt-3 space-y-2 border-l-2 border-primary-100 pl-3">
                       {(comment.replies || []).map(reply => (
                         <div key={reply.id} className="bg-white border border-gray-100 rounded-md px-3 py-2">
-                          <p className="text-gray-800 text-sm mb-1 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
+                          <div className="text-gray-800 text-sm mb-1 leading-relaxed vutt-md-comment">
+                            <MarkdownView content={reply.text} softBreaks />
+                          </div>
                           <div className="flex justify-between items-center text-xs text-gray-500">
                             <span className="font-semibold text-primary-700">{reply.author}</span>
                             <span>{new Date(reply.created_at).toLocaleString('et-EE')}</span>
@@ -896,20 +938,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   )}
                   {replyingToCommentId === comment.id && (
                     <div className="mt-3 space-y-2">
-                      <textarea
+                      <MarkdownEditor
                         value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
+                        onChange={setReplyText}
                         placeholder={t('info.replyPlaceholder')}
-                        className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
-                        rows={3}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            setReplyingToCommentId(null);
-                            setReplyText('');
-                            setReplyError(null);
-                          }
-                        }}
+                        minRows={3}
                       />
                       {replyError && <p className="text-xs text-red-600">{replyError}</p>}
                       <div className="flex gap-2 justify-end">
@@ -929,6 +962,32 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                           {t('info.sendReply')}
                         </button>
                       </div>
+                    </div>
+                  )}
+                  {openHistoryId === comment.id && (
+                    <div className="mt-3 border-t border-gray-200 pt-2 space-y-2">
+                      {historyLoading && <p className="text-xs text-gray-400">…</p>}
+                      {historyError && <p className="text-xs text-red-600">{historyError}</p>}
+                      {!historyLoading && (commentHistory?.versions[comment.id]?.length ? (
+                        commentHistory.versions[comment.id].map(v => (
+                          <div key={v.commit_hash} className="bg-white border border-gray-100 rounded px-2 py-1.5">
+                            <div className="vutt-md-comment text-sm text-gray-700">
+                              <MarkdownView content={v.text} softBreaks />
+                            </div>
+                            <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
+                              <span>{v.author} · {new Date(v.timestamp).toLocaleString('et-EE')}</span>
+                              <button
+                                onClick={() => doRestore('version', comment.id, v.commit_hash)}
+                                className="text-primary-600 hover:text-primary-800 font-medium"
+                              >
+                                {t('info.restoreText')}
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">{t('info.noOlderVersions')}</p>
+                      ))}
                     </div>
                   )}
                   {!readOnly && (
@@ -955,6 +1014,18 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                           <Edit3 size={14} />
                         </button>
                       )}
+                      {canRestore && (
+                        <button
+                          onClick={async () => {
+                            await ensureHistory();
+                            setOpenHistoryId(openHistoryId === comment.id ? null : comment.id);
+                          }}
+                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                          title={t('info.commentHistory')}
+                        >
+                          <HistoryIcon size={14} />
+                        </button>
+                      )}
                       <button
                         onClick={() => removeComment(comment.id)}
                         className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
@@ -970,13 +1041,62 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           ))}
         </div>
 
+        {canRestore && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <button
+              onClick={async () => {
+                await ensureHistory();
+                setDeletedCardOpen(o => !o);
+              }}
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+            >
+              <Trash2 size={13} />
+              {t('info.deletedComments')}
+              {commentHistory && ` (${commentHistory.deleted.length})`}
+            </button>
+            {deletedCardOpen && (
+              <div className="mt-2 space-y-2">
+                {historyLoading && <p className="text-xs text-gray-400">…</p>}
+                {historyError && <p className="text-xs text-red-600">{historyError}</p>}
+                {!historyLoading && commentHistory && (
+                  commentHistory.deleted.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">{t('info.noDeletedComments')}</p>
+                  ) : (
+                    <>
+                      {commentHistory.deleted.map(d => (
+                        <div key={d.id} className="bg-gray-50 border border-gray-100 rounded px-2 py-1.5">
+                          <div className="vutt-md-comment text-sm text-gray-700">
+                            <MarkdownView content={d.text} softBreaks />
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
+                            <span>{d.author} · {new Date(d.created_at).toLocaleString('et-EE')}</span>
+                            <button
+                              onClick={() => doRestore('deleted', d.id, d.last_seen_commit)}
+                              className="text-primary-600 hover:text-primary-800 font-medium"
+                            >
+                              {t('info.restoreComment')}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {commentHistory.truncated && (
+                        <p className="text-xs text-gray-400 italic">{t('info.historyTruncated')}</p>
+                      )}
+                    </>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {!readOnly ? (
           <div className="mt-auto">
-            <textarea
+            <MarkdownEditor
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={setNewComment}
               placeholder={t('info.commentPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
+              minRows={3}
             />
             <button
               onClick={addComment}
