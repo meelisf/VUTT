@@ -10,6 +10,7 @@ import time
 import logging
 import bcrypt
 from datetime import datetime
+from .cache import get_cached_collections
 from .config import USERS_FILE, SESSION_DURATION
 from .utils import atomic_write_json
 
@@ -358,6 +359,60 @@ def update_user_role(username, new_role, admin_user):
 
     print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' rolli: {old_role} -> {new_role}. Invalideeritud {invalidated} sessiooni.")
     return True, "Roll muudetud"
+
+
+def update_user_allowed_collections(username, collection_ids, admin_user):
+    """Muudab kasutaja piiratud kollektsioonide ligipääsu (allowed_collections).
+
+    Args:
+        username: Muudetava kasutaja kasutajanimi
+        collection_ids: Soovitud kollektsiooni-id-de list (kliendilt, valideerimata)
+        admin_user: Admin kasutaja, kes muudatuse teeb
+
+    Returns:
+        (success: bool, message: str, allowed_collections: list[str])
+        allowed_collections on serveris salvestatud (sanitiseeritud, deterministlikus
+        järjekorras) nimekiri — see on tõe allikas, mille frontend state'i kirjutab.
+        Vea korral on see [].
+    """
+    # Sisendi tüübikontroll (väldib nt stringi itereerimist tähtedeks)
+    if not isinstance(username, str) or not username.strip():
+        return False, "Kasutajanimi puudub", []
+    if not isinstance(collection_ids, list):
+        return False, "Vigane kollektsioonide nimekiri", []
+
+    users = load_users()
+    if username not in users:
+        return False, "Kasutajat ei leitud", []
+
+    # Õigus: AINULT keskne can_manage_user (rangelt madalam tase; superadmin integreeritud).
+    # Blokeerib võrdse/kõrgema taseme ja iseenda — admini piiramine oleks niikuinii mõttetu.
+    target_role = users[username].get("role", "contributor")
+    if not can_manage_user(admin_user["role"], target_role):
+        return False, "Pole õigust selle kasutaja kollektsioone muuta", []
+
+    # Sanitiseerimine + deterministlik järjekord: jäta ainult olemasolevad restricted-id-d,
+    # järjesta konfiguratsiooni restricted-kollektsioonide järjekorra järgi (stabiilne diff).
+    collections_config = get_cached_collections()
+    submitted = {c for c in collection_ids if isinstance(c, str)}
+    restricted_ordered = [
+        cid for cid, c in collections_config.items()
+        if c.get("visibility") == "restricted"
+    ]
+    sanitized = [cid for cid in restricted_ordered if cid in submitted]
+
+    # No-op kaitse: ära salvesta ega katkesta sessiooni asjatult
+    old = users[username].get("allowed_collections", [])
+    if old == sanitized:
+        return True, "Kollektsioonid uuendatud", sanitized
+
+    users[username]["allowed_collections"] = sanitized
+    save_users(users)
+    # Invalideeri sessioonid, et uus ligipääs jõustuks kohe (peegeldab kollektsiooni-poolset
+    # CollectionEditor käitumist). Reset-tokeneid EI tühistata — ligipääs ei muuda rolli.
+    delete_user_sessions(username)
+    print(f"Admin '{admin_user['username']}' muutis kasutaja '{username}' kollektsioone: {old} -> {sanitized}")
+    return True, "Kollektsioonid uuendatud", sanitized
 
 
 def delete_user(username, admin_user):
