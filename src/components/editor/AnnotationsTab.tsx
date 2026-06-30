@@ -31,6 +31,9 @@ interface AnnotationsTabProps {
   comments: Annotation[];
   setComments: (comments: Annotation[]) => void;
   onSaveAnnotations?: (comments: Annotation[]) => Promise<void>;
+  // Kommentaarid on serveris juba salvestatud (restore-endpoint commitis) — sünkroni
+  // ainult lokaalne + salvestatud baasseis, ÄRA tee teist /save commitit.
+  onCommentsRestored?: (comments: Annotation[]) => void;
   onReplyToComment?: (commentId: string, replyText: string) => Promise<void>;
   readOnly: boolean;
   user: any;
@@ -51,6 +54,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   comments,
   setComments,
   onSaveAnnotations,
+  onCommentsRestored,
   onReplyToComment,
   readOnly,
   user,
@@ -244,8 +248,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       const updated = await restoreComment(
         _page, { mode, comment_id: commentId, commit_hash: commitHash }, authToken || undefined,
       );
-      setComments(updated);
-      if (onSaveAnnotations) await onSaveAnnotations(updated);
+      // Restore-endpoint juba committis kettale — sünkroni ainult seis, ilma teise salvestuseta.
+      if (onCommentsRestored) onCommentsRestored(updated);
+      else setComments(updated);
       setCommentHistory(null);
       setOpenHistoryId(null);
     } catch (e) {
