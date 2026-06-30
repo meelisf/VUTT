@@ -82,6 +82,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [page_tags, setPageTags] = useState<(string | LinkedEntity)[]>(page.page_tags || []);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Salvestamata mustand-tekst kommentaaride paanil (AnnotationsTab) — enne nupule vajutust.
+  const [annotationDraftDirty, setAnnotationDraftDirty] = useState(false);
 
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
@@ -111,6 +113,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const editableCompartmentRef = useRef(new Compartment());
   const marginaliaCompartmentRef = useRef(new Compartment());
   const handleSaveRef = useRef<() => void>(() => {});
+  // AnnotationsTab registreerib siia kommentaari-mustandi flushi (vt handleSaveWithDrafts)
+  const commentFlushRef = useRef<(() => Annotation[] | null) | null>(null);
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
   const isSavingRef = useRef(false);
 
@@ -135,6 +139,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // Arvutame kas on salvestamata muudatusi (shallow compare, mitte JSON.stringify)
   const hasUnsavedChanges = useMemo(() => {
     if (isDirty) return true;
+    if (annotationDraftDirty) return true;
     if (status !== savedState.status) return true;
     // page_tags: string/LinkedEntity[] võrdlus sisulise JSON-kuju järgi
     if (JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags)) return true;
@@ -146,7 +151,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     })) return true;
     if (JSON.stringify(textAnnotations) !== JSON.stringify(savedState.text_annotations)) return true;
     return false;
-  }, [isDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments, textAnnotations, savedState.text_annotations]);
+  }, [isDirty, annotationDraftDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments, textAnnotations, savedState.text_annotations]);
 
   // --- Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit ---
   useEffect(() => {
@@ -431,6 +436,31 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [page, status, comments, page_tags, textAnnotations, onSave]);
 
+  // Salvestus "Salvesta ja lahku" jaoks: enne salvestust liidab kommentaari-mustandi
+  // (uus kommentaar / pooleli muutmine) kommentaaride hulka, et see ei läheks kaduma.
+  // Tavaline Salvesta-nupp seda EI tee (mustandi postitamine on "Lisa kommentaar").
+  const handleSaveWithDrafts = useCallback(async () => {
+    if (isSavingRef.current) return;
+    const flushed = commentFlushRef.current?.() ?? null;
+    const effectiveComments = flushed ?? comments;
+    isSavingRef.current = true;
+    setIsSaving(true);
+    const text = viewRef.current?.state.doc.toString() ?? '';
+    const updatedPage: Page = { ...page, text_content: text, status, comments: effectiveComments, page_tags, text_annotations: textAnnotations };
+    try {
+      await onSave(updatedPage);
+      if (flushed) setComments(flushed);
+      setSavedState({ status, comments: effectiveComments, page_tags, text_annotations: textAnnotations });
+      setIsDirty(false);
+    } catch (e: any) {
+      console.error('Save error:', e);
+      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
+    } finally {
+      isSavingRef.current = false;
+      setIsSaving(false);
+    }
+  }, [page, status, comments, page_tags, textAnnotations, onSave, t]);
+
   // Annotatsioonide kohene salvestus (möödub state async viivitusest)
   const handleSaveAnnotations = useCallback(async (updatedComments: Annotation[]) => {
     if (isSavingRef.current) return;
@@ -469,8 +499,9 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   useEffect(() => {
     handleSaveRef.current = handleSave;
-    if (triggerSave) triggerSave.current = handleSave;
-  }, [handleSave, triggerSave]);
+    // triggerSave'i kasutab AINULT "Salvesta ja lahku" (Workspace) → flush-variant.
+    if (triggerSave) triggerSave.current = handleSaveWithDrafts;
+  }, [handleSave, handleSaveWithDrafts, triggerSave]);
 
   // --- Toolbar toimingud ---
   const wrapWithTag = useCallback((tag: string) => {
@@ -1150,6 +1181,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             setPageTags={setPageTags}
             comments={comments}
             setComments={setComments}
+            onDraftChange={setAnnotationDraftDirty}
+            flushRef={commentFlushRef}
             onSaveAnnotations={handleSaveAnnotations}
             onCommentsRestored={handleCommentsRestored}
             onReplyToComment={handleReplyToComment}
