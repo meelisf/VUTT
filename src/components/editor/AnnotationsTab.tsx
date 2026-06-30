@@ -19,6 +19,8 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
+import MarkdownEditor from '../MarkdownEditor';
+import MarkdownView from '../MarkdownView';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -846,15 +848,10 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             >
               {editingCommentId === comment.id ? (
                 <div className="space-y-2">
-                  <textarea
+                  <MarkdownEditor
                     value={editingText}
-                    onChange={(e) => setEditingText(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
-                    rows={6}
-                    autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') { setEditingCommentId(null); setEditingText(''); }
-                    }}
+                    onChange={setEditingText}
+                    minRows={6}
                   />
                   <div className="flex gap-2 justify-end">
                     <button
@@ -876,7 +873,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 </div>
               ) : (
                 <>
-                  <p className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 whitespace-pre-wrap">{comment.text}</p>
+                  <div className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 vutt-md-comment">
+                    <MarkdownView content={comment.text} softBreaks />
+                  </div>
                   <div className="flex justify-between items-center text-xs text-gray-500">
                     <span className="font-semibold text-primary-700">{comment.author}</span>
                     <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
@@ -885,7 +884,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                     <div className="mt-3 space-y-2 border-l-2 border-primary-100 pl-3">
                       {(comment.replies || []).map(reply => (
                         <div key={reply.id} className="bg-white border border-gray-100 rounded-md px-3 py-2">
-                          <p className="text-gray-800 text-sm mb-1 leading-relaxed whitespace-pre-wrap">{reply.text}</p>
+                          <div className="text-gray-800 text-sm mb-1 leading-relaxed vutt-md-comment">
+                            <MarkdownView content={reply.text} softBreaks />
+                          </div>
                           <div className="flex justify-between items-center text-xs text-gray-500">
                             <span className="font-semibold text-primary-700">{reply.author}</span>
                             <span>{new Date(reply.created_at).toLocaleString('et-EE')}</span>
@@ -896,20 +897,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                   )}
                   {replyingToCommentId === comment.id && (
                     <div className="mt-3 space-y-2">
-                      <textarea
+                      <MarkdownEditor
                         value={replyText}
-                        onChange={(e) => setReplyText(e.target.value)}
+                        onChange={setReplyText}
                         placeholder={t('info.replyPlaceholder')}
-                        className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-y"
-                        rows={3}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            setReplyingToCommentId(null);
-                            setReplyText('');
-                            setReplyError(null);
-                          }
-                        }}
+                        minRows={3}
                       />
                       {replyError && <p className="text-xs text-red-600">{replyError}</p>}
                       <div className="flex gap-2 justify-end">
@@ -972,11 +964,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
         {!readOnly ? (
           <div className="mt-auto">
-            <textarea
+            <MarkdownEditor
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={setNewComment}
               placeholder={t('info.commentPlaceholder')}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded mb-2 focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none h-24"
+              minRows={3}
             />
             <button
               onClick={addComment}
