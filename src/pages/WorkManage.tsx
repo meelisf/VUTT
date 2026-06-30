@@ -226,8 +226,10 @@ const WorkManage: React.FC = () => {
         if (!cancelled && data.progress && data.progress.active) {
           timer = setTimeout(tick, 4000);
         }
-      } catch {
-        if (!cancelled) timer = setTimeout(tick, 6000);
+      } catch (e) {
+        // HTTP vead (nt 401/403 aegunud token, 404 puuduv teos) on lõplikud:
+        // ära tee taustal lõputut ebaõnnestunud pollimist. Võrgu/timeout'i viga proovi uuesti.
+        if (!cancelled && !(e instanceof ApiError)) timer = setTimeout(tick, 6000);
       }
     };
     tick();
