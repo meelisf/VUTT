@@ -168,21 +168,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
         </div>
       )}
 
-      {/* Sisu */}
+      {/* Sisu. Tekstiala jääb DOM-i ka eelvaate ajal (peidetud CSS-iga), et
+          kasutaja venitatud kõrgus ei kaoks tabi vahetusel. */}
       <div className="relative">
-        {tab === 'write' ? (
-          <textarea
-            ref={textareaRef}
-            id={id}
-            value={value}
-            disabled={disabled}
-            placeholder={placeholder}
-            rows={minRows}
-            onChange={e => onChange(e.target.value)}
-            onMouseUp={handleTextareaMouseUp}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-b focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y font-mono leading-relaxed block"
-          />
-        ) : (
+        <textarea
+          ref={textareaRef}
+          id={id}
+          value={value}
+          disabled={disabled}
+          placeholder={placeholder}
+          rows={minRows}
+          onChange={e => onChange(e.target.value)}
+          onMouseUp={handleTextareaMouseUp}
+          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-b focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none resize-y font-mono leading-relaxed block${tab === 'write' ? '' : ' hidden'}`}
+        />
+        {tab === 'preview' && (
           <div className="w-full min-h-[80px] px-3 py-2 text-sm border border-gray-300 rounded-b bg-white">
             {value.trim()
               ? <MarkdownView content={value} />
