@@ -1096,7 +1096,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
               value={newComment}
               onChange={setNewComment}
               placeholder={t('info.commentPlaceholder')}
-              minRows={3}
+              minRows={5}
             />
             <button
               onClick={addComment}
