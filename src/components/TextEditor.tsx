@@ -6,10 +6,12 @@ import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, ChevronRight, X, Settings2, Superscript, SeparatorHorizontal, Trash2, Pencil, StickyNote, RemoveFormatting, SquarePen, Columns2 } from 'lucide-react';
+import { Save, Loader2, ChevronRight, X, Settings2, Trash2, Pencil } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import CharSetEditor from './editor/CharSetEditor';
+import EditorStatusBar from './editor/EditorStatusBar';
+import EditorToolbar from './editor/EditorToolbar';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
@@ -747,6 +749,25 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     view.focus();
   }, [readOnly]);
 
+  const handleAnnotateSelection = useCallback(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const { from, to } = view.state.selection.main;
+    if (from === to) return;
+    const docText = view.state.doc.toString();
+    if (containsAnnTag(docText, from, to)) {
+      setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
+      setAnnDialogOpen(true);
+      setPendingAnnSelection(null);
+      return;
+    }
+    const text = docText.slice(from, to);
+    setPendingAnnSelection({ from, to, text });
+    setAnnDialogComment('');
+    setAnnDialogError('');
+    setAnnDialogOpen(true);
+  }, [t]);
+
   const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
 
   useEffect(() => {
@@ -941,95 +962,26 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-1.5 shrink-0 gap-4">
 
               {/* Editor Tools (Left) */}
-              <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
-                {/* Formatting Toolbar — ainult sisselogitud kasutajale */}
-                {!readOnly && (
-                  <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => wrapWithTag('b')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-bold border border-transparent hover:border-gray-200 text-gray-700 font-serif" title={`${t('editor.tooltips.bold')} (Ctrl+B)`}>B</button>
-                    <button type="button" onClick={() => wrapWithTag('i')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 italic font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.italic')} (Ctrl+I)`}>I</button>
-                    <button type="button" onClick={() => wrapWithTag('cs')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 font-serif border border-transparent hover:border-gray-200 text-gray-700" title={`${t('editor.tooltips.fractur')} (Ctrl+K)`}>𝔉</button>
-                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={insertMarginalia} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-gray-100 text-[11px] text-gray-600 border border-transparent hover:border-gray-200 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.marginalia')}><StickyNote size={14} />{!compactToolbar && <span>Marginalia</span>}</button>
-                    <button type="button" onClick={() => insertAtCursor('<fn>1</fn>')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-600" title={t('editor.tooltips.footnote')}><Superscript size={14} /></button>
-                    <button type="button" onClick={() => insertAtCursor('<pb/>\n')} className="w-7 h-7 flex items-center justify-center rounded hover:bg-gray-100 border border-transparent hover:border-gray-200 text-gray-400" title={t('editor.tooltips.pageBreak')}><SeparatorHorizontal size={14} /></button>
-                    <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                    <button type="button" onClick={cleanMarkup} className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-red-50 text-[11px] text-red-600 border border-transparent hover:border-red-100 ${compactToolbar ? 'w-7' : 'px-2'}`} title={t('editor.tooltips.cleanMarkup')}><RemoveFormatting size={14} />{!compactToolbar && <span>{t('editor.tooltips.cleanMarkupButton')}</span>}</button>
-                    {!readOnly && (
-                      <>
-                        <div className="w-px h-4 bg-gray-300 mx-1"></div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const view = viewRef.current;
-                            if (!view) return;
-                            const { from, to } = view.state.selection.main;
-                            if (from === to) return;
-                            const docText = view.state.doc.toString();
-                            if (containsAnnTag(docText, from, to)) {
-                              setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
-                              setAnnDialogOpen(true);
-                              setPendingAnnSelection(null);
-                              return;
-                            }
-                            const text = docText.slice(from, to);
-                            setPendingAnnSelection({ from, to, text });
-                            setAnnDialogComment('');
-                            setAnnDialogError('');
-                            setAnnDialogOpen(true);
-                          }}
-                          className={`h-7 flex items-center justify-center gap-1 rounded hover:bg-yellow-100 text-[11px] text-yellow-700 border border-transparent hover:border-yellow-200 ${compactToolbar ? 'w-7' : 'px-2'}`}
-                          title={t('editor.tooltips.annotate', 'Märgi ja kommenteeri (vali tekst enne)')}
-                        >
-                          <SquarePen size={14} />{!compactToolbar && <span>Ann</span>}
-                        </button>
-                      </>
-                    )}
-                    {marginaliaCount > 0 && !narrowPane && (
-                      <button
-                        type="button"
-                        onClick={toggleMarginaliaMode}
-                        className={`h-7 flex items-center justify-center gap-1 rounded text-[11px] border ${compactToolbar ? 'w-7' : 'px-2'} ${marginaliaUserMode === 'column' ? 'bg-sky-50 text-sky-700 border-sky-200' : 'text-gray-600 border-transparent hover:border-gray-200 hover:bg-gray-100'}`}
-                        title={marginaliaUserMode === 'column' ? t('editor.marginalia.collapse') : t('editor.marginalia.expand')}
-                      >
-                        <Columns2 size={14} />{!compactToolbar && <span>{t('editor.marginalia.toggle')}</span>}
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
+              <EditorToolbar
+                readOnly={readOnly}
+                compactToolbar={compactToolbar}
+                narrowPane={narrowPane}
+                marginaliaCount={marginaliaCount}
+                marginaliaUserMode={marginaliaUserMode}
+                wrapWithTag={wrapWithTag}
+                insertMarginalia={insertMarginalia}
+                insertAtCursor={insertAtCursor}
+                cleanMarkup={cleanMarkup}
+                onAnnotateSelection={handleAnnotateSelection}
+                toggleMarginaliaMode={toggleMarginaliaMode}
+              />
 
               {/* Page Status (Right) */}
-              {(() => {
-                const st = currentStatus || page.status;
-                const colorClass =
-                  st === PageStatus.DONE ? 'bg-green-50 text-green-700 border-green-200' :
-                  st === PageStatus.IN_PROGRESS ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                  st === PageStatus.CORRECTED ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                  'bg-gray-50 text-gray-700 border-gray-200';
-                return (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wide hidden sm:block">{t('status.label')}</span>
-                    {onStatusChange && !readOnly ? (
-                      <select
-                        value={st}
-                        onChange={(e) => onStatusChange(e.target.value as PageStatus)}
-                        className={`text-xs font-bold uppercase px-2 py-1 rounded-full border outline-none transition-all cursor-pointer ${colorClass} hover:opacity-80`}
-                      >
-                        {Object.values(PageStatus).map((s) => (
-                          <option key={s} value={s}>{t(`common:status.${s}`)}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span
-                        className={`text-xs font-bold uppercase px-2 py-1 rounded-full border cursor-help ${colorClass}`}
-                        title={t(`common:statusHelp.${st}`)}
-                      >
-                        {t(`common:status.${st}`)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
+              <EditorStatusBar
+                status={currentStatus || page.status}
+                readOnly={readOnly}
+                onStatusChange={onStatusChange}
+              />
             </div>
 
             {(reocrStatus === 'uploading' || reocrStatus === 'processing') && (
