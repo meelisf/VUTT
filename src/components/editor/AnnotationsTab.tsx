@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote, History as HistoryIcon } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, MessageSquare, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, Reply, Send, StickyNote, History as HistoryIcon, ChevronDown, ChevronUp } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -20,6 +20,7 @@ import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { fetchCommentHistory, restoreComment, CommentHistory } from '../../services/commentHistoryService';
+import { lineDiff } from '../../utils/lineDiff';
 import MarkdownEditor from '../MarkdownEditor';
 import MarkdownView from '../MarkdownView';
 
@@ -84,8 +85,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const [commentHistory, setCommentHistory] = useState<CommentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
-  const [deletedCardOpen, setDeletedCardOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const highlightedCommentId = new URLSearchParams(location.search).get('comment');
 
   const isAdmin = isAtLeast(user?.role, 'admin');
@@ -228,8 +228,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     }
   };
 
-  const ensureHistory = async () => {
-    if (commentHistory || historyLoading) return;
+  const loadHistory = async (force = false) => {
+    if (!force && (commentHistory || historyLoading)) return;
     setHistoryLoading(true);
     setHistoryError(null);
     try {
@@ -251,8 +251,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       // Restore-endpoint juba committis kettale — sünkroni ainult seis, ilma teise salvestuseta.
       if (onCommentsRestored) onCommentsRestored(updated);
       else setComments(updated);
-      setCommentHistory(null);
-      setOpenHistoryId(null);
+      await loadHistory(true);   // värskenda ajaloo-kaart uue seisuga
     } catch (e) {
       setHistoryError(e instanceof Error ? e.message : t('info.restoreError'));
     }
@@ -964,34 +963,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       </div>
                     </div>
                   )}
-                  {openHistoryId === comment.id && (
-                    <div className="mt-3 border-t border-gray-200 pt-2 space-y-2">
-                      {historyLoading && <p className="text-xs text-gray-400">…</p>}
-                      {historyError && <p className="text-xs text-red-600">{historyError}</p>}
-                      {!historyLoading && (commentHistory?.versions[comment.id]?.length ? (
-                        commentHistory.versions[comment.id].map(v => (
-                          <div key={v.commit_hash} className="bg-white border border-gray-100 rounded px-2 py-1.5">
-                            <div className="vutt-md-comment text-sm text-gray-700">
-                              <MarkdownView content={v.text} softBreaks />
-                            </div>
-                            <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
-                              <span>{v.author} · {new Date(v.timestamp).toLocaleString('et-EE')}</span>
-                              <button
-                                onClick={() => doRestore('version', comment.id, v.commit_hash)}
-                                className="text-primary-600 hover:text-primary-800 font-medium"
-                              >
-                                {t('info.restoreText')}
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-xs text-gray-400 italic">{t('info.noOlderVersions')}</p>
-                      ))}
-                    </div>
-                  )}
                   {!readOnly && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 rounded-md shadow-sm border border-gray-100 px-1 py-0.5">
                       {onReplyToComment && (
                         <button
                           onClick={() => {
@@ -1014,18 +987,6 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                           <Edit3 size={14} />
                         </button>
                       )}
-                      {canRestore && (
-                        <button
-                          onClick={async () => {
-                            await ensureHistory();
-                            setOpenHistoryId(openHistoryId === comment.id ? null : comment.id);
-                          }}
-                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
-                          title={t('info.commentHistory')}
-                        >
-                          <HistoryIcon size={14} />
-                        </button>
-                      )}
                       <button
                         onClick={() => removeComment(comment.id)}
                         className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
@@ -1040,55 +1001,6 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
             </div>
           ))}
         </div>
-
-        {canRestore && (
-          <div className="mt-3 border-t border-gray-100 pt-3">
-            <button
-              onClick={async () => {
-                await ensureHistory();
-                setDeletedCardOpen(o => !o);
-              }}
-              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
-            >
-              <Trash2 size={13} />
-              {t('info.deletedComments')}
-              {commentHistory && ` (${commentHistory.deleted.length})`}
-            </button>
-            {deletedCardOpen && (
-              <div className="mt-2 space-y-2">
-                {historyLoading && <p className="text-xs text-gray-400">…</p>}
-                {historyError && <p className="text-xs text-red-600">{historyError}</p>}
-                {!historyLoading && commentHistory && (
-                  commentHistory.deleted.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">{t('info.noDeletedComments')}</p>
-                  ) : (
-                    <>
-                      {commentHistory.deleted.map(d => (
-                        <div key={d.id} className="bg-gray-50 border border-gray-100 rounded px-2 py-1.5">
-                          <div className="vutt-md-comment text-sm text-gray-700">
-                            <MarkdownView content={d.text} softBreaks />
-                          </div>
-                          <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
-                            <span>{d.author} · {new Date(d.created_at).toLocaleString('et-EE')}</span>
-                            <button
-                              onClick={() => doRestore('deleted', d.id, d.last_seen_commit)}
-                              className="text-primary-600 hover:text-primary-800 font-medium"
-                            >
-                              {t('info.restoreComment')}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {commentHistory.truncated && (
-                        <p className="text-xs text-gray-400 italic">{t('info.historyTruncated')}</p>
-                      )}
-                    </>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {!readOnly ? (
           <div className="mt-auto">
@@ -1112,6 +1024,132 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
           </div>
         )}
       </div>
+
+      {/* Versiooniajalugu / taastamine — eraldi kaart kõige all (kontseptuaalselt
+          erinev igapäevasest kommenteerimisest: muudetud kommentaaride varasemad
+          versioonid diffina + kustutatud kommentaaride taaste). Ainult editor+. */}
+      {canRestore && (
+        <div className="mt-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+          <button
+            onClick={async () => { await loadHistory(); setRestoreOpen(o => !o); }}
+            className="flex items-center gap-2 w-full px-5 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg"
+          >
+            <HistoryIcon size={18} className="text-primary-600" />
+            <h4 className="font-bold">{t('info.versionHistory')}</h4>
+            {commentHistory && (
+              <span className="ml-1 text-xs text-gray-400">
+                ({Object.keys(commentHistory.versions).length + commentHistory.deleted.length})
+              </span>
+            )}
+            {restoreOpen
+              ? <ChevronUp size={16} className="ml-auto text-gray-400" />
+              : <ChevronDown size={16} className="ml-auto text-gray-400" />}
+          </button>
+
+          {restoreOpen && (
+            <div className="px-5 pb-5 space-y-5">
+              {historyLoading && <p className="text-xs text-gray-400">…</p>}
+              {historyError && <p className="text-xs text-red-600">{historyError}</p>}
+              {!historyLoading && commentHistory && (
+                <>
+                  {/* Muudetud kommentaaride varasemad versioonid (diff vana → praegune) */}
+                  <div>
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                      {t('info.editedComments')}
+                    </h5>
+                    {Object.keys(commentHistory.versions).length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">{t('info.noOlderVersions')}</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {Object.entries(commentHistory.versions).map(([cid, versions]) => {
+                          const cur = comments.find(c => c.id === cid);
+                          return (
+                            <div key={cid} className="border-l-2 border-gray-200 pl-3">
+                              {cur && (
+                                <p className="text-xs text-gray-500 mb-1.5 truncate">
+                                  <span className="font-semibold text-primary-700">{cur.author}</span>
+                                  {cur.text ? ` — ${cur.text.replace(/\s+/g, ' ').slice(0, 80)}` : ''}
+                                </p>
+                              )}
+                              <div className="space-y-2">
+                                {versions.map(v => (
+                                  <div key={v.commit_hash} className="bg-gray-50 border border-gray-100 rounded overflow-hidden">
+                                    <div>
+                                      {lineDiff(v.text, cur?.text ?? '').map((d, idx) => (
+                                        <div
+                                          key={idx}
+                                          className={`font-mono text-xs whitespace-pre-wrap break-words px-2 py-0.5 border-l-2 ${
+                                            d.type === 'add'
+                                              ? 'bg-green-50 text-green-900 border-green-400'
+                                              : d.type === 'del'
+                                                ? 'bg-red-50 text-red-900 border-red-300'
+                                                : 'text-gray-500 border-transparent'
+                                          }`}
+                                        >
+                                          <span className="select-none opacity-60 mr-1">
+                                            {d.type === 'add' ? '+' : d.type === 'del' ? '−' : ' '}
+                                          </span>
+                                          {d.text || ' '}
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-gray-400 px-2 py-1 bg-white border-t border-gray-100">
+                                      <span>{v.author} · {new Date(v.timestamp).toLocaleString('et-EE')}</span>
+                                      <button
+                                        onClick={() => doRestore('version', cid, v.commit_hash)}
+                                        className="text-primary-600 hover:text-primary-800 font-medium"
+                                      >
+                                        {t('info.restoreText')}
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Kustutatud kommentaarid */}
+                  <div>
+                    <h5 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-2">
+                      {t('info.deletedComments')} ({commentHistory.deleted.length})
+                    </h5>
+                    {commentHistory.deleted.length === 0 ? (
+                      <p className="text-xs text-gray-400 italic">{t('info.noDeletedComments')}</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {commentHistory.deleted.map(d => (
+                          <div key={d.id} className="bg-gray-50 border border-gray-100 rounded px-2 py-1.5">
+                            <div className="vutt-md-comment text-sm text-gray-700">
+                              <MarkdownView content={d.text} softBreaks />
+                            </div>
+                            <div className="flex justify-between items-center text-xs text-gray-400 mt-1">
+                              <span>{d.author} · {new Date(d.created_at).toLocaleString('et-EE')}</span>
+                              <button
+                                onClick={() => doRestore('deleted', d.id, d.last_seen_commit)}
+                                className="text-primary-600 hover:text-primary-800 font-medium"
+                              >
+                                {t('info.restoreComment')}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {commentHistory.truncated && (
+                    <p className="text-xs text-gray-400 italic">{t('info.historyTruncated')}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

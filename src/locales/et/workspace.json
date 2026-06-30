@@ -316,6 +316,8 @@
     "saveEdit": "Salvesta",
     "cancelEdit": "Tühista",
     "commentHistory": "Ajalugu",
+    "versionHistory": "Versiooniajalugu",
+    "editedComments": "Muudetud kommentaarid",
     "restoreText": "Taasta see tekst",
     "restoreComment": "Taasta kommentaar",
     "deletedComments": "Kustutatud kommentaarid",
