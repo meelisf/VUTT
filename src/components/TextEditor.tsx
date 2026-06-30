@@ -20,7 +20,6 @@ import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 import { ErrorBanner } from './ErrorBanner';
-import { replyToComment } from '../services/pageService';
 import { formatYearDisplay } from '../utils/yearDisplayUtils';
 
 // CM6 impordid
@@ -33,6 +32,7 @@ import { findContainer, findInnerPairs } from './editor/wrapTagUtils';
 import { useSpecialChars } from './editor/useSpecialChars';
 import { useCopyPastePlainMarkup } from './editor/useCopyPastePlainMarkup';
 import { useReOcr } from './editor/useReOcr';
+import { useEditorSave, type EditorSavedState } from './editor/useEditorSave';
 import SafeHtml from './SafeHtml';
 
 interface TextEditorProps {
@@ -104,7 +104,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
   // Salvestamata muudatuste jälgimine
-  const [savedState, setSavedState] = useState({
+  const [savedState, setSavedState] = useState<EditorSavedState>({
     status: page.status,
     comments: page.comments,
     page_tags: page.page_tags || [],
@@ -120,7 +120,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // AnnotationsTab registreerib siia kommentaari-mustandi flushi (vt handleSaveWithDrafts)
   const commentFlushRef = useRef<(() => Annotation[] | null) | null>(null);
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
-  const isSavingRef = useRef(false);
 
   // Kasutaja eelistus (localStorage) + kitsa paani sundrežiim
   const [marginaliaUserMode, setMarginaliaUserMode] = useState<MarginaliaMode>(
@@ -138,6 +137,32 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     authToken,
     viewRef,
     setIsDirty,
+  });
+
+  const {
+    handleSave,
+    handleSaveWithDrafts,
+    handleSaveAnnotations,
+    handleSaveTextAnnotations: saveTextAnnotations,
+    handleDeleteAndSaveTextAnnotation: deleteAndSaveTextAnnotation,
+    handleCommentsRestored,
+    handleReplyToComment,
+  } = useEditorSave({
+    page,
+    status,
+    comments,
+    setComments,
+    page_tags,
+    textAnnotations,
+    setTextAnnotations,
+    onSave,
+    setSavedState,
+    setIsDirty,
+    setIsSaving,
+    setSaveError,
+    viewRef,
+    commentFlushRef,
+    authToken,
   });
 
   // Arvutame kas on salvestamata muudatusi (shallow compare, mitte JSON.stringify)
@@ -331,88 +356,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   }, [lang]);
 
   // --- Salvestamine ---
-  const handleSave = useCallback(async () => {
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
-    setIsSaving(true);
-
-    const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: textAnnotations };
-
-    try {
-      await onSave(updatedPage);
-      setSavedState({ status, comments, page_tags, text_annotations: textAnnotations });
-      setIsDirty(false);
-    } catch (e: any) {
-      console.error('Save error:', e);
-      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
-    } finally {
-      isSavingRef.current = false;
-      setIsSaving(false);
-    }
-  }, [page, status, comments, page_tags, textAnnotations, onSave]);
-
-  // Salvestus "Salvesta ja lahku" jaoks: enne salvestust liidab kommentaari-mustandi
-  // (uus kommentaar / pooleli muutmine) kommentaaride hulka, et see ei läheks kaduma.
-  // Tavaline Salvesta-nupp seda EI tee (mustandi postitamine on "Lisa kommentaar").
-  const handleSaveWithDrafts = useCallback(async () => {
-    if (isSavingRef.current) return;
-    const flushed = commentFlushRef.current?.() ?? null;
-    const effectiveComments = flushed ?? comments;
-    isSavingRef.current = true;
-    setIsSaving(true);
-    const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments: effectiveComments, page_tags, text_annotations: textAnnotations };
-    try {
-      await onSave(updatedPage);
-      if (flushed) setComments(flushed);
-      setSavedState({ status, comments: effectiveComments, page_tags, text_annotations: textAnnotations });
-      setIsDirty(false);
-    } catch (e: any) {
-      console.error('Save error:', e);
-      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
-    } finally {
-      isSavingRef.current = false;
-      setIsSaving(false);
-    }
-  }, [page, status, comments, page_tags, textAnnotations, onSave, t]);
-
-  // Annotatsioonide kohene salvestus (möödub state async viivitusest)
-  const handleSaveAnnotations = useCallback(async (updatedComments: Annotation[]) => {
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
-    setIsSaving(true);
-    const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments: updatedComments, page_tags, text_annotations: textAnnotations };
-    try {
-      await onSave(updatedPage);
-      setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
-      setIsDirty(false);
-    } catch (e: any) {
-      console.error('Save error:', e);
-      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
-    } finally {
-      isSavingRef.current = false;
-      setIsSaving(false);
-    }
-  }, [page, status, page_tags, textAnnotations, onSave]);
-
-  // Kommentaari taastamine: restore-endpoint on kettale juba committinud, seega
-  // sünkroni ainult lokaalne + salvestatud baasseis (mitte teist /save commitit).
-  const handleCommentsRestored = useCallback((updatedComments: Annotation[]) => {
-    setComments(updatedComments);
-    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
-  }, [status, page_tags, textAnnotations]);
-
-  const handleReplyToComment = useCallback(async (commentId: string, replyText: string) => {
-    if (!authToken) {
-      throw new Error(t('saveError.tokenMissing'));
-    }
-    const updatedComments = await replyToComment(page, commentId, replyText, authToken);
-    setComments(updatedComments);
-    setSavedState({ status, comments: updatedComments, page_tags, text_annotations: textAnnotations });
-  }, [authToken, page, status, page_tags, textAnnotations, t]);
-
   useEffect(() => {
     handleSaveRef.current = handleSave;
     // triggerSave'i kasutab AINULT "Salvesta ja lahku" (Workspace) → flush-variant.
@@ -763,47 +706,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   }, []);
 
   const handleDeleteAndSaveTextAnnotation = useCallback(async (annId: number) => {
-    // removeAnnotationFromEditor dispatch on CM6-s sünkroonne —
-    // pärast seda on viewRef.current.state.doc juba uuendatud (tägid eemaldatud).
-    removeAnnotationFromEditor(annId);
-    const updated = textAnnotations.filter(a => a.id !== annId);
-    setTextAnnotations(updated);
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
-    setIsSaving(true);
-    // Loe tekst PÄRAST dispatch'i — CM6 on juba tägid eemaldanud
-    const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: updated };
-    try {
-      await onSave(updatedPage);
-      setSavedState({ status, comments, page_tags, text_annotations: updated });
-      setIsDirty(false);
-    } catch (e: any) {
-      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
-    } finally {
-      isSavingRef.current = false;
-      setIsSaving(false);
-    }
-  }, [textAnnotations, removeAnnotationFromEditor, page, status, comments, page_tags, onSave]);
+    await deleteAndSaveTextAnnotation(annId, removeAnnotationFromEditor);
+  }, [deleteAndSaveTextAnnotation, removeAnnotationFromEditor]);
 
   const handleSaveTextAnnotations = useCallback(async (updatedTextAnnotations: TextAnnotation[]) => {
-    if (isSavingRef.current) return;
-    isSavingRef.current = true;
-    setIsSaving(true);
-    const text = viewRef.current?.state.doc.toString() ?? '';
-    const updatedPage: Page = { ...page, text_content: text, status, comments, page_tags, text_annotations: updatedTextAnnotations };
-    try {
-      await onSave(updatedPage);
-      setTextAnnotations(updatedTextAnnotations);
-      setSavedState({ status, comments, page_tags, text_annotations: updatedTextAnnotations });
-      setIsDirty(false);
-    } catch (e: any) {
-      setSaveError(t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') }));
-    } finally {
-      isSavingRef.current = false;
-      setIsSaving(false);
-    }
-  }, [page, status, comments, page_tags, onSave]);
+    await saveTextAnnotations(updatedTextAnnotations);
+  }, [saveTextAnnotations]);
 
   return (
     <>
