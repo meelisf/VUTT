@@ -16,9 +16,24 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import PageImageEditorModal from '../components/PageImageEditorModal';
-import { FILE_API_URL } from '../config';
 import { useUser } from '../contexts/UserContext';
-import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
+import { ApiError } from '../services/apiClient';
+import {
+  addWorkPages,
+  deleteWork,
+  deleteWorkPages,
+  DeletedWorkPage,
+  getDeletedWorkPages,
+  getReocrStatus,
+  getViewerToken,
+  getWorkMetadata,
+  getWorkPages,
+  reorderWorkPages,
+  replaceWorkPageImage,
+  restoreDeletedWorkPage,
+  startReocrBatch,
+  WorkPageInfo,
+} from '../services/workApi';
 import { naturalCompare } from '../utils/naturalSort';
 import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
@@ -29,23 +44,8 @@ import { mapReocrState, selectableNoTextFiles, ReocrStatusResponse } from '../ut
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
 
-interface PageInfo {
-  page_num: number;
-  sequence: number;
-  base_name: string;
-  filename: string;
-  lehekylje_pilt: string;
-  status: string;
-  has_text: boolean;
-}
-
-interface DeletedPage {
-  filename: string;
-  base_name: string;
-  deleted_at: string | null;
-  deleted_by: string | null;
-  commit_hash: string | null;
-}
+type PageInfo = WorkPageInfo;
+type DeletedPage = DeletedWorkPage;
 
 type ActiveTab = 'pages' | 'trash' | 'replace';
 
@@ -138,12 +138,7 @@ const WorkManage: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/pages`,
-        { method: 'GET', headers: getAuthHeaders(authToken) }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await getWorkPages(workId, authToken);
       if (data.status === 'success') {
         const loaded: PageInfo[] = data.pages || [];
         setPages(loaded);
@@ -164,12 +159,7 @@ const WorkManage: React.FC = () => {
     setTrashLoading(true);
     setTrashError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/trash-pages`,
-        { method: 'GET', headers: getAuthHeaders(authToken) }
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = await getDeletedWorkPages(workId, authToken);
       if (data.status === 'success') {
         setTrashPages(data.pages || []);
         setTrashLoaded(true);
@@ -186,12 +176,7 @@ const WorkManage: React.FC = () => {
 
   useEffect(() => {
     if (!workId || !authToken) return;
-    fetchWithTimeout(`${FILE_API_URL}/get-work-metadata`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-      body: JSON.stringify({ work_id: workId })
-    })
-      .then(r => r.json())
+    getWorkMetadata(workId, authToken)
       .then(d => {
         if (d.status === 'success') {
           setWorkTitle(d.metadata?.title || workId || '');
@@ -215,11 +200,7 @@ const WorkManage: React.FC = () => {
     if (!workId || !authToken || !isAdmin) return;
     let cancelled = false;
     const fetchToken = () => {
-      fetchWithTimeout(`${FILE_API_URL}/work/${workId}/viewer-token`, {
-        headers: getAuthHeaders(authToken),
-        timeout: 10000,
-      })
-        .then(r => r.ok ? r.json() : null)
+      getViewerToken(workId, authToken)
         .then(d => {
           if (!cancelled && d?.image_exp && d?.image_sig) {
             setImageToken({ exp: d.image_exp, sig: d.image_sig });
@@ -240,19 +221,15 @@ const WorkManage: React.FC = () => {
 
     const tick = async () => {
       try {
-        const res = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/work/${workId}/reocr-status`,
-          { headers: getAuthHeaders(authToken), timeout: 8000 },
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) setReocrStatus(data);
-          if (!cancelled && data.progress && data.progress.active) {
-            timer = setTimeout(tick, 4000);
-          }
+        const data = await getReocrStatus<ReocrStatusResponse>(workId, authToken);
+        if (!cancelled) setReocrStatus(data);
+        if (!cancelled && data.progress && data.progress.active) {
+          timer = setTimeout(tick, 4000);
         }
-      } catch {
-        if (!cancelled) timer = setTimeout(tick, 6000);
+      } catch (e) {
+        // HTTP vead (nt 401/403 aegunud token, 404 puuduv teos) on lõplikud:
+        // ära tee taustal lõputut ebaõnnestunud pollimist. Võrgu/timeout'i viga proovi uuesti.
+        if (!cancelled && !(e instanceof ApiError)) timer = setTimeout(tick, 6000);
       }
     };
     tick();
@@ -364,16 +341,10 @@ const WorkManage: React.FC = () => {
     if (!workId || !authToken || selectedFiles.size === 0) return;
     setBatchError(null);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/reocr-batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ page_filenames: Array.from(selectedFiles), material_type: ocrModel }),
-        timeout: 30000,
+      await startReocrBatch(workId, authToken, {
+        page_filenames: Array.from(selectedFiles),
+        material_type: ocrModel,
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.detail || t('manage.reocr.error'));
-      }
       setBatchConfirm(false);
       handleClearSelection();
       // Nonce bump taaskäivitab poll-effecti (alustab pollimist), mis teeb ise status-fetchi
@@ -417,19 +388,7 @@ const WorkManage: React.FC = () => {
     setReorderSaving(true);
     setReorderError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/reorder-pages`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ order }),
-          timeout: 30000,
-        }
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
+      await reorderWorkPages(workId, authToken, order);
       await loadPages();
       // Salvestus = commit → tühjenda valik (uue protsessi eeldus). NB: Liiguta
       // (mustand) EI tühjenda, et saaks sama plokki uuesti liigutada.
@@ -451,25 +410,19 @@ const WorkManage: React.FC = () => {
     setBulkDeleting(true);
     setBulkDeleteError(null);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/work/${workId}/delete-pages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-        body: JSON.stringify({ base_names: baseNames }),
-        timeout: 30000,
-      });
-      if (res.status === 409) {
-        setBulkDeleteError(t('manage.bulkDelete.conflict'));
-        await loadPages();
-        setSelectedFiles(new Set());
-        return;
-      }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await deleteWorkPages(workId, authToken, baseNames);
       await loadPages();
       if (trashLoaded) loadTrashPages();
       setSelectedFiles(new Set());
       setBulkDeleteConfirm(false);
     } catch (e: any) {
-      setBulkDeleteError(e.message || t('manage.deletePageError'));
+      if (e instanceof ApiError && e.status === 409) {
+        setBulkDeleteError(t('manage.bulkDelete.conflict'));
+        await loadPages();
+        setSelectedFiles(new Set());
+      } else {
+        setBulkDeleteError(e.message || t('manage.deletePageError'));
+      }
     } finally {
       setBulkDeleting(false);
     }
@@ -481,15 +434,7 @@ const WorkManage: React.FC = () => {
     if (!workId || !authToken) throw new Error('Not authorized');
     setReplaceError(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const res = await fetchWithTimeout(
-      `${FILE_API_URL}/admin/work/${workId}/page/${pageNum}/replace-image`,
-      { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 30000 }
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await replaceWorkPageImage(workId, authToken, pageNum, file);
     if (data.status !== 'success') throw new Error(t('manage.replaceError'));
 
     // Õnnestus: cache-bust + sessionStorage (Workspace tühistab cache'i) + lehtede uuesti laadimine
@@ -526,19 +471,7 @@ const WorkManage: React.FC = () => {
         // Tühistus on tüki-granulaarne: parajasti pooleliolev tükk jõuab veel
         // serverisse committida; katkestus rakendub alles järgmise tüki ees.
         if (cancelRef.current) break;
-        const formData = new FormData();
-        chunk.files.forEach((f) => formData.append('file', f));
-        formData.append('after_page_num', String(chunk.afterPageNum));
-
-        const res = await fetchWithTimeout(
-          `${FILE_API_URL}/admin/work/${workId}/add-pages`,
-          { method: 'POST', headers: getAuthHeaders(authToken), body: formData, timeout: 120000 }
-        );
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await addWorkPages(workId, authToken, chunk.files, chunk.afterPageNum);
         if (data.meili_warning) meiliWarned = true;
         done += chunk.files.length;
         setUploadProgress({ done, total });
@@ -566,11 +499,7 @@ const WorkManage: React.FC = () => {
     setRestoringPage(filename);
     setRestoreMessage(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}/trash-pages/${encodeURIComponent(filename)}/restore`,
-        { method: 'POST', headers: getAuthHeaders(authToken), timeout: 30000 }
-      );
-      const data = await res.json();
+      const data = await restoreDeletedWorkPage(workId, authToken, filename);
       if (data.status === 'success') {
         setRestoreMessage({ text: t('manage.trash.restoreSuccess', { name: filename }), ok: true });
         setTrashPages(prev => prev.filter(p => p.filename !== filename));
@@ -591,15 +520,8 @@ const WorkManage: React.FC = () => {
     setDeletingWork(true);
     setDeleteWorkError(null);
     try {
-      const res = await fetchWithTimeout(
-        `${FILE_API_URL}/admin/work/${workId}`,
-        { method: 'DELETE', headers: getAuthHeaders(authToken), timeout: 15000 }
-      );
-      if (res.ok) {
-        navigate('/');
-      } else {
-        setDeleteWorkError(t('management.deleteWorkError'));
-      }
+      await deleteWork(workId, authToken);
+      navigate('/');
     } catch {
       setDeleteWorkError(t('management.deleteWorkError'));
     } finally {
