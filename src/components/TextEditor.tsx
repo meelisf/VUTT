@@ -5,12 +5,12 @@ import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, ChevronRight, X, Settings2, Trash2, Pencil } from 'lucide-react';
+import { Save, Loader2, X, Trash2, Pencil } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
-import CharSetEditor from './editor/CharSetEditor';
 import EditorStatusBar from './editor/EditorStatusBar';
 import EditorToolbar from './editor/EditorToolbar';
+import SpecialCharsPanel from './editor/SpecialCharsPanel';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
@@ -33,7 +33,6 @@ import { useCopyPastePlainMarkup } from './editor/useCopyPastePlainMarkup';
 import { useReOcr } from './editor/useReOcr';
 import { useEditorState } from './editor/useEditorState';
 import { useEditorSave } from './editor/useEditorSave';
-import SafeHtml from './SafeHtml';
 
 interface TextEditorProps {
   page: Page;
@@ -566,8 +565,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setAnnDialogOpen(true);
   }, [t]);
 
-  const toggleCharPanel = () => setShowCharPanel(!showCharPanel);
-
   useEffect(() => {
     const container = editorContainerRef.current;
     if (!container) return;
@@ -803,89 +800,23 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
             </div>
 
             {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) — ainult sisselogitud kasutajale */}
-            {!readOnly && (
-              <div className="border-t border-gray-200 bg-white shrink-0">
-                <details className="group" open={showCharPanel}>
-                  <summary
-                    className="flex items-center gap-2 px-4 py-1.5 cursor-pointer hover:bg-gray-50 text-[11px] font-medium text-gray-500 select-none outline-none transition-colors border-b border-transparent group-open:border-gray-50"
-                    onClick={(e) => { e.preventDefault(); toggleCharPanel(); }}
-                  >
-                    <div className={`transition-transform duration-200 text-gray-400 ${showCharPanel ? 'rotate-90' : ''}`}>
-                      <ChevronRight size={12} />
-                    </div>
-                    {t('editor.specialChars')}
-                    {isCustomChars && (
-                      <span className="text-[10px] text-primary-500 font-normal">✦</span>
-                    )}
-                    {user && (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setShowCharEditor(true); }}
-                        className="ml-auto text-gray-400 hover:text-gray-600 transition-colors"
-                        title={t('editor.editChars', 'Kohanda märgikomplekti')}
-                      >
-                        <Settings2 size={12} />
-                      </button>
-                    )}
-                  </summary>
-
-                  <div className="px-3 py-1.5 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap gap-1">
-                      {specialCharacters.map((char, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={(e) => insertSpecialChar(char.character, e)}
-                          disabled={readOnly}
-                          title={char.name || char.character}
-                          className="w-[22px] h-[22px] flex items-center justify-center text-xs font-serif bg-white border border-gray-200 rounded hover:bg-primary-50 hover:border-primary-300 transition-colors shadow-sm"
-                        >
-                          {char.character}
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      onClick={() => setShowTranscriptionGuide(true)}
-                      className="text-[11px] text-primary-600 hover:text-primary-800 hover:underline py-1 transition-colors"
-                    >
-                      {t('editor.openGuide')}
-                    </button>
-                  </div>
-                </details>
-              </div>
-            )}
-
-            {showCharEditor && authToken && (
-              <CharSetEditor
-                characters={specialCharacters}
-                isCustom={isCustomChars}
-                authToken={authToken}
-                onClose={() => setShowCharEditor(false)}
-                onSaved={(chars, custom) => {
-                  setSpecialCharacters(chars);
-                  setIsCustomChars(custom);
-                }}
-              />
-            )}
-
-            {showTranscriptionGuide && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowTranscriptionGuide(false)}>
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden" onClick={e => e.stopPropagation()}>
-                  <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                    <h2 className="text-lg font-bold text-gray-800">{t('editor.guideTitle')}</h2>
-                    <button onClick={() => setShowTranscriptionGuide(false)} className="text-gray-500 hover:text-gray-700">
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <SafeHtml
-                    kind="trusted"
-                    html={transcriptionGuideHtml || `<p>${t('common:labels.loading')}...</p>`}
-                    className="p-6 overflow-y-auto max-h-[calc(80vh-60px)]"
-                  />
-                </div>
-              </div>
-            )}
+            <SpecialCharsPanel
+              authToken={authToken}
+              user={user}
+              readOnly={readOnly}
+              specialCharacters={specialCharacters}
+              isCustomChars={isCustomChars}
+              showCharPanel={showCharPanel}
+              showCharEditor={showCharEditor}
+              showTranscriptionGuide={showTranscriptionGuide}
+              transcriptionGuideHtml={transcriptionGuideHtml}
+              setShowCharPanel={setShowCharPanel}
+              setShowCharEditor={setShowCharEditor}
+              setShowTranscriptionGuide={setShowTranscriptionGuide}
+              setSpecialCharacters={setSpecialCharacters}
+              setIsCustomChars={setIsCustomChars}
+              insertSpecialChar={insertSpecialChar}
+            />
         </div>
 
         {activeTab === 'annotate' && (
