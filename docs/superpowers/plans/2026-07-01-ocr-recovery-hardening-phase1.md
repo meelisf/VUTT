@@ -1,6 +1,6 @@
 # OCR Recovery Hardening (Faas 1) — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Taastatud re-OCR kirjed saavad `page_number`-i (link + "lk N" ilmuvad) ja batch-orvud muutuvad automaatselt taastatavaks püsiva mapping-faili kaudu.
 
@@ -44,7 +44,7 @@
   - `remove_batch_mapping(job_id: str) -> None` — kustutab faili (best-effort).
   - `BATCH_MAPS_DIR: str` — kausta absoluuttee.
 
-- [ ] **Step 1: Write the failing test** (lisa `tests/test_reocr_state.py` lõppu)
+- [x] **Step 1: Write the failing test** (lisa `tests/test_reocr_state.py` lõppu)
 
 ```python
 def test_batch_mapping_roundtrip(tmp_path, monkeypatch):
@@ -87,12 +87,12 @@ def test_batch_mapping_remove(tmp_path, monkeypatch):
     st.remove_batch_mapping("b1")  # teist korda — ei crash'i
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_state.py -k batch_mapping -q`
 Expected: FAIL — `AttributeError: module 'server.reocr_state' has no attribute 'BATCH_MAPS_DIR'`
 
-- [ ] **Step 3: Implement** (lisa `server/reocr_state.py` lõppu; `os`/`json`/`STATE_DIR` juba imporditud)
+- [x] **Step 3: Implement** (lisa `server/reocr_state.py` lõppu; `os`/`json`/`STATE_DIR` juba imporditud)
 
 ```python
 BATCH_MAPS_DIR = os.path.join(STATE_DIR, "reocr_batch_maps")
@@ -156,12 +156,12 @@ Lisa `Optional` importi (fail impordib juba `from typing import Dict`):
 from typing import Dict, Optional
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_state.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/reocr_state.py tests/test_reocr_state.py
@@ -182,7 +182,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `reocr_state.persist_batch_mapping`, `reocr_state.remove_batch_mapping` (Task 1).
 - Produces: batch-mapping fail eksisteerib batch algusest kuni täieliku koristuseni.
 
-- [ ] **Step 1: Write the failing test** (lisa `tests/test_reocr_slow_flag.py` lõppu)
+- [x] **Step 1: Write the failing test** (lisa `tests/test_reocr_slow_flag.py` lõppu)
 
 ```python
 def test_start_reocr_batch_persists_mapping(tmp_path, monkeypatch):
@@ -210,12 +210,12 @@ def test_start_reocr_batch_persists_mapping(tmp_path, monkeypatch):
         r._reocr_batch_jobs.clear()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_slow_flag.py::test_start_reocr_batch_persists_mapping -q`
 Expected: FAIL — `load_batch_mapping` returns None (mapping veel ei kirjutata)
 
-- [ ] **Step 3: Persist mapping at batch start**
+- [x] **Step 3: Persist mapping at batch start**
 
 `server/reocr_ops.py` `start_reocr_batch`-is, pärast `page_entries = _build_batch_pages(slug, pages)` (rida ~130) ja ENNE `_reocr_batch_jobs[job_id] = job` bloki, lisa mapping-ehitus; pärast `_persist_active_jobs()` (rida ~148) lisa mapping-persist:
 
@@ -237,7 +237,7 @@ Ja pärast olemasolevat `_persist_active_jobs()` kutset (rida ~148):
     reocr_state.persist_batch_mapping(job_id, work_id, slug, _batch_map_pages)
 ```
 
-- [ ] **Step 4: Remove mapping after full cleanup**
+- [x] **Step 4: Remove mapping after full cleanup**
 
 `_poll_batch_job`-is, `all_resolved` blokis (rida ~283-290), pärast staging rmdir'i lisa mapping-remove:
 
@@ -253,12 +253,12 @@ Ja pärast olemasolevat `_persist_active_jobs()` kutset (rida ~148):
             reocr_state.remove_batch_mapping(job_id)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_slow_flag.py tests/test_reocr_batch.py -q`
 Expected: PASS (uus + olemasolevad batch-testid)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/reocr_ops.py tests/test_reocr_slow_flag.py
@@ -279,7 +279,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `reocr_state.load_batch_mapping`, `reocr_state.remove_batch_mapping`, `reocr_ops._reocr_batch_jobs`, `reocr_ops._reocr_batch_jobs_lock`.
 - Produces: reaper taastab batch-orvud mapping'ust; recovery-kirjed sisaldavad `page_number`; skip-müra dedupe.
 
-- [ ] **Step 1: Write the failing tests** (lisa `tests/test_reocr_recovery.py` lõppu)
+- [x] **Step 1: Write the failing tests** (lisa `tests/test_reocr_recovery.py` lõppu)
 
 ```python
 def test_resolve_job_meta_includes_page_number(monkeypatch, tmp_path):
@@ -356,12 +356,12 @@ def test_reaper_skips_live_batch_job(monkeypatch, tmp_path):
 
 **NB:** `_FakeSftp` (olemasolev testis) vajab, et `listdir` toetaks vahepealseid katalooge (`/borb/w1`). Kontrolli, et `_env` fixture ei sega `BATCH_MAPS_DIR`-i — kui vaja, lisa `monkeypatch.setattr(st, "BATCH_MAPS_DIR", ...)` ka `_env`-i.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_recovery.py -k "batch_orphan or job_meta_includes or skips_live_batch" -q`
 Expected: FAIL — `_resolve_job_meta` ei tagasta `page_number`; batch-taastet pole.
 
-- [ ] **Step 3: Add page_number to `_resolve_job_meta`**
+- [x] **Step 3: Add page_number to `_resolve_job_meta`**
 
 `server/reocr_recovery.py` `_resolve_job_meta` (rida ~32-42) — lisa `page_number` mõlemasse harru:
 
@@ -394,7 +394,7 @@ Ja `_recover_one` üksik-harus (rida ~110-117) lisa recovery-sündmusesse `page_
                 job_id)
 ```
 
-- [ ] **Step 4: Update active-check + dispatch batch vs single + skip-warn**
+- [x] **Step 4: Update active-check + dispatch batch vs single + skip-warn**
 
 Asenda `_is_actively_tracked` (rida ~45-48) ja `_recover_one` (rida ~83-123) järgnevaga (lisa ka `_warned_skips` mooduli-tasandile `_recovering` juurde ja `import server.reocr_state as reocr_state` on juba olemas):
 
@@ -544,17 +544,17 @@ def _release(key) -> None:
 
 **NB:** vana `_recover_one` sisaldas otse üksik-loogika + skip'i `skipped.append` sõnumiga "page_filename teadmata" — see kolib nüüd `_recover_single`-i. Veendu, et vana keha on täielikult asendatud (mitte duplikaat).
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_recovery.py -q`
 Expected: PASS (uued + olemasolevad; olemasolev `test_skips_unmapped_orphan` peab ikka läbima — üksik-tee)
 
-- [ ] **Step 6: Full backend suite**
+- [x] **Step 6: Full backend suite**
 
 Run: `.venv/bin/python -m pytest tests/ -q`
 Expected: PASS
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add server/reocr_recovery.py tests/test_reocr_recovery.py
@@ -574,7 +574,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `ReocrJob.work_id`, `ReocrJob.page_number` (olemas).
 - Produces: iga kirje, millel `work_id`, on klõpsatav (leht kui `page_number`, muidu teos).
 
-- [ ] **Step 1: Relax active-jobs link**
+- [x] **Step 1: Relax active-jobs link**
 
 `src/pages/Review.tsx` — aktiivsete tööde renderis asenda praegune link-plokk (`{job.work_id && job.page_number && (<a href={`/work/${job.work_id}/${job.page_number}`}...`) järgnevaga:
 
@@ -591,7 +591,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
                             )}
 ```
 
-- [ ] **Step 2: Relax history-log link**
+- [x] **Step 2: Relax history-log link**
 
 Sama failis, ajaloo (`reocrLog`) renderis asenda `{entry.work_id && entry.page_number && (<a href={`/work/${entry.work_id}/${entry.page_number}`}...` järgnevaga:
 
@@ -604,12 +604,12 @@ Sama failis, ajaloo (`reocrLog`) renderis asenda `{entry.work_id && entry.page_n
                               )}
 ```
 
-- [ ] **Step 3: Typecheck**
+- [x] **Step 3: Typecheck**
 
 Run: `npm run typecheck`
 Expected: 0 errorit
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/pages/Review.tsx
