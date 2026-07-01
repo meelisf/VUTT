@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
-import { LinkedEntity } from '../types/LinkedEntity';
 import { useUser } from '../contexts/UserContext';
 import { Save, Loader2, ChevronRight, X, Settings2, Trash2, Pencil } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
@@ -32,7 +31,8 @@ import { findContainer, findInnerPairs } from './editor/wrapTagUtils';
 import { useSpecialChars } from './editor/useSpecialChars';
 import { useCopyPastePlainMarkup } from './editor/useCopyPastePlainMarkup';
 import { useReOcr } from './editor/useReOcr';
-import { useEditorSave, type EditorSavedState } from './editor/useEditorSave';
+import { useEditorState } from './editor/useEditorState';
+import { useEditorSave } from './editor/useEditorSave';
 import SafeHtml from './SafeHtml';
 
 interface TextEditorProps {
@@ -78,17 +78,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [userSettings.default_tab]);
 
-  // Redaktori sisu muudatuste jälgimine
-  const [isDirty, setIsDirty] = useState(false);
-  const [status, setStatus] = useState(page.status);
-  const [comments, setComments] = useState<Annotation[]>(page.comments);
-  const [textAnnotations, setTextAnnotations] = useState<TextAnnotation[]>(page.text_annotations || []);
-  const [page_tags, setPageTags] = useState<(string | LinkedEntity)[]>(page.page_tags || []);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  // Salvestamata mustand-tekst kommentaaride paanil (AnnotationsTab) — enne nupule vajutust.
-  const [annotationDraftDirty, setAnnotationDraftDirty] = useState(false);
-
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
 
@@ -98,18 +87,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const [annPopoverEditing, setAnnPopoverEditing] = useState(false);
   const [annPopoverEditText, setAnnPopoverEditText] = useState('');
   const [annPopoverPendingDelete, setAnnPopoverPendingDelete] = useState(false);
-  const annPopoverAnnotationsRef = useRef(textAnnotations);
-  useEffect(() => { annPopoverAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
   const [annDialogError, setAnnDialogError] = useState('');
   const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
-
-  // Salvestamata muudatuste jälgimine
-  const [savedState, setSavedState] = useState<EditorSavedState>({
-    status: page.status,
-    comments: page.comments,
-    page_tags: page.page_tags || [],
-    text_annotations: page.text_annotations || [],
-  });
 
   // CM6 refs
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -120,6 +99,27 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // AnnotationsTab registreerib siia kommentaari-mustandi flushi (vt handleSaveWithDrafts)
   const commentFlushRef = useRef<(() => Annotation[] | null) | null>(null);
   const wrapWithTagRef = useRef<(tag: string) => void>(() => {});
+
+  const {
+    setIsDirty,
+    status,
+    comments,
+    setComments,
+    textAnnotations,
+    setTextAnnotations,
+    page_tags,
+    setPageTags,
+    isSaving,
+    setIsSaving,
+    saveError,
+    setSaveError,
+    setAnnotationDraftDirty,
+    setSavedState,
+    hasUnsavedChanges,
+  } = useEditorState({ page, viewRef, onUnsavedChanges });
+
+  const annPopoverAnnotationsRef = useRef(textAnnotations);
+  useEffect(() => { annPopoverAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
 
   // Kasutaja eelistus (localStorage) + kitsa paani sundrežiim
   const [marginaliaUserMode, setMarginaliaUserMode] = useState<MarginaliaMode>(
@@ -164,23 +164,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     commentFlushRef,
     authToken,
   });
-
-  // Arvutame kas on salvestamata muudatusi (shallow compare, mitte JSON.stringify)
-  const hasUnsavedChanges = useMemo(() => {
-    if (isDirty) return true;
-    if (annotationDraftDirty) return true;
-    if (status !== savedState.status) return true;
-    // page_tags: string/LinkedEntity[] võrdlus sisulise JSON-kuju järgi
-    if (JSON.stringify(page_tags) !== JSON.stringify(savedState.page_tags)) return true;
-    // comments: Annotation[] shallow compare (id + text + replies)
-    if (comments.length !== savedState.comments.length) return true;
-    if (comments.some((c, i) => {
-      const saved = savedState.comments[i];
-      return c.id !== saved?.id || c.text !== saved?.text || JSON.stringify(c.replies || []) !== JSON.stringify(saved.replies || []);
-    })) return true;
-    if (JSON.stringify(textAnnotations) !== JSON.stringify(savedState.text_annotations)) return true;
-    return false;
-  }, [isDirty, annotationDraftDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments, textAnnotations, savedState.text_annotations]);
 
   // --- Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit ---
   useEffect(() => {
@@ -291,48 +274,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       return next;
     });
   }, []);
-
-  // Uuendame editori sisu lehe vahetusel
-  useEffect(() => {
-    setStatus(page.status);
-    setComments(page.comments);
-    setTextAnnotations(page.text_annotations || []);
-    setPageTags(page.page_tags || []);
-    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
-    setIsDirty(false);
-
-    const view = viewRef.current;
-    if (view) {
-      const currentText = view.state.doc.toString();
-      if (currentText !== page.text_content) {
-        view.dispatch({
-          changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
-          // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
-          // avaks võõra ploki uuel lehel
-          effects: closeAllMarginalia.of(null),
-        });
-      }
-    }
-
-  }, [page]);
-
-  // Hoiatus brauseri sulgemise/refreshi korral
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-      }
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  // Teavitame parent komponenti muudatuste olekust
-  useEffect(() => {
-    onUnsavedChanges?.(hasUnsavedChanges);
-  }, [hasUnsavedChanges, onUnsavedChanges]);
 
   // Laadime transkribeerimise juhendi
   useEffect(() => {
