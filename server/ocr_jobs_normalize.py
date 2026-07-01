@@ -58,7 +58,7 @@ def _normalize_upload(state: dict, title_of) -> dict:
         "progress": {"ready": ready, "total": total} if total else None,
         "link": _upload_link(state, status_key),
         "error": state.get("error_message"),
-        "username": state.get("username", ""),  # uploadid ei salvesta praegu → ""
+        "username": state.get("username") or "",  # None (vanad uploadid) → ""
     }
 
 
