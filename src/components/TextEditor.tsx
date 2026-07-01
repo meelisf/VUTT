@@ -5,11 +5,12 @@ import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import EditorStatusBar from './editor/EditorStatusBar';
 import EditorToolbar from './editor/EditorToolbar';
+import EditorHeader from './editor/EditorHeader';
 import SpecialCharsPanel from './editor/SpecialCharsPanel';
 import AnnotationDialog from './editor/AnnotationDialog';
 import AnnotationPopover from './editor/AnnotationPopover';
@@ -20,8 +21,6 @@ import { cleanMarkupSpecs, marginaliaFromSelection } from '../utils/marginaliaUt
 import { vuttTheme } from './editor/VuttTheme';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
-import { ErrorBanner } from './ErrorBanner';
-import { formatYearDisplay } from '../utils/yearDisplayUtils';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
@@ -658,63 +657,18 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     <div className="flex flex-col h-full bg-paper font-sans">
 
       {/* 1. GLOBAL HEADER */}
-      <div className="bg-white border-b border-gray-200 shrink-0 z-20 shadow-sm">
-        {work && (
-          <div className="px-4 py-1.5 border-b border-gray-50 flex items-center gap-2 text-[11px] text-gray-500 bg-gray-50/50">
-            <span className="font-bold text-gray-700 truncate max-w-[200px]">{work.creators?.find(c => c.role === 'praeses' || c.role === 'auctor')?.name || work.creators?.[0]?.name || ''}</span>
-            <span className="text-gray-300">•</span>
-            <span className="text-gray-400">{formatYearDisplay(work.year_display, work.year, t)}</span>
-            <span className="text-gray-300">•</span>
-            <span className="italic truncate flex-1">{work.title}</span>
-          </div>
-        )}
-
-        <div className="px-4 py-2 flex items-center justify-between gap-4">
-          <div className="flex bg-gray-100 p-0.5 rounded-lg shadow-inner">
-            <button
-              onClick={() => setActiveTab('edit')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'edit' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              {(readOnly ? t('tabs.view') : t('tabs.edit')).toUpperCase()}
-            </button>
-            <button
-              onClick={() => setActiveTab('annotate')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'annotate' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              {t('tabs.info').toUpperCase()}
-            </button>
-            <button
-              onClick={() => setActiveTab('history')}
-              className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${activeTab === 'history' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              {t('tabs.history').toUpperCase()}
-            </button>
-          </div>
-
-          {!readOnly && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={`flex items-center gap-2 px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-white rounded shadow-sm transition-all active:scale-95 disabled:opacity-50 ${(hasUnsavedChanges || statusDirty)
-                  ? 'bg-amber-500 hover:bg-amber-600'
-                  : 'bg-primary-600 hover:bg-primary-700'
-                  }`}
-              >
-                {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
-                {isSaving ? t('editor.saving') : t('editor.save').toUpperCase()}
-              </button>
-            </div>
-          )}
-        </div>
-        {saveError && (
-          <ErrorBanner
-            message={saveError}
-            onClose={() => setSaveError(null)}
-            className="mx-4 mb-2"
-          />
-        )}
-      </div>
+      <EditorHeader
+        work={work}
+        activeTab={activeTab}
+        readOnly={readOnly}
+        isSaving={isSaving}
+        hasUnsavedChanges={hasUnsavedChanges}
+        statusDirty={statusDirty}
+        saveError={saveError}
+        onTabChange={setActiveTab}
+        onSave={handleSave}
+        onClearSaveError={() => setSaveError(null)}
+      />
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
