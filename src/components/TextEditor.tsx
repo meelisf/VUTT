@@ -5,11 +5,8 @@ import type { TextAnnotation } from '../types';
 import { useUser } from '../contexts/UserContext';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
-import EditorStatusBar from './editor/EditorStatusBar';
-import EditorToolbar from './editor/EditorToolbar';
 import EditorHeader from './editor/EditorHeader';
-import ReocrPanel from './editor/ReocrPanel';
-import SpecialCharsPanel from './editor/SpecialCharsPanel';
+import EditorEditTab from './editor/EditorEditTab';
 import AnnotationDialog from './editor/AnnotationDialog';
 import AnnotationPopover from './editor/AnnotationPopover';
 
@@ -224,74 +221,43 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       <div className="flex-1 overflow-hidden relative flex flex-col">
 
         {/* TEXT TAB CONTENT — alati DOM-is, et CodeMirror ei häviks */}
-        <div className={`flex-1 flex flex-col overflow-hidden ${activeTab === 'edit' ? '' : 'hidden'}`}>
-            {/* 2. SECONDARY TOOLBAR */}
-            <div className="bg-white border-b border-gray-100 flex items-center justify-between px-4 py-1.5 shrink-0 gap-4">
-
-              {/* Editor Tools (Left) */}
-              <EditorToolbar
-                readOnly={readOnly}
-                compactToolbar={compactToolbar}
-                narrowPane={narrowPane}
-                marginaliaCount={marginaliaCount}
-                marginaliaUserMode={marginaliaUserMode}
-                wrapWithTag={wrapWithTag}
-                insertMarginalia={insertMarginalia}
-                insertAtCursor={insertAtCursor}
-                cleanMarkup={cleanMarkup}
-                onAnnotateSelection={handleAnnotateSelection}
-                toggleMarginaliaMode={toggleMarginaliaMode}
-              />
-
-              {/* Page Status (Right) */}
-              <EditorStatusBar
-                status={currentStatus || page.status}
-                readOnly={readOnly}
-                onStatusChange={onStatusChange}
-              />
-            </div>
-
-            <ReocrPanel
-              variant="banner"
-              status={reocrStatus}
-              text={reocrText}
-              error={reocrError}
-              onApply={applyReOcr}
-              onDelete={deleteOcrFile}
-            />
-
-            {/* 3. EDITOR AREA */}
-            <div className="flex-1 relative flex overflow-hidden bg-white">
-              <ReocrPanel
-                variant="overlay"
-                status={reocrStatus}
-                text={reocrText}
-                error={reocrError}
-                onApply={applyReOcr}
-                onDelete={deleteOcrFile}
-              />
-              <div ref={editorContainerRef} className="flex-1 overflow-hidden" />
-            </div>
-
-            {/* 4. COLLAPSIBLE FOOTER (erimärkide paneel) — ainult sisselogitud kasutajale */}
-            <SpecialCharsPanel
-              authToken={authToken}
-              user={user}
-              readOnly={readOnly}
-              specialCharacters={specialCharacters}
-              isCustomChars={isCustomChars}
-              showCharPanel={showCharPanel}
-              showCharEditor={showCharEditor}
-              showTranscriptionGuide={showTranscriptionGuide}
-              transcriptionGuideHtml={transcriptionGuideHtml}
-              setShowCharPanel={setShowCharPanel}
-              setShowCharEditor={setShowCharEditor}
-              setShowTranscriptionGuide={setShowTranscriptionGuide}
-              setSpecialCharacters={setSpecialCharacters}
-              setIsCustomChars={setIsCustomChars}
-              insertSpecialChar={insertSpecialChar}
-            />
-        </div>
+        <EditorEditTab
+          active={activeTab === 'edit'}
+          readOnly={readOnly}
+          authToken={authToken}
+          user={user}
+          editorContainerRef={editorContainerRef}
+          currentStatus={currentStatus}
+          pageStatus={page.status}
+          onStatusChange={onStatusChange}
+          compactToolbar={compactToolbar}
+          narrowPane={narrowPane}
+          marginaliaCount={marginaliaCount}
+          marginaliaUserMode={marginaliaUserMode}
+          wrapWithTag={wrapWithTag}
+          insertMarginalia={insertMarginalia}
+          insertAtCursor={insertAtCursor}
+          cleanMarkup={cleanMarkup}
+          onAnnotateSelection={handleAnnotateSelection}
+          toggleMarginaliaMode={toggleMarginaliaMode}
+          reocrStatus={reocrStatus}
+          reocrText={reocrText}
+          reocrError={reocrError}
+          applyReOcr={applyReOcr}
+          deleteOcrFile={deleteOcrFile}
+          specialCharacters={specialCharacters}
+          isCustomChars={isCustomChars}
+          showCharPanel={showCharPanel}
+          showCharEditor={showCharEditor}
+          showTranscriptionGuide={showTranscriptionGuide}
+          transcriptionGuideHtml={transcriptionGuideHtml}
+          setShowCharPanel={setShowCharPanel}
+          setShowCharEditor={setShowCharEditor}
+          setShowTranscriptionGuide={setShowTranscriptionGuide}
+          setSpecialCharacters={setSpecialCharacters}
+          setIsCustomChars={setIsCustomChars}
+          insertSpecialChar={insertSpecialChar}
+        />
 
         {activeTab === 'annotate' && (
           <AnnotationsTab
