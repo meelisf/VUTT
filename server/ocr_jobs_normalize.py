@@ -1,0 +1,135 @@
+"""Puhas normaliseerija: upload + üksik/batch re-OCR tööd ÜHE kujuni ühtse vaate jaoks.
+
+DOM-/IO-vaba. title_of süstitakse (endpoint annab cache'itud lugeja, test lambda).
+"""
+from datetime import datetime
+from typing import Callable, List, Optional
+
+
+def _parse_ts(value) -> float:
+    """ISO-string VÕI float → timestamp; parse-viga → 0.0 (sort-turvaline)."""
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return datetime.fromisoformat(str(value)).timestamp()
+    except Exception:
+        return 0.0
+
+
+def _upload_status_key(status: str) -> str:
+    if status in ("pending", "uploading", "collecting_images"):
+        return "uploading"
+    if status == "processing":
+        return "processing"
+    if status in ("reviewing", "done"):
+        return "review"
+    if status == "imported":
+        return "imported"
+    return "error"
+
+
+def _upload_link(state: dict, status_key: str) -> str:
+    if status_key == "imported":
+        wid = state.get("meta", {}).get("work_id")
+        return f"/work/{wid}" if wid else "/upload"
+    return f"/upload?resumeUpload={state.get('id')}"
+
+
+def _normalize_upload(state: dict, title_of) -> dict:
+    meta = state.get("meta", {}) or {}
+    status = state.get("status", "pending")
+    status_key = _upload_status_key(status)
+    files = state.get("files", []) or []
+    ready = sum(1 for f in files if f.get("has_ocr") and not f.get("deleted"))
+    total = state.get("expected_pages") or len(files)
+    title = meta.get("title") or meta.get("slug", "")
+    return {
+        "id": state.get("id"),
+        "type": "upload",
+        "title": title,
+        "slug": meta.get("slug", ""),
+        "work_id": meta.get("work_id"),
+        "page_number": None,
+        "status_key": status_key,
+        "slow": False,
+        "started_at": _parse_ts(state.get("created_at")),
+        "progress": {"ready": ready, "total": total} if total else None,
+        "link": _upload_link(state, status_key),
+        "error": state.get("error_message"),
+        "username": state.get("username", ""),  # uploadid ei salvesta praegu → ""
+    }
+
+
+def _reocr_status_key(status: str) -> str:
+    if status in ("uploading",):
+        return "uploading"
+    if status == "processing":
+        return "processing"
+    if status == "done":
+        return "ready"
+    return "error"
+
+
+def _work_link(work_id: Optional[str], page_number) -> str:
+    if not work_id:
+        return ""
+    return f"/work/{work_id}/{page_number}" if page_number else f"/work/{work_id}"
+
+
+def _normalize_single(job: dict, title_of) -> dict:
+    return {
+        "id": job.get("job_id"),
+        "type": "reocr",
+        "title": title_of(job.get("work_id")) or job.get("slug", ""),
+        "slug": job.get("slug", ""),
+        "work_id": job.get("work_id"),
+        "page_number": job.get("page_number"),
+        "status_key": _reocr_status_key(job.get("status")),
+        "slow": bool(job.get("slow", False)),
+        "started_at": _parse_ts(job.get("started_at")),
+        "progress": None,
+        "link": _work_link(job.get("work_id"), job.get("page_number")),
+        "error": job.get("error"),
+        "username": job.get("username", ""),
+    }
+
+
+def _normalize_batch(job: dict, title_of) -> dict:
+    total = job.get("total", 0)
+    return {
+        "id": job.get("job_id"),
+        "type": "batch",
+        "title": title_of(job.get("work_id")) or job.get("slug", ""),
+        "slug": job.get("slug", ""),
+        "work_id": job.get("work_id"),
+        "page_number": None,
+        "status_key": _reocr_status_key(job.get("status")),
+        "slow": bool(job.get("slow", False)),
+        "started_at": _parse_ts(job.get("started_at")),
+        "progress": {"ready": job.get("ready", 0), "total": total} if total else None,
+        "link": _work_link(job.get("work_id"), None),
+        "error": job.get("error"),
+        "username": job.get("username", ""),
+    }
+
+
+def normalize_ocr_jobs(uploads: List[dict], singles: List[dict], batches: List[dict],
+                       title_of: Callable[[Optional[str]], str]) -> List[dict]:
+    """Ühtne, ajajärjestatud (started_at DESC, None→0.0) OCR-tööde loend."""
+    out: List[dict] = []
+    out += [_normalize_upload(u, title_of) for u in uploads]
+    out += [_normalize_single(s, title_of) for s in singles]
+    out += [_normalize_batch(b, title_of) for b in batches]
+    # queue_ahead: ühtne lokaalne FIFO-lähend üle KÕIGI aktiivsete (upload+reocr+batch)
+    # started_at järgi. OCR-serveri päris järjekorda ei teata.
+    active = [e for e in out if e["status_key"] in ("uploading", "processing")]
+    for e in out:
+        if e["status_key"] in ("uploading", "processing"):
+            st = e.get("started_at") or 0.0
+            e["queue_ahead"] = sum(1 for o in active if (o.get("started_at") or 0.0) < st)
+        else:
+            e["queue_ahead"] = 0
+    out.sort(key=lambda e: e.get("started_at") or 0.0, reverse=True)
+    return out

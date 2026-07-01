@@ -21,6 +21,17 @@
     "elapsedLtMin": "running <1 min",
     "queueAhead": "~{{count}} earlier jobs"
   },
+  "ocr": {
+    "type": { "upload": "Upload", "reocr": "Re-OCR", "batch": "Batch" },
+    "statusKey": {
+      "uploading": "uploading",
+      "processing": "OCR running",
+      "review": "in review",
+      "ready": "ready",
+      "imported": "imported",
+      "error": "error"
+    }
+  },
   "subtitle": "Your recent work",
   "subtitleAdmin": "All users' changes",
   "empty": "No changes made yet",

@@ -21,6 +21,17 @@
     "elapsedLtMin": "töötab <1 min",
     "queueAhead": "~{{count}} varasemat tööd"
   },
+  "ocr": {
+    "type": { "upload": "Üleslaadimine", "reocr": "Re-OCR", "batch": "Batch" },
+    "statusKey": {
+      "uploading": "üleslaadimine",
+      "processing": "OCR töötleb",
+      "review": "ülevaatusel",
+      "ready": "valmis",
+      "imported": "imporditud",
+      "error": "viga"
+    }
+  },
   "subtitle": "Sinu viimased töökohad",
   "subtitleAdmin": "Kõigi kasutajate muudatused",
   "empty": "Muudatusi pole veel tehtud",

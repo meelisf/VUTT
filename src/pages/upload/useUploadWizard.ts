@@ -470,6 +470,22 @@ export function useUploadWizard() {
     }
   }
 
+  // Deep-link: /upload?resumeUpload={id} avab otse selle uploadi ülevaatusele,
+  // kui pendingUploads on laaditud. Param eemaldatakse pärast, et back/forward
+  // remount ei käivitaks resume't uuesti.
+  const resumeHandledRef = useRef(false);
+  useEffect(() => {
+    if (resumeHandledRef.current) return;
+    const targetId = searchParams.get('resumeUpload');
+    if (!targetId || pendingUploads.length === 0) return;
+    const match = pendingUploads.find((u) => u.id === targetId);
+    if (!match) return;
+    resumeHandledRef.current = true;
+    handleResume(match);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    navigate(window.location.pathname, { replace: true });
+  }, [pendingUploads, searchParams, navigate]);
+
   // ---------------------------------------------------------------------------
   // Arvutused (puhas tuletus utils-ist)
   // ---------------------------------------------------------------------------
