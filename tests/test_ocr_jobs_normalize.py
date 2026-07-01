@@ -89,3 +89,17 @@ def test_normalize_sorted_desc():
     ]
     ids = [e["id"] for e in normalize_ocr_jobs([], singles, [], _title_of)]
     assert ids == ["b", "c", "a"]  # started_at DESC
+
+
+def test_title_reader_reads_metadata(tmp_path, monkeypatch):
+    import json
+    import server.routers.ocr_jobs as oj
+    work = tmp_path / "w1"
+    work.mkdir()
+    (work / "_metadata.json").write_text(json.dumps({"title": "Loetud Pealkiri"}), encoding="utf-8")
+    monkeypatch.setattr(oj, "find_directory_by_id", lambda wid: str(work) if wid == "wid" else None)
+    reader = oj._make_title_reader()
+    assert reader("wid") == "Loetud Pealkiri"
+    assert reader("puudub") == ""     # ei leidu → tühi (normaliseerija fallback slug'ile)
+    # cache: teine kutse ei ava faili uuesti (sama tulemus)
+    assert reader("wid") == "Loetud Pealkiri"

@@ -26,6 +26,7 @@ from .routers.public_registries import router as public_registries_router
 from .routers.public import router as public_router
 from .routers.editing import router as editing_router
 from .routers.collections import router as collections_router
+from .routers.ocr_jobs import router as ocr_jobs_router
 from .prosopography.indices import rebuild_indices
 
 @asynccontextmanager
@@ -56,6 +57,7 @@ app.include_router(prosopography_router, prefix="/prosopography")
 app.include_router(notifications_router)
 app.include_router(upload_router)
 app.include_router(reocr_router)
+app.include_router(ocr_jobs_router)
 app.include_router(pages_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
