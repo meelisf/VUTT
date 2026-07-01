@@ -72,6 +72,21 @@ interface ReocrJob {
   title?: string;
 }
 
+interface OcrJob {
+  id: string;
+  type: 'upload' | 'reocr' | 'batch';
+  title: string;
+  slug: string;
+  work_id: string | null;
+  page_number: number | null;
+  status_key: 'uploading' | 'processing' | 'review' | 'ready' | 'imported' | 'error';
+  slow: boolean;
+  started_at: number | null;
+  progress: { ready: number; total: number } | null;
+  link: string;
+  error: string | null;
+}
+
 interface DiffData {
   diff: string;
   additions: number;
@@ -98,7 +113,7 @@ const Review: React.FC = () => {
   const [offset, setOffset] = useState(0);
   const [allUsers, setAllUsers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'history' | 'reocr'>('history');
-  const [reocrJobs, setReocrJobs] = useState<ReocrJob[]>([]);
+  const [reocrJobs, setReocrJobs] = useState<OcrJob[]>([]);
   const [reocrLoading, setReocrLoading] = useState(false);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reocrLog, setReocrLog] = useState<ReocrJob[]>([]);
@@ -148,7 +163,7 @@ const Review: React.FC = () => {
     if (!token || !isAdmin) return;
     if (showLoader) setReocrLoading(true);
     try {
-      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/jobs`, { headers: getAuthHeaders(token), timeout: 10000 });
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/ocr/jobs`, { headers: getAuthHeaders(token), timeout: 10000 });
       const data = await res.json();
       if (data.status === 'success') setReocrJobs(data.jobs);
     } catch {
@@ -162,7 +177,7 @@ const Review: React.FC = () => {
   useEffect(() => {
     if (!isAdmin) return;
 
-    const hasActive = reocrJobs.some(j => j.status === 'uploading' || j.status === 'processing');
+    const hasActive = reocrJobs.some(j => j.status_key === 'uploading' || j.status_key === 'processing');
     if (activeTab !== 'reocr' && !hasActive) return;
 
     reocrPollRef.current = setTimeout(() => loadReocrJobs(), 4000);
@@ -518,9 +533,9 @@ const Review: React.FC = () => {
               >
                 <Wand2 size={15} />
                 {t('tabs.reocr')}
-                {reocrJobs.filter(j => j.status === 'uploading' || j.status === 'processing').length > 0 && (
+                {reocrJobs.filter(j => j.status_key === 'uploading' || j.status_key === 'processing').length > 0 && (
                   <span className="ml-1 bg-amber-100 text-amber-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                    {reocrJobs.filter(j => j.status === 'uploading' || j.status === 'processing').length}
+                    {reocrJobs.filter(j => j.status_key === 'uploading' || j.status_key === 'processing').length}
                   </span>
                 )}
               </button>
@@ -545,84 +560,62 @@ const Review: React.FC = () => {
               ) : (
                 <div className="space-y-2">
                   {[...reocrJobs].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0)).map(job => {
-                    const isActive = job.status === 'uploading' || job.status === 'processing';
-                    const isSlow = isActive && !!job.slow;
+                    const isActive = job.status_key === 'uploading' || job.status_key === 'processing';
+                    const isSlow = isActive && job.slow;
+                    const isError = job.status_key === 'error';
                     return (
-                      <div
-                        key={job.job_id}
+                      <div key={job.id}
                         className={`flex items-center gap-4 px-4 py-3 rounded-lg border ${
                           isActive ? 'border-amber-200 bg-amber-50' :
-                          job.status === 'done' ? 'border-green-200 bg-green-50' :
-                          job.status === 'error' ? 'border-red-200 bg-red-50' :
-                          'border-gray-200'
-                        }`}
-                      >
+                          isError ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'
+                        }`}>
                         {/* Staatus ikoon */}
                         <div className="shrink-0">
-                          {isActive
-                            ? <Loader2 size={18} className="animate-spin text-amber-600" />
-                            : job.status === 'done'
-                              ? <CheckCircle size={18} className="text-green-600" />
-                              : <XCircle size={18} className="text-red-500" />
-                          }
+                          {isActive ? <Loader2 size={18} className="animate-spin text-amber-600" />
+                            : isError ? <XCircle size={18} className="text-red-500" />
+                            : <CheckCircle size={18} className="text-green-600" />}
                         </div>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                              {t(`ocr.type.${job.type}`)}
+                            </span>
                             <span className="font-medium text-gray-800 text-sm">{job.title || job.slug}</span>
-                            {job.title && (
-                              <span className="text-xs text-gray-400 font-mono" title={job.slug}>{job.slug}</span>
-                            )}
-                            {job.page_number && (
-                              <span className="text-xs text-gray-500">lk {job.page_number}</span>
-                            )}
+                            {job.title && <span className="text-xs text-gray-400 font-mono" title={job.slug}>{job.slug}</span>}
+                            {job.page_number && <span className="text-xs text-gray-500">lk {job.page_number}</span>}
+                            {job.progress && <span className="text-xs text-gray-500">{job.progress.ready}/{job.progress.total} lk</span>}
                             {job.work_id && (
-                              <a
-                                href={job.page_number ? `/work/${job.work_id}/${job.page_number}` : `/work/${job.work_id}`}
-                                className="text-xs text-primary-600 hover:underline flex items-center gap-0.5"
-                                target="_blank"
-                                rel="noreferrer"
-                              >
+                              <a href={job.link} target="_blank" rel="noreferrer"
+                                className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
                                 <ExternalLink size={11} />
                               </a>
                             )}
-                            {isActive && !!job.queue_ahead && job.queue_ahead > 0 && (
-                              <span className="text-xs text-gray-400">
-                                {t('reocr.queueAhead', { count: job.queue_ahead })}
-                              </span>
-                            )}
                           </div>
-                          {job.error && (
-                            <p className="text-xs text-red-600 mt-0.5">{job.error}</p>
-                          )}
+                          {job.error && <p className="text-xs text-red-600 mt-0.5">{job.error}</p>}
                         </div>
 
-                        {/* Kasutaja + aeg */}
+                        {/* Aeg */}
                         <div className="text-xs text-gray-500 text-right shrink-0">
-                          <div className="flex items-center gap-1 justify-end">
-                            <User size={11} />
-                            {job.username}
-                          </div>
                           {job.started_at && (
-                            <div className="flex items-center gap-1 mt-0.5 justify-end">
+                            <div className="flex items-center gap-1 justify-end">
                               <Clock size={11} />
-                              {isActive
-                                ? formatElapsed(job.started_at)
-                                : new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              {isActive ? formatElapsed(job.started_at)
+                                : new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' })}
                             </div>
                           )}
                         </div>
 
                         {/* Staatus badge */}
-                        <div className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
-                          isSlow ? 'bg-amber-100 text-amber-800' :
-                          isActive ? 'bg-amber-100 text-amber-700' :
-                          job.status === 'done' ? 'bg-green-100 text-green-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {isSlow ? t('reocr.slow') : t(`reocr.status.${job.status}`)}
-                        </div>
+                        <a href={job.link} target={job.link.startsWith('/work') ? '_blank' : undefined} rel="noreferrer"
+                          className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
+                            isSlow ? 'bg-amber-100 text-amber-800' :
+                            isActive ? 'bg-amber-100 text-amber-700' :
+                            isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                          }`}>
+                          {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
+                        </a>
                       </div>
                     );
                   })}
