@@ -15,7 +15,11 @@
       "processing": "Processing",
       "done": "Done",
       "error": "Error"
-    }
+    },
+    "slow": "slow, still running",
+    "elapsedMin": "running {{mins}} min",
+    "elapsedLtMin": "running <1 min",
+    "queueAhead": "~{{count}} earlier jobs"
   },
   "subtitle": "Your recent work",
   "subtitleAdmin": "All users' changes",

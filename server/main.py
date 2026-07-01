@@ -9,6 +9,7 @@ from .utils import build_work_id_cache
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes
 from .upload_ops import start_upload_sync_loop
+from .reocr_ops import start_reocr_background
 from .git_ops import run_git_fsck
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
@@ -46,6 +47,7 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
     start_upload_sync_loop()  # upload taustasünk — AINULT API-protsessis (mitte image_server import)
+    start_reocr_background()  # re-OCR restardi-jätkamine + orbude taaste (AINULT API-protsessis)
     yield
     print("VUTT FastAPI sulgemine.")
 
