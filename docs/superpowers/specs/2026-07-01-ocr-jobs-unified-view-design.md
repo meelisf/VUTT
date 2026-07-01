@@ -21,11 +21,11 @@ Kaks eraldi tähelepanekut deploy'tud re-OCR recovery järel:
 | Koondvaate roll | Ühtne **nähtavus**; tegevused (import, .ocr rakendus) jäävad oma lehtedele, koondvaatest lingid sinna |
 | Lingi siht | Leht (`/work/{id}/{lk}`) kui `page_number` teada; muidu teos (`/work/{id}`); upload → `/upload` deep-link. Iga kirje ALATI klõpsatav |
 | Paigutus | ÜKS ajajärjestatud nimekiri, iga rida märgib tüübi (Upload / Re-OCR / Batch) |
-| Batch-orbud | Logi batch edaspidi `reocr_log`-i → reaper taastab edaspidised batch-orvud; praegune 5 (mapping kadunud) käsitsi/jäta |
-| Batch idempotentsus | **Logi vastu, MITTE mälu vastu** — `_batch_logged_txt_names(job_id)` loeb logist, restart-kindel (review-punkt 1) |
-| Recovery-tee | **ÜKS koodirada** — mappi `(job_id, remote_txt_name)` järgi; single/batch eristust pole (review-punkt 3) |
+| Batch-orbud | **Püsiv batch-mapping fail** (`state/reocr_batch_maps/{job_id}.json`) batch ALGUSES → reaper taastab; praegune 5 (mapping kadunud) käsitsi |
+| Batch mapping püsivus | Fail kirjutatud alguses, kustutatud koristusel → restart/error/crash-kindel (review-punkt 1); orb EI valmi kunagi, seega valmimis-logimine EI sobiks |
+| Recovery-eristaja | **Deterministlik: mapping-fail olemas → batch, muidu üksik (log)** — mitte `_pg_NNN`-loenduse heuristika (review-punkt 3) |
 | Reaper-turvalisus | Puutub ainult töid, mida POLE `_reocr_jobs` EGA `_reocr_batch_jobs`-is; claim per `(job_id, remote_txt_name)` (review-punkt 2) |
-| Logi maht | `REOCR_LOG_MAX` 500 → 5000; pagineeritud; skip-hoiatus üks kord/protsess (review-punkt 4, 7) |
+| Logi maht | `REOCR_LOG_MAX` jääb 500 (batch ei floodi logi — mapping eraldi failis); skip-hoiatus üks kord/protsess (review-punkt 4, 7) |
 | Upload-link | Deep-link `/upload?resumeUpload={id}` → progress kohe näha; param eemaldatakse pärast resume't (review-punkt 5) |
 | Tarne | Kaks faasi: Komponent 1 (backend, parandab kohe) → Komponent 2 (feature) |
 
@@ -36,21 +36,40 @@ Kaks eraldi tähelepanekut deploy'tud re-OCR recovery järel:
 **1a. Taastatud `page_number` (bugfix).**
 `server/reocr_recovery.py` `_resolve_job_meta` tagastab lisaks `page_number` (loetud sama logi-error-kirjest, kust `page_filename` tuleb). `_recover_one` recovery-sündmus (`_append_to_log`) salvestab `page_number` → link + "lk N" ilmuvad. Frontend link-tingimust lõdvendatakse: `work_id` olemas → link (lehele kui `page_number`, muidu teosele).
 
-**1b. Batch logimine — idempotentsus LOGI vastu (mitte mälu vastu).**
-`server/reocr_ops.py` `_poll_batch_job` (ja batch abs-timeout/inactivity haru) lisab iga lahenenud lehe kohta `reocr_log`-i kirje. Kirje sisaldab **`remote_txt_name`** (nt `{slug}_pg_007.txt`), et taaste saaks staging-faili → page_filename mappida:
-```
-{job_id, work_id, slug, page_filename, page_number, remote_txt_name, username,
- status: "done"|"error", started_at, finished_at}
-```
-**Idempotentsus on logi vastu, MITTE in-memory "eelmine seis" vastu** (see kaoks restardil → topeltkirje või puuduv kirje). Helper `_batch_logged_txt_names(job_id) -> set` loeb `reocr_log`-ist selle job_id juba-logitud `remote_txt_name`-id; leht logitakse AINULT kui tema `remote_txt_name` pole hulgas. Nii on log-i seis taastuv üle restardi ja 1c vundament kindel. **NB: üksik-lehe logimine (`start_reocr_job` done/error) saab samuti `remote_txt_name` välja** (alati `{slug}_pg_001.txt`), et recovery-tee oleks ÜKS.
+**KRIITILINE mõistmine (miks mitte "logi valmimisel"):** batch-**orb** on leht, mis EI valmi
+kunagi VUTT-i poolel — OCR tootis `.txt` serverisse, aga VUTT kaotas jobi (restart/crash/12h-error)
+ENNE allalaadimist. Leht jääb `processing`-uks → valmimis-logimine EI salvesta selle mappingut.
+Seega mapping `_pg_NNN → page_filename` peab olema **püsiv batch'i ALGUSEST**. (Batch restardi-kadu
+on juba kaetud — batch persist'itakse `reocr_active.json`-i ja resume'ib. Jääb 12h-error-siis-hiline-txt.)
 
-**1c. Batch-orbude taaste — ÜKS koodirada (single/batch eristust POLE).**
-`server/reocr_recovery.py` reaper: iga staging-faili `{slug}_pg_NNN.txt` korral (olgu üksik `_pg_001` või batch `_pg_NNN`) lahenda page_filename `reocr_log`-ist matchides `job_id` JA `remote_txt_name == {slug}_pg_NNN.txt` (tagurpidiühilduvus: kui logi-kirjel pole `remote_txt_name`-i — vana üksik-kirje — ja job_id-l on ainult üks kirje, kasuta seda). Batch-heuristikat (">1 _pg_NNN") EI ole vaja — üks tee katab mõlemad.
-**Reaper puutub AINULT töid, mida aktiivses mälus POLE** (ei `_reocr_jobs` ega `_reocr_batch_jobs`) → väldib elava polleri ja reaperi võidujooksu batch-lehtede kirjutamisel. Claim-mehhanism (eelmisest spec'ist) laiendatakse batch-lehe granulaarsuseni: claim per `(job_id, remote_txt_name)`.
-Praegune 5 orvu (enne 1b logimist tehtud) jääb käsitsi — mapping puudub, reaper `skip`.
+**1b. Püsiv batch-mapping fail (recovery vundament).**
+`server/reocr_state.py` saab batch-mapping'u püsivuse (eraldi aktiivsete tööde failist):
+- `persist_batch_mapping(job_id, work_id, slug, pages) -> None` — kirjutab
+  `state/reocr_batch_maps/{job_id}.json` = `{work_id, slug, pages: {remote_txt_name: {page_filename, page_number}}}`.
+  Kutsutakse `start_reocr_batch`-is (batch ALGUSES, `_build_batch_pages` järel). Atomaarne (tmp+replace). Idempotentne.
+- `load_batch_mapping(job_id) -> dict|None` — reaperile.
+- `remove_batch_mapping(job_id) -> None` — kutsutakse kui batch täielikult koristatud (kõik lehed
+  resolved + staging eemaldatud `_poll_batch_job`-is) VÕI reaper koristas staging'u.
+- `list_batch_mapping_ids() -> list` — job_id-d, millel mapping-fail (reaperile eristajaks).
 
-**1d. Logi maht ja skip-müra (teadlik otsus).**
-Per-lehe batch-logimine tähendab, et 400-leheline batch = 400 kirjet. `reocr_log` on **cap'itud** (`REOCR_LOG_MAX`, praegu 500, kärbib viimase N-ni) ja `get_reocr_log` on **pagineeritud** (50/lk). Otsus: **tõsta `REOCR_LOG_MAX` 5000-ni**, et suured batch'id ei sööks ajalugu tühjaks (5000-kirjeline JSON-fail loeb ikka <ms). Aktsepteerime kärpe 5000 juures; kui kunagi liiga aeglane, siis rotatsioon (out of scope). **Skip-müra:** reaper hoiab protsessi-taseme `_warned_skips` set'i → sama unmappable `job_id` hoiatust logitakse ÜKS kord (mitte igal 5-min skannil). Praegune 5 orvu koristatakse **käsitsi Faas 1 deploy'l** (nende `job_id`-d on logides), et need üldse kaoksid staging'ust.
+See on **restart-, error- JA crash-kindel** (fail kirjutatud alguses, kustutatakse alles koristusel)
+ja hoiab `reocr_log`-i puhtana (EI floodi ajalugu 400 kirjega — dissolveerib logi-mahu mure).
+
+**1c. Batch-orbude taaste — deterministlik eristaja (mitte habras heuristika).**
+`server/reocr_recovery.py` reaper, iga staging job_id-kausta korral:
+- **Eristaja = `load_batch_mapping(job_id)`.** Kui mapping olemas → **batch**: iga staging-fail
+  `{slug}_pg_NNN.txt` → `page_filename` = `mapping["pages"][remote_txt_name]` → `_write_ocr_file` →
+  recovery-sündmus (`page_number`-iga). Kui mapping puudub → **üksik**: nagu praegu, `reocr_log`
+  `job_id` järgi (`_pg_001`). Ei mingit `_pg_NNN`-loenduse heuristikat.
+- **Reaper puutub AINULT töid, mida aktiivses mälus POLE** (ei `_reocr_jobs` EGA `_reocr_batch_jobs`)
+  → väldib elava polleri ja reaperi võidujooksu. Claim per `(job_id, remote_txt_name)`.
+- Batch täielikult taastatud/koristatud → `remove_batch_mapping(job_id)`.
+Praegune 5 orvu (enne 1b mapping'ut tehtud) jääb käsitsi — mapping puudub, reaper `skip`.
+
+**1d. Skip-müra.**
+Reaper hoiab protsessi-taseme `_warned_skips` set'i → sama unmappable `job_id` hoiatust logitakse
+ÜKS kord (mitte igal 5-min skannil). Praegune 5 orvu koristatakse **käsitsi Faas 1 deploy'l**, et
+need staging'ust kaoksid. **`reocr_log` cap jääb 500-ks** (batch ei floodi enam logi → mahumure kadus).
 
 ### Komponent 2 — Ühtne OCR-tööde vaade (faas 2)
 
@@ -106,13 +125,17 @@ normaliseerib upload-tööd (`list_uploads`) + re-OCR (`list_reocr_jobs` üksik 
 
 ```
 Faas 1:
-  batch _poll_batch_job → leht ready/error → _append_to_log (per leht)
-  reaper scan → batch staging (_pg_NNN) → log-mapping → _write_ocr_file → recovery event
+  start_reocr_batch → persist_batch_mapping(job_id, pages)  [state/reocr_batch_maps/]
+  _poll_batch_job → kõik lehed resolved + staging koristatud → remove_batch_mapping(job_id)
+  reaper scan, iga job_id-kaust:
+    load_batch_mapping(job_id)?  ── jah → BATCH: iga _pg_NNN → mapping[pages] → recover → remove_mapping
+                                 └─ ei  → ÜKSIK: reocr_log (job_id, _pg_001) → recover
+    (skip kui job_id aktiivne _reocr_jobs VÕI _reocr_batch_jobs-is)
   reaper üksik → _resolve_job_meta (nüüd + page_number) → recovery event page_number-iga
 
 Faas 2:
-  GET /admin/ocr/jobs → normalize_ocr_jobs(list_uploads(), list_reocr_jobs())
-                      → ühtne nimekiri (title-enrich, status_key, link)
+  GET /admin/ocr/jobs → normalize_ocr_jobs(list_uploads(), list_reocr_jobs(), title_of)
+                      → ühtne nimekiri (status_key, eelarvutatud link, sort started_at or 0)
   Review.tsx → üks nimekiri, tüübi-badge, järjekindel link
   upload link → /upload?resumeUpload={id} → handleResume → progress kohe
 ```
@@ -120,8 +143,8 @@ Faas 2:
 ## Veakäsitlus
 
 - `normalize_ocr_jobs` on puhas: vigane/puuduv väli → turvaline vaikeväärtus (title=slug, progress=None), ei crash'i.
-- Batch logimine idempotentne (üleminekul, mitte igal pollil) → logi ei paisu.
-- Reaper batch-taaste per-leht isoleeritud; puuduv mapping → `skip` + hoiatus (ei arva lehte).
+- Batch-mapping fail atomaarne (tmp+replace); vigane/puuduv → `None` (üksik-tee fallback), ei crash'i.
+- Reaper batch-taaste per-leht isoleeritud; mapping'us puuduv `_pg_NNN` → `skip` + hoiatus (ei arva lehte).
 - Deep-link: puuduv/vale `resumeUpload` id → ignoreeritakse vaikselt (jääb tavaline `/upload` vaade).
 - `page_number` puudub taastatud üksik-kirjel (vana, 1a-eelne) → link teosele (fallback), mitte katki.
 - **Upload import-viga** (`import_as_work` ebaõnnestus) → upload state `error` + `error_message` → normaliseerija `status_key=error`, `link=/upload?resumeUpload={id}` (admin näeb/proovib uuesti). Sama rida mis muud error'id.
@@ -133,11 +156,12 @@ Faas 2:
 **Faas 1:**
 - `test_resolve_job_meta_includes_page_number`: logi-error-kirjest loetakse `page_number`.
 - `test_recovery_event_has_page_number`: taastatud kirje sisaldab `page_number`-i.
-- `test_batch_page_logged_on_ready`: batch leht `ready` → `reocr_log` kirje `page_number` + `remote_txt_name`-iga.
-- `test_batch_page_logged_once_across_restart`: `_batch_logged_txt_names` loeb logist → juba-logitud leht EI logita uuesti, ka kui in-memory seis tühi (restart-simulatsioon). **(review-punkt 1)**
-- `test_reaper_recovers_batch_orphan_from_log`: batch-staging (mitu `_pg_NNN`) + per-lehe logi → kõik lehed taastatud õigetele `page_filename`-idele.
+- `test_batch_mapping_roundtrip`: `persist_batch_mapping` → `load_batch_mapping` tagastab sama; `remove_batch_mapping` kustutab; puuduv → None. **(review-punkt 1)**
+- `test_batch_mapping_persisted_at_start`: `start_reocr_batch` kirjutab mapping-faili (pages: remote_txt_name → page_filename+page_number).
+- `test_reaper_recovers_batch_orphan_via_mapping`: batch-staging (mitu `_pg_NNN`) + mapping-fail → kõik lehed taastatud õigetele `page_filename`-idele, `page_number`-iga.
+- `test_reaper_single_when_no_mapping`: mapping-fail puudub → üksik-tee (log `job_id` järgi, `_pg_001`).
 - `test_reaper_skips_live_batch_job`: kui `job_id` on `_reocr_batch_jobs`-is aktiivne, reaper EI puutu selle staging'ut. **(review-punkt 2)**
-- `test_reaper_single_path_matches_by_remote_txt_name`: nii üksik (`_pg_001`) kui batch-fail lahendatakse ÜHE tee kaudu (`job_id`+`remote_txt_name`); vana kirje ilma `remote_txt_name`-ita → job_id-fallback.
+- `test_reaper_removes_mapping_after_recovery`: batch täielikult taastatud → mapping-fail kustutatud.
 
 **Faas 2:**
 - `test_normalize_upload_job`: upload reviewing → `status_key=review`, `link=/upload?resumeUpload=…`, `progress`.
