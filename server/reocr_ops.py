@@ -163,6 +163,10 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
     page_entries = _build_batch_pages(slug, pages)
     now = datetime.now().timestamp()
+    _batch_map_pages = {
+        e["remote_txt_name"]: {"page_filename": e["page_filename"], "page_number": e["page_number"]}
+        for e in page_entries
+    }
 
     job = {
         "kind": "batch",
@@ -181,6 +185,7 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     with _reocr_batch_jobs_lock:
         _reocr_batch_jobs[job_id] = job
     _persist_active_jobs()
+    reocr_state.persist_batch_mapping(job_id, work_id, slug, _batch_map_pages)
 
     def _upload():
         try:
@@ -288,6 +293,7 @@ def _poll_batch_job(job_id: str) -> None:
                     sftp.rmdir(d)
                 except Exception:
                     pass
+            reocr_state.remove_batch_mapping(job_id)
     finally:
         try:
             sftp.close()
