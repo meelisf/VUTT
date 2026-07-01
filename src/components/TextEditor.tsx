@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
@@ -14,8 +13,6 @@ import SpecialCharsPanel from './editor/SpecialCharsPanel';
 import AnnotationDialog from './editor/AnnotationDialog';
 import AnnotationPopover from './editor/AnnotationPopover';
 
-import { fetchWithTimeout } from '../utils/fetchWithTimeout';
-import { getLangCode } from '../utils/getLangCode';
 
 // CM6 impordid
 import type { EditorView } from '@codemirror/view';
@@ -27,6 +24,7 @@ import { useEditorSave } from './editor/useEditorSave';
 import { useEditorFormattingActions } from './editor/useEditorFormattingActions';
 import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
 import { useCodeMirrorLifecycle } from './editor/useCodeMirrorLifecycle';
+import { useTranscriptionGuide } from './editor/useTranscriptionGuide';
 import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
@@ -45,9 +43,7 @@ interface TextEditorProps {
 }
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections }) => {
-  const { i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
-  const lang = getLangCode(i18n.language);
   const {
     specialCharacters,
     isCustomChars,
@@ -70,8 +66,12 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     }
   }, [userSettings.default_tab]);
 
-  const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
-  const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
+  const {
+    lang,
+    showTranscriptionGuide,
+    setShowTranscriptionGuide,
+    transcriptionGuideHtml,
+  } = useTranscriptionGuide();
 
   // CM6 refs
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -185,27 +185,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     insertMarginalia,
     cleanMarkup,
   } = useEditorFormattingActions({ viewRef, readOnly });
-
-  // Laadime transkribeerimise juhendi
-  useEffect(() => {
-    const loadTranscriptionGuide = async () => {
-      try {
-        const fileSuffix = lang === 'en' ? '_en' : '';
-        const response = await fetchWithTimeout(`/transcription_guide${fileSuffix}.html`, { timeout: 5000 });
-        if (response.ok) {
-          const html = await response.text();
-          const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-          const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-          const styleTag = styleMatch ? `<style>${styleMatch[1]}</style>` : '';
-          const bodyContent = bodyMatch ? bodyMatch[1] : html;
-          setTranscriptionGuideHtml(styleTag + bodyContent);
-        }
-      } catch (e) {
-        console.warn('Transkribeerimise juhendi laadimine ebaõnnestus:', e);
-      }
-    };
-    loadTranscriptionGuide();
-  }, [lang]);
 
   // --- Salvestamine ---
   useEffect(() => {
