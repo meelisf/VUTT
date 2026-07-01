@@ -69,6 +69,7 @@ interface ReocrJob {
   slow?: boolean;
   slow_since?: number | null;
   queue_ahead?: number;
+  title?: string;
 }
 
 interface DiffData {
@@ -569,7 +570,10 @@ const Review: React.FC = () => {
                         {/* Info */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-gray-800 text-sm">{job.slug}</span>
+                            <span className="font-medium text-gray-800 text-sm">{job.title || job.slug}</span>
+                            {job.title && (
+                              <span className="text-xs text-gray-400 font-mono" title={job.slug}>{job.slug}</span>
+                            )}
                             {job.page_number && (
                               <span className="text-xs text-gray-500">lk {job.page_number}</span>
                             )}
@@ -651,7 +655,8 @@ const Review: React.FC = () => {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-gray-700">{entry.slug}</span>
+                              <span className="text-gray-700">{entry.title || entry.slug}</span>
+                              {entry.title && <span className="text-xs text-gray-400 font-mono" title={entry.slug}>{entry.slug}</span>}
                               {entry.page_number && <span className="text-xs text-gray-400">lk {entry.page_number}</span>}
                               {entry.work_id && entry.page_number && (
                                 <a href={`/work/${entry.work_id}/${entry.page_number}`} target="_blank" rel="noreferrer"

@@ -57,16 +57,42 @@ async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
     return {"status": "success", **poll_reocr_job(job_id)}
 
 
+def _enrich_titles(items: list) -> list:
+    """Lisab igale re-OCR kirjele 'title' (teose pealkiri work_id järgi). Slug jääb alles
+    (tehniline, OCR-serveris vaatamiseks). Fallback pealkirjale = slug. Per-call cache."""
+    title_cache: dict = {}
+    for it in items:
+        work_id = it.get("work_id")
+        slug = it.get("slug", "")
+        if not work_id:
+            it["title"] = slug
+            continue
+        if work_id not in title_cache:
+            title = slug
+            path = find_directory_by_id(work_id)
+            if path:
+                try:
+                    with open(os.path.join(path, "_metadata.json"), "r", encoding="utf-8") as f:
+                        title = json.load(f).get("title") or slug
+                except Exception:
+                    pass
+            title_cache[work_id] = title
+        it["title"] = title_cache[work_id]
+    return items
+
+
 @router.get("/admin/reocr/jobs")
 async def admin_reocr_jobs(user=Depends(require_role("admin"))):
     """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
-    return {"status": "success", "jobs": list_reocr_jobs()}
+    return {"status": "success", "jobs": _enrich_titles(list_reocr_jobs())}
 
 
 @router.get("/admin/reocr/log")
 async def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require_role("admin"))):
     """Tagastab re-OCR ajalogi (püsiv, uuemad ees)."""
-    return {"status": "success", **get_reocr_log(offset, limit)}
+    log = get_reocr_log(offset, limit)
+    log["entries"] = _enrich_titles(log["entries"])
+    return {"status": "success", **log}
 
 
 @router.get("/admin/work/{work_id}/page-ocr")
