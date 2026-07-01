@@ -577,9 +577,9 @@ const Review: React.FC = () => {
                             {job.page_number && (
                               <span className="text-xs text-gray-500">lk {job.page_number}</span>
                             )}
-                            {job.work_id && job.page_number && (
+                            {job.work_id && (
                               <a
-                                href={`/work/${job.work_id}/${job.page_number}`}
+                                href={job.page_number ? `/work/${job.work_id}/${job.page_number}` : `/work/${job.work_id}`}
                                 className="text-xs text-primary-600 hover:underline flex items-center gap-0.5"
                                 target="_blank"
                                 rel="noreferrer"
@@ -658,8 +658,8 @@ const Review: React.FC = () => {
                               <span className="text-gray-700">{entry.title || entry.slug}</span>
                               {entry.title && <span className="text-xs text-gray-400 font-mono" title={entry.slug}>{entry.slug}</span>}
                               {entry.page_number && <span className="text-xs text-gray-400">lk {entry.page_number}</span>}
-                              {entry.work_id && entry.page_number && (
-                                <a href={`/work/${entry.work_id}/${entry.page_number}`} target="_blank" rel="noreferrer"
+                              {entry.work_id && (
+                                <a href={entry.page_number ? `/work/${entry.work_id}/${entry.page_number}` : `/work/${entry.work_id}`} target="_blank" rel="noreferrer"
                                   className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
                                   <ExternalLink size={11} />
                                 </a>

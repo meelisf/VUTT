@@ -42,3 +42,43 @@ def test_persist_is_atomic_valid_json(tmp_path, monkeypatch):
     st.persist_active_jobs({"a": {"status": "processing", "kind": "batch"}})
     assert json.loads(target.read_text(encoding="utf-8"))["a"]["kind"] == "batch"
     assert not (tmp_path / "reocr_active.json.tmp").exists()
+
+
+def test_batch_mapping_roundtrip(tmp_path, monkeypatch):
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "reocr_batch_maps"))
+    pages = {
+        "w1_pg_001.txt": {"page_filename": "w1-lk-005.jpg", "page_number": 5},
+        "w1_pg_002.txt": {"page_filename": "w1-lk-006.jpg", "page_number": 6},
+    }
+    st.persist_batch_mapping("b1", "wid", "w1", pages)
+    loaded = st.load_batch_mapping("b1")
+    assert loaded["work_id"] == "wid"
+    assert loaded["slug"] == "w1"
+    assert loaded["pages"]["w1_pg_002.txt"]["page_filename"] == "w1-lk-006.jpg"
+    assert loaded["pages"]["w1_pg_002.txt"]["page_number"] == 6
+
+
+def test_batch_mapping_missing_returns_none(tmp_path, monkeypatch):
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "reocr_batch_maps"))
+    assert st.load_batch_mapping("puudub") is None
+
+
+def test_batch_mapping_corrupt_returns_none(tmp_path, monkeypatch):
+    import server.reocr_state as st
+    d = tmp_path / "reocr_batch_maps"
+    d.mkdir()
+    (d / "b1.json").write_text("{ vigane", encoding="utf-8")
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(d))
+    assert st.load_batch_mapping("b1") is None
+
+
+def test_batch_mapping_remove(tmp_path, monkeypatch):
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "reocr_batch_maps"))
+    st.persist_batch_mapping("b1", "wid", "w1", {})
+    assert st.load_batch_mapping("b1") is not None
+    st.remove_batch_mapping("b1")
+    assert st.load_batch_mapping("b1") is None
+    st.remove_batch_mapping("b1")  # teist korda — ei crash'i

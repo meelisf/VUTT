@@ -7,7 +7,7 @@ reocr_log (vt reocr_recovery.py), sest error/crash'itud tööd on siit juba eema
 import json
 import os
 import threading
-from typing import Dict
+from typing import Dict, Optional
 
 from .config import STATE_DIR, get_logger
 
@@ -44,3 +44,59 @@ def load_active_jobs() -> Dict[str, dict]:
         except Exception as e:
             logger.warning(f"reocr_active.json lugemine ebaõnnestus: {e}")
             return {}
+
+
+BATCH_MAPS_DIR = os.path.join(STATE_DIR, "reocr_batch_maps")
+
+
+def _batch_map_path(job_id: str) -> str:
+    return os.path.join(BATCH_MAPS_DIR, f"{job_id}.json")
+
+
+def persist_batch_mapping(job_id: str, work_id, slug: str, pages: Dict[str, dict]) -> None:
+    """Kirjuta batch lehe-mapping püsivalt (recovery vundament). Atomaarne."""
+    data = {"work_id": work_id, "slug": slug, "pages": pages}
+    with _file_lock:
+        try:
+            os.makedirs(BATCH_MAPS_DIR, exist_ok=True)
+            path = _batch_map_path(job_id)
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+        except Exception as e:
+            logger.warning(f"batch-mapping kirjutamine ebaõnnestus ({job_id}): {e}")
+
+
+def load_batch_mapping(job_id: str) -> Optional[dict]:
+    """Batch lehe-mapping või None (puuduv/vigane)."""
+    with _file_lock:
+        try:
+            path = _batch_map_path(job_id)
+            if not os.path.exists(path):
+                return None
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else None
+        except Exception as e:
+            logger.warning(f"batch-mapping lugemine ebaõnnestus ({job_id}): {e}")
+            return None
+
+
+def remove_batch_mapping(job_id: str) -> None:
+    """Kustuta batch-mapping fail (best-effort, koristusel)."""
+    with _file_lock:
+        try:
+            os.remove(_batch_map_path(job_id))
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.warning(f"batch-mapping kustutamine ebaõnnestus ({job_id}): {e}")
+
+
+def list_batch_mapping_ids() -> list:
+    """job_id-d, millel on batch-mapping fail (reaperile)."""
+    try:
+        return [os.path.splitext(f)[0] for f in os.listdir(BATCH_MAPS_DIR) if f.endswith(".json")]
+    except FileNotFoundError:
+        return []

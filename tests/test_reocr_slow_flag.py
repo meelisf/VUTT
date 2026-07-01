@@ -105,3 +105,28 @@ def test_batch_absolute_timeout_errors_remaining_after_final_poll(monkeypatch):
     j = reocr_ops._reocr_batch_jobs["b1"]
     assert j["status"] == "done"
     assert j["pages"][0]["status"] == "error"
+
+
+def test_start_reocr_batch_persists_mapping(tmp_path, monkeypatch):
+    import server.reocr_ops as r
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "maps"))
+    monkeypatch.setattr(st, "REOCR_ACTIVE_FILE", str(tmp_path / "active.json"))
+    # Ära ava päris SFTP-d — upload-thread ebaõnnestub vaikselt, mapping on juba kirjutatud
+    monkeypatch.setattr(r, "_sftp_open", lambda jid: (_ for _ in ()).throw(RuntimeError("no ssh")))
+    work_dir = tmp_path / "w1"; work_dir.mkdir()
+    (work_dir / "w1-a.jpg").write_bytes(b"x")
+    monkeypatch.setattr(r, "BASE_DIR", str(tmp_path))
+
+    job_id = r.start_reocr_batch("wid", "w1", str(work_dir),
+                                 [("w1-a.jpg", 7)], material_type="print", username="u")
+    mapping = st.load_batch_mapping(job_id)
+    assert mapping is not None
+    assert mapping["slug"] == "w1" and mapping["work_id"] == "wid"
+    # remote_txt_name → page_filename + page_number
+    names = list(mapping["pages"].values())
+    assert names[0]["page_filename"] == "w1-a.jpg"
+    assert names[0]["page_number"] == 7
+    assert "w1_pg_001.txt" in mapping["pages"]
+    with r._reocr_batch_jobs_lock:
+        r._reocr_batch_jobs.clear()

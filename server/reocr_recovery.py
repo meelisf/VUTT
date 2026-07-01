@@ -1,12 +1,15 @@
-"""Reconciliation-reaper: leiab OCR-serveri staging'usse orvuks jäänud VALMIS üksik-lehe
-re-OCR tulemused ja taastab need (kirjutab .ocr faili, lisab reocr_log-i recovery-sündmuse,
-koristab staging'u).
+"""Reconciliation-reaper: leiab OCR-serveri staging'usse orvuks jäänud VALMIS re-OCR
+tulemused (nii üksik-lehe kui batch) ja taastab need (kirjutab .ocr faili, lisab reocr_log-i
+recovery-sündmuse, koristab staging'u).
 
-Skoop: AINULT üksik-lehe orvud (AUTO-OCR/{print,hand}/{job_id}/{slug}/{slug}_pg_001.txt).
+Skoop: orvud — tööd, mis pole aktiivselt jälitatud (_reocr_jobs EGA _reocr_batch_jobs-is).
 Batch restardi-jätkamine käib load_active_jobs → resume polling kaudu, MITTE siit.
 
-Mapping-allikad (järjekorras): (1) reocr_log — orbude PÕHI-allikas (error-kirjed);
-(2) reocr_active.json — restardi-jätkamise varu.
+Deterministlik eristaja: batch-mapping fail olemas → batch-tee; puudub → üksik-tee.
+
+Mapping-allikad üksik-tee jaoks (järjekorras): (1) reocr_log — orbude PÕHI-allikas
+(error-kirjed); (2) reocr_active.json — restardi-jätkamise varu.
+Batch-tee kasutab püsivat mapping-faili (reocr_state.load_batch_mapping).
 """
 import io
 import os
@@ -26,43 +29,60 @@ _MATERIAL_TYPES = ("print", "hand")
 
 # Claim-set: kaitseb tavalise polleri ja reaperi võistluse eest (sama .txt topelt-töötlus).
 # Kaitstud reocr_ops._reocr_jobs_lock-iga (jagatud lukk, ei loo uut).
+# Võtmeks võib olla job_id (üksik-tee) VÕI (job_id, remote_txt_name) (batch-tee).
 _recovering = set()
+_warned_skips = set()  # job_id-d, mille skip-hoiatust juba logitud (müra vältimine)
 
 
 def _resolve_job_meta(job_id: str) -> Optional[dict]:
-    """Leia {page_filename, work_id} logist (põhi) või active.json-ist (varu)."""
+    """Leia {page_filename, work_id, page_number} logist (põhi) või active.json-ist (varu)."""
     log = reocr_ops.get_reocr_log(0, reocr_ops.REOCR_LOG_MAX).get("entries", [])
     for e in log:
         if e.get("job_id") == job_id and e.get("page_filename"):
-            return {"page_filename": e["page_filename"], "work_id": e.get("work_id")}
+            return {"page_filename": e["page_filename"], "work_id": e.get("work_id"),
+                    "page_number": e.get("page_number")}
     active = reocr_state.load_active_jobs()
     j = active.get(job_id)
     if j and j.get("page_filename"):
-        return {"page_filename": j["page_filename"], "work_id": j.get("work_id")}
+        return {"page_filename": j["page_filename"], "work_id": j.get("work_id"),
+                "page_number": j.get("page_number")}
     return None
 
 
 def _is_actively_tracked(job_id: str) -> bool:
     with reocr_ops._reocr_jobs_lock:
         j = reocr_ops._reocr_jobs.get(job_id)
-        return bool(j and j.get("status") in ("uploading", "processing"))
+        if j and j.get("status") in ("uploading", "processing"):
+            return True
+    with reocr_ops._reocr_batch_jobs_lock:
+        b = reocr_ops._reocr_batch_jobs.get(job_id)
+        if b and b.get("status") in ("uploading", "processing"):
+            return True
+    return False
 
 
-def _claim(job_id: str) -> bool:
-    """Proovi claimida job. Tagastab False kui juba claimitud või aktiivne."""
+def _warn_skip_once(job_id: str, msg: str) -> None:
+    if job_id not in _warned_skips:
+        _warned_skips.add(job_id)
+        logger.warning(f"Reaper skip {job_id}: {msg}")
+
+
+def _claim(key) -> bool:
+    """Claim recovery-võti (job_id VÕI (job_id, txt_name)). Tagastab False kui juba claimitud."""
+    job_id = key[0] if isinstance(key, tuple) else key
     with reocr_ops._reocr_jobs_lock:
-        if job_id in _recovering:
+        if key in _recovering:
             return False
         j = reocr_ops._reocr_jobs.get(job_id)
         if j and j.get("status") in ("uploading", "processing"):
             return False
-        _recovering.add(job_id)
+        _recovering.add(key)
         return True
 
 
-def _release(job_id: str) -> None:
+def _release(key) -> None:
     with reocr_ops._reocr_jobs_lock:
-        _recovering.discard(job_id)
+        _recovering.discard(key)
 
 
 def _cleanup_staging(sftp, job_dir: str, slug: str) -> None:
@@ -83,6 +103,69 @@ def _cleanup_staging(sftp, job_dir: str, slug: str) -> None:
 def _recover_one(sftp, base: str, job_id: str, recovered: List[str], skipped: List[str]) -> None:
     if _is_actively_tracked(job_id):
         return
+    mapping = reocr_state.load_batch_mapping(job_id)
+    if mapping is not None:
+        _recover_batch(sftp, base, job_id, mapping, recovered, skipped)
+    else:
+        _recover_single(sftp, base, job_id, recovered, skipped)
+
+
+def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[str], skipped: List[str]) -> None:
+    slug = mapping.get("slug")
+    work_id = mapping.get("work_id")
+    pages = mapping.get("pages", {})
+    job_dir = f"{base}/{job_id}"
+    work_dir = f"{job_dir}/{slug}"
+    try:
+        files = sftp.listdir(work_dir)
+    except FileNotFoundError:
+        reocr_state.remove_batch_mapping(job_id)  # staging kadunud → mapping aegunud
+        return
+    for fname in files:
+        if not fname.endswith(".txt"):
+            continue
+        info = pages.get(fname)
+        if not info:
+            _warn_skip_once(job_id, f"{fname} pole mapping'us")
+            skipped.append(job_id)
+            continue
+        key = (job_id, fname)
+        if not _claim(key):
+            continue
+        try:
+            buf = io.BytesIO()
+            sftp.getfo(f"{work_dir}/{fname}", buf)
+            text = buf.getvalue().decode("utf-8", errors="replace")
+            reocr_ops._write_ocr_file(slug, info["page_filename"], text)
+            now = datetime.now().timestamp()
+            reocr_ops._append_to_log(
+                {"work_id": work_id, "slug": slug, "page_filename": info["page_filename"],
+                 "page_number": info.get("page_number"), "status": "done", "error": None,
+                 "started_at": None, "finished_at": now,
+                 "recovered": True, "original_status": "error", "recovered_at": now}, job_id)
+            try:
+                sftp.remove(f"{work_dir}/{fname}")
+            except Exception:
+                pass
+            recovered.append(job_id)
+            logger.info(f"Reaper taastas batch {job_id}/{fname} ({slug}/{info['page_filename']})")
+        finally:
+            _release(key)
+    # Kui rohkem .txt pole, koorista kaust + mapping
+    try:
+        remaining = [f for f in sftp.listdir(work_dir) if f.endswith(".txt")]
+    except FileNotFoundError:
+        remaining = []
+    if not remaining:
+        for d in (work_dir, job_dir):
+            try:
+                sftp.rmdir(d)
+            except Exception:
+                pass
+        reocr_state.remove_batch_mapping(job_id)
+
+
+def _recover_single(sftp, base: str, job_id: str, recovered: List[str], skipped: List[str]) -> None:
     job_dir = f"{base}/{job_id}"
     try:
         slugs = sftp.listdir(job_dir)
@@ -100,7 +183,7 @@ def _recover_one(sftp, base: str, job_id: str, recovered: List[str], skipped: Li
             meta = _resolve_job_meta(job_id)
             if not meta:
                 skipped.append(job_id)
-                logger.warning(f"Reaper: {job_id} .txt olemas, aga page_filename teadmata → skip")
+                _warn_skip_once(job_id, ".txt olemas, aga page_filename teadmata")
                 return
             buf = io.BytesIO()
             sftp.getfo(txt_abs, buf)
@@ -108,13 +191,10 @@ def _recover_one(sftp, base: str, job_id: str, recovered: List[str], skipped: Li
             reocr_ops._write_ocr_file(slug, meta["page_filename"], text)
             now = datetime.now().timestamp()
             reocr_ops._append_to_log(
-                {"work_id": meta.get("work_id"), "slug": slug,
-                 "page_filename": meta["page_filename"], "status": "done",
-                 "error": None, "started_at": None,
-                 "finished_at": now,
-                 "recovered": True, "original_status": "error",
-                 "recovered_at": now},
-                job_id)
+                {"work_id": meta.get("work_id"), "slug": slug, "page_filename": meta["page_filename"],
+                 "page_number": meta.get("page_number"), "status": "done", "error": None,
+                 "started_at": None, "finished_at": now,
+                 "recovered": True, "original_status": "error", "recovered_at": now}, job_id)
             _cleanup_staging(sftp, job_dir, slug)
             recovered.append(job_id)
             logger.info(f"Reaper taastas {job_id} ({slug}/{meta['page_filename']})")
