@@ -280,13 +280,14 @@ def check_slug_conflict(year, slug: str) -> bool:
 # PÕHIFUNKTSIOONID
 # =========================================================
 
-def create_upload(meta: dict) -> dict:
+def create_upload(meta: dict, username: Optional[str] = None) -> dict:
     """
     Loob uue upload staging'u ja tagastab state.json sisu.
 
     meta peab sisaldama: title, year, slug
     Valikulised: type, genre, creators, location, publisher,
                  collections, languages, tags
+    username: kes uploadi lõi (ühtses OCR-vaates kuvamiseks)
     """
     upload_id = generate_nanoid()
     while os.path.isdir(_upload_dir(upload_id)):
@@ -309,6 +310,7 @@ def create_upload(meta: dict) -> dict:
     state = {
         "id": upload_id,
         "status": "pending",
+        "username": username,
         "meta": {
             "title": meta.get('title', ''),
             "year": year,

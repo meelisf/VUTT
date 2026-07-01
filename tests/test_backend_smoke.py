@@ -667,3 +667,13 @@ def test_create_upload_appends_work_id(backend_env):
     assert len(work_id) == 6
     assert meta["slug"] == f"adam-koljo-kiri-{work_id}"
     assert meta["slug"].endswith(f"-{work_id}")
+
+
+def test_create_upload_stores_username(backend_env):
+    """create_upload salvestab creatori username'i (ühtses OCR-vaates kuvamiseks)."""
+    upload_ops = backend_env["upload_ops"]
+    state = upload_ops.create_upload({"title": "T", "year": "", "slug": "t"}, username="mari")
+    assert state["username"] == "mari"
+    # ilma username'ita → None (tagurpidiühilduv)
+    state2 = upload_ops.create_upload({"title": "T2", "year": "", "slug": "t2"})
+    assert state2["username"] is None

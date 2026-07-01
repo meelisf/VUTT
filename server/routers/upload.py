@@ -40,7 +40,7 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
     # sanitize_slug on idempotentne, seega juba korrektne slug ei muutu.
     slug = sanitize_slug(data.get("slug") or data.get("title", ""))
     data["slug"] = slug
-    return {"status": "success", "upload": create_upload(data)}
+    return {"status": "success", "upload": create_upload(data, username=user["username"])}
 
 
 @router.get("/admin/upload/{upload_id}/status")
