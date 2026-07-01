@@ -85,6 +85,8 @@ interface OcrJob {
   progress: { ready: number; total: number } | null;
   link: string;
   error: string | null;
+  username?: string;
+  queue_ahead?: number;
 }
 
 interface DiffData {
@@ -592,14 +594,25 @@ const Review: React.FC = () => {
                                 <ExternalLink size={11} />
                               </a>
                             )}
+                            {isActive && !!job.queue_ahead && job.queue_ahead > 0 && (
+                              <span className="text-xs text-gray-400">
+                                {t('reocr.queueAhead', { count: job.queue_ahead })}
+                              </span>
+                            )}
                           </div>
                           {job.error && <p className="text-xs text-red-600 mt-0.5">{job.error}</p>}
                         </div>
 
-                        {/* Aeg */}
+                        {/* Kasutaja + aeg */}
                         <div className="text-xs text-gray-500 text-right shrink-0">
-                          {job.started_at && (
+                          {job.username && (
                             <div className="flex items-center gap-1 justify-end">
+                              <User size={11} />
+                              {job.username}
+                            </div>
+                          )}
+                          {job.started_at && (
+                            <div className="flex items-center gap-1 justify-end mt-0.5">
                               <Clock size={11} />
                               {isActive ? formatElapsed(job.started_at)
                                 : new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit' })}

@@ -103,3 +103,34 @@ def test_title_reader_reads_metadata(tmp_path, monkeypatch):
     assert reader("puudub") == ""     # ei leidu → tühi (normaliseerija fallback slug'ile)
     # cache: teine kutse ei ava faili uuesti (sama tulemus)
     assert reader("wid") == "Loetud Pealkiri"
+
+
+def test_normalize_includes_username():
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w1", "page_number": 1,
+                "status": "processing", "slow": False, "started_at": 100.0,
+                "error": None, "username": "mari"}]
+    batches = [{"job_id": "b1", "work_id": "wid", "slug": "w1", "status": "processing",
+                "slow": False, "started_at": 90.0, "ready": 0, "total": 2, "username": "jaan"}]
+    uploads = [{"id": "u1", "status": "processing",
+                "meta": {"title": "T", "slug": "t", "work_id": "wx"},
+                "expected_pages": 3, "created_at": "2026-07-01T10:00:00", "files": []}]
+    by_id = {e["id"]: e for e in normalize_ocr_jobs(uploads, singles, batches, _title_of)}
+    assert by_id["s1"]["username"] == "mari"
+    assert by_id["b1"]["username"] == "jaan"
+    assert by_id["u1"]["username"] == ""   # upload ei salvesta kasutajanime
+
+
+def test_normalize_queue_ahead_across_all_active():
+    # Aktiivsed single+batch erineva started_at-iga → ühtne järjekord üle tüüpide.
+    # (float started_at, et vältida ISO/TZ-sõltuvust; done pole aktiivne → 0)
+    singles = [{"job_id": "s1", "work_id": "wid", "slug": "w", "page_number": 1,
+                "status": "processing", "slow": False, "started_at": 30.0, "error": None},
+               {"job_id": "s2", "work_id": "wid", "slug": "w", "page_number": 2,
+                "status": "done", "slow": False, "started_at": 10.0, "error": None}]  # done → mitte-aktiivne
+    batches = [{"job_id": "b1", "work_id": "wid", "slug": "w", "status": "processing",
+                "slow": False, "started_at": 25.0, "ready": 0, "total": 1}]
+    by_id = {e["id"]: e for e in normalize_ocr_jobs([], singles, batches, _title_of)}
+    # Aktiivsed started_at järgi: b1(25) < s1(30); done s2 pole aktiivne
+    assert by_id["b1"]["queue_ahead"] == 0
+    assert by_id["s1"]["queue_ahead"] == 1
+    assert by_id["s2"]["queue_ahead"] == 0   # mitte-aktiivne → 0

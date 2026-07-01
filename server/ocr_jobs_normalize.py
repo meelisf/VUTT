@@ -58,6 +58,7 @@ def _normalize_upload(state: dict, title_of) -> dict:
         "progress": {"ready": ready, "total": total} if total else None,
         "link": _upload_link(state, status_key),
         "error": state.get("error_message"),
+        "username": state.get("username", ""),  # uploadid ei salvesta praegu → ""
     }
 
 
@@ -91,6 +92,7 @@ def _normalize_single(job: dict, title_of) -> dict:
         "progress": None,
         "link": _work_link(job.get("work_id"), job.get("page_number")),
         "error": job.get("error"),
+        "username": job.get("username", ""),
     }
 
 
@@ -109,6 +111,7 @@ def _normalize_batch(job: dict, title_of) -> dict:
         "progress": {"ready": job.get("ready", 0), "total": total} if total else None,
         "link": _work_link(job.get("work_id"), None),
         "error": job.get("error"),
+        "username": job.get("username", ""),
     }
 
 
@@ -119,5 +122,14 @@ def normalize_ocr_jobs(uploads: List[dict], singles: List[dict], batches: List[d
     out += [_normalize_upload(u, title_of) for u in uploads]
     out += [_normalize_single(s, title_of) for s in singles]
     out += [_normalize_batch(b, title_of) for b in batches]
+    # queue_ahead: ühtne lokaalne FIFO-lähend üle KÕIGI aktiivsete (upload+reocr+batch)
+    # started_at järgi. OCR-serveri päris järjekorda ei teata.
+    active = [e for e in out if e["status_key"] in ("uploading", "processing")]
+    for e in out:
+        if e["status_key"] in ("uploading", "processing"):
+            st = e.get("started_at") or 0.0
+            e["queue_ahead"] = sum(1 for o in active if (o.get("started_at") or 0.0) < st)
+        else:
+            e["queue_ahead"] = 0
     out.sort(key=lambda e: e.get("started_at") or 0.0, reverse=True)
     return out
