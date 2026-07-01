@@ -1,6 +1,6 @@
 # OCR-tööde ühtne vaade (Faas 2) — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Review-lehel üks ajajärjestatud nimekiri, mis näitab KÕIKI OCR-serveri töid (upload + üksik re-OCR + batch) tüübi-badge'i, ühtse staatuse ja järjekindla lingiga.
 
@@ -45,7 +45,7 @@
 **Interfaces:**
 - Produces: `list_reocr_batch_jobs() -> list` — iga batch-jobi kohta `{job_id, work_id, slug, username, status, slow, started_at, ready, total}`.
 
-- [ ] **Step 1: Write the failing test** (lisa `tests/test_reocr_batch.py` lõppu)
+- [x] **Step 1: Write the failing test** (lisa `tests/test_reocr_batch.py` lõppu)
 
 ```python
 def test_list_reocr_batch_jobs_summary():
@@ -67,12 +67,12 @@ def test_list_reocr_batch_jobs_summary():
         r._reocr_batch_jobs.clear()
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_batch.py::test_list_reocr_batch_jobs_summary -q`
 Expected: FAIL — `AttributeError: ... 'list_reocr_batch_jobs'`
 
-- [ ] **Step 3: Implement** (lisa `server/reocr_ops.py`-sse, `list_reocr_jobs` järele)
+- [x] **Step 3: Implement** (lisa `server/reocr_ops.py`-sse, `list_reocr_jobs` järele)
 
 ```python
 def list_reocr_batch_jobs() -> list:
@@ -96,12 +96,12 @@ def list_reocr_batch_jobs() -> list:
     return out
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `.venv/bin/python -m pytest tests/test_reocr_batch.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/reocr_ops.py tests/test_reocr_batch.py
@@ -123,7 +123,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Produces:
   - `normalize_ocr_jobs(uploads: List[dict], singles: List[dict], batches: List[dict], title_of: Callable[[Optional[str]], str]) -> List[dict]` — ühtne, ajajärjestatud (started_at DESC, None→0.0) kirjete loend kujuga: `{id, type, title, slug, work_id, page_number, status_key, slow, started_at, progress, link, error}`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # tests/test_ocr_jobs_normalize.py
@@ -220,12 +220,12 @@ def test_normalize_sorted_desc():
     assert ids == ["b", "c", "a"]  # started_at DESC
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_ocr_jobs_normalize.py -q`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.ocr_jobs_normalize'`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```python
 # server/ocr_jobs_normalize.py
@@ -354,12 +354,12 @@ def normalize_ocr_jobs(uploads: List[dict], singles: List[dict], batches: List[d
     return out
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_ocr_jobs_normalize.py -q`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add server/ocr_jobs_normalize.py tests/test_ocr_jobs_normalize.py
@@ -380,7 +380,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `normalize_ocr_jobs` (Task 2), `list_uploads`, `list_reocr_jobs`, `list_reocr_batch_jobs` (Task 1), `find_directory_by_id`.
 - Produces: `GET /admin/ocr/jobs` → `{status:"success", jobs:[...]}`.
 
-- [ ] **Step 1: Write the failing test** (lisa `tests/test_ocr_jobs_normalize.py` lõppu — endpoint-tasandi title-cache lugeja)
+- [x] **Step 1: Write the failing test** (lisa `tests/test_ocr_jobs_normalize.py` lõppu — endpoint-tasandi title-cache lugeja)
 
 ```python
 def test_title_reader_reads_metadata(tmp_path, monkeypatch):
@@ -397,12 +397,12 @@ def test_title_reader_reads_metadata(tmp_path, monkeypatch):
     assert reader("wid") == "Loetud Pealkiri"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_ocr_jobs_normalize.py::test_title_reader_reads_metadata -q`
 Expected: FAIL — `ModuleNotFoundError: No module named 'server.routers.ocr_jobs'`
 
-- [ ] **Step 3: Implement router**
+- [x] **Step 3: Implement router**
 
 ```python
 # server/routers/ocr_jobs.py
@@ -453,7 +453,7 @@ async def admin_ocr_jobs(user=Depends(require_role("admin"))):
     return {"status": "success", "jobs": jobs}
 ```
 
-- [ ] **Step 4: Register router in main.py**
+- [x] **Step 4: Register router in main.py**
 
 `server/main.py` — lisa import (`from .routers.reocr import router as reocr_router` juurde, rida ~19):
 
@@ -467,12 +467,12 @@ Ja registreerimise juurde (`app.include_router(reocr_router)` juurde, rida ~56):
 app.include_router(ocr_jobs_router)
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [x] **Step 5: Run tests to verify they pass**
 
 Run: `.venv/bin/python -m pytest tests/test_ocr_jobs_normalize.py -q && .venv/bin/python -c "import server.main; print('main imports OK')"`
 Expected: PASS + "main imports OK"
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add server/routers/ocr_jobs.py server/main.py tests/test_ocr_jobs_normalize.py
@@ -492,7 +492,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 - Consumes: `searchParams`, `pendingUploads`, `handleResume` (olemas).
 - Produces: `/upload?resumeUpload={id}` avab otse selle uploadi ülevaatusele; param eemaldatakse pärast.
 
-- [ ] **Step 1: Add deep-link resume effect**
+- [x] **Step 1: Add deep-link resume effect**
 
 `src/pages/upload/useUploadWizard.ts` — lisa `useRef` import kui puudub (`import { useRef } from 'react'`) ja `useNavigate` on juba imporditud. Lisa `handleResume` funktsiooni JÄREL (rida ~471) effect:
 
@@ -513,12 +513,12 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 **NB:** kontrolli, et `location` on saadaval (`useLocation`) või kasuta `window.location.pathname`. Kui `useLocation` pole imporditud, lisa `import { useLocation } from 'react-router-dom'` ja `const location = useLocation()`. `handleResume` on funktsioon samas hookis — effect'i deps ei vaja seda (stabiilne closure); kui lint nõuab, lisa `// eslint-disable-next-line react-hooks/exhaustive-deps`.
 
-- [ ] **Step 2: Typecheck**
+- [x] **Step 2: Typecheck**
 
 Run: `npm run typecheck`
 Expected: 0 errorit
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/pages/upload/useUploadWizard.ts
@@ -538,7 +538,7 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `GET /admin/ocr/jobs` (Task 3) → `{jobs:[{id,type,title,slug,work_id,page_number,status_key,slow,started_at,progress,link,error}]}`.
 
-- [ ] **Step 1: Replace ReocrJob type with unified OcrJob**
+- [x] **Step 1: Replace ReocrJob type with unified OcrJob**
 
 `src/pages/Review.tsx` — asenda `interface ReocrJob {...}` (aktiivsete tööde tüüp) järgnevaga (jäta `reocrLog` tüüp ReocrJob-iks eraldi — vt allpool):
 
@@ -561,7 +561,7 @@ interface OcrJob {
 
 Muuda `reocrJobs` olek: `const [reocrJobs, setReocrJobs] = useState<OcrJob[]>([]);` (ajaloo `reocrLog` jääb ReocrJob-iks, mille tüüp on juba failis — kui see kasutab slow/queue_ahead välju, jäta need alles).
 
-- [ ] **Step 2: Point fetch at unified endpoint**
+- [x] **Step 2: Point fetch at unified endpoint**
 
 `loadReocrJobs`-is asenda URL:
 
@@ -575,7 +575,7 @@ Ja pollimise `hasActive` kontroll (`j.status === ...`) → `status_key`:
     const hasActive = reocrJobs.some(j => j.status_key === 'uploading' || j.status_key === 'processing');
 ```
 
-- [ ] **Step 3: Replace active-jobs render with unified rows**
+- [x] **Step 3: Replace active-jobs render with unified rows**
 
 Asenda aktiivsete tööde `.map(job => {...})` plokk järgnevaga (kasutab `status_key`, `type`, `link`, `progress`; kulunud aeg + slow badge nagu enne):
 
@@ -637,7 +637,7 @@ Asenda aktiivsete tööde `.map(job => {...})` plokk järgnevaga (kasutab `statu
 
 **NB:** `formatElapsed` on juba failis (eelmisest featuurist). Kui `reocrJobs.filter(...)` loendurit kasutatakse mujal (nt aktiivsete arv, rida ~510), muuda `j.status === ...` → `j.status_key === ...`.
 
-- [ ] **Step 4: Add i18n keys**
+- [x] **Step 4: Add i18n keys**
 
 `src/locales/et/review.json` — `reocr` bloki KÕRVALE (juur-tasand) lisa `ocr` blokk:
 
@@ -671,12 +671,12 @@ Asenda aktiivsete tööde `.map(job => {...})` plokk järgnevaga (kasutab `statu
   },
 ```
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `npm run typecheck`
 Expected: 0 errorit
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/pages/Review.tsx src/locales/et/review.json src/locales/en/review.json
