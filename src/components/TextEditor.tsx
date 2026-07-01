@@ -13,19 +13,12 @@ import ReocrPanel from './editor/ReocrPanel';
 import SpecialCharsPanel from './editor/SpecialCharsPanel';
 import AnnotationDialog from './editor/AnnotationDialog';
 import AnnotationPopover from './editor/AnnotationPopover';
-import { vuttMarkupExtension } from './editor/VuttMarkupExtension';
-import { marginaliaExtension, marginaliaField, closeAllMarginalia } from './editor/MarginaliaExtension';
-import type { MarginaliaMode } from './editor/MarginaliaExtension';
-import { vuttTheme } from './editor/VuttTheme';
+
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { getLangCode } from '../utils/getLangCode';
 
 // CM6 impordid
-import { EditorView, lineNumbers, keymap } from '@codemirror/view';
-import { EditorState, Compartment } from '@codemirror/state';
-import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
-import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
-import { createVuttSearchPanel } from './editor/VuttSearchPanel';
+import type { EditorView } from '@codemirror/view';
 import { useSpecialChars } from './editor/useSpecialChars';
 import { useCopyPastePlainMarkup } from './editor/useCopyPastePlainMarkup';
 import { useReOcr } from './editor/useReOcr';
@@ -33,6 +26,7 @@ import { useEditorState } from './editor/useEditorState';
 import { useEditorSave } from './editor/useEditorSave';
 import { useEditorFormattingActions } from './editor/useEditorFormattingActions';
 import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
+import { useCodeMirrorLifecycle } from './editor/useCodeMirrorLifecycle';
 import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
@@ -82,8 +76,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   // CM6 refs
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-  const editableCompartmentRef = useRef(new Compartment());
-  const marginaliaCompartmentRef = useRef(new Compartment());
   const handleSaveRef = useRef<() => void>(() => {});
   // AnnotationsTab registreerib siia kommentaari-mustandi flushi (vt handleSaveWithDrafts)
   const commentFlushRef = useRef<(() => Annotation[] | null) | null>(null);
@@ -136,16 +128,22 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     authorName: user?.name || 'Anonüümne',
   });
 
-  // Kasutaja eelistus (localStorage) + kitsa paani sundrežiim
-  const [marginaliaUserMode, setMarginaliaUserMode] = useState<MarginaliaMode>(
-    () => (localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
-  );
-  const [narrowPane, setNarrowPane] = useState(false);
-  // Kitsas paan (kõrvuti aknad) → laiad tekst-sildid kokku ikoonideks.
-  // Eraldi (kõrgem) lävend kui narrowPane (640) — sildid kaovad enne badge-režiimi.
-  const [compactToolbar, setCompactToolbar] = useState(false);
-  const [marginaliaCount, setMarginaliaCount] = useState(0);
-  const marginaliaMode: MarginaliaMode = narrowPane ? 'badge' : marginaliaUserMode;
+  const {
+    marginaliaUserMode,
+    narrowPane,
+    compactToolbar,
+    marginaliaCount,
+    toggleMarginaliaMode,
+  } = useCodeMirrorLifecycle({
+    page,
+    readOnly,
+    editorContainerRef,
+    viewRef,
+    handleSaveRef,
+    wrapWithTagRef,
+    copyPastePlainMarkup,
+    setIsDirty,
+  });
 
   const { reocrStatus, reocrText, reocrError, handleReOcr, applyReOcr, deleteOcrFile } = useReOcr({
     page,
@@ -187,116 +185,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     insertMarginalia,
     cleanMarkup,
   } = useEditorFormattingActions({ viewRef, readOnly });
-
-  // --- Globaalne Ctrl+F käsitleja — avab CM6 otsingu capture-faasis enne brauserit ---
-  useEffect(() => {
-    const handleCtrlF = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        const view = viewRef.current;
-        if (view) {
-          e.preventDefault();
-          e.stopPropagation();
-          openSearchPanel(view);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleCtrlF, true); // capture=true: enne CM6 ja brauserit
-    return () => window.removeEventListener('keydown', handleCtrlF, true);
-  }, []);
-
-  // --- CM6 editori loomine (üks kord mount'il) ---
-  useEffect(() => {
-    if (!editorContainerRef.current) return;
-
-    const view = new EditorView({
-      state: EditorState.create({
-        doc: page.text_content || '',
-        extensions: [
-          lineNumbers(),
-          history(),
-          keymap.of([
-            ...defaultKeymap,
-            ...historyKeymap,
-            ...searchKeymap,
-            { key: 'Mod-s', run: () => { handleSaveRef.current(); return true; } },
-            { key: 'Mod-b', run: () => { wrapWithTagRef.current('b'); return true; } },
-            { key: 'Mod-i', run: () => { wrapWithTagRef.current('i'); return true; } },
-            { key: 'Mod-k', run: () => { wrapWithTagRef.current('cs'); return true; } },
-          ]),
-          editableCompartmentRef.current.of(
-            EditorView.editable.of(!readOnly)
-          ),
-          search({ top: false, createPanel: createVuttSearchPanel }),
-          vuttMarkupExtension,
-          marginaliaCompartmentRef.current.of(
-            marginaliaExtension(localStorage.getItem('vutt_marginalia_view') === 'badge' ? 'badge' : 'column')
-          ),
-          vuttTheme,
-          EditorView.updateListener.of((update) => {
-            if (update.docChanged) setIsDirty(true);
-            const count = update.state.field(marginaliaField).blocks.length;
-            setMarginaliaCount(prev => (prev === count ? prev : count));
-          }),
-          copyPastePlainMarkup,
-        ],
-      }),
-      parent: editorContainerRef.current,
-    });
-
-    viewRef.current = view;
-    setMarginaliaCount(view.state.field(marginaliaField).blocks.length);
-
-    return () => {
-      view.destroy();
-      viewRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Uuendame editeeritavust readOnly muutmisel
-  useEffect(() => {
-    viewRef.current?.dispatch({
-      effects: editableCompartmentRef.current.reconfigure(
-        EditorView.editable.of(!readOnly)
-      ),
-    });
-  }, [readOnly]);
-
-  // Marginaalia režiimi vahetus: reconfigure + sule avatud plokid
-  // (facet'i muutus üksi ei käivita dekoratsioonide ümberehitust — closeAll efekt teeb seda)
-  useEffect(() => {
-    viewRef.current?.dispatch({
-      effects: [
-        marginaliaCompartmentRef.current.reconfigure(marginaliaExtension(marginaliaMode)),
-        closeAllMarginalia.of(null),
-      ],
-    });
-  }, [marginaliaMode]);
-
-  // Kitsas paan sunnib märgivaate — veerg ei mahu.
-  // Lävend 500px: veerg ise võtab 146px (.vutt-has-margin padding-left), jättes
-  // ~350px tekstile. 640 oli liiga vara — sildid kadusid kuigi ruumi veel jätkus.
-  useEffect(() => {
-    const el = editorContainerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(entries => {
-      const w = entries[0]?.contentRect.width ?? 9999;
-      // Peidetud paan (display:none) annab 0-laiuse — ära muuda režiimi
-      if (w === 0) return;
-      setNarrowPane(w < 500);
-      setCompactToolbar(w < 760);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const toggleMarginaliaMode = useCallback(() => {
-    setMarginaliaUserMode(prev => {
-      const next = prev === 'column' ? 'badge' : 'column';
-      localStorage.setItem('vutt_marginalia_view', next);
-      return next;
-    });
-  }, []);
 
   // Laadime transkribeerimise juhendi
   useEffect(() => {
