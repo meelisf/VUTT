@@ -41,7 +41,7 @@ export default function AnnotationDialog({
               value={comment}
               onChange={e => onCommentChange(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && comment.trim()) onSave(comment.trim());
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onSave(comment.trim());
                 if (e.key === 'Escape') onCancel();
               }}
             />
@@ -51,9 +51,8 @@ export default function AnnotationDialog({
               </button>
               <button
                 type="button"
-                disabled={!comment.trim()}
-                onClick={() => { if (comment.trim()) onSave(comment.trim()); }}
-                className="px-3 py-1.5 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded disabled:opacity-50"
+                onClick={() => onSave(comment.trim())}
+                className="px-3 py-1.5 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded"
               >
                 {t('common:buttons.save', 'Salvesta')}
               </button>

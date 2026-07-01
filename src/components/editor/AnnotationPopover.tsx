@@ -106,7 +106,11 @@ export default function AnnotationPopover({
           </div>
         ) : annotation ? (
           <>
-            <p className="text-sm text-gray-800 mb-2 leading-relaxed whitespace-pre-wrap">{annotation.comment}</p>
+            {annotation.comment.trim() ? (
+              <p className="text-sm text-gray-800 mb-2 leading-relaxed whitespace-pre-wrap">{annotation.comment}</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic mb-2">{t('annotations.orphanedAnchor', 'Kommentaar puudub')}</p>
+            )}
             <div className="flex items-center justify-between border-t border-gray-100 pt-2">
               <span className="text-xs text-gray-400">{annotation.author}</span>
               {!readOnly && (
