@@ -3,18 +3,17 @@ import { useTranslation } from 'react-i18next';
 import type { Work } from '../../types';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { ErrorBanner } from '../ErrorBanner';
-
-type TabType = 'edit' | 'annotate' | 'history';
+import type { EditorTab } from './types';
 
 interface EditorHeaderProps {
   work?: Work;
-  activeTab: TabType;
+  activeTab: EditorTab;
   readOnly: boolean;
   isSaving: boolean;
   hasUnsavedChanges: boolean;
   statusDirty: boolean;
   saveError: string | null;
-  onTabChange: (tab: TabType) => void;
+  onTabChange: (tab: EditorTab) => void;
   onSave: () => void;
   onClearSaveError: () => void;
 }

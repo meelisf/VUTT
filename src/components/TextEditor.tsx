@@ -34,6 +34,7 @@ import { useCopyPastePlainMarkup } from './editor/useCopyPastePlainMarkup';
 import { useReOcr } from './editor/useReOcr';
 import { useEditorState } from './editor/useEditorState';
 import { useEditorSave } from './editor/useEditorSave';
+import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
   page: Page;
@@ -50,8 +51,6 @@ interface TextEditorProps {
   collections?: Collections;
 }
 
-type TabType = 'edit' | 'annotate' | 'history';
-
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections }) => {
   const { t, i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
@@ -67,13 +66,13 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     setIsCustomChars,
   } = useSpecialChars(authToken);
   const copyPastePlainMarkup = useCopyPastePlainMarkup();
-  const [activeTab, setActiveTab] = useState<TabType>('edit');
+  const [activeTab, setActiveTab] = useState<EditorTab>('edit');
   const hasAppliedDefaultTab = useRef(false);
 
   // Sünkrooni default_tab serverist (ainult esimesel laadimsel)
   useEffect(() => {
     if (!hasAppliedDefaultTab.current && userSettings.default_tab) {
-      setActiveTab(userSettings.default_tab as TabType);
+      setActiveTab(userSettings.default_tab as EditorTab);
       hasAppliedDefaultTab.current = true;
     }
   }, [userSettings.default_tab]);
