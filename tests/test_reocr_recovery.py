@@ -1,4 +1,5 @@
 """Reconciliation-reaper: taastab OCR-staging'usse orvuks jäänud üksik-lehe tulemused."""
+import os
 import sys
 from pathlib import Path
 
@@ -10,7 +11,8 @@ import server.reocr_recovery as rec
 
 
 class _FakeSftp:
-    """Mockib OCR-serveri staging'ut. tree: {abs_dir: [names]}, files: {abs_path: bytes}."""
+    """Mockib OCR-serveri staging'ut. tree: {abs_dir: [names]}, files: {abs_path: bytes}.
+    Käitub realistlikult: remove/rmdir muteerivad olekut, et listdir peegeldaks kustutusi."""
     def __init__(self, tree, files):
         self.tree = tree
         self.files = files
@@ -28,8 +30,16 @@ class _FakeSftp:
         buf.write(self.files[path])
     def remove(self, path):
         self.removed.append(path)
+        self.files.pop(path, None)
+        parent, base = os.path.split(path)
+        if parent in self.tree and base in self.tree[parent]:
+            self.tree[parent].remove(base)
     def rmdir(self, path):
         self.rmdired.append(path)
+        self.tree.pop(path, None)
+        parent, base = os.path.split(path)
+        if parent in self.tree and base in self.tree[parent]:
+            self.tree[parent].remove(base)
     def close(self):
         pass
 
@@ -42,10 +52,12 @@ def _env(tmp_path, monkeypatch):
     monkeypatch.setattr(reocr_ops, "REOCR_LOG_FILE", str(tmp_path / "reocr_log.json"))
     import server.reocr_state as st
     monkeypatch.setattr(st, "REOCR_ACTIVE_FILE", str(tmp_path / "reocr_active.json"))
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "reocr_batch_maps"))
     (tmp_path / "w1").mkdir()
     with reocr_ops._reocr_jobs_lock:
         reocr_ops._reocr_jobs.clear()
     rec._recovering.clear()
+    rec._warned_skips.clear()
     yield
     with reocr_ops._reocr_jobs_lock:
         reocr_ops._reocr_jobs.clear()
@@ -182,3 +194,67 @@ def test_revive_dead_uploads_counts_only_uploading():
     assert r._revive_dead_uploads(jobs) == 2
     assert jobs["a"]["status"] == "processing"
     assert jobs["b"]["status"] == "processing"
+
+
+def test_resolve_job_meta_includes_page_number(monkeypatch, tmp_path):
+    reocr_ops._append_to_log(
+        {"work_id": "wid", "slug": "w1", "page_filename": "w1-lk-7.jpg",
+         "page_number": 7, "status": "error", "started_at": 1.0, "finished_at": 2.0}, "j1")
+    meta = rec._resolve_job_meta("j1")
+    assert meta["page_filename"] == "w1-lk-7.jpg"
+    assert meta["page_number"] == 7
+
+
+def test_batch_orphan_recovered_via_mapping(monkeypatch, tmp_path):
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "maps"))
+    st.persist_batch_mapping("borb", "wid", "w1", {
+        "w1_pg_001.txt": {"page_filename": "w1-lk-1.jpg", "page_number": 1},
+        "w1_pg_002.txt": {"page_filename": "w1-lk-2.jpg", "page_number": 2},
+    })
+    tree = {"/OCR/AUTO-OCR/print": ["borb"], "/OCR/AUTO-OCR/hand": [],
+            "/OCR/AUTO-OCR/print/borb": ["w1"],
+            "/OCR/AUTO-OCR/print/borb/w1": ["w1_pg_001.txt", "w1_pg_002.txt"]}
+    files = {"/OCR/AUTO-OCR/print/borb/w1/w1_pg_001.txt": b"tekst1",
+             "/OCR/AUTO-OCR/print/borb/w1/w1_pg_002.txt": b"tekst2"}
+    monkeypatch.setattr(rec.reocr_ops, "_sftp_open", lambda cid: _FakeSftp(tree, files))
+    monkeypatch.setattr(rec.reocr_ops, "close_ssh", lambda cid: None)
+    with reocr_ops._reocr_jobs_lock:
+        reocr_ops._reocr_jobs.clear()
+    rec._recovering.clear()
+
+    result = rec.scan_and_recover()
+
+    assert "borb" in result["recovered"]
+    assert (tmp_path / "w1" / "w1-lk-1.ocr").read_text(encoding="utf-8") == "tekst1"
+    assert (tmp_path / "w1" / "w1-lk-2.ocr").read_text(encoding="utf-8") == "tekst2"
+    # Logi recovery-kirjed page_number-iga
+    entries = reocr_ops.get_reocr_log(0, 100)["entries"]
+    recs = [e for e in entries if e.get("recovered")]
+    assert {e["page_number"] for e in recs} == {1, 2}
+    # Mapping kustutatud pärast taastet
+    assert st.load_batch_mapping("borb") is None
+
+
+def test_reaper_skips_live_batch_job(monkeypatch, tmp_path):
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "maps"))
+    st.persist_batch_mapping("borb", "wid", "w1", {
+        "w1_pg_001.txt": {"page_filename": "w1-lk-1.jpg", "page_number": 1}})
+    tree = {"/OCR/AUTO-OCR/print": ["borb"], "/OCR/AUTO-OCR/hand": [],
+            "/OCR/AUTO-OCR/print/borb": ["w1"],
+            "/OCR/AUTO-OCR/print/borb/w1": ["w1_pg_001.txt"]}
+    sftp = _FakeSftp(tree, {"/OCR/AUTO-OCR/print/borb/w1/w1_pg_001.txt": b"x"})
+    monkeypatch.setattr(rec.reocr_ops, "_sftp_open", lambda cid: sftp)
+    monkeypatch.setattr(rec.reocr_ops, "close_ssh", lambda cid: None)
+    with reocr_ops._reocr_batch_jobs_lock:
+        reocr_ops._reocr_batch_jobs.clear()
+        reocr_ops._reocr_batch_jobs["borb"] = {"status": "processing", "kind": "batch"}
+    rec._recovering.clear()
+
+    result = rec.scan_and_recover()
+
+    assert result["recovered"] == []
+    assert sftp.removed == []
+    with reocr_ops._reocr_batch_jobs_lock:
+        reocr_ops._reocr_batch_jobs.clear()
