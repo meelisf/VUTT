@@ -66,6 +66,9 @@ interface ReocrJob {
   error: string | null;
   started_at: number | null;
   finished_at: number | null;
+  slow?: boolean;
+  slow_since?: number | null;
+  queue_ahead?: number;
 }
 
 interface DiffData {
@@ -406,6 +409,13 @@ const Review: React.FC = () => {
     return null;
   }
 
+  // Kulunud aeg minutites aktiivsele tööle (elav — uueneb polli-renderdusel iga 4s)
+  const formatElapsed = (startedAt: number | null): string => {
+    if (!startedAt) return '';
+    const mins = Math.floor((Date.now() / 1000 - startedAt) / 60);
+    return mins < 1 ? t('reocr.elapsedLtMin') : t('reocr.elapsedMin', { mins });
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-amber-50">
       <Header />
@@ -535,6 +545,7 @@ const Review: React.FC = () => {
                 <div className="space-y-2">
                   {[...reocrJobs].sort((a, b) => (b.started_at ?? 0) - (a.started_at ?? 0)).map(job => {
                     const isActive = job.status === 'uploading' || job.status === 'processing';
+                    const isSlow = isActive && !!job.slow;
                     return (
                       <div
                         key={job.job_id}
@@ -572,6 +583,11 @@ const Review: React.FC = () => {
                                 <ExternalLink size={11} />
                               </a>
                             )}
+                            {isActive && !!job.queue_ahead && job.queue_ahead > 0 && (
+                              <span className="text-xs text-gray-400">
+                                {t('reocr.queueAhead', { count: job.queue_ahead })}
+                              </span>
+                            )}
                           </div>
                           {job.error && (
                             <p className="text-xs text-red-600 mt-0.5">{job.error}</p>
@@ -587,18 +603,21 @@ const Review: React.FC = () => {
                           {job.started_at && (
                             <div className="flex items-center gap-1 mt-0.5 justify-end">
                               <Clock size={11} />
-                              {new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                              {isActive
+                                ? formatElapsed(job.started_at)
+                                : new Date(job.started_at * 1000).toLocaleTimeString('et-EE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </div>
                           )}
                         </div>
 
                         {/* Staatus badge */}
                         <div className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
+                          isSlow ? 'bg-amber-100 text-amber-800' :
                           isActive ? 'bg-amber-100 text-amber-700' :
                           job.status === 'done' ? 'bg-green-100 text-green-700' :
                           'bg-red-100 text-red-700'
                         }`}>
-                          {t(`reocr.status.${job.status}`)}
+                          {isSlow ? t('reocr.slow') : t(`reocr.status.${job.status}`)}
                         </div>
                       </div>
                     );

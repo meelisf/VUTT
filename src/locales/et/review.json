@@ -15,7 +15,11 @@
       "processing": "Töötleb",
       "done": "Valmis",
       "error": "Viga"
-    }
+    },
+    "slow": "aeglane, töötab edasi",
+    "elapsedMin": "töötab {{mins}} min",
+    "elapsedLtMin": "töötab <1 min",
+    "queueAhead": "~{{count}} varasemat tööd"
   },
   "subtitle": "Sinu viimased töökohad",
   "subtitleAdmin": "Kõigi kasutajate muudatused",

@@ -8,9 +8,10 @@ import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, get_logger
+from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, get_logger
 from .utils import generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
+from . import reocr_state
 
 REOCR_LOG_MAX = 500   # Maksimaalne kirjete arv logifailis
 _log_lock = threading.Lock()
@@ -30,6 +31,9 @@ def _append_to_log(job: dict, job_id: str):
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
     }
+    for _k in ("recovered", "original_status", "recovered_at"):
+        if _k in job:
+            entry[_k] = job[_k]
     with _log_lock:
         try:
             if os.path.exists(REOCR_LOG_FILE):
@@ -100,12 +104,42 @@ _reocr_jobs_lock = threading.Lock()
 
 REOCR_MAX_CONCURRENT = 20   # Max korraga aktiivseid re-OCR töid
 REOCR_JOB_TTL = 86400       # Valmis/vigased tööd kustutatakse 24h pärast
-REOCR_PROCESSING_TIMEOUT = 1800  # 30 minutit — pärast seda märgitakse error
+REOCR_PROCESSING_TIMEOUT = 1800  # 30 min — SLOW-lävi (nõuandev), EI lõpeta tööd
+REOCR_ABSOLUTE_TIMEOUT = int(os.getenv("REOCR_ABSOLUTE_TIMEOUT", str(12 * 3600)))
+# ^ Sanity cap kogu kliendipoolsele elueale (sh järjekorras ootamine), MITTE OCR-töötluse timeout.
 
-REOCR_BATCH_INACTIVITY_TIMEOUT = 1800  # Batch error, kui X s pole ühegi lehe kohta uut .txt
+REOCR_BATCH_INACTIVITY_TIMEOUT = 1800  # Batch slow, kui X s pole ühegi lehe kohta uut .txt
 
 _reocr_batch_jobs: Dict = {}  # {job_id: batch-job dict}
 _reocr_batch_jobs_lock = threading.Lock()
+
+
+def _persist_active_jobs() -> None:
+    """Snapshot mõlemast dict'ist ja persist reocr_active.json-i (aktiivsed jäävad)."""
+    with _reocr_jobs_lock:
+        single = dict(_reocr_jobs)
+    with _reocr_batch_jobs_lock:
+        batch = dict(_reocr_batch_jobs)
+    reocr_state.persist_active_jobs({**single, **batch})
+
+
+def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
+    """Sea slow=True esimest korda kui üle slow-läve. Debounce: teisel korral False."""
+    if now - job.get("started_at", now) <= REOCR_PROCESSING_TIMEOUT:
+        return False
+    if job.get("slow"):
+        return False
+    with _reocr_jobs_lock:
+        j = _reocr_jobs.get(jid)
+        if j and j["status"] == "processing" and not j.get("slow"):
+            j["slow"] = True
+            j["slow_since"] = now
+            return True
+    return False
+
+
+def _abs_timeout_reached(job: dict, now: float) -> bool:
+    return now - job.get("started_at", now) > REOCR_ABSOLUTE_TIMEOUT
 
 
 def get_active_batch_for_work(work_id: str) -> Optional[str]:
@@ -146,6 +180,7 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
     }
     with _reocr_batch_jobs_lock:
         _reocr_batch_jobs[job_id] = job
+    _persist_active_jobs()
 
     def _upload():
         try:
@@ -163,6 +198,7 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                 entry["status"] = "processing"
             sftp.close()
             job["status"] = "processing"
+            _persist_active_jobs()
             logger.info(f"Re-OCR batch {job_id}: {len(page_entries)} pilti edastatud ({slug})")
         except Exception as e:
             logger.error(f"Re-OCR batch {job_id} upload viga: {e}")
@@ -172,6 +208,7 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                     entry["error"] = str(e)
             job["status"] = "error"
             job["finished_at"] = datetime.now().timestamp()
+            _persist_active_jobs()
 
     threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}").start()
     return job_id
@@ -260,35 +297,66 @@ def _poll_batch_job(job_id: str) -> None:
     _finalize_batch_if_complete(job)
 
 
-def _reocr_batch_poll_loop():
-    """Daemon: kontrollib batch-töid iga 10s; inactivity-timeout märgib lahendamata lehed error-iks."""
-    import time
-    while True:
-        time.sleep(10)
-        now = datetime.now().timestamp()
-        with _reocr_batch_jobs_lock:
-            active = [(jid, j) for jid, j in _reocr_batch_jobs.items() if j["status"] == "processing"]
-            # TTL: eemalda vanad done jobid
-            stale = [jid for jid, j in _reocr_batch_jobs.items()
-                     if j["status"] in ("done", "error")
-                     and (j.get("finished_at") or 0) < now - REOCR_JOB_TTL]
-            for jid in stale:
-                del _reocr_batch_jobs[jid]
-        for jid, job in active:
-            if _batch_inactive(job, now, REOCR_BATCH_INACTIVITY_TIMEOUT):
-                with _reocr_batch_jobs_lock:
-                    for e in job["pages"]:
-                        if e["status"] in ("uploading", "processing"):
-                            e["status"] = "error"
-                            e["error"] = "Aegumine: OCR ei edenenud määratud aja jooksul."
-                    job["status"] = "done"
-                    job["finished_at"] = now
-                logger.warning(f"Re-OCR batch {jid}: inactivity-timeout")
-                continue
+def _batch_poll_iteration(now: float) -> None:
+    """Üks batch-pollimis-pass. slow batch-tasemel; absoluutne lagi märgib allesjäänud
+    pending-lehed veaks ALLES pärast viimast _poll_batch_job-i. Osaliselt valmis jäävad.
+    Säilitab olemasoleva TTL-puhastuse (vanad done/error batch'id)."""
+    with _reocr_batch_jobs_lock:
+        active = [(jid, j) for jid, j in _reocr_batch_jobs.items() if j["status"] == "processing"]
+        stale = [jid for jid, j in _reocr_batch_jobs.items()
+                 if j["status"] in ("done", "error")
+                 and (j.get("finished_at") or 0) < now - REOCR_JOB_TTL]
+        for jid in stale:
+            del _reocr_batch_jobs[jid]
+    changed = bool(stale)
+    for jid, job in active:
+        if _abs_timeout_reached(job, now):
             try:
                 _poll_batch_job(jid)
             except Exception as e:
-                logger.warning(f"Re-OCR batch {jid} poll viga: {e}")
+                logger.warning(f"Re-OCR batch {jid} viimane kontroll ebaõnnestus: {e}")
+            with _reocr_batch_jobs_lock:
+                j = _reocr_batch_jobs.get(jid)
+                if j and j["status"] == "processing":
+                    for e in j["pages"]:
+                        if e["status"] in ("uploading", "processing"):
+                            e["status"] = "error"
+                            e["error"] = "Aegumine: OCR-tulemust ei saabunud absoluutse aja jooksul."
+                    j["status"] = "done"
+                    j["finished_at"] = now
+                    changed = True
+            continue
+        if _batch_inactive(job, now, REOCR_BATCH_INACTIVITY_TIMEOUT) and not job.get("slow"):
+            with _reocr_batch_jobs_lock:
+                j = _reocr_batch_jobs.get(jid)
+                if j and j["status"] == "processing" and not j.get("slow"):
+                    j["slow"] = True
+                    j["slow_since"] = now
+                    changed = True
+        before = (job.get("status"), job.get("last_progress_at"),
+                  tuple(e.get("status") for e in job.get("pages", [])))
+        try:
+            _poll_batch_job(jid)
+            with _reocr_batch_jobs_lock:
+                cur = _reocr_batch_jobs.get(jid)
+                after = (cur.get("status"), cur.get("last_progress_at"),
+                         tuple(e.get("status") for e in cur.get("pages", []))) if cur else None
+            if after != before:
+                changed = True
+        except Exception as e:
+            logger.warning(f"Re-OCR batch {jid} poll viga: {e}")
+    if changed:
+        _persist_active_jobs()
+
+
+def _reocr_batch_poll_loop():
+    import time
+    while True:
+        time.sleep(10)
+        try:
+            _batch_poll_iteration(datetime.now().timestamp())
+        except Exception as e:
+            logger.warning(f"Re-OCR batch poll iteration viga: {e}")
 
 
 threading.Thread(target=_reocr_batch_poll_loop, daemon=True, name="reocr-batch-poll").start()
@@ -349,31 +417,46 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
     return {"active": active, "ocr_ready": ocr_ready, "errors": errors, "progress": progress}
 
 
-def _reocr_poll_loop():
-    """Daemon-thread: kontrollib proaktiivselt 'processing' töid iga 10s tagant.
-    Nii ei pea kasutaja olema Workspace lehel, et tulemus kätte saada.
-    Tööd mis on olnud processing-s üle 30 min märgitakse error-iks."""
-    import time
-    while True:
-        time.sleep(10)
-        now = datetime.now().timestamp()
-        with _reocr_jobs_lock:
-            processing = [(jid, j) for jid, j in _reocr_jobs.items() if j["status"] == "processing"]
-        for jid, job in processing:
-            # Timeout: liiga kaua processing-s olnud töö märgitakse veaks
-            if now - job.get("started_at", now) > REOCR_PROCESSING_TIMEOUT:
-                with _reocr_jobs_lock:
-                    if _reocr_jobs.get(jid, {}).get("status") == "processing":
-                        _reocr_jobs[jid]["status"] = "error"
-                        _reocr_jobs[jid]["error"] = "Aegumine: OCR server ei vastanud 30 minuti jooksul."
-                        _reocr_jobs[jid]["finished_at"] = now
-                        logger.warning(f"Re-OCR {jid}: timeout, märgitud error-iks")
-                        _append_to_log(_reocr_jobs[jid], jid)
-                continue
+def _poll_iteration(now: float) -> None:
+    """Üks pollimis-pass üle 'processing' tööde. Testitav ilma lõputu loopita."""
+    with _reocr_jobs_lock:
+        processing = [(jid, j) for jid, j in _reocr_jobs.items() if j["status"] == "processing"]
+    changed = False
+    for jid, job in processing:
+        if _abs_timeout_reached(job, now):
             try:
                 poll_reocr_job(jid)
             except Exception as e:
-                logger.warning(f"Re-OCR background poll viga ({jid}): {e}")
+                logger.warning(f"Re-OCR {jid} viimane kontroll ebaõnnestus: {e}")
+            with _reocr_jobs_lock:
+                j = _reocr_jobs.get(jid)
+                if j and j["status"] == "processing":
+                    j["status"] = "error"
+                    j["error"] = "Aegumine: OCR-tulemust ei saabunud absoluutse aja jooksul."
+                    j["finished_at"] = now
+                    _append_to_log(j, jid)
+                    changed = True
+            continue
+        if _mark_slow_if_stale(jid, job, now):
+            changed = True
+        try:
+            poll_reocr_job(jid)
+        except Exception as e:
+            logger.warning(f"Re-OCR background poll viga ({jid}): {e}")
+    if changed:
+        _persist_active_jobs()
+
+
+def _reocr_poll_loop():
+    """Daemon-thread: kontrollib 'processing' töid iga 10s. 30 min → slow-lipp (ei loobu);
+    absoluutne sanity-lagi → error ALLES pärast viimast SFTP-kontrolli."""
+    import time
+    while True:
+        time.sleep(10)
+        try:
+            _poll_iteration(datetime.now().timestamp())
+        except Exception as e:
+            logger.warning(f"Re-OCR poll iteration viga: {e}")
 
 
 threading.Thread(target=_reocr_poll_loop, daemon=True, name="reocr-poll").start()
@@ -387,21 +470,34 @@ def get_active_reocr_count() -> int:
 def list_reocr_jobs() -> list:
     """Tagastab kõigi re-OCR tööde loendi (admin ülevaate jaoks)."""
     with _reocr_jobs_lock:
-        return [
-            {
-                "job_id": jid,
-                "work_id": j["work_id"],
-                "slug": j["slug"],
-                "page_filename": j.get("page_filename", ""),
-                "page_number": j.get("page_number"),
-                "username": j.get("username", ""),
-                "status": j["status"],
-                "error": j.get("error"),
-                "started_at": j.get("started_at"),
-                "finished_at": j.get("finished_at"),
-            }
-            for jid, j in _reocr_jobs.items()
-        ]
+        items = list(_reocr_jobs.items())
+    active = [(jid, j) for jid, j in items if j["status"] in ("uploading", "processing")]
+
+    def _queue_ahead(job: dict) -> int:
+        if job["status"] not in ("uploading", "processing"):
+            return 0
+        st = job.get("started_at", 0) or 0
+        # Lokaalne VUTT FIFO-lähend — OCR-serveri päris järjekorda ei teata.
+        return sum(1 for _, o in active if (o.get("started_at", 0) or 0) < st)
+
+    return [
+        {
+            "job_id": jid,
+            "work_id": j["work_id"],
+            "slug": j["slug"],
+            "page_filename": j.get("page_filename", ""),
+            "page_number": j.get("page_number"),
+            "username": j.get("username", ""),
+            "status": j["status"],
+            "error": j.get("error"),
+            "started_at": j.get("started_at"),
+            "finished_at": j.get("finished_at"),
+            "slow": bool(j.get("slow", False)),
+            "slow_since": j.get("slow_since"),
+            "queue_ahead": _queue_ahead(j),
+        }
+        for jid, j in items
+    ]
 
 
 def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "", material_type: str = "print") -> str:
@@ -431,6 +527,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
         "remote_img": f"{remote_work}/{remote_img_name}",
         "remote_txt": f"{remote_work}/{slug}_pg_001.txt",
     }
+    _persist_active_jobs()
 
     def _upload():
         try:
@@ -446,6 +543,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             sftp.put(img_path, img_abs)
             sftp.close()
             _reocr_jobs[job_id]["status"] = "processing"
+            _persist_active_jobs()
             logger.info(f"Re-OCR {job_id}: pilt edastatud ({slug})")
         except Exception as e:
             logger.error(f"Re-OCR {job_id} upload viga: {e}")
@@ -453,6 +551,7 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             _reocr_jobs[job_id]["error"] = str(e)
             _reocr_jobs[job_id]["finished_at"] = datetime.now().timestamp()
             _append_to_log(_reocr_jobs[job_id], job_id)
+            _persist_active_jobs()
         finally:
             try:
                 os.unlink(img_path)
@@ -519,6 +618,7 @@ def poll_reocr_job(job_id: str) -> dict:
         job["finished_at"] = datetime.now().timestamp()
         logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
         _append_to_log(job, job_id)
+        _persist_active_jobs()
 
         # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
         page_fn = job.get("page_filename", "")
@@ -532,3 +632,53 @@ def poll_reocr_job(job_id: str) -> dict:
         logger.warning(f"Re-OCR {job_id} poll viga: {e}")
 
     return {"status": job["status"], "text": job.get("text"), "error": job.get("error")}
+
+
+def _split_loaded(loaded: dict):
+    """Jaga laetud aktiivsed tööd üksik- ja batch-dict'ideks 'kind' järgi."""
+    single, batch = {}, {}
+    for jid, j in loaded.items():
+        if j.get("kind") == "batch":
+            batch[jid] = j
+        else:
+            single[jid] = j
+    return single, batch
+
+
+def _revive_dead_uploads(jobs: dict) -> int:
+    """Restardil laetud 'uploading' tööde upload-thread on surnud → poll ei töötleks neid
+    kunagi (poll ainult 'processing') ega reaper (uploading = aktiivne) → igavene zombie.
+    Teisenda 'uploading' → 'processing', et absoluutne sanity-lagi (12h) neid katab: kui
+    pilt jõudis serverisse, poll leiab tulemuse; kui ei, aegub error-iks. Tagastab arvu."""
+    n = 0
+    for j in jobs.values():
+        if j.get("status") == "uploading":
+            j["status"] = "processing"
+            n += 1
+    return n
+
+
+def start_reocr_background() -> None:
+    """Käivita re-OCR restardi-jätkamine + reconciliation. Kutsu AINULT main.py lifespan'ist
+    (API-protsess). JÄRJEKORD KRIITILINE: load → recovery → reaper, et aktiivseid töid
+    ei peetaks orvuks."""
+    if not UPLOAD_ENABLED:
+        return
+    from . import reocr_recovery
+    single, batch = _split_loaded(reocr_state.load_active_jobs())
+    revived = _revive_dead_uploads(single) + _revive_dead_uploads(batch)
+    with _reocr_jobs_lock:
+        _reocr_jobs.update(single)
+    with _reocr_batch_jobs_lock:
+        _reocr_batch_jobs.update(batch)
+    logger.info(f"Re-OCR taastatud mällu: {len(single)} üksik + {len(batch)} batch "
+                f"({revived} surnud upload-i → processing)")
+    if revived:
+        _persist_active_jobs()  # kirjuta teisendatud staatus kohe tagasi
+    try:
+        result = reocr_recovery.scan_and_recover()
+        logger.info(f"Re-OCR startup recovery: taastatud {len(result['recovered'])}, "
+                    f"skip {len(result['skipped'])}")
+    except Exception as e:
+        logger.warning(f"Re-OCR startup recovery viga: {e}")
+    reocr_recovery.start_reaper_loop()
