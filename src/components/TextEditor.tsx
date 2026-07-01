@@ -5,12 +5,14 @@ import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { useUser } from '../contexts/UserContext';
-import { Save, Loader2, X, Trash2, Pencil } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
 import EditorStatusBar from './editor/EditorStatusBar';
 import EditorToolbar from './editor/EditorToolbar';
 import SpecialCharsPanel from './editor/SpecialCharsPanel';
+import AnnotationDialog from './editor/AnnotationDialog';
+import AnnotationPopover from './editor/AnnotationPopover';
 import { vuttMarkupExtension, vuttMarkupField } from './editor/VuttMarkupExtension';
 import { marginaliaExtension, marginaliaField, openMarginalia, closeAllMarginalia, hiddenBlockRanges } from './editor/MarginaliaExtension';
 import type { MarginaliaMode } from './editor/MarginaliaExtension';
@@ -873,191 +875,38 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
       </div>
     </div>
 
-    {annPopover && (() => {
-      const ann = annPopoverAnnotationsRef.current.find(a => a.id === annPopover.annId);
-      const closePopover = () => { setAnnPopover(null); setAnnPopoverEditing(false); setAnnPopoverPendingDelete(false); };
-
-      // Ühtsed nupustiilid
-      const btnCancel = "text-xs text-gray-400 hover:text-gray-700";
-      const btnDanger = "text-xs text-red-600 hover:text-red-800 font-medium";
-      const btnSave   = "text-xs text-primary-600 hover:text-primary-800 font-medium disabled:opacity-40";
-
-      return (
-        <div
-          className="fixed z-40 bg-white border border-gray-200 rounded-lg shadow-xl w-72 max-w-xs"
-          style={{ left: annPopover.x, top: annPopover.y - 8, transform: 'translate(-50%, -100%)' }}
-          onClick={e => e.stopPropagation()}
-        >
-          {/* Päis: sulge-nupp alati nähtav */}
-          <div className="flex items-center justify-between px-3 pt-2.5 pb-1">
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              {ann ? t('annotations.annotationLabel', 'Märge') : t('annotations.orphanedAnchor', 'Kommentaar puudub')}
-            </span>
-            <button type="button" onClick={closePopover} className="text-gray-300 hover:text-gray-600 transition-colors" title={t('common:buttons.close', 'Sulge')}>
-              <X size={14} />
-            </button>
-          </div>
-
-          <div className="px-3 pb-3">
-            {annPopoverEditing ? (
-              /* ── Muutmisvaade (kehtib nii ann kui orphan puhul) ── */
-              <div className="space-y-2">
-                <textarea
-                  autoFocus
-                  className="w-full px-2 py-1.5 text-sm border border-primary-300 rounded focus:border-primary-500 focus:ring-1 focus:ring-primary-200 outline-none resize-none"
-                  rows={3}
-                  placeholder={t('editor.annotateCommentPlaceholder', 'Kommentaar...')}
-                  value={annPopoverEditText}
-                  onChange={e => setAnnPopoverEditText(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Escape') setAnnPopoverEditing(false);
-                    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && annPopoverEditText.trim()) {
-                      if (ann) {
-                        const updated = annPopoverAnnotationsRef.current.map(a => a.id === ann.id ? { ...a, comment: annPopoverEditText.trim() } : a);
-                        handleSaveTextAnnotations(updated);
-                      } else {
-                        const newAnn: TextAnnotation = { id: annPopover.annId, comment: annPopoverEditText.trim(), author: user?.name || 'Anonüümne', created_at: new Date().toISOString() };
-                        handleSaveTextAnnotations([...annPopoverAnnotationsRef.current, newAnn]);
-                      }
-                      closePopover();
-                    }
-                  }}
-                />
-                <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setAnnPopoverEditing(false)} className={btnCancel}>
-                    {t('common:buttons.cancel', 'Tühista')}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!annPopoverEditText.trim()}
-                    onClick={() => {
-                      if (ann) {
-                        const updated = annPopoverAnnotationsRef.current.map(a => a.id === ann.id ? { ...a, comment: annPopoverEditText.trim() } : a);
-                        handleSaveTextAnnotations(updated);
-                      } else {
-                        const newAnn: TextAnnotation = { id: annPopover.annId, comment: annPopoverEditText.trim(), author: user?.name || 'Anonüümne', created_at: new Date().toISOString() };
-                        handleSaveTextAnnotations([...annPopoverAnnotationsRef.current, newAnn]);
-                      }
-                      closePopover();
-                    }}
-                    className={btnSave}
-                  >
-                    {t('common:buttons.save', 'Salvesta')}
-                  </button>
-                </div>
-              </div>
-            ) : ann ? (
-              /* ── Kommentaariga ankur: kuva tekst + tegutsemine ── */
-              <>
-                <p className="text-sm text-gray-800 mb-2 leading-relaxed whitespace-pre-wrap">{ann.comment}</p>
-                <div className="flex items-center justify-between border-t border-gray-100 pt-2">
-                  <span className="text-xs text-gray-400">{ann.author}</span>
-                  {!readOnly && (
-                    <div className="flex gap-3 items-center">
-                      {annPopoverPendingDelete ? (
-                        <>
-                          <button type="button" onClick={() => { handleDeleteAndSaveTextAnnotation(ann.id); closePopover(); }} className={btnDanger}>
-                            {t('common:buttons.delete', 'Kustuta')}
-                          </button>
-                          <button type="button" onClick={() => setAnnPopoverPendingDelete(false)} className={btnCancel}>
-                            {t('common:buttons.cancel', 'Tühista')}
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(ann.comment); }} className="text-gray-300 hover:text-primary-500 transition-colors" title={t('info.editComment')}>
-                            <Pencil size={13} />
-                          </button>
-                          <button type="button" onClick={() => setAnnPopoverPendingDelete(true)} className="text-gray-300 hover:text-red-500 transition-colors" title={t('info.deleteComment')}>
-                            <Trash2 size={13} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              /* ── Kommentaarita ankur: lisa või kustuta ── */
-              !readOnly && (annPopoverPendingDelete ? (
-                <div className="flex gap-3 items-center">
-                  <button type="button" onClick={() => { removeAnnotationFromEditor(annPopover.annId); closePopover(); }} className={btnDanger}>
-                    {t('common:buttons.delete', 'Kustuta')}
-                  </button>
-                  <button type="button" onClick={() => setAnnPopoverPendingDelete(false)} className={btnCancel}>
-                    {t('common:buttons.cancel', 'Tühista')}
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <button type="button" onClick={() => { setAnnPopoverEditing(true); setAnnPopoverEditText(''); }} className="text-xs text-primary-600 hover:text-primary-800">
-                    {t('annotations.addComment', 'Lisa kommentaar')}
-                  </button>
-                  <button type="button" onClick={() => setAnnPopoverPendingDelete(true)} className="text-gray-300 hover:text-red-500 transition-colors" title={t('annotations.deleteAnchor', 'Kustuta ankur')}>
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      );
-    })()}
+    {annPopover && (
+      <AnnotationPopover
+        annId={annPopover.annId}
+        x={annPopover.x}
+        y={annPopover.y}
+        annotation={annPopoverAnnotationsRef.current.find(a => a.id === annPopover.annId)}
+        annotations={annPopoverAnnotationsRef.current}
+        readOnly={readOnly}
+        editText={annPopoverEditText}
+        editing={annPopoverEditing}
+        pendingDelete={annPopoverPendingDelete}
+        authorName={user?.name || 'Anonüümne'}
+        onEditTextChange={setAnnPopoverEditText}
+        onEditingChange={setAnnPopoverEditing}
+        onPendingDeleteChange={setAnnPopoverPendingDelete}
+        onClose={() => setAnnPopover(null)}
+        onSaveTextAnnotations={handleSaveTextAnnotations}
+        onDeleteTextAnnotation={handleDeleteAndSaveTextAnnotation}
+        onRemoveAnchor={removeAnnotationFromEditor}
+      />
+    )}
 
     {annDialogOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-        <div className="bg-white rounded-lg shadow-xl p-5 w-96 max-w-full">
-          <h3 className="font-bold text-gray-800 mb-1">{t('editor.annotateTitle', 'Lisa kommentaar')}</h3>
-          {annDialogError ? (
-            <p className="text-sm text-red-600 mb-3">{annDialogError}</p>
-          ) : pendingAnnSelection ? (
-            <p className="text-xs text-gray-500 mb-3 italic truncate">„{pendingAnnSelection.text}"</p>
-          ) : null}
-          {!annDialogError && (
-            <>
-              <textarea
-                autoFocus
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-2 focus:ring-yellow-400 outline-none resize-none"
-                rows={3}
-                placeholder={t('editor.annotateCommentPlaceholder', 'Kommentaar...')}
-                value={annDialogComment}
-                onChange={e => setAnnDialogComment(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && annDialogComment.trim()) {
-                    insertAnnotation(annDialogComment.trim());
-                  }
-                  if (e.key === 'Escape') {
-                    setAnnDialogOpen(false);
-                    setPendingAnnSelection(null);
-                  }
-                }}
-              />
-              <div className="flex justify-end gap-2 mt-3">
-                <button
-                  type="button"
-                  onClick={() => { setAnnDialogOpen(false); setPendingAnnSelection(null); }}
-                  className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                >{t('common:buttons.cancel', 'Tühista')}</button>
-                <button
-                  type="button"
-                  disabled={!annDialogComment.trim()}
-                  onClick={() => { if (annDialogComment.trim()) insertAnnotation(annDialogComment.trim()); }}
-                  className="px-3 py-1.5 text-sm bg-yellow-500 hover:bg-yellow-600 text-white rounded disabled:opacity-50"
-                >{t('common:buttons.save', 'Salvesta')}</button>
-              </div>
-            </>
-          )}
-          {annDialogError && (
-            <div className="flex justify-end mt-3">
-              <button
-                type="button"
-                onClick={() => { setAnnDialogOpen(false); setAnnDialogError(''); }}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-              >{t('common:buttons.close', 'Sulge')}</button>
-            </div>
-          )}
-        </div>
-      </div>
+      <AnnotationDialog
+        comment={annDialogComment}
+        error={annDialogError}
+        selectionText={pendingAnnSelection?.text}
+        onCommentChange={setAnnDialogComment}
+        onSave={insertAnnotation}
+        onCancel={() => { setAnnDialogOpen(false); setPendingAnnSelection(null); }}
+        onCloseError={() => { setAnnDialogOpen(false); setAnnDialogError(''); }}
+      />
     )}
     </>
   );
