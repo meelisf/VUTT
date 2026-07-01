@@ -3,10 +3,9 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { useUser } from '../contexts/UserContext';
-import AnnotationsTab from './editor/AnnotationsTab';
-import HistoryTab from './editor/HistoryTab';
 import EditorHeader from './editor/EditorHeader';
 import EditorEditTab from './editor/EditorEditTab';
+import EditorInfoHistoryTabs from './editor/EditorInfoHistoryTabs';
 import AnnotationDialog from './editor/AnnotationDialog';
 import AnnotationPopover from './editor/AnnotationPopover';
 
@@ -259,57 +258,36 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
           insertSpecialChar={insertSpecialChar}
         />
 
-        {activeTab === 'annotate' && (
-          <AnnotationsTab
-            work={work}
-            page={page}
-            page_tags={page_tags}
-            setPageTags={setPageTags}
-            comments={comments}
-            setComments={setComments}
-            onDraftChange={setAnnotationDraftDirty}
-            flushRef={commentFlushRef}
-            onSaveAnnotations={handleSaveAnnotations}
-            onCommentsRestored={handleCommentsRestored}
-            onReplyToComment={handleReplyToComment}
-            readOnly={readOnly || false}
-            user={user}
-            authToken={authToken}
-            onOpenMetaModal={onOpenMetaModal}
-            lang={lang}
-            textAnnotations={textAnnotations}
-            textContent={viewRef.current?.state.doc.toString() ?? page.text_content}
-            onSaveTextAnnotations={handleSaveTextAnnotations}
-            onDeleteTextAnnotation={handleDeleteAndSaveTextAnnotation}
-          />
-        )}
-
-        {activeTab === 'history' && (
-          <HistoryTab
-            page={page}
-            work={work}
-            user={user}
-            authToken={authToken}
-            handleReOcr={handleReOcr}
-            reocrStatus={reocrStatus}
-            onShareableChange={(shareable) => onWorkUpdate?.({ shareable })}
-            collections={collections}
-            onRestore={(content, restoredTextAnnotations) => {
-              const view = viewRef.current;
-              if (view) {
-                view.dispatch({
-                  changes: { from: 0, to: view.state.doc.length, insert: content },
-                });
-                setIsDirty(true);
-              }
-              if (Array.isArray(restoredTextAnnotations)) {
-                setTextAnnotations(restoredTextAnnotations);
-              }
-              setActiveTab('edit');
-            }}
-            readOnly={readOnly || false}
-          />
-        )}
+        <EditorInfoHistoryTabs
+          activeTab={activeTab}
+          page={page}
+          work={work}
+          user={user}
+          authToken={authToken}
+          readOnly={readOnly}
+          collections={collections}
+          onOpenMetaModal={onOpenMetaModal}
+          onWorkUpdate={onWorkUpdate}
+          lang={lang}
+          viewRef={viewRef}
+          setIsDirty={setIsDirty}
+          setActiveTab={setActiveTab}
+          page_tags={page_tags}
+          setPageTags={setPageTags}
+          comments={comments}
+          setComments={setComments}
+          setAnnotationDraftDirty={setAnnotationDraftDirty}
+          commentFlushRef={commentFlushRef}
+          handleSaveAnnotations={handleSaveAnnotations}
+          handleCommentsRestored={handleCommentsRestored}
+          handleReplyToComment={handleReplyToComment}
+          textAnnotations={textAnnotations}
+          setTextAnnotations={setTextAnnotations}
+          handleSaveTextAnnotations={handleSaveTextAnnotations}
+          handleDeleteAndSaveTextAnnotation={handleDeleteAndSaveTextAnnotation}
+          handleReOcr={handleReOcr}
+          reocrStatus={reocrStatus}
+        />
       </div>
     </div>
 
