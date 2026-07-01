@@ -506,6 +506,27 @@ def list_reocr_jobs() -> list:
     ]
 
 
+def list_reocr_batch_jobs() -> list:
+    """Batch re-OCR tööde summaarid (ühtse OCR-vaate jaoks)."""
+    with _reocr_batch_jobs_lock:
+        items = list(_reocr_batch_jobs.items())
+    out = []
+    for jid, j in items:
+        pages = j.get("pages", [])
+        out.append({
+            "job_id": jid,
+            "work_id": j.get("work_id"),
+            "slug": j.get("slug", ""),
+            "username": j.get("username", ""),
+            "status": j.get("status"),
+            "slow": bool(j.get("slow", False)),
+            "started_at": j.get("started_at"),
+            "ready": sum(1 for e in pages if e.get("status") == "ready"),
+            "total": len(pages),
+        })
+    return out
+
+
 def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str = "", page_number: int = None, username: str = "", material_type: str = "print") -> str:
     """
     Alustab lehekülje re-OCR tööd: laadib pildi OCR serverisse SFTP kaudu.

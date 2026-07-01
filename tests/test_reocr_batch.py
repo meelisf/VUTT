@@ -320,3 +320,22 @@ def test_poll_batch_write_vea_korral_remote_txt_ei_kustutata(tmp_path, monkeypat
         f"remote .txt kustutati write-vea korral — andmekadu! removed={fake_sftp.removed}")
 
     del reocr_ops._reocr_batch_jobs[job_id]
+
+
+def test_list_reocr_batch_jobs_summary():
+    import server.reocr_ops as r
+    with r._reocr_batch_jobs_lock:
+        r._reocr_batch_jobs.clear()
+        r._reocr_batch_jobs["b1"] = {
+            "kind": "batch", "work_id": "wid", "slug": "w1", "username": "u",
+            "status": "processing", "slow": True, "started_at": 123.0,
+            "pages": [{"status": "ready"}, {"status": "processing"}, {"status": "error"}],
+        }
+    out = {j["job_id"]: j for j in r.list_reocr_batch_jobs()}
+    assert out["b1"]["work_id"] == "wid"
+    assert out["b1"]["ready"] == 1        # ainult "ready"
+    assert out["b1"]["total"] == 3
+    assert out["b1"]["slow"] is True
+    assert out["b1"]["started_at"] == 123.0
+    with r._reocr_batch_jobs_lock:
+        r._reocr_batch_jobs.clear()
