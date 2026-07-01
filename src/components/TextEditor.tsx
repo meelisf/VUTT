@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
-import { nextAnnId, containsAnnTag } from '../utils/annUtils';
 import { useUser } from '../contexts/UserContext';
 import AnnotationsTab from './editor/AnnotationsTab';
 import HistoryTab from './editor/HistoryTab';
@@ -23,7 +22,7 @@ import { getLangCode } from '../utils/getLangCode';
 
 // CM6 impordid
 import { EditorView, lineNumbers, keymap } from '@codemirror/view';
-import { EditorState, Compartment, Transaction } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { history, historyKeymap, defaultKeymap } from '@codemirror/commands';
 import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { createVuttSearchPanel } from './editor/VuttSearchPanel';
@@ -33,6 +32,7 @@ import { useReOcr } from './editor/useReOcr';
 import { useEditorState } from './editor/useEditorState';
 import { useEditorSave } from './editor/useEditorSave';
 import { useEditorFormattingActions } from './editor/useEditorFormattingActions';
+import { useTextAnnotationActions } from './editor/useTextAnnotationActions';
 import type { EditorTab } from './editor/types';
 
 interface TextEditorProps {
@@ -51,7 +51,7 @@ interface TextEditorProps {
 }
 
 const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedChanges, onOpenMetaModal, readOnly = false, statusDirty = false, currentStatus, onStatusChange, triggerSave, onWorkUpdate, collections }) => {
-  const { t, i18n } = useTranslation(['workspace', 'common']);
+  const { i18n } = useTranslation(['workspace', 'common']);
   const { user, authToken, userSettings } = useUser();
   const lang = getLangCode(i18n.language);
   const {
@@ -78,15 +78,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   const [showTranscriptionGuide, setShowTranscriptionGuide] = useState(false);
   const [transcriptionGuideHtml, setTranscriptionGuideHtml] = useState<string>('');
-
-  const [annDialogOpen, setAnnDialogOpen] = useState(false);
-  const [annDialogComment, setAnnDialogComment] = useState('');
-  const [annPopover, setAnnPopover] = useState<{ annId: number; x: number; y: number } | null>(null);
-  const [annPopoverEditing, setAnnPopoverEditing] = useState(false);
-  const [annPopoverEditText, setAnnPopoverEditText] = useState('');
-  const [annPopoverPendingDelete, setAnnPopoverPendingDelete] = useState(false);
-  const [annDialogError, setAnnDialogError] = useState('');
-  const [pendingAnnSelection, setPendingAnnSelection] = useState<{ from: number; to: number; text: string } | null>(null);
 
   // CM6 refs
   const editorContainerRef = useRef<HTMLDivElement>(null);
@@ -116,8 +107,34 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
     hasUnsavedChanges,
   } = useEditorState({ page, viewRef, onUnsavedChanges });
 
-  const annPopoverAnnotationsRef = useRef(textAnnotations);
-  useEffect(() => { annPopoverAnnotationsRef.current = textAnnotations; }, [textAnnotations]);
+  const {
+    annDialogOpen,
+    annDialogComment,
+    annPopover,
+    annPopoverEditing,
+    annPopoverEditText,
+    annPopoverPendingDelete,
+    annDialogError,
+    pendingAnnSelection,
+    setAnnDialogOpen,
+    setAnnDialogComment,
+    setAnnPopover,
+    setAnnPopoverEditing,
+    setAnnPopoverEditText,
+    setAnnPopoverPendingDelete,
+    setAnnDialogError,
+    setPendingAnnSelection,
+    handleAnnotateSelection,
+    insertAnnotation,
+    removeAnnotationFromEditor,
+  } = useTextAnnotationActions({
+    viewRef,
+    editorContainerRef,
+    readOnly,
+    textAnnotations,
+    setTextAnnotations,
+    authorName: user?.name || 'Anonüümne',
+  });
 
   // Kasutaja eelistus (localStorage) + kitsa paani sundrežiim
   const [marginaliaUserMode, setMarginaliaUserMode] = useState<MarginaliaMode>(
@@ -311,103 +328,6 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
 
   useEffect(() => { wrapWithTagRef.current = wrapWithTag; }, [wrapWithTag]);
 
-  const handleAnnotateSelection = useCallback(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const { from, to } = view.state.selection.main;
-    if (from === to) return;
-    const docText = view.state.doc.toString();
-    if (containsAnnTag(docText, from, to)) {
-      setAnnDialogError(t('editor.annotateOverlapError', 'Valitud tekst sisaldab juba annotatsiooni'));
-      setAnnDialogOpen(true);
-      setPendingAnnSelection(null);
-      return;
-    }
-    const text = docText.slice(from, to);
-    setPendingAnnSelection({ from, to, text });
-    setAnnDialogComment('');
-    setAnnDialogError('');
-    setAnnDialogOpen(true);
-  }, [t]);
-
-  useEffect(() => {
-    const container = editorContainerRef.current;
-    if (!container) return;
-
-    const handleClick = (e: MouseEvent) => {
-      const target = (e.target as Element).closest('[data-ann-id]') as HTMLElement | null;
-      if (!target) {
-        setAnnPopover(null);
-        setAnnPopoverEditing(false);
-        setAnnPopoverPendingDelete(false);
-        return;
-      }
-      const annId = parseInt(target.getAttribute('data-ann-id') || '', 10);
-      if (isNaN(annId)) return;
-      e.stopPropagation();
-      const rect = target.getBoundingClientRect();
-      setAnnPopover({ annId, x: rect.left + rect.width / 2, y: rect.top });
-      setAnnPopoverEditing(false);
-      setAnnPopoverEditText('');
-      setAnnPopoverPendingDelete(false);
-    };
-
-    container.addEventListener('click', handleClick);
-    return () => container.removeEventListener('click', handleClick);
-  }, []); // mount kord — annPopoverAnnotationsRef hoiab annotations ajakohasena
-
-  // Sulge popover klikkimisel väljaspool
-  useEffect(() => {
-    if (!annPopover) return;
-    const handleOutside = () => { setAnnPopover(null); setAnnPopoverEditing(false); setAnnPopoverPendingDelete(false); };
-    document.addEventListener('click', handleOutside);
-    return () => document.removeEventListener('click', handleOutside);
-  }, [annPopover]);
-
-  const insertAnnotation = useCallback((comment: string) => {
-    const view = viewRef.current;
-    if (!view || !pendingAnnSelection || readOnly) return;
-    const annId = nextAnnId(textAnnotations);
-    const { from, to, text } = pendingAnnSelection;
-    const openTag = `<ann${annId}>`;
-    const closeTag = `</ann${annId}>`;
-
-    view.dispatch({
-      changes: { from, to, insert: openTag + text + closeTag },
-      annotations: [Transaction.userEvent.of('input.format')],
-    });
-
-    const newAnnotation: TextAnnotation = {
-      id: annId,
-      comment,
-      author: user?.name || 'Anonüümne',
-      created_at: new Date().toISOString(),
-    };
-    const updated = [...textAnnotations, newAnnotation];
-    setTextAnnotations(updated);
-    setPendingAnnSelection(null);
-    setAnnDialogOpen(false);
-    setAnnDialogComment('');
-    setAnnDialogError('');
-  }, [pendingAnnSelection, textAnnotations, user, readOnly]);
-
-  const removeAnnotationFromEditor = useCallback((annId: number) => {
-    const view = viewRef.current;
-    if (!view) return;
-    const text = view.state.doc.toString();
-    const openTag = `<ann${annId}>`;
-    const closeTag = `</ann${annId}>`;
-    const openIdx = text.indexOf(openTag);
-    const closeIdx = text.indexOf(closeTag);
-    if (openIdx === -1 || closeIdx === -1) return;
-    // Eemalda sulgev täg enne avavat (positsioonid ei nihku)
-    const changes = [
-      { from: closeIdx, to: closeIdx + closeTag.length, insert: '' },
-      { from: openIdx, to: openIdx + openTag.length, insert: '' },
-    ].sort((a, b) => b.from - a.from);
-    view.dispatch({ changes, annotations: [Transaction.userEvent.of('input.format')] });
-  }, []);
-
   const handleDeleteAndSaveTextAnnotation = useCallback(async (annId: number) => {
     await deleteAndSaveTextAnnotation(annId, removeAnnotationFromEditor);
   }, [deleteAndSaveTextAnnotation, removeAnnotationFromEditor]);
@@ -565,8 +485,8 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
         annId={annPopover.annId}
         x={annPopover.x}
         y={annPopover.y}
-        annotation={annPopoverAnnotationsRef.current.find(a => a.id === annPopover.annId)}
-        annotations={annPopoverAnnotationsRef.current}
+        annotation={textAnnotations.find(a => a.id === annPopover.annId)}
+        annotations={textAnnotations}
         readOnly={readOnly}
         editText={annPopoverEditText}
         editing={annPopoverEditing}
