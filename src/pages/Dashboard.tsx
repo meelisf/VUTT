@@ -794,7 +794,6 @@ const Dashboard: React.FC = () => {
                     selectedCount={selectedWorkIds.size}
                     statusFiltered={Boolean(statusParam)}
                     totalPages={totalPages}
-                    currentPage={currentPage}
                     labels={{
                       bookshelf: t('results.bookshelf'),
                       enterSelect: t('bulkAssign.enterSelect'),

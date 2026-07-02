@@ -7,7 +7,6 @@ interface DashboardResultsHeaderProps {
   selectedCount: number;
   statusFiltered: boolean;
   totalPages: number;
-  currentPage: number;
   labels: {
     bookshelf: string;
     enterSelect: string;
@@ -31,7 +30,6 @@ export default function DashboardResultsHeader({
   selectedCount,
   statusFiltered,
   totalPages,
-  currentPage,
   labels,
   onToggleSelectMode,
   onSelectAllVisible,
