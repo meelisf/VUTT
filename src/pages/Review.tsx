@@ -589,10 +589,10 @@ const Review: React.FC = () => {
                             {job.page_number && <span className="text-xs text-gray-500">lk {job.page_number}</span>}
                             {job.progress && <span className="text-xs text-gray-500">{job.progress.ready}/{job.progress.total} lk</span>}
                             {job.work_id && (
-                              <a href={job.link} target="_blank" rel="noreferrer"
+                              <Link to={job.link}
                                 className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
                                 <ExternalLink size={11} />
-                              </a>
+                              </Link>
                             )}
                             {isActive && !!job.queue_ahead && job.queue_ahead > 0 && (
                               <span className="text-xs text-gray-400">
@@ -678,10 +678,10 @@ const Review: React.FC = () => {
                               {entry.title && <span className="text-xs text-gray-400 font-mono" title={entry.slug}>{entry.slug}</span>}
                               {entry.page_number && <span className="text-xs text-gray-400">lk {entry.page_number}</span>}
                               {entry.work_id && (
-                                <a href={entry.page_number ? `/work/${entry.work_id}/${entry.page_number}` : `/work/${entry.work_id}`} target="_blank" rel="noreferrer"
+                                <Link to={entry.page_number ? `/work/${entry.work_id}/${entry.page_number}` : `/work/${entry.work_id}`}
                                   className="text-xs text-primary-600 hover:underline flex items-center gap-0.5">
                                   <ExternalLink size={11} />
-                                </a>
+                                </Link>
                               )}
                             </div>
                             {entry.error && <p className="text-xs text-red-500 mt-0.5">{entry.error}</p>}
