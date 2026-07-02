@@ -110,6 +110,15 @@ def _recover_one(sftp, base: str, job_id: str, recovered: List[str], skipped: Li
         _recover_single(sftp, base, job_id, recovered, skipped)
 
 
+def _remote_img_name(txt_name: str, info: Optional[dict]) -> str:
+    """Remote-pildi nimi .txt-nime järgi. Laiend tuletatakse mapping'u page_filename-st
+    (nagu _build_batch_pages selle algselt tegi: remote_img jagab txt-ga stem'i, ext on
+    originaalfaili oma), et .png/.jpeg lehed ei jääks lõpetamise-kontrollist vahele."""
+    stem = txt_name[:-4] if txt_name.endswith(".txt") else txt_name
+    ext = os.path.splitext((info or {}).get("page_filename", ""))[1] or ".jpg"
+    return stem + ext
+
+
 def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[str], skipped: List[str]) -> None:
     slug = mapping.get("slug")
     work_id = mapping.get("work_id")
@@ -147,12 +156,13 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
                 sftp.remove(f"{work_dir}/{fname}")
             except Exception:
                 pass
-            # Sama lehe JPG ei ole pärast .txt taastamist enam vajalik. Selle eemaldamine
-            # laseb alloleval lõpetamise kontrollil eristada "veel töötleb" (JPG alles,
-            # .txt puudub) seisust "kõik mapping'u lehed on lahendatud".
-            jpg_name = fname[:-4] + ".jpg"
+            # Sama lehe pilt ei ole pärast .txt taastamist enam vajalik. Selle eemaldamine
+            # laseb alloleval lõpetamise kontrollil eristada "veel töötleb" (pilt alles,
+            # .txt puudub) seisust "kõik mapping'u lehed on lahendatud". Laiend page_filename-st
+            # (võib olla .png/.jpeg, mitte ainult .jpg).
+            img_name = _remote_img_name(fname, info)
             try:
-                sftp.remove(f"{work_dir}/{jpg_name}")
+                sftp.remove(f"{work_dir}/{img_name}")
             except Exception:
                 pass
             recovered.append(job_id)
@@ -161,7 +171,7 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
             _release(key)
     # Mappingut tohib kustutada ainult siis, kui staging on kadunud või kõik mapping'u
     # lehed on lahendatud. "0 .txt" ei tähenda valmis: OCR-server võib alles töödelda
-    # allesolevaid .jpg faile ja kirjutada .txt-id hiljem.
+    # allesolevaid pildifaile ja kirjutada .txt-id hiljem.
     try:
         remaining_files = set(sftp.listdir(work_dir))
     except FileNotFoundError:
@@ -169,9 +179,9 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
         return
 
     unresolved = []
-    for txt_name in pages.keys():
-        jpg_name = txt_name[:-4] + ".jpg" if txt_name.endswith(".txt") else txt_name + ".jpg"
-        if txt_name in remaining_files or jpg_name in remaining_files:
+    for txt_name, info in pages.items():
+        img_name = _remote_img_name(txt_name, info)
+        if txt_name in remaining_files or img_name in remaining_files:
             unresolved.append(txt_name)
 
     if not unresolved:

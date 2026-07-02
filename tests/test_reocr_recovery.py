@@ -291,6 +291,38 @@ def test_batch_mapping_sailib_kui_osa_lehti_veel_jpgna_ootab(monkeypatch, tmp_pa
     assert sftp.rmdired == []
 
 
+def test_batch_mapping_arvestab_png_jpeg_laiendit(monkeypatch, tmp_path):
+    """Remote-pilt jagab .txt-ga stem'i, aga laiend on originaalfaili oma (.png/.jpeg).
+    Kui lõpetamise-kontroll eeldaks kõvasti .jpg-d, jääks veel-töötlev .png leht vahele
+    ja mapping kustutataks enne .txt saabumist (sama andmekadu, mille #112 pidi vältima)."""
+    import server.reocr_state as st
+    monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "maps"))
+    st.persist_batch_mapping("borb", "wid", "w1", {
+        "w1_pg_001.txt": {"page_filename": "w1-lk-1.png", "page_number": 1},
+        "w1_pg_002.txt": {"page_filename": "w1-lk-2.png", "page_number": 2},
+    })
+    # Lk 1: .txt valmis (taastatav). Lk 2: ainult .png (OCR töötleb veel).
+    tree = {"/OCR/AUTO-OCR/print": ["borb"], "/OCR/AUTO-OCR/hand": [],
+            "/OCR/AUTO-OCR/print/borb": ["w1"],
+            "/OCR/AUTO-OCR/print/borb/w1": ["w1_pg_001.png", "w1_pg_001.txt", "w1_pg_002.png"]}
+    files = {"/OCR/AUTO-OCR/print/borb/w1/w1_pg_001.txt": b"tekst1"}
+    sftp = _FakeSftp(tree, files)
+    monkeypatch.setattr(rec.reocr_ops, "_sftp_open", lambda cid: sftp)
+    monkeypatch.setattr(rec.reocr_ops, "close_ssh", lambda cid: None)
+    rec._recovering.clear()
+
+    result = rec.scan_and_recover()
+
+    assert result["recovered"] == ["borb"]
+    assert (tmp_path / "w1" / "w1-lk-1.ocr").read_text(encoding="utf-8") == "tekst1"
+    # Mapping säilib — lk 2 .png ootab veel .txt-d
+    assert st.load_batch_mapping("borb") is not None
+    # Taastatud lehe .png koristati õige laiendiga (mitte .jpg)
+    assert "/OCR/AUTO-OCR/print/borb/w1/w1_pg_001.png" in sftp.removed
+    assert "/OCR/AUTO-OCR/print/borb/w1/w1_pg_002.png" not in sftp.removed
+    assert sftp.rmdired == []
+
+
 def test_reaper_skips_live_batch_job(monkeypatch, tmp_path):
     import server.reocr_state as st
     monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "maps"))
