@@ -28,7 +28,7 @@ import { buildManageLink } from '../utils/manageDeeplink';
 
 const Workspace: React.FC = () => {
   const { t } = useTranslation(['workspace', 'common', 'auth']);
-  const { user, authToken, logout, sessionExpired, clearSessionExpired } = useUser();
+  const { user, authToken, logout, sessionExpired, clearSessionExpired, isLoading: authInitializing } = useUser();
   const isAdmin = isAtLeast(user?.role, 'admin');
   const { collections, selectedCollection, setSelectedCollection } = useCollection();
   const index = useMeiliIndex();
@@ -140,6 +140,12 @@ const Workspace: React.FC = () => {
 
   useEffect(() => {
     if (!effectiveIndex) return;
+    // Värske tab (nt Review-lingist, järjehoidjast, refreshist): auth initsialiseerub
+    // async (initAuth → /verify-token + Meili-tokeni värskendus). Kuni see käib, oota —
+    // muidu läheks restricted-teose päring anonüümse Meili-tokeniga → 403 → vale "logi
+    // sisse" vilkumine. `loading` jääb true (spinner). Effect jookseb uuesti kui
+    // authInitializing → false (dep-listis).
+    if (authInitializing) return;
     const loadData = async () => {
       if (!workId) {
         setError("Töö ID on puudu.");
@@ -223,7 +229,7 @@ const Workspace: React.FC = () => {
       }
     };
     loadData();
-  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, sessionExpired, user, t]);
+  }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, sessionExpired, user, authInitializing, t]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
