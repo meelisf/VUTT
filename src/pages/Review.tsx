@@ -620,15 +620,28 @@ const Review: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Staatus badge */}
-                        <a href={job.link} target={job.link.startsWith('/work') ? '_blank' : undefined} rel="noreferrer"
-                          className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
+                        {/* Staatus badge — avaneb SAMAS tabis (react-routeri klient-nav):
+                            säilitab auth-state, väldib värske tabi auth-re-initi ja
+                            "logi sisse" vilkumist restricted-teosel. ↗-ikoon (üleval) jääb
+                            uue-tabi valikuks. */}
+                        {job.link ? (
+                          <Link to={job.link}
+                            className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
+                              isSlow ? 'bg-amber-100 text-amber-800' :
+                              isActive ? 'bg-amber-100 text-amber-700' :
+                              isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                            {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
+                          </Link>
+                        ) : (
+                          <span className={`shrink-0 text-xs font-medium px-2 py-1 rounded ${
                             isSlow ? 'bg-amber-100 text-amber-800' :
                             isActive ? 'bg-amber-100 text-amber-700' :
                             isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
                           }`}>
-                          {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
-                        </a>
+                            {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
