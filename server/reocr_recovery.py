@@ -147,16 +147,34 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
                 sftp.remove(f"{work_dir}/{fname}")
             except Exception:
                 pass
+            # Sama lehe JPG ei ole pärast .txt taastamist enam vajalik. Selle eemaldamine
+            # laseb alloleval lõpetamise kontrollil eristada "veel töötleb" (JPG alles,
+            # .txt puudub) seisust "kõik mapping'u lehed on lahendatud".
+            jpg_name = fname[:-4] + ".jpg"
+            try:
+                sftp.remove(f"{work_dir}/{jpg_name}")
+            except Exception:
+                pass
             recovered.append(job_id)
             logger.info(f"Reaper taastas batch {job_id}/{fname} ({slug}/{info['page_filename']})")
         finally:
             _release(key)
-    # Kui rohkem .txt pole, koorista kaust + mapping
+    # Mappingut tohib kustutada ainult siis, kui staging on kadunud või kõik mapping'u
+    # lehed on lahendatud. "0 .txt" ei tähenda valmis: OCR-server võib alles töödelda
+    # allesolevaid .jpg faile ja kirjutada .txt-id hiljem.
     try:
-        remaining = [f for f in sftp.listdir(work_dir) if f.endswith(".txt")]
+        remaining_files = set(sftp.listdir(work_dir))
     except FileNotFoundError:
-        remaining = []
-    if not remaining:
+        reocr_state.remove_batch_mapping(job_id)  # staging kadunud → mapping aegunud
+        return
+
+    unresolved = []
+    for txt_name in pages.keys():
+        jpg_name = txt_name[:-4] + ".jpg" if txt_name.endswith(".txt") else txt_name + ".jpg"
+        if txt_name in remaining_files or jpg_name in remaining_files:
+            unresolved.append(txt_name)
+
+    if not unresolved:
         for d in (work_dir, job_dir):
             try:
                 sftp.rmdir(d)
