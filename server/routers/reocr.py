@@ -3,6 +3,7 @@ import os
 import shutil
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from ..deps import get_json_data, require_role
 from ..reocr_ops import (
@@ -54,7 +55,9 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
 @router.get("/admin/reocr/{job_id}/status")
 async def admin_reocr_status(job_id: str, user=Depends(require_role("admin"))):
     """Küsib re-OCR töö staatust. Küsida korduvalt kuni done/error."""
-    return {"status": "success", **poll_reocr_job(job_id)}
+    # poll_reocr_job teeb SFTP stat/getfo päringuid; ära blokeeri uvicorni event-loopi.
+    result = await run_in_threadpool(poll_reocr_job, job_id)
+    return {"status": "success", **result}
 
 
 def _enrich_titles(items: list) -> list:

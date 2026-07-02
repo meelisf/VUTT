@@ -3,6 +3,7 @@ import json
 import os
 
 from fastapi import APIRouter, Depends
+from starlette.concurrency import run_in_threadpool
 
 from ..deps import require_role
 from ..ocr_jobs_normalize import normalize_ocr_jobs
@@ -36,10 +37,15 @@ def _make_title_reader():
     return title_of
 
 
+def _build_admin_ocr_jobs() -> list:
+    """Blokeeriv failisüsteemi skänn + pealkirjade lugemine; jooksutatakse threadpoolis."""
+    return normalize_ocr_jobs(
+        list_uploads(), list_reocr_jobs(), list_reocr_batch_jobs(), _make_title_reader()
+    )
+
+
 @router.get("/admin/ocr/jobs")
 async def admin_ocr_jobs(user=Depends(require_role("admin"))):
     """Kõik OCR-serveri tööd (upload + üksik + batch) ühes normaliseeritud loendis."""
-    jobs = normalize_ocr_jobs(
-        list_uploads(), list_reocr_jobs(), list_reocr_batch_jobs(), _make_title_reader()
-    )
+    jobs = await run_in_threadpool(_build_admin_ocr_jobs)
     return {"status": "success", "jobs": jobs}
