@@ -12,7 +12,7 @@ import AdvancedFilters from '../components/AdvancedFilters';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
-import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, CheckSquare, Square, FolderInput, Tag, BookOpen, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
+import { Search, AlertTriangle, ArrowUpDown, X, ChevronLeft, ChevronRight, User, Library, ChevronDown, Lock, LogIn } from 'lucide-react';
 import CollectionPicker from '../components/CollectionPicker';
 import CollectionInfoBanner from '../components/CollectionInfoBanner';
 import SafeHtml from '../components/SafeHtml';
@@ -26,6 +26,8 @@ import { bulkAssignCollection, bulkAssignGenre, bulkAssignTags } from '../servic
 import { getLangCode } from '../utils/getLangCode';
 import { buildLinkedEntityMaps, collectLinkedEntities } from '../utils/buildLinkedEntityMaps';
 import { useCollectionUrlSync } from '../hooks/useCollectionUrlSync';
+import DashboardBulkActionBar from '../components/dashboard/DashboardBulkActionBar';
+import DashboardResultsHeader from '../components/dashboard/DashboardResultsHeader';
 
 const ITEMS_PER_PAGE = 12;
 const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
@@ -785,54 +787,29 @@ const Dashboard: React.FC = () => {
 
               return (
                 <>
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-6 border-b border-gray-200 pb-3">
-                    <div className="flex items-center gap-4">
-                      <h2 className="text-xl font-bold text-gray-800">{t('results.bookshelf')}</h2>
-                      {/* Admin: Select mode toggle */}
-                      {isAdmin && works.length > 0 && (
-                        <button
-                          onClick={() => selectMode ? exitSelectMode() : setSelectMode(true)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                            selectMode
-                              ? 'bg-primary-100 text-primary-700 font-medium'
-                              : 'text-gray-500 hover:bg-gray-100'
-                          }`}
-                          title={selectMode ? t('bulkAssign.exitSelect') : t('bulkAssign.enterSelect')}
-                        >
-                          {selectMode ? <CheckSquare size={16} /> : <Square size={16} />}
-                          {selectMode ? t('bulkAssign.exitSelect') : t('bulkAssign.select')}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      {/* Select all / clear selection */}
-                      {selectMode && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <button
-                            onClick={selectAllVisible}
-                            className="text-primary-600 hover:text-primary-800 font-medium"
-                          >
-                            {t('bulkAssign.selectAllVisible')}
-                          </button>
-                          {selectedWorkIds.size > 0 && (
-                            <>
-                              <span className="text-gray-300">|</span>
-                              <button
-                                onClick={clearSelection}
-                                className="text-gray-500 hover:text-gray-700"
-                              >
-                                {t('bulkAssign.clearSelection')}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      <span className="text-sm text-gray-500">
-                        {t('results.worksCount', { count: works.length })} {statusParam && t('results.filtered')} {totalPages > 1 && `• ${t('results.pageOf', { current: currentPage, total: totalPages })}`}
-                      </span>
-                    </div>
-                  </div>
+                  <DashboardResultsHeader
+                    isAdmin={isAdmin}
+                    hasWorks={works.length > 0}
+                    selectMode={selectMode}
+                    selectedCount={selectedWorkIds.size}
+                    statusFiltered={Boolean(statusParam)}
+                    totalPages={totalPages}
+                    currentPage={currentPage}
+                    labels={{
+                      bookshelf: t('results.bookshelf'),
+                      enterSelect: t('bulkAssign.enterSelect'),
+                      exitSelect: t('bulkAssign.exitSelect'),
+                      select: t('bulkAssign.select'),
+                      selectAllVisible: t('bulkAssign.selectAllVisible'),
+                      clearSelection: t('bulkAssign.clearSelection'),
+                      worksCount: t('results.worksCount', { count: works.length }),
+                      filtered: t('results.filtered'),
+                      pageOf: t('results.pageOf', { current: currentPage, total: totalPages }),
+                    }}
+                    onToggleSelectMode={() => selectMode ? exitSelectMode() : setSelectMode(true)}
+                    onSelectAllVisible={selectAllVisible}
+                    onClearSelection={clearSelection}
+                  />
 
                   {loading ? (
                     <div className="flex justify-center py-20">
@@ -1013,61 +990,23 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Floating Action Bar - ilmub kui teosed on valitud (ühtlustatud PageActionBar stiiliga manage-lehelt) */}
-      {selectMode && selectedWorkIds.size > 0 && !showBulkCollectionPicker && !showBulkTagsPicker && !showBulkGenrePicker && (
-        <div className="fixed bottom-0 left-0 right-0 z-[1100] flex justify-center px-3 pb-3 pointer-events-none">
-          <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-lg px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-            {/* Valitud arv */}
-            <span className="text-sm font-medium text-primary-800 shrink-0">
-              {t('bulkAssign.selectedCount', { count: selectedWorkIds.size })}
-            </span>
-
-            {/* Kollektsioon */}
-            <div className="border-l border-gray-200 pl-3">
-              <button
-                onClick={() => setShowBulkCollectionPicker(true)}
-                disabled={bulkAssignLoading}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded transition-colors"
-              >
-                <FolderInput size={14} />
-                {t('bulkAssign.assignCollection')}
-              </button>
-            </div>
-
-            {/* Sildid */}
-            <div className="border-l border-gray-200 pl-3">
-              <button
-                onClick={() => setShowBulkTagsPicker(true)}
-                disabled={bulkAssignLoading}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white rounded transition-colors"
-              >
-                <Tag size={14} />
-                {t('bulkAssign.assignTags')}
-              </button>
-            </div>
-
-            {/* Žanr */}
-            <div className="border-l border-gray-200 pl-3">
-              <button
-                onClick={() => setShowBulkGenrePicker(true)}
-                disabled={bulkAssignLoading}
-                className="flex items-center gap-1.5 px-3 py-1 text-sm bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded transition-colors"
-              >
-                <BookOpen size={14} />
-                {t('bulkAssign.assignGenre')}
-              </button>
-            </div>
-
-            {/* Tühista valik — punane tekst (nagu manage-lehe PageActionBar) */}
-            <button
-              onClick={exitSelectMode}
-              title={t('bulkAssign.exitSelect')}
-              className="flex items-center gap-1 px-2 py-1 text-sm font-medium text-red-600 hover:bg-red-50 rounded border-l border-gray-200 pl-3"
-            >
-              <X size={15} />
-              {t('bulkAssign.clearSelection')}
-            </button>
-          </div>
-        </div>
+      {selectMode && !showBulkCollectionPicker && !showBulkTagsPicker && !showBulkGenrePicker && (
+        <DashboardBulkActionBar
+          selectedCount={selectedWorkIds.size}
+          loading={bulkAssignLoading}
+          labels={{
+            selectedCount: t('bulkAssign.selectedCount', { count: selectedWorkIds.size }),
+            assignCollection: t('bulkAssign.assignCollection'),
+            assignTags: t('bulkAssign.assignTags'),
+            assignGenre: t('bulkAssign.assignGenre'),
+            clearSelection: t('bulkAssign.clearSelection'),
+            exitSelect: t('bulkAssign.exitSelect'),
+          }}
+          onOpenCollection={() => setShowBulkCollectionPicker(true)}
+          onOpenTags={() => setShowBulkTagsPicker(true)}
+          onOpenGenre={() => setShowBulkGenrePicker(true)}
+          onExitSelectMode={exitSelectMode}
+        />
       )}
 
       {/* Mobiili kollektsiooni filter picker */}
