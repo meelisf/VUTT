@@ -1269,7 +1269,7 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     return {"work_id": work_id, "slug": slug}
 
 
-async def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: dict, username: str, background_tasks) -> dict:
+def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: dict, username: str, background_tasks) -> dict:
     """
     Asendab olemasoleva teose sisu uue OCR-itud materjaliga.
 

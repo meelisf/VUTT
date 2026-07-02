@@ -3,6 +3,7 @@ import os
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
@@ -30,7 +31,8 @@ router = APIRouter()
 async def admin_uploads(user=Depends(require_role("admin"))):
     if not UPLOAD_ENABLED:
         raise HTTPException(status_code=503)
-    return {"status": "success", "uploads": list_uploads()}
+    uploads = await run_in_threadpool(list_uploads)
+    return {"status": "success", "uploads": uploads}
 
 
 @router.post("/admin/upload/create")
@@ -91,11 +93,17 @@ async def admin_upload_files(upload_id: str, request: Request, user=Depends(requ
         raise HTTPException(status_code=500, detail="Serveri viga faili töötlemisel")
 
 
+def _import_upload_sync(upload_id: str, username: str) -> dict:
+    """Blokeeriv import + cache rebuild; jooksutatakse ainult threadpoolis."""
+    res = import_as_work(upload_id, username=username)
+    build_work_id_cache()
+    return res
+
+
 @router.post("/admin/upload/{upload_id}/import")
 async def admin_upload_import(upload_id: str, user=Depends(require_role("admin"))):
     try:
-        res = import_as_work(upload_id, username=user["username"])
-        build_work_id_cache()
+        res = await run_in_threadpool(_import_upload_sync, upload_id, user["username"])
         return {"status": "success", **res}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -114,7 +122,8 @@ async def admin_upload_replace_work(
     except Exception:
         data = {}
     metadata_updates = (data.get("metadata_updates") or {}) if isinstance(data, dict) else {}
-    res = await replace_work_content(
+    res = await run_in_threadpool(
+        replace_work_content,
         upload_id,
         work_id,
         metadata_updates,
@@ -142,6 +151,6 @@ async def admin_upload_update_meta(upload_id: str, request: Request, user=Depend
 
 @router.delete("/admin/upload/{upload_id}")
 async def admin_upload_cancel(upload_id: str, user=Depends(require_role("admin"))):
-    if cancel_upload(upload_id):
+    if await run_in_threadpool(cancel_upload, upload_id):
         return {"status": "success"}
     raise HTTPException(status_code=500)
