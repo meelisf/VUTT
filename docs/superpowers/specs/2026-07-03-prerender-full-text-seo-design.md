@@ -109,14 +109,19 @@ changes → next crawl rebuilds; otherwise serve cached HTML. Mirrors the existi
 invalidate implicitly by key mismatch.
 
 **Large-work guardrail (size):** log the rendered HTML byte size per work in debug/manual
-mode and emit a warning when uncompressed HTML exceeds a conservative threshold
-(~1.5–1.8 MB). Rationale: Google documents a **15 MB per-file fetch cap** for Googlebot,
-and very large / text-diluted pages tend to index less reliably; the exact "effective text
-budget" is not officially specified, so treat this as a monitoring signal, not a hard rule.
-Most works are far below this, but a decision is pre-registered for the rare oversized work:
-**accept truncation** (cap at N pages / M bytes with a "full text in app" note) rather than
-silently emit multi-MB HTML. "Full text" is therefore best-effort for exceptionally large
-works — this does **not** imply per-page URLs.
+mode and emit a warning when **uncompressed** HTML exceeds ~1.5–1.8 MB. Rationale: Google
+currently documents (Search Central, updated Feb 2026) that for Google Search **Googlebot
+crawls only the first 2 MB of supported text/HTML file types** and, once the limit is hit,
+stops fetching and sends only the already-downloaded part for indexing consideration
+(the separate 15 MB figure is the broader resource-download cap, not the HTML-indexing
+budget). So warn at ~1.5–1.8 MB and **deliberately truncate** oversized prerenders rather
+than emitting HTML Google may only partially use. A decision is pre-registered for the rare
+oversized work: **cap at N pages / M bytes with a visible "full text in app" note** rather
+than silently emit multi-MB HTML. "Full text" is therefore best-effort for exceptionally
+large works — this does **not** imply per-page URLs. (Context: the current largest work is
+706 pages ≈ 800 KB, comfortably under the limit — this guardrail is insurance, not a
+present constraint. The canonical/OG/title tags live in `<head>` at the top, so they are
+always within the 2 MB even if body text were truncated.)
 
 **Access gating:** unchanged — honor `is_work_public` / `can_read_work`. Restricted works
 get **no text** (as today; `work_meta` already returns 403 for unauthorized).
@@ -131,6 +136,14 @@ edited** → Google never learns to re-crawl edited transcriptions. Change work 
 Part A (bounded cost; sitemap is already cached in `_sitemap_cache`). Person `lastmod`
 (from `updated_at`) is unchanged.
 
+**Cache staleness decision.** The sitemap is served from `_sitemap_cache`, which today has
+a **1 h TTL** (`_sitemap_cache["expires"] = now + 3600`, `public.py:298`). So the improved
+`lastmod` propagates within ≤1 h of an edit — bounded, not stale-until-restart. That is
+acceptable given sitemaps are fetched infrequently; we keep the TTL rather than adding
+mtime-keying. **Decision:** optionally shorten the TTL to ~15 min if faster propagation is
+wanted, but 1 h is fine. (Explicitly noted so the improved lastmod isn't silently hidden
+behind an unbounded cache — it isn't.)
+
 **`lastmod` is a hint, not a guarantee.** Google treats sitemap `lastmod` and submission as
 signals, not commitments; "Crawled – currently not indexed" explicitly means Google has
 seen the page and may still choose not to index it. This change removes a real blocker (no
@@ -144,22 +157,37 @@ Add robots.txt tokens that opt out of known AI-training / AI-ingestion crawlers,
 search engines fully allowed. These are **robots.txt product tokens**, not necessarily
 distinct HTTP User-Agents:
 
+Comments go on their **own lines**, never inline after a directive value — some non-Google
+parsers mishandle `User-agent: GPTBot # ...`:
+
 ```
 # --- AI training / ingestion opt-out (see maintenance note) ---
-User-agent: GPTBot          # OpenAI model-training crawler
+
+# OpenAI model-training crawler
+User-agent: GPTBot
 Disallow: /
-User-agent: Google-Extended # robots.txt token: opts out of Gemini training/grounding
-Disallow: /                 #   — does NOT affect Google Search crawling or ranking
-User-agent: CCBot           # Common Crawl
+
+# Google product token for Gemini training/grounding opt-out.
+# Does not affect Google Search crawling or ranking.
+User-agent: Google-Extended
 Disallow: /
-User-agent: ClaudeBot       # Anthropic
+
+# Common Crawl
+User-agent: CCBot
+Disallow: /
+
+# Anthropic
+User-agent: ClaudeBot
 Disallow: /
 User-agent: anthropic-ai
 Disallow: /
-User-agent: Bytespider      # ByteDance
+
+# ByteDance
+User-agent: Bytespider
 Disallow: /
-# NOTE: AI search / referral / agent-fetch bots are intentionally NOT blocked
-# (allowed): OAI-SearchBot, PerplexityBot, FirecrawlAgent. See "Allowed" note below.
+
+# AI search / referral / agent-fetch bots are intentionally NOT blocked (allowed):
+# OAI-SearchBot, PerplexityBot, Perplexity-User, FirecrawlAgent. See "Allowed" note below.
 ```
 
 Retain the existing `User-agent: *` rules (which already `Disallow: /api/`, covering images
@@ -170,15 +198,18 @@ goal (be *discoverable*, including via AI intermediaries that send readers to th
 the following are **not** blocked:
 - **`OAI-SearchBot`** — ChatGPT-search visibility (distinct from GPTBot training). Left
   allowed so ChatGPT-search can surface and link the corpus.
-- **`PerplexityBot`** — officially a search/indexing crawler ("not used to crawl content
-  for AI foundation models"); blocking it would only cost Perplexity-answer/referral
-  visibility. Allowed.
-- **`FirecrawlAgent`** — Firecrawl's crawler (respects robots.txt by default). It is
-  **multi-tenant**: one crawler serves all Firecrawl customers, so blocking it would cut
-  off every downstream agent/app at once — including legitimate on-demand fetches a user
-  triggered. It is a dual-use *fetch layer*, not a training-corpus builder, so it is
-  grouped with search/referral, not with GPTBot/CCBot. Allowed initially; **monitor access
-  logs for `FirecrawlAgent` volume** and block only if a single actor bulk-scrapes the
+- **`PerplexityBot`** (and **`Perplexity-User`**) — Perplexity runs two agents:
+  `PerplexityBot` is a search/indexing crawler ("not used to crawl content for AI foundation
+  models"), and `Perplexity-User` performs **user-triggered** fetches. Both are allowed
+  (blocking would only cost Perplexity-answer/referral visibility); in logs, watch them as
+  **separate categories** — indexing vs. user-initiated retrieval.
+- **`FirecrawlAgent`** — Firecrawl's multi-tenant fetch/scrape layer; one crawler serves all
+  Firecrawl customers. It respects robots.txt **by default**, but Firecrawl also exposes an
+  enterprise `ignoreRobotsTxt` option and a customizable `robotsUserAgent`, so robots.txt
+  compliance is **not guaranteed**. It is allowed initially **not because it is inherently
+  harmless, but because blocking it would also block legitimate user-triggered retrieval**
+  across every downstream app at once. Treat it as **monitor-first, not trust-by-default**:
+  watch access logs for `FirecrawlAgent` volume and block if a single actor bulk-scrapes the
   corpus. The nginx image rate-limit is the load backstop regardless.
 
 **Wording precision (important):**
@@ -199,8 +230,9 @@ appears.
 Keep two conceptual buckets explicit and decide them separately: (1) **training/ingestion
 bots** (GPTBot, Google-Extended, CCBot, ClaudeBot, anthropic-ai, Bytespider) — block;
 (2) **AI search / referral / agent-fetch bots** (OAI-SearchBot, PerplexityBot,
-FirecrawlAgent) — allowed, a visibility trade-off; watch access logs and reclassify if one
-starts driving bulk load. Note that vendor tokens are documented but UA spoofing is common
+Perplexity-User, FirecrawlAgent) — allowed, a visibility trade-off; watch access logs
+(track indexing vs. user-triggered fetchers separately) and reclassify if one starts
+driving bulk load. Note that vendor tokens are documented but UA spoofing is common
 and Firecrawl is multi-tenant, so robots.txt remains advisory (the nginx rate-limit is the
 UA-agnostic backstop).
 
@@ -229,14 +261,21 @@ many thumbnails/page images), so the new log MUST have strict rotation: size-bas
 `vutt_access.log` rotation (currently ~14 daily gz rotations) stays sane. Goal: monitoring
 must never fill the disk.
 
+**Privacy / retention.** Because image (and page) logs contain **IP addresses and
+User-Agents**, keep retention **short**, access **admin-only**, and the data
+**purpose-limited** to abuse/load monitoring — not analytics or profiling. The short
+logrotate retention above doubles as the retention control.
+
 **D3 — GoAccess for aggregation + a real review habit.** Install GoAccess (no daemon/new
 service) and generate reports over `vutt_access.log` (page bots) and `vutt_images.log`
 (image scraping): top User-Agents, top IPs, request rates, status codes (incl. 429s).
-Produce a periodic **static HTML report via cron**, kept admin-private (e.g. behind the
-existing SSH-tunnel/private path), so review is a habit not ad-hoc `awk`. Define a light
-**review cadence**: weekly glance at top UAs/IPs; act if one UA/IP dominates image volume or
-trips many 429s (this is the trigger for reclassifying `FirecrawlAgent` / PerplexityBot /
-OAI-SearchBot per Part C's maintenance note).
+Produce a periodic **static HTML report via cron**. **The report must not leak** — it
+aggregates IPs/UAs, so it is itself sensitive: store it outside any web root, `chmod`
+admin-only, and expose it **only** via SSH tunnel or nginx Basic-Auth — **no public URL**.
+So review is a habit not ad-hoc `awk`. Define a light **review cadence**: weekly glance at
+top UAs/IPs; act if one UA/IP dominates image volume or trips many 429s (this is the trigger
+for reclassifying `FirecrawlAgent` / PerplexityBot / OAI-SearchBot per Part C's maintenance
+note).
 
 **D4 — Zabbix alerting (DEFERRED to autumn 2026).** Ideal end state is *push* alerts on
 request-rate / bandwidth / 429 spikes via the already-deployed Zabbix. Deferred pending
@@ -270,7 +309,13 @@ the GoAccess cron) in `docs/` or `scripts/` so the setup is documented and repea
   work is truncated per the pre-registered decision.
 - **Sitemap:** `lastmod` for a work reflects a page-file mtime newer than `_metadata.json`.
 - **robots.txt:** served content includes the AI-bot blocks and retains `Sitemap:` +
-  existing `*` rules.
+  existing `*` rules. **Group non-inheritance check:** a matching crawler uses only its own
+  most-specific `User-agent` group — specific groups do **not** inherit `User-agent: *`
+  rules. So (a) blocked bots (GPTBot etc.) are covered by their own `Disallow: /`
+  regardless of `*`, and (b) crucially, verify the `User-agent: *` group does **not**
+  contain anything that would restrict Googlebot/Bingbot from the `/work/` and `/persons/`
+  text pages (only `/api/`, `/search`, `/admin`, etc. as today). Confirm no allowed
+  search/referral bot is accidentally caught by a block group.
 - **Manual (server):** fetch `/meta/work/{id}` with a Googlebot UA and confirm full text is
   present; confirm a restricted work still 403s; re-run seed/reindex unaffected.
 
@@ -291,7 +336,9 @@ the GoAccess cron) in `docs/` or `scripts/` so the setup is documented and repea
 
 ## Success criteria
 
-- Bot-facing `/work/{id}` pages contain the full cleaned transcription (main + marginalia).
+- Bot-facing `/work/{id}` pages contain the full cleaned transcription (main + marginalia)
+  where safely below the HTML-size threshold; exceptionally large works are deliberately
+  capped with a visible "full text in app" note.
 - Editing a transcription bumps that work's sitemap `lastmod`.
 - robots.txt blocks the named AI training/ingestion crawlers while allowing Googlebot/
   Bingbot and the AI search/referral/agent-fetch bots (OAI-SearchBot, PerplexityBot,
