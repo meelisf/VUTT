@@ -378,6 +378,32 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
     assert "teos1" in calls[0][1]
 
 
+def test_save_reports_git_commit_failure(client, login, monkeypatch, tmp_path):
+    """POST /save peab nähtavalt teatama, kui save_with_git commit ebaõnnestus."""
+    from server.routers import editing as editing_router
+
+    monkeypatch.setattr(editing_router, "save_with_git", lambda *a, **kw: {"success": False, "error": "boom"})
+    monkeypatch.setattr(editing_router, "sync_work_to_meilisearch_async", lambda *a: None)
+    monkeypatch.setattr(editing_router, "update_page_person_mentions", lambda *a: None)
+    monkeypatch.setattr(editing_router, "BASE_DIR", str(tmp_path))
+
+    token = login("editor", "editorpass")
+    response = client.post("/save", headers={"Authorization": f"Bearer {token}"}, json={
+        "original_path": "teos1",
+        "file_name": "leht1.txt",
+        "text_content": "uus tekst",
+        "meta_content": {"page_tags": []},
+    })
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["git_committed"] is False
+    assert data["commit_hash"] == ""
+    assert "warning" in data
+    assert data["git_error"] == "boom"
+
+
 # ============================================================
 # has_annotations regressioonitestid
 # ============================================================
