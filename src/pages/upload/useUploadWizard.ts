@@ -372,8 +372,9 @@ export function useUploadWizard() {
       const d = await importUpload(uploadId, authToken);
       stopPolling();
       setFileUploading(false);
-      // Suuna tööle
-      navigate(`/work/${d.work_id}`);
+      const uploadWarning = d.warning || (d.git_committed === false ? t('step3.gitCommitWarning') : undefined);
+      // Suuna tööle; Git-hoiatus kantakse kaasa, et admin seda sihtlehel näeks.
+      navigate(`/work/${d.work_id}`, uploadWarning ? { state: { uploadWarning } } : undefined);
     } catch (e) {
       setImportError(e instanceof Error ? e.message : t('step3.importError'));
     } finally {
