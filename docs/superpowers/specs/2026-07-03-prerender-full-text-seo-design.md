@@ -207,6 +207,46 @@ UA-agnostic backstop).
 **Image load protection is already handled** by the deployed nginx rate-limit
 (`/api/images/` → `zone=vutt_api`, 10 r/s per IP, burst 50; `nginx.conf:64`). No code change.
 
+### Part D — Monitoring bot/scraper traffic  *(mostly host-config, not git)*
+
+The bot policy's "allow initially, monitor, reclassify" only works if traffic is actually
+visible. Current state (verified 2026-07-03): HTML-page hits **are** logged with User-Agent
+in `vutt_access.log` (default `combined` format), so page-level bots are greppable. But
+`/api/images/` has `access_log off` (site config line 159) → **image scraping — the real
+load concern — is invisible in logs today.** Umami (port 3000) only tracks browsers running
+its JS beacon → humans, not bots. The university's **Zabbix** already probes the site
+(uptime `HEAD /`) and is the natural home for push alerting later.
+
+**D1 — Log image requests (close the blind spot).** Replace `access_log off` in the
+`/api/images/` location with a **dedicated** log (e.g. `/var/log/nginx/vutt_images.log`) so
+image traffic is captured with UA/IP without polluting the main log. (Alternative: log only
+429s — rejected as primary because it misses high-volume 200s sitting just under the rate
+limit; the dedicated log + aggregation captures both.)
+
+**D2 — Bound log growth (REQUIRED).** Image requests are high-volume (normal browsing pulls
+many thumbnails/page images), so the new log MUST have strict rotation: size-based logrotate
+(e.g. rotate at ~100 MB or daily, keep ~7 rotations, `compress`). Also confirm the existing
+`vutt_access.log` rotation (currently ~14 daily gz rotations) stays sane. Goal: monitoring
+must never fill the disk.
+
+**D3 — GoAccess for aggregation + a real review habit.** Install GoAccess (no daemon/new
+service) and generate reports over `vutt_access.log` (page bots) and `vutt_images.log`
+(image scraping): top User-Agents, top IPs, request rates, status codes (incl. 429s).
+Produce a periodic **static HTML report via cron**, kept admin-private (e.g. behind the
+existing SSH-tunnel/private path), so review is a habit not ad-hoc `awk`. Define a light
+**review cadence**: weekly glance at top UAs/IPs; act if one UA/IP dominates image volume or
+trips many 429s (this is the trigger for reclassifying `FirecrawlAgent` / PerplexityBot /
+OAI-SearchBot per Part C's maintenance note).
+
+**D4 — Zabbix alerting (DEFERRED to autumn 2026).** Ideal end state is *push* alerts on
+request-rate / bandwidth / 429 spikes via the already-deployed Zabbix. Deferred pending
+university IT availability (holiday season). GoAccess + logs cover the interim; revisit in
+autumn.
+
+**Reproducibility:** since the nginx site config and logrotate live on the host (not in
+git), capture the applied snippets (the `/api/images/` logging diff, the logrotate file,
+the GoAccess cron) in `docs/` or `scripts/` so the setup is documented and repeatable.
+
 ## Explicitly out of scope / deferred
 
 - **Tightening the image rate-limit.** 10 r/s per IP caps runaway load but a patient single
@@ -239,6 +279,10 @@ UA-agnostic backstop).
 - Backend change (Parts A, B): `git pull && docker compose build --no-cache backend &&
   docker compose up -d backend`.
 - robots.txt (Part C): ships in frontend build → `npm run build` + `rsync -avz dist/ vutt:~/VUTT/dist/`.
+- Monitoring (Part D, host-config): edit the `/api/images/` location (dedicated log),
+  install the logrotate rule for it, `sudo nginx -t && sudo systemctl reload nginx`; install
+  GoAccess + cron report. Zabbix (D4) deferred to autumn. Commit the applied snippets to
+  `docs/`/`scripts/` for reproducibility.
 - After deploy: request re-indexing / validation in Search Console for a sample of the
   affected `/work/{id}` URLs. "Crawled – currently not indexed" **may** shrink over
   subsequent weeks as pages carry unique substantive content, but this is **not guaranteed**
@@ -253,5 +297,8 @@ UA-agnostic backstop).
   Bingbot and the AI search/referral/agent-fetch bots (OAI-SearchBot, PerplexityBot,
   FirecrawlAgent).
 - No regression to browser SPA behavior, access gating, or existing indexing pipeline.
+- Image requests are logged (with UA/IP) to a size-bounded dedicated log, and a GoAccess
+  report makes top UAs/IPs/status codes reviewable on a defined cadence — so the Part C
+  "monitor and reclassify" policy is actually actionable.
 - Over weeks: measurable rise in "Indexed" count and appearance of corpus text in Google
   results.
