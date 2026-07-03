@@ -74,7 +74,8 @@
     "timeoutWarning": "OCR töötlemine võtab kaua aega. Saad importida olemasolevad lehed.",
     "forceImport": "Impordi olemasolevad lehed",
     "importSuccess": "Teos imporditud!",
-    "importError": "Importimine ebaõnnestus"
+    "importError": "Importimine ebaõnnestus",
+    "gitCommitWarning": "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus."
   },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",

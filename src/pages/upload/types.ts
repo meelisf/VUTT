@@ -63,4 +63,6 @@ export interface UploadListResponse {
 export interface UploadImportResponse {
   work_id: string;
   message?: string;
+  warning?: string;
+  git_committed?: boolean;
 }

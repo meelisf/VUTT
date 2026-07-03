@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { isAtLeast } from '../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import { getPage, savePage } from '../services/pageService';
@@ -40,6 +40,7 @@ const Workspace: React.FC = () => {
   }, [index, viewerToken]);
   const { workId, pageNum } = useParams<{ workId: string, pageNum: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [errorRequiresLogin, setErrorRequiresLogin] = useState(false);
@@ -65,6 +66,15 @@ const Workspace: React.FC = () => {
   useEffect(() => {
     setEditorChanges(false);
   }, [pageNum]);
+
+  // Upload-viisardilt tulnud hoiatused (nt import õnnestus, aga Git commit mitte)
+  // kuvatakse tööle jõudes ühekordselt ja eemaldatakse history state'ist.
+  useEffect(() => {
+    const uploadWarning = (location.state as { uploadWarning?: string } | null)?.uploadWarning;
+    if (!uploadWarning) return;
+    setSaveError(uploadWarning);
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location.pathname, location.search, location.state, navigate]);
 
   // Metaandmete muutmise modal
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
