@@ -158,12 +158,28 @@ User-agent: anthropic-ai
 Disallow: /
 User-agent: Bytespider      # ByteDance
 Disallow: /
-User-agent: PerplexityBot   # POLICY CHOICE — see note below
-Disallow: /
+# NOTE: AI search / referral / agent-fetch bots are intentionally NOT blocked
+# (allowed): OAI-SearchBot, PerplexityBot, FirecrawlAgent. See "Allowed" note below.
 ```
 
 Retain the existing `User-agent: *` rules (which already `Disallow: /api/`, covering images
 for compliant bots) and the `Sitemap:` line.
+
+**Intentionally allowed — AI search / referral / agent-fetch bots.** Consistent with the
+goal (be *discoverable*, including via AI intermediaries that send readers to the corpus),
+the following are **not** blocked:
+- **`OAI-SearchBot`** — ChatGPT-search visibility (distinct from GPTBot training). Left
+  allowed so ChatGPT-search can surface and link the corpus.
+- **`PerplexityBot`** — officially a search/indexing crawler ("not used to crawl content
+  for AI foundation models"); blocking it would only cost Perplexity-answer/referral
+  visibility. Allowed.
+- **`FirecrawlAgent`** — Firecrawl's crawler (respects robots.txt by default). It is
+  **multi-tenant**: one crawler serves all Firecrawl customers, so blocking it would cut
+  off every downstream agent/app at once — including legitimate on-demand fetches a user
+  triggered. It is a dual-use *fetch layer*, not a training-corpus builder, so it is
+  grouped with search/referral, not with GPTBot/CCBot. Allowed initially; **monitor access
+  logs for `FirecrawlAgent` volume** and block only if a single actor bulk-scrapes the
+  corpus. The nginx image rate-limit is the load backstop regardless.
 
 **Wording precision (important):**
 - **`Google-Extended`** is not a separate crawler UA. Google crawls with its normal UAs;
@@ -172,23 +188,21 @@ for compliant bots) and the `Sitemap:` line.
   Search**. Frame it as "opt out of Google-Extended uses while leaving Google Search
   crawling allowed" — not "block the Google-Extended crawler".
 - **`GPTBot` vs `OAI-SearchBot`:** OpenAI distinguishes `GPTBot` (training opt-out) from
-  `OAI-SearchBot` (ChatGPT-search visibility); they can be allowed/blocked independently. We
-  block `GPTBot` (training) and, by default, leave `OAI-SearchBot` unlisted (i.e. allowed)
-  so ChatGPT-search referrals remain possible — flag this as a reviewable choice.
-- **`PerplexityBot` is a policy choice, not the same category.** Perplexity documents
-  `PerplexityBot` as a **search/indexing** crawler "not used to crawl content for AI
-  foundation models," and recommends allowing it for visibility in Perplexity answers.
-  Blocking it therefore trades away Perplexity-answer/referral visibility. It is included
-  here only as a conservative "AI-mediated use is not a priority" stance (and amid reports
-  of stealth crawling). **Decision needed:** keep the block, or allow it for referral
-  visibility.
+  `OAI-SearchBot` (ChatGPT-search visibility); they can be allowed/blocked independently.
+  **Decision:** block `GPTBot` (training), allow `OAI-SearchBot` (referral visibility).
+
+**Decided policy (this iteration):** block **training/ingestion** bots only; allow all
+**AI search / referral / agent-fetch** bots. Revisit per the maintenance note if load/abuse
+appears.
 
 **Maintenance note (mechanism, not just a comment):** review this crawler list ~quarterly.
 Keep two conceptual buckets explicit and decide them separately: (1) **training/ingestion
-bots** (GPTBot, Google-Extended, CCBot, Bytespider) — block; (2) **AI search/referral bots**
-(OAI-SearchBot, PerplexityBot) — a visibility trade-off, not automatically blocked. Note
-that CCBot/ClaudeBot tokens are vendor-documented but UA spoofing is common, so robots.txt
-remains advisory (the nginx rate-limit is the UA-agnostic backstop).
+bots** (GPTBot, Google-Extended, CCBot, ClaudeBot, anthropic-ai, Bytespider) — block;
+(2) **AI search / referral / agent-fetch bots** (OAI-SearchBot, PerplexityBot,
+FirecrawlAgent) — allowed, a visibility trade-off; watch access logs and reclassify if one
+starts driving bulk load. Note that vendor tokens are documented but UA spoofing is common
+and Firecrawl is multi-tenant, so robots.txt remains advisory (the nginx rate-limit is the
+UA-agnostic backstop).
 
 **Image load protection is already handled** by the deployed nginx rate-limit
 (`/api/images/` → `zone=vutt_api`, 10 r/s per IP, burst 50; `nginx.conf:64`). No code change.
@@ -235,7 +249,9 @@ remains advisory (the nginx rate-limit is the UA-agnostic backstop).
 
 - Bot-facing `/work/{id}` pages contain the full cleaned transcription (main + marginalia).
 - Editing a transcription bumps that work's sitemap `lastmod`.
-- robots.txt blocks the named AI crawlers while allowing Googlebot/Bingbot.
+- robots.txt blocks the named AI training/ingestion crawlers while allowing Googlebot/
+  Bingbot and the AI search/referral/agent-fetch bots (OAI-SearchBot, PerplexityBot,
+  FirecrawlAgent).
 - No regression to browser SPA behavior, access gating, or existing indexing pipeline.
 - Over weeks: measurable rise in "Indexed" count and appearance of corpus text in Google
   results.
