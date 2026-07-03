@@ -112,6 +112,64 @@ def _fake_sftp():
     return sftp
 
 
+class _ImportSftp:
+    """Minimaalne SFTP fake import_as_work testi jaoks."""
+
+    def listdir(self, _path):
+        return ["test-teos_pg_001.jpg", "test-teos_pg_001.txt"]
+
+    def get(self, remote, local):
+        if remote.endswith(".jpg"):
+            Path(local).write_bytes(b"jpg")
+        elif remote.endswith(".txt"):
+            Path(local).write_text("OCR tekst", encoding="utf-8")
+        else:
+            raise FileNotFoundError(remote)
+
+    def close(self):
+        pass
+
+
+# =========================================================
+# import_as_work
+# =========================================================
+
+
+def test_import_as_work_reports_git_commit_failure(make_state, tmp_path, monkeypatch):
+    """Import peab õnnestuma, aga vastuses nähtavalt märkima ebaõnnestunud Git-commiti."""
+    import server.git_ops as git_ops
+    import server.meilisearch_ops as meili_ops
+    import server.prosopography.indices as prosopo_indices
+    import server.prosopography.person_crud as person_crud
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    monkeypatch.setattr(upload_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(git_ops, "commit_new_work_to_git", lambda *a, **kw: False)
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda upload_id: _ImportSftp())
+    monkeypatch.setattr(upload_ops, "_ssh_rm_rf", lambda *a, **kw: None)
+    monkeypatch.setattr(upload_ops, "close_ssh", lambda *a, **kw: None)
+    monkeypatch.setattr(meili_ops, "sync_work_to_meilisearch", lambda slug: True)
+    monkeypatch.setattr(person_crud, "ensure_prosopo_stubs", lambda metadata, username=None: {})
+    monkeypatch.setattr(prosopo_indices, "update_person_to_works", lambda *a, **kw: None)
+    monkeypatch.setattr(prosopo_indices, "update_work_collections", lambda *a, **kw: None)
+
+    upload_id, _state = make_state(
+        upload_id="imp123",
+        slug="test-teos",
+        status="reviewing",
+        files=[{"page": 1, "has_ocr": True, "deleted": False}],
+        meta={"title": "Test teos", "year": "1700", "slug": "test-teos", "work_id": "wid123"},
+    )
+
+    result = upload_ops.import_as_work(upload_id, username="admin")
+
+    assert result["work_id"] == "wid123"
+    assert result["slug"] == "test-teos"
+    assert result["git_committed"] is False
+    assert "warning" in result
+
+
 # =========================================================
 # _count_pdf_pages (eraldatud pdfinfo loogika)
 # =========================================================
