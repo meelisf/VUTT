@@ -574,6 +574,7 @@ def commit_new_work_to_git(dir_name, username=None):
         return True
     except Exception as e:
         logger.error(f"GIT viga uue teose lisamisel ({dir_name}): {e}")
+        _record_git_failure(dir_name, username or "Automaatne", e)
         return False
 
 

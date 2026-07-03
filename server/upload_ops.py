@@ -1215,12 +1215,24 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
     os.chmod(meta_path, 0o644)
 
     # Git commit
+    git_committed = False
+    git_warning = None
     try:
         from .git_ops import commit_new_work_to_git
-        commit_new_work_to_git(slug, username=username)
-        logger.info(f"import {upload_id}: git commit OK ({slug})")
+        git_committed = bool(commit_new_work_to_git(slug, username=username))
+        if git_committed:
+            logger.info(f"import {upload_id}: git commit OK ({slug})")
+        else:
+            git_warning = "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus."
+            logger.warning(f"import {upload_id}: git commit ebaõnnestus ({slug})")
     except Exception as e:
+        git_warning = "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus."
         logger.warning(f"import {upload_id}: git commit ebaõnnestus: {e}")
+        try:
+            from .git_ops import _record_git_failure
+            _record_git_failure(slug, username or "Automaatne", e)
+        except Exception:
+            pass
 
     # Person-to-works indeks (uus teos võib juba sisaldada creators/tags isikuid)
     try:
@@ -1266,7 +1278,10 @@ def import_as_work(upload_id: str, username: str = None) -> dict:
         logger.warning(f"import {upload_id}: OCR koristamine ebaõnnestus: {e}")
 
     logger.info(f"import {upload_id}: valmis → work_id={work_id}, slug={slug}, lehed={downloaded}")
-    return {"work_id": work_id, "slug": slug}
+    result = {"work_id": work_id, "slug": slug, "git_committed": git_committed}
+    if git_warning:
+        result["warning"] = git_warning
+    return result
 
 
 def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: dict, username: str, background_tasks) -> dict:
