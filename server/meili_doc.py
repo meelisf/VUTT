@@ -106,6 +106,32 @@ def _clean_search_text(page_text):
     return clean_text_for_search(main_text), clean_text_for_search(marginalia_text)
 
 
+
+
+def enumerate_page_images(doc_path):
+    """Loeb teose pildifailid järjekorras (sequence, siis failinimi).
+
+    Jätab välja `_thumb_` failid. ÜHINE loogika indekseerijale (build_work_documents)
+    ja bot-prerenderi teksti-lugejale (text_reading.read_work_page_texts) —
+    nii ei saa lehe-järjekord kahe tee vahel lahku minna.
+    """
+    def _seq(img_name):
+        jp = os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json')
+        if os.path.exists(jp):
+            try:
+                with open(jp, 'r', encoding='utf-8') as fj:
+                    d = json.load(fj)
+                    s = d.get('sequence') or d.get('meta_content', {}).get('sequence')
+                    if s is not None:
+                        return int(s)
+            except Exception:
+                pass
+        return float('inf')
+
+    all_imgs = [f for f in os.listdir(doc_path)
+                if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
+    return sorted(all_imgs, key=lambda f: (_seq(f), f))
+
 def build_text_annotations_text(text_annotations):
     """Koostab otsitava teksti text_annotations kommentaaridest.
 
@@ -564,22 +590,7 @@ def build_work_documents(doc_path, dir_name, collections, people_data, archives,
     """
     teose_id, doc_metadata = get_work_metadata(doc_path, dir_name, collections)
 
-    def _seq(img_name):
-        jp = os.path.join(doc_path, os.path.splitext(img_name)[0] + '.json')
-        if os.path.exists(jp):
-            try:
-                with open(jp, 'r', encoding='utf-8') as fj:
-                    d = json.load(fj)
-                    s = d.get('sequence') or d.get('meta_content', {}).get('sequence')
-                    if s is not None:
-                        return int(s)
-            except Exception:
-                pass
-        return float('inf')
-
-    all_imgs = [f for f in os.listdir(doc_path)
-                if f.lower().endswith(('.jpg', '.jpeg', '.png')) and not f.startswith('_thumb_')]
-    jpg_files = sorted(all_imgs, key=lambda f: (_seq(f), f))
+    jpg_files = enumerate_page_images(doc_path)
     if not jpg_files:
         return teose_id, []
 

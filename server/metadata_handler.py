@@ -1,12 +1,15 @@
 import os
 import json
 import html
+import logging
 from typing import Optional
 from urllib.parse import urlencode
 from .config import BASE_DIR
 from .utils import find_directory_by_id
+from .text_reading import read_work_page_texts, _clean_search_text, work_latest_mtime
 
 SITE_URL = "https://vutt.utlib.ut.ee"
+logger = logging.getLogger(__name__)
 
 _ROLE_LABELS = {
     "praeses": "Praeses",
@@ -72,6 +75,60 @@ def _build_coins(meta: dict) -> str:
 
     return urlencode(params)
 
+
+
+
+# Googlebot indekseerib esimesed ~2MB HTML-i. Hoiame teksti alla selle;
+# piiri ületamisel lõikame ja lisame "täistekst rakenduses" viite.
+PRERENDER_TEXT_MAX_BYTES = 1_600_000
+PRERENDER_TEXT_WARN_BYTES = 1_500_000
+
+
+def _append_work_text(body_lines, found_path, work_url, work_id):
+    """Lisab lehekülgede kaupa puhastatud põhiteksti + marginaalia body_lines-i."""
+    parts = []
+    total = 0
+    truncated = False
+    for page_num, raw in read_work_page_texts(found_path):
+        main_clean, marg_clean = _clean_search_text(raw)
+        if not main_clean and not marg_clean:
+            continue
+        seg = f'<section data-page="{page_num}">'
+        if main_clean:
+            seg += f'<p>{_escape(main_clean)}</p>'
+        if marg_clean:
+            seg += f'<p class="marginalia"><em>Ääremärkused:</em> {_escape(marg_clean)}</p>'
+        seg += '</section>'
+        seg_bytes = len(seg.encode('utf-8'))
+        if total + seg_bytes > PRERENDER_TEXT_MAX_BYTES:
+            truncated = True
+            break
+        parts.append(seg)
+        total += seg_bytes
+
+    if parts or truncated:
+        body_lines.append('<div class="work-text">')
+        body_lines.extend(parts)
+        if truncated:
+            body_lines.append(f'<p><a href="{work_url}">Täistekst rakenduses</a></p>')
+        body_lines.append('</div>')
+    if total >= PRERENDER_TEXT_WARN_BYTES:
+        logger.warning(
+            "Prerender HTML suur: work_id=%s text_bytes=%s truncated=%s",
+            work_id, total, truncated,
+        )
+
+
+def cached_work_meta_html(work_id, work_path, build_fn):
+    """Tagastab bot-HTML-i cache'ist, kui teose max-mtime pole muutunud."""
+    from .cache_invalidation import _work_meta_cache
+    key = work_latest_mtime(work_path)
+    cached = _work_meta_cache.get(work_id)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    html = build_fn()
+    _work_meta_cache[work_id] = (key, html)
+    return html
 
 def build_meta_html(work_id: str, creator_persons=None) -> str:
     """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega.
@@ -158,6 +215,11 @@ def build_meta_html(work_id: str, creator_persons=None) -> str:
         if pid:
             person_url = f"{SITE_URL}/persons/{_escape(pid)}"
             body_lines.append(f'<p><a href="{person_url}">{_escape(plabel)}</a></p>')
+
+    # Täistekst botidele (sama avalik transkriptsioon, mida kasutaja SPA-s näeb —
+    # EI ole SEO-only peidetud teksti → ei ole cloaking). Lehekülgede kaupa.
+    if found_path:
+        _append_work_text(body_lines, found_path, work_url, work_id)
 
     body_lines.append(f'<p><a href="{work_url}">{work_url}</a></p>')
     # Tagasi-lingid hub-lehtedele (alati — jaotab crawl-graafi)
@@ -456,7 +518,9 @@ def build_sitemap_xml(
         if not is_work_public_fn(meta):
             continue
 
-        lastmod = _sitemap_lastmod(mtime)
+        # lastmod = max(_metadata.json, lehtede .txt/.json) → tekstimuudatus värskendab
+        latest = work_latest_mtime(path) or mtime
+        lastmod = _sitemap_lastmod(latest)
         loc = f"{SITE_URL}/work/{html.escape(work_id)}"
         lastmod_xml = f"\n    <lastmod>{lastmod}</lastmod>" if lastmod else ""
         urls.append(f"  <url>\n    <loc>{loc}</loc>{lastmod_xml}\n  </url>")

@@ -10,7 +10,7 @@ from ..cache import get_cached_collections
 from ..cache_invalidation import _sitemap_cache, _home_cache
 from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
-from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml
+from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml, cached_work_meta_html
 from ..metadata_ops import save_work_metadata
 from ..prosopography.indices import _load_index, _load_work_collections
 from ..prosopography.relations import get_person_with_works, get_persons_for_work
@@ -278,9 +278,17 @@ async def work_meta(work_id: str, request: Request):
         user = _get_optional_user(request)
         if not can_read_work(meta, user):
             return HTMLResponse(content="<html><body>Ligipääs keelatud</body></html>", status_code=403)
-    # Loojate isikukaardid ristviidete jaoks (linkgraaf teos↔isik)
-    creator_persons = get_persons_for_work(work_id)
-    return HTMLResponse(content=build_meta_html(work_id, creator_persons=creator_persons))
+    found_path = find_directory_by_id(work_id)
+    if found_path and meta is not None:
+        # Avalik/lubatud teos → cache mtime-võtmega.
+        html = cached_work_meta_html(
+            work_id,
+            found_path,
+            lambda: build_meta_html(work_id, creator_persons=get_persons_for_work(work_id)),
+        )
+        return HTMLResponse(content=html)
+    # Tundmatu teos → fallback HTML (odav, ei cache'i).
+    return HTMLResponse(content=build_meta_html(work_id, creator_persons=get_persons_for_work(work_id)))
 
 @router.get("/sitemap.xml")
 async def sitemap_xml():
