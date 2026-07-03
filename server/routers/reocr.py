@@ -35,6 +35,9 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
     page_filename = data.get("page_filename")
     if not page_filename:
         raise HTTPException(status_code=400, detail="page_filename puudub")
+    # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
+    if not isinstance(page_filename, str) or page_filename != os.path.basename(page_filename):
+        raise HTTPException(status_code=400, detail="Vigane failinimi")
     img_path = os.path.join(path, page_filename)
     if not os.path.isfile(img_path):
         raise HTTPException(status_code=404, detail="Pilti ei leitud")
