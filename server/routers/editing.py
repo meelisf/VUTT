@@ -92,7 +92,14 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     }
     if page_tag_qcodes:
         background_tasks.add_task(enrich_entity_labels_async_qcodes, page_tag_qcodes)
-    return {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8]}
+
+    response = {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True}
+    if git_result.get("success") is False:
+        response["git_committed"] = False
+        response["warning"] = "Tekst salvestati kettale, aga Git versioonihalduse commit ebaõnnestus."
+        if git_result.get("error"):
+            response["git_error"] = git_result.get("error")
+    return response
 
 
 
