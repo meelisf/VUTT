@@ -19,6 +19,7 @@ Pärast --apply: data/ git commit (--commit teeb automaatselt) + Meilisearch
 reindeks (./scripts/server_seed_data.sh vm seed-sammud), et otsing kajastaks muutust.
 """
 import os
+import re
 import sys
 import argparse
 import subprocess
@@ -27,6 +28,9 @@ _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_ROOT = os.getenv("VUTT_DATA_DIR", os.path.join(_project_root, "data"))
 
 _IMG_EXTS = ('.jpg', '.jpeg', '.png')
+# Üldine (any_name) reegel: juhtiv token, mis lõpeb pildi-laiendiga, millele
+# järgneb tühik või rea lõpp. `\S+` ei ületa tühikut → ei haara päris teksti.
+_ANY_IMG_RE = re.compile(r'\S+\.(?:jpg|jpeg|png)(?=\s|$)', re.IGNORECASE)
 
 
 def find_txt_files(root):
@@ -39,33 +43,44 @@ def find_txt_files(root):
                 yield os.path.join(dp, f)
 
 
-def strip_leading_image_name(raw, txt_path):
-    """Eemaldab esimese rea, kui see on lehe enda pildifaili nimi.
+def _leading_token_len(first_stripped, txt_path, any_name):
+    """Kui esimene rida algab pildi-failinime tokeniga, tagasta tokeni pikkus.
 
-    Tagastab (fixed, changed). Konservatiivne: puutub AINULT juhtivat rida,
-    mis võrdub `{base}.{jpg|jpeg|png}`-ga (base = .txt failinimi ilma laiendita).
+    any_name=False (vaikimisi): ainult lehe OMA failinimi (`{base}.ext`) →
+    0 valepositiivi. any_name=True: mis tahes juhtiv pildi-failinimi (kasutuses
+    ümbernimetatud failide jaoks, kus tekstis on vana skaneeringu nimi).
+    """
+    if any_name:
+        m = _ANY_IMG_RE.match(first_stripped)
+        return m.end() if m else 0
+    low = first_stripped.lower()
+    base = os.path.splitext(os.path.basename(txt_path))[0].lower()
+    for ext in _IMG_EXTS:
+        name = base + ext
+        # kogu token VÕI token + tühik (päris tekst samal real)
+        if low == name or (low.startswith(name) and first_stripped[len(name):len(name) + 1].isspace()):
+            return len(name)
+    return 0
+
+
+def strip_leading_image_name(raw, txt_path, any_name=False):
+    """Eemaldab juhtiva pildi-failinime tokeni teksti algusest.
+
+    Tagastab (fixed, changed). Kui token oli kogu esimene rida → eemaldab rea
+    (+ järgnevad tühjad read). Kui token oli prefiks, millele järgnes päris tekst
+    samal real → jätab ülejäänud rea alles.
     """
     nl = raw.find('\n')
     first = raw if nl == -1 else raw[:nl]
     rest = "" if nl == -1 else raw[nl + 1:]
-    base = os.path.splitext(os.path.basename(txt_path))[0].lower()
-    expected = {base + ext for ext in _IMG_EXTS}
     first_stripped = first.strip()
-    low = first_stripped.lower()
-
-    # Variant A: kogu esimene rida ON failinimi → eemalda rida (+ järgnevad tühjad).
-    if low in expected:
-        return rest.lstrip('\n'), True
-
-    # Variant B: rida ALGAB oma failinimega + tühik, siis päris tekst samal real
-    # (nt "r_..._0002.jpg 1633:16 LESSUS") → eemalda ainult failinime-prefiks.
-    for name in expected:
-        if low.startswith(name) and first_stripped[len(name):len(name) + 1].isspace():
-            remainder = first_stripped[len(name):].lstrip()
-            new = remainder + (("\n" + rest) if rest else "")
-            return new, True
-
-    return raw, False
+    tlen = _leading_token_len(first_stripped, txt_path, any_name)
+    if tlen == 0:
+        return raw, False
+    remainder = first_stripped[tlen:].lstrip()
+    if remainder:
+        return remainder + (("\n" + rest) if rest else ""), True
+    return rest.lstrip('\n'), True
 
 
 def main():
@@ -74,6 +89,9 @@ def main():
     ap.add_argument('--dry-run', action='store_true', help='Selgesõnaline dry-run (vaikimisi, kui --apply puudub)')
     ap.add_argument('--commit', action='store_true', help='Pärast --apply tee data/ git commit')
     ap.add_argument('--limit', type=int, default=0, help='Töötle ainult N esimest muudetavat (test)')
+    ap.add_argument('--any-image-name', action='store_true',
+                    help='Eemalda MIS TAHES juhtiv pildi-failinimi (mitte ainult lehe oma) — '
+                         'ümbernimetatud failid, kus tekstis on vana skaneeringu nimi')
     args = ap.parse_args()
 
     changed = []
@@ -86,7 +104,7 @@ def main():
         except Exception as e:
             print(f"  LUGEMISVIGA {path}: {e}")
             continue
-        fixed, did = strip_leading_image_name(raw, path)
+        fixed, did = strip_leading_image_name(raw, path, any_name=args.any_image_name)
         if not did or fixed == raw:
             continue
         changed.append(path)

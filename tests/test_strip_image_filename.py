@@ -73,3 +73,29 @@ def test_does_not_strip_filename_mid_text():
     fixed, did = strip(raw, "/x/p1.txt")
     assert did is False
     assert fixed == raw
+
+
+def test_any_name_strips_foreign_filename():
+    # Ümbernimetatud fail: tekstis vana skaneeringu nimi, ei vasta failinimele.
+    raw = "r_acad_dorp_1633_16_17_0002.jpg 1633:16 LESSUS\nrida2"
+    # Range reegel EI puutu (nimi ei vasta failinimele)
+    fixed, did = strip(raw, "/x/1633-16-Menius-xta9hx-2ywsfa.txt")
+    assert did is False
+    # any_name reegel eemaldab
+    fixed, did = strip(raw, "/x/1633-16-Menius-xta9hx-2ywsfa.txt", any_name=True)
+    assert did is True
+    assert fixed == "1633:16 LESSUS\nrida2"
+
+
+def test_any_name_whole_line_filename():
+    raw = "r_acad_dorp_1633_16_17_0006.jpg\nSisu"
+    fixed, did = strip(raw, "/x/foo.txt", any_name=True)
+    assert did is True
+    assert fixed == "Sisu"
+
+
+def test_any_name_does_not_strip_real_text():
+    raw = "In principio erat verbum\nrida2"
+    fixed, did = strip(raw, "/x/foo.txt", any_name=True)
+    assert did is False
+    assert fixed == raw
