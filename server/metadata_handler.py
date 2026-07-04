@@ -112,7 +112,9 @@ def _append_work_text(body_lines, found_path, work_url, work_id):
         if truncated:
             body_lines.append(f'<p><a href="{work_url}">Täistekst rakenduses</a></p>')
         body_lines.append('</div>')
-    if total >= PRERENDER_TEXT_WARN_BYTES:
+    # Hoiata ka siis kui KÄRBITI (üksik esimene leht võib ületada MAX-i enne
+    # kui total jõuab WARN-piirini → muidu jääks halvim juht signaalita).
+    if total >= PRERENDER_TEXT_WARN_BYTES or truncated:
         logger.warning(
             "Prerender HTML suur: work_id=%s text_bytes=%s truncated=%s",
             work_id, total, truncated,
@@ -130,7 +132,7 @@ def cached_work_meta_html(work_id, work_path, build_fn):
     _work_meta_cache[work_id] = (key, html)
     return html
 
-def build_meta_html(work_id: str, creator_persons=None) -> str:
+def build_meta_html(work_id: str, creator_persons=None, include_text: bool = True) -> str:
     """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega.
 
     creator_persons: eel-resolvitud [{id, label}] loojate isikukaardid (route filtreerib)
@@ -218,7 +220,9 @@ def build_meta_html(work_id: str, creator_persons=None) -> str:
 
     # Täistekst botidele (sama avalik transkriptsioon, mida kasutaja SPA-s näeb —
     # EI ole SEO-only peidetud teksti → ei ole cloaking). Lehekülgede kaupa.
-    if found_path:
+    # include_text=False, kui ligipääsu ei õnnestunud hinnata (meta laadimata) —
+    # nii ei leki piiratud teose tekst veateel (vt work_meta endpoint fallback).
+    if found_path and include_text:
         _append_work_text(body_lines, found_path, work_url, work_id)
 
     body_lines.append(f'<p><a href="{work_url}">{work_url}</a></p>')

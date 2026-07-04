@@ -287,8 +287,9 @@ async def work_meta(work_id: str, request: Request):
             lambda: build_meta_html(work_id, creator_persons=get_persons_for_work(work_id)),
         )
         return HTMLResponse(content=html)
-    # Tundmatu teos → fallback HTML (odav, ei cache'i).
-    return HTMLResponse(content=build_meta_html(work_id, creator_persons=get_persons_for_work(work_id)))
+    # Ligipääsu ei õnnestunud hinnata (meta laadimata / tundmatu teos) → fallback
+    # HTML ILMA täistekstita: piiratud teose tekst ei tohi veateel lekkida.
+    return HTMLResponse(content=build_meta_html(work_id, creator_persons=get_persons_for_work(work_id), include_text=False))
 
 @router.get("/sitemap.xml")
 async def sitemap_xml():

@@ -403,6 +403,37 @@ def test_body_includes_page_text(patch_find):
     assert "Pars altera textus" in html
 
 
+def test_include_text_false_omits_transcription(patch_find):
+    """include_text=False (ligipääsu ei hinnatud) → mitte teksti, ainult metaandmed."""
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    _write_page(path, "p1", 1, "Salajane transkriptsioon")
+    html = build_meta_html("work001", include_text=False)
+    assert "Salajane transkriptsioon" not in html
+    assert 'data-page=' not in html
+    assert 'class="work-text"' not in html
+    # Metaandmed/head siiski olemas
+    assert 'rel="canonical"' in html
+
+
+def test_oversized_first_page_still_warns(patch_find, monkeypatch, caplog):
+    """Esimene leht üksi ületab MAX → total jääb 0, aga kärbe → hoiatus siiski."""
+    import logging
+    import server.metadata_handler as mh
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    monkeypatch.setattr(mh, "PRERENDER_TEXT_MAX_BYTES", 50)
+    monkeypatch.setattr(mh, "PRERENDER_TEXT_WARN_BYTES", 40)
+    _write_page(path, "p1", 1, "A" * 300)  # üksik segment > MAX
+    with caplog.at_level(logging.WARNING):
+        html = mh.build_meta_html("work001")
+    assert "Täistekst rakenduses" in html
+    assert any("Prerender HTML suur" in r.message for r in caplog.records)
+
+
 def test_oversized_work_truncated_with_note(patch_find, monkeypatch):
     import server.metadata_handler as mh
     registry, tmp_path = patch_find
