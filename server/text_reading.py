@@ -24,14 +24,16 @@ __all__ = [
 def read_work_page_texts(work_path):
     """Loeb teose lehtede toore teksti järjekorras.
 
-    Tagastab [(page_num, raw_text)]. `.txt` on autoriteet, lehe `.json`
-    `text_content` on fallback (sama reegel nagu indekseerijal).
+    Tagastab [(page_num, raw_text)]. `page_num` on lehe päris `sequence`
+    (`.json`-ist), fallback järjekorra-positsioon (idx+1) kui sequence puudub.
+    `.txt` on teksti autoriteet, lehe `.json` `text_content` on fallback
+    (sama reegel nagu indekseerijal).
     """
     pages = []
     for idx, img_name in enumerate(enumerate_page_images(work_path)):
-        page_num = idx + 1
         base = os.path.splitext(img_name)[0]
         raw = ""
+        seq = None
         txt_path = os.path.join(work_path, base + '.txt')
         if os.path.exists(txt_path):
             try:
@@ -39,15 +41,21 @@ def read_work_page_texts(work_path):
                     raw = f.read()
             except Exception:
                 pass
-        if not raw:
-            jp = os.path.join(work_path, base + '.json')
-            if os.path.exists(jp):
-                try:
-                    with open(jp, 'r', encoding='utf-8') as jf:
-                        d = json.load(jf)
+        jp = os.path.join(work_path, base + '.json')
+        if os.path.exists(jp):
+            try:
+                with open(jp, 'r', encoding='utf-8') as jf:
+                    d = json.load(jf)
+                    s = d.get('sequence')
+                    if s is None:
+                        s = d.get('meta_content', {}).get('sequence')
+                    if s is not None:
+                        seq = int(s)
+                    if not raw:
                         raw = d.get('text_content', '') or ''
-                except Exception:
-                    pass
+            except Exception:
+                pass
+        page_num = seq if seq is not None else idx + 1
         pages.append((page_num, raw))
     return pages
 
