@@ -47,14 +47,25 @@ def strip_leading_image_name(raw, txt_path):
     """
     nl = raw.find('\n')
     first = raw if nl == -1 else raw[:nl]
+    rest = "" if nl == -1 else raw[nl + 1:]
     base = os.path.splitext(os.path.basename(txt_path))[0].lower()
     expected = {base + ext for ext in _IMG_EXTS}
-    if first.strip().lower() not in expected:
-        return raw, False
-    # Eemalda juhtiv rida (ja seda vahetult järgnevad tühjad read).
-    rest = "" if nl == -1 else raw[nl + 1:]
-    rest = rest.lstrip('\n')
-    return rest, True
+    first_stripped = first.strip()
+    low = first_stripped.lower()
+
+    # Variant A: kogu esimene rida ON failinimi → eemalda rida (+ järgnevad tühjad).
+    if low in expected:
+        return rest.lstrip('\n'), True
+
+    # Variant B: rida ALGAB oma failinimega + tühik, siis päris tekst samal real
+    # (nt "r_..._0002.jpg 1633:16 LESSUS") → eemalda ainult failinime-prefiks.
+    for name in expected:
+        if low.startswith(name) and first_stripped[len(name):len(name) + 1].isspace():
+            remainder = first_stripped[len(name):].lstrip()
+            new = remainder + (("\n" + rest) if rest else "")
+            return new, True
+
+    return raw, False
 
 
 def main():

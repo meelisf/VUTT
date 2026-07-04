@@ -51,6 +51,22 @@ def test_filename_only_page_becomes_empty():
     assert fixed == ""
 
 
+def test_strips_filename_prefix_on_same_line():
+    # Variant B: failinimi + tühik + päris tekst samal real → jäta ainult tekst
+    raw = "r_acad_dorp_1633_16_17_0002.jpg 1633:16 LESSUS. I.\nteine rida"
+    fixed, did = strip(raw, "/x/r_acad_dorp_1633_16_17_0002.txt")
+    assert did is True
+    assert fixed == "1633:16 LESSUS. I.\nteine rida"
+
+
+def test_prefix_needs_whitespace_boundary():
+    # "p1.jpgX" ei ole failinimi-token → ei puutu
+    raw = "p1.jpgX rest"
+    fixed, did = strip(raw, "/x/p1.txt")
+    assert did is False
+    assert fixed == raw
+
+
 def test_does_not_strip_filename_mid_text():
     # Nimi ei ole esimesel real → ei puutu
     raw = "Sisu\np1.jpg"
