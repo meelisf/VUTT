@@ -60,6 +60,7 @@ def strip_leading_image_name(raw, txt_path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--apply', action='store_true', help='Kirjuta muudatused (muidu dry-run)')
+    ap.add_argument('--dry-run', action='store_true', help='Selgesõnaline dry-run (vaikimisi, kui --apply puudub)')
     ap.add_argument('--commit', action='store_true', help='Pärast --apply tee data/ git commit')
     ap.add_argument('--limit', type=int, default=0, help='Töötle ainult N esimest muudetavat (test)')
     args = ap.parse_args()
