@@ -94,8 +94,13 @@ def main():
 
     if args.apply and args.commit and changed:
         msg = f"txt: eemalda juhtiv pildi-nime rida ({len(changed)} faili)"
+        # Lisa AINULT muudetud .txt failid (mitte `add -A`) — data/ gitis võib
+        # olla committimata runtime-config muudatusi, mida ei tohi kaasa haarata.
+        rels = [os.path.relpath(p, DATA_ROOT) for p in changed]
         try:
-            subprocess.run(['git', '-C', DATA_ROOT, 'add', '-A'], check=True)
+            # Pane pathspec-id kaupa (väldib liiga pikka käsurida suure N korral).
+            for i in range(0, len(rels), 500):
+                subprocess.run(['git', '-C', DATA_ROOT, 'add', '--'] + rels[i:i + 500], check=True)
             subprocess.run(['git', '-C', DATA_ROOT, 'commit', '-m', msg], check=True)
             print(f"data/ git commit tehtud: {msg}")
         except subprocess.CalledProcessError as e:
