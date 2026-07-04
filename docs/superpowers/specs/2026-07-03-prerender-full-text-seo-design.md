@@ -1,0 +1,351 @@
+# Prerender full-text for SEO discoverability + AI-bot policy
+
+**Date:** 2026-07-03
+**Status:** Design (approved for spec review)
+
+## Problem
+
+Google Search Console reports ~1,660 `/work/{id}` and `/persons/{id}` pages as
+**"Crawled – currently not indexed"** (only ~437 indexed). Diagnosis: the pages are
+technically fine (correct self-referencing canonicals — verified), but the bot-facing
+prerendered HTML (`build_meta_html`) contains **only bibliographic metadata** (title,
+creators, year, place, publisher, archive refs). ~2,000 work pages therefore look
+**thin and structurally near-identical** to Google's quality layer → crawled but not
+indexed.
+
+The actual mission problem is the mirror image: **nobody knows the corpus exists.** The
+material is substantial but undiscoverable because the unique content — the transcribed
+text itself — is never exposed to search engines.
+
+(Separately, the "Alternative page with proper canonical tag" report is a single page,
+`/stats`, canonicalizing to `/` by design — intentional, not addressed here.)
+
+## Goal
+
+Expose each work's full transcribed text in the bot-facing prerender so search engines
+can index the corpus by its actual words — **while not inviting AI-training scrapers to
+hammer the server**, particularly the scanned page images (the expensive, scrape-attractive
+asset; the concern that drives peers like Uppsala to deploy Anubis).
+
+## Constraints & context
+
+- **Moving target:** transcriptions are edited continuously. Whatever is exposed must
+  stay current at crawl time, and edits must (eventually) prompt Google to re-crawl.
+- **Whole-work pages, not per-page URLs.** ~20k page-level URLs would balloon the sitemap
+  and crawl surface for negligible benefit. One rich page per work.
+- **AI-bot blocking is non-trivial and partly futile via robots.txt.** Compliant bots
+  (GPTBot, Google-Extended, CCBot, ClaudeBot) honor it; the aggressive/unlabeled scrapers
+  ignore it and spoof UAs. Genuine enforcement (Cloudflare AI Labyrinth, Anubis PoW) is a
+  separate, heavy project — explicitly out of scope.
+- Text is cheap bandwidth; **images are the load risk.** Image protection must be
+  UA-agnostic (rate-limit), not reliant on bot cooperation.
+
+## What each protection layer actually buys us (honest accounting)
+
+| Layer | Stops | Doesn't stop | Cost | Status |
+|---|---|---|---|---|
+| robots.txt AI rules | Compliant AI bots | Anything ignoring it | Free | **New (this work)** |
+| Image rate-limit (per-IP, nginx) | Bulk image download load — UA-agnostic | Distributed/rotating-IP scrapers | Low | **Already deployed** |
+| Anubis / Cloudflare PoW | Almost everything | — | High infra | Deferred (future project) |
+
+The rate-limit is the real teeth because it doesn't care whether a bot identifies itself.
+robots.txt is free politeness that catches the well-behaved AI crawlers. That's the honest
+baseline; true AI-proofing is named but not attempted here.
+
+## Design
+
+### Part A — Full work text in the prerender  *(substantive; in git)*
+
+**Where:** `build_meta_html(work_id, ...)` in `server/metadata_handler.py`, served to bots
+via `GET /meta/work/{work_id}` (`server/routers/public.py`).
+
+**Extract pure text helpers to a neutral module (avoid heavy import).** Do **not** import
+the full Meilisearch indexing module into `metadata_handler.py` — it risks cyclic/heavy
+imports and indexing side-effects. Move the pure text functions `split_marginalia`
+(`meili_doc.py:41`), `clean_text_for_search` (`:60`), `_clean_search_text` (`:93`), and the
+new `read_work_page_texts` into a small neutral module (e.g. `server/text_reading.py`).
+`meili_doc.py` and `metadata_handler.py` both import from there (keep back-compat re-exports
+in `meili_doc.py` if anything imports them by that path).
+
+**Text source (reuse the indexer's path):** the Meilisearch indexer already reads page
+text authoritatively at `server/meili_doc.py:~640-683` — enumerate the work's page images
+in sorted order, read `data/{slug}/{base}.txt` (fallback to page `.json` `text_content`
+when the `.txt` is missing/empty). Factor this enumeration+read into the shared helper
+`read_work_page_texts(work_path) -> list[(page_num, raw_text)]` so the prerender and the
+indexer stay consistent and don't drift.
+
+**Cleaning:** run each page's raw text through `clean_text_for_search()` — joins line-end
+hyphens, strips all VUTT XML/markdown markup → readable prose. Include **main text +
+marginalia** via `_clean_search_text(page_text)` which returns `(main_clean, marginalia_clean)`.
+
+**Rendering (preserve page context):** render **per page**, not one flat blob, so page
+context survives for both indexing and debugging. Append after the bibliographic block and
+before the nav back-links, e.g.:
+
+```html
+<section data-page="12">
+  <p>… cleaned main text of page 12 …</p>
+  <p class="marginalia"><em>Ääremärkused:</em> … cleaned marginalia …</p>
+</section>
+```
+
+Use a lightweight per-page wrapper (`<section data-page="N">`), not an `<h2>` per page
+(noisy in large works). Keep everything else (canonical, OG/DC tags, cross-links)
+unchanged. Escape via the existing `_escape` helper.
+
+**Not cloaking — same public content the user sees.** The prerender contains the **same
+public transcription that is available to the user in the SPA** — no SEO-only hidden text.
+This keeps dynamic rendering within Google's acceptable use (equivalence of bot and user
+content) and avoids any cloaking concern.
+
+**Moving target → live but cheap (caching):** the endpoint already rebuilds fresh per
+request, so text is current at crawl time. To avoid re-reading/cleaning N page files on
+every crawl, add a **per-work HTML cache** keyed on
+`max(_metadata.json mtime, all page .txt/.json mtimes considered by the reader)`. The
+`_metadata.json` mtime is **required** in the key — otherwise a bibliographic-only edit
+(title/author/year/publisher) would leave the bot-facing HTML stale. Any change → key
+changes → next crawl rebuilds; otherwise serve cached HTML. Mirrors the existing
+`_home_cache` pattern in `public.py`. Cache entry: `{work_id: (cache_key, html)}`;
+invalidate implicitly by key mismatch.
+
+**Large-work guardrail (size):** log the rendered HTML byte size per work in debug/manual
+mode and emit a warning when **uncompressed** HTML exceeds ~1.5–1.8 MB. Rationale: Google
+currently documents (Search Central, updated Feb 2026) that for Google Search **Googlebot
+crawls only the first 2 MB of supported text/HTML file types** and, once the limit is hit,
+stops fetching and sends only the already-downloaded part for indexing consideration
+(the separate 15 MB figure is the broader resource-download cap, not the HTML-indexing
+budget). So warn at ~1.5–1.8 MB and **deliberately truncate** oversized prerenders rather
+than emitting HTML Google may only partially use. A decision is pre-registered for the rare
+oversized work: **cap at N pages / M bytes with a visible "full text in app" note** rather
+than silently emit multi-MB HTML. "Full text" is therefore best-effort for exceptionally
+large works — this does **not** imply per-page URLs. (Context: the current largest work is
+706 pages ≈ 800 KB, comfortably under the limit — this guardrail is insurance, not a
+present constraint. The canonical/OG/title tags live in `<head>` at the top, so they are
+always within the 2 MB even if body text were truncated.)
+
+**Access gating:** unchanged — honor `is_work_public` / `can_read_work`. Restricted works
+get **no text** (as today; `work_meta` already returns 403 for unauthorized).
+
+### Part B — Sitemap `lastmod` reflects text edits  *(small; in git)*
+
+**Where:** `build_sitemap_xml()` in `server/metadata_handler.py:426`.
+
+Today work `lastmod` = `_metadata.json` mtime, which **does not change when page text is
+edited** → Google never learns to re-crawl edited transcriptions. Change work `lastmod` to
+`max(page file mtimes, _metadata.json mtime)`. Reuse the same page-enumeration helper from
+Part A (bounded cost; sitemap is already cached in `_sitemap_cache`). Person `lastmod`
+(from `updated_at`) is unchanged.
+
+**Cache staleness decision.** The sitemap is served from `_sitemap_cache`, which today has
+a **1 h TTL** (`_sitemap_cache["expires"] = now + 3600`, `public.py:298`). So the improved
+`lastmod` propagates within ≤1 h of an edit — bounded, not stale-until-restart. That is
+acceptable given sitemaps are fetched infrequently; we keep the TTL rather than adding
+mtime-keying. **Decision:** optionally shorten the TTL to ~15 min if faster propagation is
+wanted, but 1 h is fine. (Explicitly noted so the improved lastmod isn't silently hidden
+behind an unbounded cache — it isn't.)
+
+**`lastmod` is a hint, not a guarantee.** Google treats sitemap `lastmod` and submission as
+signals, not commitments; "Crawled – currently not indexed" explicitly means Google has
+seen the page and may still choose not to index it. This change removes a real blocker (no
+freshness signal at all today) but does not guarantee re-crawl or indexing.
+
+### Part C — robots.txt AI-bot rules  *(tiny; in git)*
+
+**Where:** `public/robots.txt` (built into `dist/`, served static by nginx).
+
+Add robots.txt tokens that opt out of known AI-training / AI-ingestion crawlers, keeping
+search engines fully allowed. These are **robots.txt product tokens**, not necessarily
+distinct HTTP User-Agents:
+
+Comments go on their **own lines**, never inline after a directive value — some non-Google
+parsers mishandle `User-agent: GPTBot # ...`:
+
+```
+# --- AI training / ingestion opt-out (see maintenance note) ---
+
+# OpenAI model-training crawler
+User-agent: GPTBot
+Disallow: /
+
+# Google product token for Gemini training/grounding opt-out.
+# Does not affect Google Search crawling or ranking.
+User-agent: Google-Extended
+Disallow: /
+
+# Common Crawl
+User-agent: CCBot
+Disallow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Disallow: /
+User-agent: anthropic-ai
+Disallow: /
+
+# ByteDance
+User-agent: Bytespider
+Disallow: /
+
+# AI search / referral / agent-fetch bots are intentionally NOT blocked (allowed):
+# OAI-SearchBot, PerplexityBot, Perplexity-User, FirecrawlAgent. See "Allowed" note below.
+```
+
+Retain the existing `User-agent: *` rules (which already `Disallow: /api/`, covering images
+for compliant bots) and the `Sitemap:` line.
+
+**Intentionally allowed — AI search / referral / agent-fetch bots.** Consistent with the
+goal (be *discoverable*, including via AI intermediaries that send readers to the corpus),
+the following are **not** blocked:
+- **`OAI-SearchBot`** — ChatGPT-search visibility (distinct from GPTBot training). Left
+  allowed so ChatGPT-search can surface and link the corpus.
+- **`PerplexityBot`** (and **`Perplexity-User`**) — Perplexity runs two agents:
+  `PerplexityBot` is a search/indexing crawler ("not used to crawl content for AI foundation
+  models"), and `Perplexity-User` performs **user-triggered** fetches. Both are allowed
+  (blocking would only cost Perplexity-answer/referral visibility); in logs, watch them as
+  **separate categories** — indexing vs. user-initiated retrieval.
+- **`FirecrawlAgent`** — Firecrawl's multi-tenant fetch/scrape layer; one crawler serves all
+  Firecrawl customers. It respects robots.txt **by default**, but Firecrawl also exposes an
+  enterprise `ignoreRobotsTxt` option and a customizable `robotsUserAgent`, so robots.txt
+  compliance is **not guaranteed**. It is allowed initially **not because it is inherently
+  harmless, but because blocking it would also block legitimate user-triggered retrieval**
+  across every downstream app at once. Treat it as **monitor-first, not trust-by-default**:
+  watch access logs for `FirecrawlAgent` volume and block if a single actor bulk-scrapes the
+  corpus. The nginx image rate-limit is the load backstop regardless.
+
+**Wording precision (important):**
+- **`Google-Extended`** is not a separate crawler UA. Google crawls with its normal UAs;
+  this token only opts the site out of Google using crawled content for **Gemini training
+  and grounding**, and Google states it **does not affect inclusion or ranking in Google
+  Search**. Frame it as "opt out of Google-Extended uses while leaving Google Search
+  crawling allowed" — not "block the Google-Extended crawler".
+- **`GPTBot` vs `OAI-SearchBot`:** OpenAI distinguishes `GPTBot` (training opt-out) from
+  `OAI-SearchBot` (ChatGPT-search visibility); they can be allowed/blocked independently.
+  **Decision:** block `GPTBot` (training), allow `OAI-SearchBot` (referral visibility).
+
+**Decided policy (this iteration):** block **training/ingestion** bots only; allow all
+**AI search / referral / agent-fetch** bots. Revisit per the maintenance note if load/abuse
+appears.
+
+**Maintenance note (mechanism, not just a comment):** review this crawler list ~quarterly.
+Keep two conceptual buckets explicit and decide them separately: (1) **training/ingestion
+bots** (GPTBot, Google-Extended, CCBot, ClaudeBot, anthropic-ai, Bytespider) — block;
+(2) **AI search / referral / agent-fetch bots** (OAI-SearchBot, PerplexityBot,
+Perplexity-User, FirecrawlAgent) — allowed, a visibility trade-off; watch access logs
+(track indexing vs. user-triggered fetchers separately) and reclassify if one starts
+driving bulk load. Note that vendor tokens are documented but UA spoofing is common
+and Firecrawl is multi-tenant, so robots.txt remains advisory (the nginx rate-limit is the
+UA-agnostic backstop).
+
+**Image load protection is already handled** by the deployed nginx rate-limit
+(`/api/images/` → `zone=vutt_api`, 10 r/s per IP, burst 50; `nginx.conf:64`). No code change.
+
+### Part D — Monitoring bot/scraper traffic  *(mostly host-config, not git)*
+
+The bot policy's "allow initially, monitor, reclassify" only works if traffic is actually
+visible. Current state (verified 2026-07-03): HTML-page hits **are** logged with User-Agent
+in `vutt_access.log` (default `combined` format), so page-level bots are greppable. But
+`/api/images/` has `access_log off` (site config line 159) → **image scraping — the real
+load concern — is invisible in logs today.** Umami (port 3000) only tracks browsers running
+its JS beacon → humans, not bots. The university's **Zabbix** already probes the site
+(uptime `HEAD /`) and is the natural home for push alerting later.
+
+**D1 — Log image requests (close the blind spot).** Replace `access_log off` in the
+`/api/images/` location with a **dedicated** log (e.g. `/var/log/nginx/vutt_images.log`) so
+image traffic is captured with UA/IP without polluting the main log. (Alternative: log only
+429s — rejected as primary because it misses high-volume 200s sitting just under the rate
+limit; the dedicated log + aggregation captures both.)
+
+**D2 — Bound log growth (REQUIRED).** Image requests are high-volume (normal browsing pulls
+many thumbnails/page images), so the new log MUST have strict rotation: size-based logrotate
+(e.g. rotate at ~100 MB or daily, keep ~7 rotations, `compress`). Also confirm the existing
+`vutt_access.log` rotation (currently ~14 daily gz rotations) stays sane. Goal: monitoring
+must never fill the disk.
+
+**Privacy / retention.** Because image (and page) logs contain **IP addresses and
+User-Agents**, keep retention **short**, access **admin-only**, and the data
+**purpose-limited** to abuse/load monitoring — not analytics or profiling. The short
+logrotate retention above doubles as the retention control.
+
+**D3 — GoAccess for aggregation + a real review habit.** Install GoAccess (no daemon/new
+service) and generate reports over `vutt_access.log` (page bots) and `vutt_images.log`
+(image scraping): top User-Agents, top IPs, request rates, status codes (incl. 429s).
+Produce a periodic **static HTML report via cron**. **The report must not leak** — it
+aggregates IPs/UAs, so it is itself sensitive: store it outside any web root, `chmod`
+admin-only, and expose it **only** via SSH tunnel or nginx Basic-Auth — **no public URL**.
+So review is a habit not ad-hoc `awk`. Define a light **review cadence**: weekly glance at
+top UAs/IPs; act if one UA/IP dominates image volume or trips many 429s (this is the trigger
+for reclassifying `FirecrawlAgent` / PerplexityBot / OAI-SearchBot per Part C's maintenance
+note).
+
+**D4 — Zabbix alerting (DEFERRED to autumn 2026).** Ideal end state is *push* alerts on
+request-rate / bandwidth / 429 spikes via the already-deployed Zabbix. Deferred pending
+university IT availability (holiday season). GoAccess + logs cover the interim; revisit in
+autumn.
+
+**Reproducibility:** since the nginx site config and logrotate live on the host (not in
+git), capture the applied snippets (the `/api/images/` logging diff, the logrotate file,
+the GoAccess cron) in `docs/` or `scripts/` so the setup is documented and repeatable.
+
+## Explicitly out of scope / deferred
+
+- **Tightening the image rate-limit.** 10 r/s per IP caps runaway load but a patient single
+  IP could still drain ~20k images in ~30 min. Decision: **leave as-is for now, monitor.**
+  If traffic/abuse grows, tighten via a stricter image-specific nginx zone (e.g. 2–4 r/s)
+  and/or `limit_conn` per IP — a one-line host-config change, not git, reversible.
+- **Anubis / Cloudflare-tier bot challenge.** Separate future project if scrapers become a
+  real problem despite the above.
+- **Per-page URLs / anchors.** Rejected — whole-work pages only.
+- **`/stats` canonical report.** Intentional behavior; no change.
+
+## Testing
+
+- **Unit:** shared page-text helper (`read_work_page_texts`) returns pages in order with
+  `.txt`-authoritative / `.json`-fallback behavior; `build_meta_html` output contains
+  cleaned per-page main text in `<section data-page="N">` wrappers plus cleaned marginalia,
+  and omits text for a restricted work; cache key =
+  `max(_metadata.json mtime, page file mtimes)` — a changed **page** mtime *and* a changed
+  **`_metadata.json`** mtime each force a rebuild (guards the bibliographic-staleness case);
+  size-guardrail warning fires when rendered HTML exceeds the threshold, and the oversized
+  work is truncated per the pre-registered decision.
+- **Sitemap:** `lastmod` for a work reflects a page-file mtime newer than `_metadata.json`.
+- **robots.txt:** served content includes the AI-bot blocks and retains `Sitemap:` +
+  existing `*` rules. **Group non-inheritance check:** a matching crawler uses only its own
+  most-specific `User-agent` group — specific groups do **not** inherit `User-agent: *`
+  rules. So (a) blocked bots (GPTBot etc.) are covered by their own `Disallow: /`
+  regardless of `*`, and (b) crucially, verify the `User-agent: *` group does **not**
+  contain anything that would restrict Googlebot/Bingbot from the `/work/` and `/persons/`
+  text pages (only `/api/`, `/search`, `/admin`, etc. as today). Confirm no allowed
+  search/referral bot is accidentally caught by a block group.
+- **Manual (server):** fetch `/meta/work/{id}` with a Googlebot UA and confirm full text is
+  present; confirm a restricted work still 403s; re-run seed/reindex unaffected.
+
+## Rollout
+
+- Backend change (Parts A, B): `git pull && docker compose build --no-cache backend &&
+  docker compose up -d backend`.
+- robots.txt (Part C): ships in frontend build → `npm run build` + `rsync -avz dist/ vutt:~/VUTT/dist/`.
+- Monitoring (Part D, host-config): edit the `/api/images/` location (dedicated log),
+  install the logrotate rule for it, `sudo nginx -t && sudo systemctl reload nginx`; install
+  GoAccess + cron report. Zabbix (D4) deferred to autumn. Commit the applied snippets to
+  `docs/`/`scripts/` for reproducibility.
+- After deploy: request re-indexing / validation in Search Console for a sample of the
+  affected `/work/{id}` URLs. "Crawled – currently not indexed" **may** shrink over
+  subsequent weeks as pages carry unique substantive content, but this is **not guaranteed**
+  — Google's crawl/index decisions are discretionary. Monitor impressions and indexed-count
+  over time rather than expecting an immediate change.
+
+## Success criteria
+
+- Bot-facing `/work/{id}` pages contain the full cleaned transcription (main + marginalia)
+  where safely below the HTML-size threshold; exceptionally large works are deliberately
+  capped with a visible "full text in app" note.
+- Editing a transcription bumps that work's sitemap `lastmod`.
+- robots.txt blocks the named AI training/ingestion crawlers while allowing Googlebot/
+  Bingbot and the AI search/referral/agent-fetch bots (OAI-SearchBot, PerplexityBot,
+  FirecrawlAgent).
+- No regression to browser SPA behavior, access gating, or existing indexing pipeline.
+- Image requests are logged (with UA/IP) to a size-bounded dedicated log, and a GoAccess
+  report makes top UAs/IPs/status codes reviewable on a defined cadence — so the Part C
+  "monitor and reclassify" policy is actually actionable.
+- Over weeks: measurable rise in "Indexed" count and appearance of corpus text in Google
+  results.

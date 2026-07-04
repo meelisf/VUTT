@@ -14,4 +14,32 @@ Disallow: /statistics
 Disallow: /api/
 Disallow: /meili/
 
+# --- AI training / ingestion opt-out (review quarterly) ---
+
+# OpenAI model-training crawler
+User-agent: GPTBot
+Disallow: /
+
+# Google product token for Gemini training/grounding opt-out.
+# Does not affect Google Search crawling or ranking.
+User-agent: Google-Extended
+Disallow: /
+
+# Common Crawl
+User-agent: CCBot
+Disallow: /
+
+# Anthropic
+User-agent: ClaudeBot
+Disallow: /
+User-agent: anthropic-ai
+Disallow: /
+
+# ByteDance
+User-agent: Bytespider
+Disallow: /
+
+# AI search / referral / agent-fetch bots are intentionally NOT blocked (allowed):
+# OAI-SearchBot, PerplexityBot, Perplexity-User, FirecrawlAgent.
+
 Sitemap: https://vutt.utlib.ut.ee/sitemap.xml

@@ -16,6 +16,15 @@ def _write_meta(tmp_path, meta: dict) -> str:
     return str(work_dir)
 
 
+def _write_page(work_dir_path, base, seq, txt):
+    """Lisab teosele lehe: {base}.jpg + {base}.json (sequence) + {base}.txt."""
+    import json as _json
+    p = Path(work_dir_path)
+    (p / f"{base}.jpg").write_bytes(b"x")
+    (p / f"{base}.json").write_text(_json.dumps({"sequence": seq}), encoding="utf-8")
+    (p / f"{base}.txt").write_text(txt, encoding="utf-8")
+
+
 @pytest.fixture()
 def patch_find(monkeypatch, tmp_path):
     """Monkeypatchi find_directory_by_id et tagastaks tmp_path kausta."""
@@ -374,3 +383,112 @@ def test_sitemap_includes_persons_and_excludes_tombstones():
     assert "https://vutt.utlib.ut.ee/persons/vutt:P1" in xml
     assert "2026-06-21" in xml
     assert "vutt:P2" not in xml
+
+
+def test_body_includes_page_text(patch_find):
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    _write_page(path, "p1", 1, "Suecorum gloria in aeternum")
+    _write_page(path, "p2", 2, "Pars altera <m>nota marginalis</m> textus")
+    html = build_meta_html("work001")
+    assert 'data-page="1"' in html
+    assert "Suecorum gloria in aeternum" in html
+    assert 'data-page="2"' in html
+    # Marginaalia eraldi lõiguna
+    assert 'class="marginalia"' in html
+    assert "nota marginalis" in html
+    # Põhitekstist on marginaalia välja lõigatud
+    assert "Pars altera textus" in html
+
+
+def test_include_text_false_omits_transcription(patch_find):
+    """include_text=False (ligipääsu ei hinnatud) → mitte teksti, ainult metaandmed."""
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    _write_page(path, "p1", 1, "Salajane transkriptsioon")
+    html = build_meta_html("work001", include_text=False)
+    assert "Salajane transkriptsioon" not in html
+    assert 'data-page=' not in html
+    assert 'class="work-text"' not in html
+    # Metaandmed/head siiski olemas
+    assert 'rel="canonical"' in html
+
+
+def test_oversized_first_page_still_warns(patch_find, monkeypatch, caplog):
+    """Esimene leht üksi ületab MAX → total jääb 0, aga kärbe → hoiatus siiski."""
+    import logging
+    import server.metadata_handler as mh
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    monkeypatch.setattr(mh, "PRERENDER_TEXT_MAX_BYTES", 50)
+    monkeypatch.setattr(mh, "PRERENDER_TEXT_WARN_BYTES", 40)
+    _write_page(path, "p1", 1, "A" * 300)  # üksik segment > MAX
+    with caplog.at_level(logging.WARNING):
+        html = mh.build_meta_html("work001")
+    assert "Täistekst rakenduses" in html
+    assert any("Prerender HTML suur" in r.message for r in caplog.records)
+
+
+def test_oversized_work_truncated_with_note(patch_find, monkeypatch):
+    import server.metadata_handler as mh
+    registry, tmp_path = patch_find
+    path = _write_meta(tmp_path, FULL_META)
+    registry["work001"] = path
+    # Väike piir, et test ei vaja megabaite
+    monkeypatch.setattr(mh, "PRERENDER_TEXT_MAX_BYTES", 200)
+    _write_page(path, "p1", 1, "A" * 300)
+    _write_page(path, "p2", 2, "B" * 300)
+    html = mh.build_meta_html("work001")
+    assert "Täistekst rakenduses" in html          # kärbe-märge olemas
+    assert "BBB" not in html                        # teine leht jäi välja
+    assert 'rel="canonical"' in html                # head-tagid alles (2MB sees)
+
+
+def test_sitemap_lastmod_uses_page_mtime(tmp_path):
+    import os, json as _json, datetime
+    from server.metadata_handler import build_sitemap_xml
+    # Loo päris kaust, kus lehe .txt on UUEM kui _metadata.json mtime
+    d = tmp_path / "slug"
+    d.mkdir()
+    (d / "_metadata.json").write_text(_json.dumps({"id": "w1", "collections": []}), encoding="utf-8")
+    txt = d / "a.txt"
+    txt.write_text("tekst", encoding="utf-8")
+    new_ts = 1_800_000_000.0  # kaugel tulevikus, kindlasti > _metadata mtime
+    os.utime(str(txt), (new_ts, new_ts))
+
+    cache = {"w1": (str(d), os.path.getmtime(str(d / "_metadata.json")))}
+    xml = build_sitemap_xml(cache, lambda m: True, lambda wid: {"id": "w1", "collections": []})
+    expected = datetime.datetime.fromtimestamp(new_ts, datetime.timezone.utc).strftime("%Y-%m-%d")
+    assert expected in xml
+
+
+def test_cached_work_meta_html_rebuilds_on_mtime_change(tmp_path):
+    import os
+    from server.metadata_handler import cached_work_meta_html
+    from server.cache_invalidation import _work_meta_cache
+    _work_meta_cache.clear()
+    d = tmp_path / "slug"
+    d.mkdir()
+    (d / "_metadata.json").write_text("{}", encoding="utf-8")
+    txt = d / "a.txt"
+    txt.write_text("v1", encoding="utf-8")
+
+    calls = {"n": 0}
+    def build():
+        calls["n"] += 1
+        return f"<html>{calls['n']}</html>"
+
+    h1 = cached_work_meta_html("w1", str(d), build)
+    h2 = cached_work_meta_html("w1", str(d), build)  # cache hit
+    assert h1 == h2
+    assert calls["n"] == 1
+
+    os.utime(str(txt), (2_000_000_000.0, 2_000_000_000.0))  # muudatus
+    h3 = cached_work_meta_html("w1", str(d), build)         # rebuild
+    assert calls["n"] == 2
+    assert h3 != h1
