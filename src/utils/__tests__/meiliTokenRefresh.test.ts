@@ -5,7 +5,15 @@ import {
   REFRESH_LOOKAHEAD_MS,
   shouldRefreshToken,
   shouldRefreshOrPromote,
+  tokenExpiresAtFromJwt,
+  resolveTokenExpiresAt,
 } from '../meiliTokenRefresh';
+
+function fakeJwt(payload: object): string {
+  const json = JSON.stringify(payload);
+  const base64url = btoa(json).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  return `header.${base64url}.sig`;
+}
 
 describe('meiliTokenRefresh', () => {
   it('uuendab tokeni ENNE aegumist, kui kontroll käib intervalliga CHECK_INTERVAL_MS', () => {
@@ -37,6 +45,16 @@ describe('meiliTokenRefresh', () => {
     const expiresAt = TOKEN_TTL_MS;
     expect(shouldRefreshToken(0, expiresAt)).toBe(false);
     expect(shouldRefreshToken(CHECK_INTERVAL_MS, expiresAt)).toBe(false);
+  });
+
+  it('loeb aegumisaja JWT exp väljast', () => {
+    const token = fakeJwt({ exp: 12345 });
+    expect(tokenExpiresAtFromJwt(token)).toBe(12345 * 1000);
+  });
+
+  it('kasutab parsingu vea korral fallback TTL-i', () => {
+    expect(tokenExpiresAtFromJwt('not-a-jwt')).toBeNull();
+    expect(resolveTokenExpiresAt('not-a-jwt', 1000)).toBe(1000 + TOKEN_TTL_MS);
   });
 });
 

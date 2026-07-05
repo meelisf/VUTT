@@ -137,6 +137,12 @@ def test_generate_meili_token_admin(monkeypatch):
     assert payload["searchRules"] == {"teosed": {}}
 
 
+def test_auth_meili_token_ttl_matches_session_duration():
+    from server.config import SESSION_DURATION
+    from server.routers.auth import USER_MEILI_TOKEN_TTL_SECONDS
+    assert USER_MEILI_TOKEN_TTL_SECONDS == int(SESSION_DURATION.total_seconds())
+
+
 def test_generate_meili_token_with_collection(monkeypatch):
     import jwt
     from server.meilisearch_ops import generate_meili_token

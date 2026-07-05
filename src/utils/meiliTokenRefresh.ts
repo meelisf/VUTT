@@ -1,6 +1,7 @@
 // Meilisearchi tenant tokeni uuendamise ajastus.
 //
-// Backend väljastab tokeni TTL-iga 3600s (server/main.py, generate_meili_token).
+// Backend paneb JWT `exp` välja; frontend arvutab aegumise tokenist, mitte
+// ei eelda fikseeritud TTL-i. Fallback jääb juhuks, kui tokenit ei saa parsida.
 // Varasem bug: kontroll käis iga 55 min ja uuendas ainult 60s enne aegumist —
 // t=55min oli aegumiseni veel 5 min, järgmine kontroll alles t=110min,
 // seega vahemikus 60–110 min kasutati aegunud tokenit ("Tenant token expired").
@@ -12,6 +13,28 @@ export const REFRESH_LOOKAHEAD_MS = 5 * 60 * 1000;
 
 export function shouldRefreshToken(now: number, expiresAt: number): boolean {
   return now > expiresAt - REFRESH_LOOKAHEAD_MS;
+}
+
+function decodeBase64UrlJson(segment: string): any | null {
+  try {
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    return JSON.parse(atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+export function tokenExpiresAtFromJwt(token: string): number | null {
+  const payloadSegment = token.split('.')[1];
+  if (!payloadSegment) return null;
+  const payload = decodeBase64UrlJson(payloadSegment);
+  if (!payload || typeof payload.exp !== 'number') return null;
+  return payload.exp * 1000;
+}
+
+export function resolveTokenExpiresAt(token: string, now: number = Date.now()): number {
+  return tokenExpiresAtFromJwt(token) ?? now + TOKEN_TTL_MS;
 }
 
 // Kas Meili-tokenit on vaja kontrollida/uuendada — ajapõhine aegumine PLUSS

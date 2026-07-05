@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from ..auth import create_session, delete_session, get_session, load_users, require_token, verify_user
-from ..config import get_logger
+from ..config import SESSION_DURATION, get_logger
 from ..rate_limit import (
     check_account_lockout,
     check_rate_limit,
@@ -24,6 +24,12 @@ from ..password_reset import complete_password_reset, validate_reset_token
 logger = get_logger(__name__)
 router = APIRouter()
 
+# Autenditud Meilisearch tenant-token peab kestma sama kaua kui VUTT sessioon.
+# Muidu võib kasutajal 24h sessiooni sees Meili token varem aeguda ja otsingud
+# hakata andma 403 / anon-degradeerumist. Anon-token jääb allpool lühikeseks.
+USER_MEILI_TOKEN_TTL_SECONDS = int(SESSION_DURATION.total_seconds())
+ANON_MEILI_TOKEN_TTL_SECONDS = 3600
+
 
 @router.post("/login")
 async def login(request: Request):
@@ -44,7 +50,7 @@ async def login(request: Request):
         clear_login_failures(username)
         from ..meilisearch_ops import generate_meili_token
         try:
-            meili_token = generate_meili_token(user=user, ttl_seconds=3600)
+            meili_token = generate_meili_token(user=user, ttl_seconds=USER_MEILI_TOKEN_TTL_SECONDS)
         except Exception as e:
             logger.info(f"Meili token genereerimine ebaõnnestus (test env?): {e}")
             meili_token = None
@@ -87,7 +93,7 @@ async def public_meili_token():
     """Anonüümne Meilisearchi tenant token — filter: is_public = true."""
     from ..meilisearch_ops import generate_meili_token
     try:
-        token = generate_meili_token(user=None, ttl_seconds=3600)
+        token = generate_meili_token(user=None, ttl_seconds=ANON_MEILI_TOKEN_TTL_SECONDS)
         return {"token": token}
     except Exception as e:
         logger.info(f"Meili token genereerimine ebaõnnestus (test env?): {e}")
@@ -107,7 +113,7 @@ async def refresh_meili_token(request: Request):
     full_user = users.get(user["username"], user)
     user_with_collections = {**user, "allowed_collections": full_user.get("allowed_collections", [])}
     try:
-        new_token = generate_meili_token(user=user_with_collections, ttl_seconds=3600)
+        new_token = generate_meili_token(user=user_with_collections, ttl_seconds=USER_MEILI_TOKEN_TTL_SECONDS)
         return {"token": new_token}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Token refresh ebaõnnestus: {e}")

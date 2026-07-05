@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { MeiliSearch, Index } from 'meilisearch';
 import { MEILI_HOST, MEILI_INDEX } from '../config';
-import { TOKEN_TTL_MS, CHECK_INTERVAL_MS, shouldRefreshOrPromote } from '../utils/meiliTokenRefresh';
+import { CHECK_INTERVAL_MS, resolveTokenExpiresAt, shouldRefreshOrPromote } from '../utils/meiliTokenRefresh';
 
 const SESSION_TOKEN_KEY = 'vutt_token';
 
@@ -32,7 +32,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
       const { token } = await r.json();
       if (token) {
         setIndex(makeIndex(token));
-        tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
+        tokenExpiresAt.current = resolveTokenExpiresAt(token);
         isUserToken.current = false;
       }
     } catch (e) {
@@ -61,7 +61,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
           const { token } = await r.json();
           if (token) {
             setIndex(makeIndex(token));
-            tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
+            tokenExpiresAt.current = resolveTokenExpiresAt(token);
             isUserToken.current = true;
             return;
           }
@@ -86,7 +86,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
 
   const setUserToken = useCallback((token: string) => {
     setIndex(makeIndex(token));
-    tokenExpiresAt.current = Date.now() + TOKEN_TTL_MS;
+    tokenExpiresAt.current = resolveTokenExpiresAt(token);
     isUserToken.current = true;
   }, []);
 
