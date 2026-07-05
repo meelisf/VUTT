@@ -14,12 +14,24 @@ import socket
 import subprocess
 import threading
 import unicodedata
+import warnings
 from datetime import datetime
 from typing import Optional
 
 # OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
 OCR_CONNECT_TIMEOUT = 10
+
+# Pildi-uploadi sanity piirid. Väga kõrged, et tavalised suured skannid töötaksid,
+# aga patoloogilised/decompression-bomb sisendid ei jõuaks OCR-serverisse.
+UPLOAD_IMAGE_MAX_PIXELS = int(os.getenv("UPLOAD_IMAGE_MAX_PIXELS", "150000000"))
+UPLOAD_IMAGE_MAX_DIMENSION = int(os.getenv("UPLOAD_IMAGE_MAX_DIMENSION", "30000"))
+try:
+    from PIL import Image as _PILImage
+    _PILImage.MAX_IMAGE_PIXELS = UPLOAD_IMAGE_MAX_PIXELS
+    warnings.simplefilter("error", _PILImage.DecompressionBombWarning)
+except Exception:
+    pass
 
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
 from .utils import atomic_write_json, generate_nanoid
@@ -446,6 +458,44 @@ def _detect_file_type(path: str) -> str:
     return 'unknown'
 
 
+def _validate_upload_image(path: str) -> tuple[int, int]:
+    """Kontrollib pildi mõõtmeid enne OCR-serverisse saatmist.
+
+    See ei sea väikest praktilist skannipiiri, vaid lõikab ära patoloogilised
+    sisendid: liiga suur pikselite koguarv, absurdne üksik mõõde või vigane pilt.
+    Tagastab (width, height).
+    """
+    try:
+        from PIL import Image, UnidentifiedImageError
+    except ImportError as e:
+        raise ValueError("Pildi töötlemise tugi puudub (Pillow pole paigaldatud)") from e
+
+    try:
+        with Image.open(path) as img:
+            width, height = img.size
+            if width <= 0 or height <= 0:
+                raise ValueError("Pildi mõõtmeid ei õnnestunud tuvastada")
+            if width > UPLOAD_IMAGE_MAX_DIMENSION or height > UPLOAD_IMAGE_MAX_DIMENSION:
+                raise ValueError(
+                    f"Pilt on liiga suur: {width}×{height} px. "
+                    f"Maksimaalne lubatud külg on {UPLOAD_IMAGE_MAX_DIMENSION} px."
+                )
+            pixels = width * height
+            if pixels > UPLOAD_IMAGE_MAX_PIXELS:
+                raise ValueError(
+                    f"Pilt on liiga suur: {width}×{height} px ({pixels} pikslit). "
+                    f"Maksimaalne lubatud kogus on {UPLOAD_IMAGE_MAX_PIXELS} pikslit."
+                )
+            img.verify()
+            return width, height
+    except ValueError:
+        raise
+    except UnidentifiedImageError as e:
+        raise ValueError("Vigane pildifail — pilti ei õnnestunud avada") from e
+    except Exception as e:
+        raise ValueError(f"Vigane pildifail — {e}") from e
+
+
 # =========================================================
 # SFTP TRANSFER (etapp 2): PDF/pildi edastamine OCR serverisse
 #
@@ -601,14 +651,18 @@ def _sftp_transfer_image(upload_id: str, tmp_path: str, file_type: str,
         sftp = _sftp_open(upload_id)
         _ensure_remote_dirs(sftp, remote_dirs)
 
+        _validate_upload_image(tmp_path)
+
         # Konverteeri JPEG-iks kui PNG või TIFF
         if file_type in ('png', 'tiff'):
             from PIL import Image
             conv_path = tmp_path + '.conv.jpg'
-            with Image.open(tmp_path) as img:
-                img.convert('RGB').save(conv_path, 'JPEG', quality=95)
-            sftp.put(conv_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
-            os.unlink(conv_path)
+            try:
+                with Image.open(tmp_path) as img:
+                    img.convert('RGB').save(conv_path, 'JPEG', quality=95)
+                sftp.put(conv_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
+            finally:
+                _safe_unlink(conv_path)
         else:
             sftp.put(tmp_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
 
@@ -677,6 +731,11 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
     file_type = _detect_file_type(tmp_path)
 
     if file_type in ('jpeg', 'png', 'tiff'):
+        try:
+            _validate_upload_image(tmp_path)
+        except ValueError:
+            _safe_unlink(tmp_path)
+            raise
         # Pildi puhul: laadi otse remote work kausta, OCR server teeb ise üles
         pages, remote_dirs, remote_tmp, remote_dst, remote_img_name = _prepare_image_upload(state)
         _init_upload_progress(upload_id, tmp_path)
@@ -949,6 +1008,12 @@ def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages:
             pass
         raise ValueError("Multi-page režiim ei toeta PDF-e — kasuta PDF puhul üksikut üleslaadimist.")
 
+    try:
+        _validate_upload_image(tmp_path)
+    except ValueError:
+        _safe_unlink(tmp_path)
+        raise
+
     remote_img_name = f"{slug}_pg_{page_number:03d}.jpg"
     remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
     remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
@@ -979,10 +1044,12 @@ def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages:
         if file_type in ('png', 'tiff'):
             from PIL import Image
             conv_path = tmp_path + '.conv.jpg'
-            with Image.open(tmp_path) as img:
-                img.convert('RGB').save(conv_path, 'JPEG', quality=95)
-            sftp.put(conv_path, remote_tmp)
-            os.unlink(conv_path)
+            try:
+                with Image.open(tmp_path) as img:
+                    img.convert('RGB').save(conv_path, 'JPEG', quality=95)
+                sftp.put(conv_path, remote_tmp)
+            finally:
+                _safe_unlink(conv_path)
         else:
             sftp.put(tmp_path, remote_tmp)
 

@@ -324,6 +324,7 @@ class TestDispatch:
         upload_id, _ = make_state()
         path = fake_file("img.jpg", b"\xff\xd8\xff\xe0")
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
 
         pages = upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
@@ -342,6 +343,34 @@ class TestDispatch:
         # progress init
         assert upload_ops.upload_progress[upload_id]['bytes_total'] > 0
         assert upload_ops.upload_progress[upload_id]['error'] is None
+
+    def test_liiga_suur_pilt_katkestab_enne_threadi(self, make_state, monkeypatch,
+                                                     fake_file, capture_threads):
+        upload_id, _ = make_state()
+        path = fake_file("img.jpg", b"\xff\xd8\xff\xe0")
+        monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
+
+        with pytest.raises(ValueError, match="Pilt on liiga suur"):
+            upload_ops.save_and_transfer_to_ocr(upload_id, path)
+
+        assert not os.path.exists(path), "tagasilükatud pildi tmp_path kustutatakse"
+        assert capture_threads == []
+
+    def test_validate_upload_image_pikslipiir(self, monkeypatch, tmp_path):
+        from PIL import Image
+        path = tmp_path / "big.png"
+        Image.new("RGB", (20, 20), (1, 2, 3)).save(path)
+        monkeypatch.setattr(upload_ops, "UPLOAD_IMAGE_MAX_PIXELS", 300)
+
+        with pytest.raises(ValueError, match="Pilt on liiga suur"):
+            upload_ops._validate_upload_image(str(path))
+
+    def test_validate_upload_image_vigane_magic(self, fake_file):
+        path = fake_file("broken.jpg", b"\xff\xd8\xff\xe0vigane")
+
+        with pytest.raises(ValueError, match="Vigane pildifail"):
+            upload_ops._validate_upload_image(path)
 
     def test_pdf_dispatch_käivitab_pdf_thread(self, make_state, monkeypatch,
                                               fake_file, capture_threads, uploads_dir):
@@ -371,12 +400,33 @@ class TestDispatch:
         upload_id, _ = make_state()
         path = fake_file("img.png", b"\x89PNG\r\n\x1a\n")
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'png')
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
 
         pages = upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
         assert pages == 1
         assert capture_threads[0].target == upload_ops._sftp_transfer_image
         assert capture_threads[0].args[2] == 'png'  # file_type edastatakse konverteerimiseks
+
+
+# =========================================================
+# add_image_page (multi-image)
+# =========================================================
+
+class TestAddImagePage:
+    def test_liiga_suur_multi_image_katkestab_enne_sftp(self, make_state, monkeypatch, fake_file):
+        upload_id, _ = make_state(status='pending')
+        path = fake_file("page.jpg", b"\xff\xd8\xff\xe0")
+        monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
+        sftp_open = MagicMock()
+        monkeypatch.setattr(upload_ops, "_sftp_open", sftp_open)
+
+        with pytest.raises(ValueError, match="Pilt on liiga suur"):
+            upload_ops.add_image_page(upload_id, path, 1, 2)
+
+        assert not os.path.exists(path)
+        sftp_open.assert_not_called()
 
 
 # =========================================================
@@ -389,6 +439,7 @@ class TestSftpTransfer:
         path = fake_file("img.jpg", b"\xff\xd8")
         sftp = _fake_sftp()
         monkeypatch.setattr(upload_ops, "_sftp_open", lambda uid: sftp)
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
 
         upload_ops._sftp_transfer_image(
             upload_id, path, 'jpeg',
@@ -414,6 +465,7 @@ class TestSftpTransfer:
         sftp = _fake_sftp()
         sftp.put.side_effect = RuntimeError("ühendus katkes")
         monkeypatch.setattr(upload_ops, "_sftp_open", lambda uid: sftp)
+        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
 
         upload_ops._sftp_transfer_image(
             upload_id, path, 'jpeg',
