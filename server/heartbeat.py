@@ -8,7 +8,7 @@ from __future__ import annotations
 import threading
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 _lock = threading.Lock()
 _jobs: Dict[str, Dict[str, Any]] = {}
@@ -46,7 +46,7 @@ def mark_success(name: str, *, detail: Optional[Dict[str, Any]] = None) -> None:
             job["last_detail"] = detail
 
 
-def mark_error(name: str, error: Exception | str, *, detail: Optional[Dict[str, Any]] = None) -> None:
+def mark_error(name: str, error: Union[Exception, str], *, detail: Optional[Dict[str, Any]] = None) -> None:
     """Märgi töö pass veaga lõppenuks."""
     now = time.time()
     with _lock:
