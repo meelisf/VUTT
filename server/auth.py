@@ -13,6 +13,7 @@ from datetime import datetime
 from .cache import get_cached_collections
 from .config import USERS_FILE, SESSION_DURATION
 from .utils import atomic_write_json
+from .heartbeat import mark_error, mark_success, register_job
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ _sessions_lock = threading.Lock()
 
 # Sessioonide puhastamise intervall (sekundites)
 SESSION_CLEANUP_INTERVAL = 300  # 5 minutit
+register_job("session_cleanup", interval_seconds=SESSION_CLEANUP_INTERVAL, description="Aegunud kasutajasessioonide puhastus")
 
 # =========================================================
 # ROLLIDE HIERARHIA — üks tõeallikas
@@ -104,9 +106,11 @@ def _cleanup_expired_sessions():
                 for token in expired_tokens:
                     del sessions[token]
 
+            mark_success("session_cleanup", detail={"removed": len(expired_tokens), "active": len(sessions)})
             if expired_tokens:
                 print(f"Sessioonide puhastus: eemaldatud {len(expired_tokens)} aegunud sessiooni (aktiivseid: {len(sessions)})")
         except Exception as e:
+            mark_error("session_cleanup", e)
             print(f"Sessioonide puhastuse viga: {e}")
 
 

@@ -21,10 +21,12 @@ from typing import Dict, List, Optional
 from .config import OCR_SERVER_PATH, get_logger
 from . import reocr_ops
 from . import reocr_state
+from .heartbeat import mark_error, mark_success, register_job
 
 logger = get_logger(__name__)
 
 REOCR_REAPER_INTERVAL = int(os.getenv("REOCR_REAPER_INTERVAL", "300"))
+register_job("reocr_reaper", interval_seconds=REOCR_REAPER_INTERVAL, description="OCR staging'u orvuks jäänud valmis re-OCR tulemuste taaste")
 _MATERIAL_TYPES = ("print", "hand")
 
 # Claim-set: kaitseb tavalise polleri ja reaperi võistluse eest (sama .txt topelt-töötlus).
@@ -266,8 +268,10 @@ def _reaper_loop():
     while True:
         time.sleep(REOCR_REAPER_INTERVAL)
         try:
-            scan_and_recover()
+            result = scan_and_recover()
+            mark_success("reocr_reaper", detail=result)
         except Exception as e:
+            mark_error("reocr_reaper", e)
             logger.warning(f"Reaper loop viga: {e}")
 
 

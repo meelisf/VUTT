@@ -24,6 +24,7 @@ OCR_CONNECT_TIMEOUT = 10
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
 from .utils import atomic_write_json, generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
+from .heartbeat import mark_error, mark_success, register_job
 
 
 def _normalize_txt_file(path: str):
@@ -1620,6 +1621,7 @@ _ACTIVE_SYNC_STATUSES = frozenset({'processing', 'reviewing'})
 # Taustasünki intervall (s). Pikem kui re-OCR oma (10s), sest upload-poll laeb
 # SFTP kaudu pisipilte (raskem) ja töid on tüüpiliselt vähe. Env-st ülekirjutatav.
 UPLOAD_SYNC_INTERVAL = int(os.getenv("UPLOAD_SYNC_INTERVAL", "60"))
+register_job("upload_sync", interval_seconds=UPLOAD_SYNC_INTERVAL, description="Aktiivsete uploadide OCR-progressi taustasünk")
 
 
 def _uploads_needing_sync(states: list) -> list:
@@ -1643,13 +1645,20 @@ def _upload_sync_loop():
         try:
             ids = _uploads_needing_sync(list_uploads())
         except Exception as e:
+            mark_error("upload_sync", e)
             logger.warning(f"upload-sync: aktiivsete uploadide lugemine ebaõnnestus: {e}")
             continue
+        errors = 0
         for uid in ids:
             try:
                 poll_and_sync_thumbs(uid)
             except Exception as e:
+                errors += 1
                 logger.warning(f"upload-sync taustapoll viga ({uid}): {e}")
+        if errors:
+            mark_error("upload_sync", f"{errors} uploadi poll ebaõnnestus", detail={"active_uploads": len(ids), "errors": errors})
+        else:
+            mark_success("upload_sync", detail={"active_uploads": len(ids)})
 
 
 def start_upload_sync_loop():

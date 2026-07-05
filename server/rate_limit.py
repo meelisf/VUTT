@@ -6,6 +6,7 @@ import json
 import time
 import threading
 from .config import RATE_LIMITS
+from .heartbeat import mark_error, mark_success, register_job
 
 # IP-põhine päringute ajalugu: {endpoint: {ip: [timestamp1, timestamp2, ...]}}
 _rate_limit_store = {}
@@ -22,6 +23,7 @@ ACCOUNT_LOCKOUT_WINDOW = 900     # libisev aken sekundites (15 min)
 
 # Puhastuse intervall (sekundites)
 RATE_LIMIT_CLEANUP_INTERVAL = 600  # 10 minutit
+register_job("rate_limit_cleanup", interval_seconds=RATE_LIMIT_CLEANUP_INTERVAL, description="Rate-limit ja login-throttle aegunud kirjete puhastus")
 
 
 def _cleanup_rate_limit_store():
@@ -69,9 +71,11 @@ def _cleanup_rate_limit_store():
                     else:
                         del _account_failures[username]
 
+            mark_success("rate_limit_cleanup", detail={"removed_ip_entries": total_removed})
             if total_removed > 0:
                 print(f"Rate limit puhastus: eemaldatud {total_removed} IP kirjet")
         except Exception as e:
+            mark_error("rate_limit_cleanup", e)
             print(f"Rate limit puhastuse viga: {e}")
 
 

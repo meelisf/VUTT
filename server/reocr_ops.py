@@ -12,6 +12,7 @@ from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, g
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
 from . import reocr_state
+from .heartbeat import mark_error, mark_success, register_job
 
 REOCR_LOG_MAX = 500   # Maksimaalne kirjete arv logifailis
 _log_lock = threading.Lock()
@@ -109,6 +110,9 @@ REOCR_ABSOLUTE_TIMEOUT = int(os.getenv("REOCR_ABSOLUTE_TIMEOUT", str(12 * 3600))
 # ^ Sanity cap kogu kliendipoolsele elueale (sh järjekorras ootamine), MITTE OCR-töötluse timeout.
 
 REOCR_BATCH_INACTIVITY_TIMEOUT = 1800  # Batch slow, kui X s pole ühegi lehe kohta uut .txt
+register_job("reocr_batch_poll", interval_seconds=10, description="Batch re-OCR tööde taustapoll")
+register_job("reocr_cleanup", interval_seconds=600, description="Vanade re-OCR tööde mälust puhastus")
+register_job("reocr_poll", interval_seconds=10, description="Üksiklehe re-OCR tööde taustapoll")
 
 _reocr_batch_jobs: Dict = {}  # {job_id: batch-job dict}
 _reocr_batch_jobs_lock = threading.Lock()
@@ -395,7 +399,9 @@ def _reocr_batch_poll_loop():
         time.sleep(10)
         try:
             _batch_poll_iteration(datetime.now().timestamp())
+            mark_success("reocr_batch_poll")
         except Exception as e:
+            mark_error("reocr_batch_poll", e)
             logger.warning(f"Re-OCR batch poll iteration viga: {e}")
 
 
@@ -413,6 +419,7 @@ def _reocr_cleanup_loop():
                      if j["status"] in ("done", "error") and j.get("finished_at", 0) < cutoff]
             for jid in stale:
                 del _reocr_jobs[jid]
+        mark_success("reocr_cleanup", detail={"removed": len(stale)})
         if stale:
             logger.info(f"Re-OCR cleanup: eemaldati {len(stale)} vana tööd")
 
@@ -495,7 +502,9 @@ def _reocr_poll_loop():
         time.sleep(10)
         try:
             _poll_iteration(datetime.now().timestamp())
+            mark_success("reocr_poll")
         except Exception as e:
+            mark_error("reocr_poll", e)
             logger.warning(f"Re-OCR poll iteration viga: {e}")
 
 

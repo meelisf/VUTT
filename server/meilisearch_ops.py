@@ -32,6 +32,7 @@ import json
 import time
 import urllib.request
 import urllib.parse
+import threading
 from concurrent.futures import ThreadPoolExecutor
 import jwt  # PyJWT
 from datetime import datetime, timezone, timedelta
@@ -48,6 +49,7 @@ logger = get_logger(__name__)
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
 from .git_ops import commit_new_work_to_git
+from .heartbeat import mark_error, mark_success, register_job
 
 # Puhtad kaardistusfunktsioonid (teksti puhastus, aliased, dokumendi ehitamine) elavad
 # nüüd side-effect-vabas moodulis server/meili_doc.py (issue #23) — neid impordivad
@@ -315,14 +317,53 @@ _meilisearch_executor = ThreadPoolExecutor(
     max_workers=MEILISEARCH_POOL_SIZE,
     thread_name_prefix="meili_sync"
 )
+_meili_sync_lock = threading.Lock()
+_meili_sync_pending = 0
+_meili_sync_last_error = None
+_meili_sync_last_error_at = None
+_meili_sync_last_success_at = None
+_meili_sync_completed = 0
+register_job("meilisearch_async_sync", description="Asünkroonne teoste sünkroonimine Meilisearchi")
+register_job("metadata_watcher", interval_seconds=60, description="Uute teosekaustade metaandmete jälgija")
 
 
 def _sync_work_task(dir_name):
     """Meilisearch sync task (käivitatakse pool'is)."""
+    global _meili_sync_pending, _meili_sync_last_error, _meili_sync_last_error_at, _meili_sync_last_success_at, _meili_sync_completed
     try:
-        sync_work_to_meilisearch(dir_name)
+        ok = sync_work_to_meilisearch(dir_name)
+        with _meili_sync_lock:
+            _meili_sync_completed += 1
+            if ok:
+                _meili_sync_last_success_at = time.time()
+        if ok:
+            mark_success("meilisearch_async_sync", detail={"dir_name": dir_name})
+        else:
+            raise RuntimeError("sync_work_to_meilisearch tagastas False")
     except Exception as e:
+        with _meili_sync_lock:
+            _meili_sync_last_error = str(e)
+            _meili_sync_last_error_at = time.time()
+        mark_error("meilisearch_async_sync", e, detail={"dir_name": dir_name})
         logger.error(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
+    finally:
+        with _meili_sync_lock:
+            _meili_sync_pending = max(0, _meili_sync_pending - 1)
+
+
+def get_meilisearch_sync_status():
+    """Tagastab async Meilisearch sync queue seisu health endpointile."""
+    with _meili_sync_lock:
+        queued = _meilisearch_executor._work_queue.qsize() if hasattr(_meilisearch_executor, "_work_queue") else None
+        return {
+            "pending": _meili_sync_pending,
+            "queued": queued,
+            "pool_size": MEILISEARCH_POOL_SIZE,
+            "completed": _meili_sync_completed,
+            "last_success_at": datetime.fromtimestamp(_meili_sync_last_success_at, timezone.utc).isoformat() if _meili_sync_last_success_at else None,
+            "last_error": _meili_sync_last_error,
+            "last_error_at": datetime.fromtimestamp(_meili_sync_last_error_at, timezone.utc).isoformat() if _meili_sync_last_error_at else None,
+        }
 
 
 def sync_work_to_meilisearch_async(dir_name):
@@ -332,6 +373,9 @@ def sync_work_to_meilisearch_async(dir_name):
     Vead logitakse, aga ei katkesta kasutaja tööd.
     Pool piirab samaagsete päringute arvu (max 10).
     """
+    global _meili_sync_pending
+    with _meili_sync_lock:
+        _meili_sync_pending += 1
     _meilisearch_executor.submit(_sync_work_task, dir_name)
 
 
@@ -414,6 +458,7 @@ def update_collection_is_public_async(collection_id: str, is_public_flag: bool):
 MEILI_KEEPWARM_INTERVAL = 7200  # 2 tundi sekundites
 MEILI_SEARCH_KEEPWARM_INTERVAL = int(os.getenv("MEILI_SEARCH_KEEPWARM_INTERVAL", "1800"))
 DEFAULT_DASHBOARD_COLLECTION = os.getenv("VUTT_DEFAULT_COLLECTION", "universitas-dorpatensis-1")
+register_job("meilisearch_keepwarm", interval_seconds=MEILI_SEARCH_KEEPWARM_INTERVAL, description="Meilisearchi otsingu- ja sync-radade soojendamine")
 
 
 def _meili_search(body, timeout=30):
@@ -560,7 +605,9 @@ def _keepwarm_loop():
                             sync_work_to_meilisearch(entry.name)
                             last_sync_warmup = now
                             break
+            mark_success("meilisearch_keepwarm")
         except Exception as e:
+            mark_error("meilisearch_keepwarm", e)
             logger.error(f"Keep-warm viga: {e}")
         time.sleep(MEILI_SEARCH_KEEPWARM_INTERVAL)
 
@@ -607,8 +654,10 @@ def metadata_watcher_loop():
                             except Exception as e:
                                 logger.error(f"Viga metaandmete loomisel ({entry.name}): {e}")
 
+            mark_success("metadata_watcher")
             # Oota 60 sekundit järgmise skannimiseni
             time.sleep(60)
         except Exception as e:
+            mark_error("metadata_watcher", e)
             logger.error(f"Jälgija viga: {e}")
             time.sleep(60)

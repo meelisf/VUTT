@@ -7,10 +7,11 @@ from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR
 from .utils import build_work_id_cache
 
 logger = get_logger(__name__)
-from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes
+from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, get_meilisearch_sync_status
 from .upload_ops import start_upload_sync_loop
 from .reocr_ops import start_reocr_background
 from .git_ops import run_git_fsck
+from .heartbeat import snapshot as heartbeat_snapshot
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
 # server/__init__.py kaudu otse ops-moodulitest, seega main.py ei impordi neid.
@@ -118,6 +119,14 @@ from .notifications_ops import (
 
 @app.get("/health")
 async def health(): return {"status": "ok"}
+
+
+@app.get("/health/background")
+async def background_health():
+    """Taustatööde heartbeat ja Meilisearch async queue seis."""
+    data = heartbeat_snapshot()
+    data["meilisearch_sync"] = get_meilisearch_sync_status()
+    return data
 
 if __name__ == "__main__":
     import uvicorn
