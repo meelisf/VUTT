@@ -200,19 +200,28 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
             for entry in page_entries:
                 src = os.path.join(work_path, entry["page_filename"])
                 sftp.put(src, f"{work_abs}/{entry['remote_img_name']}")
-                entry["status"] = "processing"
+                with _reocr_batch_jobs_lock:
+                    current = _reocr_batch_jobs.get(job_id)
+                    if current and current.get("status") == "uploading":
+                        entry["status"] = "processing"
             sftp.close()
-            job["status"] = "processing"
+            with _reocr_batch_jobs_lock:
+                current = _reocr_batch_jobs.get(job_id)
+                if current and current.get("status") == "uploading":
+                    current["status"] = "processing"
             _persist_active_jobs()
             logger.info(f"Re-OCR batch {job_id}: {len(page_entries)} pilti edastatud ({slug})")
         except Exception as e:
             logger.error(f"Re-OCR batch {job_id} upload viga: {e}")
-            for entry in page_entries:
-                if entry["status"] in ("uploading", "processing"):
-                    entry["status"] = "error"
-                    entry["error"] = str(e)
-            job["status"] = "error"
-            job["finished_at"] = datetime.now().timestamp()
+            with _reocr_batch_jobs_lock:
+                current = _reocr_batch_jobs.get(job_id)
+                if current:
+                    for entry in current.get("pages", []):
+                        if entry["status"] in ("uploading", "processing"):
+                            entry["status"] = "error"
+                            entry["error"] = str(e)
+                    current["status"] = "error"
+                    current["finished_at"] = datetime.now().timestamp()
             _persist_active_jobs()
 
     threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}").start()
@@ -245,19 +254,23 @@ def _finalize_batch_if_complete(job: Dict) -> None:
 
 def _poll_batch_job(job_id: str) -> None:
     """Laeb iga ootel-lehe valmis .txt alla → .ocr fail (AUTORITEETNE mapping kirjest)."""
-    job = _reocr_batch_jobs.get(job_id)
-    if not job or job["status"] != "processing":
-        return
-    pending = [e for e in job["pages"] if e["status"] == "processing"]
-    if not pending:
-        _finalize_batch_if_complete(job)
-        return
+    with _reocr_batch_jobs_lock:
+        job = _reocr_batch_jobs.get(job_id)
+        if not job or job["status"] != "processing":
+            return
+        pending = [dict(e) for e in job["pages"] if e["status"] == "processing"]
+        slug = job["slug"]
+        remote_work = job["remote_work"]
+        remote_staging = job.get("remote_staging", os.path.dirname(remote_work))
+        if not pending:
+            _finalize_batch_if_complete(job)
+            return
     try:
         sftp = _sftp_open(job_id)
     except Exception as e:
         logger.warning(f"Re-OCR batch {job_id} poll sftp viga: {e}")
         return
-    work_abs = f"{OCR_SERVER_PATH}/{job['remote_work']}"
+    work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
     try:
         for entry in pending:
             txt_abs = f"{work_abs}/{entry['remote_txt_name']}"
@@ -268,26 +281,44 @@ def _poll_batch_job(job_id: str) -> None:
                 continue
             if text is None:
                 continue
-            # AUTORITEETNE: kirje page_filename määrab sihtkoha
+            ready = False
             try:
-                _write_ocr_file(job["slug"], entry["page_filename"], text)
-                entry["status"] = "ready"
-                job["last_progress_at"] = datetime.now().timestamp()
+                # AUTORITEETNE: kirje page_filename määrab sihtkoha
+                _write_ocr_file(slug, entry["page_filename"], text)
+                with _reocr_batch_jobs_lock:
+                    current = _reocr_batch_jobs.get(job_id)
+                    if current and current.get("status") == "processing":
+                        for cur_entry in current.get("pages", []):
+                            if cur_entry.get("remote_txt_name") == entry["remote_txt_name"] and cur_entry.get("status") == "processing":
+                                cur_entry["status"] = "ready"
+                                current["last_progress_at"] = datetime.now().timestamp()
+                                ready = True
+                                break
             except Exception as e:
-                entry["status"] = "error"
-                entry["error"] = str(e)
-            # Korista remote pilt+txt AINULT õnnestunud kirjutuse korral.
-            # Vea korral jäetakse .txt alles, et järgmine poll-ring saaks uuesti proovida.
-            if entry["status"] == "ready":
+                with _reocr_batch_jobs_lock:
+                    current = _reocr_batch_jobs.get(job_id)
+                    if current and current.get("status") == "processing":
+                        for cur_entry in current.get("pages", []):
+                            if cur_entry.get("remote_txt_name") == entry["remote_txt_name"] and cur_entry.get("status") == "processing":
+                                cur_entry["status"] = "error"
+                                cur_entry["error"] = str(e)
+                                break
+            # Korista remote pilt+txt AINULT õnnestunud kirjutuse ja endiselt kehtiva
+            # processing→ready ülemineku korral. Vea korral jäetakse .txt alles.
+            if ready:
                 for f in (txt_abs, f"{work_abs}/{entry['remote_img_name']}"):
                     try:
                         sftp.remove(f)
                     except Exception:
                         pass
         # Kui kõik lehed on lahendatud, koristame tühja remote staging-kausta
-        all_resolved = all(e["status"] in ("ready", "error") for e in job["pages"])
+        with _reocr_batch_jobs_lock:
+            current = _reocr_batch_jobs.get(job_id)
+            all_resolved = bool(current) and all(
+                e["status"] in ("ready", "error") for e in current.get("pages", [])
+            )
         if all_resolved:
-            staging_abs = f"{OCR_SERVER_PATH}/{job['remote_staging']}"
+            staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
             for d in (work_abs, staging_abs):
                 try:
                     sftp.rmdir(d)
@@ -300,7 +331,10 @@ def _poll_batch_job(job_id: str) -> None:
         except Exception:
             pass
         close_ssh(job_id)
-    _finalize_batch_if_complete(job)
+    with _reocr_batch_jobs_lock:
+        current = _reocr_batch_jobs.get(job_id)
+        if current:
+            _finalize_batch_if_complete(current)
 
 
 def _batch_poll_iteration(now: float) -> None:
@@ -470,7 +504,8 @@ threading.Thread(target=_reocr_poll_loop, daemon=True, name="reocr-poll").start(
 
 def get_active_reocr_count() -> int:
     """Tagastab parajasti aktiivsete (uploading/processing) re-OCR tööde arvu."""
-    return sum(1 for j in _reocr_jobs.values() if j["status"] in ("uploading", "processing"))
+    with _reocr_jobs_lock:
+        return sum(1 for j in _reocr_jobs.values() if j["status"] in ("uploading", "processing"))
 
 
 def list_reocr_jobs() -> list:
@@ -539,21 +574,22 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
     remote_work = f"AUTO-OCR/{material_type}/{job_id}/{slug}"
     remote_img_name = f"{slug}_pg_001.jpg"
 
-    _reocr_jobs[job_id] = {
-        "work_id": work_id,
-        "slug": slug,
-        "page_filename": page_filename,
-        "page_number": page_number,
-        "username": username,
-        "status": "uploading",
-        "text": None,
-        "error": None,
-        "started_at": datetime.now().timestamp(),
-        "remote_staging": remote_staging,
-        "remote_work": remote_work,
-        "remote_img": f"{remote_work}/{remote_img_name}",
-        "remote_txt": f"{remote_work}/{slug}_pg_001.txt",
-    }
+    with _reocr_jobs_lock:
+        _reocr_jobs[job_id] = {
+            "work_id": work_id,
+            "slug": slug,
+            "page_filename": page_filename,
+            "page_number": page_number,
+            "username": username,
+            "status": "uploading",
+            "text": None,
+            "error": None,
+            "started_at": datetime.now().timestamp(),
+            "remote_staging": remote_staging,
+            "remote_work": remote_work,
+            "remote_img": f"{remote_work}/{remote_img_name}",
+            "remote_txt": f"{remote_work}/{slug}_pg_001.txt",
+        }
     _persist_active_jobs()
 
     def _upload():
@@ -566,18 +602,27 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
                     sftp.stat(d)
                 except FileNotFoundError:
                     sftp.mkdir(d)
-            img_abs = f"{OCR_SERVER_PATH}/{_reocr_jobs[job_id]['remote_img']}"
+            img_abs = f"{OCR_SERVER_PATH}/{remote_work}/{remote_img_name}"
             sftp.put(img_path, img_abs)
             sftp.close()
-            _reocr_jobs[job_id]["status"] = "processing"
+            with _reocr_jobs_lock:
+                current = _reocr_jobs.get(job_id)
+                if current and current.get("status") == "uploading":
+                    current["status"] = "processing"
             _persist_active_jobs()
             logger.info(f"Re-OCR {job_id}: pilt edastatud ({slug})")
         except Exception as e:
             logger.error(f"Re-OCR {job_id} upload viga: {e}")
-            _reocr_jobs[job_id]["status"] = "error"
-            _reocr_jobs[job_id]["error"] = str(e)
-            _reocr_jobs[job_id]["finished_at"] = datetime.now().timestamp()
-            _append_to_log(_reocr_jobs[job_id], job_id)
+            log_job = None
+            with _reocr_jobs_lock:
+                current = _reocr_jobs.get(job_id)
+                if current and current.get("status") in ("uploading", "processing"):
+                    current["status"] = "error"
+                    current["error"] = str(e)
+                    current["finished_at"] = datetime.now().timestamp()
+                    log_job = dict(current)
+            if log_job:
+                _append_to_log(log_job, job_id)
             _persist_active_jobs()
         finally:
             try:
@@ -595,18 +640,20 @@ def poll_reocr_job(job_id: str) -> dict:
     Kui olek on 'processing', proovib SFTP kaudu TXT faili alla laadida.
     Tagastab: {status, text?, error?}
     """
-    job = _reocr_jobs.get(job_id)
-    if not job:
-        return {"status": "not_found"}
+    with _reocr_jobs_lock:
+        job = _reocr_jobs.get(job_id)
+        if not job:
+            return {"status": "not_found"}
+        snapshot = dict(job)
 
-    current = job["status"]
+    current = snapshot["status"]
     if current in ("uploading", "done", "error"):
-        return {"status": current, "text": job.get("text"), "error": job.get("error")}
+        return {"status": current, "text": snapshot.get("text"), "error": snapshot.get("error")}
 
     # status == 'processing' — proovi TXT alla laadida
     try:
         sftp = _sftp_open(job_id)
-        txt_abs = f"{OCR_SERVER_PATH}/{job['remote_txt']}"
+        txt_abs = f"{OCR_SERVER_PATH}/{snapshot['remote_txt']}"
         try:
             sftp.stat(txt_abs)
         except FileNotFoundError:
@@ -622,9 +669,9 @@ def poll_reocr_job(job_id: str) -> dict:
         # Puhasta OCR serveri kataloog taustal
         try:
             sftp2 = _sftp_open(job_id)
-            img_abs = f"{OCR_SERVER_PATH}/{job['remote_img']}"
-            work_abs = f"{OCR_SERVER_PATH}/{job['remote_work']}"
-            staging_abs = f"{OCR_SERVER_PATH}/{job['remote_staging']}"
+            img_abs = f"{OCR_SERVER_PATH}/{snapshot['remote_img']}"
+            work_abs = f"{OCR_SERVER_PATH}/{snapshot['remote_work']}"
+            staging_abs = f"{OCR_SERVER_PATH}/{snapshot['remote_staging']}"
             for f in (txt_abs, img_abs):
                 try:
                     sftp2.remove(f)
@@ -640,25 +687,35 @@ def poll_reocr_job(job_id: str) -> dict:
             logger.warning(f"Re-OCR {job_id} cleanup viga: {cleanup_err}")
 
         close_ssh(job_id)
-        job["status"] = "done"
-        job["text"] = text
-        job["finished_at"] = datetime.now().timestamp()
-        logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
-        _append_to_log(job, job_id)
-        _persist_active_jobs()
+        log_job = None
+        with _reocr_jobs_lock:
+            current_job = _reocr_jobs.get(job_id)
+            if current_job and current_job.get("status") == "processing":
+                current_job["status"] = "done"
+                current_job["text"] = text
+                current_job["finished_at"] = datetime.now().timestamp()
+                log_job = dict(current_job)
+        if log_job:
+            logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
+            _append_to_log(log_job, job_id)
+            _persist_active_jobs()
 
-        # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
-        page_fn = job.get("page_filename", "")
-        if page_fn:
-            try:
-                ocr_path = _write_ocr_file(job["slug"], page_fn, text)
-                logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
-            except Exception as write_err:
-                logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
+            # Kirjuta tulemus .ocr failina teose kausta (püsiv backup)
+            page_fn = log_job.get("page_filename", "")
+            if page_fn:
+                try:
+                    ocr_path = _write_ocr_file(log_job["slug"], page_fn, text)
+                    logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
+                except Exception as write_err:
+                    logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
     except Exception as e:
         logger.warning(f"Re-OCR {job_id} poll viga: {e}")
 
-    return {"status": job["status"], "text": job.get("text"), "error": job.get("error")}
+    with _reocr_jobs_lock:
+        final = _reocr_jobs.get(job_id)
+        if not final:
+            return {"status": "not_found"}
+        return {"status": final["status"], "text": final.get("text"), "error": final.get("error")}
 
 
 def _split_loaded(loaded: dict):

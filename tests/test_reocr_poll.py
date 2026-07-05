@@ -139,6 +139,37 @@ def test_poll_processing_txt_ready_done(monkeypatch):
     assert len(sftp.rmdired) == 2  # work + staging
 
 
+def test_poll_processing_ready_ei_kirjuta_timeout_errorit_yle(monkeypatch):
+    """Kui teine thread jõudis töö erroriks märkida, ei tohi poll hiljem done'iks üle kirjutada."""
+    first = _FakeSFTP(txt_ready=True, txt_content=b"hilinenud tekst")
+    cleanup = _FakeSFTP(txt_ready=True)
+
+    def _open(jid):
+        if not hasattr(_open, "called"):
+            _open.called = True
+            return first
+        return cleanup
+
+    def _race_remove(_path):
+        with reocr_ops._reocr_jobs_lock:
+            reocr_ops._reocr_jobs["j1"]["status"] = "error"
+            reocr_ops._reocr_jobs["j1"]["error"] = "timeout"
+
+    cleanup.remove = _race_remove
+    monkeypatch.setattr(reocr_ops, "_sftp_open", _open)
+    monkeypatch.setattr(reocr_ops, "close_ssh", lambda jid: None)
+    monkeypatch.setattr(reocr_ops, "_write_ocr_file",
+                        lambda *a, **kw: pytest.fail("erroriks märgitud tööd ei tohi .ocr-iks kirjutada"))
+    monkeypatch.setattr(reocr_ops, "_append_to_log",
+                        lambda *a, **kw: pytest.fail("erroriks märgitud tööd ei tohi done-logida"))
+
+    reocr_ops._reocr_jobs["j1"] = _make_job(status="processing")
+
+    res = reocr_ops.poll_reocr_job("j1")
+    assert res == {"status": "error", "text": None, "error": "timeout"}
+    assert reocr_ops._reocr_jobs["j1"]["status"] == "error"
+
+
 def test_poll_processing_no_page_filename_skips_ocr_write(monkeypatch):
     """Kui page_filename puudub, .ocr faili ei kirjutata (aga done siiski)."""
     sftp = _FakeSFTP(txt_ready=True)
