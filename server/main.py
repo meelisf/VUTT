@@ -1,6 +1,6 @@
 import threading
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, get_logger
@@ -121,9 +121,12 @@ from .notifications_ops import (
 async def health(): return {"status": "ok"}
 
 
-@app.get("/health/background")
-async def background_health():
-    """Taustatööde heartbeat ja Meilisearch async queue seis."""
+# NB: admin-only — lekitab sisemist operatiivinfot (last_error stringid, dir_name'id).
+# Avalik /health (üleval) jääb liveness-checkiks. Tee on /admin/ all, et nginx
+# proksiks selle /api/files/admin/ kaudu; auth jõustub app-tasandil (require_role).
+@app.get("/admin/health/background")
+async def background_health(user=Depends(require_role("admin"))):
+    """Taustatööde heartbeat ja Meilisearch async queue seis (ainult admin)."""
     data = heartbeat_snapshot()
     data["meilisearch_sync"] = get_meilisearch_sync_status()
     return data
