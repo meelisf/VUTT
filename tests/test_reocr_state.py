@@ -44,6 +44,39 @@ def test_persist_is_atomic_valid_json(tmp_path, monkeypatch):
     assert not (tmp_path / "reocr_active.json.tmp").exists()
 
 
+def test_reocr_log_write_is_atomic_json(tmp_path, monkeypatch):
+    import server.reocr_ops as ops
+    target = tmp_path / "reocr_log.json"
+    monkeypatch.setattr(ops, "REOCR_LOG_FILE", str(target))
+
+    ops._append_to_log({
+        "work_id": "wid",
+        "slug": "slug",
+        "page_filename": "slug_pg_001.txt",
+        "status": "done",
+        "finished_at": "2026-01-01T00:00:00",
+    }, "job1")
+
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data[0]["job_id"] == "job1"
+    assert data[0]["status"] == "done"
+    assert not list(tmp_path.glob(".tmp_*.json"))
+
+
+def test_reocr_log_corrupt_file_logs_warning(tmp_path, monkeypatch, caplog):
+    import logging
+    import server.reocr_ops as ops
+    target = tmp_path / "reocr_log.json"
+    target.write_text("{ vigane json", encoding="utf-8")
+    monkeypatch.setattr(ops, "REOCR_LOG_FILE", str(target))
+
+    with caplog.at_level(logging.WARNING):
+        result = ops.get_reocr_log()
+
+    assert result == {"entries": [], "has_more": False, "total": 0}
+    assert "Re-OCR logi lugemine ebaõnnestus" in caplog.text
+
+
 def test_batch_mapping_roundtrip(tmp_path, monkeypatch):
     import server.reocr_state as st
     monkeypatch.setattr(st, "BATCH_MAPS_DIR", str(tmp_path / "reocr_batch_maps"))

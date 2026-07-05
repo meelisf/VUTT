@@ -132,3 +132,5 @@ App-i `<Header>` on `sticky top-0 z-[1200]`, aga modaali ülekate oli vaid `z-50
 renderdus modaali peale. Vertikaalselt tsentreeritud `max-h-[92vh]` modaali ülemine serv (X-nupp)
 libises väiksel ekraanil app-i päise taha ega olnud klikitav (Esc töötas). **Parandatud:**
 modaali ülekate `z-50` → `z-[1300]` (app-i päisest kõrgemale).
+
+probleem: kui ma olen https://vutt.utlib.ut.ee/persons/vutt:Ptdn4lxy isiku lehel, kellel pole ühtegi teost, siis kui ma vaatan tema seoste kaarti, siis ta ütleb, et see isik ei kuulu valitud kollektsiooni (Kaardile kantavaid päritolukohti ei leitud. Valitud kollektsioonis („Academia Gustaviana (1632–1665)") pole selle isiku seoseid.) ja on printsiibis tõsi, et sellel isikul ei ole _seoseid_ aga tal on päritolukoht siiski märgitud ja fakt on see, et ta kuulub Academia Gustaviana üliõpilaste hulka. kuidas lahendada? 

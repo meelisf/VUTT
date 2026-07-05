@@ -22,7 +22,7 @@ from typing import Optional
 OCR_CONNECT_TIMEOUT = 10
 
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
-from .utils import generate_nanoid
+from .utils import atomic_write_json, generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 
 
@@ -86,10 +86,9 @@ def _read_state(upload_id: str):
 
 
 def _write_state(upload_id: str, state: dict):
-    """Kirjutab state.json (ei lukusta ise — kasuta _get_upload_lock)."""
+    """Kirjutab state.json atomaarse asendusega (ei lukusta ise — kasuta _get_upload_lock)."""
     path = _state_path(upload_id)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, state)
 
 
 def _valid_upload_id(upload_id: str) -> bool:
@@ -1351,7 +1350,9 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
 
     logger.info(f"replace {upload_id}: vanad JPG-d arhiveeritud → {trash_dir}")
 
-    # 6. Git rm vanad lehed (txt + json, v.a. _metadata.json) — JPG-d on gitignore all
+    # 6. Git rm vanad lehed (txt + json, v.a. _metadata.json) — JPG-d on gitignore all.
+    # Kui see ebaõnnestub, katkesta enne uute failide allalaadimist: muidu võib teosesse
+    # jääda vana ja uus .txt/.json sisu segamini.
     try:
         old_tracked = []
         for fname in os.listdir(work_dir):
@@ -1365,7 +1366,20 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         if old_tracked:
             logger.info(f"replace {upload_id}: git rm {len(old_tracked)} vana faili")
     except Exception as e:
-        logger.warning(f"replace {upload_id}: git rm viga: {e}")
+        logger.error(f"replace {upload_id}: git rm viga, katkestan ja taastan vana sisu: {e}")
+        try:
+            repo.git.checkout(old_head, '--', slug)
+            logger.info(f"replace {upload_id}: rollback git checkout OK (head={old_head[:8]})")
+        except Exception as rb_git_err:
+            logger.error(f"replace {upload_id}: rollback git checkout ebaõnnestus: {rb_git_err}")
+        try:
+            for fname in os.listdir(trash_dir):
+                if fname.endswith('.jpg'):
+                    shutil.move(os.path.join(trash_dir, fname), os.path.join(work_dir, fname))
+            logger.info(f"replace {upload_id}: rollback JPG-d tagasi liigutatud")
+        except Exception as rb_jpg_err:
+            logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
+        raise HTTPException(status_code=500, detail=f"Vana sisu eemaldamine ebaõnnestus: {e}")
 
     # 7. Lae alla uued lehed SFTP kaudu
     importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]

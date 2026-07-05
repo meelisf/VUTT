@@ -139,6 +139,32 @@ def test_poll_batch_mapping_on_autoriteetne_mitte_jarjekorra_pohine(tmp_path, mo
     del reocr_ops._reocr_batch_jobs[job_id]
 
 
+def test_revive_dead_uploads_taastab_batch_lehtede_pollimise():
+    from server.reocr_ops import _revive_dead_uploads
+    jobs = {
+        "batch1": {
+            "kind": "batch",
+            "status": "uploading",
+            "pages": [
+                {"page_filename": "a.jpg", "status": "uploading"},
+                {"page_filename": "b.jpg", "status": "ready"},
+            ],
+        },
+        "batch2": {
+            "kind": "batch",
+            "status": "processing",
+            "pages": [{"page_filename": "c.jpg", "status": "uploading"}],
+        },
+    }
+
+    assert _revive_dead_uploads(jobs) == 2
+    assert jobs["batch1"]["status"] == "processing"
+    assert jobs["batch1"]["pages"][0]["status"] == "processing"
+    assert jobs["batch1"]["pages"][1]["status"] == "ready"
+    assert jobs["batch2"]["status"] == "processing"
+    assert jobs["batch2"]["pages"][0]["status"] == "processing"
+
+
 def test_batch_inactive_ja_finalize():
     from server.reocr_ops import _batch_inactive, _finalize_batch_if_complete
     job = {"started_at": 0, "last_progress_at": 100, "status": "processing",

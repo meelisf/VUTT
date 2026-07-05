@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, get_logger
-from .utils import generate_nanoid
+from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
 from . import reocr_state
 
@@ -44,8 +44,7 @@ def _append_to_log(job: dict, job_id: str):
             log.append(entry)
             if len(log) > REOCR_LOG_MAX:
                 log = log[-REOCR_LOG_MAX:]
-            with open(REOCR_LOG_FILE, "w", encoding="utf-8") as f:
-                json.dump(log, f, ensure_ascii=False, indent=2)
+            atomic_write_json(REOCR_LOG_FILE, log)
         except Exception as e:
             logger.warning(f"Re-OCR logi kirjutamine ebaõnnestus: {e}")
 
@@ -58,7 +57,8 @@ def get_reocr_log(offset: int = 0, limit: int = 50) -> dict:
                 return {"entries": [], "has_more": False, "total": 0}
             with open(REOCR_LOG_FILE, "r", encoding="utf-8") as f:
                 log = json.load(f)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Re-OCR logi lugemine ebaõnnestus: {e}")
             return {"entries": [], "has_more": False, "total": 0}
     entries = list(reversed(log))  # uuemad ees
     total = len(entries)
@@ -676,11 +676,20 @@ def _revive_dead_uploads(jobs: dict) -> int:
     """Restardil laetud 'uploading' tööde upload-thread on surnud → poll ei töötleks neid
     kunagi (poll ainult 'processing') ega reaper (uploading = aktiivne) → igavene zombie.
     Teisenda 'uploading' → 'processing', et absoluutne sanity-lagi (12h) neid katab: kui
-    pilt jõudis serverisse, poll leiab tulemuse; kui ei, aegub error-iks. Tagastab arvu."""
+    pilt jõudis serverisse, poll leiab tulemuse; kui ei, aegub error-iks. Batch-töödel
+    taasta sama üleminek ka lehekülje-kirjetel, sest poll vaatab per-page staatust.
+    Tagastab muudetud tööde arvu."""
     n = 0
     for j in jobs.values():
+        changed = False
         if j.get("status") == "uploading":
             j["status"] = "processing"
+            changed = True
+        for page in j.get("pages") or []:
+            if page.get("status") == "uploading":
+                page["status"] = "processing"
+                changed = True
+        if changed:
             n += 1
     return n
 

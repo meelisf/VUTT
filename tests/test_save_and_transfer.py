@@ -278,6 +278,16 @@ class TestHelpers:
         # state.json puudub → _set_upload_state ei tohi visata
         upload_ops._set_upload_state("olematu", status='processing')
 
+    def test_write_state_kirjutab_atomaarse_jsoni(self, uploads_dir):
+        upload_id = "abc123"
+        (uploads_dir / upload_id).mkdir()
+        upload_ops._write_state(upload_id, {"id": upload_id, "status": "pending"})
+
+        path = uploads_dir / upload_id / "state.json"
+        assert json.loads(path.read_text(encoding="utf-8"))["status"] == "pending"
+        assert not list((uploads_dir / upload_id).glob(".tmp_*.json"))
+        assert oct(path.stat().st_mode & 0o777) == "0o644"
+
     def test_ensure_remote_dirs_loob_puuduvad(self):
         sftp = MagicMock()
         sftp.stat.side_effect = FileNotFoundError  # kõik "puuduvad"
