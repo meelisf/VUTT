@@ -148,19 +148,75 @@ def _collection_descendants(collection_id: str, collections: dict) -> set:
     return target
 
 
+ACADEMIA_INSTITUTION_NAMES = frozenset({"Academia Gustaviana", "Academia Gustavo-Carolina"})
+
+# Teosevälise kuuluvuse kaardistus peab olema eksplitsiitne, mitte tuletatud
+# kollektsiooni kuvanimest: admin võib kuvanime muuta, aga domeeniseos jääb samaks.
+COLLECTION_EDUCATION_INSTITUTIONS = {
+    "academia-gustaviana": frozenset({"Academia Gustaviana"}),
+    "academia-gustavo-carolina": frozenset({"Academia Gustavo-Carolina"}),
+}
+
+
+def _normalize_membership_label(value: str) -> str:
+    """Normaliseerib asutuse nime kuuluvuse võrdluseks."""
+    value = re.sub(r"\s*\([^)]*\)", " ", value or "")
+    value = re.sub(r"\s+", " ", value).strip().lower()
+    return value
+
+
+def _collection_membership_institutions(collection_id: str, collections: dict) -> set:
+    """Eksplitsiitselt kaardistatud haridusasutused kollektsioonile ja
+    alamkollektsioonidele (nt Academia Gustaviana/Gustavo-Carolina).
+    """
+    labels = set()
+    for cid in _collection_descendants(collection_id, collections):
+        for institution in COLLECTION_EDUCATION_INSTITUTIONS.get(cid, ()):
+            normalized = _normalize_membership_label(institution)
+            if normalized:
+                labels.add(normalized)
+    return labels
+
+
+def _entry_matches_collection_membership(entry: dict, institutions: set) -> bool:
+    """Kas prosopograafia indeksikirje kuulub kollektsiooni teosevälise
+    asutusekuuluvuse kaudu. Kasutame ainult eksplitsiitset collection_id →
+    haridusasutus kaardistust, et vältida kuvanime muutusest või juhuslikust
+    sarnasusest tulenevat vaikset üle-/alam-match'i.
+    """
+    if not institutions:
+        return False
+    for inst in entry.get("education_institutions") or []:
+        if isinstance(inst, str) and _normalize_membership_label(inst) in institutions:
+            return True
+    return False
+
+
 def _persons_in_collection(collection_id: str) -> set:
-    """Isikute id-d, kes esinevad mõnes selle kollektsiooni (või
-    alamkollektsiooni) teoses ükskõik mis rollis (creator/publisher/
-    subject/mentioned)."""
+    """Isikute id-d, kes kuuluvad kollektsiooni.
+
+    Põhitee: isik esineb mõnes selle kollektsiooni (või alamkollektsiooni)
+    teoses ükskõik mis rollis (creator/publisher/subject/mentioned).
+    Lisatee: teose-seoseta isik, kelle indeksis on kollektsiooniga eksplitsiitselt
+    seotud haridusasutus (nt Academia Gustaviana üliõpilane), kuulub samuti
+    kollektsiooni päritolukaardi ja isikuloendi filtris.
+    """
     from ..cache import get_cached_collections
     collections = get_cached_collections() or {}
     target = _collection_descendants(collection_id, collections)
     wc = _load_work_collections()
     ptw = _load_person_to_works()
-    return {
+    result = {
         pid for pid, entries in ptw.items()
         if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
     }
+
+    membership_institutions = _collection_membership_institutions(collection_id, collections)
+    for entry in _load_index().get("entries", []):
+        pid = entry.get("id")
+        if pid and entry.get("record_status") != "tombstone" and _entry_matches_collection_membership(entry, membership_institutions):
+            result.add(pid)
+    return result
 
 
 def _person_collections(person_id: str) -> list:
@@ -238,8 +294,6 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
             pass
     imm_year: Optional[int] = None
     imm_date: Optional[str] = None
-    _AG_NAMES = {"Academia Gustaviana", "Academia Gustavo-Carolina"}
-
     def _extract_date(edu: dict) -> str:
         return (edu.get("date_from") or {}).get("date") or edu.get("date_start") or ""
 
@@ -261,7 +315,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     # Prioriteet 1: Academia Gustaviana / Gustavo-Carolina kirje (= Tartu immatrikuleerumine)
     ag_entries = [
         edu for edu in (person.get("education") or [])
-        if edu.get("institution") in _AG_NAMES
+        if edu.get("institution") in ACADEMIA_INSTITUTION_NAMES
     ]
     imm_year, imm_date = _earliest_dated_education(ag_entries)
 

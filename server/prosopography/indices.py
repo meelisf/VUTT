@@ -64,29 +64,15 @@ def _collection_descendants(collection_id: str, collections: dict) -> set:
 
 
 def _persons_in_collection(collection_id: str) -> set:
-    """Isikute id-d, kes esinevad selles kollektsioonis või alamkollektsioonides."""
-    from ..cache import get_cached_collections
-
-    collections = get_cached_collections() or {}
-    target = _collection_descendants(collection_id, collections)
-    wc = _load_work_collections()
-    ptw = _load_person_to_works()
-    return {
-        pid for pid, entries in ptw.items()
-        if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
-    }
+    """Isikute id-d, kes kuuluvad kollektsiooni või alamkollektsioonidesse."""
+    sync_from_facade()
+    return legacy._persons_in_collection(collection_id)
 
 
 def _person_collections(person_id: str) -> list:
     """Kollektsioonid, kuhu isiku teosed kuuluvad; dedup esmaesinemise järjekorras."""
-    wc = _load_work_collections()
-    ptw = _load_person_to_works()
-    result: list = []
-    for entry in ptw.get(person_id, ()):
-        for cid in wc.get(entry.get("work_id"), ()):
-            if cid not in result:
-                result.append(cid)
-    return result
+    sync_from_facade()
+    return legacy._person_collections(person_id)
 
 
 def _update_index_entry(person: dict):

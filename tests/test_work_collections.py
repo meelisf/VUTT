@@ -74,6 +74,7 @@ def test_persons_in_collection_roles_and_inheritance(tmp_path):
     ops = _ops(tmp_path)
     wc_file = tmp_path / "work_collections_index.json"
     ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
     # w1 kuulub alamkollektsiooni 'c-child'; w2 kuulub 'c-other'
     wc_file.write_text(json.dumps({"w1": ["c-child"], "w2": ["c-other"]}), encoding="utf-8")
     ptw_file.write_text(json.dumps({
@@ -83,9 +84,11 @@ def test_persons_in_collection_roles_and_inheritance(tmp_path):
         "vutt:Pother":     [{"work_id": "w2", "role": "creator"}],
         "vutt:Pnowork":    [],
     }), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": []}), encoding="utf-8")
 
     with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
          mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
          mock.patch("server.cache.get_cached_collections", return_value=COLLECTIONS):
         # Valitud vanemkollektsioon → hõlmab alamkollektsiooni w1 isikuid
         result = ops._persons_in_collection("parent")
@@ -93,6 +96,76 @@ def test_persons_in_collection_roles_and_inheritance(tmp_path):
     assert result == {"vutt:Pauthor", "vutt:Pmention", "vutt:Ppublisher"}
     assert "vutt:Pother" not in result   # teine kollektsioon
     assert "vutt:Pnowork" not in result  # teosteta isik
+
+
+def test_persons_in_collection_includes_education_institution_members_without_works(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
+    wc_file.write_text(json.dumps({"w1": ["academia-gustaviana"]}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({
+        "vutt:Pwork": [{"work_id": "w1", "role": "creator"}],
+        "vutt:Pnoinst": [],
+    }), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": [
+        {
+            "id": "vutt:Pstudent",
+            "label": "Teoseta Tudeng",
+            "sort_name": "tudeng",
+            "record_status": "published",
+            "education_institutions": ["Academia Gustaviana"],
+        },
+        {
+            "id": "vutt:Pnoinst",
+            "label": "Teoseta Muu",
+            "sort_name": "muu",
+            "record_status": "published",
+            "education_institutions": ["Muu kool"],
+        },
+    ]}), encoding="utf-8")
+    collections = {
+        "academia-gustaviana": {"name": {"et": "Gustavianum", "en": "Gustavian University"}},
+    }
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+         mock.patch("server.cache.get_cached_collections", return_value=collections):
+        result = ops._persons_in_collection("academia-gustaviana")
+
+    assert "vutt:Pwork" in result      # teose-seose kaudu
+    assert "vutt:Pstudent" in result   # haridusasutuse kaudu, ilma teoseta
+    assert "vutt:Pnoinst" not in result
+
+
+def test_persons_in_collection_does_not_match_institution_by_display_name(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
+    wc_file.write_text(json.dumps({}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({}), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": [
+        {
+            "id": "vutt:Pstudent",
+            "label": "Teoseta Tudeng",
+            "sort_name": "tudeng",
+            "record_status": "published",
+            "education_institutions": ["Academia Gustaviana"],
+        },
+    ]}), encoding="utf-8")
+    collections = {
+        "theme-gustaviana": {"name": {"et": "Academia Gustaviana", "en": "Academia Gustaviana"}},
+    }
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+         mock.patch("server.cache.get_cached_collections", return_value=collections):
+        result = ops._persons_in_collection("theme-gustaviana")
+
+    assert result == set()
 
 
 def test_list_persons_collection_filters(tmp_path):
@@ -137,6 +210,39 @@ def test_person_collections_returns_works_own_collections(tmp_path):
         assert ops._person_collections("vutt:Pmulti") == ["c-child", "c-other"]
         assert ops._person_collections("vutt:Pnowork") == []
         assert ops._person_collections("vutt:Punknown") == []
+
+
+def test_map_markers_collection_includes_education_member_without_works(tmp_path):
+    ops = _ops(tmp_path)
+    wc_file = tmp_path / "work_collections_index.json"
+    ptw_file = tmp_path / "ptw.json"
+    idx_file = tmp_path / "idx.json"
+    wc_file.write_text(json.dumps({}), encoding="utf-8")
+    ptw_file.write_text(json.dumps({}), encoding="utf-8")
+    idx_file.write_text(json.dumps({"entries": [
+        {
+            "id": "vutt:Pstudent",
+            "label": "Teoseta Tudeng",
+            "sort_name": "tudeng",
+            "record_status": "published",
+            "education_institutions": ["Academia Gustaviana"],
+            "origin_place": "Riga",
+            "origin_place_labels": {"et": "Riia"},
+            "origin_coordinates": {"lat": 56.9475, "lon": 24.1069},
+        },
+    ]}), encoding="utf-8")
+    collections = {
+        "academia-gustaviana": {"name": {"et": "Gustavianum", "en": "Gustavian University"}},
+    }
+
+    with mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(wc_file)), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(ptw_file)), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(idx_file)), \
+         mock.patch("server.cache.get_cached_collections", return_value=collections):
+        res = ops.get_person_map_markers(collection="academia-gustaviana")
+
+    assert res["mapped_persons"] == 1
+    assert res["markers"][0]["persons"][0]["id"] == "vutt:Pstudent"
 
 
 def test_map_markers_includes_focus_for_related_to(tmp_path):

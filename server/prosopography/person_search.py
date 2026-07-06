@@ -469,8 +469,6 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
             pass
     imm_year: Optional[int] = None
     imm_date: Optional[str] = None
-    _AG_NAMES = {"Academia Gustaviana", "Academia Gustavo-Carolina"}
-
     def _extract_edu_date(edu: dict) -> str:
         return (edu.get("date_from") or {}).get("date") or edu.get("date_start") or ""
 
@@ -491,7 +489,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
 
     ag_entries = [
         edu for edu in (person.get("education") or [])
-        if edu.get("institution") in _AG_NAMES
+        if edu.get("institution") in legacy.ACADEMIA_INSTITUTION_NAMES
     ]
     imm_year, imm_date = _earliest_dated_education(ag_entries)
 
