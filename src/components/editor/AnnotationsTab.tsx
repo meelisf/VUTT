@@ -24,6 +24,112 @@ import { lineDiff } from '../../utils/lineDiff';
 import MarkdownEditor from '../MarkdownEditor';
 import MarkdownView from '../MarkdownView';
 
+interface EditablePostProps {
+  text: string;
+  author: string;
+  createdAt: string;
+  canModify: boolean;
+  isEditing: boolean;
+  editingText: string;
+  onEditingTextChange: (value: string) => void;
+  onStartEdit: () => void;
+  onCancelEdit: () => void;
+  onSaveEdit: () => void;
+  onDelete: () => void;
+  labels: {
+    cancel: string;
+    save: string;
+    edit: string;
+    delete: string;
+  };
+  extraActions?: React.ReactNode;
+  minRows?: number;
+  contentClassName?: string;
+}
+
+// Ühine komponent nii juurkommentaari kui vastuse teksti muutmiseks/kustutamiseks.
+const EditablePost: React.FC<EditablePostProps> = ({
+  text,
+  author,
+  createdAt,
+  canModify,
+  isEditing,
+  editingText,
+  onEditingTextChange,
+  onStartEdit,
+  onCancelEdit,
+  onSaveEdit,
+  onDelete,
+  labels,
+  extraActions,
+  minRows = 3,
+  contentClassName = '',
+}) => {
+  if (isEditing) {
+    return (
+      <div className="space-y-2">
+        <MarkdownEditor
+          value={editingText}
+          onChange={onEditingTextChange}
+          minRows={minRows}
+        />
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onCancelEdit}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
+          >
+            <X size={12} />
+            {labels.cancel}
+          </button>
+          <button
+            onClick={onSaveEdit}
+            disabled={!editingText.trim()}
+            className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
+          >
+            <Check size={12} />
+            {labels.save}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={`text-gray-800 text-sm mb-2 leading-relaxed pr-12 vutt-md-comment ${contentClassName}`}>
+        <MarkdownView content={text} softBreaks />
+      </div>
+      <div className="flex justify-between items-center text-xs text-gray-500">
+        <span className="font-semibold text-primary-700">{author}</span>
+        <span>{new Date(createdAt).toLocaleString('et-EE')}</span>
+      </div>
+      {(extraActions || canModify) && (
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 rounded-md shadow-sm border border-gray-100 px-1 py-0.5">
+          {extraActions}
+          {canModify && (
+            <>
+              <button
+                onClick={onStartEdit}
+                className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                title={labels.edit}
+              >
+                <Edit3 size={14} />
+              </button>
+              <button
+                onClick={onDelete}
+                className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
+                title={labels.delete}
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  );
+};
+
 interface AnnotationsTabProps {
   work?: Work;
   page: Page;
@@ -91,6 +197,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [savingReplyId, setSavingReplyId] = useState<string | null>(null);
+  const [editingReplyCommentId, setEditingReplyCommentId] = useState<string | null>(null);
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editingReplyText, setEditingReplyText] = useState('');
   const [commentHistory, setCommentHistory] = useState<CommentHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -99,6 +208,9 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
 
   const isAdmin = isAtLeast(user?.role, 'admin');
   const canRestore = isAtLeast(user?.role, 'editor');
+  const canModifyOwnPost = (authorUsername?: string) => (
+    isAdmin || Boolean(user?.username && authorUsername && user.username === authorUsername)
+  );
   
   // Arhiivide register (nimed kuvamiseks)
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
@@ -145,8 +257,8 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   // parenti, et lahkumise hoiatus käivituks. Ainult need kaks: nad on lihtsalt
   // kommentaaride massiivi liidetavad, seega "Salvesta ja lahku" oskab neid säilitada.
   useEffect(() => {
-    onDraftChange?.(Boolean(newComment.trim() || editingText.trim()));
-  }, [newComment, editingText, onDraftChange]);
+    onDraftChange?.(Boolean(newComment.trim() || editingText.trim() || editingReplyText.trim()));
+  }, [newComment, editingText, editingReplyText, onDraftChange]);
 
   // Komponendi eemaldamisel (nt tabi vahetus) nulli mustand-lipp, et see ei jääks toppama.
   useEffect(() => () => onDraftChange?.(false), [onDraftChange]);
@@ -277,6 +389,42 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
     } finally {
       setSavingReplyId(null);
     }
+  };
+
+  const startEditReply = (commentId: string, replyId: string, text: string) => {
+    setEditingReplyCommentId(commentId);
+    setEditingReplyId(replyId);
+    setEditingReplyText(text);
+  };
+
+  const cancelEditReply = () => {
+    setEditingReplyCommentId(null);
+    setEditingReplyId(null);
+    setEditingReplyText('');
+  };
+
+  const saveEditReply = async (commentId: string, replyId: string) => {
+    if (!editingReplyText.trim()) return;
+    const updated = comments.map(comment => comment.id === commentId
+      ? {
+          ...comment,
+          replies: (comment.replies || []).map(reply => reply.id === replyId
+            ? { ...reply, text: editingReplyText }
+            : reply),
+        }
+      : comment);
+    setComments(updated);
+    cancelEditReply();
+    if (onSaveAnnotations) await onSaveAnnotations(updated);
+  };
+
+  const removeReply = async (commentId: string, replyId: string) => {
+    if (!window.confirm(t('info.deleteCommentConfirm'))) return;
+    const updated = comments.map(comment => comment.id === commentId
+      ? { ...comment, replies: (comment.replies || []).filter(reply => reply.id !== replyId) }
+      : comment);
+    setComments(updated);
+    if (onSaveAnnotations) await onSaveAnnotations(updated);
   };
 
   const loadHistory = async (force = false) => {
@@ -937,51 +1085,66 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                 highlightedCommentId === comment.id ? 'border-primary-300 ring-2 ring-primary-100' : 'border-gray-100'
               }`}
             >
-              {editingCommentId === comment.id ? (
-                <div className="space-y-2">
-                  <MarkdownEditor
-                    value={editingText}
-                    onChange={setEditingText}
-                    minRows={6}
-                  />
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => { setEditingCommentId(null); setEditingText(''); }}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-                    >
-                      <X size={12} />
-                      {t('info.cancelEdit')}
-                    </button>
-                    <button
-                      onClick={() => saveEditComment(comment.id)}
-                      disabled={!editingText.trim()}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-white bg-primary-600 rounded hover:bg-primary-700 disabled:opacity-50 transition-colors"
-                    >
-                      <Check size={12} />
-                      {t('info.saveEdit')}
-                    </button>
-                  </div>
-                </div>
-              ) : (
+              <EditablePost
+                text={comment.text}
+                author={comment.author}
+                createdAt={comment.created_at}
+                canModify={!readOnly && canModifyOwnPost(comment.author_username)}
+                isEditing={editingCommentId === comment.id}
+                editingText={editingText}
+                onEditingTextChange={setEditingText}
+                onStartEdit={() => startEditComment(comment)}
+                onCancelEdit={() => { setEditingCommentId(null); setEditingText(''); }}
+                onSaveEdit={() => saveEditComment(comment.id)}
+                onDelete={() => removeComment(comment.id)}
+                labels={{
+                  cancel: t('info.cancelEdit'),
+                  save: t('info.saveEdit'),
+                  edit: t('info.editComment'),
+                  delete: t('info.deleteComment'),
+                }}
+                extraActions={!readOnly && onReplyToComment ? (
+                  <button
+                    onClick={() => {
+                      setReplyingToCommentId(comment.id);
+                      setReplyText('');
+                      setReplyError(null);
+                    }}
+                    className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
+                    title={t('info.replyToComment')}
+                  >
+                    <Reply size={14} />
+                  </button>
+                ) : null}
+                minRows={6}
+              />
+              {editingCommentId !== comment.id && (
                 <>
-                  <div className="text-gray-800 text-sm mb-2 leading-relaxed pr-5 vutt-md-comment">
-                    <MarkdownView content={comment.text} softBreaks />
-                  </div>
-                  <div className="flex justify-between items-center text-xs text-gray-500">
-                    <span className="font-semibold text-primary-700">{comment.author}</span>
-                    <span>{new Date(comment.created_at).toLocaleString('et-EE')}</span>
-                  </div>
                   {(comment.replies || []).length > 0 && (
                     <div className="mt-3 space-y-2 border-l-2 border-primary-100 pl-3">
                       {(comment.replies || []).map(reply => (
-                        <div key={reply.id} className="bg-white border border-gray-100 rounded-md px-3 py-2">
-                          <div className="text-gray-800 text-sm mb-1 leading-relaxed vutt-md-comment">
-                            <MarkdownView content={reply.text} softBreaks />
-                          </div>
-                          <div className="flex justify-between items-center text-xs text-gray-500">
-                            <span className="font-semibold text-primary-700">{reply.author}</span>
-                            <span>{new Date(reply.created_at).toLocaleString('et-EE')}</span>
-                          </div>
+                        <div key={reply.id} className="bg-white border border-gray-100 rounded-md px-3 py-2 relative group">
+                          <EditablePost
+                            text={reply.text}
+                            author={reply.author}
+                            createdAt={reply.created_at}
+                            canModify={!readOnly && canModifyOwnPost(reply.author_username)}
+                            isEditing={editingReplyCommentId === comment.id && editingReplyId === reply.id}
+                            editingText={editingReplyText}
+                            onEditingTextChange={setEditingReplyText}
+                            onStartEdit={() => startEditReply(comment.id, reply.id, reply.text)}
+                            onCancelEdit={cancelEditReply}
+                            onSaveEdit={() => saveEditReply(comment.id, reply.id)}
+                            onDelete={() => removeReply(comment.id, reply.id)}
+                            labels={{
+                              cancel: t('info.cancelEdit'),
+                              save: t('info.saveEdit'),
+                              edit: t('info.editComment'),
+                              delete: t('info.deleteComment'),
+                            }}
+                            minRows={3}
+                            contentClassName="mb-1"
+                          />
                         </div>
                       ))}
                     </div>
@@ -1014,39 +1177,7 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
                       </div>
                     </div>
                   )}
-                  {!readOnly && (
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/95 rounded-md shadow-sm border border-gray-100 px-1 py-0.5">
-                      {onReplyToComment && (
-                        <button
-                          onClick={() => {
-                            setReplyingToCommentId(comment.id);
-                            setReplyText('');
-                            setReplyError(null);
-                          }}
-                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
-                          title={t('info.replyToComment')}
-                        >
-                          <Reply size={14} />
-                        </button>
-                      )}
-                      {isAdmin && (
-                        <button
-                          onClick={() => startEditComment(comment)}
-                          className="text-gray-400 hover:text-primary-600 p-1 rounded hover:bg-white transition-colors"
-                          title={t('info.editComment')}
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => removeComment(comment.id)}
-                        className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-white transition-colors"
-                        title={t('info.deleteComment')}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  )}
+
                 </>
               )}
             </div>
