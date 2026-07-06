@@ -21,7 +21,6 @@ import { getCollectionColorClasses, getCollectionHierarchy } from '../../service
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import { fetchCommentHistory, restoreComment, CommentHistory } from '../../services/commentHistoryService';
 import { lineDiff } from '../../utils/lineDiff';
-import MarkdownEditor from '../MarkdownEditor';
 import MarkdownView from '../MarkdownView';
 import PageCommentsPanel from './PageCommentsPanel';
 
