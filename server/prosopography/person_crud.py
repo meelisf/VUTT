@@ -7,10 +7,16 @@ import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from . import _legacy_ops as legacy
 from . import state
 from ._compat import sync_from_facade
 from .locks import person_lock
+
+
+def _indices():
+    """Hilinenud import väldib CRUD/index moodulite import-tsüklit."""
+    from . import indices
+    return indices
+
 
 # Lubatud nanoid-märgid: generate_nanoid annab [a-z0-9], lubame ka legacy variandid
 # (A-Z, _, -). EI sisalda path-ohtlikke märke (., /, \) → kaitseb path traversal'i eest.
@@ -52,7 +58,7 @@ def get_person(person_id: str) -> Optional[dict]:
     """Laeb isiku faili. Tagastab None kui ei leitud või kui ID on vigane."""
     sync_from_facade()
     try:
-        path = legacy._id_to_path(person_id)
+        path = _id_to_path(person_id)
     except ValueError:
         return None
     if not os.path.exists(path):
@@ -115,13 +121,13 @@ def create_person(data: dict, username: str) -> dict:
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
     name = (person.get("name") or {}).get("label") or person_id
     state.save_with_git(
-        legacy._id_to_path(person_id),
+        _id_to_path(person_id),
         json.dumps(person, ensure_ascii=False, indent=2),
         username,
         message=f"Prosopo loomine: {name} [{person_id}]",
     )
-    legacy._update_index_entry(person)
-    legacy._update_aliases_entry(person)
+    _indices()._update_index_entry(person)
+    _indices()._update_aliases_entry(person)
     return person
 
 
@@ -206,7 +212,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
     """Uuendab isiku kirjet optimistliku konkurentsikontrolliga."""
     sync_from_facade()
     with person_lock(person_id):
-        person = legacy.get_person(person_id)
+        person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
 
@@ -235,17 +241,17 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
         name = (person.get("name") or {}).get("label") or person_id
         state.save_with_git(
-            legacy._id_to_path(person_id),
+            _id_to_path(person_id),
             json.dumps(person, ensure_ascii=False, indent=2),
             username,
             message=f"Prosopo muudatus: {name} [{person_id}]",
         )
-    legacy._update_index_entry(person)
-    legacy._update_aliases_entry(person)
+    _indices()._update_index_entry(person)
+    _indices()._update_aliases_entry(person)
 
     new_label = (person.get("name") or {}).get("label") or ""
     if new_label and new_label != old_label:
-        legacy._propagate_name_to_works(person_id, new_label, username)
+        _propagate_name_to_works(person_id, new_label, username)
 
     return person
 
@@ -256,7 +262,7 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
 
     sync_from_facade()
     with person_lock(person_id):
-        person = legacy.get_person(person_id)
+        person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
 
@@ -275,13 +281,13 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
         state.save_with_git(
-            legacy._id_to_path(person_id),
+            _id_to_path(person_id),
             json.dumps(person, ensure_ascii=False, indent=2),
             username,
             message=f"Prosopo identifikaator: {name} [{person_id}]",
         )
-    legacy._update_index_entry(person)
-    legacy._update_aliases_entry(person)
+    _indices()._update_index_entry(person)
+    _indices()._update_aliases_entry(person)
     return person, diff
 
 
@@ -298,7 +304,7 @@ def _person_image_path(person_id: str, ext: str) -> str:
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
     """Salvestab isiku pildi ja uuendab image_url kirjes."""
     sync_from_facade()
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     if person is None:
         raise KeyError(person_id)
 
@@ -337,8 +343,8 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    state.atomic_write_json(legacy._id_to_path(person_id), person)
-    legacy._update_index_entry(person)
+    state.atomic_write_json(_id_to_path(person_id), person)
+    _indices()._update_index_entry(person)
     return person
 
 
@@ -357,7 +363,7 @@ def get_person_image_path(person_id: str) -> Optional[str]:
 def delete_person_image(person_id: str, username: str) -> dict:
     """Kustutab isiku pildi ja tühjendab image_url. Tagastab uuendatud kirje."""
     sync_from_facade()
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     if person is None:
         raise KeyError(person_id)
 
@@ -370,8 +376,8 @@ def delete_person_image(person_id: str, username: str) -> dict:
     now = datetime.now(timezone.utc).isoformat()
     person["updated_at"] = now
     person["updated_by"] = username
-    state.atomic_write_json(legacy._id_to_path(person_id), person)
-    legacy._update_index_entry(person)
+    state.atomic_write_json(_id_to_path(person_id), person)
+    _indices()._update_index_entry(person)
     return person
 
 
@@ -388,7 +394,7 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
 
     sync_from_facade()
     with person_lock(person_id):
-        person = legacy.get_person(person_id)
+        person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
 
@@ -406,13 +412,13 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         person["updated_by"] = username
         name = (person.get("name") or {}).get("label") or person_id
         state.save_with_git(
-            legacy._id_to_path(person_id),
+            _id_to_path(person_id),
             json.dumps(person, ensure_ascii=False, indent=2),
             username,
             message=f"Prosopo rikastus: {name} [{person_id}]",
         )
-    legacy._update_index_entry(person)
-    legacy._update_aliases_entry(person)
+    _indices()._update_index_entry(person)
+    _indices()._update_aliases_entry(person)
     return person
 
 
@@ -507,7 +513,7 @@ def bulk_update_occupation(
     for person_id in person_ids:
         # Per-isiku lukk: read-modify-write serialiseerimine iga isiku kohta.
         with person_lock(person_id):
-            person = legacy.get_person(person_id)
+            person = get_person(person_id)
             if not person:
                 skipped += 1
                 continue
@@ -528,8 +534,8 @@ def bulk_update_occupation(
                 new_occupations = list(existing) + [occupation]
 
             person["occupations"] = new_occupations
-            state.atomic_write_json(legacy._id_to_path(person_id), person)
-            legacy._update_index_entry(person)
+            state.atomic_write_json(_id_to_path(person_id), person)
+            _indices()._update_index_entry(person)
             updated += 1
 
     return {"updated": updated, "skipped": skipped, "total": len(person_ids)}

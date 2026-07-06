@@ -5,8 +5,9 @@ import json
 import os
 from datetime import datetime, timezone
 
-from . import _legacy_ops as legacy
 from . import state
+from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
+from .person_crud import _id_to_path, get_person
 from ._compat import sync_from_facade
 
 
@@ -18,8 +19,8 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     if source_id == target_id:
         raise ValueError("Source ja target ei tohi olla samad.")
 
-    source = legacy.get_person(source_id)
-    target = legacy.get_person(target_id)
+    source = get_person(source_id)
+    target = get_person(target_id)
 
     if source is None:
         raise KeyError(source_id)
@@ -108,11 +109,11 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     source_name = (source.get("name") or {}).get("label") or source_id
     target_name = (target.get("name") or {}).get("label") or target_id
     additional = (
-        [(legacy._id_to_path(target_id), json.dumps(target, ensure_ascii=False, indent=2))]
+        [(_id_to_path(target_id), json.dumps(target, ensure_ascii=False, indent=2))]
         if target_changed else None
     )
     state.save_with_git(
-        legacy._id_to_path(source_id),
+        _id_to_path(source_id),
         json.dumps(source, ensure_ascii=False, indent=2),
         username,
         message=f"Prosopo liitmine: {source_name} → {target_name}",
@@ -188,20 +189,20 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
             dir_name = os.path.basename(os.path.dirname(meta_path))
             sync_work_to_meilisearch_async(dir_name)
 
-    legacy.rebuild_indices()
-    return legacy.get_person(target_id)
+    rebuild_indices()
+    return get_person(target_id)
 
 
 def delete_person(person_id: str, username: str) -> dict:
     """Kustutab isikukaardi jäädavalt, kui viiteid pole."""
     sync_from_facade()
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     if person is None:
         raise KeyError(person_id)
     if person.get("record_status") == "tombstone":
         raise ValueError(f"Isik on tombstone, kasuta merge: {person_id}")
 
-    ptw = legacy._load_person_to_works()
+    ptw = _load_person_to_works()
     work_refs = len(set(w["work_id"] for w in ptw.get(person_id, [])))
     if work_refs > 0:
         raise ValueError(f"WORK_REFS:{work_refs}")
@@ -225,16 +226,16 @@ def delete_person(person_id: str, username: str) -> dict:
     if relation_refs > 0:
         raise ValueError(f"RELATION_REFS:{relation_refs}")
 
-    path = legacy._id_to_path(person_id)
+    path = _id_to_path(person_id)
     name = (person.get("name") or {}).get("label") or person_id
     state.delete_file_from_git(path, f"Prosopo kustutamine: {name} [{person_id}]", username)
 
     with state._index_lock:
-        index = legacy._load_index()
+        index = _load_index()
         index["entries"] = [e for e in index["entries"] if e["id"] != person_id]
         state.atomic_write_json(state.PROSOPOGRAPHY_INDEX_FILE, index)
 
-    legacy._remove_aliases_entry(person_id)
+    _remove_aliases_entry(person_id)
 
     return {"deleted": person_id, "work_refs": 0, "relation_refs": 0}
 

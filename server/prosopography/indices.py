@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from . import _legacy_ops as legacy
 from . import state
 from ._compat import sync_from_facade
 
@@ -63,28 +63,91 @@ def _collection_descendants(collection_id: str, collections: dict) -> set:
     return target
 
 
+ACADEMIA_INSTITUTION_NAMES = frozenset({"Academia Gustaviana", "Academia Gustavo-Carolina"})
+
+# Teosevälise kuuluvuse kaardistus peab olema eksplitsiitne, mitte tuletatud
+# kollektsiooni kuvanimest: admin võib kuvanime muuta, aga domeeniseos jääb samaks.
+COLLECTION_EDUCATION_INSTITUTIONS = {
+    "academia-gustaviana": frozenset({"Academia Gustaviana"}),
+    "academia-gustavo-carolina": frozenset({"Academia Gustavo-Carolina"}),
+}
+
+
+def _normalize_membership_label(value: str) -> str:
+    """Normaliseerib asutuse nime kuuluvuse võrdluseks."""
+    value = re.sub(r"\s*\([^)]*\)", " ", value or "")
+    value = re.sub(r"\s+", " ", value).strip().lower()
+    return value
+
+
+def _collection_membership_institutions(collection_id: str, collections: dict) -> set:
+    """Eksplitsiitselt kaardistatud haridusasutused kollektsioonile ja alamkollektsioonidele."""
+    labels = set()
+    for cid in _collection_descendants(collection_id, collections):
+        for institution in COLLECTION_EDUCATION_INSTITUTIONS.get(cid, ()):
+            normalized = _normalize_membership_label(institution)
+            if normalized:
+                labels.add(normalized)
+    return labels
+
+
+def _entry_matches_collection_membership(entry: dict, institutions: set) -> bool:
+    """Kas indeksikirje kuulub kollektsiooni teosevälise asutusekuuluvuse kaudu."""
+    if not institutions:
+        return False
+    for inst in entry.get("education_institutions") or []:
+        if isinstance(inst, str) and _normalize_membership_label(inst) in institutions:
+            return True
+    return False
+
+
 def _persons_in_collection(collection_id: str) -> set:
     """Isikute id-d, kes kuuluvad kollektsiooni või alamkollektsioonidesse."""
+    from ..cache import get_cached_collections
+
     sync_from_facade()
-    return legacy._persons_in_collection(collection_id)
+    collections = get_cached_collections() or {}
+    target = _collection_descendants(collection_id, collections)
+    wc = _load_work_collections()
+    ptw = _load_person_to_works()
+    result = {
+        pid for pid, entries in ptw.items()
+        if any(target & set(wc.get(e.get("work_id"), ())) for e in entries)
+    }
+
+    membership_institutions = _collection_membership_institutions(collection_id, collections)
+    for entry in _load_index().get("entries", []):
+        pid = entry.get("id")
+        if pid and entry.get("record_status") != "tombstone" and _entry_matches_collection_membership(entry, membership_institutions):
+            result.add(pid)
+    return result
 
 
 def _person_collections(person_id: str) -> list:
     """Kollektsioonid, kuhu isiku teosed kuuluvad; dedup esmaesinemise järjekorras."""
     sync_from_facade()
-    return legacy._person_collections(person_id)
+    wc = _load_work_collections()
+    ptw = _load_person_to_works()
+    result: list = []
+    for entry in ptw.get(person_id, ()):
+        for cid in wc.get(entry.get("work_id"), ()):
+            if cid not in result:
+                result.append(cid)
+    return result
 
 
 def _update_index_entry(person: dict):
     """Uuendab ühe kirje prosopography_index.json-s."""
     sync_from_facade()
+    from .person_search import _index_entry_from_person
+
     person_id = person["id"]
-    works = legacy._load_person_to_works()
+    works = _load_person_to_works()
     work_count = len(set(w["work_id"] for w in works.get(person_id, [])))
-    new_entry = legacy._index_entry_from_person(person, work_count)
+    new_entry = _index_entry_from_person(person, work_count)
 
     with state._index_lock:
-        index = legacy._load_index()
+        index = _load_index()
         entries = [e for e in index["entries"] if e["id"] != person_id]
         if person.get("record_status") != "tombstone":
             entries.append(new_entry)
@@ -101,8 +164,10 @@ def _update_aliases_entry(person: dict):
     aliases = name_obj.get("aliases") or []
     all_names = list({label} | set(aliases))
 
+    from .person_search import _load_person_aliases
+
     with state._aliases_lock:
-        data = legacy._load_person_aliases()
+        data = _load_person_aliases()
         if person.get("record_status") == "tombstone":
             data.pop(person_id, None)
         else:
@@ -144,7 +209,7 @@ def update_person_to_works(
             new_entries.setdefault(pid, set()).add("publisher")
 
     with state._works_lock:
-        data = legacy._load_person_to_works()
+        data = _load_person_to_works()
 
         # Eemalda kõik olemasolevad viited sellele teosele.
         for pid_entries in data.values():
@@ -261,7 +326,8 @@ def rebuild_indices():
         pid = person["id"]
         works_list = ptw.get(pid, [])
         work_count = len({w["work_id"] for w in works_list})
-        entries.append(legacy._index_entry_from_person(person, work_count))
+        from .person_search import _index_entry_from_person
+        entries.append(_index_entry_from_person(person, work_count))
 
         name_obj = person.get("name") or {}
         label = name_obj.get("label") or ""

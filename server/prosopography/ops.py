@@ -6,39 +6,39 @@ Domeenipõhised impordid asuvad moodulites `person_crud`, `person_search`,
 """
 from __future__ import annotations
 
-from . import _legacy_ops as _legacy
 import sys
 
+from . import state
 from ._compat import install_facade_patch_hook, register_default
 
 # Vana API kaudu patch'itavad sõltuvused/konstandid.
-PROSOPOGRAPHY_DIR = _legacy.PROSOPOGRAPHY_DIR
-PROSOPOGRAPHY_IMAGES_DIR = _legacy.PROSOPOGRAPHY_IMAGES_DIR
-PROSOPOGRAPHY_INDEX_FILE = _legacy.PROSOPOGRAPHY_INDEX_FILE
-PERSON_TO_WORKS_FILE = _legacy.PERSON_TO_WORKS_FILE
-PERSON_ALIASES_FILE = _legacy.PERSON_ALIASES_FILE
-WORK_COLLECTIONS_INDEX_FILE = _legacy.WORK_COLLECTIONS_INDEX_FILE
-BASE_DIR = _legacy.BASE_DIR
+PROSOPOGRAPHY_DIR = state.PROSOPOGRAPHY_DIR
+PROSOPOGRAPHY_IMAGES_DIR = state.PROSOPOGRAPHY_IMAGES_DIR
+PROSOPOGRAPHY_INDEX_FILE = state.PROSOPOGRAPHY_INDEX_FILE
+PERSON_TO_WORKS_FILE = state.PERSON_TO_WORKS_FILE
+PERSON_ALIASES_FILE = state.PERSON_ALIASES_FILE
+WORK_COLLECTIONS_INDEX_FILE = state.WORK_COLLECTIONS_INDEX_FILE
+BASE_DIR = state.BASE_DIR
 
-save_with_git = _legacy.save_with_git
-delete_file_from_git = _legacy.delete_file_from_git
-atomic_write_json = _legacy.atomic_write_json
-_glob = _legacy._glob
-build_works_creators_index = _legacy.build_works_creators_index
-update_works_creators_index = _legacy.update_works_creators_index
-get_work_relations = _legacy.get_work_relations
-_resolve_origin_group = _legacy._resolve_origin_group
-_get_parent_place = _legacy._get_parent_place
-_get_place_labels = _legacy._get_place_labels
-_get_place_coordinates = _legacy._get_place_coordinates
-_enrich_origin_from_places = _legacy._enrich_origin_from_places
-_load_origin_groups = _legacy._load_origin_groups
+save_with_git = state.save_with_git
+delete_file_from_git = state.delete_file_from_git
+atomic_write_json = state.atomic_write_json
+_glob = state._glob
+build_works_creators_index = state.build_works_creators_index
+update_works_creators_index = state.update_works_creators_index
+get_work_relations = state.get_work_relations
+_resolve_origin_group = state._resolve_origin_group
+_get_parent_place = state._get_parent_place
+_get_place_labels = state._get_place_labels
+_get_place_coordinates = state._get_place_coordinates
+_enrich_origin_from_places = state._enrich_origin_from_places
+_load_origin_groups = state._load_origin_groups
 
-# Lukud jäävad nähtavaks legacy API jaoks.
-_index_lock = _legacy._index_lock
-_works_lock = _legacy._works_lock
-_aliases_lock = _legacy._aliases_lock
-_work_collections_lock = _legacy._work_collections_lock
+# Lukud jäävad nähtavaks vana API jaoks.
+_index_lock = state._index_lock
+_works_lock = state._works_lock
+_aliases_lock = state._aliases_lock
+_work_collections_lock = state._work_collections_lock
 
 from .person_crud import (
     _safe_nanoid,

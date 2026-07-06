@@ -5,7 +5,6 @@ import sys
 from types import ModuleType
 from typing import Any
 
-from . import _legacy_ops as legacy
 from . import state
 
 # Nimed, mida vanad testid ja kood võivad patch'ida server.prosopography.ops peal.
@@ -56,10 +55,20 @@ _SYNC_NAMES = {
     "_load_origin_groups",
 }
 
-_ORIGINALS = {name: getattr(legacy, name) for name in _SYNC_NAMES if hasattr(legacy, name)}
 _STATE_ORIGINALS = {name: getattr(state, name) for name in _SYNC_NAMES if hasattr(state, name)}
 _DEFAULT_FACADE: dict[str, Any] = {}
+_MODULE_ORIGINALS: dict[tuple[str, str], Any] = {}
 _FACADE_DIRTY = False
+
+# Domeenimoodulid, mille module-global'id võivad vanade ops.py monkeypatch'ide tõttu
+# sünkroniseerimist vajada (nt tests patch("server.prosopography.ops._load_index")).
+_DOMAIN_MODULES = (
+    "server.prosopography.person_crud",
+    "server.prosopography.person_search",
+    "server.prosopography.relations",
+    "server.prosopography.indices",
+    "server.prosopography.merge_ops",
+)
 
 
 def register_default(name: str, value: Any) -> None:
@@ -88,8 +97,18 @@ def install_facade_patch_hook(module: ModuleType) -> None:
         module.__class__ = _PatchAwareModule
 
 
+def _sync_attr(module: ModuleType, name: str, facade_value: Any) -> None:
+    if not hasattr(module, name):
+        return
+    key = (module.__name__, name)
+    if key not in _MODULE_ORIGINALS:
+        _MODULE_ORIGINALS[key] = getattr(module, name)
+    default = _DEFAULT_FACADE.get(name, _MODULE_ORIGINALS[key])
+    setattr(module, name, _MODULE_ORIGINALS[key] if facade_value is default else facade_value)
+
+
 def sync_from_facade() -> None:
-    """Kanna ops.py monkeypatch'id legacy/state moodulitesse ainult siis, kui midagi muutus."""
+    """Kanna ops.py monkeypatch'id state'i ja laaditud domeenimoodulitesse."""
     global _FACADE_DIRTY
     if not _FACADE_DIRTY:
         return
@@ -101,21 +120,11 @@ def sync_from_facade() -> None:
         if not hasattr(facade, name):
             continue
         value = getattr(facade, name)
-        if name in _ORIGINALS:
-            default = _DEFAULT_FACADE.get(name, _ORIGINALS[name])
-            if value is default:
-                setattr(legacy, name, _ORIGINALS[name])
-            else:
-                setattr(legacy, name, value)
         if name in _STATE_ORIGINALS:
             default = _DEFAULT_FACADE.get(name, _STATE_ORIGINALS[name])
-            if value is default:
-                setattr(state, name, _STATE_ORIGINALS[name])
-            else:
-                setattr(state, name, value)
+            setattr(state, name, _STATE_ORIGINALS[name] if value is default else value)
+        for module_name in _DOMAIN_MODULES:
+            module = sys.modules.get(module_name)
+            if module is not None:
+                _sync_attr(module, name, value)
     _FACADE_DIRTY = False
-
-
-def call(name: str, *args: Any, **kwargs: Any) -> Any:
-    sync_from_facade()
-    return getattr(legacy, name)(*args, **kwargs)

@@ -6,8 +6,9 @@ import os
 import time
 from typing import Optional
 
-from . import _legacy_ops as legacy
 from . import state
+from .indices import _load_index, _load_person_to_works
+from .person_crud import get_person
 from ._compat import sync_from_facade
 
 _work_to_persons_cache = {"map": None, "expires": 0.0}
@@ -17,10 +18,10 @@ _WORK_TO_PERSONS_TTL = 300  # sekundit
 def get_person_with_works(person_id: str) -> Optional[dict]:
     """Laeb isiku + tema teosed pöördindeksist (O(1))."""
     sync_from_facade()
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     if person is None:
         return None
-    works = legacy._load_person_to_works()
+    works = _load_person_to_works()
     person["works"] = works.get(person_id, [])
     return person
 
@@ -28,8 +29,8 @@ def get_person_with_works(person_id: str) -> Optional[dict]:
 def _build_work_to_persons() -> dict:
     """Pöörab person_to_works → {work_id: [{id, label}]}, label isikuindeksist."""
     sync_from_facade()
-    ptw = legacy._load_person_to_works()
-    index = legacy._load_index()
+    ptw = _load_person_to_works()
+    index = _load_index()
     labels = {e.get("id"): (e.get("label") or e.get("name") or e.get("id"))
               for e in index.get("entries", [])}
     result: dict = {}
@@ -76,7 +77,7 @@ def get_person_relation_network_ids(person_id: str, work_limit: int = 500) -> li
             ids.append(pid)
 
     add(person_id)
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     for target_id in _structured_relation_ids(person):
         add(target_id)
 
@@ -150,7 +151,7 @@ def update_page_person_mentions(work_id: str, work_dir: str):
         return
 
     with state._works_lock:
-        data = legacy._load_person_to_works()
+        data = _load_person_to_works()
         # Eemalda ainult 'mentioned' viited sellele teosele.
         for pid_entries in data.values():
             pid_entries[:] = [
