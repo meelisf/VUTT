@@ -5,8 +5,10 @@ import json
 import os
 from typing import Optional
 
-from . import _legacy_ops as legacy
 from . import state
+from .indices import ACADEMIA_INSTITUTION_NAMES, _load_index, _persons_in_collection, _person_collections
+from .person_crud import _make_snippet, get_person
+from .relations import get_person_relation_network_ids
 from ._compat import sync_from_facade
 
 
@@ -86,7 +88,7 @@ def _entry_occupations(entry: dict) -> list[dict]:
     if not person_id:
         return []
     sync_from_facade()
-    person = legacy.get_person(person_id)
+    person = get_person(person_id)
     if not person:
         return []
     return _extract_occupation_entries(person)
@@ -135,7 +137,7 @@ def _filter_index_entries(
     ids: Optional[list] = None,
 ) -> list[dict]:
     sync_from_facade()
-    index = legacy._load_index()
+    index = _load_index()
     results = [
         e for e in index.get("entries", [])
         if e.get("record_status") != "tombstone"
@@ -146,7 +148,7 @@ def _filter_index_entries(
         results = [e for e in results if e.get("id") in id_set]
     if q:
         q_lower = q.lower()
-        aliases_data = legacy._load_person_aliases()
+        aliases_data = _load_person_aliases()
         results = [
             e for e in results
             if q_lower in (e.get("label") or "").lower()
@@ -218,7 +220,7 @@ def list_persons(
     """Tagastab prosopography_index.json kirjed filtreeritult, pagineeritult."""
     sync_from_facade()
     if collection:
-        collection_ids = legacy._persons_in_collection(collection)
+        collection_ids = _persons_in_collection(collection)
         if ids is not None:
             ids = [i for i in ids if i in collection_ids]
         else:
@@ -278,11 +280,11 @@ def get_person_map_markers(
     """Tagastab koordinaadiga isikud grupeerituna päritolukoha markeriteks."""
     sync_from_facade()
     if related_to:
-        network_ids = legacy.get_person_relation_network_ids(related_to)
+        network_ids = get_person_relation_network_ids(related_to)
         ids = list(dict.fromkeys([*(ids or []), *network_ids])) if ids else network_ids
 
     if collection:
-        collection_ids = legacy._persons_in_collection(collection)
+        collection_ids = _persons_in_collection(collection)
         if ids is not None:
             ids = [i for i in ids if i in collection_ids]
         else:
@@ -353,13 +355,13 @@ def get_person_map_markers(
     }
     if related_to:
         focus_label = next(
-            (e.get("label") for e in legacy._load_index().get("entries", []) if e.get("id") == related_to),
+            (e.get("label") for e in _load_index().get("entries", []) if e.get("id") == related_to),
             None,
         )
         response["focus"] = {
             "id": related_to,
             "label": focus_label,
-            "collections": legacy._person_collections(related_to),
+            "collections": _person_collections(related_to),
         }
     return response
 
@@ -489,7 +491,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
 
     ag_entries = [
         edu for edu in (person.get("education") or [])
-        if edu.get("institution") in legacy.ACADEMIA_INSTITUTION_NAMES
+        if edu.get("institution") in ACADEMIA_INSTITUTION_NAMES
     ]
     imm_year, imm_date = _earliest_dated_education(ag_entries)
 
@@ -553,7 +555,7 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
         "verification_level": person.get("verification_level", "draft"),
         "updated_at": person.get("updated_at"),
         "work_count": work_count,
-        "biography_snippet": legacy._make_snippet(person),
+        "biography_snippet": _make_snippet(person),
         "image_url": person.get("image_url"),
         "aliases": aliases,
         "occupations": occupations,
