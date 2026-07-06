@@ -22,6 +22,12 @@ export interface FacetsState {
     tagLabels: Record<string, string>; // Q-kood → label (laetud tags_object-ist)
 }
 
+const FACET_DEBOUNCE_MS = 400;
+
+const isAbortError = (error: unknown) =>
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError');
+
 export function useSearchFacets(
     urlParams: SearchUrlParams,
     lang: string,
@@ -39,12 +45,15 @@ export function useSearchFacets(
 
     // Alglaadimine: vocabularies + aliased + (kui pole aktiivset filtrit) facetid
     useEffect(() => {
-        const load = async () => {
+        const controller = new AbortController();
+        let cancelled = false;
+        const timer = window.setTimeout(async () => {
             try {
                 const [vocabs, aliasRes] = await Promise.all([
                     getVocabularies(),
-                    fetch(`${FILE_API_URL}/people-aliases`).then(r => r.ok ? r.json() : null).catch(() => null)
+                    fetch(`${FILE_API_URL}/people-aliases`, { signal: controller.signal }).then(r => r.ok ? r.json() : null).catch(e => isAbortError(e) ? null : Promise.reject(e))
                 ]);
+                if (cancelled) return;
                 setVocabularies(vocabs);
                 if (aliasRes?.status === 'success' && aliasRes.aliases) setAliasMap(aliasRes.aliases);
 
@@ -54,22 +63,28 @@ export function useSearchFacets(
 
                 const facetLang = getLangCode(lang);
                 const [tags, genres, types, authors, labels] = await Promise.all([
-                    getTeoseTagsFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getGenreFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getTypeFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
-                    getAuthorFacets(index, selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd),
-                    getTagsLabelMap(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd),
+                    getTeoseTagsFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getGenreFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getTypeFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getAuthorFacets(index, selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd, controller.signal),
+                    getTagsLabelMap(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                 ]);
+                if (cancelled) return;
                 setTagLabels(labels);
                 setAvailableTeoseTags(mergeSelectedIntoTags(tags, urlParams.teoseTags));
                 setAvailableGenres(mergeSelectedIntoFacets(genres, urlParams.genres));
                 setAvailableTypes(mergeSelectedIntoFacets(types, urlParams.types));
                 setAvailableAuthors(authors);
             } catch (e) {
-                console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
+                if (!cancelled && !controller.signal.aborted && !isAbortError(e)) console.warn('Filtrite andmete laadimine ebaõnnestus:', e);
             }
+        }, FACET_DEBOUNCE_MS);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+            controller.abort();
         };
-        load();
     }, [selectedCollection, lang, urlParams.yearStart, urlParams.yearEnd,
         urlParams.q, urlParams.workId, urlParams.author,
         urlParams.teoseTags.length, urlParams.genres.length, urlParams.types.length, index]);

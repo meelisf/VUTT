@@ -291,6 +291,7 @@ export interface ContentSearchOptions {
   author?: string;        // V2: autori filter (creators massiivist)
   subjectPerson?: string; // VUTT isiku ID (vutt:Pxxxxxx) teema-filtrina (tags_ids kaudu)
   pageTags?: string[];    // Lehekülje märksõnad (AND loogika, page_tags_ids)
+  signal?: AbortSignal;   // Poolelioleva Meilisearchi päringu katkestamine
 }
 
 /**

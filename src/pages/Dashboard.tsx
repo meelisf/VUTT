@@ -34,6 +34,8 @@ const SCROLL_STORAGE_KEY = 'vutt_dashboard_scroll';
 const RETURN_URL_KEY = 'vutt_return_url';
 const DASHBOARD_URL_KEY = 'vutt_dashboard_url';
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
@@ -341,6 +343,8 @@ const Dashboard: React.FC = () => {
   // Perform search when params change
   useEffect(() => {
     if (!index) return;
+    const controller = new AbortController();
+    let cancelled = false;
     const fetchWorks = async () => {
       setLoading(true);
       setError(null);
@@ -362,8 +366,10 @@ const Dashboard: React.FC = () => {
           type: selectedType ? [selectedType] : undefined,
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
-          lang: getLangCode(i18n.language)
+          lang: getLangCode(i18n.language),
+          signal: controller.signal
         });
+        if (cancelled) return;
         setWorks(result.works);
         setFacets(result.facets);
 
@@ -374,18 +380,24 @@ const Dashboard: React.FC = () => {
         // Uue otsingutulemuse korral on shift-valiku ankur (lehekohalik) aegunud
         lastSelectedIndexRef.current = null;
       } catch (e: any) {
-        console.error("Search failed", e);
-        setError(e.message || "Tundmatu viga ühendamisel.");
+        if (!cancelled && !controller.signal.aborted) {
+          console.error("Search failed", e);
+          setError(e.message || "Tundmatu viga ühendamisel.");
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     const timer = setTimeout(() => {
       fetchWorks();
-    }, 400);
+    }, SEARCH_DEBOUNCE_MS);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [index, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
