@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, User, ExternalLink, Download, Edit3, Tag, Search, X, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, StickyNote } from 'lucide-react';
+import { BookOpen, User, ExternalLink, Download, Edit3, Search, X, Trash2, FolderOpen, Bookmark, Check, BookDown, IdCard, SquarePen, FileSliders, StickyNote } from 'lucide-react';
 import DownloadModal from '../DownloadModal';
 import { Work, Page, Annotation, ArchiveRef } from '../../types';
 import type { TextAnnotation } from '../../types';
@@ -9,17 +9,15 @@ import { extractHighlightedText } from '../../utils/annUtils';
 import { LinkedEntity } from '../../types/LinkedEntity';
 import { getLabel } from '../../utils/metadataUtils';
 import { getEntityUrl } from '../../utils/entityUrl';
-import { getAllTags } from '../../services/searchService';
 import { isQCode } from '../../utils/qcodeUtils';
-import EntityPicker from '../EntityPicker';
 import { FILE_API_URL } from '../../config';
-import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { useCollection } from '../../contexts/CollectionContext';
-import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses, getCollectionHierarchy } from '../../services/collectionService';
 import { formatYearDisplay } from '../../utils/yearDisplayUtils';
 import PageCommentsPanel from './PageCommentsPanel';
 import CommentHistoryPanel from './CommentHistoryPanel';
+import PageTagsPanel from './PageTagsPanel';
 
 interface AnnotationsTabProps {
   work?: Work;
@@ -77,7 +75,6 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { collections } = useCollection();
-  const index = useMeiliIndex();
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [editingAnnId, setEditingAnnId] = useState<number | null>(null);
   const [editingAnnText, setEditingAnnText] = useState('');
@@ -93,84 +90,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       .catch(() => {});
   }, []);
 
-  // Sõnavara soovitused lehekülje märksõnadele (serverist)
-  const [tagSuggestions, setTagSuggestions] = useState<{ label: string; id: string | null }[]>([]);
-  // Meilisearchi märksõnad (kõik olemasolevad, koos ID-dega)
-  const [allAvailableTags, setAllAvailableTags] = useState<{ label: string; id: string | null }[]>([]);
-
-  // Lae soovitused serverist
-  useEffect(() => {
-    const fetchTags = async () => {
-      if (!authToken) return;
-      try {
-        const response = await fetchWithTimeout(`${FILE_API_URL}/get-metadata-suggestions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
-          body: JSON.stringify({ lang })
-        });
-        const data = await response.json();
-        if (data.status === 'success') {
-          setTagSuggestions(data.tags || []);
-        }
-      } catch (e) {
-        console.error("Viga märksõnade laadimisel", e);
-      }
-    };
-    fetchTags();
-  }, [authToken, lang]);
-
   useEffect(() => {
     if (!highlightedCommentId) return;
     const el = document.getElementById(`comment-${highlightedCommentId}`);
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [highlightedCommentId, comments]);
-
-  // Lae kõik olemasolevad märksõnad Meilisearchist
-  useEffect(() => {
-    if (!index) return;
-    const loadTags = async () => {
-      const fetchedTags = await getAllTags(index, lang);
-      setAllAvailableTags(fetchedTags);
-    };
-    loadTags();
-  }, [lang, index]);
-
-  // Ühenda serveri soovitused ja Meilisearchi märksõnad
-  const mergedTagSuggestions = React.useMemo(() => {
-    // Ühenda ja eemalda duplikaadid (labeli JA ID järgi)
-    // Eelistame serveri omasid (tagSuggestions), siis Meilisearchi omasid (allAvailableTags)
-    const combined = [...tagSuggestions, ...allAvailableTags];
-    const uniqueByLabel = new Map();
-    const seenIds = new Set<string>();  // Jälgi nähtud Wikidata ID-sid
-
-    combined.forEach(item => {
-      // Kui see ID on juba nähtud, jäta vahele (vältimaks duplikaate eri labelitega)
-      if (item.id && seenIds.has(item.id)) {
-        return;
-      }
-      if (item.id) {
-        seenIds.add(item.id);
-      }
-
-      // Võti on label väiketähtedega
-      const key = item.label.toLowerCase();
-      const existing = uniqueByLabel.get(key);
-
-      if (!existing) {
-        uniqueByLabel.set(key, item);
-      } else if (!existing.id && item.id) {
-        // Kui olemasoleval pole ID-d, aga uuel on, asenda (rikasta)
-        uniqueByLabel.set(key, item);
-      }
-    });
-
-    return Array.from(uniqueByLabel.values()).sort((a, b) => a.label.localeCompare(b.label, lang));
-  }, [tagSuggestions, allAvailableTags, lang]);
-
-  const removeTag = (tagToRemove: string) => {
-    // Eemalda sildi järgi
-    setPageTags(page_tags.filter(t => getLabel(t, lang).toLowerCase() !== tagToRemove.toLowerCase()));
-  };
 
   return (
     <div className="h-full flex flex-col bg-gray-50 p-6 overflow-y-auto">
@@ -683,102 +607,13 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
       )}
 
       {/* Tags */}
-      <div className="bg-white p-5 rounded-lg border border-gray-200 shadow-sm mb-6">
-        <div className="flex items-center gap-2 mb-4 text-gray-800 border-b border-gray-100 pb-2">
-          <Tag size={18} className="text-primary-600" />
-          <h4 className="font-bold">{t('workspace:info.pageTags')}</h4>
-        </div>
-        <div className="flex flex-wrap gap-2 mb-4">
-          {page_tags.length === 0 && <span className="text-sm text-gray-400 italic">{t('info.noTags')}</span>}
-          {page_tags.map((tag, idx) => {
-            const label = getLabel(tag, lang);
-            const tagId = typeof tag !== 'string' ? (tag as any).id : null;
-            const isPersonTag = tagId?.startsWith('vutt:P');
-
-            if (isPersonTag) {
-              return (
-                <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-200 text-sm text-primary-700 overflow-hidden">
-                  <Link
-                    to={`/persons/${tagId}`}
-                    className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 hover:text-primary-600 transition-colors"
-                    title={t('dashboard:workCard.viewPerson', 'Vaata isiku lehte')}
-                  >
-                    <User size={12} className="opacity-60" />
-                    {label}
-                  </Link>
-                  {!readOnly && (
-                    <button
-                      onClick={() => removeTag(label)}
-                      className="pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 border-l border-primary-100"
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
-                </span>
-              );
-            }
-
-            return (
-              <span key={idx} className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 text-sm text-primary-800 group overflow-hidden">
-                <button
-                  onClick={() => tagId
-                    ? navigate(`/search?pageTags=${encodeURIComponent(tagId)}`, { state: { pageTagsLabels: { [tagId]: label } } })
-                    : navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
-                  className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
-                  title="Otsi seda märksõna kogu korpusest"
-                >
-                  {label}
-                  <Search size={12} className="opacity-0 group-hover:opacity-50" />
-                </button>
-
-                {getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined) && (
-                  <a
-                    href={getEntityUrl(tagId, typeof tag !== 'string' ? (tag as any).source : undefined)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-1.5 py-1 text-primary-400 hover:text-blue-600 border-l border-primary-100 transition-colors"
-                    title={tagId || ''}
-                  >
-                    <ExternalLink size={10} />
-                  </a>
-                )}
-
-                {!readOnly && (
-                  <button
-                    onClick={() => removeTag(label)}
-                    className={`pr-2 pl-1 py-1 text-primary-400 hover:text-red-500 ${tagId ? 'border-l border-primary-100' : ''}`}
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </span>
-            );
-          })}
-        </div>
-        {!readOnly && (
-          <div className="relative">
-            <EntityPicker
-              type="topic"
-              showPersonToggle={true}
-              token={authToken ?? undefined}
-              value={null}
-              onChange={(val) => {
-                if (val) {
-                  // Lisa märksõna kui teda pole veel listis
-                  const label = val.label.toLowerCase();
-                  const exists = page_tags.some(t => getLabel(t, lang).toLowerCase() === label);
-                  if (!exists) {
-                    setPageTags([...page_tags, val]);
-                  }
-                }
-              }}
-              placeholder={t('workspace:metadata.tagsPlaceholder')}
-              lang={lang}
-              localSuggestions={mergedTagSuggestions}
-            />
-          </div>
-        )}
-      </div>
+      <PageTagsPanel
+        pageTags={page_tags}
+        setPageTags={setPageTags}
+        readOnly={readOnly}
+        authToken={authToken}
+        lang={lang}
+      />
 
       {/* Comments */}
       <PageCommentsPanel
