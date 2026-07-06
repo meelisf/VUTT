@@ -18,6 +18,10 @@ const pushYearFilter = (filter: string[], yearStart?: number, yearEnd?: number):
   if (yearEnd) filter.push(`year_start <= ${yearEnd}`);
 };
 
+const isAbortError = (error: unknown): boolean =>
+  (error instanceof DOMException && error.name === 'AbortError') ||
+  (typeof error === 'object' && error !== null && (error as { name?: string }).name === 'AbortError');
+
 // Interface for dashboard search options
 export interface DashboardSearchOptions {
   yearStart?: number;
@@ -35,6 +39,7 @@ export interface DashboardSearchOptions {
   genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
   type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
   lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
+  signal?: AbortSignal; // Poolelioleva Meilisearchi päringu katkestamine
 }
 
 // Facetide vastuse tüüp
@@ -60,7 +65,8 @@ export const getTeoseTagsFacets = async (
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
-  yearEnd?: number
+  yearEnd?: number,
+  signal?: AbortSignal
 ): Promise<{ tag: string; count: number }[]> => {
   checkMixedContent();
 
@@ -79,7 +85,7 @@ export const getTeoseTagsFacets = async (
       filter,
       limit: 0,
       facets: [facetField]
-    });
+    }, signal ? { signal } : undefined);
 
     const facetDistribution = response.facetDistribution?.[facetField] || {};
 
@@ -89,6 +95,7 @@ export const getTeoseTagsFacets = async (
 
     return result;
   } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     console.error("getTeoseTagsFacets error:", error);
     return [];
   }
@@ -101,7 +108,8 @@ export const getGenreFacets = async (
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
-  yearEnd?: number
+  yearEnd?: number,
+  signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
 
@@ -119,7 +127,7 @@ export const getGenreFacets = async (
       filter,
       limit: 0,
       facets: [facetField]
-    });
+    }, signal ? { signal } : undefined);
 
     const facetDistribution = response.facetDistribution?.[facetField] || {};
 
@@ -129,6 +137,7 @@ export const getGenreFacets = async (
 
     return result;
   } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     console.error("getGenreFacets error:", error);
     return [];
   }
@@ -141,7 +150,8 @@ export const getTypeFacets = async (
   collection?: string,
   _lang: string = 'et',
   yearStart?: number,
-  yearEnd?: number
+  yearEnd?: number,
+  signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
 
@@ -159,7 +169,7 @@ export const getTypeFacets = async (
       filter,
       limit: 0,
       facets: [facetField]
-    });
+    }, signal ? { signal } : undefined);
 
     const facetDistribution = response.facetDistribution?.[facetField] || {};
 
@@ -169,6 +179,7 @@ export const getTypeFacets = async (
 
     return result;
   } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     console.error("getTypeFacets error:", error);
     return [];
   }
@@ -205,7 +216,8 @@ export const getTagsLabelMap = async (
   collection?: string,
   lang: string = 'et',
   yearStart?: number,
-  yearEnd?: number
+  yearEnd?: number,
+  signal?: AbortSignal
 ): Promise<Record<string, string>> => {
   checkMixedContent();
   try {
@@ -217,7 +229,7 @@ export const getTagsLabelMap = async (
       filter,
       limit: 200,
       attributesToRetrieve: ['tags_object'],
-    });
+    }, signal ? { signal } : undefined);
 
     const map: Record<string, string> = {};
     const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
@@ -232,6 +244,7 @@ export const getTagsLabelMap = async (
     }
     return map;
   } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     console.error('getTagsLabelMap error:', error);
     return {};
   }
@@ -242,7 +255,8 @@ export const getAuthorFacets = async (
   index: Index,
   collection?: string,
   yearStart?: number,
-  yearEnd?: number
+  yearEnd?: number,
+  signal?: AbortSignal
 ): Promise<{ value: string; count: number }[]> => {
   checkMixedContent();
 
@@ -257,7 +271,7 @@ export const getAuthorFacets = async (
       filter,
       limit: 0,
       facets: ['author_names', 'respondens_names']
-    });
+    }, signal ? { signal } : undefined);
 
     // Liida author_names ja respondens_names kokku
     const authorFacets = response.facetDistribution?.['author_names'] || {};
@@ -271,6 +285,7 @@ export const getAuthorFacets = async (
       .map(([value, count]) => ({ value, count: count as number }))
       .sort((a, b) => b.count - a.count);
   } catch (error) {
+    if (signal?.aborted || isAbortError(error)) throw error;
     console.error("getAuthorFacets error:", error);
     return [];
   }
@@ -376,7 +391,7 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
       searchParams.sort = ['year:asc'];
     }
 
-    const response = await index.search(query, searchParams);
+    const response = await index.search(query, searchParams, options?.signal ? { signal: options.signal } : undefined);
 
     // Kui kasutame distinct, siis iga hit on unikaalne teos
     // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
@@ -433,6 +448,7 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
     };
 
   } catch (error: any) {
+    if (options?.signal?.aborted || isAbortError(error)) throw error;
     console.error("Meilisearch error:", error);
     throw new Error(`Ühenduse viga (${MEILI_HOST}): ${error.message}`);
   }
@@ -492,6 +508,8 @@ export const searchContent = async (index: Index, query: string, page: number = 
     if (!query) filter.push('has_annotations = true');
   }
 
+  const requestConfig = options.signal ? { signal: options.signal } : undefined;
+
   try {
     // Kui otsime ühe teose piires, näitame kogu lehekülje teksti kõigi highlight'idega
     if (options.workId) {
@@ -507,7 +525,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
         highlightPostTag: HIGHLIGHT_POST_TAG,
         attributesToSearchOn: attributesToSearchOn,
         matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies
-      });
+      }, requestConfig);
 
       const totalHits = response.estimatedTotalHits || 0;
 
@@ -542,7 +560,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
           limit: 0,
           facets: ['originaal_kataloog', genreFacetField, typeFacetField, tagsFacetField, 'author_names', 'respondens_names'],
           attributesToSearchOn: attributesToSearchOn
-        }),
+        }, requestConfig),
         // Päring 2: Sisu (teosed)
         index.search('', {
           offset,
@@ -552,7 +570,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
           attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           sort: ['year:asc'], // Vaikimisi sortimine aasta järgi kui otsingut pole
           attributesToSearchOn: attributesToSearchOn
-        })
+        }, requestConfig)
       ]);
 
       facetDistribution = statsResponse.facetDistribution || {};
@@ -603,7 +621,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
           limit: STATS_LIMIT,
           attributesToRetrieve: ['id', 'work_id', 'title', 'year', 'location', 'publisher', 'creators', 'genre_object', 'type_object', 'collections', 'collections_hierarchy', 'author_names', 'respondens_names', 'tags_object', genreFacetField, typeFacetField, tagsFacetField],
           attributesToSearchOn: attributesToSearchOn
-        }),
+        }, requestConfig),
         // Päring 2: Sisu (kuvatavad teosed, distinct)
         index.search(query, {
           offset,
@@ -617,14 +635,14 @@ export const searchContent = async (index: Index, query: string, page: number = 
           highlightPreTag: HIGHLIGHT_PRE_TAG,
           highlightPostTag: HIGHLIGHT_POST_TAG,
           attributesToSearchOn: attributesToSearchOn
-        }),
+        }, requestConfig),
         // Päring 3: Lehekülgede arvud teoste kaupa (work_id facet)
         index.search(query, {
           filter,
           limit: 0,
           facets: ['work_id'],
           attributesToSearchOn: attributesToSearchOn
-        })
+        }, requestConfig)
       ]);
 
       // Arvuta unikaalsete teoste statistika käsitsi

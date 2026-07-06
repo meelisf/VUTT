@@ -11,6 +11,8 @@ export interface SearchResultsState {
     error: string | null;
 }
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 export function useSearchResults(urlParams: SearchUrlParams, lang: string, selectedCollection: string | null): SearchResultsState {
     const index = useMeiliIndex();
     const [results, setResults] = useState<ContentSearchResponse | null>(null);
@@ -30,8 +32,9 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
 
         if (!index) return;
 
+        const controller = new AbortController();
         let cancelled = false;
-        const run = async () => {
+        const timer = window.setTimeout(async () => {
             setLoading(true);
             setError(null);
             try {
@@ -48,16 +51,21 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
                     subjectPerson: urlParams.subjectPerson || undefined,
                     collection: selectedCollection || undefined,
                     lang: getLangCode(lang),
+                    signal: controller.signal,
                 });
                 if (!cancelled) setResults(data);
             } catch (e: any) {
-                if (!cancelled) setError(e.message || 'Otsinguviga');
+                if (!cancelled && !controller.signal.aborted) setError(e.message || 'Otsinguviga');
             } finally {
                 if (!cancelled) setLoading(false);
             }
+        }, SEARCH_DEBOUNCE_MS);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+            controller.abort();
         };
-        run();
-        return () => { cancelled = true; };
     }, [urlParams.q, urlParams.page, urlParams.yearStart, urlParams.yearEnd,
         urlParams.scope, urlParams.workId,
         urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
