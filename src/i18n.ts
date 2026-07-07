@@ -65,7 +65,11 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'et',
+    // Mitte-eesti brauser → inglise (rahvusvaheline publik). Eesti brauser saab
+    // eesti keele (navigator tuvastab 'et'); tundmatu/muu keel langeb 'en' peale.
+    // Teine fallback 'et' = turvavõrk, kui mõni 'en' võti peaks puuduma.
+    // localStorage 'vutt_language' (käsitsi valik) on tuvastusjärjekorras esimene.
+    fallbackLng: ['en', 'et'],
     defaultNS: 'common',
     ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload', 'prosopography', 'settings'],
 
