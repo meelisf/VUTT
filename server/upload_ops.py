@@ -7,20 +7,15 @@ Etapp 4 lisab: import_as_work, cleanup_upload.
 """
 import json
 import os
-import shlex
 import shutil
-import socket
 import threading
 from datetime import datetime
 from typing import Optional
 
-# OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
-# minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
-OCR_CONNECT_TIMEOUT = 10
-
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
 from .upload import file_detection as _file_detection
 from .upload import state as _upload_state
+from .upload import ocr_client as _ocr_client
 from .utils import generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 from .heartbeat import mark_error, mark_success, register_job
@@ -41,6 +36,10 @@ def _normalize_txt_file(path: str):
 
 logger = get_logger(__name__)
 
+# OCR-serveri SSH-connecti timeout (s). Hoiab event-loopi/threadi blokeerumast
+# minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
+OCR_CONNECT_TIMEOUT = _ocr_client.OCR_CONNECT_TIMEOUT
+
 # Compatibility-konstandid: testid ja admin-konfiguratsioon võivad neid upload_ops peal monkeypatchida.
 UPLOAD_IMAGE_MAX_PIXELS = _file_detection.UPLOAD_IMAGE_MAX_PIXELS
 UPLOAD_IMAGE_MAX_DIMENSION = _file_detection.UPLOAD_IMAGE_MAX_DIMENSION
@@ -49,11 +48,9 @@ SLUG_MAX_LEN = _file_detection.SLUG_MAX_LEN
 # Mälupõhine progress elab state-moodulis; nimi jääb siin compatibility jaoks alles.
 upload_progress = _upload_state.upload_progress
 
-# =========================================================
-# PÜSIVAD SSH ÜHENDUSED (üks per upload_id)
-# =========================================================
-_ssh_connections: dict = {}
-_ssh_lock = threading.Lock()
+# Püsivad SSH ühendused elavad ocr_client-moodulis; nimed jäävad testide jaoks alles.
+_ssh_connections = _ocr_client.ssh_connections
+_ssh_lock = _ocr_client.ssh_lock
 
 
 def _get_upload_lock(upload_id: str) -> threading.Lock:
@@ -97,30 +94,7 @@ def _valid_filename(filename: str) -> bool:
 
 def _load_ssh_key():
     """Laeb SSH privaatvõtme tavalistest asukohtadest (~/.ssh/)."""
-    try:
-        import paramiko
-    except ImportError:
-        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
-
-    key_paths = [
-        ("ed25519", os.path.expanduser("~/.ssh/id_ed25519")),
-        ("ecdsa",   os.path.expanduser("~/.ssh/id_ecdsa")),
-        ("rsa",     os.path.expanduser("~/.ssh/id_rsa")),
-    ]
-    for key_type, path in key_paths:
-        if not os.path.exists(path):
-            continue
-        try:
-            if key_type == "ed25519":
-                return paramiko.Ed25519Key.from_private_key_file(path)
-            elif key_type == "ecdsa":
-                return paramiko.ECDSAKey.from_private_key_file(path)
-            else:
-                return paramiko.RSAKey.from_private_key_file(path)
-        except Exception as e:
-            logger.warning(f"SSH võtme laadimine ebaõnnestus ({path}): {e}")
-
-    raise FileNotFoundError("SSH privaatvõtit ei leitud (~/.ssh/id_ed25519 ega teised)")
+    return _ocr_client.load_ssh_key()
 
 
 def get_or_create_ssh(upload_id: str):
@@ -128,65 +102,23 @@ def get_or_create_ssh(upload_id: str):
     Tagastab püsiva paramiko.Transport objekti antud upload_id jaoks.
     Loob uue ühenduse kui puudub või on katkine.
     """
-    try:
-        import paramiko
-    except ImportError:
-        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
-
-    with _ssh_lock:
-        transport = _ssh_connections.get(upload_id)
-        if transport and transport.is_active():
-            return transport
-
-        # Sulge vana katkine ühendus
-        if transport:
-            try:
-                transport.close()
-            except Exception:
-                pass
-
-        logger.info(f"SSH: loob ühenduse {OCR_SERVER_USER}@{OCR_SERVER_HOST} (upload {upload_id})")
-        # Loo socket eraldi LÜHIKESE timeout'iga — paramiko.Transport((host, 22))
-        # kasutaks OS-i vaikimisi TCP-connect timeouti (~130 s), mis surnud OCR-hosti
-        # korral blokeeris kogu backendi (2026-06-13 outage).
-        sock = socket.create_connection((OCR_SERVER_HOST, 22), timeout=OCR_CONNECT_TIMEOUT)
-        transport = paramiko.Transport(sock)
-        transport.set_keepalive(30)
-        transport.connect()
-        key = _load_ssh_key()
-        transport.auth_publickey(OCR_SERVER_USER, key)
-        _ssh_connections[upload_id] = transport
-        return transport
+    return _ocr_client.get_or_create_ssh(
+        upload_id,
+        host=OCR_SERVER_HOST,
+        user=OCR_SERVER_USER,
+        connect_timeout=OCR_CONNECT_TIMEOUT,
+        load_key_func=_load_ssh_key,
+    )
 
 
 def close_ssh(upload_id: str):
     """Suleb ja eemaldab SSH ühenduse."""
-    with _ssh_lock:
-        transport = _ssh_connections.pop(upload_id, None)
-    if transport:
-        try:
-            transport.close()
-        except Exception:
-            pass
+    return _ocr_client.close_ssh(upload_id)
 
 
 def _ssh_rm_rf(upload_id: str, remote_path: str):
-    """Kustutab OCR serveris kausta rekursiivselt (`rm -rf`) SSH kanali kaudu.
-
-    remote_path peab olema serveri koostatud absoluutne tee (mitte kasutaja sisend).
-    Kasutab shlex.quote + `--`, et vältida tulevikus shell-injection lõhna/kirra
-    (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 5).
-    """
-    transport = get_or_create_ssh(upload_id)
-    chan = transport.open_session()
-    try:
-        chan.set_combine_stderr(True)
-        chan.exec_command(f"rm -rf -- {shlex.quote(remote_path)}")
-        status = chan.recv_exit_status()
-        if status != 0:
-            raise RuntimeError(f"rm -rf ebaõnnestus (exit={status}): {remote_path}")
-    finally:
-        chan.close()
+    """Kustutab OCR serveris kausta rekursiivselt (`rm -rf`) SSH kanali kaudu."""
+    return _ocr_client.ssh_rm_rf(upload_id, remote_path, get_ssh_func=get_or_create_ssh)
 
 
 def _sftp_open(upload_id: str):
@@ -194,20 +126,11 @@ def _sftp_open(upload_id: str):
     Loob SFTP seansi püsivalt SSH transpordilt.
     Proovib uuesti üks kord kui ühendus on katkine.
     """
-    try:
-        import paramiko
-    except ImportError:
-        raise RuntimeError("paramiko pole paigaldatud (pip install paramiko)")
-
-    for attempt in range(2):
-        try:
-            transport = get_or_create_ssh(upload_id)
-            return paramiko.SFTPClient.from_transport(transport)
-        except Exception:
-            if attempt == 0:
-                close_ssh(upload_id)  # Eemalda katkine ühendus, proovi uuesti
-            else:
-                raise
+    return _ocr_client.sftp_open(
+        upload_id,
+        get_ssh_func=get_or_create_ssh,
+        close_ssh_func=close_ssh,
+    )
 
 
 def _extract_page_num(base: str) -> int:
@@ -422,21 +345,12 @@ def _sftp_progress_cb(upload_id: str):
 
 def _ensure_remote_dirs(sftp, remote_dirs):
     """Loob OCR-serveri kaustad kui need puuduvad (idempotentne)."""
-    for remote_dir in remote_dirs:
-        try:
-            sftp.stat(remote_dir)
-        except FileNotFoundError:
-            sftp.mkdir(remote_dir)
+    return _ocr_client.ensure_remote_dirs(sftp, remote_dirs)
 
 
 def _close_sftp_and_unlink(sftp, tmp_path: str):
     """Taustalõime finally-puhastus: sulge SFTP seanss ja kustuta ajutine fail."""
-    if sftp:
-        try:
-            sftp.close()
-        except Exception:
-            pass
-    _safe_unlink(tmp_path)
+    return _ocr_client.close_sftp_and_unlink(sftp, tmp_path)
 
 
 def _count_pdf_pages(tmp_path: str) -> int:
@@ -445,107 +359,51 @@ def _count_pdf_pages(tmp_path: str) -> int:
 
 
 def _prepare_image_upload(state: dict) -> tuple:
-    """Arvutab pildi-upload'i (alati 1 leht) remote teed.
-
-    Tagastab: (pages, remote_dirs, remote_tmp, remote_dst, remote_img_name).
-    """
-    slug = state['meta']['slug']
-    remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
-    remote_work_abs = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
-    remote_img_name = f"{slug}_pg_001.jpg"
-    remote_tmp = f"{remote_work_abs}/{remote_img_name}.tmp"
-    remote_dst = f"{remote_work_abs}/{remote_img_name}"
-    remote_dirs = (remote_staging_abs, remote_work_abs)
-    return 1, remote_dirs, remote_tmp, remote_dst, remote_img_name
+    """Arvutab pildi-upload'i (alati 1 leht) remote teed."""
+    return _ocr_client.prepare_image_upload(state, ocr_server_path=OCR_SERVER_PATH)
 
 
 def _prepare_pdf_upload(state: dict, tmp_path: str) -> tuple:
-    """Arvutab PDF-upload'i remote teed (pärast pdfinfo lehekülgede loendust).
-
-    Tagastab: (pages, remote_dirs, remote_tmp, remote_dst).
-    """
-    pages = _count_pdf_pages(tmp_path)
-    slug = state['meta']['slug']
-    remote_staging_abs = f"{OCR_SERVER_PATH}/{state['remote_staging_path']}"
-    remote_tmp = f"{remote_staging_abs}/{slug}.pdf.tmp"
-    remote_dst = f"{remote_staging_abs}/{slug}.pdf"
-    remote_dirs = (remote_staging_abs,)
-    return pages, remote_dirs, remote_tmp, remote_dst
+    """Arvutab PDF-upload'i remote teed (pärast pdfinfo lehekülgede loendust)."""
+    return _ocr_client.prepare_pdf_upload(
+        state,
+        tmp_path,
+        ocr_server_path=OCR_SERVER_PATH,
+        count_pdf_pages_func=_count_pdf_pages,
+    )
 
 
 def _sftp_transfer_image(upload_id: str, tmp_path: str, file_type: str,
                           remote_dirs, remote_tmp: str, remote_dst: str,
                           remote_img_name: str):
-    """Taustalõime sihtfunktsioon: edastab üksiku pildi OCR-serverisse.
-
-    PNG/TIFF konvertitakse Pillow'ga JPEG-iks; sihtfail eemaldatakse kui see
-    juba eksisteerib (uuesti üleslaadimine). Edukorral state → 'processing',
-    veakorral state → 'error' + error_message.
-    """
-    sftp = None
-    try:
-        sftp = _sftp_open(upload_id)
-        _ensure_remote_dirs(sftp, remote_dirs)
-
-        _validate_upload_image(tmp_path)
-
-        # Konverteeri JPEG-iks kui PNG või TIFF
-        if file_type in ('png', 'tiff'):
-            from PIL import Image
-            conv_path = tmp_path + '.conv.jpg'
-            try:
-                with Image.open(tmp_path) as img:
-                    img.convert('RGB').save(conv_path, 'JPEG', quality=95)
-                sftp.put(conv_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
-            finally:
-                _safe_unlink(conv_path)
-        else:
-            sftp.put(tmp_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
-
-        # Kustuta sihtfail kui see juba eksisteerib (uuesti üleslaadimine)
-        try:
-            sftp.stat(remote_dst)
-            sftp.unlink(remote_dst)
-        except FileNotFoundError:
-            pass
-        sftp.rename(remote_tmp, remote_dst)
-        logger.info(f"Pilt edastatud OCR serverisse: {upload_id} ({remote_img_name})")
-
-        _set_upload_state(upload_id, status='processing')
-
-    except Exception as e:
-        logger.error(f"SFTP pilt {upload_id}: {e}")
-        upload_progress[upload_id]['error'] = str(e)
-        _set_upload_state(upload_id, status='error', error_message=str(e))
-    finally:
-        _close_sftp_and_unlink(sftp, tmp_path)
+    """Taustalõime sihtfunktsioon: edastab üksiku pildi OCR-serverisse."""
+    return _ocr_client.transfer_image(
+        upload_id,
+        tmp_path,
+        file_type,
+        remote_dirs,
+        remote_tmp,
+        remote_dst,
+        remote_img_name,
+        sftp_open_func=_sftp_open,
+        validate_upload_image_func=_validate_upload_image,
+    )
 
 
 def _sftp_transfer_pdf(upload_id: str, tmp_path: str,
                         remote_dirs, remote_tmp: str, remote_dst: str,
                         pages: int, file_size: int):
-    """Taustalõime sihtfunktsioon: edastab PDF-i OCR-serverisse (OCR server
-    lõhub ise lehekülgedeks). Edukorral state → 'processing', veakorral
-    state → 'error' + error_message.
-    """
-    sftp = None
-    try:
-        sftp = _sftp_open(upload_id)
-        _ensure_remote_dirs(sftp, remote_dirs)
-
-        sftp.put(tmp_path, remote_tmp, callback=_sftp_progress_cb(upload_id))
-        sftp.rename(remote_tmp, remote_dst)
-
-        logger.info(f"SFTP upload valmis: {upload_id} ({pages} lk, {file_size} B)")
-
-        _set_upload_state(upload_id, status='processing')
-
-    except Exception as e:
-        logger.error(f"SFTP transfer {upload_id}: {e}")
-        upload_progress[upload_id]['error'] = str(e)
-        _set_upload_state(upload_id, status='error', error_message=str(e))
-    finally:
-        _close_sftp_and_unlink(sftp, tmp_path)
+    """Taustalõime sihtfunktsioon: edastab PDF-i OCR-serverisse."""
+    return _ocr_client.transfer_pdf(
+        upload_id,
+        tmp_path,
+        remote_dirs,
+        remote_tmp,
+        remote_dst,
+        pages,
+        file_size,
+        sftp_open_func=_sftp_open,
+    )
 
 
 def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:

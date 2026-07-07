@@ -12,7 +12,6 @@ surnud host annab vea sekunditega, mitte minutitega.
 """
 import sys
 import types
-import socket
 import pytest
 
 
@@ -38,13 +37,13 @@ def fake_paramiko(monkeypatch):
 
 def test_get_or_create_ssh_kasutab_piiratud_connect_timeouti(fake_paramiko, monkeypatch):
     from server import upload_ops
+    from server.upload import ocr_client
 
     # Tühjenda cache, et test looks uue ühenduse
     upload_ops._ssh_connections.clear()
     monkeypatch.setattr(upload_ops, '_load_ssh_key', lambda: object())
 
     calls = {}
-    real_create = socket.create_connection
 
     def spy_create_connection(addr, timeout=None, *a, **kw):
         calls['addr'] = addr
@@ -52,7 +51,9 @@ def test_get_or_create_ssh_kasutab_piiratud_connect_timeouti(fake_paramiko, monk
         # Ära tee päris võrguühendust
         return types.SimpleNamespace(close=lambda: None)
 
-    monkeypatch.setattr(upload_ops.socket, 'create_connection', spy_create_connection)
+    # socket.create_connection jookseb nüüd ocr_client-moodulis (get_or_create_ssh
+    # kolis sinna); patchi seal, kus kõne päriselt toimub.
+    monkeypatch.setattr(ocr_client.socket, 'create_connection', spy_create_connection)
 
     upload_ops.get_or_create_ssh('test-upload')
 
