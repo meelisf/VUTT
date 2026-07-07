@@ -7,14 +7,10 @@ Etapp 4 lisab: import_as_work, cleanup_upload.
 """
 import json
 import os
-import re
 import shlex
 import shutil
 import socket
-import subprocess
 import threading
-import unicodedata
-import warnings
 from datetime import datetime
 from typing import Optional
 
@@ -22,19 +18,10 @@ from typing import Optional
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
 OCR_CONNECT_TIMEOUT = 10
 
-# Pildi-uploadi sanity piirid. Väga kõrged, et tavalised suured skannid töötaksid,
-# aga patoloogilised/decompression-bomb sisendid ei jõuaks OCR-serverisse.
-UPLOAD_IMAGE_MAX_PIXELS = int(os.getenv("UPLOAD_IMAGE_MAX_PIXELS", "150000000"))
-UPLOAD_IMAGE_MAX_DIMENSION = int(os.getenv("UPLOAD_IMAGE_MAX_DIMENSION", "30000"))
-try:
-    from PIL import Image as _PILImage
-    _PILImage.MAX_IMAGE_PIXELS = UPLOAD_IMAGE_MAX_PIXELS
-    warnings.simplefilter("error", _PILImage.DecompressionBombWarning)
-except Exception:
-    pass
-
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
-from .utils import atomic_write_json, generate_nanoid
+from .upload import file_detection as _file_detection
+from .upload import state as _upload_state
+from .utils import generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -54,15 +41,13 @@ def _normalize_txt_file(path: str):
 
 logger = get_logger(__name__)
 
-# Lock per upload_id — kaitseb samaaegset state.json lugemist/kirjutamist
-_upload_locks: dict = {}
-_locks_lock = threading.Lock()
+# Compatibility-konstandid: testid ja admin-konfiguratsioon võivad neid upload_ops peal monkeypatchida.
+UPLOAD_IMAGE_MAX_PIXELS = _file_detection.UPLOAD_IMAGE_MAX_PIXELS
+UPLOAD_IMAGE_MAX_DIMENSION = _file_detection.UPLOAD_IMAGE_MAX_DIMENSION
+SLUG_MAX_LEN = _file_detection.SLUG_MAX_LEN
 
-# =========================================================
-# MÄLUPÕHINE PROGRESS (SFTP üleslaadimise jälgimine)
-# Kettale kirjutatakse alles pärast edastuse lõppu.
-# =========================================================
-upload_progress: dict = {}  # {upload_id: {"bytes_sent": 0, "bytes_total": 0, "error": None}}
+# Mälupõhine progress elab state-moodulis; nimi jääb siin compatibility jaoks alles.
+upload_progress = _upload_state.upload_progress
 
 # =========================================================
 # PÜSIVAD SSH ÜHENDUSED (üks per upload_id)
@@ -73,45 +58,37 @@ _ssh_lock = threading.Lock()
 
 def _get_upload_lock(upload_id: str) -> threading.Lock:
     """Tagastab konkreetsele upload_id-le vastava luku."""
-    with _locks_lock:
-        if upload_id not in _upload_locks:
-            _upload_locks[upload_id] = threading.Lock()
-        return _upload_locks[upload_id]
+    return _upload_state.get_upload_lock(upload_id)
 
 
 def _upload_dir(upload_id: str) -> str:
     """Tagastab upload staging kausta tee."""
-    return os.path.join(UPLOADS_DIR, upload_id)
+    return _upload_state.upload_dir(upload_id)
 
 
 def _state_path(upload_id: str) -> str:
     """Tagastab state.json faili tee."""
-    return os.path.join(_upload_dir(upload_id), "state.json")
+    return _upload_state.state_path(upload_id)
 
 
 def _read_state(upload_id: str):
     """Loeb state.json (ei lukusta ise — kasuta _get_upload_lock)."""
-    path = _state_path(upload_id)
-    if not os.path.exists(path):
-        return None
-    with open(path, 'r', encoding='utf-8') as f:
-        return json.load(f)
+    return _upload_state.read_state(upload_id)
 
 
 def _write_state(upload_id: str, state: dict):
     """Kirjutab state.json atomaarse asendusega (ei lukusta ise — kasuta _get_upload_lock)."""
-    path = _state_path(upload_id)
-    atomic_write_json(path, state)
+    return _upload_state.write_state(upload_id, state)
 
 
 def _valid_upload_id(upload_id: str) -> bool:
     """Valideerib upload_id formaadi (ainult a-z0-9, max 20 märki)."""
-    return bool(re.match(r'^[a-z0-9]{1,20}$', upload_id))
+    return _file_detection.valid_upload_id(upload_id)
 
 
 def _valid_filename(filename: str) -> bool:
     """Valideerib failinime (ainult a-z0-9._-, keelatud .. ja /)."""
-    return bool(re.match(r'^[a-z0-9._-]+$', filename)) and '..' not in filename
+    return _file_detection.valid_filename(filename)
 
 
 # =========================================================
@@ -238,40 +215,21 @@ def _extract_page_num(base: str) -> int:
     Eraldab leheküljenumbri OCR failinimest.
     '{year}-{slug}_pg_001' → 1
     """
-    parts = base.rsplit('_pg_', 1)
-    if len(parts) == 2:
-        try:
-            return int(parts[1])
-        except ValueError:
-            pass
-    return 0
+    return _file_detection.extract_page_num(base)
 
 
 # =========================================================
 # SLUG UTILIIDID
 # =========================================================
 
-SLUG_MAX_LEN = 80
-
 def sanitize_slug(text: str) -> str:
     """Puhastab teksti, et see sobiks slug-iks (ainult a-z, 0-9, sidekriips, max 80 tähemärki)."""
-    normalized = unicodedata.normalize('NFD', text)
-    ascii_text = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
-    slug = ascii_text.lower()
-    slug = re.sub(r'[^a-z0-9]+', '-', slug)
-    slug = slug[:SLUG_MAX_LEN].rstrip('-')
-    return slug or 'teos'
+    return _file_detection.sanitize_slug(text)
 
 
 def _page_base_name(slug: str, work_id: str, pn: int) -> str:
-    """Lehekülje failinime tüvi (ilma laiendita).
-
-    Uus konventsioon: kaust = {slug}, kus slug juba sisaldab work_id'd → {slug}-{pn}.
-    Vana konventsioon: kaust = {slug} ilma work_id'ta → {slug}-{work_id}-{pn}.
-    """
-    if slug.endswith(f"-{work_id}"):
-        return f"{slug}-{pn:03d}"
-    return f"{slug}-{work_id}-{pn:03d}"
+    """Lehekülje failinime tüvi (ilma laiendita)."""
+    return _file_detection.page_base_name(slug, work_id, pn)
 
 
 def check_slug_conflict(year, slug: str) -> bool:
@@ -378,32 +336,7 @@ def update_upload_meta(upload_id: str, updates: dict) -> bool:
 
 def list_uploads() -> list:
     """Tagastab kõik aktiivsed (mitte-imporditud) üleslaadimised, uuemad ees."""
-    if not os.path.isdir(UPLOADS_DIR):
-        return []
-
-    result = []
-    for entry in os.scandir(UPLOADS_DIR):
-        if not entry.is_dir():
-            continue
-        state_file = os.path.join(entry.path, 'state.json')
-        if not os.path.exists(state_file):
-            continue
-        try:
-            with open(state_file, 'r', encoding='utf-8') as f:
-                state = json.load(f)
-            if state.get('status') != 'imported':
-                # Nõuandev stall-märk (ei püsi state.json-is — arvutatakse lugemisel)
-                ready = sum(1 for fl in state.get('files', []) if fl.get('has_ocr'))
-                state['stalled'] = _is_stalled(
-                    ready, state.get('expected_pages'),
-                    state.get('last_progress_at'), datetime.now().timestamp(),
-                )
-                result.append(state)
-        except Exception as e:
-            logger.warning(f"list_uploads: ei saa lugeda {state_file}: {e}")
-
-    result.sort(key=lambda s: s.get('created_at', ''), reverse=True)
-    return result
+    return _upload_state.list_upload_states()
 
 
 def get_upload(upload_id: str):
@@ -445,55 +378,15 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
 
 def _detect_file_type(path: str) -> str:
     """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png', 'tiff' või 'unknown'."""
-    with open(path, 'rb') as f:
-        header = f.read(1024)
-    if b'%PDF' in header[:1024]:
-        return 'pdf'
-    if header[:2] == b'\xff\xd8':
-        return 'jpeg'
-    if header[:8] == b'\x89PNG\r\n\x1a\n':
-        return 'png'
-    if header[:4] in (b'II\x2a\x00', b'MM\x00\x2a'):  # little-endian ja big-endian TIFF
-        return 'tiff'
-    return 'unknown'
+    return _file_detection.detect_file_type(path)
 
 
 def _validate_upload_image(path: str) -> tuple[int, int]:
-    """Kontrollib pildi mõõtmeid enne OCR-serverisse saatmist.
-
-    See ei sea väikest praktilist skannipiiri, vaid lõikab ära patoloogilised
-    sisendid: liiga suur pikselite koguarv, absurdne üksik mõõde või vigane pilt.
-    Tagastab (width, height).
-    """
-    try:
-        from PIL import Image, UnidentifiedImageError
-    except ImportError as e:
-        raise ValueError("Pildi töötlemise tugi puudub (Pillow pole paigaldatud)") from e
-
-    try:
-        with Image.open(path) as img:
-            width, height = img.size
-            if width <= 0 or height <= 0:
-                raise ValueError("Pildi mõõtmeid ei õnnestunud tuvastada")
-            if width > UPLOAD_IMAGE_MAX_DIMENSION or height > UPLOAD_IMAGE_MAX_DIMENSION:
-                raise ValueError(
-                    f"Pilt on liiga suur: {width}×{height} px. "
-                    f"Maksimaalne lubatud külg on {UPLOAD_IMAGE_MAX_DIMENSION} px."
-                )
-            pixels = width * height
-            if pixels > UPLOAD_IMAGE_MAX_PIXELS:
-                raise ValueError(
-                    f"Pilt on liiga suur: {width}×{height} px ({pixels} pikslit). "
-                    f"Maksimaalne lubatud kogus on {UPLOAD_IMAGE_MAX_PIXELS} pikslit."
-                )
-            img.verify()
-            return width, height
-    except ValueError:
-        raise
-    except UnidentifiedImageError as e:
-        raise ValueError("Vigane pildifail — pilti ei õnnestunud avada") from e
-    except Exception as e:
-        raise ValueError(f"Vigane pildifail — {e}") from e
+    """Kontrollib pildi mõõtmeid enne OCR-serverisse saatmist."""
+    # Hoia vanad upload_ops monkeypatchid ühilduvana.
+    _file_detection.UPLOAD_IMAGE_MAX_PIXELS = UPLOAD_IMAGE_MAX_PIXELS
+    _file_detection.UPLOAD_IMAGE_MAX_DIMENSION = UPLOAD_IMAGE_MAX_DIMENSION
+    return _file_detection.validate_upload_image(path)
 
 
 # =========================================================
@@ -509,46 +402,22 @@ def _validate_upload_image(path: str) -> tuple[int, int]:
 
 def _safe_unlink(path: str):
     """Kustutab faili, ignoreerides vigu (ajutised failid, juba kustutatud)."""
-    try:
-        os.unlink(path)
-    except Exception:
-        pass
+    return _file_detection.safe_unlink(path)
 
 
 def _set_upload_state(upload_id: str, *, status: Optional[str] = None, **extra):
-    """Uuendab state.json välju upload-i luku all (thread-turvaline).
-
-    Kasutatakse taustalõimedes staatusemasina uuendamiseks:
-    edu → status='processing', viga → status='error' + error_message.
-    Kui state on vahepeal kadunud (import/kustutus), ei tee midagi (idempotentne).
-    """
-    state_lock = _get_upload_lock(upload_id)
-    with state_lock:
-        s = _read_state(upload_id)
-        if not s:
-            return
-        if status is not None:
-            s['status'] = status
-        for key, value in extra.items():
-            s[key] = value
-        _write_state(upload_id, s)
+    """Uuendab state.json välju upload-i luku all (thread-turvaline)."""
+    return _upload_state.set_upload_state(upload_id, status=status, **extra)
 
 
 def _init_upload_progress(upload_id: str, tmp_path: str) -> int:
-    """Lähtestab mälupõhise SFTP progressi (bytes_total = faili suurus).
-    Tagastab faili suuruse baitides. Kutsutud sünkroonselt enne taustalõime
-    käivitamist."""
-    file_size = os.path.getsize(tmp_path)
-    upload_progress[upload_id] = {"bytes_sent": 0, "bytes_total": file_size, "error": None}
-    return file_size
+    """Lähtestab mälupõhise SFTP progressi (bytes_total = faili suurus)."""
+    return _upload_state.init_upload_progress(upload_id, tmp_path)
 
 
 def _sftp_progress_cb(upload_id: str):
     """Loob SFTP put() callback'i, mis uuendab upload_progress mäludikti."""
-    def _progress(transferred, total):
-        upload_progress[upload_id]['bytes_sent'] = transferred
-        upload_progress[upload_id]['bytes_total'] = total
-    return _progress
+    return _upload_state.sftp_progress_cb(upload_id)
 
 
 def _ensure_remote_dirs(sftp, remote_dirs):
@@ -571,41 +440,8 @@ def _close_sftp_and_unlink(sftp, tmp_path: str):
 
 
 def _count_pdf_pages(tmp_path: str) -> int:
-    """Loeb PDF-i lehekülgede arvu pdfinfo abil.
-
-    Tõstab ValueError kui:
-      - PDF on vigane (pdfinfo viga) — tmp_path kustutatakse;
-      - lehekülgede arvu ei leidu pdfinfo väljundist;
-      - pdfinfo pole paigaldatud (FileNotFoundError);
-      - pdfinfo aegub (TimeoutExpired).
-    """
-    try:
-        result = subprocess.run(
-            ['pdfinfo', tmp_path],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            logger.error(f"pdfinfo viga: {result.stderr}")
-            _safe_unlink(tmp_path)
-            raise ValueError(
-                f"Vigane PDF — fail ei ole korrektne PDF-dokument (pdfinfo viga). "
-                f"Kontrolli, et laadid üles õige faili."
-            )
-
-        pages = None
-        for line in result.stdout.splitlines():
-            if line.startswith('Pages:'):
-                pages = int(line.split(':', 1)[1].strip())
-                break
-        if pages is None:
-            logger.error(f"pdfinfo väljundis puudus 'Pages:': {result.stdout}")
-            raise ValueError("PDF lehekülgede arvu ei õnnestunud tuvastada")
-        return pages
-
-    except FileNotFoundError:
-        raise ValueError("pdfinfo pole paigaldatud (apt install poppler-utils)")
-    except subprocess.TimeoutExpired:
-        raise ValueError("PDF analüüs võttis liiga kaua — fail on liiga suur või kahjustatud")
+    """Loeb PDF-i lehekülgede arvu pdfinfo abil."""
+    return _file_detection.count_pdf_pages(tmp_path, logger)
 
 
 def _prepare_image_upload(state: dict) -> tuple:
@@ -767,23 +603,13 @@ def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
 
 # Stall-indikaator: mitu sekundit ilma uue valmis leheta enne kui töö märgitakse
 # UI-s "kinni jäänuks" (NÕUANDEV — staatust ei muudeta, töid ei katkestata).
-# Env-st muudetav. Tahaühilduv: vanad state.json-id ilma last_progress_at-ita ei flag'i.
-UPLOAD_STALL_THRESHOLD = int(os.getenv("UPLOAD_STALL_THRESHOLD", "1800"))  # 30 min
+# Kanooniline väärtus elab state-moodulis; siin compatibility-re-export (testid loevad).
+UPLOAD_STALL_THRESHOLD = _upload_state.UPLOAD_STALL_THRESHOLD
 
 
 def _is_stalled(ready_count: int, expected_pages, last_progress_at, now_ts: float) -> bool:
-    """Kas OCR-töö paistab kinni jäänud: pole veel kõik lehed valmis JA pole
-    UPLOAD_STALL_THRESHOLD jooksul ühtegi uut valmis lehte tekkinud.
-
-    Puhtalt nõuandev — ei muuda staatusemasinat. Aeglane-aga-elav töö (kus lehed
-    aeg-ajalt juurde tulevad) EI flag'i, sest last_progress_at uueneb."""
-    if not expected_pages:
-        return False  # ilma oodatava arvuta ei saa "pooleli" defineerida (nt pildi-upload)
-    if ready_count >= expected_pages:
-        return False  # kõik valmis → staatus läheb done-iks, mitte stalled
-    if not last_progress_at:
-        return False  # baseline puudub (vana state.json) → ei flag'i
-    return (now_ts - last_progress_at) > UPLOAD_STALL_THRESHOLD
+    """Kas OCR-töö paistab kinni jäänud."""
+    return _upload_state.is_stalled(ready_count, expected_pages, last_progress_at, now_ts)
 
 
 def poll_and_sync_thumbs(upload_id: str) -> dict:
@@ -1657,8 +1483,7 @@ def cancel_upload(upload_id: str) -> bool:
 
     try:
         shutil.rmtree(upload_path)
-        with _locks_lock:
-            _upload_locks.pop(upload_id, None)
+        _upload_state.remove_upload_lock(upload_id)
         upload_progress.pop(upload_id, None)
         logger.info(f"Upload tühistatud: {upload_id}")
         return True
@@ -1683,7 +1508,6 @@ def cancel_upload(upload_id: str) -> bool:
 # Sünki vajavad ainult need staatused, mille puhul poll_and_sync_thumbs teeb
 # tegelikku SFTP-tööd. Ülejäänud short-circuitivad (pending/uploading/error/
 # imported/collecting_images) või on lõppseis (done) — neid pole mõtet pollida.
-_ACTIVE_SYNC_STATUSES = frozenset({'processing', 'reviewing'})
 
 # Taustasünki intervall (s). Pikem kui re-OCR oma (10s), sest upload-poll laeb
 # SFTP kaudu pisipilte (raskem) ja töid on tüüpiliselt vähe. Env-st ülekirjutatav.
@@ -1693,13 +1517,7 @@ register_job("upload_sync", interval_seconds=UPLOAD_SYNC_INTERVAL, description="
 
 def _uploads_needing_sync(states: list) -> list:
     """Tagastab aktiivsete uploadide id-d, mille OCR-progressi tuleb taustal sünkida."""
-    out = []
-    for s in states:
-        if s.get('status') in _ACTIVE_SYNC_STATUSES:
-            uid = s.get('id')
-            if uid:
-                out.append(uid)
-    return out
+    return _upload_state.uploads_needing_sync(states)
 
 
 def _upload_sync_loop():

@@ -9,6 +9,7 @@ from fastapi import HTTPException
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from server import upload_ops
+from server.upload import state as upload_state
 
 
 class _FakeGit:
@@ -59,6 +60,7 @@ def test_replace_work_content_git_rm_viga_katkestab_ja_taastab_jpg(tmp_path, mon
 
     fake_repo = _FakeRepo()
     monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(uploads_dir))
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(uploads_dir))
     monkeypatch.setattr(upload_ops, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(utils, "find_directory_by_id", lambda wid: str(work_dir) if wid == work_id else None)
     monkeypatch.setattr(git_ops, "get_or_init_repo", lambda: fake_repo)
