@@ -7,14 +7,10 @@ Etapp 4 lisab: import_as_work, cleanup_upload.
 """
 import json
 import os
-import re
 import shlex
 import shutil
 import socket
-import subprocess
 import threading
-import unicodedata
-import warnings
 from datetime import datetime
 from typing import Optional
 
@@ -22,21 +18,16 @@ from typing import Optional
 # minuteid, kui OCR-server on kättesaamatu (vt tests/test_upload_ssh_timeout.py).
 OCR_CONNECT_TIMEOUT = 10
 
-# Pildi-uploadi sanity piirid. Väga kõrged, et tavalised suured skannid töötaksid,
-# aga patoloogilised/decompression-bomb sisendid ei jõuaks OCR-serverisse.
-UPLOAD_IMAGE_MAX_PIXELS = int(os.getenv("UPLOAD_IMAGE_MAX_PIXELS", "150000000"))
-UPLOAD_IMAGE_MAX_DIMENSION = int(os.getenv("UPLOAD_IMAGE_MAX_DIMENSION", "30000"))
-try:
-    from PIL import Image as _PILImage
-    _PILImage.MAX_IMAGE_PIXELS = UPLOAD_IMAGE_MAX_PIXELS
-    warnings.simplefilter("error", _PILImage.DecompressionBombWarning)
-except Exception:
-    pass
-
 from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR_SERVER_PATH, UPLOAD_ENABLED, get_logger
+from .upload import file_detection as _file_detection
 from .utils import atomic_write_json, generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 from .heartbeat import mark_error, mark_success, register_job
+
+# Compatibility-konstandid: testid ja admin-konfiguratsioon võivad neid upload_ops peal monkeypatchida.
+UPLOAD_IMAGE_MAX_PIXELS = _file_detection.UPLOAD_IMAGE_MAX_PIXELS
+UPLOAD_IMAGE_MAX_DIMENSION = _file_detection.UPLOAD_IMAGE_MAX_DIMENSION
+SLUG_MAX_LEN = _file_detection.SLUG_MAX_LEN
 
 
 def _normalize_txt_file(path: str):
@@ -106,12 +97,12 @@ def _write_state(upload_id: str, state: dict):
 
 def _valid_upload_id(upload_id: str) -> bool:
     """Valideerib upload_id formaadi (ainult a-z0-9, max 20 märki)."""
-    return bool(re.match(r'^[a-z0-9]{1,20}$', upload_id))
+    return _file_detection.valid_upload_id(upload_id)
 
 
 def _valid_filename(filename: str) -> bool:
     """Valideerib failinime (ainult a-z0-9._-, keelatud .. ja /)."""
-    return bool(re.match(r'^[a-z0-9._-]+$', filename)) and '..' not in filename
+    return _file_detection.valid_filename(filename)
 
 
 # =========================================================
@@ -238,40 +229,21 @@ def _extract_page_num(base: str) -> int:
     Eraldab leheküljenumbri OCR failinimest.
     '{year}-{slug}_pg_001' → 1
     """
-    parts = base.rsplit('_pg_', 1)
-    if len(parts) == 2:
-        try:
-            return int(parts[1])
-        except ValueError:
-            pass
-    return 0
+    return _file_detection.extract_page_num(base)
 
 
 # =========================================================
 # SLUG UTILIIDID
 # =========================================================
 
-SLUG_MAX_LEN = 80
-
 def sanitize_slug(text: str) -> str:
     """Puhastab teksti, et see sobiks slug-iks (ainult a-z, 0-9, sidekriips, max 80 tähemärki)."""
-    normalized = unicodedata.normalize('NFD', text)
-    ascii_text = ''.join(c for c in normalized if unicodedata.category(c) != 'Mn')
-    slug = ascii_text.lower()
-    slug = re.sub(r'[^a-z0-9]+', '-', slug)
-    slug = slug[:SLUG_MAX_LEN].rstrip('-')
-    return slug or 'teos'
+    return _file_detection.sanitize_slug(text)
 
 
 def _page_base_name(slug: str, work_id: str, pn: int) -> str:
-    """Lehekülje failinime tüvi (ilma laiendita).
-
-    Uus konventsioon: kaust = {slug}, kus slug juba sisaldab work_id'd → {slug}-{pn}.
-    Vana konventsioon: kaust = {slug} ilma work_id'ta → {slug}-{work_id}-{pn}.
-    """
-    if slug.endswith(f"-{work_id}"):
-        return f"{slug}-{pn:03d}"
-    return f"{slug}-{work_id}-{pn:03d}"
+    """Lehekülje failinime tüvi (ilma laiendita)."""
+    return _file_detection.page_base_name(slug, work_id, pn)
 
 
 def check_slug_conflict(year, slug: str) -> bool:
@@ -445,55 +417,15 @@ def mark_page_deleted(upload_id: str, filename: str, deleted: bool = True) -> bo
 
 def _detect_file_type(path: str) -> str:
     """Tuvastab faili tüübi magic bytes alusel. Tagastab 'pdf', 'jpeg', 'png', 'tiff' või 'unknown'."""
-    with open(path, 'rb') as f:
-        header = f.read(1024)
-    if b'%PDF' in header[:1024]:
-        return 'pdf'
-    if header[:2] == b'\xff\xd8':
-        return 'jpeg'
-    if header[:8] == b'\x89PNG\r\n\x1a\n':
-        return 'png'
-    if header[:4] in (b'II\x2a\x00', b'MM\x00\x2a'):  # little-endian ja big-endian TIFF
-        return 'tiff'
-    return 'unknown'
+    return _file_detection.detect_file_type(path)
 
 
 def _validate_upload_image(path: str) -> tuple[int, int]:
-    """Kontrollib pildi mõõtmeid enne OCR-serverisse saatmist.
-
-    See ei sea väikest praktilist skannipiiri, vaid lõikab ära patoloogilised
-    sisendid: liiga suur pikselite koguarv, absurdne üksik mõõde või vigane pilt.
-    Tagastab (width, height).
-    """
-    try:
-        from PIL import Image, UnidentifiedImageError
-    except ImportError as e:
-        raise ValueError("Pildi töötlemise tugi puudub (Pillow pole paigaldatud)") from e
-
-    try:
-        with Image.open(path) as img:
-            width, height = img.size
-            if width <= 0 or height <= 0:
-                raise ValueError("Pildi mõõtmeid ei õnnestunud tuvastada")
-            if width > UPLOAD_IMAGE_MAX_DIMENSION or height > UPLOAD_IMAGE_MAX_DIMENSION:
-                raise ValueError(
-                    f"Pilt on liiga suur: {width}×{height} px. "
-                    f"Maksimaalne lubatud külg on {UPLOAD_IMAGE_MAX_DIMENSION} px."
-                )
-            pixels = width * height
-            if pixels > UPLOAD_IMAGE_MAX_PIXELS:
-                raise ValueError(
-                    f"Pilt on liiga suur: {width}×{height} px ({pixels} pikslit). "
-                    f"Maksimaalne lubatud kogus on {UPLOAD_IMAGE_MAX_PIXELS} pikslit."
-                )
-            img.verify()
-            return width, height
-    except ValueError:
-        raise
-    except UnidentifiedImageError as e:
-        raise ValueError("Vigane pildifail — pilti ei õnnestunud avada") from e
-    except Exception as e:
-        raise ValueError(f"Vigane pildifail — {e}") from e
+    """Kontrollib pildi mõõtmeid enne OCR-serverisse saatmist."""
+    # Hoia vanad upload_ops monkeypatchid ühilduvana.
+    _file_detection.UPLOAD_IMAGE_MAX_PIXELS = UPLOAD_IMAGE_MAX_PIXELS
+    _file_detection.UPLOAD_IMAGE_MAX_DIMENSION = UPLOAD_IMAGE_MAX_DIMENSION
+    return _file_detection.validate_upload_image(path)
 
 
 # =========================================================
@@ -509,10 +441,7 @@ def _validate_upload_image(path: str) -> tuple[int, int]:
 
 def _safe_unlink(path: str):
     """Kustutab faili, ignoreerides vigu (ajutised failid, juba kustutatud)."""
-    try:
-        os.unlink(path)
-    except Exception:
-        pass
+    return _file_detection.safe_unlink(path)
 
 
 def _set_upload_state(upload_id: str, *, status: Optional[str] = None, **extra):
@@ -571,41 +500,8 @@ def _close_sftp_and_unlink(sftp, tmp_path: str):
 
 
 def _count_pdf_pages(tmp_path: str) -> int:
-    """Loeb PDF-i lehekülgede arvu pdfinfo abil.
-
-    Tõstab ValueError kui:
-      - PDF on vigane (pdfinfo viga) — tmp_path kustutatakse;
-      - lehekülgede arvu ei leidu pdfinfo väljundist;
-      - pdfinfo pole paigaldatud (FileNotFoundError);
-      - pdfinfo aegub (TimeoutExpired).
-    """
-    try:
-        result = subprocess.run(
-            ['pdfinfo', tmp_path],
-            capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            logger.error(f"pdfinfo viga: {result.stderr}")
-            _safe_unlink(tmp_path)
-            raise ValueError(
-                f"Vigane PDF — fail ei ole korrektne PDF-dokument (pdfinfo viga). "
-                f"Kontrolli, et laadid üles õige faili."
-            )
-
-        pages = None
-        for line in result.stdout.splitlines():
-            if line.startswith('Pages:'):
-                pages = int(line.split(':', 1)[1].strip())
-                break
-        if pages is None:
-            logger.error(f"pdfinfo väljundis puudus 'Pages:': {result.stdout}")
-            raise ValueError("PDF lehekülgede arvu ei õnnestunud tuvastada")
-        return pages
-
-    except FileNotFoundError:
-        raise ValueError("pdfinfo pole paigaldatud (apt install poppler-utils)")
-    except subprocess.TimeoutExpired:
-        raise ValueError("PDF analüüs võttis liiga kaua — fail on liiga suur või kahjustatud")
+    """Loeb PDF-i lehekülgede arvu pdfinfo abil."""
+    return _file_detection.count_pdf_pages(tmp_path, logger)
 
 
 def _prepare_image_upload(state: dict) -> tuple:
