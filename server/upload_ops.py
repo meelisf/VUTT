@@ -16,6 +16,7 @@ from .config import BASE_DIR, UPLOADS_DIR, OCR_SERVER_HOST, OCR_SERVER_USER, OCR
 from .upload import file_detection as _file_detection
 from .upload import state as _upload_state
 from .upload import ocr_client as _ocr_client
+from .upload import thumbs as _thumbs
 from .utils import generate_nanoid
 from .marginalia_normalize import normalize_marginalia_tags
 from .heartbeat import mark_error, mark_success, register_job
@@ -474,183 +475,12 @@ def poll_and_sync_thumbs(upload_id: str) -> dict:
     """
     Küsib SFTP kaudu OCR serveri kausta, tuvastab valmis JPG+TXT paarid,
     laeb alla uued pisipildid (Pillow thumbnail 400x600) ja uuendab state.json.
-
-    Tagastab: {status, ready, total, expected_pages, files, progress, error?}
     """
-    state_lock = _get_upload_lock(upload_id)
-    with state_lock:
-        state = _read_state(upload_id)
-    if not state:
-        return {"error": "Upload ei leitud"}
-
-    current_status = state.get('status', 'pending')
-    expected_pages = state.get('expected_pages')
-
-    # Uploading/pending/collecting_images/error: SFTP-d pole vaja
-    if current_status in ('pending', 'uploading', 'error', 'imported', 'collecting_images'):
-        return {
-            "status": current_status,
-            "ready": 0,
-            "total": 0,
-            "expected_pages": expected_pages,
-            "files": state.get('files', []),
-            "progress": upload_progress.get(upload_id, {}),
-            "error": state.get('error_message'),
-        }
-
-    year = state['meta']['year']
-    slug = state['meta']['slug']
-    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
-    thumbs_dir = os.path.join(_upload_dir(upload_id), 'thumbs')
-
-    sftp = None
-    try:
-        sftp = _sftp_open(upload_id)
-
-        # --- Kontrolli VIGASED kausta ---
-        vigased_path = f"{OCR_SERVER_PATH}/VIGASED/{slug}.pdf"
-        try:
-            sftp.stat(vigased_path)
-            # PDF on vigane — OCR teenus teisaldas selle
-            err_msg = "PDF on vigane — OCR teenus ei suutnud seda töödelda"
-            with state_lock:
-                s = _read_state(upload_id)
-                if s and s.get('status') != 'error':
-                    s['status'] = 'error'
-                    s['error_message'] = err_msg
-                    _write_state(upload_id, s)
-            return {
-                "status": "error",
-                "error": err_msg,
-                "ready": 0,
-                "total": 0,
-                "expected_pages": expected_pages,
-                "files": state.get('files', []),
-                "progress": upload_progress.get(upload_id, {}),
-            }
-        except FileNotFoundError:
-            pass  # OK — PDF pole vigane
-
-        # --- SFTP ls remote work path ---
-        try:
-            remote_files = sftp.listdir(remote_work)
-        except FileNotFoundError:
-            # Töökaust pole veel loodud (OCR pole alustanud)
-            return {
-                "status": "processing",
-                "ready": 0,
-                "total": 0,
-                "expected_pages": expected_pages,
-                "files": state.get('files', []),
-                "progress": upload_progress.get(upload_id, {}),
-            }
-
-        # --- Leia JPG-d ja TXT-d ---
-        jpg_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith('.jpg')}
-        txt_bases = {os.path.splitext(f)[0] for f in remote_files if f.lower().endswith('.txt')}
-        ready_bases = jpg_bases & txt_bases  # Mõlemad olemas = OCR valmis
-
-        # --- Laadi alla UUED valmis JPG-d (ainult mille jaoks on ka TXT) ---
-        os.makedirs(thumbs_dir, exist_ok=True)
-        existing_thumbs = set(os.listdir(thumbs_dir))
-
-        for base in sorted(ready_bases):
-            page_num = _extract_page_num(base)
-            if page_num <= 0:
-                continue
-            thumb_name = f"{page_num:03d}.jpg"
-            if thumb_name in existing_thumbs:
-                continue
-            tmp_thumb = os.path.join(thumbs_dir, f"{page_num:03d}.jpg.tmp")
-            if os.path.exists(tmp_thumb):
-                continue  # Teise threadi poolt juba allalaadimisel
-
-            try:
-                sftp.get(f"{remote_work}/{base}.jpg", tmp_thumb)
-                from PIL import Image
-                with Image.open(tmp_thumb) as img:
-                    img.thumbnail((400, 600), Image.LANCZOS)
-                    img.save(os.path.join(thumbs_dir, thumb_name), "JPEG", quality=85)
-                os.unlink(tmp_thumb)
-                existing_thumbs.add(thumb_name)
-                logger.info(f"Thumbnail loodud: {upload_id}/{thumb_name}")
-            except Exception as e:
-                logger.warning(f"Thumbnail {thumb_name} allalaadimine ebaõnnestus: {e}")
-                try:
-                    os.unlink(tmp_thumb)
-                except Exception:
-                    pass
-
-        # --- Ehita files massiiv ---
-        all_page_nums = sorted(
-            {_extract_page_num(b) for b in jpg_bases if _extract_page_num(b) > 0}
-        )
-        ready_page_nums = {_extract_page_num(b) for b in ready_bases if _extract_page_num(b) > 0}
-        existing_deleted = {f['page']: f.get('deleted', False) for f in state.get('files', [])}
-
-        new_files = [
-            {
-                "page": pn,
-                "filename": f"{pn:03d}.jpg",
-                "has_ocr": pn in ready_page_nums,
-                "deleted": existing_deleted.get(pn, False),
-            }
-            for pn in all_page_nums
-        ]
-
-        # --- Uus staatus ---
-        ready_count = len(ready_page_nums)
-        new_status = current_status
-        if expected_pages and ready_count >= expected_pages:
-            new_status = 'done'
-        elif all_page_nums:
-            new_status = 'reviewing'
-
-        # --- Stall-indikaator: jälgi millal viimati uus valmis leht tekkis ---
-        now_ts = datetime.now().timestamp()
-        prev_ready = sum(1 for f in state.get('files', []) if f.get('has_ocr'))
-        last_progress_at = state.get('last_progress_at')
-        # Edenes (uusi valmis lehti) VÕI puudub baseline (esimene poll) → uuenda ajatempel
-        if ready_count > prev_ready or last_progress_at is None:
-            last_progress_at = now_ts
-
-        # --- Uuenda state.json ---
-        with state_lock:
-            s = _read_state(upload_id)
-            if s:
-                s['files'] = new_files
-                s['last_progress_at'] = last_progress_at
-                if new_status != s.get('status'):
-                    s['status'] = new_status
-                _write_state(upload_id, s)
-
-        return {
-            "status": new_status,
-            "ready": ready_count,
-            "total": len(all_page_nums),
-            "expected_pages": expected_pages,
-            "files": new_files,
-            "progress": upload_progress.get(upload_id, {}),
-            "stalled": _is_stalled(ready_count, expected_pages, last_progress_at, now_ts),
-        }
-
-    except Exception as e:
-        logger.error(f"poll_and_sync_thumbs {upload_id}: {e}")
-        return {
-            "status": current_status,
-            "ready": 0,
-            "total": 0,
-            "expected_pages": expected_pages,
-            "files": state.get('files', []),
-            "error": str(e),
-            "progress": upload_progress.get(upload_id, {}),
-        }
-    finally:
-        if sftp:
-            try:
-                sftp.close()
-            except Exception:
-                pass
+    return _thumbs.poll_and_sync_thumbs(
+        upload_id,
+        sftp_open_func=_sftp_open,
+        ocr_server_path=OCR_SERVER_PATH,
+    )
 
 
 def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages: int) -> int:
