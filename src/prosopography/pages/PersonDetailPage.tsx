@@ -765,7 +765,7 @@ const PersonDetailPage: React.FC = () => {
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {historyLoading && <span className="text-xs text-gray-400">Laadin…</span>}
+                {historyLoading && <span className="text-xs text-gray-400">{t('common:loading')}</span>}
                 {historyOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
               </div>
             </button>

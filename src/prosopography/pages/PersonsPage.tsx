@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, ChevronLeft, ChevronRight, Map, List } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List } from 'lucide-react';
 import Header from '../../components/Header';
+import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
 import PersonsMap from '../components/PersonsMap';
 import MergePersonsModal from '../components/MergePersonsModal';
@@ -450,28 +451,13 @@ const PersonsPage: React.FC = () => {
           />
         )}
 
-        {view === 'list' && !(loading || false) && totalPages > 1 && (
-          <div className="flex justify-center items-center gap-3 mt-8 pt-6 border-t border-gray-200">
-            <button
-              onClick={() => setOffset(offset - LIMIT)}
-              disabled={offset === 0}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft size={16} />
-              {t('common:pagination.previous', 'Eelmine')}
-            </button>
-            <span className="text-sm text-gray-500 font-mono">
-              {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={() => setOffset(offset + LIMIT)}
-              disabled={offset + LIMIT >= total}
-              className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              {t('common:pagination.next', 'Järgmine')}
-              <ChevronRight size={16} />
-            </button>
-          </div>
+        {view === 'list' && !loading && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={(page) => { setOffset((page - 1) * LIMIT); window.scrollTo(0, 0); }}
+            className="mt-8 pt-6 border-t border-gray-200"
+          />
         )}
       </main>
 

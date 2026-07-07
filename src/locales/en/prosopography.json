@@ -215,6 +215,10 @@
   "persons": "persons",
   "immatriculation": "Matriculation",
   "statuses": "Statuses",
+  "workRelations": "Connections through works",
+  "sharedWorks_one": "{{count}} shared work",
+  "sharedWorks_other": "{{count}} shared works",
+  "history": "Change history",
   "tags": "Keywords",
   "loadMore": "Load more",
   "bulkOccupation": {

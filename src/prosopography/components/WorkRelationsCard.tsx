@@ -68,7 +68,7 @@ const WorkRelationsCard: React.FC<{ personId: string }> = ({ personId }) => {
                 </Link>
               </div>
               <span className="text-xs text-gray-400 shrink-0 ml-3">
-                {rel.shared_works_count} {t('sharedWorks', 'ühist teost')}
+                {t('sharedWorks', { count: rel.shared_works_count })}
               </span>
             </button>
 
