@@ -12,6 +12,9 @@ npm install && npm run dev    # Frontend dev (localhost:5173)
 npm run build                 # Production build to dist/
 ```
 
+**Python/testid lokaalselt:** kasuta alati projekti venv-i (`.venv/bin/python`, `.venv/bin/pytest`). Süsteemi `python3`/`pytest` ei pruugi omada vajalikke sõltuvusi.
+
+
 ### Deploy serverisse
 
 ```bash
