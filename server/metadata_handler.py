@@ -11,6 +11,22 @@ from .text_reading import read_work_page_texts, _clean_search_text, work_latest_
 SITE_URL = "https://vutt.utlib.ut.ee"
 logger = logging.getLogger(__name__)
 
+# Saidinime (site name) signaalid bot-prerenderis. Robotid saavad AINULT selle
+# prerenderi (mitte SPA index.html-i, kus need sildid juba on) — ilma nendeta
+# tuletab Google saidinime domeenist (→ liiga üldine "Tartu Ülikool").
+# og:site_name lisatakse igale bot-lehele; WebSite JSON-LD ainult kodulehele
+# (Google võtab kogu domeeni saidinime homepage'ist).
+SITE_NAME = "VUTT"
+SITE_ALT_NAME = "Varauusaegsete tekstide töölaud"
+_OG_SITE_NAME = f'<meta property="og:site_name" content="{SITE_NAME}">'
+_WEBSITE_JSONLD = (
+    '<script type="application/ld+json">\n'
+    '    {"@context":"https://schema.org","@type":"WebSite",'
+    f'"name":"{SITE_NAME}","alternateName":"{SITE_ALT_NAME}",'
+    f'"url":"{SITE_URL}/","inLanguage":["et","en"]'
+    '}\n    </script>'
+)
+
 _ROLE_LABELS = {
     "praeses": "Praeses",
     "auctor": "Autor",
@@ -242,6 +258,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
 
     {dc_tags}
     <meta property="og:type" content="website">
+    {_OG_SITE_NAME}
     <meta property="og:url" content="{work_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
@@ -300,6 +317,7 @@ def build_persons_meta_html(person_entries=None) -> str:
     <link rel="canonical" href="{persons_url}">
     <meta name="description" content="{safe_desc}">
     <meta property="og:type" content="website">
+    {_OG_SITE_NAME}
     <meta property="og:url" content="{persons_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
@@ -373,9 +391,11 @@ def build_home_meta_html(work_id_cache, is_work_public_fn, load_meta_fn, work_co
     <link rel="canonical" href="{home_url}">
     <meta name="description" content="{safe_desc}">
     <meta property="og:type" content="website">
+    {_OG_SITE_NAME}
     <meta property="og:url" content="{home_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
+    {_WEBSITE_JSONLD}
 </head>
 <body>
     {body_content}
@@ -460,6 +480,7 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     <meta name="description" content="{safe_desc}">
 
 {dc_tags}    <meta property="og:type" content="profile">
+    {_OG_SITE_NAME}
     <meta property="og:url" content="{person_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
