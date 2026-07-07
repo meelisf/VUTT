@@ -29,6 +29,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from server import upload_ops
+from server.upload import state as upload_state
 
 
 # =========================================================
@@ -41,6 +42,8 @@ def uploads_dir(tmp_path, monkeypatch):
     d = tmp_path / "uploads"
     d.mkdir()
     monkeypatch.setattr(upload_ops, "UPLOADS_DIR", str(d))
+    # state.json I/O loeb UPLOADS_DIR-i upload/state-moodulist (kanooniline omanik).
+    monkeypatch.setattr(upload_state, "UPLOADS_DIR", str(d))
     upload_ops.upload_progress.clear()
     yield d
     upload_ops.upload_progress.clear()

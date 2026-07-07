@@ -103,7 +103,8 @@ def backend_env(tmp_path, monkeypatch):
     #
     # NB: konstandi routerisse tõstmisel lisatakse vastav moodul siia loetellu.
     # Näiteks Faas 2 tõstab upload-endpointid ``server.routers.upload`` alla,
-    # seega UPLOADS_DIR patchitakse nii ops-moodulis kui routeris.
+    # seega UPLOADS_DIR patchitakse ops-moodulis, routeris ja upload/state-moodulis
+    # (viimane loeb UPLOADS_DIR-i otse oma moodulimuutujana).
     # ``server.work_meta`` pole siin, sest see impordib ainult BASE_DIR (mitte
     # ühtegi neist konstantidest) — tõstaksime selle siia alles siis, kui work_meta
     # hakkaks mõnda neist importima.
@@ -129,7 +130,7 @@ def backend_env(tmp_path, monkeypatch):
     _patch_config_const(
         monkeypatch,
         {"UPLOADS_DIR": str(uploads_dir)},
-        modules=["server.main", "server.upload_ops", "server.routers.upload"],
+        modules=["server.main", "server.upload_ops", "server.routers.upload", "server.upload.state"],
     )
 
     upload_ops = importlib.import_module("server.upload_ops")
