@@ -215,6 +215,10 @@
   "persons": "isikut",
   "immatriculation": "Immatrikuleerumine",
   "statuses": "Seisused",
+  "workRelations": "Seosed teoste kaudu",
+  "sharedWorks_one": "{{count}} ühine teos",
+  "sharedWorks_other": "{{count}} ühist teost",
+  "history": "Muudatuste ajalugu",
   "tags": "Märksõnad",
   "loadMore": "Lae veel",
   "bulkOccupation": {

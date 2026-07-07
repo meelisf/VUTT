@@ -147,8 +147,8 @@ export interface ProsopoRecord {
     coordinates: string | null;
   };
   floruit?: { year_from?: number | null; year_to?: number | null } | null;
-  statuses: { id: string; label: string }[];
-  confessions: { id: string; label: string }[];
+  statuses: { id: string; label: string; labels?: { et?: string; en?: string } }[];
+  confessions: { id: string; label: string; labels?: { et?: string; en?: string } }[];
   occupations: any[];
   education: any[];
   burial: any | null;

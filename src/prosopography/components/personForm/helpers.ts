@@ -274,11 +274,12 @@ export function draftToPayload(
     death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
     statuses: (draft.statuses ?? []).map(qId => {
       const vocabItem = seisusedVocab.find(s => s.id === qId);
-      return { id: qId, label: vocabItem?.label?.et ?? qId };
+      // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles
+      return { id: qId, label: vocabItem?.label?.et ?? qId, labels: vocabItem?.label };
     }),
     confessions: (draft.confessions ?? []).map(qId => {
       const vocabItem = konfessioonidVocab.find(k => k.id === qId);
-      return { id: qId, label: vocabItem?.label?.et ?? qId };
+      return { id: qId, label: vocabItem?.label?.et ?? qId, labels: vocabItem?.label };
     }),
     origin: {
       place: draft.origin_place || null,
