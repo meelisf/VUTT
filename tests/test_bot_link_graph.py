@@ -214,3 +214,51 @@ def test_person_work_title_escaped(patch_person):
     from server.metadata_handler import build_person_meta_html
     html = build_person_meta_html("vutt:P1", work_links=[{"work_id": "wx", "title": "<x>"}])
     assert "<x>" not in html
+
+
+# ---------------------------------------------------------------------------
+# og:image — sotsiaalmeedia jagamise pilt kõigil bot-lehtedel
+# ---------------------------------------------------------------------------
+
+OG_STATIC = 'property="og:image" content="https://vutt.utlib.ut.ee/vutt-og.png"'
+
+
+def test_home_has_og_image_and_twitter_card():
+    html = _home({}, lambda m: True, lambda wid: None, {})
+    assert OG_STATIC in html
+    assert 'name="twitter:card" content="summary_large_image"' in html
+    assert 'name="twitter:image" content="https://vutt.utlib.ut.ee/vutt-og.png"' in html
+
+
+def test_persons_hub_has_og_image():
+    from server.metadata_handler import build_persons_meta_html
+    html = build_persons_meta_html([])
+    assert OG_STATIC in html
+    assert 'name="twitter:card"' in html
+
+
+def test_person_page_has_og_image(patch_person):
+    from server.metadata_handler import build_person_meta_html
+    html = build_person_meta_html("vutt:P1", work_links=[])
+    assert OG_STATIC in html
+    assert 'name="twitter:card"' in html
+
+
+def test_work_og_image_is_thumb_without_bogus_dimensions(patch_find):
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    registry["work001"] = _write_meta(tmp_path, WORK_META)
+    html = build_meta_html("work001")
+    assert 'property="og:image" content="https://vutt.utlib.ut.ee/api/images/work001/_thumb"' in html
+    assert 'content="image/jpeg"' in html
+    # Thumbi mõõdud varieeruvad teoste kaupa — valesid fikseeritud mõõte ei tohi väita
+    assert 'og:image:width" content="400"' not in html
+    assert 'og:image:height" content="600"' not in html
+
+
+def test_unknown_work_fallback_og_image_is_static_png(patch_find):
+    from server.metadata_handler import build_meta_html
+    html = build_meta_html("puudub123")
+    assert OG_STATIC in html
+    assert 'content="image/png"' in html
+    assert 'content="image/jpeg"' not in html

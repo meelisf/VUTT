@@ -19,6 +19,18 @@ logger = logging.getLogger(__name__)
 SITE_NAME = "VUTT"
 SITE_ALT_NAME = "Varauusaegsete tekstide töölaud"
 _OG_SITE_NAME = f'<meta property="og:site_name" content="{SITE_NAME}">'
+# og:image jagamispilt: ilma selleta näitavad sotsiaalmeedia/vestlusrakendused
+# linki pildita kaardina. Teose lehel kasutatakse teose enda avalikku thumbi
+# (/api/images/{id}/_thumb), mujal staatiline 1200×630 vutt-og.png.
+_OG_IMAGE_URL = f"{SITE_URL}/vutt-og.png"
+_OG_IMAGE_STATIC = (
+    f'<meta property="og:image" content="{_OG_IMAGE_URL}">\n'
+    '    <meta property="og:image:type" content="image/png">\n'
+    '    <meta property="og:image:width" content="1200">\n'
+    '    <meta property="og:image:height" content="630">\n'
+    '    <meta name="twitter:card" content="summary_large_image">\n'
+    f'    <meta name="twitter:image" content="{_OG_IMAGE_URL}">'
+)
 _WEBSITE_JSONLD = (
     '<script type="application/ld+json">\n'
     '    {"@context":"https://schema.org","@type":"WebSite",'
@@ -158,7 +170,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
 
     title = "VUTT - Varauusaegsete tekstide töölaud"
     description = "Vaata ja toimeta Tartu Ülikooli varauusaegseid akadeemilisi tekste."
-    image_url = f"{SITE_URL}/vutt-og.png"
+    image_url = _OG_IMAGE_URL
     meta = {}
 
     if found_path:
@@ -176,6 +188,20 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
             except Exception:
                 pass
         image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_thumb"
+
+    # Teose thumbi mõõdud varieeruvad → mõõte ei väida; staatilisel PNG-l fikseeritud.
+    if found_path:
+        og_image_tags = (
+            f'<meta property="og:image" content="{image_url}">\n'
+            '    <meta property="og:image:type" content="image/jpeg">'
+        )
+    else:
+        og_image_tags = (
+            f'<meta property="og:image" content="{image_url}">\n'
+            '    <meta property="og:image:type" content="image/png">\n'
+            '    <meta property="og:image:width" content="1200">\n'
+            '    <meta property="og:image:height" content="630">'
+        )
 
     safe_work_id = _escape(work_id)
     work_url = f"{SITE_URL}/work/{safe_work_id}"
@@ -262,10 +288,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
     <meta property="og:url" content="{work_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
-    <meta property="og:image" content="{image_url}">
-    <meta property="og:image:type" content="image/jpeg">
-    <meta property="og:image:width" content="400">
-    <meta property="og:image:height" content="600">
+    {og_image_tags}
 
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{safe_title}">
@@ -321,6 +344,7 @@ def build_persons_meta_html(person_entries=None) -> str:
     <meta property="og:url" content="{persons_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
+    {_OG_IMAGE_STATIC}
 </head>
 <body>
     {body_content}
@@ -395,6 +419,7 @@ def build_home_meta_html(work_id_cache, is_work_public_fn, load_meta_fn, work_co
     <meta property="og:url" content="{home_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
+    {_OG_IMAGE_STATIC}
     {_WEBSITE_JSONLD}
 </head>
 <body>
@@ -484,6 +509,7 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     <meta property="og:url" content="{person_url}">
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
+    {_OG_IMAGE_STATIC}
 </head>
 <body>
     {body_content}
