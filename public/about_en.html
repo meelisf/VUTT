@@ -96,6 +96,22 @@
       flex-direction: column;
       gap: 0.5rem;
     }
+
+    .about-content sup {
+      color: #6b7280;
+      font-size: 11px;
+      padding-left: 2px;
+    }
+
+    .about-content .references {
+      font-size: 13px;
+      color: #4b5563;
+      word-break: break-word;
+    }
+
+    .about-content .references li {
+      margin-bottom: 0.25rem;
+    }
   </style>
 </head>
 
@@ -118,55 +134,83 @@
     <h2>Corpus</h2>
 
     <p>
-      The current corpus includes publications from the Academy of Tartu (Academia Gustaviana / Academia Gustavo-Carolina)
-      from the years 1632–1710. The texts originate from the digitized collections of the <a href="https://utlib.ut.ee/en" target="_blank">UT Library</a>
+      The corpus brings together material connected with early modern Livonia and Estonia (regardless of place of
+      printing) — disputations, orations, etc. The material is organized into collections:
+    </p>
+    <ul>
+      <li><strong>Academia Gustaviana</strong> (1632–1665)</li>
+      <li><strong>Academia Gustavo-Carolina</strong> (1690–1710)</li>
+      <li><strong>Funeral prints</strong> — a thematic collection of funeral publications</li>
+      <li><strong>Pedagogical-Philological Seminar</strong></li>
+    </ul>
+    <p>
+      The texts originate mostly from the digitized collections of the <a href="https://utlib.ut.ee/en" target="_blank">UT Library</a>
       and are largely based on copies of publications collected during the compilation of Ene-Lille Jaanson, comp., <i>Druckerei der Universität Dorpat 1632-1710: Geschichte und Bibliographie der
         Druckschriften</i> (Tartu University Library, 2000).
     </p>
 
-    <h2>Recognition Model</h2>
+    <h2>Recognition Models</h2>
 
     <p>
-      The recognition model is page-based. It uses the Qwen3-VL-8B model, which has been fine-tuned on 1500 pages of
-      transcribed text originating from various databases (including inspiration from data at
-      <a href="https://zenodo.org/records/15764161" target="_blank">zenodo.org/records/15764161</a>):
+      VUTT uses two page-based recognition models: one for printed works and one for handwritten texts.
     </p>
 
+    <h3>Print model</h3>
+
+    <p>
+      The print model is based on Qwen3.5-8B and has been fine-tuned in two stages:
+    </p>
     <ul>
-      <li>Transcriptions produced at the UT Library research center (conducted within the ETAg research project PUT 132
-        (“Humanist Greek in Early Modern Estonia and Livonia: A Cultural Bridge to the European Present and Past”;
-        2013-2016, PI J. Päll), Helleno-Nordica: Humanist Greek in the Swedish Empire (PI Janika Päll, sub-project of
-        the Lund University project “Helleno-Nordica. The Humanist Greek Heritage of the Swedish Empire”, 2016-2022, PI
-        Johanna Akujärvi), and with the support of University of Tartu base-funded grants)</li>
-      <li>With the support of the UT Professorship of Intellectual History</li>
-      <li>Selected pages from the Gallicorpora dataset (<a href="https://github.com/Gallicorpora/HTR-imprime-17e-siecle"
-          target="_blank">github.com/Gallicorpora/HTR-imprime-17e-siecle</a>)</li>
+      <li><strong>First stage:</strong> on ~1500 pages of transcribed printed text originating from various databases
+        (including inspiration from data at
+        <a href="https://zenodo.org/records/15764161" target="_blank">zenodo.org/records/15764161</a>).</li>
+      <li><strong>Second stage:</strong> on pages already edited to completion in VUTT, so that the model learns the VUTT markup.</li>
     </ul>
 
+    <p><strong>Sources, text authorship and funding:</strong></p>
+
+    <ul>
+      <li><strong>Gezelius's Greek–Latin lexicon</strong> — produced within the ETAg research project PUT 132 (“Humanist
+        Greek in Early Modern Estonia and Livonia: A Cultural Bridge to the European Present and Past”, 2013–2016, PI J.
+        Päll) and the project Helleno-Nordica: Humanist Greek in the Swedish Empire (PI Janika Päll, sub-project of the
+        Lund University project “Helleno-Nordica. The Humanist Greek Heritage of the Swedish Empire”, PI Johanna
+        Akujärvi, 2016–2022), as well as with the support of University of Tartu base-funded grants.</li>
+      <li><strong>Gallicorpora</strong> (bpt*/data_*, French tragicomedies) — <a
+          href="https://github.com/Gallicorpora/HTR-imprime-17e-siecle"
+          target="_blank">github.com/Gallicorpora/HTR-imprime-17e-siecle</a></li>
+      <li><strong>All remaining material</strong> (Tartu Academia Gustaviana disputations, orations, etc.) has been
+        transcribed manually and in the Transkribus/eScriptorium environments. Transcription authors and reviewers
+        (in alphabetical order): Ove Averin, Meelis Friedenthal, Jaana Jurtšenkova, Kristiina Kase, Vallo Kask, Kristin
+        Klaus, Hant Mikit Kolk, Pärtel Piirimäe, Agne Pilvisto, Anni Polding, Janika Päll, Kaarina Rein, Rahel Toomik.</li>
+    </ul>
+
+    <h3>Handwriting model</h3>
+
     <p>
-      The texts have been transcribed both manually and using the Transkribus and eScriptorium environments.
-      Transcription authors and reviewers (in alphabetical order):
+      For handwritten texts there is a separate model, trained on public handwriting datasets
+      (~16,600 pages in total, mainly 14th–19th century German and Swedish chancery and Kurrent hands).
+      Datasets used:
     </p>
     <ul>
-      <li>Ove Averin</li>
-      <li>Meelis Friedenthal</li>
-      <li>Jaana Jurtšenkova</li>
-      <li>Kristiina Kase</li>
-      <li>Vallo Kask</li>
-      <li>Kristin Klaus</li>
-      <li>Hant Mikit Kolk</li>
-      <li>Pärtel Piirimäe</li>
-      <li>Agne Pilvisto</li>
-      <li>Anni Polding</li>
-      <li>Janika Päll</li>
-      <li>Kaarina Rein</li>
-      <li>Rahel Toomik</li>
+      <li>kurrent_xix — German, 19th c., ~8,000 pp. (CC BY 4.0)<sup>1</sup></li>
+      <li>aaeb_xiv_xvii — German, 14th–17th c., ~1,990 pp. (CC BY 4.0)<sup>2</sup></li>
+      <li>bullinger_autoren — German/Latin, 16th c., ~1,840 pp. (CC BY 4.0)<sup>3</sup></li>
+      <li>bergskollegium_rel_seg — Swedish/German, 17th–18th c., ~1,440 pp.<sup>4</sup></li>
+      <li>hanse_kurrent_xvi — German, 16th c., ~1,140 pp. (MIT)<sup>5</sup></li>
+      <li>svea_hovratt_seg — Swedish, 17th–18th c., ~850 pp.<sup>6</sup></li>
+      <li>trolldomskommissionen_seg — Swedish, 17th c., ~760 pp.<sup>7</sup></li>
+      <li>krigshovrattens_seg — Swedish, 17th–18th c., ~340 pp.<sup>8</sup></li>
+      <li>jonkopings_seg — Swedish, 17th–18th c., ~57 pp.<sup>9</sup></li>
+      <li>bergskollegium_adv_seg — Swedish/German, 17th–18th c., ~53 pp.<sup>10</sup></li>
+      <li>gota_hovratt_seg — Swedish, 17th–18th c., ~51 pp.<sup>11</sup></li>
+      <li>koenigsfelden_adhr — German, 19th c., ~34 pp. (CC BY 4.0)<sup>12</sup></li>
+      <li>dresdner_hofdiarium_1673 — German, 1673, ~20 pp. (CC BY-NC-SA 4.0)<sup>13</sup></li>
     </ul>
 
     <h3>Numbers</h3>
     <ul>
-      <li>1199 works</li>
-      <li>ca 20,000 pages</li>
+      <li>ca 1,260 works</li>
+      <li>ca 20,500 pages</li>
       <li>Languages: Latin, German, Swedish, Greek, Hebrew</li>
     </ul>
 
@@ -175,7 +219,7 @@
     <ul>
       <li><strong>Frontend:</strong> React + TypeScript + Tailwind CSS</li>
       <li><strong>Search Engine:</strong> Meilisearch</li>
-      <li><strong>OCR:</strong> fine-tuned Qwen3 VL 8B model</li>
+      <li><strong>OCR:</strong> fine-tuned Qwen3.5-8B model (print) and a separate handwriting model</li>
     </ul>
     <p>
       VUTT is developed at <a href="https://utlib.ut.ee/en" target="_blank">UT Library</a>. The logo was suggested by Rahel Toomik
@@ -209,6 +253,24 @@
         Texts and images: according to UT Library terms of use
       </div>
     </div>
+
+    <h2>Handwriting model dataset references</h2>
+
+    <ol class="references">
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_kurrent-xix" target="_blank">dh-unibe/image-text_kurrent-xix</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_aaeb-xiv-xvii" target="_blank">dh-unibe/image-text_aaeb-xiv-xvii</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_bullinger-autoren" target="_blank">dh-unibe/image-text_bullinger-autoren</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/bergskollegium_relationer_och_skrivelser_seg" target="_blank">Riksarkivet/bergskollegium_relationer_och_skrivelser_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/fgho/hanse-kurrent-xvi-rawxml" target="_blank">fgho/hanse-kurrent-xvi-rawxml</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/svea_hovratt_seg" target="_blank">Riksarkivet/svea_hovratt_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/trolldomskommissionen_seg" target="_blank">Riksarkivet/trolldomskommissionen_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/krigshovrattens_dombocker_seg" target="_blank">Riksarkivet/krigshovrattens_dombocker_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/jonkopings_radhusratts_och_magistrat_seg" target="_blank">Riksarkivet/jonkopings_radhusratts_och_magistrat_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/bergskollegium_advokatfiskalskontoret_seg" target="_blank">Riksarkivet/bergskollegium_advokatfiskalskontoret_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/gota_hovratt_seg" target="_blank">Riksarkivet/gota_hovratt_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_koenigsfelden-adhr-colmar" target="_blank">dh-unibe/image-text_koenigsfelden-adhr-colmar</a></li>
+      <li><a href="https://zenodo.org/records/15303243" target="_blank">Zenodo 10.5281/zenodo.15303243 (dresdner_hofdiarium_1673)</a></li>
+    </ol>
 
   </div>
 </body>

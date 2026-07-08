@@ -112,6 +112,22 @@
       flex-direction: column;
       gap: 0.5rem;
     }
+
+    .about-content sup {
+      color: #6b7280;
+      font-size: 11px;
+      padding-left: 2px;
+    }
+
+    .about-content .references {
+      font-size: 13px;
+      color: #4b5563;
+      word-break: break-word;
+    }
+
+    .about-content .references li {
+      margin-bottom: 0.25rem;
+    }
   </style>
 </head>
 
@@ -134,59 +150,86 @@
     <h2>Korpus</h2>
 
     <p>
-      Praegune korpus sisaldab Tartu Akadeemia (Academia Gustaviana / Academia Gustavo-Carolina)
-      trükiseid aastatest 1632–1710. Tekstid on pärit <a href="https://utlib.ut.ee/et" target="_blank">TÜ
-        raamatukogu</a>
+      Korpus koondab varauusaegse Liivi- ja Eestimaaga seotud materjali (olenemata trükikohast) —
+      disputatsioone, oratsioone jm. Materjal on jaotatud kollektsioonidesse:
+    </p>
+    <ul>
+      <li><strong>Academia Gustaviana</strong> (1632–1665)</li>
+      <li><strong>Academia Gustavo-Carolina</strong> (1690–1710)</li>
+      <li><strong>Matusetrükised</strong> — temaatiline kogu matusetrükistest</li>
+      <li><strong>Pedagoogilis-filoloogiline seminar</strong></li>
+    </ul>
+    <p>
+      Tekstid pärinevad enamasti <a href="https://utlib.ut.ee/et" target="_blank">TÜ raamatukogu</a>
       digiteeritud kogudest ja põhinevad suuresti Ene-Lille Jaanson, koost., <i>Tartu Ülikooli trükikoda 1632-1710:
         Ajalugu ja trükiste bibliograafia = Druckerei der Universität Dorpat 1632-1710: Geschichte und Bibliographie der
         Druckschriften</i>, koos. Mare Rand et al. (Tartu Ülikooli Raamatukogu, 2000) koostamise käigus kogutud trükiste
       koopiatel.
     </p>
 
-    <h2>Tuvastusmudel</h2>
+    <h2>Tuvastusmudelid</h2>
 
     <p>
-      Tuvastusmudel on leheküljepõhine. Kasutatud on Qwen3-VL-8B mudelit, mida on peenhäälestatud 1500 leheküljel
-      transkribeeritud tekstil, mis pärineb erinevatest andmebaasidest (mh on inspiratsiooni võetud
-      <a href="https://zenodo.org/records/15764161" target="_blank">zenodo.org/records/15764161</a> toodud andmetest):
+      VUTT kasutab kahte leheküljepõhist tuvastusmudelit: üht trükiste ja teist käsikirjaliste tekstide jaoks.
     </p>
 
+    <h3>Trükimudel</h3>
+
+    <p>
+      Trükimudel põhineb Qwen3.5-8B mudelil ning on peenhäälestatud kahes etapis:
+    </p>
     <ul>
-      <li>TÜ raamatukogu teaduskeskuses tehtud transkriptsioonid (tehtud ETAgi teadusprojekti PUT 132 (“Humanistide kreeka
-        keel varauusaja Eesti- ja Liivimaal: kultuurisild Euroopa kaasaega ja minevikku”; 2013-2016, vastutav täitja J.
-        Päll), Helleno-Nordica: humanistide kreeka keel Rootsi suurrriigis (vastutav täitja Janika Päll, alaprojekt Lundi
-        ülikooli projektile “Helleno-Nordica. The Humanist Greek Heritage of the Swedish Empire”, 2016-2022, vastutav
-        täitja Johanna Akujärvi) ning Tartu Ülikooli baasfinantseeritavate grantide toel)</li>
-      <li>Rahvusteaduse mõtteloo professuuri toel</li>
-      <li>Selekteeritud lehekülgedel Gallicorpora datasetist (<a
-          href="https://github.com/Gallicorpora/HTR-imprime-17e-siecle"
-          target="_blank">github.com/Gallicorpora/HTR-imprime-17e-siecle</a>)</li>
+      <li><strong>Esimene ring:</strong> ~1500 leheküljel transkribeeritud trükitekstil, mis pärineb erinevatest
+        andmebaasidest (mh on inspiratsiooni võetud
+        <a href="https://zenodo.org/records/15764161" target="_blank">zenodo.org/records/15764161</a> toodud andmetest).</li>
+      <li><strong>Teine ring:</strong> VUTT-is valmis toimetatud lehekülgedel, et mudel õpiks VUTT-i märgendust (markup).</li>
     </ul>
 
+    <p><strong>Allikate ja teksti autorlus/rahastus:</strong></p>
+
+    <ul>
+      <li><strong>Gezeliuse kreeka-ladina leksikon</strong> — valminud ETAg uurimisprojekti PUT 132 (“Humanist Greek
+        in Early Modern Estonia and Livonia: A Cultural Bridge to the European Present and Past”, 2013–2016, PI J. Päll)
+        ning projekti Helleno-Nordica: Humanist Greek in the Swedish Empire (PI Janika Päll, Lundi Ülikooli projekti
+        “Helleno-Nordica. The Humanist Greek Heritage of the Swedish Empire” alamprojekt, PI Johanna Akujärvi, 2016–2022)
+        raames, samuti Tartu Ülikooli baasfinantseeritud grantide toel.</li>
+      <li><strong>Gallicorpora</strong> (bpt*/data_*, prantsuse tragikomöödiad) — <a
+          href="https://github.com/Gallicorpora/HTR-imprime-17e-siecle"
+          target="_blank">github.com/Gallicorpora/HTR-imprime-17e-siecle</a></li>
+      <li><strong>Kõik ülejäänud materjal</strong> (Tartu Academia Gustaviana disputatsioonid, oratsioonid jm) on
+        transkribeeritud käsitsi ning Transkribus/eScriptorium keskkondades. Transkriptsiooni autorid ja retsensendid
+        (tähestiku järjekorras): Ove Averin, Meelis Friedenthal, Jaana Jurtšenkova, Kristiina Kase, Vallo Kask,
+        Kristin Klaus, Hant Mikit Kolk, Pärtel Piirimäe, Agne Pilvisto, Anni Polding, Janika Päll, Kaarina Rein,
+        Rahel Toomik.</li>
+    </ul>
+
+    <h3>Käsikirjamudel</h3>
+
     <p>
-      Tekstid on transkribeeritud nii manuaalselt kui ka kasutades keskkondi Transkribus ja eScriptorium.
-      Transkriptsioonide autorid ja kontrollijad (tähestikulises järjekorras):
+      Käsikirjaliste tekstide jaoks on eraldi mudel, mis on treenitud avalikel käsikirja-andmestikel
+      (kokku ~16 600 lehekülge, peamiselt XIV–XIX sajandi saksa ja rootsi kantselei- ja Kurrent-kiri).
+      Kasutatud andmestikud:
     </p>
     <ul>
-      <li>Ove Averin</li>
-      <li>Meelis Friedenthal</li>
-      <li>Jaana Jurtšenkova</li>
-      <li>Kristiina Kase</li>
-      <li>Vallo Kask</li>
-      <li>Kristin Klaus</li>
-      <li>Hant Mikit Kolk</li>
-      <li>Pärtel Piirimäe</li>
-      <li>Agne Pilvisto</li>
-      <li>Anni Polding</li>
-      <li>Janika Päll</li>
-      <li>Kaarina Rein</li>
-      <li>Rahel Toomik</li>
+      <li>kurrent_xix — saksa, XIX saj, ~8000 lk (CC BY 4.0)<sup>1</sup></li>
+      <li>aaeb_xiv_xvii — saksa, XIV–XVII saj, ~1990 lk (CC BY 4.0)<sup>2</sup></li>
+      <li>bullinger_autoren — saksa/ladina, XVI saj, ~1840 lk (CC BY 4.0)<sup>3</sup></li>
+      <li>bergskollegium_rel_seg — rootsi/saksa, XVII–XVIII saj, ~1440 lk<sup>4</sup></li>
+      <li>hanse_kurrent_xvi — saksa, XVI saj, ~1140 lk (MIT)<sup>5</sup></li>
+      <li>svea_hovratt_seg — rootsi, XVII–XVIII saj, ~850 lk<sup>6</sup></li>
+      <li>trolldomskommissionen_seg — rootsi, XVII saj, ~760 lk<sup>7</sup></li>
+      <li>krigshovrattens_seg — rootsi, XVII–XVIII saj, ~340 lk<sup>8</sup></li>
+      <li>jonkopings_seg — rootsi, XVII–XVIII saj, ~57 lk<sup>9</sup></li>
+      <li>bergskollegium_adv_seg — rootsi/saksa, XVII–XVIII saj, ~53 lk<sup>10</sup></li>
+      <li>gota_hovratt_seg — rootsi, XVII–XVIII saj, ~51 lk<sup>11</sup></li>
+      <li>koenigsfelden_adhr — saksa, XIX saj, ~34 lk (CC BY 4.0)<sup>12</sup></li>
+      <li>dresdner_hofdiarium_1673 — saksa, 1673, ~20 lk (CC BY-NC-SA 4.0)<sup>13</sup></li>
     </ul>
 
     <h3>Numbrid</h3>
     <ul>
-      <li>1199 teost</li>
-      <li>ca 20 000 lehekülge</li>
+      <li>ca 1260 teost</li>
+      <li>ca 20 500 lehekülge</li>
       <li>Keeled: ladina, saksa, rootsi, kreeka, heebrea</li>
     </ul>
 
@@ -195,7 +238,7 @@
     <ul>
       <li><strong>Frontend:</strong> React + TypeScript + Tailwind CSS</li>
       <li><strong>Otsimootor:</strong> Meilisearch</li>
-      <li><strong>OCR:</strong> peenhäälestatud Qwen3 VL 8B mudel</li>
+      <li><strong>OCR:</strong> peenhäälestatud Qwen3.5-8B mudel (trükised) ja eraldi käsikirjamudel</li>
     </ul>
     <p>
       VUTT on arendatud <a href="https://utlib.ut.ee/et" target="_blank">TÜ raamatukogus</a>. Logo soovitas Rahel Toomik
@@ -229,6 +272,24 @@
         Tekstid ja pildid: vastavalt TÜ raamatukogu kasutustingimustele
       </div>
     </div>
+
+    <h2>Käsikirjamudeli andmestike viited</h2>
+
+    <ol class="references">
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_kurrent-xix" target="_blank">dh-unibe/image-text_kurrent-xix</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_aaeb-xiv-xvii" target="_blank">dh-unibe/image-text_aaeb-xiv-xvii</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_bullinger-autoren" target="_blank">dh-unibe/image-text_bullinger-autoren</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/bergskollegium_relationer_och_skrivelser_seg" target="_blank">Riksarkivet/bergskollegium_relationer_och_skrivelser_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/fgho/hanse-kurrent-xvi-rawxml" target="_blank">fgho/hanse-kurrent-xvi-rawxml</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/svea_hovratt_seg" target="_blank">Riksarkivet/svea_hovratt_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/trolldomskommissionen_seg" target="_blank">Riksarkivet/trolldomskommissionen_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/krigshovrattens_dombocker_seg" target="_blank">Riksarkivet/krigshovrattens_dombocker_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/jonkopings_radhusratts_och_magistrat_seg" target="_blank">Riksarkivet/jonkopings_radhusratts_och_magistrat_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/bergskollegium_advokatfiskalskontoret_seg" target="_blank">Riksarkivet/bergskollegium_advokatfiskalskontoret_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/Riksarkivet/gota_hovratt_seg" target="_blank">Riksarkivet/gota_hovratt_seg</a></li>
+      <li><a href="https://huggingface.co/datasets/dh-unibe/image-text_koenigsfelden-adhr-colmar" target="_blank">dh-unibe/image-text_koenigsfelden-adhr-colmar</a></li>
+      <li><a href="https://zenodo.org/records/15303243" target="_blank">Zenodo 10.5281/zenodo.15303243 (dresdner_hofdiarium_1673)</a></li>
+    </ol>
 
   </div>
 </body>
