@@ -88,7 +88,7 @@ export function applyEnrichmentToDraft(autoFilled: Record<string, any>, draft: F
     patch.occupations = autoFilled['_occupations'].map((o: any) => ({
       label: o.label,
       id: o.id ?? null,
-      labels: undefined,
+      labels: o.labels ?? undefined,
     }));
   } else if (autoFilled['_occupation_label'] && draft.occupations.length === 0) {
     patch.occupations = [{ label: autoFilled['_occupation_label'] }];
