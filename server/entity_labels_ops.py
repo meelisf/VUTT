@@ -78,34 +78,83 @@ def _collect_qcodes(metadata):
     return qcodes
 
 
-def _collect_qcodes_from_person(person):
-    """Kogub Q-koodid prosopograafia kirje väljadelt (seisus, amet, asutus jne)."""
-    qcodes = set()
-
-    def add(val):
-        if isinstance(val, dict):
-            qid = val.get('id', '')
-            if qid and isinstance(qid, str) and qid.startswith('Q'):
-                qcodes.add(qid)
-
-    add(person.get('status'))
-    add(person.get('confession'))
-    add(person.get('origin_city'))
-    add(person.get('origin_region'))
-    birth = person.get('birth') or {}
-    if isinstance(birth, dict):
-        add(birth.get('place'))
-    death = person.get('death') or {}
-    if isinstance(death, dict):
-        add(death.get('place'))
-    for occ in person.get('occupations', []) or []:
+# Entiteedi-pesad: (id-võti, labels-võti). Kasutatakse nii Q-koodide
+# kogumiseks kui inline labels täitmiseks.
+def _entity_slots(person):
+    """Tagastab [(obj, id_key, labels_key)] kõigi entiteedi-pesade kohta."""
+    slots = []
+    for parent_key in ("birth", "death"):
+        parent = person.get(parent_key)
+        if isinstance(parent, dict) and isinstance(parent.get("place"), dict):
+            slots.append((parent["place"], "id", "labels"))
+    origin = person.get("origin")
+    if isinstance(origin, dict):
+        slots.append((origin, "place_id", "place_labels"))
+    for key in ("statuses", "confessions", "tags"):
+        for item in person.get(key) or []:
+            if isinstance(item, dict):
+                slots.append((item, "id", "labels"))
+    for occ in person.get("occupations") or []:
         if isinstance(occ, dict):
-            add({'id': occ.get('id')})
-            add({'id': occ.get('institution_id')})
-    for edu in person.get('education', []) or []:
+            slots.append((occ, "id", "labels"))
+            slots.append((occ, "institution_id", "institution_labels"))
+    for edu in person.get("education") or []:
         if isinstance(edu, dict):
-            add({'id': edu.get('institution_id')})
+            slots.append((edu, "institution_id", "institution_labels"))
+            slots.append((edu, "id", "labels"))
+    for rel in person.get("relations") or []:
+        if isinstance(rel, dict):
+            slots.append((rel, "type", "type_labels"))
+    return slots
+
+
+def _slot_qcode(obj, id_key):
+    qid = obj.get(id_key)
+    if isinstance(qid, str) and qid.startswith("Q"):
+        return qid
+    return None
+
+
+def collect_entity_qcodes(person):
+    """Kogub kõik Q-koodid prosopograafia kirje entiteedi-väljadelt."""
+    qcodes = set()
+    for obj, id_key, _labels_key in _entity_slots(person):
+        qid = _slot_qcode(obj, id_key)
+        if qid:
+            qcodes.add(qid)
     return qcodes
+
+
+def fill_entity_labels(person, registry):
+    """Täidab inline labels registrist (gap-fill, kohapeal). Tagastab muudetud pesade arvu."""
+    changed = 0
+    for obj, id_key, labels_key in _entity_slots(person):
+        qid = _slot_qcode(obj, id_key)
+        if not qid or qid not in registry:
+            continue
+        reg = {k: v for k, v in registry[qid].items()
+               if isinstance(v, str) and v.strip()}
+        if not reg:
+            continue
+        existing = obj.get(labels_key)
+        existing = existing if isinstance(existing, dict) else {}
+        # Registri väärtused täidavad AUGUD; olemasolevad keeled jäävad peale
+        merged = {**reg, **{k: v for k, v in existing.items()
+                            if isinstance(v, str) and v.strip()}}
+        if merged != existing:
+            obj[labels_key] = merged
+            changed += 1
+    return changed
+
+
+def fill_person_labels_from_registry(person):
+    """Täidab kirje inline labels labels.json registrist (sünkroonne, kiire)."""
+    return fill_entity_labels(person, load_entity_labels())
+
+
+def _collect_qcodes_from_person(person):
+    """Kogub Q-koodid prosopograafia kirje entiteedi-väljadelt."""
+    return collect_entity_qcodes(person)
 
 
 def enrich_entity_labels_from_person_async(person):
