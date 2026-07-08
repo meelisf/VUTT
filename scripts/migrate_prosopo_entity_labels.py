@@ -25,6 +25,7 @@ from server.entity_labels_ops import (  # noqa: E402
     load_entity_labels, _TARGET_LANGS,
 )
 from server.config import LABELS_FILE, PROSOPOGRAPHY_DIR  # noqa: E402
+from server.utils import atomic_write_json  # noqa: E402
 
 DATA_ROOT = os.getenv("VUTT_DATA_DIR", "data")
 
@@ -63,13 +64,14 @@ def main():
     print(f"{len(files)} faili, {len(all_qcodes)} unikaalset Q-koodi, "
           f"{len(to_fetch)} vajab Wikidata päringut.")
 
+    labels_written = False
     if to_fetch:
         fetched = _fetch_wikidata_labels(to_fetch)
         registry.update(fetched)
         if args.apply:
             os.makedirs(os.path.dirname(LABELS_FILE), exist_ok=True)
-            with open(LABELS_FILE, "w", encoding="utf-8") as f:
-                json.dump(registry, f, ensure_ascii=False, indent=2)
+            atomic_write_json(LABELS_FILE, registry)
+            labels_written = True
             print(f"labels.json uuendatud: +{len(fetched)} kirjet.")
 
     files_changed = 0
@@ -90,8 +92,11 @@ def main():
     mode = "APPLY" if args.apply else "DRY-RUN"
     print(f"[{mode}] {files_changed} faili, {slots_changed} pesa backfill'itud.")
 
-    if args.apply and args.commit and files_changed:
-        msg = f"Backfill mitmekeelsed inline labels prosopo entiteedi-väljadele ({files_changed} kaarti)"
+    if args.apply and args.commit and (files_changed or labels_written):
+        if files_changed:
+            msg = f"Backfill mitmekeelsed inline labels prosopo entiteedi-väljadele ({files_changed} kaarti)"
+        else:
+            msg = "Backfill mitmekeelsed inline labels prosopo entiteedi-väljadele (ainult labels.json)"
         try:
             subprocess.run(["git", "-C", DATA_ROOT, "add", "-A", "config/prosopography", "config/labels.json"], check=True)
             subprocess.run(["git", "-C", DATA_ROOT, "commit", "-m", msg], check=True)
