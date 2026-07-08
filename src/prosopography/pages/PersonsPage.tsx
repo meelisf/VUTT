@@ -437,6 +437,7 @@ const PersonsPage: React.FC = () => {
                 selectMode={selectMode}
                 selected={selectedIds.has(person.id)}
                 onSelect={() => toggleSelect(person)}
+                statusVocab={seisused}
               />
             ))}
           </div>
