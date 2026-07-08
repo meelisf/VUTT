@@ -10,6 +10,7 @@ from typing import Optional
 from . import state
 from ._compat import sync_from_facade
 from .locks import person_lock
+from ..entity_labels_ops import fill_person_labels_from_registry
 
 
 def _indices():
@@ -120,6 +121,8 @@ def create_person(data: dict, username: str) -> dict:
 
     os.makedirs(state.PROSOPOGRAPHY_DIR, exist_ok=True)
     name = (person.get("name") or {}).get("label") or person_id
+    # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
+    fill_person_labels_from_registry(person)
     state.save_with_git(
         _id_to_path(person_id),
         json.dumps(person, ensure_ascii=False, indent=2),
@@ -240,6 +243,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
                 person["origin"] = {**origin, "place": None, "place_id": None, "place_labels": None}
 
         name = (person.get("name") or {}).get("label") or person_id
+        # Täida inline labels registrist (self-healing), et EN-UI ei kuvaks ET-silte
+        fill_person_labels_from_registry(person)
         state.save_with_git(
             _id_to_path(person_id),
             json.dumps(person, ensure_ascii=False, indent=2),

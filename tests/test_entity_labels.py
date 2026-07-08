@@ -65,3 +65,12 @@ def test_fill_entity_labels_idempotent():
     registry = {"Q30185": {"et": "linnapea", "en": "mayor"}}
     elo.fill_entity_labels(person, registry)
     assert elo.fill_entity_labels(person, registry) == 0
+
+
+def test_fill_person_labels_from_registry_uses_labels_json(monkeypatch):
+    import server.entity_labels_ops as elo
+    monkeypatch.setattr(elo, "load_entity_labels",
+                        lambda: {"Q30185": {"et": "linnapea", "en": "mayor"}})
+    person = {"occupations": [{"id": "Q30185", "label": "linnapea"}]}
+    assert elo.fill_person_labels_from_registry(person) == 1
+    assert person["occupations"][0]["labels"]["en"] == "mayor"
