@@ -3,12 +3,15 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
+import type { VocabularySeisusItem } from '../../services/collectionService';
 
 interface PersonCardProps {
   person: ProsopoIndexEntry;
   selectMode?: boolean;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  /** Seisuste sõnavara (id → {et,en}), laetakse PersonsPage'is; kasutatakse seisuse lokaliseerimiseks. */
+  statusVocab?: VocabularySeisusItem[];
 }
 
 const ExternalBadge: React.FC<{ label: string }> = ({ label }) => (
@@ -72,8 +75,13 @@ function formatImmLabel(dateStr: string, lang: string): string {
   }
 }
 
-const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode; onOriginClick?: () => void }> = ({
-  person, lifespan, onOriginClick,
+const CardInner: React.FC<{
+  person: ProsopoIndexEntry;
+  lifespan: React.ReactNode;
+  onOriginClick?: () => void;
+  statusVocab?: VocabularySeisusItem[];
+}> = ({
+  person, lifespan, onOriginClick, statusVocab,
 }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   return (
@@ -169,9 +177,19 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
           return null;
         })()}
 
-        {/* Seisus */}
-        {(person.status_labels ?? []).length > 0 && (
-          <p className="text-sm text-gray-600">{(person.status_labels ?? []).join(', ')}</p>
+        {/* Seisus — lokaliseeritud aktiivses keeles (status_ids → sõnavara), varuks status_labels (eesti) */}
+        {(person.status_ids ?? person.status_labels ?? []).length > 0 && (
+          <p className="text-sm text-gray-600">
+            {(person.status_ids ?? []).length > 0
+              ? person.status_ids.map((sid, i) => {
+                  const item = statusVocab?.find(s => s.id === sid);
+                  const loc = item
+                    ? (i18n.language?.startsWith('en') ? item.label.en : item.label.et)
+                    : null;
+                  return loc || person.status_labels?.[i] || sid;
+                }).filter(Boolean).join(', ')
+              : (person.status_labels ?? []).join(', ')}
+          </p>
         )}
 
         {/* Biograafia snippet */}
@@ -207,7 +225,7 @@ const CardInner: React.FC<{ person: ProsopoIndexEntry; lifespan: React.ReactNode
   );
 };
 
-const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect }) => {
+const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, onSelect, statusVocab }) => {
   const { t } = useTranslation(['prosopography']);
   const location = useLocation();
   const navigate = useNavigate();
@@ -245,7 +263,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
             </svg>
           )}
         </div>
-        <CardInner person={person} lifespan={lifespanNode} />
+        <CardInner person={person} lifespan={lifespanNode} statusVocab={statusVocab} />
       </div>
     );
   }
@@ -271,7 +289,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
       onKeyDown={e => e.key === 'Enter' && openPerson()}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden cursor-pointer"
     >
-      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} />
+      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} statusVocab={statusVocab} />
     </div>
   );
 };

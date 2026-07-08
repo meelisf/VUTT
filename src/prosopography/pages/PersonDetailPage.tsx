@@ -162,7 +162,12 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   if (person.education?.length > 0) {
     rows.push({
       label: t('education', 'Haridus'),
-      value: person.education.map((e: any) => (e.institution ?? getLabel(e)) || e).join(', '),
+      value: person.education.map((e: any) => {
+        const loc = e.institution_labels
+          ? (e.institution_labels[lang] ?? e.institution_labels['en'] ?? e.institution_labels['et'])
+          : null;
+        return loc || e.institution || getLabel(e) || e;
+      }).join(', '),
     });
   }
   if (person.relations?.length > 0) {
