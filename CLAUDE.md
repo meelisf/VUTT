@@ -122,6 +122,7 @@ Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change
 | `server/upload_ops.py` | Upload wizard, OCR server integratsioon |
 | `state/` | Runtime andmed (ei ole gitis): `users.json`, `pending_registrations.json`, `invite_tokens.json`, `prosopography/`, `user_settings/` |
 | `data/config/` | Konfiguratsioon (sisemises gitis): `collections.json`, `vocabularies.json`, `places.json`, `labels.json`, `person_aliases.json`, `prosopography_index.json`, `person_to_works.json` |
+| `docs/decisions/` | ADR-otsuste logi — arhitektuuriotsused ja kriitilised invariandid (loe ENNE nende alade muutmist) |
 
 ## Linked Data (Wikidata)
 
