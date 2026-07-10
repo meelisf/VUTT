@@ -689,6 +689,29 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         existing_meta = json.load(f)
     work_id = existing_meta.get('id', target_work_id)
 
+    # Täielikkuse preflight ENNE vana sisu puutumist. Hiljem kontrollime remote
+    # loendit uuesti, et katta ka preflight'i ja downloadi vaheline muutus.
+    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
+    if not importable:
+        raise HTTPException(status_code=400, detail="Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
+    importable.sort(key=lambda f: f['page'])
+    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
+    preflight_sftp = None
+    try:
+        preflight_sftp = _sftp_open(upload_id)
+        remote_items = preflight_sftp.listdir(remote_work)
+        _import_work.validate_remote_ocr_files(importable, remote_items, _extract_page_num)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR kausta kontroll ebaõnnestus: {e}")
+    finally:
+        if preflight_sftp:
+            try:
+                preflight_sftp.close()
+            except Exception:
+                pass
+
     # Salvesta git HEAD rollback'i jaoks
     from .git_ops import get_or_init_repo
     repo = get_or_init_repo()
@@ -740,14 +763,8 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
             logger.error(f"replace {upload_id}: rollback JPG liigutamine ebaõnnestus: {rb_jpg_err}")
         raise HTTPException(status_code=500, detail=f"Vana sisu eemaldamine ebaõnnestus: {e}")
 
-    # 7. Lae alla uued lehed SFTP kaudu
-    importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
-    if not importable:
-        raise HTTPException(status_code=400, detail="Imporditavaid lehekülgi pole (kõik kustutatud või OCR puudub)")
-    importable.sort(key=lambda f: f['page'])
-
-    remote_work = f"{OCR_SERVER_PATH}/{state['remote_work_path']}"
-
+    # 7. Lae alla uued lehed SFTP kaudu. Remote loend valideeritakse uuesti,
+    # sest fail võis preflight'i järel kaduda; sellisel juhul käivitub rollback.
     sftp = None
     downloaded = 0
     try:
@@ -758,19 +775,14 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         except Exception as e:
             raise ValueError(f"Ei saa lugeda OCR kausta: {e}")
 
-        jpg_map = {}
-        for item in remote_items:
-            if item.endswith('.jpg') and '_pg_' in item:
-                pn = _extract_page_num(item.rsplit('.', 1)[0])
-                if pn > 0:
-                    jpg_map[pn] = item
+        # Sama täielikkuse invariant mis uue teose impordil: osalist asendust
+        # ei tohi edukaks lugeda ega selle staging'ut hiljem kustutada.
+        jpg_map = _import_work.validate_remote_ocr_files(
+            importable, remote_items, _extract_page_num
+        )
 
         for entry in importable:
             pn = entry['page']
-            if pn not in jpg_map:
-                logger.warning(f"replace {upload_id}: lk {pn} JPG puudub, vahele jäetud")
-                continue
-
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
@@ -786,7 +798,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
                 _normalize_txt_file(local_txt)
             except FileNotFoundError:
-                open(local_txt, 'w').close()
+                raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); asendus katkestati")
             os.chmod(local_txt, 0o644)
 
             page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
