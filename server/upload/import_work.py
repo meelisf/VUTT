@@ -45,7 +45,8 @@ def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
     missing_jpg = sorted(expected_pages - set(jpg_map))
     missing_txt = sorted(
         pn for pn in expected_pages
-        if pn in jpg_map and jpg_map[pn].replace('.jpg', '.txt') not in remote_set
+        if pn in jpg_map
+        and os.path.splitext(jpg_map[pn])[0] + '.txt' not in remote_set
     )
     if missing_jpg or missing_txt:
         problems = []
