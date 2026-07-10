@@ -12,7 +12,7 @@ from datetime import datetime
 from git import Repo, Actor
 from git.exc import InvalidGitRepositoryError, GitCommandError
 from .config import BASE_DIR, get_logger
-from .utils import sanitize_id
+from .utils import atomic_write_text, sanitize_id
 
 logger = get_logger(__name__)
 
@@ -324,11 +324,9 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
     except Exception:
         is_first_commit = True
 
-    # Kirjuta põhifail
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(content)
-    # Sea failiõigused loetavaks kõigile (Docker/root probleemi vältimiseks)
-    os.chmod(filepath, 0o644)
+    # Atomaarne kirjutus: ligipääsukontrolli lugeja ei tohi näha poolikut
+    # _metadata.json-i (sama helper sobib ka txt/json lisafailidele).
+    atomic_write_text(filepath, content)
 
     # Kogu kõik failid indeksisse lisamiseks
     files_to_add = [relative_path]
@@ -336,9 +334,7 @@ def save_with_git(filepath, content, username, message=None, additional_files=No
     # Kirjuta ja lisa lisafailid
     if additional_files:
         for add_filepath, add_content in additional_files:
-            with open(add_filepath, 'w', encoding='utf-8') as f:
-                f.write(add_content)
-            os.chmod(add_filepath, 0o644)
+            atomic_write_text(add_filepath, add_content)
             add_relative = os.path.relpath(add_filepath, BASE_DIR)
             files_to_add.append(add_relative)
 

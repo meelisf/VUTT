@@ -360,6 +360,11 @@ def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, t
     monkeypatch.setattr(editing_router, "save_with_git", lambda *a, **kw: {"commit_hash": "abc12345"})
     monkeypatch.setattr(editing_router, "sync_work_to_meilisearch_async", lambda *a: None)
     monkeypatch.setattr(editing_router, "BASE_DIR", str(tmp_path))
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(
+        json.dumps({"id": "workAAA", "collections": []}), encoding="utf-8"
+    )
 
     calls = []
     monkeypatch.setattr(editing_router, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir)))
@@ -386,6 +391,11 @@ def test_save_reports_git_commit_failure(client, login, monkeypatch, tmp_path):
     monkeypatch.setattr(editing_router, "sync_work_to_meilisearch_async", lambda *a: None)
     monkeypatch.setattr(editing_router, "update_page_person_mentions", lambda *a: None)
     monkeypatch.setattr(editing_router, "BASE_DIR", str(tmp_path))
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(
+        json.dumps({"id": "workAAA", "collections": []}), encoding="utf-8"
+    )
 
     token = login("editor", "editorpass")
     response = client.post("/save", headers={"Authorization": f"Bearer {token}"}, json={

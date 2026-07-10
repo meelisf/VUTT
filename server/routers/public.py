@@ -32,15 +32,12 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
         return {"status": "error", "message": "Teos ei leitud"}
 
     meta_path = os.path.join(folder, '_metadata.json')
-    # Kirjutamisõiguse kontroll praeguse (toggle-eelse) seisu põhjal (Leid G).
-    if os.path.exists(meta_path):
-        try:
-            with open(meta_path, 'r', encoding='utf-8') as f:
-                _cur_meta = json.load(f)
-        except Exception:
-            _cur_meta = None
-        if _cur_meta is not None and not can_write_work(_cur_meta, user):
-            raise HTTPException(status_code=403, detail="Puudub õigus selle teose jagamist muuta")
+    # Ligipääsukontroll on fail-closed: vigane või puuduv meta ei tähenda avalikku teost.
+    _cur_meta = _load_work_metadata(work_id)
+    if _cur_meta is None:
+        raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
+    if not can_write_work(_cur_meta, user):
+        raise HTTPException(status_code=403, detail="Puudub õigus selle teose jagamist muuta")
     slug = os.path.basename(folder)
     save_work_metadata(
         meta_path,
@@ -101,10 +98,11 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
 
     # Ligipääsukontroll
     meta_for_access = _load_work_metadata(work_id)
-    if meta_for_access is not None:
-        user = _get_optional_user(request)
-        if not can_read_work(meta_for_access, user):
-            raise HTTPException(status_code=403, detail="Ligipääs keelatud")
+    if meta_for_access is None:
+        raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
+    user = _get_optional_user(request)
+    if not can_read_work(meta_for_access, user):
+        raise HTTPException(status_code=403, detail="Ligipääs keelatud")
 
     slug = os.path.basename(folder)
 
