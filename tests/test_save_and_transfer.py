@@ -118,10 +118,15 @@ def _fake_sftp():
 class _ImportSftp:
     """Minimaalne SFTP fake import_as_work testi jaoks."""
 
+    def __init__(self, items=None):
+        self.items = items or ["test-teos_pg_001.jpg", "test-teos_pg_001.txt"]
+        self.get_calls = []
+
     def listdir(self, _path):
-        return ["test-teos_pg_001.jpg", "test-teos_pg_001.txt"]
+        return self.items
 
     def get(self, remote, local):
+        self.get_calls.append((remote, local))
         if remote.endswith(".jpg"):
             Path(local).write_bytes(b"jpg")
         elif remote.endswith(".txt"):
@@ -136,6 +141,42 @@ class _ImportSftp:
 # =========================================================
 # import_as_work
 # =========================================================
+
+
+@pytest.mark.parametrize(("remote_items", "error_match"), [
+    (["test-teos_pg_001.jpg", "test-teos_pg_001.txt"], "JPG puudub lehtedel 2"),
+    (["test-teos_pg_001.jpg"], "TXT puudub lehtedel 1"),
+])
+def test_import_as_work_rejects_incomplete_remote_result_and_keeps_staging(
+    make_state, tmp_path, monkeypatch, remote_items, error_match
+):
+    """Puuduv oodatud JPG/TXT katkestab impordi enne downloadi ja staging'u koristust."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    sftp = _ImportSftp(remote_items)
+    cleanup_calls = []
+    monkeypatch.setattr(upload_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(upload_ops, "_sftp_open", lambda upload_id: sftp)
+    monkeypatch.setattr(upload_ops, "_ssh_rm_rf", lambda *args, **kwargs: cleanup_calls.append(args))
+
+    files = [{"page": 1, "has_ocr": True, "deleted": False}]
+    if "JPG" in error_match:
+        files.append({"page": 2, "has_ocr": True, "deleted": False})
+    upload_id, _state = make_state(
+        upload_id="incomplete123",
+        slug="test-teos",
+        status="reviewing",
+        files=files,
+        meta={"title": "Test teos", "year": "1700", "slug": "test-teos", "work_id": "wid123"},
+    )
+
+    with pytest.raises(ValueError, match=error_match):
+        upload_ops.import_as_work(upload_id, username="admin")
+
+    assert sftp.get_calls == []
+    assert cleanup_calls == []
+    assert not (data_dir / "test-teos").exists()
+    assert _read_state(Path(upload_ops.UPLOADS_DIR), upload_id)["status"] == "reviewing"
 
 
 def test_import_as_work_reports_git_commit_failure(make_state, tmp_path, monkeypatch):

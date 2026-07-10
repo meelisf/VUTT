@@ -31,6 +31,35 @@ def normalize_txt_file(path: str):
         pass  # normaliseerimise tõrge ei tohi importi katkestada
 
 
+def validate_remote_ocr_files(importable, remote_items, extract_page_num_func):
+    """Kontrollib enne importi, et igal oodatud lehel on remote JPG+TXT paar."""
+    remote_set = set(remote_items)
+    jpg_map = {}
+    for item in remote_items:
+        if item.endswith('.jpg') and '_pg_' in item:
+            pn = extract_page_num_func(item.rsplit('.', 1)[0])
+            if pn > 0:
+                jpg_map[pn] = item
+
+    expected_pages = {entry['page'] for entry in importable}
+    missing_jpg = sorted(expected_pages - set(jpg_map))
+    missing_txt = sorted(
+        pn for pn in expected_pages
+        if pn in jpg_map and jpg_map[pn].replace('.jpg', '.txt') not in remote_set
+    )
+    if missing_jpg or missing_txt:
+        problems = []
+        if missing_jpg:
+            problems.append(f"JPG puudub lehtedel {', '.join(map(str, missing_jpg))}")
+        if missing_txt:
+            problems.append(f"TXT puudub lehtedel {', '.join(map(str, missing_txt))}")
+        raise ValueError(
+            "OCR tulemus pole täielik: " + "; ".join(problems) +
+            ". Toiming katkestati ja OCR staging säilitati."
+        )
+    return jpg_map
+
+
 def import_as_work(
     upload_id: str,
     username: str = None,
@@ -112,22 +141,13 @@ def import_as_work(
         except Exception as e:
             raise ValueError(f"Ei saa lugeda OCR kausta: {e}")
 
-        # Map: page_num → jpg_filename
-        jpg_map = {}
-        for item in remote_items:
-            if item.endswith('.jpg') and '_pg_' in item:
-                pn = extract_page_num_func(item.rsplit('.', 1)[0])
-                if pn > 0:
-                    jpg_map[pn] = item
+        # Täielikkuse preflight ENNE allalaadimist: osalist teost ei impordita.
+        jpg_map = validate_remote_ocr_files(importable, remote_items, extract_page_num_func)
 
         # Lae alla iga soovitud leht
         downloaded = 0
         for entry in importable:
             pn = entry['page']
-            if pn not in jpg_map:
-                logger.warning(f"import {upload_id}: lk {pn} JPG puudub, vahele jäetud")
-                continue
-
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
@@ -143,7 +163,7 @@ def import_as_work(
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
                 normalize_txt_file_func(local_txt)
             except FileNotFoundError:
-                open(local_txt, 'w').close()
+                raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); import katkestati")
             os.chmod(local_txt, 0o644)
 
             page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}

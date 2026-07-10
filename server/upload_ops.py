@@ -758,19 +758,14 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
         except Exception as e:
             raise ValueError(f"Ei saa lugeda OCR kausta: {e}")
 
-        jpg_map = {}
-        for item in remote_items:
-            if item.endswith('.jpg') and '_pg_' in item:
-                pn = _extract_page_num(item.rsplit('.', 1)[0])
-                if pn > 0:
-                    jpg_map[pn] = item
+        # Sama täielikkuse invariant mis uue teose impordil: osalist asendust
+        # ei tohi edukaks lugeda ega selle staging'ut hiljem kustutada.
+        jpg_map = _import_work.validate_remote_ocr_files(
+            importable, remote_items, _extract_page_num
+        )
 
         for entry in importable:
             pn = entry['page']
-            if pn not in jpg_map:
-                logger.warning(f"replace {upload_id}: lk {pn} JPG puudub, vahele jäetud")
-                continue
-
             jpg_name = jpg_map[pn]
             txt_name = jpg_name.replace('.jpg', '.txt')
 
@@ -786,7 +781,7 @@ def replace_work_content(upload_id: str, target_work_id: str, metadata_updates: 
                 sftp.get(f"{remote_work}/{txt_name}", local_txt)
                 _normalize_txt_file(local_txt)
             except FileNotFoundError:
-                open(local_txt, 'w').close()
+                raise ValueError(f"OCR TXT kadus allalaadimise ajal (lk {pn}); asendus katkestati")
             os.chmod(local_txt, 0o644)
 
             page_json = {"sequence": pn * 100, "status": "Toores", "page_tags": [], "comments": [], "history": []}
