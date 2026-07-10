@@ -768,6 +768,8 @@ async def prosopography_update(
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     except ValueError as e:
         msg = str(e)
+        if msg == "updated_at_required":
+            raise HTTPException(status_code=400, detail="updated_at on kohustuslik")
         if msg.startswith("conflict:"):
             current_updated_at = msg.split(":", 1)[1]
             raise HTTPException(
@@ -826,4 +828,5 @@ async def prosopography_bulk_occupation(
         occupation=occupation,
         mode=mode,
         person_ids=person_ids,
+        username=user["username"],
     )
