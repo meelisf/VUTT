@@ -69,7 +69,9 @@ def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
     catalog, filename = parts[-2], parts[-1]
     if catalog != os.path.basename(catalog) or filename != os.path.basename(filename):
         raise HTTPException(status_code=400, detail="Vigane failitee")
-    return catalog, os.path.join(catalog, filename)
+    # Ligipääsuotsus kasutab teose kataloogi (eelviimane segment), kuid git-filter
+    # peab säilitama kogu repo-suhtelise tee, sh config/prosopography prefiksi.
+    return catalog, "/".join(parts)
 
 
 @router.post("/save")

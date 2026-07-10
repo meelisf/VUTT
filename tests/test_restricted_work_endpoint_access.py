@@ -2,6 +2,7 @@
 import json
 
 import pytest
+from git import Repo
 
 
 @pytest.fixture
@@ -10,7 +11,6 @@ def restricted_work_env(backend_env, monkeypatch, tmp_path):
     import server.routers.editing as editing
     import server.routers.public as public
     import server.utils as utils
-    import server.work_meta as work_meta
 
     data_dir = tmp_path / "data"
     work_dir = data_dir / "secret-work"
@@ -30,7 +30,6 @@ def restricted_work_env(backend_env, monkeypatch, tmp_path):
     })
     monkeypatch.setattr(editing, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(public, "BASE_DIR", str(data_dir))
-    monkeypatch.setattr(work_meta, "BASE_DIR", str(data_dir))
     monkeypatch.setattr(utils, "BASE_DIR", str(data_dir))
     utils.WORK_ID_CACHE.clear()
     utils.WORK_ID_CACHE["secret1"] = str(work_dir)
@@ -45,6 +44,43 @@ def restricted_work_env(backend_env, monkeypatch, tmp_path):
 
 def _auth(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+def test_admin_sees_full_prosopography_path_diff(client, login, backend_env, monkeypatch, tmp_path):
+    """Kolmesegmendiline config/prosopography tee ei tohi kaotada config/ prefiksit."""
+    import server.git_ops as git_ops
+    import server.routers.editing as editing
+
+    data_dir = tmp_path / "git-data"
+    person_dir = data_dir / "config" / "prosopography"
+    person_dir.mkdir(parents=True)
+    person_path = person_dir / "abc123.json"
+    repo = Repo.init(str(data_dir))
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "test").set_value("user", "email", "test@example.test")
+
+    person_path.write_text(json.dumps({"id": "vutt:Pabc123", "notes": "vana"}), encoding="utf-8")
+    repo.index.add(["config/prosopography/abc123.json"])
+    repo.index.commit("Prosopo algseis")
+    person_path.write_text(json.dumps({"id": "vutt:Pabc123", "notes": "uus"}), encoding="utf-8")
+    repo.index.add(["config/prosopography/abc123.json"])
+    commit = repo.index.commit("Prosopo muudatus")
+
+    monkeypatch.setattr(editing, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(git_ops, "BASE_DIR", str(data_dir))
+    monkeypatch.setattr(git_ops, "_git_repo", repo)
+
+    token = login("admin", "adminpass")
+    response = client.post("/commit-diff", json={
+        "commit_hash": commit.hexsha,
+        "filepath": "config/prosopography/abc123.json",
+    }, headers=_auth(token))
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "success"
+    assert "config/prosopography/abc123.json" in payload["diff"]
+    assert 'uus' in payload["diff"]
 
 
 @pytest.mark.parametrize(("path", "body"), [
