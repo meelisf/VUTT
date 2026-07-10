@@ -4,6 +4,7 @@ import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from git import Actor
+from starlette.concurrency import run_in_threadpool
 
 from ..auth import delete_user_sessions, load_users, save_users
 from ..cache import get_cached_archives, get_cached_collections
@@ -16,6 +17,11 @@ from ..utils import atomic_write_json, find_directory_by_id, metadata_lock
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+def _read_json(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
 @router.get("/collections")
@@ -34,15 +40,14 @@ async def create_archive(request: Request, user=Depends(require_role("admin"))):
         raise HTTPException(status_code=400, detail="Lühend ja nimi on kohustuslikud")
     archives = {}
     if os.path.exists(ARCHIVES_FILE):
-        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
-            archives = json.load(f)
+        archives = await run_in_threadpool(_read_json, ARCHIVES_FILE)
     if archive_id in archives:
         raise HTTPException(status_code=409, detail=f"Arhiiv tähisega '{archive_id}' on juba olemas")
     entry: dict = {"name": name}
     if url:
         entry["url"] = url
     archives[archive_id] = entry
-    atomic_write_json(ARCHIVES_FILE, archives)
+    await run_in_threadpool(atomic_write_json, ARCHIVES_FILE, archives)
     _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
@@ -55,24 +60,23 @@ async def update_archive(archive_id: str, request: Request, user=Depends(require
         raise HTTPException(status_code=400, detail="Nimi on kohustuslik")
     archives = {}
     if os.path.exists(ARCHIVES_FILE):
-        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
-            archives = json.load(f)
+        archives = await run_in_threadpool(_read_json, ARCHIVES_FILE)
     if archive_id not in archives:
         raise HTTPException(status_code=404, detail=f"Arhiivi '{archive_id}' ei leitud")
     entry: dict = {"name": name}
     if url:
         entry["url"] = url
     archives[archive_id] = entry
-    atomic_write_json(ARCHIVES_FILE, archives)
+    await run_in_threadpool(atomic_write_json, ARCHIVES_FILE, archives)
     _invalidate_all_caches()
     return {"status": "success", "id": archive_id, "archive": entry}
 
+# sync def → threadpool: arhiivi kustutus skannib kõiki teoseid (_find_works_with_archive)
 @router.delete("/config/archives/{archive_id}")
-async def delete_archive(archive_id: str, force: bool = False, user=Depends(require_role("admin"))):
+def delete_archive(archive_id: str, force: bool = False, user=Depends(require_role("admin"))):
     archives = {}
     if os.path.exists(ARCHIVES_FILE):
-        with open(ARCHIVES_FILE, 'r', encoding='utf-8') as f:
-            archives = json.load(f)
+        archives = _read_json(ARCHIVES_FILE)
     if archive_id not in archives:
         raise HTTPException(status_code=404, detail=f"Arhiivi '{archive_id}' ei leitud")
     if not force:
@@ -100,8 +104,7 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     # Loe olemaolev fail
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
-    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    data = await run_in_threadpool(_read_json, COLLECTIONS_FILE)
 
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
@@ -140,7 +143,7 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
         return {"status": "error", "message": "visibility peab olema 'public' või 'restricted'"}
 
     # Kirjuta tagasi
-    atomic_write_json(COLLECTIONS_FILE, data)
+    await run_in_threadpool(atomic_write_json, COLLECTIONS_FILE, data)
 
     # Invalideerib cache → järgmine /collections päring laeb uued andmed
     _invalidate_all_caches()
@@ -165,7 +168,7 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
             if updated != current:
                 changed_users.append(username)
             users_data[username]["allowed_collections"] = list(updated)
-        save_users(users_data)
+        await run_in_threadpool(save_users, users_data)
         # Invalideeri muutunud kasutajate sessioonid, et uus ligipääs jõustuks kohe (Leid I)
         for username in changed_users:
             delete_user_sessions(username)
@@ -173,12 +176,11 @@ async def admin_update_collection(collection_id: str, request: Request, backgrou
     return {"status": "success"}
 
 @router.get("/admin/collections/{collection_id}/users")
-async def admin_collection_users(collection_id: str, user=Depends(require_role("admin"))):
+def admin_collection_users(collection_id: str, user=Depends(require_role("admin"))):
     """Tagastab kollektsiooni metaandmed koos ligipääsuga kasutajate nimekirjaga."""
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
-    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    data = _read_json(COLLECTIONS_FILE)
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}
     col = data[collection_id]
@@ -211,8 +213,7 @@ async def admin_create_collection(request: Request, user=Depends(require_role("s
 
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
-    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    data = await run_in_threadpool(_read_json, COLLECTIONS_FILE)
 
     if collection_id in data:
         return {"status": "error", "message": f"ID '{collection_id}' on juba kasutusel"}
@@ -229,7 +230,7 @@ async def admin_create_collection(request: Request, user=Depends(require_role("s
 
     data[collection_id] = new_col
 
-    atomic_write_json(COLLECTIONS_FILE, data)
+    await run_in_threadpool(atomic_write_json, COLLECTIONS_FILE, data)
 
     _invalidate_all_caches()
     return {"status": "success"}
@@ -295,13 +296,13 @@ def admin_collection_works_count(collection_id: str, user=Depends(require_role("
     count = len(_find_works_with_collection(collection_id))
     return {"status": "success", "count": count}
 
+# sync def → threadpool: skannib ja kirjutab kõiki mõjutatud teoseid + git commit
 @router.delete("/admin/collections/{collection_id}")
-async def admin_delete_collection(collection_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
+def admin_delete_collection(collection_id: str, background_tasks: BackgroundTasks, user=Depends(require_role("superadmin"))):
     """Kustutab kollektsiooni ja eemaldab selle ID kõigi teoste metaandmetest. Keeldub kui on alamkollektsioone."""
     if not os.path.exists(COLLECTIONS_FILE):
         return {"status": "error", "message": "collections.json ei leitud"}
-    with open(COLLECTIONS_FILE, 'r', encoding='utf-8') as f:
-        data = json.load(f)
+    data = _read_json(COLLECTIONS_FILE)
 
     if collection_id not in data:
         return {"status": "error", "message": f"Kollektsioon '{collection_id}' ei leitud"}

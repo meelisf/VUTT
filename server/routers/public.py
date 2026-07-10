@@ -3,6 +3,7 @@ import os
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_read_work, can_write_work, is_work_public
 from ..admin_page_ops import get_sorted_images
@@ -39,7 +40,8 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
     if not can_write_work(_cur_meta, user):
         raise HTTPException(status_code=403, detail="Puudub õigus selle teose jagamist muuta")
     slug = os.path.basename(folder)
-    save_work_metadata(
+    await run_in_threadpool(
+        save_work_metadata,
         meta_path,
         {"shareable": shareable},
         user["username"],
@@ -52,7 +54,7 @@ async def toggle_shareable(work_id: str, request: Request, background_tasks: Bac
 
 
 @router.get("/work/{work_id}/viewer-token")
-async def get_viewer_token(work_id: str, request: Request):
+def get_viewer_token(work_id: str, request: Request):
     """Tagastab Meilisearch tokeni + pildi HMAC andmed juurdepääsuks ühele teosele.
     Kasutatakse shareable ja restricted teoste otselinkide jaoks."""
     import hashlib as _hashlib
@@ -78,7 +80,7 @@ async def get_viewer_token(work_id: str, request: Request):
 
 
 @router.get("/download/{work_id}")
-async def download_work(request: Request, work_id: str, content: str = "both"):
+def download_work(request: Request, work_id: str, content: str = "both"):
     """Laeb alla teose failid.
     content:
       'text'   → üks kokku liidetud .txt fail (sequence järjekorras)
@@ -207,7 +209,7 @@ async def download_work(request: Request, work_id: str, content: str = "both"):
         raise
 
 @router.get("/meta/home")
-async def home_meta(request: Request):
+def home_meta(request: Request):
     """Bot-koduleht: kollektsioonide kaupa grupeeritud teosed + isikute-hub.
     Linkgraafi peamine jaotuspunkt (iga avalik teos 1 hüppe kaugusel /-st)."""
     import time
@@ -230,7 +232,7 @@ async def home_meta(request: Request):
 
 
 @router.get("/meta/persons")
-async def persons_meta(request: Request):
+def persons_meta(request: Request):
     client_ip = get_client_ip(request)
     allowed, retry_after = check_rate_limit(client_ip, '/meta/persons')
     if not allowed:
@@ -240,7 +242,7 @@ async def persons_meta(request: Request):
 
 
 @router.get("/meta/person/{person_id:path}")
-async def person_meta(person_id: str, request: Request):
+def person_meta(person_id: str, request: Request):
     client_ip = get_client_ip(request)
     allowed, retry_after = check_rate_limit(client_ip, '/meta/person')
     if not allowed:
@@ -266,7 +268,7 @@ async def person_meta(person_id: str, request: Request):
 
 
 @router.get("/meta/work/{work_id}")
-async def work_meta(work_id: str, request: Request):
+def work_meta(work_id: str, request: Request):
     client_ip = get_client_ip(request)
     allowed, retry_after = check_rate_limit(client_ip, '/meta/work')
     if not allowed:
@@ -290,7 +292,7 @@ async def work_meta(work_id: str, request: Request):
     return HTMLResponse(content=build_meta_html(work_id, creator_persons=get_persons_for_work(work_id), include_text=False))
 
 @router.get("/sitemap.xml")
-async def sitemap_xml():
+def sitemap_xml():
     import time
     from .. import utils as utils_module
     now = time.time()

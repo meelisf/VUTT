@@ -1,11 +1,10 @@
-import asyncio
 import json
 import os
 import shutil
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from fastapi.datastructures import FormData
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from ..admin_page_ops import (
     clear_original_backup,
@@ -35,7 +34,7 @@ router = APIRouter()
 
 
 @router.get("/admin/work/{work_id}/pages")
-async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
+def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
     """Tagastab teose lehekülgede nimekirja halduseks (sequence järgi sorditud)."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -77,7 +76,7 @@ async def admin_work_pages(work_id: str, user=Depends(require_role("admin"))):
 
 
 @router.delete("/admin/work/{work_id}/page/{page_num}")
-async def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("admin"))):
+def admin_delete_page(work_id: str, page_num: int, user=Depends(require_role("admin"))):
     """Kustutab teose lehekülje: liigutab .jpg prügikasti, kustutab .txt ja .json gitist."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -121,7 +120,7 @@ async def admin_delete_pages(work_id: str, request: Request, user=Depends(requir
     except Exception:
         raise HTTPException(status_code=400, detail="Vigane päring")
 
-    result = delete_pages(work_id, base_names, username=user["username"])
+    result = await run_in_threadpool(delete_pages, work_id, base_names, username=user["username"])
     if result["status"] == "not_found":
         raise HTTPException(status_code=404, detail={"missing": result["missing"]})
     if result["status"] == "conflict":
@@ -130,7 +129,12 @@ async def admin_delete_pages(work_id: str, request: Request, user=Depends(requir
 
 
 @router.post("/admin/work/{work_id}/page/{page_num}/replace-image")
-async def admin_replace_page_image(work_id: str, page_num: int, request: Request, user=Depends(require_role("admin"))):
+def admin_replace_page_image(
+    work_id: str,
+    page_num: int,
+    file: UploadFile = File(...),
+    user=Depends(require_role("admin")),
+):
     """
     Asendab lehekülje pildi uuega. Vana pilt säilitatakse prügikastis 90 päeva.
     Body: multipart — file (JPG/PNG)
@@ -140,19 +144,8 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
 
-    # Parse multipart (async — enne luku võtmist)
-    try:
-        form: FormData = await request.form()
-        file: UploadFile = form.get("file")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
-
-    if not file:
-        raise HTTPException(status_code=400, detail="Fail puudub")
-
-    # Kontrolli failitüüpi + teisenda (jagatud helper: magic-byte, mõõtmekaitse,
-    # PNG→JPG valgele taustale). Enne luku võtmist.
-    content = await file.read()
+    # Kogu endpoint on sync def: FastAPI käitab Pillow/fail/git/Meili tee threadpoolis.
+    content = file.file.read()
     try:
         content, _ext = detect_and_convert_image(content, file.filename or "")
     except ValueError as e:
@@ -204,7 +197,12 @@ async def admin_replace_page_image(work_id: str, page_num: int, request: Request
 
 
 @router.post("/admin/work/{work_id}/add-page")
-async def admin_add_page(work_id: str, request: Request, user=Depends(require_role("admin"))):
+def admin_add_page(
+    work_id: str,
+    file: UploadFile = File(...),
+    after_page_num: int = Form(-1),
+    user=Depends(require_role("admin")),
+):
     """
     Lisab teosele uue lehekülje (JPG/PNG).
     Body: multipart — file (JPG/PNG), after_page_num (int, 0=algusesse, -1=lõppu)
@@ -215,19 +213,8 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     folder_name = os.path.basename(path)
 
-    # Parse multipart (async — enne luku võtmist)
-    try:
-        form: FormData = await request.form()
-        file: UploadFile = form.get("file")
-        after_page_num = int(form.get("after_page_num", -1))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
-
-    if not file:
-        raise HTTPException(status_code=400, detail="Fail puudub")
-
-    # Kontrolli failitüüpi + teisenda (enne luku võtmist)
-    content = await file.read()
+    # Kogu endpoint on sync def: FastAPI käitab Pillow/fail/git/Meili tee threadpoolis.
+    content = file.file.read()
     try:
         content, ext = detect_and_convert_image(content, file.filename or "")
     except ValueError as e:
@@ -309,32 +296,19 @@ async def admin_add_page(work_id: str, request: Request, user=Depends(require_ro
 
 
 @router.post("/admin/work/{work_id}/add-pages")
-async def admin_add_pages(work_id: str, request: Request, user=Depends(require_role("admin"))):
+def admin_add_pages(
+    work_id: str,
+    files: list[UploadFile] = File(..., alias="file"),
+    after_page_num: int = Form(-1),
+    user=Depends(require_role("admin")),
+):
     """Lisab teosele mitu lehekülge korraga (JPG/PNG), nimejärgi sorteeritud.
     Body: multipart — mitu `file`-välja + after_page_num (int, 0=algusesse, -1=lõppu).
     """
-    try:
-        form: FormData = await request.form()
-        after_page_num = int(form.get("after_page_num", -1))
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Vigane vorm: {e}")
-
-    uploads = form.getlist("file")
-    if not uploads:
-        raise HTTPException(status_code=400, detail="Faile pole")
-
-    files = []
-    for up in uploads:
-        if not hasattr(up, "read"):
-            continue
-        content = await up.read()
-        files.append((up.filename or "", content))
+    upload_data = [(up.filename or "", up.file.read()) for up in files]
 
     try:
-        # add_pages on blokeeriv (Pillow-teisendus, failikirjutus, flock, git commit) —
-        # offload threadpooli, et mitte külmutada single-worker event-loopi (vt OCR-SSH outage)
-        loop = asyncio.get_running_loop()
-        result = await loop.run_in_executor(None, add_pages, work_id, files, after_page_num, user["username"])
+        result = add_pages(work_id, upload_data, after_page_num, user["username"])
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
@@ -350,7 +324,9 @@ async def admin_split_page(work_id: str, page_num: int, request: Request, user=D
     if split_x is None:
         raise HTTPException(status_code=400, detail="split_x on kohustuslik")
     try:
-        result = split_page(work_id, page_num, float(split_x), user["username"])
+        result = await run_in_threadpool(
+            split_page, work_id, page_num, float(split_x), user["username"]
+        )
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
@@ -366,7 +342,15 @@ async def admin_transform_page_image(work_id: str, filename: str, request: Reque
     crop = data.get("crop")
     quad = data.get("quad")
     try:
-        result = transform_page_image(work_id, filename, angle=angle, crop=crop, quad=quad, username=user["username"])
+        result = await run_in_threadpool(
+            transform_page_image,
+            work_id,
+            filename,
+            angle=angle,
+            crop=crop,
+            quad=quad,
+            username=user["username"],
+        )
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not result.get("found", True):
@@ -375,7 +359,7 @@ async def admin_transform_page_image(work_id: str, filename: str, request: Reque
 
 
 @router.post("/admin/work/{work_id}/page-image/{filename}/restore-original")
-async def admin_restore_original_page_image(work_id: str, filename: str, user=Depends(require_role("admin"))):
+def admin_restore_original_page_image(work_id: str, filename: str, user=Depends(require_role("admin"))):
     """Taastab lehe pildi ._originals pristine versiooni."""
     try:
         result = restore_original_page_image(work_id, filename, username=user["username"])
@@ -394,9 +378,11 @@ async def admin_reorder_pages(work_id: str, request: Request, user=Depends(requi
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     data = await request.json()
     new_order = data.get("order", [])
-    result = reorder_pages(path, new_order, user.get("username", "admin"))
+    result = await run_in_threadpool(
+        reorder_pages, path, new_order, user.get("username", "admin")
+    )
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
     folder_name = os.path.basename(path)
-    sync_work_to_meilisearch(folder_name)
+    await run_in_threadpool(sync_work_to_meilisearch, folder_name)
     return {"status": "success"}

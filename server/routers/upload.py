@@ -42,7 +42,8 @@ async def admin_upload_create(request: Request, user=Depends(require_role("admin
     # sanitize_slug on idempotentne, seega juba korrektne slug ei muutu.
     slug = sanitize_slug(data.get("slug") or data.get("title", ""))
     data["slug"] = slug
-    return {"status": "success", "upload": create_upload(data, username=user["username"])}
+    upload = await run_in_threadpool(create_upload, data, username=user["username"])
+    return {"status": "success", "upload": upload}
 
 
 @router.get("/admin/upload/{upload_id}/status")
@@ -135,7 +136,7 @@ async def admin_upload_replace_work(
 
 @router.get("/admin/upload/{upload_id}/meta")
 async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin"))):
-    state = get_upload(upload_id)
+    state = await run_in_threadpool(get_upload, upload_id)
     if not state:
         raise HTTPException(status_code=404, detail="Upload ei leitud")
     return {"status": "success", "meta": state.get("meta", {})}
@@ -144,7 +145,7 @@ async def admin_upload_get_meta(upload_id: str, user=Depends(require_role("admin
 @router.patch("/admin/upload/{upload_id}/meta")
 async def admin_upload_update_meta(upload_id: str, request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    if not update_upload_meta(upload_id, data):
+    if not await run_in_threadpool(update_upload_meta, upload_id, data):
         raise HTTPException(status_code=404, detail="Upload ei leitud")
     return {"status": "success"}
 

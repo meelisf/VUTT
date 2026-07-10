@@ -23,6 +23,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
+from starlette.concurrency import run_in_threadpool
 
 from ..config import BASE_DIR
 from ..deps import get_user, require_role, get_json_data
@@ -40,24 +41,9 @@ from ..notifications_ops import (
 router = APIRouter()
 
 
-@router.post("/page-comments/reply")
-async def reply_to_page_comment(
-    request: Request,
-    background_tasks: BackgroundTasks,
-    user=Depends(require_role("editor")),
-):
-    """Lisab lehekülje kommentaarile vastuse ja loob kommentaari autorile teavituse."""
-    data = await get_json_data(request)
-    catalog = os.path.basename(data.get('original_path', ''))
-    filename = os.path.basename(data.get('file_name', ''))
-    comment_id = str(data.get('comment_id', '')).strip()
-    reply_text = unicodedata.normalize('NFC', str(data.get('text', '')).strip())
-    work_id = str(data.get('work_id', '')).strip()
-    page_number = int(data.get('page_number') or 0)
-
-    if not catalog or not filename or not comment_id or not reply_text:
-        raise HTTPException(status_code=400, detail="Puudulikud vastuse andmed")
-
+def _apply_reply_sync(catalog, filename, comment_id, reply_text, work_id, page_number, user):
+    """Blokeeriv osa: faililugemine + git commit + teavitus. Jookseb threadpool'is,
+    et event-loop ei külmuks (vt issue #111)."""
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
     if not os.path.exists(txt_path) or not os.path.exists(json_path):
@@ -104,7 +90,6 @@ async def reply_to_page_comment(
         message=f"Vasta kommentaarile: {os.path.relpath(json_path, BASE_DIR)}",
         additional_files=[(json_path, json.dumps(meta_content, indent=2, ensure_ascii=False))]
     )
-    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
 
     recipient = target_comment.get('author_username') or find_username_by_display_name(target_comment.get('author'))
     if recipient and recipient != user['username']:
@@ -132,8 +117,71 @@ async def reply_to_page_comment(
     }
 
 
+def _deliver_notifications_sync(recipients, notification_type, title, body, link, user, users_by_username, recipient_mode):
+    """Blokeeriv teavituste kirjutamine (file write per saaja). Jookseb threadpool'is."""
+    created = [
+        create_notification(
+            recipient,
+            notification_type,
+            title,
+            body,
+            link,
+            actor=user,
+            metadata={"sent_by_role": user.get("role", "")},
+        )
+        for recipient in recipients
+    ]
+    recipient_names = [
+        users_by_username[recipient].get("name") or recipient
+        for recipient in recipients
+        if recipient in users_by_username
+    ]
+    if user.get("username"):
+        create_notification(
+            user["username"],
+            "sent_notification",
+            title,
+            body,
+            link,
+            actor=user,
+            metadata={
+                "sent_by_role": user.get("role", ""),
+                "recipient_mode": recipient_mode,
+                "recipient_usernames": recipients,
+                "recipient_names": recipient_names,
+                "delivered_count": len(created),
+            },
+        )
+    return len(created)
+
+
+@router.post("/page-comments/reply")
+async def reply_to_page_comment(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(require_role("editor")),
+):
+    """Lisab lehekülje kommentaarile vastuse ja loob kommentaari autorile teavituse."""
+    data = await get_json_data(request)
+    catalog = os.path.basename(data.get('original_path', ''))
+    filename = os.path.basename(data.get('file_name', ''))
+    comment_id = str(data.get('comment_id', '')).strip()
+    reply_text = unicodedata.normalize('NFC', str(data.get('text', '')).strip())
+    work_id = str(data.get('work_id', '')).strip()
+    page_number = int(data.get('page_number') or 0)
+
+    if not catalog or not filename or not comment_id or not reply_text:
+        raise HTTPException(status_code=400, detail="Puudulikud vastuse andmed")
+
+    result = await run_in_threadpool(
+        _apply_reply_sync, catalog, filename, comment_id, reply_text, work_id, page_number, user
+    )
+    background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
+    return result
+
+
 @router.get("/notifications")
-async def get_notifications(request: Request, user=Depends(get_user)):
+def get_notifications(request: Request, user=Depends(get_user)):
     """Kasutaja enda teavitused. ``?unread=true`` filtreerib loetud teatised välja."""
     unread_only = request.query_params.get('unread') == 'true'
     with _notifications_lock:
@@ -219,44 +267,15 @@ async def send_notification(request: Request, user=Depends(require_role("editor"
         recipients = [recipient_username]
         notification_type = "review_request"
 
-    created = [
-        create_notification(
-            recipient,
-            notification_type,
-            title,
-            body,
-            link,
-            actor=user,
-            metadata={"sent_by_role": user.get("role", "")},
-        )
-        for recipient in recipients
-    ]
-    recipient_names = [
-        users_by_username[recipient].get("name") or recipient
-        for recipient in recipients
-        if recipient in users_by_username
-    ]
-    if user.get("username"):
-        create_notification(
-            user["username"],
-            "sent_notification",
-            title,
-            body,
-            link,
-            actor=user,
-            metadata={
-                "sent_by_role": user.get("role", ""),
-                "recipient_mode": recipient_mode,
-                "recipient_usernames": recipients,
-                "recipient_names": recipient_names,
-                "delivered_count": len(created),
-            },
-        )
-    return {"status": "success", "created": len(created)}
+    delivered = await run_in_threadpool(
+        _deliver_notifications_sync,
+        recipients, notification_type, title, body, link, user, users_by_username, recipient_mode
+    )
+    return {"status": "success", "created": delivered}
 
 
 @router.post("/notifications/{notification_id}/read")
-async def mark_notification_read(notification_id: str, user=Depends(get_user)):
+def mark_notification_read(notification_id: str, user=Depends(get_user)):
     """Märgib teatise loetuks (idempotentne: juba loetud teatis jääb loetuks)."""
     with _notifications_lock:
         notifications = load_notifications(user['username'])

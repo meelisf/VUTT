@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from ..auth import create_session, delete_session, get_session, load_users, require_token, verify_user
 from ..config import SESSION_DURATION, get_logger
@@ -45,7 +46,8 @@ async def login(request: Request):
     if locked:
         logger.warning(f"Login blokeeritud (konto lukus): username={username!r} ip={client_ip} retry_after={acc_retry}s")
         return JSONResponse(status_code=429, content={"status": "error", "message": f"Liiga palju ebaõnnestunud katseid. Proovi uuesti {acc_retry}s pärast"})
-    user = verify_user(username, data.get("password", ""))
+    # bcrypt on CPU-raske (~100ms) — event-loopis blokeeriks kõiki teisi päringuid.
+    user = await run_in_threadpool(verify_user, username, data.get("password", ""))
     if user:
         clear_login_failures(username)
         from ..meilisearch_ops import generate_meili_token
@@ -128,7 +130,8 @@ async def register(request: Request):
     data = await request.json()
     if data.get("website"):
         return {"status": "success"}
-    registration, error = add_registration(
+    registration, error = await run_in_threadpool(
+        add_registration,
         data.get("name", ""),
         data.get("email", ""),
         data.get("affiliation"),
@@ -145,12 +148,13 @@ async def register_username_preview(email: str = ""):
     email = email.strip().lower()
     if not email or "@" not in email:
         return {"status": "success", "username": ""}
-    return {"status": "success", "username": suggest_username_for_email(email)}
+    username = await run_in_threadpool(suggest_username_for_email, email)
+    return {"status": "success", "username": username}
 
 
 @router.get("/invite/{token}")
 async def check_invite(token: str):
-    token_data, error = validate_invite_token(token)
+    token_data, error = await run_in_threadpool(validate_invite_token, token)
     if token_data:
         return {
             "status": "success",
@@ -170,7 +174,9 @@ async def set_password(request: Request):
     if not allowed:
         return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"})
     data = await request.json()
-    new_user, error = create_user_from_invite(data.get("token", ""), data.get("password", ""))
+    new_user, error = await run_in_threadpool(
+        create_user_from_invite, data.get("token", ""), data.get("password", "")
+    )
     if not new_user:
         raise HTTPException(status_code=400, detail=error)
     return {"status": "success", "username": new_user["username"]}
@@ -184,7 +190,9 @@ async def reset_validate(request: Request):
     if not allowed:
         return JSONResponse(status_code=429, content={"status": "error", "valid": False, "message": "Liiga palju päringuid"})
     data = await request.json()
-    token_data, error = validate_reset_token((data.get("token") or "").strip())
+    token_data, error = await run_in_threadpool(
+        validate_reset_token, (data.get("token") or "").strip()
+    )
     if token_data:
         return {
             "status": "success",
@@ -204,7 +212,9 @@ async def reset_set_password(request: Request):
     if not allowed:
         return JSONResponse(status_code=429, content={"status": "error", "message": "Liiga palju päringuid"})
     data = await request.json()
-    result, error = complete_password_reset((data.get("token") or "").strip(), data.get("password", ""))
+    result, error = await run_in_threadpool(
+        complete_password_reset, (data.get("token") or "").strip(), data.get("password", "")
+    )
     if not result:
         raise HTTPException(status_code=400, detail=error)
     return {"status": "success", "username": result["username"]}

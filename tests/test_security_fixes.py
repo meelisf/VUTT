@@ -78,8 +78,7 @@ def test_sitemap_uses_snapshot_not_live_cache(monkeypatch):
 
     monkeypatch.setattr(utils_mod, "WORK_ID_CACHE", {"w1": "/data/w1", "w2": "/data/w2"})
 
-    import asyncio
-    asyncio.run(public_router.sitemap_xml())
+    public_router.sitemap_xml()
 
     assert captured_args, "build_sitemap_xml ei kutsutud"
     passed_cache = captured_args[0]

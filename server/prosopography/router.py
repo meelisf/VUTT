@@ -6,6 +6,7 @@ import json
 import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
 from fastapi.responses import FileResponse
+from starlette.concurrency import run_in_threadpool
 
 from ..auth import require_token
 from ..config import get_logger
@@ -108,7 +109,7 @@ async def _get_json(request: Request) -> dict:
 # =========================================================
 
 @router.get("")
-async def prosopography_list(
+def prosopography_list(
     request: Request,
     q: str = None,
     gender: str = None,
@@ -161,7 +162,8 @@ async def prosopography_query(request: Request):
     Väldib liiga pikka query stringi, kui ids massiiv on suur.
     """
     data = await _get_json(request)
-    return list_persons(
+    return await run_in_threadpool(
+        list_persons,
         q=data.get("q"),
         gender=data.get("gender"),
         occupation=data.get("occupation"),
@@ -183,7 +185,7 @@ async def prosopography_query(request: Request):
 
 
 @router.get("/map")
-async def prosopography_map(
+def prosopography_map(
     request: Request,
     q: str = None,
     gender: str = None,
@@ -224,7 +226,7 @@ async def prosopography_map(
 
 
 @router.get("/facets")
-async def prosopography_facets(
+def prosopography_facets(
     q: str = None,
     gender: str = None,
     ids: str = None,
@@ -245,7 +247,8 @@ async def prosopography_facets_post(request: Request):
     """POST variant /facets — kasuta kui ids nimekiri on pikk (414 vältimiseks)."""
     data = await _get_json(request)
     id_list = data.get("ids") or None
-    return get_person_facets(
+    return await run_in_threadpool(
+        get_person_facets,
         q=data.get("q"),
         gender=data.get("gender"),
         ids=id_list,
@@ -268,6 +271,23 @@ def _load_work_meta(work_id: str):
         return None
 
 
+def _collect_work_titles(work_ids):
+    """Blokeeriv osa: kuni 200 metadata-faili lugemine. Jookseb threadpool'is."""
+    result: dict = {}
+    for wid in work_ids[:200]:
+        if not isinstance(wid, str) or wid in result:
+            continue
+        meta = _load_work_meta(wid)
+        if meta is None:
+            continue
+        result[wid] = {
+            "title": meta.get("title") or "",
+            "year": meta.get("year"),
+            "restricted": not is_work_public(meta),
+        }
+    return result
+
+
 @router.post("/work-titles")
 async def prosopography_work_titles(request: Request):
     """Tagastab teoste pealkirjad ID järgi (sh kaitstud kollektsioonide teosed).
@@ -281,18 +301,8 @@ async def prosopography_work_titles(request: Request):
     work_ids = data.get("work_ids") or []
     if not isinstance(work_ids, list):
         raise HTTPException(status_code=400, detail="work_ids peab olema massiiv")
-    result: dict = {}
-    for wid in work_ids[:200]:
-        if not isinstance(wid, str) or wid in result:
-            continue
-        meta = _load_work_meta(wid)
-        if meta is None:
-            continue
-        result[wid] = {
-            "title": meta.get("title") or "",
-            "year": meta.get("year"),
-            "restricted": not is_work_public(meta),
-        }
+    # Kuni 200 metadata-faili lugemine — event-loopis blokeeriks kõiki teisi päringuid.
+    result = await run_in_threadpool(_collect_work_titles, work_ids)
     return {"titles": result}
 
 
@@ -303,7 +313,7 @@ async def prosopography_create(
 ):
     """Loob uue vutt:P kirje."""
     data = await _get_json(request)
-    person = create_person(data, username=user["username"])
+    person = await run_in_threadpool(create_person, data, username=user["username"])
     enrich_entity_labels_from_person_async(person)
     return person
 
@@ -322,7 +332,7 @@ async def enrichment_preview(
     Kutsutakse /persons/new vormi täitmisel.
     """
     from .enrichment import fetch_and_diff
-    diff = fetch_and_diff(scheme, id, {})
+    diff = await run_in_threadpool(fetch_and_diff, scheme, id, {})
     return diff
 
 
@@ -349,7 +359,7 @@ async def enrichment_preview_for_person(
     )
     if not ext_id:
         raise HTTPException(status_code=400, detail=f"Isikul puudub {scheme} identifikaator")
-    diff = fetch_and_diff(scheme, ext_id, person)
+    diff = await run_in_threadpool(fetch_and_diff, scheme, ext_id, person)
     return diff
 
 
@@ -370,7 +380,9 @@ async def prosopography_add_identifier(
     if not scheme or not ext_id:
         raise HTTPException(status_code=400, detail="Nõutud: scheme ja id")
     try:
-        person, diff = add_identifier(person_id, scheme, ext_id, username=user["username"])
+        person, diff = await run_in_threadpool(
+            add_identifier, person_id, scheme, ext_id, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     return {"person": person, "diff": diff}
@@ -390,7 +402,9 @@ async def prosopography_enrich(
     approved = data.get("approved", {})
     approved["_enrichment_scheme"] = data.get("_enrichment_scheme")
     try:
-        person = apply_enrichment(person_id, approved, username=user["username"])
+        person = await run_in_threadpool(
+            apply_enrichment, person_id, approved, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     return person
@@ -411,7 +425,9 @@ async def prosopography_upload_image(
     if not body:
         raise HTTPException(status_code=400, detail="Fail puudub")
     try:
-        person = upload_person_image(person_id, body, content_type, username=user["username"])
+        person = await run_in_threadpool(
+            upload_person_image, person_id, body, content_type, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     except ValueError as e:
@@ -437,7 +453,9 @@ async def prosopography_delete_image(
 ):
     """Kustutab isiku pildi."""
     try:
-        person = delete_person_image(person_id, username=user["username"])
+        person = await run_in_threadpool(
+            delete_person_image, person_id, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     return {"status": "ok", "updated_at": person["updated_at"]}
@@ -460,7 +478,7 @@ async def places_merge(
     if not target_key:
         raise HTTPException(status_code=400, detail="target_key on kohustuslik")
     try:
-        result = merge_places(source_key, target_key)
+        result = await run_in_threadpool(merge_places, source_key, target_key)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -472,7 +490,7 @@ async def places_merge(
 # ── Ajalugu ja taastamine ──────────────────────────────────
 
 @router.get("/{person_id:path}/history")
-async def person_history(person_id: str, user=Depends(_require_role("editor"))):
+def person_history(person_id: str, user=Depends(_require_role("editor"))):
     """Tagastab isikukaardi muudatuste ajaloo (git commitid)."""
     try:
         nanoid = _safe_nanoid(person_id)
@@ -484,7 +502,7 @@ async def person_history(person_id: str, user=Depends(_require_role("editor"))):
 
 
 @router.get("/{person_id:path}/diff")
-async def person_diff(person_id: str, commit: str, user=Depends(_require_role("editor"))):
+def person_diff(person_id: str, commit: str, user=Depends(_require_role("editor"))):
     """Tagastab commit-i muutunud väljade loendi võrreldes eelmise commitiga."""
     try:
         nanoid = _safe_nanoid(person_id)
@@ -533,7 +551,7 @@ async def person_restore(person_id: str, request: Request, user=Depends(_require
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     relative_path = f"config/prosopography/{nanoid}.json"
 
-    content = get_file_at_commit(relative_path, commit_hash)
+    content = await run_in_threadpool(get_file_at_commit, relative_path, commit_hash)
     if content is None:
         raise HTTPException(status_code=404, detail="Commit ei leitud")
 
@@ -548,15 +566,16 @@ async def person_restore(person_id: str, request: Request, user=Depends(_require
 
     path = os.path.join(PROSOPOGRAPHY_DIR, f"{nanoid}.json")
     name = (person.get("name") or {}).get("label") or person_id
-    save_with_git(
+    await run_in_threadpool(
+        save_with_git,
         path,
         json.dumps(person, ensure_ascii=False, indent=2),
         user["username"],
         message=f"Prosopo taastamine: {name} [{person_id}]",
     )
 
-    _update_index_entry(person)
-    _update_aliases_entry(person)
+    await run_in_threadpool(_update_index_entry, person)
+    await run_in_threadpool(_update_aliases_entry, person)
     return {"status": "ok", "person": person}
 
 
@@ -578,7 +597,9 @@ async def prosopography_merge(
     if not target_id:
         raise HTTPException(status_code=400, detail="target_id on kohustuslik.")
     try:
-        result = merge_person(source_id, target_id, username=user["username"])
+        result = await run_in_threadpool(
+            merge_person, source_id, target_id, username=user["username"]
+        )
     except KeyError as e:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {e}")
     except ValueError as e:
@@ -594,7 +615,9 @@ async def prosopography_delete_person(
 ):
     """Kustutab isikukaardi jäädavalt (admin only). Blokeerib kui teostes/relations viited."""
     try:
-        result = delete_person(person_id, username=user["username"])
+        result = await run_in_threadpool(
+            delete_person, person_id, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     except ValueError as e:
@@ -610,13 +633,13 @@ async def prosopography_delete_person(
 
 
 @router.get("/relation-type-suggestions")
-async def prosopography_relation_type_suggestions():
+def prosopography_relation_type_suggestions():
     """Tagastab kõigis kaartides kasutatud unikaalsed seose tüübid. Avalik endpoint."""
     return get_relation_type_suggestions()
 
 
 @router.get("/work-relations/{person_id:path}")
-async def prosopography_work_relations(
+def prosopography_work_relations(
     person_id: str,
     limit: int = 10,
     offset: int = 0,
@@ -628,14 +651,14 @@ async def prosopography_work_relations(
 # ── Places register ────────────────────────────────────────────────────────
 
 @router.get("/places/wikidata-search")
-async def places_wikidata_search(request: Request, q: str = "", lang: str = "en"):
+def places_wikidata_search(request: Request, q: str = "", lang: str = "en"):
     """Otsib Wikidatast kohti nime järgi. Avalik (rate-limititud, et vältida proksi kuritarvitust)."""
     _check_wikidata_rate_limit(request)
     return search_places_wikidata(q.strip(), lang=lang)
 
 
 @router.get("/places/wikidata/{qid}")
-async def places_wikidata_fetch(qid: str, request: Request):
+def places_wikidata_fetch(qid: str, request: Request):
     """Pärib Wikidatast koha andmed (labelid, tüüp, P131 ülempiirkonnad). Avalik (rate-limititud)."""
     _check_wikidata_rate_limit(request)
     result = fetch_place_wikidata(qid)
@@ -645,13 +668,13 @@ async def places_wikidata_fetch(qid: str, request: Request):
 
 
 @router.get("/places")
-async def places_list():
+def places_list():
     """Tagastab kõik places.json kirjed. Avalik — töötab kõigil rollidel."""
     return get_places()
 
 
 @router.get("/places/meta")
-async def places_meta():
+def places_meta():
     """Tagastab origin_groups.json sisu + lubatud type väärtused. Avalik."""
     return get_places_meta()
 
@@ -670,13 +693,13 @@ async def groups_put(key: str, request: Request, user=Depends(_require_role("adm
     """Lisab või uuendab gruppi (admin). Body: {labels, sort_order, parent}"""
     data = await _get_json(request)
     try:
-        return put_group(key, data)
+        return await run_in_threadpool(put_group, key, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/admin/groups/{key}")
-async def groups_delete(key: str, user=Depends(_require_role("admin"))):
+def groups_delete(key: str, user=Depends(_require_role("admin"))):
     """Kustutab grupi (admin)."""
     try:
         delete_group(key)
@@ -686,13 +709,13 @@ async def groups_delete(key: str, user=Depends(_require_role("admin"))):
 
 
 @router.post("/admin/groups/auto-assign")
-async def groups_auto_assign(user=Depends(_require_role("admin"))):
+def groups_auto_assign(user=Depends(_require_role("admin"))):
     """Rakendab automaatse parent seadmise teadaolevatele alamgruppidele."""
     return auto_assign_group_parents()
 
 
 @router.delete("/admin/places/{key}")
-async def places_delete(
+def places_delete(
     key: str,
     user=Depends(_require_role("admin")),
 ):
@@ -719,7 +742,7 @@ async def places_put(
     """
     data = await _get_json(request)
     try:
-        entry = put_place(key, data)
+        entry = await run_in_threadpool(put_place, key, data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -729,7 +752,7 @@ async def places_put(
 
 
 @router.get("/{person_id:path}")
-async def prosopography_get(
+def prosopography_get(
     person_id: str,
     user=Depends(_optional_user),
 ):
@@ -760,10 +783,12 @@ async def prosopography_update(
     """
     data = await _get_json(request)
     # Loe vana seis ENNE salvestust — server-side diff vastastikuste seoste jaoks
-    old_person = get_person(person_id)
+    old_person = await run_in_threadpool(get_person, person_id)
     old_relations = (old_person or {}).get("relations", [])
     try:
-        person = update_person(person_id, data, username=user["username"])
+        person = await run_in_threadpool(
+            update_person, person_id, data, username=user["username"]
+        )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
     except ValueError as e:
@@ -784,7 +809,8 @@ async def prosopography_update(
     # Sünkroniseeri vastastikused seosed (best-effort — viga ei blokeeri 200 vastust)
     try:
         a_label = (person.get("name") or {}).get("label", "")
-        sync_reciprocals(
+        await run_in_threadpool(
+            sync_reciprocals,
             person_id,
             old_relations,
             person.get("relations", []),
@@ -802,7 +828,7 @@ async def prosopography_rebuild(
     user=Depends(_require_role("admin")),
 ):
     """Taastab kõik kolm read-modeli nullist (admin only)."""
-    rebuild_indices()
+    await run_in_threadpool(rebuild_indices)
     return {"status": "ok", "message": "Indeksid taastatud."}
 
 
@@ -824,7 +850,8 @@ async def prosopography_bulk_occupation(
     if not person_ids:
         raise HTTPException(status_code=400, detail="person_ids on kohustuslik")
 
-    return bulk_update_occupation(
+    return await run_in_threadpool(
+        bulk_update_occupation,
         occupation=occupation,
         mode=mode,
         person_ids=person_ids,
