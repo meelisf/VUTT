@@ -99,8 +99,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
         # Säilita sequence väli kui on olemas (ära lase salvestamisel üle kirjutada)
         if os.path.exists(json_path):
             try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    existing = json.load(f)
+                existing = await run_in_threadpool(_read_json_file, json_path)
                 existing_seq = existing.get('sequence') or existing.get('meta_content', {}).get('sequence')
                 if existing_seq is not None and meta_content.get('sequence') is None:
                     meta_content['sequence'] = existing_seq
@@ -108,7 +107,13 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
                 pass
         additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
 
-    git_result = save_with_git(txt_path, text, user['username'], additional_files=additional if additional else None)
+    git_result = await run_in_threadpool(
+        save_with_git,
+        txt_path,
+        text,
+        user['username'],
+        additional_files=additional if additional else None,
+    )
     background_tasks.add_task(sync_work_to_meilisearch_async, catalog)
     work_id = (data.get('meta_content') or {}).get('work_id')
     if work_id:
@@ -138,7 +143,8 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     meta_path = os.path.join(path, '_metadata.json')
     slug = os.path.basename(path)
 
-    meta = save_work_metadata(
+    meta = await run_in_threadpool(
+        save_work_metadata,
         meta_path,
         data.get('metadata', {}),
         user['username'],
@@ -176,7 +182,12 @@ async def metadata_suggestions(request: Request, user=Depends(require_role("edit
 @router.get("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
     f_user = request.query_params.get('user') if is_at_least(user['role'], 'admin') else user['username']
-    res = get_recent_commits(username=f_user, limit=int(request.query_params.get('limit', 30)), skip=int(request.query_params.get('offset', 0)))
+    res = await run_in_threadpool(
+        get_recent_commits,
+        username=f_user,
+        limit=int(request.query_params.get('limit', 30)),
+        skip=int(request.query_params.get('offset', 0)),
+    )
     return {"status": "success", "commits": res["commits"], "has_more": res["has_more"], "is_admin": is_at_least(user['role'], 'admin')}
 
 @router.post("/git-history")
@@ -188,7 +199,8 @@ async def git_history(request: Request, user=Depends(require_role("editor"))):
         raise HTTPException(status_code=400, detail="Vigane failitee")
     await run_in_threadpool(_require_catalog_access, catalog, user)
     path = os.path.join(catalog, filename)
-    return {"status": "success", "history": get_file_git_history(path)}
+    history = await run_in_threadpool(get_file_git_history, path)
+    return {"status": "success", "history": history}
 
 @router.post("/commit-diff")
 async def commit_diff(request: Request, user=Depends(require_role("editor"))):
@@ -202,7 +214,7 @@ async def commit_diff(request: Request, user=Depends(require_role("editor"))):
         # editorile on mitte-teose tee alati keelatud.
         if not (exc.status_code == 404 and is_at_least(user['role'], 'admin')):
             raise
-    diff_res = get_commit_diff(commit_hash, filepaths=clean_path)
+    diff_res = await run_in_threadpool(get_commit_diff, commit_hash, filepaths=clean_path)
     return {"status": "success", **diff_res} if diff_res else {"status": "error"}
 
 def _validate_page_paths(data):
@@ -227,6 +239,16 @@ def _validate_page_paths(data):
     return catalog, raw_file, json_relpath, json_path, txt_path
 
 
+def _read_json_file(path: str):
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+
+def _read_text_file(path: str):
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 def _read_current_comments(json_path):
     """Loeb praeguse comments-massiivi kettalt (toetab meta_content wrapperit)."""
     if not os.path.exists(json_path):
@@ -243,7 +265,7 @@ async def page_comments_history(request: Request, user=Depends(require_role("edi
     data = await get_json_data(request)
     _catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(data)
     await run_in_threadpool(_require_catalog_access, _catalog, user)
-    current = _read_current_comments(json_path)
+    current = await run_in_threadpool(_read_current_comments, json_path)
     result = await run_in_threadpool(build_comment_history, json_relpath, current)
     return {"status": "success", **result}
 
@@ -263,12 +285,12 @@ async def page_comments_restore(
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
 
     # commit_hash peab kuuluma SELLE faili ajalukku (mitte suvaline git-objekt)
-    history = get_file_git_history(json_relpath, max_count=500)
+    history = await run_in_threadpool(get_file_git_history, json_relpath, max_count=500)
     valid = {h['full_hash'] for h in history} | {h['hash'] for h in history}
     if commit_hash not in valid:
         raise HTTPException(status_code=400, detail="Commit ei kuulu selle faili ajalukku")
 
-    content = get_file_at_commit(json_relpath, commit_hash)
+    content = await run_in_threadpool(get_file_at_commit, json_relpath, commit_hash)
     if content is None:
         raise HTTPException(status_code=400, detail="Commitist ei leitud faili")
     restored = find_comment_in_content(content, comment_id)
@@ -277,8 +299,7 @@ async def page_comments_restore(
 
     if not os.path.exists(json_path):
         raise HTTPException(status_code=404, detail="Lehe metaandmeid ei leitud")
-    with open(json_path, 'r', encoding='utf-8') as f:
-        cur_data = json.load(f)
+    cur_data = await run_in_threadpool(_read_json_file, json_path)
     source = cur_data['meta_content'] if (
         isinstance(cur_data, dict) and isinstance(cur_data.get('meta_content'), dict)
     ) else cur_data
@@ -290,11 +311,13 @@ async def page_comments_restore(
     source['comments'] = new_comments
 
     # .txt jääb muutmata (taastame ainult kommentaari)
-    with open(txt_path, 'r', encoding='utf-8') as f:
-        txt = f.read()
+    txt = await run_in_threadpool(_read_text_file, txt_path)
 
-    save_with_git(
-        txt_path, txt, user['username'],
+    await run_in_threadpool(
+        save_with_git,
+        txt_path,
+        txt,
+        user['username'],
         message=f"Restore comment {comment_id}: {commit_hash[:8]}",
         additional_files=[(json_path, json.dumps(cur_data, indent=2, ensure_ascii=False))],
     )
@@ -310,17 +333,20 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
         raise HTTPException(status_code=400, detail="Vigane failitee")
     await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
     path = os.path.join(BASE_DIR, catalog, filename)
-    content = get_file_at_commit(os.path.join(catalog, filename), data.get('commit_hash'))
+    content = await run_in_threadpool(
+        get_file_at_commit, os.path.join(catalog, filename), data.get('commit_hash')
+    )
     if content is None: raise HTTPException(status_code=400, detail="Ei leitud")
 
     additional = None
     restored_text_annotations = None
     json_filename = os.path.splitext(filename)[0] + ".json"
     json_path = os.path.join(BASE_DIR, catalog, json_filename)
-    restored_json = get_file_at_commit(os.path.join(catalog, json_filename), data.get('commit_hash'))
+    restored_json = await run_in_threadpool(
+        get_file_at_commit, os.path.join(catalog, json_filename), data.get('commit_hash')
+    )
     if os.path.exists(json_path):
-        with open(json_path, 'r', encoding='utf-8') as f:
-            current_meta = json.load(f)
+        current_meta = await run_in_threadpool(_read_json_file, json_path)
         if restored_json is not None:
             try:
                 restored_meta = json.loads(restored_json)
@@ -335,7 +361,8 @@ async def git_restore(request: Request, background_tasks: BackgroundTasks, user=
             current_meta['updated_at'] = datetime.now().isoformat()
             additional = [(json_path, json.dumps(current_meta, indent=2, ensure_ascii=False))]
 
-    save_with_git(
+    await run_in_threadpool(
+        save_with_git,
         path,
         content,
         user['username'],
@@ -380,7 +407,8 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
                     return {'collections': [coll_id] if coll_id else []}
             return transform
 
-        bulk_update_field(
+        await run_in_threadpool(
+            bulk_update_field,
             os.path.join(path, '_metadata.json'),
             make_transform(),
             user['username'],
@@ -419,7 +447,8 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
                 return {'tags': cur}
             return transform
 
-        bulk_update_field(
+        await run_in_threadpool(
+            bulk_update_field,
             os.path.join(path, '_metadata.json'),
             make_transform(),
             user['username'],
@@ -462,7 +491,8 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
                 return {'genre': current}
             return transform
 
-        bulk_update_field(
+        await run_in_threadpool(
+            bulk_update_field,
             os.path.join(path, '_metadata.json'),
             make_transform(),
             user['username'],

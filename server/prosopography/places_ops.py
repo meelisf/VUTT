@@ -246,7 +246,7 @@ def _collect_descendants(place_key: str, places: dict, max_depth: int = MAX_PLAC
     return result
 
 
-async def _propagate_place_change(place_key: str) -> None:
+def _propagate_place_change(place_key: str) -> None:
     """
     Pärast places.json muutmist uuendab kõik mõjutatud isikute indeksikirjed.
     Käivitatakse background task-ina.
@@ -277,7 +277,7 @@ async def _propagate_place_change(place_key: str) -> None:
         logger.info("_propagate_place_change: uuendas indeksi place_key=%s", place_key)
 
 
-async def _propagate_place_merge(source_key: str, target_key: str) -> None:
+def _propagate_place_merge(source_key: str, target_key: str) -> None:
     """
     Pärast kohade ühendamist uuendab nii source kui target isikud indeksis.
     Source isikute failid ütlevad nüüd target_key — indeks peab järele jõudma.

@@ -26,20 +26,23 @@ async def people_register():
     return {"status": "success", "people": get_cached_people_register()}
 
 
+# sync def → threadpool: labels.json faililugemine ei blokeeri event-loopi
 @router.get("/entity-labels")
-async def entity_labels():
+def entity_labels():
     return load_entity_labels()
 
 
+# sync def → threadpool: Wikidata võrgupäringud + failikirjutused ei blokeeri event-loopi
 @router.post("/admin/refresh-entity-labels")
-async def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
+def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
     """Värskendab kõik labels.json Q-koodid Wikidatast (admin)."""
     count = refresh_all_entity_labels()
     return {"updated": count}
 
 
+# sync def → threadpool: skannib kõiki lehekülje-JSON-e (raske faililugemine)
 @router.post("/admin/enrich-page-tag-labels")
-async def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
+def admin_enrich_page_tag_labels(background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
     """Rikastab kõik lehekülje-tagide Q-koodid labels.json-i (retroaktiivselt).
 
     Skannib kõik lehekülje JSON-failid, kogub Q-koodid page_tags väljalt

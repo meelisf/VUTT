@@ -4,6 +4,7 @@ import shutil
 import threading
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
 from ..auth import can_manage_user, delete_user, get_all_users, update_user_allowed_collections, update_user_role
 from ..config import BASE_DIR
@@ -24,19 +25,22 @@ from ..utils import build_work_id_cache, find_directory_by_id
 router = APIRouter()
 
 
+# sync def → Starlette jooksutab threadpool'is (faililugemine ei blokeeri event-loopi)
 @router.post("/admin/registrations")
-async def admin_registrations(user=Depends(require_role("admin"))):
+def admin_registrations(user=Depends(require_role("admin"))):
     return {"status": "success", "registrations": load_pending_registrations()["registrations"]}
 
 
 @router.post("/admin/registrations/approve")
 async def approve_registration(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    reg = get_registration_by_id(data.get("registration_id"))
+    reg = await run_in_threadpool(get_registration_by_id, data.get("registration_id"))
     if not reg or reg["status"] != "pending":
         raise HTTPException(status_code=400, detail="Vigane taotlus")
-    update_registration_status(reg["id"], "approved", user["username"])
-    token_data = create_invite_token(reg["email"], reg["name"], user["username"], username=reg.get("username"))
+    await run_in_threadpool(update_registration_status, reg["id"], "approved", user["username"])
+    token_data = await run_in_threadpool(
+        create_invite_token, reg["email"], reg["name"], user["username"], username=reg.get("username")
+    )
     return {
         "status": "success",
         "invite_token": token_data["token"],
@@ -51,7 +55,9 @@ async def approve_registration(request: Request, user=Depends(require_role("admi
 @router.post("/admin/registrations/reject")
 async def reject_registration(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    reg = update_registration_status(data.get("registration_id"), "rejected", user["username"])
+    reg = await run_in_threadpool(
+        update_registration_status, data.get("registration_id"), "rejected", user["username"]
+    )
     if not reg:
         raise HTTPException(status_code=400, detail="Vigane taotlus")
     return {"status": "success"}
@@ -65,7 +71,9 @@ async def admin_users(user=Depends(require_role("admin"))):
 @router.post("/admin/users/update-role")
 async def admin_update_role(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    success, message = update_user_role(data.get("username"), data.get("new_role"), user)
+    success, message = await run_in_threadpool(
+        update_user_role, data.get("username"), data.get("new_role"), user
+    )
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success"}
@@ -76,7 +84,8 @@ async def admin_update_collections(request: Request, user=Depends(require_role("
     data = await get_json_data(request)
     # NB: anna allowed_collections muutmatult edasi (tüübikontroll on helperis,
     # et see kehtiks ka otseses ühiktestis); vastus sisaldab serveris salvestatud nimekirja
-    success, message, allowed = update_user_allowed_collections(
+    success, message, allowed = await run_in_threadpool(
+        update_user_allowed_collections,
         data.get("username"), data.get("allowed_collections", []), user)
     if not success:
         raise HTTPException(status_code=400, detail=message)
@@ -86,7 +95,7 @@ async def admin_update_collections(request: Request, user=Depends(require_role("
 @router.post("/admin/users/delete")
 async def admin_delete_user(request: Request, user=Depends(require_role("admin"))):
     data = await get_json_data(request)
-    success, message = delete_user(data.get("username"), user)
+    success, message = await run_in_threadpool(delete_user, data.get("username"), user)
     if not success:
         raise HTTPException(status_code=400, detail=message)
     return {"status": "success"}
@@ -112,7 +121,7 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
     if target != user["username"] and not can_manage_user(user["role"], users[target].get("role", "contributor")):
         raise HTTPException(status_code=403, detail="Ei saa lähtestada võrdse või kõrgema õigusega kasutajat")
 
-    token_data, error = create_reset_token(target, user["username"])
+    token_data, error = await run_in_threadpool(create_reset_token, target, user["username"])
     if not token_data:
         raise HTTPException(status_code=400, detail=error)
     return {
@@ -125,12 +134,12 @@ async def admin_reset_password(request: Request, user=Depends(require_role("admi
 
 
 @router.post("/admin/trash")
-async def admin_trash(user=Depends(require_role("admin"))):
+def admin_trash(user=Depends(require_role("admin"))):
     return {"status": "success", "items": list_deleted_works()}
 
 
 @router.post("/admin/trash/{work_id}/restore")
-async def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
+def admin_trash_restore(work_id: str, user=Depends(require_role("admin"))):
     res = restore_deleted_work(work_id, username=user["username"])
     if not res["ok"]:
         raise HTTPException(status_code=400, detail=res["error"])
@@ -138,7 +147,7 @@ async def admin_trash_restore(work_id: str, user=Depends(require_role("admin")))
 
 
 @router.get("/admin/work/{work_id}/metadata")
-async def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
+def admin_work_metadata(work_id: str, user=Depends(require_role("admin"))):
     """Tagastab teose _metadata.json sisu."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -151,7 +160,7 @@ async def admin_work_metadata(work_id: str, user=Depends(require_role("admin")))
 
 
 @router.get("/admin/work/{work_id}/trash-pages")
-async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
+def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
     """Loetleb teose kustutatud leheküljed."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -160,7 +169,7 @@ async def admin_trash_pages(work_id: str, user=Depends(require_role("admin"))):
 
 
 @router.post("/admin/work/{work_id}/trash-pages/{filename}/restore")
-async def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("admin"))):
+def admin_restore_page(work_id: str, filename: str, user=Depends(require_role("admin"))):
     """Taastab kustutatud lehekülje prügikastist."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -181,7 +190,7 @@ async def admin_git_failures(request: Request, user=Depends(require_role("admin"
 
 
 @router.post("/admin/git-health")
-async def admin_git_health(user=Depends(require_role("admin"))):
+def admin_git_health(user=Depends(require_role("admin"))):
     return {"status": "success", "git_ok": run_git_fsck()["ok"]}
 
 
@@ -197,7 +206,7 @@ async def admin_people_refresh_status(user=Depends(require_role("admin"))):
 
 
 @router.delete("/admin/work/{work_id}")
-async def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
+def admin_work_delete(work_id: str, user=Depends(require_role("admin"))):
     path = find_directory_by_id(work_id)
     if not path:
         raise HTTPException(status_code=404, detail="Teost ei leitud")

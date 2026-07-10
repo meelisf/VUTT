@@ -22,12 +22,42 @@ from ..utils import find_directory_by_id, generate_nanoid
 router = APIRouter()
 
 
+def _prepare_reocr_page(path: str, page_filename: str):
+    """Loeb mudeli meta ja kopeerib pildi temp-kausta blokeeriva I/O-na."""
+    img_path = os.path.join(path, page_filename)
+    if not os.path.isfile(img_path):
+        raise HTTPException(status_code=404, detail="Pilti ei leitud")
+    meta_path = os.path.join(path, "_metadata.json")
+    ocr_model = "print"
+    if os.path.isfile(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as meta_file:
+            meta = json.load(meta_file)
+        if isinstance(meta.get("type"), dict) and meta["type"].get("id") == "Q87167":
+            ocr_model = "hand"
+    tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
+    shutil.copy2(img_path, tmp_path)
+    return tmp_path, ocr_model
+
+
+def _validate_batch_pages(path: str, page_filenames):
+    """Kontrollib iga faili olemasolu (blokeeriv stat per fail); jookseb threadpool'is."""
+    pages = []
+    for fn in page_filenames:
+        # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
+        if not isinstance(fn, str) or fn != os.path.basename(fn):
+            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
+        if not os.path.isfile(os.path.join(path, fn)):
+            raise HTTPException(status_code=400, detail=f"Pilti ei leitud: {fn}")
+        pages.append((fn, None))
+    return pages
+
+
 @router.post("/admin/work/{work_id}/reocr-page")
 async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_role("admin"))):
     """Alustab lehekülje pildi re-OCR tööd. Tagastab job_id pollimiseks."""
     if get_active_reocr_count() >= REOCR_MAX_CONCURRENT:
         raise HTTPException(status_code=429, detail=f"Liiga palju korraga ({REOCR_MAX_CONCURRENT} max). Proovi hetke pärast uuesti.")
-    path = find_directory_by_id(work_id)
+    path = await run_in_threadpool(find_directory_by_id, work_id)
     if not path:
         raise HTTPException(status_code=404, detail="Teos ei leitud")
     slug = os.path.basename(path)
@@ -38,20 +68,20 @@ async def admin_reocr_page(work_id: str, request: Request, user=Depends(require_
     # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
     if not isinstance(page_filename, str) or page_filename != os.path.basename(page_filename):
         raise HTTPException(status_code=400, detail="Vigane failinimi")
-    img_path = os.path.join(path, page_filename)
-    if not os.path.isfile(img_path):
-        raise HTTPException(status_code=404, detail="Pilti ei leitud")
     page_number = data.get("page_number")
-    meta_path = os.path.join(path, "_metadata.json")
-    ocr_model = "print"
-    if os.path.isfile(meta_path):
-        with open(meta_path, "r", encoding="utf-8") as _mf:
-            _meta = json.load(_mf)
-        if isinstance(_meta.get("type"), dict) and _meta["type"].get("id") == "Q87167":
-            ocr_model = "hand"
-    tmp_path = f"/tmp/vutt-reocr-{generate_nanoid()}.jpg"
-    shutil.copy2(img_path, tmp_path)
-    job_id = start_reocr_job(work_id, slug, tmp_path, page_filename=page_filename, page_number=page_number, username=user["username"], material_type=ocr_model)
+    tmp_path, ocr_model = await run_in_threadpool(
+        _prepare_reocr_page, path, page_filename
+    )
+    job_id = await run_in_threadpool(
+        start_reocr_job,
+        work_id,
+        slug,
+        tmp_path,
+        page_filename=page_filename,
+        page_number=page_number,
+        username=user["username"],
+        material_type=ocr_model,
+    )
     return {"status": "accepted", "job_id": job_id}
 
 
@@ -88,13 +118,13 @@ def _enrich_titles(items: list) -> list:
 
 
 @router.get("/admin/reocr/jobs")
-async def admin_reocr_jobs(user=Depends(require_role("admin"))):
+def admin_reocr_jobs(user=Depends(require_role("admin"))):
     """Tagastab kõigi aktiivsete ja hiljutiste re-OCR tööde loendi."""
     return {"status": "success", "jobs": _enrich_titles(list_reocr_jobs())}
 
 
 @router.get("/admin/reocr/log")
-async def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require_role("admin"))):
+def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require_role("admin"))):
     """Tagastab re-OCR ajalogi (püsiv, uuemad ees)."""
     log = get_reocr_log(offset, limit)
     log["entries"] = _enrich_titles(log["entries"])
@@ -102,7 +132,7 @@ async def admin_reocr_log(offset: int = 0, limit: int = 50, user=Depends(require
 
 
 @router.get("/admin/work/{work_id}/page-ocr")
-async def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
+def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
     """Tagastab lehekülje .ocr faili sisu, kui see eksisteerib."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -117,7 +147,7 @@ async def get_page_ocr(work_id: str, filename: str, user=Depends(require_role("a
 
 
 @router.delete("/admin/work/{work_id}/page-ocr")
-async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
+def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role("admin"))):
     """Kustutab lehekülje .ocr faili (tulemus rakendatud või tagasi lükatud)."""
     path = find_directory_by_id(work_id)
     if not path:
@@ -132,7 +162,7 @@ async def delete_page_ocr(work_id: str, filename: str, user=Depends(require_role
 @router.post("/admin/work/{work_id}/reocr-batch")
 async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require_role("admin"))):
     """Alustab mitme lehe batch re-OCR tööd. Tagastab job_id."""
-    path = find_directory_by_id(work_id)
+    path = await run_in_threadpool(find_directory_by_id, work_id)
     if not path:
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     if get_active_batch_for_work(work_id):
@@ -143,20 +173,22 @@ async def admin_reocr_batch(work_id: str, request: Request, user=Depends(require
     if not isinstance(page_filenames, list) or not page_filenames:
         raise HTTPException(status_code=400, detail="page_filenames puudub või tühi")
     material_type = data.get("material_type") if data.get("material_type") in ("print", "hand") else "print"
-    pages = []
-    for fn in page_filenames:
-        # Turvalisus: ainult bare failinimi — väldi path traversal'i (nt ../../state/users.json)
-        if not isinstance(fn, str) or fn != os.path.basename(fn):
-            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
-        if not os.path.isfile(os.path.join(path, fn)):
-            raise HTTPException(status_code=400, detail=f"Pilti ei leitud: {fn}")
-        pages.append((fn, None))
-    job_id = start_reocr_batch(work_id, slug, path, pages, material_type=material_type, username=user["username"])
+    # Failide olemasolu-kontroll (kuni terve teose jagu stat-e) threadpool'is
+    pages = await run_in_threadpool(_validate_batch_pages, path, page_filenames)
+    job_id = await run_in_threadpool(
+        start_reocr_batch,
+        work_id,
+        slug,
+        path,
+        pages,
+        material_type=material_type,
+        username=user["username"],
+    )
     return {"status": "accepted", "job_id": job_id}
 
 
 @router.get("/admin/work/{work_id}/reocr-status")
-async def admin_reocr_status_for_work(work_id: str, user=Depends(require_role("admin"))):
+def admin_reocr_status_for_work(work_id: str, user=Depends(require_role("admin"))):
     """Teose re-OCR koondstaatus manage-lehele (active/ocr_ready/errors/progress)."""
     path = find_directory_by_id(work_id)
     if not path:

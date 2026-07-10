@@ -254,7 +254,7 @@ def test_person_history_uses_correct_relative_path():
         from server.prosopography import router as prosopo_router
         import importlib; importlib.reload(prosopo_router)
         with patch("server.prosopography.router.get_file_git_history", return_value=mock_history) as mock_git2:
-            result = asyncio.run(prosopo_router.person_history("vutt:Pabc123", user={"username": "t", "role": "editor"}))
+            result = prosopo_router.person_history("vutt:Pabc123", user={"username": "t", "role": "editor"})
 
     assert result["status"] == "ok"
     called_path = mock_git2.call_args.args[0]
@@ -277,8 +277,8 @@ def test_compute_person_diff_used_in_diff_endpoint():
          patch("server.prosopography.router.get_or_init_repo") as mock_repo:
         mock_repo.return_value.commit.return_value = mock_commit
         from server.prosopography import router as prosopo_router
-        result = asyncio.run(prosopo_router.person_diff("vutt:Pabc123", commit="abc12345",
-                             user={"username": "t", "role": "editor"}))
+        result = prosopo_router.person_diff("vutt:Pabc123", commit="abc12345",
+                                            user={"username": "t", "role": "editor"})
 
     assert result["status"] == "ok"
     fields = {c["field"] for c in result["changes"]}
