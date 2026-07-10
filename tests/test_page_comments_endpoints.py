@@ -40,6 +40,9 @@ def page_repo(backend_env, tmp_path, monkeypatch):
     txt = folder / "pg1.txt"
     jp = folder / "pg1.json"
     txt.write_text("lehe tekst", encoding="utf-8")
+    (folder / "_metadata.json").write_text(
+        json.dumps({"id": "work1", "collections": []}), encoding="utf-8"
+    )
 
     def commit(comments, msg):
         jp.write_text(json.dumps({"comments": comments}, ensure_ascii=False, indent=2),

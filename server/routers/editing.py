@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
-from ..access_ops import can_write_work
+from ..access_ops import can_read_work, can_write_work
 from ..auth import is_at_least
 from ..cache import get_cached_suggestions
 from ..cache_invalidation import invalidate_all_caches as _invalidate_all_caches
@@ -32,9 +32,46 @@ from ..metadata_ops import bulk_update_field, save_work_metadata
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
 from ..utils import find_directory_by_id
-from ..work_meta import read_work_meta_direct_sync as _read_work_meta_direct_sync
-
 router = APIRouter()
+
+
+def _read_catalog_metadata(catalog: str) -> dict:
+    """Laeb teose meta ligipääsukontrolliks; vigane/puuduv meta on fail-closed."""
+    if not catalog or catalog != os.path.basename(catalog):
+        raise HTTPException(status_code=400, detail="Vigane teose tee")
+    work_dir = os.path.join(BASE_DIR, catalog)
+    meta_path = os.path.join(work_dir, "_metadata.json")
+    if not os.path.isdir(work_dir) or not os.path.exists(meta_path):
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    try:
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Teose metaandmeid ei saa praegu lugeda")
+    if not isinstance(meta, dict):
+        raise HTTPException(status_code=503, detail="Teose metaandmed on vigased")
+    return meta
+
+
+def _require_catalog_access(catalog: str, user: dict, *, write: bool = False) -> dict:
+    meta = _read_catalog_metadata(catalog)
+    allowed = can_write_work(meta, user) if write else can_read_work(meta, user)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="Puudub õigus sellele teosele")
+    return meta
+
+
+def _catalog_from_filepath(filepath: str) -> tuple[str, str]:
+    """Normaliseerib git-diffi tee kujule ``catalog/filename``."""
+    parts = [part for part in str(filepath or "").replace("\\", "/").strip("/").split("/") if part]
+    if len(parts) < 2 or any(part in (".", "..") for part in parts):
+        raise HTTPException(status_code=400, detail="Vigane failitee")
+    catalog, filename = parts[-2], parts[-1]
+    if catalog != os.path.basename(catalog) or filename != os.path.basename(filename):
+        raise HTTPException(status_code=400, detail="Vigane failitee")
+    # Ligipääsuotsus kasutab teose kataloogi (eelviimane segment), kuid git-filter
+    # peab säilitama kogu repo-suhtelise tee, sh config/prosopography prefiksi.
+    return catalog, "/".join(parts)
 
 
 @router.post("/save")
@@ -51,17 +88,8 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
     if not catalog or not filename: raise HTTPException(status_code=400, detail="Vigased teed")
 
-    # Kirjutamisõiguse kontroll: piiratud kollektsiooni teosesse saab kirjutada ainult
-    # editor allowed_collections kattuvusega või admin (Leid G). Avalikud teosed läbivad alati.
-    _work_meta_path = os.path.join(BASE_DIR, catalog, '_metadata.json')
-    if os.path.exists(_work_meta_path):
-        try:
-            with open(_work_meta_path, 'r', encoding='utf-8') as f:
-                _work_meta = json.load(f)
-        except Exception:
-            _work_meta = None
-        if _work_meta is not None and not can_write_work(_work_meta, user):
-            raise HTTPException(status_code=403, detail="Puudub õigus sellesse teosesse kirjutada")
+    # Puuduv/vigane meta ei tohi muuta piiratud teose kontrolli fail-open'iks.
+    await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     additional = []
@@ -127,9 +155,13 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
 @router.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
-    # Faililugemine threadpoolis, et mitte blokeerida event loopi
-    # (vt docs/koodi_ulevaade_2026-06-24_gemini_soovitused.md Leid 4).
-    metadata = await run_in_threadpool(_read_work_meta_direct_sync, data.get('work_id'), data.get('original_path', ''))
+    path = find_directory_by_id(data.get("work_id"))
+    if path is None:
+        raw_path = data.get("original_path", "")
+        catalog = os.path.basename(raw_path) if raw_path else ""
+    else:
+        catalog = os.path.basename(path)
+    metadata = await run_in_threadpool(_require_catalog_access, catalog, user)
     return {"status": "success", "metadata": metadata}
 
 @router.post("/get-metadata-suggestions")
@@ -150,16 +182,27 @@ async def recent_edits(request: Request, user=Depends(get_user)):
 @router.post("/git-history")
 async def git_history(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
-    path = os.path.join(os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', '')))
+    catalog = os.path.basename(data.get('original_path', ''))
+    filename = os.path.basename(data.get('file_name', ''))
+    if not catalog or not filename:
+        raise HTTPException(status_code=400, detail="Vigane failitee")
+    await run_in_threadpool(_require_catalog_access, catalog, user)
+    path = os.path.join(catalog, filename)
     return {"status": "success", "history": get_file_git_history(path)}
 
 @router.post("/commit-diff")
 async def commit_diff(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
-    commit_hash, filepath = data.get('commit_hash'), data.get('filepath', '')
-    clean_path = os.path.join(filepath.strip('/').split('/')[-2], filepath.strip('/').split('/')[-1]) if '/' in filepath else None
+    commit_hash = data.get('commit_hash')
+    catalog, clean_path = _catalog_from_filepath(data.get('filepath', ''))
+    try:
+        await run_in_threadpool(_require_catalog_access, catalog, user)
+    except HTTPException as exc:
+        # Admini Review-vaade peab jätkuvalt nägema config/prosopography committe;
+        # editorile on mitte-teose tee alati keelatud.
+        if not (exc.status_code == 404 and is_at_least(user['role'], 'admin')):
+            raise
     diff_res = get_commit_diff(commit_hash, filepaths=clean_path)
-    if not diff_res or not diff_res.get('diff'): diff_res = get_commit_diff(commit_hash)
     return {"status": "success", **diff_res} if diff_res else {"status": "error"}
 
 def _validate_page_paths(data):
@@ -199,6 +242,7 @@ def _read_current_comments(json_path):
 async def page_comments_history(request: Request, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     _catalog, _filename, json_relpath, json_path, _txt = _validate_page_paths(data)
+    await run_in_threadpool(_require_catalog_access, _catalog, user)
     current = _read_current_comments(json_path)
     result = await run_in_threadpool(build_comment_history, json_relpath, current)
     return {"status": "success", **result}
@@ -216,6 +260,7 @@ async def page_comments_restore(
         raise HTTPException(status_code=400, detail="Vigased parameetrid")
 
     catalog, _filename, json_relpath, json_path, txt_path = _validate_page_paths(data)
+    await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
 
     # commit_hash peab kuuluma SELLE faili ajalukku (mitte suvaline git-objekt)
     history = get_file_git_history(json_relpath, max_count=500)
@@ -261,6 +306,9 @@ async def page_comments_restore(
 async def git_restore(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("editor"))):
     data = await get_json_data(request)
     catalog, filename = os.path.basename(data.get('original_path', '')), os.path.basename(data.get('file_name', ''))
+    if not catalog or not filename:
+        raise HTTPException(status_code=400, detail="Vigane failitee")
+    await run_in_threadpool(_require_catalog_access, catalog, user, write=True)
     path = os.path.join(BASE_DIR, catalog, filename)
     content = get_file_at_commit(os.path.join(catalog, filename), data.get('commit_hash'))
     if content is None: raise HTTPException(status_code=400, detail="Ei leitud")

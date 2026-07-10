@@ -19,47 +19,41 @@ metadata_lock = threading.RLock()  # _metadata.json operatsioonid
 page_json_lock = threading.RLock()  # Lehekülje .json failide operatsioonid
 
 
-def atomic_write_json(filepath, data, indent=2):
-    """Kirjutab JSON faili atomically (temp file + rename).
-
-    See tagab, et serveri crashi korral ei jää fail poolikuks.
-    os.replace() on atomic operatsioon POSIX süsteemides.
-
-    Args:
-        filepath: Sihtfaili absoluutne tee
-        data: JSON-serialiseeritavad andmed
-        indent: JSON indentatsiooni tase (default 2)
-    """
+def atomic_write_text(filepath, content):
+    """Kirjutab tekstifaili atomaarselt (temp-fail + os.replace)."""
     dir_name = os.path.dirname(filepath)
     if dir_name:
         os.makedirs(dir_name, exist_ok=True)
     tmp_path = None
 
     try:
-        # Loo temp fail samas kataloogis (vajalik atomic rename jaoks)
         with tempfile.NamedTemporaryFile(
             mode='w',
             encoding='utf-8',
             dir=dir_name,
             delete=False,
             prefix='.tmp_',
-            suffix='.json'
+            suffix='.txt'
         ) as tmp:
-            json.dump(data, tmp, ensure_ascii=False, indent=indent)
+            tmp.write(content)
+            tmp.flush()
+            os.fsync(tmp.fileno())
             tmp_path = tmp.name
 
-        # Atomic rename (asendab olemasoleva faili)
+        os.chmod(tmp_path, 0o644)
         os.replace(tmp_path, filepath)
-        # Sea õigused loetavaks kõigile (Docker/root probleemi vältimiseks)
-        os.chmod(filepath, 0o644)
     except Exception:
-        # Kustuta temp fail kui os.replace() ebaõnnestus
         if tmp_path and os.path.exists(tmp_path):
             try:
                 os.remove(tmp_path)
             except OSError:
                 pass
         raise
+
+
+def atomic_write_json(filepath, data, indent=2):
+    """Kirjutab JSON faili atomaarselt (temp-fail + os.replace)."""
+    atomic_write_text(filepath, json.dumps(data, ensure_ascii=False, indent=indent))
 
 # Nanoid seadistus
 NANOID_LENGTH = 6
