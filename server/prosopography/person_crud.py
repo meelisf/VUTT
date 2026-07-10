@@ -220,7 +220,9 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
             raise KeyError(person_id)
 
         client_updated_at = data.get("updated_at")
-        if client_updated_at and person.get("updated_at") != client_updated_at:
+        if not isinstance(client_updated_at, str) or not client_updated_at.strip():
+            raise ValueError("updated_at_required")
+        if person.get("updated_at") != client_updated_at:
             raise ValueError(f"conflict:{person['updated_at']}")
 
         old_label = (person.get("name") or {}).get("label") or ""
@@ -503,6 +505,7 @@ def bulk_update_occupation(
     occupation: dict,
     mode: str,
     person_ids: list,
+    username: str,
 ) -> dict:
     """
     Massiga ameti määramine/asendamine mitmele isikule korraga.
@@ -539,7 +542,15 @@ def bulk_update_occupation(
                 new_occupations = list(existing) + [occupation]
 
             person["occupations"] = new_occupations
-            state.atomic_write_json(_id_to_path(person_id), person)
+            person["updated_at"] = datetime.now(timezone.utc).isoformat()
+            person["updated_by"] = username
+            name = (person.get("name") or {}).get("label") or person_id
+            state.save_with_git(
+                _id_to_path(person_id),
+                json.dumps(person, ensure_ascii=False, indent=2),
+                username,
+                message=f"Prosopo ametite massmuudatus: {name} [{person_id}]",
+            )
             _indices()._update_index_entry(person)
             updated += 1
 
