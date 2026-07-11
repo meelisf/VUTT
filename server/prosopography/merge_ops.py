@@ -9,12 +9,12 @@ from datetime import datetime, timezone
 from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
 from .person_crud import _id_to_path, get_person
-from .locks import person_lock
+from .locks import merge_operation_lock, person_lock
 from ._compat import sync_from_facade
 
 
 def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
-    """Liidab kirjed; kutsuja hoiab source- ja target-kaardi lukke."""
+    """Liidab kirjed; kutsuja hoiab liitmis- ning source/target isikulukke."""
     sync_from_facade()
     if source_id == target_id:
         raise ValueError("Source ja target ei tohi olla samad.")
@@ -211,11 +211,13 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
     """Liidab source kirje target kirjesse ja sünkroniseerib read-modelid."""
     if source_id == target_id:
         raise ValueError("Source ja target ei tohi olla samad.")
-    # Fikseeritud järjekord väldib kahe samaaegse ristmerge'i deadlock'i.
-    with ExitStack() as stack:
-        for person_id in sorted((source_id, target_id)):
-            stack.enter_context(person_lock(person_id))
-        return _merge_person_locked(source_id, target_id, username)
+    # Globaalne lukk serialiseerib ka relation-loop'is ja kohaliitmisel võetavad
+    # lisalukud; järjestus väldib source/target paaris ebavajalikku ristootamist.
+    with merge_operation_lock:
+        with ExitStack() as stack:
+            for person_id in sorted((source_id, target_id)):
+                stack.enter_context(person_lock(person_id))
+            return _merge_person_locked(source_id, target_id, username)
 
 
 def delete_person(person_id: str, username: str) -> dict:

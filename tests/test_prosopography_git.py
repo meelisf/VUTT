@@ -202,8 +202,11 @@ def test_merge_person_commits_source_and_target(tmp_path):
                "import_batch_ids": [], "statuses": [], "occupations": [], "education": [],
                "sources": [], "confessions": [], "birth": None, "death": None,
                "origin": {}, "gender": None, "biography": None, "notes": None, "image_url": None}
+    # Targeti viide source'ile katab source/target kaartide relation-loop'is
+    # vahelejätmise: neid ei tohi tavalise Lock-iga teist korda lukustada.
     target = {"id": "vutt:Ptgt", "name": {"label": "Sihtmärk"}, "record_status": "draft",
-               "updated_at": "2024-01-01T00:00:00+00:00", "relations": [], "identifiers": [],
+               "updated_at": "2024-01-01T00:00:00+00:00",
+               "relations": [{"target_id": "vutt:Psrc", "type": "kolleeg"}], "identifiers": [],
                "import_batch_ids": [], "statuses": [], "occupations": [], "education": [],
                "sources": [], "confessions": [], "birth": None, "death": None,
                "origin": {}, "gender": None, "biography": None, "notes": None, "image_url": None}

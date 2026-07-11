@@ -418,8 +418,10 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
             raise KeyError(person_id)
 
         # Tehniline võti juhib checked_at uuendust, kuid ei kuulu isikukaardile.
-        scheme = approved.pop("_enrichment_scheme", None)
-        for field_path, value in approved.items():
+        # Koopia väldib kutsuja request-dict'i muteerimist.
+        approved_fields = dict(approved)
+        scheme = approved_fields.pop("_enrichment_scheme", None)
+        for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 
         if scheme:

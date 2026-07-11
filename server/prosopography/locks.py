@@ -6,13 +6,16 @@ või bulk + edit) loevad-muudavad-kirjutavad sama faili paralleelselt. Uvicorn o
 single-worker, AGA BackgroundTasks ja daemon-thread'id jooksevad samas protsessis.
 
 Lukud on püsivad (ei puhastata) — ~2200 isikut → ~2200 Lock objekti, tühine.
-Iga kirjutaja haarab korraga AINULT ühe luku → deadlock pole võimalik.
+Tavaline kirjutaja haarab korraga ainult ühe isikuluku. Isiku- ja kohaliitmine võivad
+haarata mitu isikulukku, kuid need operatsioonid serialiseerib enne seda ühine
+``merge_operation_lock``; nii ei saa kaks liitmist tekitada ristlukustust.
 """
 import threading
 from typing import Dict
 
 _registry_guard = threading.Lock()
 _person_locks: Dict[str, threading.Lock] = {}
+merge_operation_lock = threading.Lock()
 
 
 def person_lock(person_id: str) -> threading.Lock:

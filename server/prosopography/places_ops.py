@@ -16,7 +16,7 @@ from typing import Optional
 from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
 from ..git_ops import save_with_git
-from .locks import person_lock
+from .locks import merge_operation_lock, person_lock
 
 logger = get_logger(__name__)
 
@@ -616,7 +616,7 @@ def refresh_all_place_labels() -> int:
     return updated
 
 
-def merge_places(source_key: str, target_key: str, username: str = "system") -> dict:
+def _merge_places_locked(source_key: str, target_key: str, username: str) -> dict:
     """
     Ühendab source_key sihtkoha target_key alla.
     1. Uuendab kõik isikud kelle origin.place == source_key → target_key.
@@ -694,6 +694,12 @@ def merge_places(source_key: str, target_key: str, username: str = "system") -> 
 
     logger.info("merge_places: %s → %s, %d isikut ümber suunatud", source_key, target_key, redirected)
     return {"redirected": redirected, "target_key": target_key}
+
+
+def merge_places(source_key: str, target_key: str, username: str = "system") -> dict:
+    """Serialiseerib kohaliitmise teiste isiku- ja kohaliitmiste suhtes."""
+    with merge_operation_lock:
+        return _merge_places_locked(source_key, target_key, username)
 
 
 def delete_place(key: str) -> None:
