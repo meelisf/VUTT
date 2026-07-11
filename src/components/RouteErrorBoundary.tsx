@@ -1,7 +1,8 @@
 import { useRouteError, isRouteErrorResponse, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, RefreshCw, Home, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { reportError } from '../services/errorReporting';
 
 // React Routeri errorElement — näitab kasutajasõbralikku veateadet marsruudi vigade korral
 export default function RouteErrorBoundary() {
@@ -9,6 +10,10 @@ export default function RouteErrorBoundary() {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
   const [showDetails, setShowDetails] = useState(false);
+
+  useEffect(() => {
+    reportError(error, { boundary: 'react-router' });
+  }, [error]);
 
   // Veateade
   let errorMessage = t('errors.unknownError');

@@ -8,6 +8,7 @@ tqdm>=4.66.0
 paramiko>=3.0.0
 fastapi>=0.115.0
 uvicorn>=0.30.0
+sentry-sdk[fastapi]>=2.0,<3.0
 python-multipart>=0.0.9
 PyJWT>=2.0
 bcrypt>=4.0.0
