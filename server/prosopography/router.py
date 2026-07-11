@@ -478,7 +478,9 @@ async def places_merge(
     if not target_key:
         raise HTTPException(status_code=400, detail="target_key on kohustuslik")
     try:
-        result = await run_in_threadpool(merge_places, source_key, target_key)
+        result = await run_in_threadpool(
+            merge_places, source_key, target_key, username=user["username"]
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

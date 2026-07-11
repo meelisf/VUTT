@@ -311,9 +311,6 @@ def _person_image_path(person_id: str, ext: str) -> str:
 def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, username: str) -> dict:
     """Salvestab isiku pildi ja uuendab image_url kirjes."""
     sync_from_facade()
-    person = get_person(person_id)
-    if person is None:
-        raise KeyError(person_id)
 
     if content_type not in ("image/jpeg", "image/png", "image/webp"):
         raise ValueError("Toetatud formaadid: JPEG, PNG, WebP")
@@ -332,25 +329,34 @@ def upload_person_image(person_id: str, file_bytes: bytes, content_type: str, us
 
     ext = ".jpg" if content_type in ("image/jpeg",) else ".webp"
 
-    for old_ext in (".jpg", ".webp"):
-        old_path = _person_image_path(person_id, old_ext)
-        if old_path.endswith(ext):
-            continue
-        if os.path.exists(old_path):
-            os.remove(old_path)
+    with person_lock(person_id):
+        person = get_person(person_id)
+        if person is None:
+            raise KeyError(person_id)
 
-    os.makedirs(state.PROSOPOGRAPHY_IMAGES_DIR, exist_ok=True)
-    img_path = _person_image_path(person_id, ext)
-    with open(img_path, "wb") as f:
-        f.write(file_bytes)
+        for old_ext in (".jpg", ".webp"):
+            old_path = _person_image_path(person_id, old_ext)
+            if old_path.endswith(ext):
+                continue
+            if os.path.exists(old_path):
+                os.remove(old_path)
 
-    encoded_id = person_id.replace(":", "%3A")
-    person["image_url"] = f"/api/files/prosopography/{encoded_id}/image"
+        os.makedirs(state.PROSOPOGRAPHY_IMAGES_DIR, exist_ok=True)
+        img_path = _person_image_path(person_id, ext)
+        with open(img_path, "wb") as f:
+            f.write(file_bytes)
 
-    now = datetime.now(timezone.utc).isoformat()
-    person["updated_at"] = now
-    person["updated_by"] = username
-    state.atomic_write_json(_id_to_path(person_id), person)
+        encoded_id = person_id.replace(":", "%3A")
+        person["image_url"] = f"/api/files/prosopography/{encoded_id}/image"
+        person["updated_at"] = datetime.now(timezone.utc).isoformat()
+        person["updated_by"] = username
+        name = (person.get("name") or {}).get("label") or person_id
+        state.save_with_git(
+            _id_to_path(person_id),
+            json.dumps(person, ensure_ascii=False, indent=2),
+            username,
+            message=f"Prosopo pildi lisamine: {name} [{person_id}]",
+        )
     _indices()._update_index_entry(person)
     return person
 
@@ -370,20 +376,26 @@ def get_person_image_path(person_id: str) -> Optional[str]:
 def delete_person_image(person_id: str, username: str) -> dict:
     """Kustutab isiku pildi ja tühjendab image_url. Tagastab uuendatud kirje."""
     sync_from_facade()
-    person = get_person(person_id)
-    if person is None:
-        raise KeyError(person_id)
+    with person_lock(person_id):
+        person = get_person(person_id)
+        if person is None:
+            raise KeyError(person_id)
 
-    for ext in (".jpg", ".webp"):
-        path = _person_image_path(person_id, ext)
-        if os.path.exists(path):
-            os.remove(path)
+        for ext in (".jpg", ".webp"):
+            path = _person_image_path(person_id, ext)
+            if os.path.exists(path):
+                os.remove(path)
 
-    person["image_url"] = None
-    now = datetime.now(timezone.utc).isoformat()
-    person["updated_at"] = now
-    person["updated_by"] = username
-    state.atomic_write_json(_id_to_path(person_id), person)
+        person["image_url"] = None
+        person["updated_at"] = datetime.now(timezone.utc).isoformat()
+        person["updated_by"] = username
+        name = (person.get("name") or {}).get("label") or person_id
+        state.save_with_git(
+            _id_to_path(person_id),
+            json.dumps(person, ensure_ascii=False, indent=2),
+            username,
+            message=f"Prosopo pildi kustutamine: {name} [{person_id}]",
+        )
     _indices()._update_index_entry(person)
     return person
 
@@ -405,10 +417,13 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
         if person is None:
             raise KeyError(person_id)
 
-        for field_path, value in approved.items():
+        # Tehniline võti juhib checked_at uuendust, kuid ei kuulu isikukaardile.
+        # Koopia väldib kutsuja request-dict'i muteerimist.
+        approved_fields = dict(approved)
+        scheme = approved_fields.pop("_enrichment_scheme", None)
+        for field_path, value in approved_fields.items():
             _deep_set(person, field_path, value)
 
-        scheme = approved.get("_enrichment_scheme")
         if scheme:
             for ident in person.get("identifiers") or []:
                 if ident.get("scheme") == scheme:
