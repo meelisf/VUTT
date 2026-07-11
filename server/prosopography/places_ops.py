@@ -10,10 +10,13 @@ import time
 import threading
 import urllib.request
 import urllib.parse
+from datetime import datetime, timezone
 from typing import Optional
 
 from ..config import PLACES_FILE, ORIGIN_GROUPS_FILE, PROSOPOGRAPHY_DIR, get_logger
 from ..utils import atomic_write_json
+from ..git_ops import save_with_git
+from .locks import person_lock
 
 logger = get_logger(__name__)
 
@@ -613,7 +616,7 @@ def refresh_all_place_labels() -> int:
     return updated
 
 
-def merge_places(source_key: str, target_key: str) -> dict:
+def merge_places(source_key: str, target_key: str, username: str = "system") -> dict:
     """
     Ühendab source_key sihtkoha target_key alla.
     1. Uuendab kõik isikud kelle origin.place == source_key → target_key.
@@ -648,14 +651,32 @@ def merge_places(source_key: str, target_key: str) -> dict:
         except Exception as exc:
             logger.warning("merge_places: skipping %s: %s", fpath, exc)
             continue
-        origin = person.get("origin")
-        if not isinstance(origin, dict):
+        person_id = person.get("id")
+        if not person_id:
             continue
-        if origin.get("place") != source_key:
-            continue
-        origin["place"] = target_key
-        atomic_write_json(fpath, person)
-        redirected += 1
+        with person_lock(person_id):
+            # Loe luku all uuesti, et paralleelne isikukaardi salvestus ei kaoks.
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    person = json.load(f)
+            except Exception as exc:
+                logger.warning("merge_places: skipping %s after lock: %s", fpath, exc)
+                continue
+            origin = person.get("origin")
+            if not isinstance(origin, dict) or origin.get("place") != source_key:
+                continue
+            origin["place"] = target_key
+            person["updated_at"] = datetime.now(timezone.utc).isoformat()
+            person["updated_by"] = username
+            raw_name = person.get("name")
+            person_name = (raw_name.get("label") if isinstance(raw_name, dict) else raw_name) or person_id
+            save_with_git(
+                fpath,
+                json.dumps(person, ensure_ascii=False, indent=2),
+                username,
+                message=f"Prosopo kohaliitmine: {person_name} [{person_id}]",
+            )
+            redirected += 1
 
     # 2. Lisa source_key sihtkoha historical_names-i
     target = dict(places[target_key])

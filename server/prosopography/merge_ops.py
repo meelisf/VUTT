@@ -3,18 +3,18 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import ExitStack
 from datetime import datetime, timezone
 
 from . import state
 from .indices import _load_index, _load_person_to_works, _remove_aliases_entry, rebuild_indices
 from .person_crud import _id_to_path, get_person
+from .locks import person_lock
 from ._compat import sync_from_facade
 
 
-def merge_person(source_id: str, target_id: str, username: str) -> dict:
-    """
-    Liidab source kirje target kirjesse ja sünkroniseerib read-modelid.
-    """
+def _merge_person_locked(source_id: str, target_id: str, username: str) -> dict:
+    """Liidab kirjed; kutsuja hoiab source- ja target-kaardi lukke."""
     sync_from_facade()
     if source_id == target_id:
         raise ValueError("Source ja target ei tohi olla samad.")
@@ -132,15 +132,29 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
             continue
         if p.get("record_status") == "tombstone":
             continue
-        changed = False
-        for rel in p.get("relations", []):
-            if rel.get("target_id") == source_id:
-                rel["target_id"] = target_id
-                changed = True
-        if changed:
-            p["updated_at"] = now
-            p["updated_by"] = username
-            state.atomic_write_json(fpath, p)
+        person_id = p.get("id")
+        if not person_id:
+            continue
+        # Loe luku all uuesti: skannimise ja kirjutamise vahel võis kaart muutuda.
+        with person_lock(person_id):
+            p = get_person(person_id)
+            if p is None or p.get("record_status") == "tombstone":
+                continue
+            changed = False
+            for rel in p.get("relations", []):
+                if rel.get("target_id") == source_id:
+                    rel["target_id"] = target_id
+                    changed = True
+            if changed:
+                p["updated_at"] = now
+                p["updated_by"] = username
+                person_name = (p.get("name") or {}).get("label") or person_id
+                state.save_with_git(
+                    fpath,
+                    json.dumps(p, ensure_ascii=False, indent=2),
+                    username,
+                    message=f"Prosopo liitmise seoseuuendus: {person_name} [{person_id}]",
+                )
 
     target_label = (target.get("name") or {}).get("label") or source.get("name", {}).get("label", "")
     from ..config import BASE_DIR as data_dir
@@ -191,6 +205,17 @@ def merge_person(source_id: str, target_id: str, username: str) -> dict:
 
     rebuild_indices()
     return get_person(target_id)
+
+
+def merge_person(source_id: str, target_id: str, username: str) -> dict:
+    """Liidab source kirje target kirjesse ja sünkroniseerib read-modelid."""
+    if source_id == target_id:
+        raise ValueError("Source ja target ei tohi olla samad.")
+    # Fikseeritud järjekord väldib kahe samaaegse ristmerge'i deadlock'i.
+    with ExitStack() as stack:
+        for person_id in sorted((source_id, target_id)):
+            stack.enter_context(person_lock(person_id))
+        return _merge_person_locked(source_id, target_id, username)
 
 
 def delete_person(person_id: str, username: str) -> dict:

@@ -41,7 +41,12 @@ def _read_person(prosopo_dir: Path, person_id: str) -> dict:
 
 
 def _run(prosopo_dir: Path, old_relations: list, new_relations: list) -> list[str]:
-    with patch("server.prosopography.reciprocal_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)):
+    def fake_save(path, content, *_args, **_kwargs):
+        Path(path).write_text(content, encoding="utf-8")
+        return {"success": True, "commit_hash": "test"}
+
+    with patch("server.prosopography.reciprocal_ops.PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
+         patch("server.prosopography.reciprocal_ops.save_with_git", side_effect=fake_save):
         return sync_reciprocals(A_ID, old_relations, new_relations, A_LABEL, "testuser")
 
 

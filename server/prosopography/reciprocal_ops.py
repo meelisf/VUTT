@@ -2,7 +2,8 @@
 """
 Vastastikuste seoste sünkroniseerimine.
 Kutsutakse router.py PUT endpointist pärast isiku salvestamist.
-Kasutab atomic_write_json otse — EI kasuta update_person() — vältimaks lõputut tsüklit.
+Ei kasuta update_person() — see väldib lõputut sünkroniseerimistsüklit —,
+kuid salvestab muudatuse git-ajalooga.
 """
 import json
 import os
@@ -10,7 +11,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from ..config import PROSOPOGRAPHY_DIR, get_logger
-from ..utils import atomic_write_json
+from ..git_ops import save_with_git
 from .locks import person_lock
 
 logger = get_logger(__name__)
@@ -82,7 +83,13 @@ def sync_reciprocals(
             })
             b["updated_at"] = now
             b["updated_by"] = username
-            atomic_write_json(_id_to_path(b_id), b)
+            b_name = (b.get("name") or {}).get("label") or b_id
+            save_with_git(
+                _id_to_path(b_id),
+                json.dumps(b, ensure_ascii=False, indent=2),
+                username,
+                message=f"Prosopo vastastikune seos: {b_name} [{b_id}]",
+            )
             synced.append(b_id)
 
     for b_id in removed:
@@ -101,7 +108,13 @@ def sync_reciprocals(
             b["relations"] = after
             b["updated_at"] = now
             b["updated_by"] = username
-            atomic_write_json(_id_to_path(b_id), b)
+            b_name = (b.get("name") or {}).get("label") or b_id
+            save_with_git(
+                _id_to_path(b_id),
+                json.dumps(b, ensure_ascii=False, indent=2),
+                username,
+                message=f"Prosopo vastastikune seos: {b_name} [{b_id}]",
+            )
             synced.append(b_id)
 
     return synced
