@@ -4,8 +4,10 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import PORT, ALLOWED_ORIGINS, BASE_DIR, UPLOAD_ENABLED, UPLOADS_DIR, get_logger
+from .error_reporting import init_error_reporting
 from .utils import build_work_id_cache
 
+init_error_reporting()
 logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, get_meilisearch_sync_status
 from .upload_ops import start_upload_sync_loop
