@@ -34,6 +34,49 @@ describe('renderVuttMarkup — VUTT-tägide renderdamine', () => {
   });
 });
 
+describe('renderVuttMarkup — annotatsioonid (<annN>)', () => {
+  it('renderdab <ann1> sisu highlight-märgendina, tägid peidetud', () => {
+    const out = renderVuttMarkup('<ann1>tekst</ann1>');
+    expect(out).not.toContain('ann1');
+    expect(out).not.toContain('&lt;ann');
+    expect(out).toContain('tekst');
+    expect(out).toMatch(/<mark[^>]*>tekst<\/mark>/);
+  });
+
+  it('annotatsioon marginaalia sees (overlay stsenaarium)', () => {
+    const out = renderVuttMarkup('<m>Vide <ann2>Picrium</ann2></m>');
+    expect(out).not.toContain('ann2');
+    expect(out).toContain('Picrium');
+    expect(out).toMatch(/<mark[^>]*>Picrium<\/mark>/);
+  });
+
+  it('mitmekohaline ID ja mitu annotatsiooni', () => {
+    const out = renderVuttMarkup('<ann12>a</ann12> ja <ann3>b</ann3>');
+    expect(out).not.toContain('ann12');
+    expect(out).not.toContain('ann3');
+    expect(out).toContain('a');
+    expect(out).toContain('b');
+  });
+
+  it('orv (paarita) ann-täg eemaldatakse, sisu säilib', () => {
+    const out = renderVuttMarkup('enne <ann5>sisu järel');
+    expect(out).not.toContain('ann5');
+    expect(out).toContain('enne sisu järel');
+  });
+
+  it('valepaar (ID-d ei klapi) ei renderdu markina, tägid eemaldatakse', () => {
+    const out = renderVuttMarkup('<ann1>tekst</ann2>');
+    expect(out).not.toContain('ann1');
+    expect(out).not.toContain('ann2');
+    expect(out).toContain('tekst');
+  });
+
+  it('ann-tägi ei saa kuritarvitada atribuutidega (XSS)', () => {
+    const out = renderVuttMarkup('<ann1 onclick="alert(1)">x</ann1>');
+    expect(out).not.toContain('onclick');
+  });
+});
+
 describe('renderVuttMarkup — XSS kaitse (Leid A)', () => {
   it('span onclick — ei teki aktiivset elementi (< on escape\'itud)', () => {
     const out = renderVuttMarkup('<span onclick="alert(1)">kliki</span>');
