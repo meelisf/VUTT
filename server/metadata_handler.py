@@ -20,8 +20,8 @@ SITE_NAME = "VUTT"
 SITE_ALT_NAME = "Varauusaegsete tekstide töölaud"
 _OG_SITE_NAME = f'<meta property="og:site_name" content="{SITE_NAME}">'
 # og:image jagamispilt: ilma selleta näitavad sotsiaalmeedia/vestlusrakendused
-# linki pildita kaardina. Teose lehel kasutatakse teose enda avalikku thumbi
-# (/api/images/{id}/_thumb), mujal staatiline 1200×630 vutt-og.png.
+# linki pildita kaardina. Teose lehel kasutatakse dashboard'i stiilis 1200×630
+# jagamispilti (/api/images/{id}/_og), mujal staatilist vutt-og.png pilti.
 _OG_IMAGE_URL = f"{SITE_URL}/vutt-og.png"
 _OG_IMAGE_STATIC = (
     f'<meta property="og:image" content="{_OG_IMAGE_URL}">\n'
@@ -199,13 +199,15 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
                     description = f"{creator_names}. {year}" if year else creator_names
             except Exception:
                 pass
-        image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_thumb"
+        image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_og"
 
-    # Teose thumbi mõõdud varieeruvad → mõõte ei väida; staatilisel PNG-l fikseeritud.
+    # Teose jagamispilt genereeritakse dashboard'i kaardi proportsioonis.
     if found_path:
         og_image_tags = (
             f'<meta property="og:image" content="{image_url}">\n'
-            '    <meta property="og:image:type" content="image/jpeg">'
+            '    <meta property="og:image:type" content="image/jpeg">\n'
+            '    <meta property="og:image:width" content="1200">\n'
+            '    <meta property="og:image:height" content="630">'
         )
     else:
         og_image_tags = (

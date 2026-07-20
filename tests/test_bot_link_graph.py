@@ -285,16 +285,16 @@ def test_person_page_has_og_image(patch_person):
     assert 'name="twitter:card"' in html
 
 
-def test_work_og_image_is_thumb_without_bogus_dimensions(patch_find):
+def test_work_og_image_uses_dashboard_card_dimensions(patch_find):
     from server.metadata_handler import build_meta_html
     registry, tmp_path = patch_find
     registry["work001"] = _write_meta(tmp_path, WORK_META)
     html = build_meta_html("work001")
-    assert 'property="og:image" content="https://vutt.utlib.ut.ee/api/images/work001/_thumb"' in html
+    assert 'property="og:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og"' in html
     assert 'content="image/jpeg"' in html
-    # Thumbi mõõdud varieeruvad teoste kaupa — valesid fikseeritud mõõte ei tohi väita
-    assert 'og:image:width" content="400"' not in html
-    assert 'og:image:height" content="600"' not in html
+    assert 'og:image:width" content="1200"' in html
+    assert 'og:image:height" content="630"' in html
+    assert 'name="twitter:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og"' in html
 
 
 def test_unknown_work_fallback_og_image_is_static_png(patch_find):
