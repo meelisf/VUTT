@@ -290,11 +290,11 @@ def test_work_og_image_uses_dashboard_card_dimensions(patch_find):
     registry, tmp_path = patch_find
     registry["work001"] = _write_meta(tmp_path, WORK_META)
     html = build_meta_html("work001")
-    assert 'property="og:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og"' in html
+    assert 'property="og:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og?v=2"' in html
     assert 'content="image/jpeg"' in html
     assert 'og:image:width" content="1200"' in html
     assert 'og:image:height" content="630"' in html
-    assert 'name="twitter:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og"' in html
+    assert 'name="twitter:image" content="https://vutt.utlib.ut.ee/api/images/work001/_og?v=2"' in html
 
 
 def test_unknown_work_fallback_og_image_is_static_png(patch_find):

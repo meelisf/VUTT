@@ -70,34 +70,21 @@ def test_safe_image_path_blocks_symlink_outside_base(tmp_path):
     assert _is_safe_image_path(str(link_file), str(tmp_path)) is False
 
 
-def test_generate_og_image_matches_dashboard_card(tmp_path):
-    from PIL import Image, ImageDraw
+def test_generate_og_image_is_language_neutral_dashboard_crop(tmp_path):
+    from PIL import Image
     from server.image_server import generate_og_image
 
     source_path = tmp_path / "page.jpg"
     output_path = tmp_path / "og.jpg"
-    source = Image.new("RGB", (600, 900), "#ddd3bd")
-    draw = ImageDraw.Draw(source)
-    draw.rectangle((100, 300, 500, 600), fill="#784421")
-    source.save(source_path)
+    Image.new("RGB", (600, 900), "white").save(source_path)
 
-    meta = {
-        "tags": [
-            {"label": "Jutlus"},
-            {"label": "Johannes Aeschinnus", "id": "vutt:P1", "entity_type": "person"},
-            {"labels": {"et": "Akadeemiline trükis", "en": "Academic print"}},
-            {"label": "Neljas märgend"},
-        ]
-    }
-    assert generate_og_image(str(source_path), str(output_path), meta) is True
+    assert generate_og_image(str(source_path), str(output_path)) is True
 
     with Image.open(output_path) as result:
         assert result.size == (1200, 630)
         assert result.format == "JPEG"
-        # Gradient ja märgendid muudavad allserva ülaosast tumedamaks.
-        top = sum(result.convert("RGB").getpixel((20, 20)))
-        bottom = sum(result.convert("RGB").getpixel((20, 610)))
-        assert bottom < top
+        # Keele-neutraalne pilt ei lisa allserva tumedat gradienti ega märgendeid.
+        assert sum(result.convert("RGB").getpixel((20, 610))) > 700
 
 
 def test_get_or_create_og_image_uses_first_page_and_cache(tmp_path):
@@ -110,10 +97,10 @@ def test_get_or_create_og_image_uses_first_page_and_cache(tmp_path):
     (work / "page_001.json").write_text('{"sequence": 1}', encoding="utf-8")
     (work / "_metadata.json").write_text('{"tags": []}', encoding="utf-8")
 
-    first = get_or_create_og_image(str(work), meta={"tags": []})
-    second = get_or_create_og_image(str(work), meta={"tags": []})
+    first = get_or_create_og_image(str(work))
+    second = get_or_create_og_image(str(work))
     assert first == second
-    assert os.path.basename(first) == "_og_page_001.jpg"
+    assert os.path.basename(first) == "_og_v2_page_001.jpg"
     assert os.path.exists(first)
 
 

@@ -82,7 +82,7 @@ def _is_safe_image_path(resolved_path: str, base_dir: str) -> bool:
 
 # Pillow thumbnail genereerimiseks
 try:
-    from PIL import Image, ImageDraw, ImageFont, ImageOps
+    from PIL import Image, ImageOps
     PILLOW_AVAILABLE = True
 except ImportError:
     PILLOW_AVAILABLE = False
@@ -94,6 +94,7 @@ THUMB_HEIGHT = 560  # Kõrgus pikslites (portree- ja topeltlehtedel ühtlane kõ
 THUMB_QUALITY = 85  # JPEG kvaliteet (0-100)
 OG_IMAGE_SIZE = (1200, 630)
 OG_IMAGE_QUALITY = 88
+OG_IMAGE_VERSION = 2  # Muutmisel uueneb failinimi ja jagamis-URL-i cache-võti.
 
 # =========================================================
 # KONFIGURATSIOON
@@ -183,39 +184,11 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
         return False
 
 
-def _tag_label(tag):
-    """Tagastab dashboard'i märgendi eestikeelse kuvateksti."""
-    if isinstance(tag, str):
-        return tag.strip()
-    if not isinstance(tag, dict):
-        return ""
-    label = tag.get('label')
-    if isinstance(label, str) and label.strip():
-        return label.strip()
-    labels = tag.get('labels') or {}
-    if isinstance(labels, dict):
-        return str(labels.get('et') or labels.get('en') or next(iter(labels.values()), '')).strip()
-    return ""
+def generate_og_image(source_path, output_path):
+    """Genereerib keele-neutraalse 1200×630 jagamispildi.
 
-
-def _og_font(size=28):
-    """Laeb Unicode-toega fondi; Pillow vaikefont jääb minimaalseks fallback'iks."""
-    for path in (
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',
-        '/usr/share/fonts/dejavu/DejaVuSans.ttf',
-    ):
-        try:
-            return ImageFont.truetype(path, size=size)
-        except OSError:
-            continue
-    return ImageFont.load_default()
-
-
-def generate_og_image(source_path, output_path, meta=None):
-    """Genereerib dashboard'i pildiala meenutava 1200×630 jagamispildi.
-
-    Esileht täidab ala nagu CSS ``object-cover``. Allserva lisatakse sama laadne
-    tume gradient ja kuni kolm teose märgendit (ning vajadusel +N).
+    Esileht täidab ala nagu dashboard'i CSS ``object-cover``. Teksti, gradienti
+    ega märgendeid pilti ei lisata, sest sama URL-i jagatakse eri keeltes.
     """
     if not PILLOW_AVAILABLE:
         return False
@@ -228,54 +201,10 @@ def generate_og_image(source_path, output_path, meta=None):
                 OG_IMAGE_SIZE,
                 method=Image.Resampling.LANCZOS,
                 centering=(0.5, 0.5),
-            ).convert('RGBA')
-
-        tags = (meta or {}).get('tags') or []
-        tag_items = []
-        for tag in tags[:3]:
-            label = _tag_label(tag)
-            if not label:
-                continue
-            is_person = isinstance(tag, dict) and (
-                tag.get('entity_type') == 'person' or str(tag.get('id') or '').startswith('vutt:P')
             )
-            tag_items.append((label, is_person))
-        if len(tags) > 3:
-            tag_items.append((f"+{len(tags) - 3}", False))
 
-        if tag_items:
-            overlay = Image.new('RGBA', OG_IMAGE_SIZE, (0, 0, 0, 0))
-            gradient = ImageDraw.Draw(overlay)
-            gradient_height = 190
-            for offset in range(gradient_height):
-                alpha = int(185 * offset / max(gradient_height - 1, 1))
-                y = OG_IMAGE_SIZE[1] - gradient_height + offset
-                gradient.line((0, y, OG_IMAGE_SIZE[0], y), fill=(0, 0, 0, alpha))
-            card = Image.alpha_composite(card, overlay)
-
-            draw = ImageDraw.Draw(card)
-            font = _og_font()
-            x, y = 32, OG_IMAGE_SIZE[1] - 76
-            max_x = OG_IMAGE_SIZE[0] - 32
-            for raw_label, is_person in tag_items:
-                label = raw_label if len(raw_label) <= 32 else raw_label[:31].rstrip() + '…'
-                bbox = draw.textbbox((0, 0), label, font=font)
-                text_w = bbox[2] - bbox[0]
-                text_h = bbox[3] - bbox[1]
-                chip_w, chip_h = text_w + 28, text_h + 18
-                if x + chip_w > max_x and x > 32:
-                    x = 32
-                    y -= chip_h + 12
-                if y < OG_IMAGE_SIZE[1] - gradient_height + 12:
-                    break
-                color = (79, 70, 229, 220) if is_person else (30, 41, 59, 205)
-                draw.rounded_rectangle((x, y, x + chip_w, y + chip_h), radius=9, fill=color)
-                draw.text((x + 14, y + 7 - bbox[1]), label, font=font, fill=(255, 255, 255, 255))
-                x += chip_w + 10
-
-        output_rgb = card.convert('RGB')
         tmp_path = f"{output_path}.tmp.{os.getpid()}.{time.time_ns()}"
-        output_rgb.save(tmp_path, 'JPEG', quality=OG_IMAGE_QUALITY, optimize=True)
+        card.save(tmp_path, 'JPEG', quality=OG_IMAGE_QUALITY, optimize=True)
         os.chmod(tmp_path, 0o644)
         os.replace(tmp_path, output_path)
         return True
@@ -289,7 +218,7 @@ def generate_og_image(source_path, output_path, meta=None):
         return False
 
 
-def get_or_create_og_image(work_path, meta=None):
+def get_or_create_og_image(work_path):
     """Tagastab teose cache'itud jagamispildi, genereerides selle vajadusel."""
     first_image = get_first_image(work_path)
     if not first_image:
@@ -297,7 +226,7 @@ def get_or_create_og_image(work_path, meta=None):
 
     image_base = os.path.splitext(os.path.basename(first_image))[0]
     thumbs_dir = os.path.join(work_path, '_thumbs')
-    output_path = os.path.join(thumbs_dir, f'_og_{image_base}.jpg')
+    output_path = os.path.join(thumbs_dir, f'_og_v{OG_IMAGE_VERSION}_{image_base}.jpg')
     os.makedirs(thumbs_dir, exist_ok=True)
 
     for old_path in glob.glob(os.path.join(thumbs_dir, '_og_*.jpg')):
@@ -307,11 +236,9 @@ def get_or_create_og_image(work_path, meta=None):
             except OSError:
                 pass
 
-    metadata_path = os.path.join(work_path, '_metadata.json')
     source_mtime = os.path.getmtime(first_image)
-    metadata_mtime = os.path.getmtime(metadata_path) if os.path.exists(metadata_path) else 0
-    stale = not os.path.exists(output_path) or os.path.getmtime(output_path) < max(source_mtime, metadata_mtime)
-    if stale and not generate_og_image(first_image, output_path, meta=meta):
+    stale = not os.path.exists(output_path) or os.path.getmtime(output_path) < source_mtime
+    if stale and not generate_og_image(first_image, output_path):
         return None
     return output_path
 
@@ -512,7 +439,7 @@ class ImageRequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(403, "Keelatud")
             return
 
-        image_path = get_or_create_og_image(work_path, meta=meta)
+        image_path = get_or_create_og_image(work_path)
         if not image_path or not os.path.exists(image_path):
             self.send_error(404, "Jagamispilti ei õnnestunud luua")
             return

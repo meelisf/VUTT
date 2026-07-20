@@ -199,7 +199,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
                     description = f"{creator_names}. {year}" if year else creator_names
             except Exception:
                 pass
-        image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_og"
+        image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_og?v=2"
 
     # Teose jagamispilt genereeritakse dashboard'i kaardi proportsioonis.
     if found_path:
