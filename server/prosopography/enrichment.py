@@ -4,6 +4,7 @@ fetch_and_diff(scheme, ext_id, person) → {auto_filled, conflicts}
 """
 import json
 import os
+import re
 import urllib.request
 import urllib.parse
 from typing import Optional
@@ -98,7 +99,9 @@ def _fetch_wikidata(qid: str) -> Optional[dict]:
     Päring 1: ühe väärtusega väljad (sugu, sünd/surm kuupäev+koht).
     Päring 2: mitme väärtusega väljad (ametid, konfessioon, seisus) — LIMIT 1 puudub.
     """
-    if not qid.startswith("Q"):
+    # Range Q-ID kontroll: vältib SPARQL-injektsiooni — qid interpoleeritakse
+    # otse SPARQL-päringusse (wd:{qid} ...), seega lubame ainult "Q" + ASCII numbrid.
+    if not re.fullmatch(r"Q\d+", qid):
         return None
 
     # ── Päring 1: ühe väärtusega omadused (sh kuupäeva täpsus) ───────────────
