@@ -216,6 +216,47 @@ def test_person_work_title_escaped(patch_person):
     assert "<x>" not in html
 
 
+def test_person_exposes_structured_facts_and_unique_description(patch_person):
+    from server.metadata_handler import build_person_meta_html
+    patch_person.update({
+        "gender": "M",
+        "origin": {"place": "Pärnu"},
+        "education": [{
+            "institution": "Academia Gustaviana",
+            "date_from": {"date": "1632-11-27"},
+            "source": "album_academicum",
+        }],
+        "identifiers": [
+            {"scheme": "album_academicum", "id": "AA:84"},
+            {"scheme": "gnd", "id": "123456"},
+        ],
+        "statuses": [{"label": "Literatus"}],
+        "confessions": [{"label": "Luterlane"}],
+    })
+
+    html = build_person_meta_html("vutt:P1", work_links=[])
+
+    assert "Academia Gustaviana" in html
+    assert "1632-11-27" in html
+    assert "Album Academicum" in html
+    assert "AA:84" in html
+    assert "Pärnu" in html
+    assert "Literatus" in html
+    assert "Luterlane" in html
+    assert "Haridus: Academia Gustaviana" in html
+    assert 'type="application/ld+json"' in html
+    assert '"@type":"Person"' in html
+    assert "https://d-nb.info/gnd/123456" in html
+
+
+def test_person_structured_data_escapes_script_end(patch_person):
+    from server.metadata_handler import build_person_meta_html
+    patch_person["name"]["aliases"] = ["</script><script>alert(1)</script>"]
+    html = build_person_meta_html("vutt:P1", work_links=[])
+    assert "</script><script>alert(1)</script>" not in html
+    assert "\\u003c/script>" in html
+
+
 # ---------------------------------------------------------------------------
 # og:image — sotsiaalmeedia jagamise pilt kõigil bot-lehtedel
 # ---------------------------------------------------------------------------

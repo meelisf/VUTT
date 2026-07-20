@@ -2,7 +2,7 @@ import json
 import os
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..access_ops import can_read_work, can_write_work, is_work_public
@@ -11,7 +11,7 @@ from ..cache import get_cached_collections
 from ..cache_invalidation import _sitemap_cache, _home_cache
 from ..config import BASE_DIR
 from ..deps import optional_user as _get_optional_user, require_role
-from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml, cached_work_meta_html
+from ..metadata_handler import build_home_meta_html, build_meta_html, build_person_meta_html, build_persons_meta_html, build_sitemap_xml, cached_person_meta_html, cached_work_meta_html
 from ..metadata_ops import save_work_metadata
 from ..prosopography.indices import _load_index, _load_work_collections
 from ..prosopography.relations import get_person_with_works, get_persons_for_work
@@ -214,10 +214,6 @@ def home_meta(request: Request):
     Linkgraafi peamine jaotuspunkt (iga avalik teos 1 hüppe kaugusel /-st)."""
     import time
     from .. import utils as utils_module
-    client_ip = get_client_ip(request)
-    allowed, retry_after = check_rate_limit(client_ip, '/meta/home')
-    if not allowed:
-        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
     now = time.time()
     if _home_cache["html"] is None or now > _home_cache["expires"]:
         _home_cache["html"] = build_home_meta_html(
@@ -233,20 +229,12 @@ def home_meta(request: Request):
 
 @router.get("/meta/persons")
 def persons_meta(request: Request):
-    client_ip = get_client_ip(request)
-    allowed, retry_after = check_rate_limit(client_ip, '/meta/persons')
-    if not allowed:
-        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
     entries = _load_index().get("entries", [])
     return HTMLResponse(content=build_persons_meta_html(entries))
 
 
 @router.get("/meta/person/{person_id:path}")
 def person_meta(person_id: str, request: Request):
-    client_ip = get_client_ip(request)
-    allowed, retry_after = check_rate_limit(client_ip, '/meta/person')
-    if not allowed:
-        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
     # Resolvi isiku AVALIKUD teosed ristviidete jaoks (linkgraaf isik↔teos)
     work_links = []
     person = get_person_with_works(person_id)
@@ -260,8 +248,16 @@ def person_meta(person_id: str, request: Request):
             meta = _load_work_metadata(wid)
             if meta is None or not is_work_public(meta):
                 continue
-            work_links.append({"work_id": wid, "title": meta.get("title") or wid})
-    html = build_person_meta_html(person_id, work_links=work_links)
+            work_links.append({"work_id": wid, "title": meta.get("title") or wid, "role": w.get("role")})
+    cache_key = (
+        person.get("updated_at") if person else None,
+        tuple((w.get("work_id"), w.get("title"), w.get("role")) for w in work_links),
+    )
+    html = cached_person_meta_html(
+        person_id,
+        cache_key,
+        lambda: build_person_meta_html(person_id, work_links=work_links),
+    )
     if html is None:
         return HTMLResponse(content="<html><body>Isikut ei leitud</body></html>", status_code=404)
     return HTMLResponse(content=html)
@@ -269,10 +265,6 @@ def person_meta(person_id: str, request: Request):
 
 @router.get("/meta/work/{work_id}")
 def work_meta(work_id: str, request: Request):
-    client_ip = get_client_ip(request)
-    allowed, retry_after = check_rate_limit(client_ip, '/meta/work')
-    if not allowed:
-        return JSONResponse(status_code=429, content={"status": "error", "message": f"Proovi uuesti {retry_after}s pärast"}, headers={"Retry-After": str(retry_after)})
     meta = _load_work_metadata(work_id)
     if meta is not None:
         user = _get_optional_user(request)

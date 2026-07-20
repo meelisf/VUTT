@@ -160,6 +160,18 @@ def cached_work_meta_html(work_id, work_path, build_fn):
     _work_meta_cache[work_id] = (key, html)
     return html
 
+
+def cached_person_meta_html(person_id, cache_key, build_fn):
+    """Tagastab isiku bot-HTML-i cache'ist, kui isik ja teoselingid pole muutunud."""
+    from .cache_invalidation import _person_meta_cache
+    cached = _person_meta_cache.get(person_id)
+    if cached is not None and cached[0] == cache_key:
+        return cached[1]
+    rendered = build_fn()
+    _person_meta_cache[person_id] = (cache_key, rendered)
+    return rendered
+
+
 def build_meta_html(work_id: str, creator_persons=None, include_text: bool = True) -> str:
     """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega.
 
@@ -428,11 +440,78 @@ def build_home_meta_html(work_id_cache, is_work_public_fn, load_meta_fn, work_co
 </html>"""
 
 
-def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
-    """Genereerib Google'ile ja sotsiaalmeedia robotitele isikukaardi HTML-i.
+def _person_date_text(value) -> str:
+    """Muudab ajaloolise kuupäeva bot-HTML-i jaoks loetavaks faktiks."""
+    if not isinstance(value, dict):
+        return ""
+    date = value.get("date") or value.get("original_text") or ""
+    date_to = value.get("date_to") or ""
+    if date and date_to and date_to != date:
+        date = f"{date}–{date_to}"
+    if value.get("is_circa") and date:
+        date = f"u {date}"
+    bound = {"before": "enne", "after": "pärast"}.get(value.get("bound"))
+    if bound and date:
+        date = f"{bound} {date}"
+    place = _label(value.get("place"))
+    if date and place:
+        return f"{date}, {place}"
+    return str(date or place)
 
-    work_links: eel-resolvitud [{work_id, title}] isiku AVALIKUD teosed (route filtreerib)
-    — lingitakse ristviidetena. Tagasi-lingid isikud/kodu lisatakse alati (linkgraaf).
+
+def _person_entity_labels(values) -> list[str]:
+    labels = []
+    for value in values or []:
+        if isinstance(value, dict):
+            label = value.get("label") or value.get("occupation") or value.get("name")
+        else:
+            label = value
+        if label and str(label) not in labels:
+            labels.append(str(label))
+    return labels
+
+
+def _person_origin_label(person: dict) -> str:
+    origin = person.get("origin") or {}
+    labels = origin.get("place_labels") or {}
+    if isinstance(labels, dict):
+        localized = labels.get("et") or labels.get("en") or next(iter(labels.values()), "")
+        if localized:
+            return str(localized)
+    return _label(origin.get("place"))
+
+
+def _education_facts(person: dict) -> list[str]:
+    facts = []
+    for education in person.get("education") or []:
+        if not isinstance(education, dict):
+            continue
+        institution = _label(education.get("institution"))
+        date_from = education.get("date_from") or {}
+        date = date_from.get("date") if isinstance(date_from, dict) else ""
+        date = date or education.get("date_start") or ""
+        edu_type = education.get("edu_type") or education.get("type") or ""
+        parts = [str(part) for part in (institution, date, edu_type) if part]
+        fact = ", ".join(parts)
+        if fact and fact not in facts:
+            facts.append(fact)
+    return facts
+
+
+def _identifier_url(scheme: str, identifier: str) -> Optional[str]:
+    if scheme == "wikidata":
+        return f"https://www.wikidata.org/wiki/{identifier}"
+    if scheme == "gnd":
+        return f"https://d-nb.info/gnd/{identifier}"
+    if scheme == "viaf":
+        return f"https://viaf.org/viaf/{identifier}"
+    return None
+
+
+def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
+    """Genereerib botile sama faktilise isikukaardi, mida näeb SPA kasutaja.
+
+    work_links sisaldab ainult eelnevalt ligipääsukontrollitud avalikke teoseid.
     """
     from .prosopography.ops import get_person_with_works
 
@@ -442,14 +521,35 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
 
     name = person.get("name") or {}
     title = name.get("label") or person.get("id") or "Isik"
-    aliases = name.get("aliases") or []
-    biography = _strip_html_tags(person.get("biography") or person.get("notes") or "")
-    description_parts = []
-    if aliases:
-        description_parts.append("; ".join(str(a) for a in aliases[:5]))
-    if biography:
-        description_parts.append(biography[:180])
-    description = " — ".join(description_parts) or "VUTT prosopograafia isikukaart."
+    aliases = [str(a) for a in (name.get("aliases") or []) if a]
+    birth = _person_date_text(person.get("birth"))
+    death = _person_date_text(person.get("death"))
+    origin = _person_origin_label(person)
+    statuses = _person_entity_labels(person.get("statuses"))
+    confessions = _person_entity_labels(person.get("confessions"))
+    occupations = _person_entity_labels(person.get("occupations"))
+    education = _education_facts(person)
+    identifiers = [i for i in (person.get("identifiers") or []) if isinstance(i, dict) and i.get("id")]
+    biography = _strip_html_tags(person.get("biography") or "")
+    notes = _strip_html_tags(person.get("notes") or "")
+
+    description_parts = [str(title)]
+    if birth:
+        description_parts.append(f"Sündinud {birth}.")
+    if death:
+        description_parts.append(f"Surnud {death}.")
+    if education:
+        description_parts.append(f"Haridus: {education[0]}.")
+    aa_id = next((str(i["id"]) for i in identifiers if i.get("scheme") == "album_academicum"), "")
+    if aa_id:
+        description_parts.append(f"Album Academicum {aa_id}.")
+    if len(description_parts) == 1 and origin:
+        description_parts.append(f"Päritolu: {origin}.")
+    if len(description_parts) == 1 and aliases:
+        description_parts.append(f"Nimevariant: {aliases[0]}.")
+    if len(description_parts) == 1:
+        description_parts.append("VUTT prosopograafia isikukaart.")
+    description = " ".join(description_parts)[:320]
 
     person_url = f"{SITE_URL}/persons/{_escape(person_id)}"
     safe_title = _escape(title)
@@ -460,47 +560,121 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     if updated:
         dc_tags += f'    <meta name="DC.date" content="{_escape(str(updated))}">\n'
 
-    body_lines = [f"<h1>{safe_title}</h1>"]
-    if aliases:
-        body_lines.append(f"<p>{_escape('; '.join(str(a) for a in aliases))}</p>")
+    body_lines = [f"<h1>{safe_title}</h1>", "<dl>"]
 
-    birth = (person.get("birth") or {}).get("date")
-    death = (person.get("death") or {}).get("date")
-    if birth or death:
-        body_lines.append(f"<p>{_escape(birth or '')}–{_escape(death or '')}</p>")
+    def add_fact(label, value):
+        if value:
+            body_lines.append(f"  <dt>{_escape(label)}</dt><dd>{_escape(value)}</dd>")
 
-    occupations = person.get("occupations") or []
-    occ_labels = [o.get("label") or o.get("occupation") for o in occupations if isinstance(o, dict) and (o.get("label") or o.get("occupation"))]
-    if occ_labels:
-        body_lines.append(f"<p>{_escape(', '.join(occ_labels))}</p>")
+    add_fact("Nimevariandid", "; ".join(aliases))
+    add_fact("Sündinud", birth)
+    add_fact("Surnud", death)
+    add_fact("Päritolu", origin)
+    add_fact("Sugu", {"M": "mees", "F": "naine"}.get(person.get("gender"), ""))
+    add_fact("Seisused", ", ".join(statuses))
+    add_fact("Konfessioon", ", ".join(confessions))
+    add_fact("Ametid", ", ".join(occupations))
+    for fact in education:
+        add_fact("Haridus", fact)
+    for identifier in identifiers:
+        scheme = str(identifier.get("scheme") or "identifikaator")
+        identifier_value = str(identifier["id"])
+        url = _identifier_url(scheme, identifier_value)
+        label = "Album Academicum" if scheme == "album_academicum" else scheme.upper()
+        if url:
+            body_lines.append(
+                f'  <dt>{_escape(label)}</dt><dd><a href="{_escape(url)}">{_escape(identifier_value)}</a></dd>'
+            )
+        else:
+            add_fact(label, identifier_value)
+    body_lines.append("</dl>")
+
     if biography:
-        body_lines.append(f"<p>{_escape(biography)}</p>")
+        body_lines.extend(["<h2>Elulugu</h2>", f"<p>{_escape(biography)}</p>"])
+    if notes:
+        body_lines.extend(["<h2>Märkmed</h2>", f"<p>{_escape(notes)}</p>"])
 
-    # Ristviited isiku avalikele teostele (linkgraaf isik↔teos)
+    relations = person.get("relations") or []
+    relation_items = []
+    for relation in relations:
+        if not isinstance(relation, dict):
+            continue
+        relation_name = relation.get("name") or relation.get("target_id")
+        if not relation_name:
+            continue
+        relation_type = relation.get("type") or "seos"
+        target_id = relation.get("target_id")
+        if target_id:
+            target_url = f"{SITE_URL}/persons/{_escape(target_id)}"
+            relation_items.append(
+                f'<li>{_escape(relation_type)}: <a href="{target_url}">{_escape(relation_name)}</a></li>'
+            )
+        else:
+            relation_items.append(f"<li>{_escape(relation_type)}: {_escape(relation_name)}</li>")
+    if relation_items:
+        body_lines.extend(["<h2>Seosed</h2>", "<ul>", *relation_items, "</ul>"])
+
+    sources = person.get("sources") or []
+    source_items = []
+    for source in sources:
+        text = source.get("text") if isinstance(source, dict) else source
+        if text:
+            source_items.append(f"<li>{_escape(text)}</li>")
+    if source_items:
+        body_lines.extend(["<h2>Allikad</h2>", "<ul>", *source_items, "</ul>"])
+
     if work_links:
-        body_lines.append("<h2>Teosed</h2>")
-        body_lines.append("<ul>")
-        for w in work_links:
-            wid = w.get("work_id")
+        body_lines.extend(["<h2>Teosed</h2>", "<ul>"])
+        for work in work_links:
+            wid = work.get("work_id")
             if not wid:
                 continue
-            wtitle = w.get("title") or wid
+            work_title = work.get("title") or wid
+            role = work.get("role")
+            role_text = f" — {_ROLE_LABELS.get(role, role)}" if role else ""
             url = f"{SITE_URL}/work/{_escape(wid)}"
-            body_lines.append(f'  <li><a href="{url}">{_escape(wtitle)}</a></li>')
+            body_lines.append(f'  <li><a href="{url}">{_escape(work_title)}</a>{_escape(role_text)}</li>')
         body_lines.append("</ul>")
 
     body_lines.append(f'<p><a href="{person_url}">{person_url}</a></p>')
-    # Tagasi-lingid hub-lehtedele (alati)
     body_lines.append(
         f'<nav><a href="{SITE_URL}/persons">Isikud</a> · <a href="{SITE_URL}/">VUTT</a></nav>'
     )
     body_content = "\n".join(body_lines)
 
+    same_as = [url for i in identifiers if (url := _identifier_url(str(i.get("scheme") or ""), str(i["id"])))]
+    structured_person = {
+        "@context": "https://schema.org",
+        "@type": "Person",
+        "@id": f"{SITE_URL}/persons/{person_id}#person",
+        "url": f"{SITE_URL}/persons/{person_id}",
+        "name": str(title),
+        "identifier": str(person_id),
+    }
+    if aliases:
+        structured_person["alternateName"] = aliases
+    if same_as:
+        structured_person["sameAs"] = same_as
+    if (person.get("birth") or {}).get("date"):
+        structured_person["birthDate"] = person["birth"]["date"]
+    if (person.get("death") or {}).get("date"):
+        structured_person["deathDate"] = person["death"]["date"]
+    if education:
+        structured_person["alumniOf"] = [
+            {"@type": "EducationalOrganization", "name": fact.split(",", 1)[0]} for fact in education
+        ]
+    if biography:
+        structured_person["description"] = biography[:500]
+    image_url = person.get("image_url")
+    if image_url:
+        structured_person["image"] = image_url if str(image_url).startswith("http") else f"{SITE_URL}{image_url}"
+    structured_json = json.dumps(structured_person, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
+
     return f"""<!DOCTYPE html>
-<html>
+<html lang="et">
 <head>
     <meta charset="UTF-8">
-    <title>{safe_title}</title>
+    <title>{safe_title} – VUTT</title>
     <link rel="canonical" href="{person_url}">
     <meta name="description" content="{safe_desc}">
 
@@ -510,6 +684,7 @@ def build_person_meta_html(person_id: str, work_links=None) -> Optional[str]:
     <meta property="og:title" content="{safe_title}">
     <meta property="og:description" content="{safe_desc}">
     {_OG_IMAGE_STATIC}
+    <script type="application/ld+json">{structured_json}</script>
 </head>
 <body>
     {body_content}
@@ -579,7 +754,7 @@ def build_sitemap_xml(
     urls.append(f"  <url>\n    <loc>{SITE_URL}/persons</loc>\n  </url>")
 
     for person in person_entries or []:
-        if person.get("record_status") == "tombstone":
+        if person.get("record_status") == "tombstone" or person.get("merged_into"):
             continue
         person_id = person.get("id")
         if not person_id:

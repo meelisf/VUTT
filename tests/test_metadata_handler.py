@@ -369,12 +369,13 @@ def test_sitemap_multiple_works():
     assert "https://vutt.utlib.ut.ee/persons" in xml
 
 
-def test_sitemap_includes_persons_and_excludes_tombstones():
+def test_sitemap_includes_active_persons_and_excludes_removed_records():
     from server.metadata_handler import build_sitemap_xml
 
     persons = [
         {"id": "vutt:P1", "record_status": "published", "updated_at": "2026-06-21T12:00:00Z"},
         {"id": "vutt:P2", "record_status": "tombstone"},
+        {"id": "vutt:P3", "record_status": "published", "merged_into": "vutt:P1"},
     ]
 
     xml = build_sitemap_xml({}, lambda m: True, lambda wid: None, persons)
@@ -383,6 +384,7 @@ def test_sitemap_includes_persons_and_excludes_tombstones():
     assert "https://vutt.utlib.ut.ee/persons/vutt:P1" in xml
     assert "2026-06-21" in xml
     assert "vutt:P2" not in xml
+    assert "vutt:P3" not in xml
 
 
 def test_body_includes_page_text(patch_find):
@@ -465,6 +467,26 @@ def test_sitemap_lastmod_uses_page_mtime(tmp_path):
     xml = build_sitemap_xml(cache, lambda m: True, lambda wid: {"id": "w1", "collections": []})
     expected = datetime.datetime.fromtimestamp(new_ts, datetime.timezone.utc).strftime("%Y-%m-%d")
     assert expected in xml
+
+
+def test_cached_person_meta_html_rebuilds_when_key_changes():
+    from server.metadata_handler import cached_person_meta_html
+    from server.cache_invalidation import _person_meta_cache
+    _person_meta_cache.clear()
+    calls = {"n": 0}
+
+    def build():
+        calls["n"] += 1
+        return f"<html>{calls['n']}</html>"
+
+    first = cached_person_meta_html("vutt:P1", ("2026-01-01", ()), build)
+    second = cached_person_meta_html("vutt:P1", ("2026-01-01", ()), build)
+    assert first == second
+    assert calls["n"] == 1
+
+    third = cached_person_meta_html("vutt:P1", ("2026-01-02", ()), build)
+    assert third != first
+    assert calls["n"] == 2
 
 
 def test_cached_work_meta_html_rebuilds_on_mtime_change(tmp_path):
