@@ -63,6 +63,36 @@ def test_rebuild_indices_builds_work_collections(tmp_path):
     assert data == {"w1": ["c-child", "c-other"]}
 
 
+def test_rebuild_indices_excludes_merged_persons(tmp_path):
+    ops = _ops(tmp_path)
+    base_dir = tmp_path / "data"
+    base_dir.mkdir()
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    active = {"id": "vutt:Pactive", "name": {"label": "Aktiivne"}, "record_status": "draft"}
+    merged = {
+        "id": "vutt:Pmerged",
+        "name": {"label": "Liidetud"},
+        "record_status": "draft",
+        "merged_into": "vutt:Pactive",
+    }
+    (prosopo_dir / "active.json").write_text(json.dumps(active), encoding="utf-8")
+    (prosopo_dir / "merged.json").write_text(json.dumps(merged), encoding="utf-8")
+    index_file = tmp_path / "idx.json"
+
+    with mock.patch.object(ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir)), \
+         mock.patch.object(ops, "BASE_DIR", str(base_dir)), \
+         mock.patch.object(ops, "WORK_COLLECTIONS_INDEX_FILE", str(tmp_path / "wc.json")), \
+         mock.patch.object(ops, "PERSON_TO_WORKS_FILE", str(tmp_path / "ptw.json")), \
+         mock.patch.object(ops, "PROSOPOGRAPHY_INDEX_FILE", str(index_file)), \
+         mock.patch.object(ops, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json")), \
+         mock.patch.object(ops, "build_works_creators_index", lambda: None):
+        ops.rebuild_indices()
+
+    entries = json.loads(index_file.read_text(encoding="utf-8"))["entries"]
+    assert [entry["id"] for entry in entries] == ["vutt:Pactive"]
+
+
 COLLECTIONS = {
     "parent": {"name": {"et": "Vanem"}},
     "c-child": {"name": {"et": "Laps"}, "parent": "parent"},

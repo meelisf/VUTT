@@ -321,7 +321,7 @@ def rebuild_indices():
     entries = []
     aliases_data = {}
     for person in all_persons:
-        if person.get("record_status") == "tombstone":
+        if person.get("record_status") == "tombstone" or person.get("merged_into"):
             continue
         pid = person["id"]
         works_list = ptw.get(pid, [])

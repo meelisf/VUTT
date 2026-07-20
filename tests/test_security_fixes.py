@@ -86,6 +86,19 @@ def test_csp_no_unsafe_inline_in_nginx_config():
     )
 
 
+def test_bot_meta_nginx_location_has_no_rate_limit():
+    """Bot-prerender peab nginxis mööduma üldisest /api/files/ limiidist."""
+    import re
+    from pathlib import Path
+
+    config_path = Path(__file__).resolve().parent.parent / "nginx.host.conf"
+    content = config_path.read_text(encoding="utf-8")
+    match = re.search(r"location /api/files/meta/ \{(?P<body>.*?)\n    \}", content, re.DOTALL)
+    assert match, "nginx.host.conf-is puudub bot-prerenderi eraldi location"
+    assert "limit_req" not in match.group("body")
+    assert content.index("location /api/files/meta/") < content.index("location /api/files/ {")
+
+
 # ---------------------------------------------------------------------------
 # 4. Prosopograafia path traversal kaitse (Leid F)
 # ---------------------------------------------------------------------------
