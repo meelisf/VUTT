@@ -86,6 +86,36 @@ export interface ProsopoMapMarker {
   persons: ProsopoMapPerson[];
 }
 
+export interface HistoricalRegionProperties {
+  relation_id: number;
+  name: string;
+  label_et: string | null;
+  label_en: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  color: string;
+}
+
+export interface HistoricalRegionFeatureCollection {
+  type: 'FeatureCollection';
+  features: Array<{
+    type: 'Feature';
+    id: number;
+    properties: HistoricalRegionProperties;
+    geometry: {
+      type: 'Polygon' | 'MultiPolygon';
+      coordinates: unknown;
+    };
+  }>;
+}
+
+export interface HistoricalRegionsResponse {
+  geojson: HistoricalRegionFeatureCollection;
+  year: number;
+  bounds: { south: number; west: number; north: number; east: number };
+  region_count: number;
+}
+
 export interface ProsopoMapResponse {
   markers: ProsopoMapMarker[];
   total_persons: number;

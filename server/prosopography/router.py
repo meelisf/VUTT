@@ -4,7 +4,7 @@ Registreeritakse main.py-s: app.include_router(router, prefix="/prosopography")
 """
 import json
 import os
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends, Query
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
 
@@ -24,6 +24,7 @@ from .person_crud import (
     _safe_nanoid,
 )
 from .person_search import list_persons, get_person_map_markers, get_person_facets
+from .historical_regions import HistoricalRegionsError, get_historical_regions
 from .relations import get_person_with_works, get_relation_type_suggestions
 from .merge_ops import merge_person, delete_person
 from .indices import rebuild_indices
@@ -223,6 +224,32 @@ def prosopography_map(
         related_to=related_to,
         collection=collection,
     )
+
+
+@router.get("/map-regions")
+async def prosopography_map_regions(
+    request: Request,
+    year: int = Query(ge=1, le=9999),
+    south: float = Query(ge=-85, le=85),
+    west: float = Query(ge=-180, le=180),
+    north: float = Query(ge=-85, le=85),
+    east: float = Query(ge=-180, le=180),
+):
+    """Tagastab OHM-i aktiivsed riigipolügoonid valitud aasta ja kaardivaate jaoks."""
+    allowed, retry_after = check_rate_limit(get_client_ip(request), '/prosopography/map-regions')
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Liiga palju kaardipiirkondade päringuid, proovi uuesti {retry_after}s pärast",
+            headers={"Retry-After": str(retry_after)},
+        )
+    try:
+        return await run_in_threadpool(get_historical_regions, year, south, west, north, east)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HistoricalRegionsError as exc:
+        logger.warning("OHM ajalooliste piirkondade päring ebaõnnestus: %s", exc)
+        raise HTTPException(status_code=502, detail="Ajalooliste piirkondade laadimine ebaõnnestus") from exc
 
 
 @router.get("/facets")

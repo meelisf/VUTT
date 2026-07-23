@@ -1,14 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import type { FilterSpecification, Map as MapLibreMap } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
+import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { useMap } from 'react-leaflet';
+import { fetchHistoricalRegions } from '../services/prosopographyService';
+import type { HistoricalRegionProperties } from '../types';
 import '@maplibre/maplibre-gl-leaflet';
 
 const HISTORICAL_STYLE_URL = 'https://www.openhistoricalmap.org/map-styles/historical/historical.json';
 const OHM_ATTRIBUTION = '<a href="https://www.openhistoricalmap.org/">OpenHistoricalMap</a>';
+const REGION_SOURCE_ID = 'vutt-historical-regions';
+const REGION_FILL_LAYER_ID = 'vutt-historical-regions-fill';
+const REGION_LINE_LAYER_ID = 'vutt-historical-regions-line';
+const EMPTY_REGIONS: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 interface HistoricalMapLayerProps {
   year: number;
+  lang: string;
 }
 
 function dateFilter(year: number): FilterSpecification {
@@ -63,8 +71,77 @@ function enhanceAdministrativeReadability(map: MapLibreMap): void {
   }
 }
 
+function ensureRegionLayers(map: MapLibreMap): void {
+  if (!map.getSource(REGION_SOURCE_ID)) {
+    map.addSource(REGION_SOURCE_ID, { type: 'geojson', data: EMPTY_REGIONS });
+  }
+
+  const beforeId = map.getLayer('admin_country_lines_z10_case')
+    ? 'admin_country_lines_z10_case'
+    : undefined;
+  if (!map.getLayer(REGION_FILL_LAYER_ID)) {
+    map.addLayer({
+      id: REGION_FILL_LAYER_ID,
+      type: 'fill',
+      source: REGION_SOURCE_ID,
+      paint: {
+        'fill-color': ['get', 'color'],
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.24,
+          0.1,
+        ],
+      },
+    }, beforeId);
+  }
+  if (!map.getLayer(REGION_LINE_LAYER_ID)) {
+    map.addLayer({
+      id: REGION_LINE_LAYER_ID,
+      type: 'line',
+      source: REGION_SOURCE_ID,
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.95,
+          0.5,
+        ],
+        'line-width': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          2.5,
+          1,
+        ],
+      },
+    }, beforeId);
+  }
+}
+
+function regionTooltipContent(properties: HistoricalRegionProperties, lang: string): HTMLElement {
+  const content = document.createElement('div');
+  content.className = 'space-y-0.5';
+
+  const name = document.createElement('div');
+  name.className = 'font-semibold text-gray-900';
+  name.textContent = (lang === 'en' ? properties.label_en : properties.label_et)
+    || properties.label_et
+    || properties.label_en
+    || properties.name;
+  content.appendChild(name);
+
+  if (properties.start_date || properties.end_date) {
+    const dates = document.createElement('div');
+    dates.className = 'text-[11px] text-gray-500';
+    dates.textContent = `${properties.start_date || '…'}–${properties.end_date || '…'}`;
+    content.appendChild(dates);
+  }
+  return content;
+}
+
 /** Leafleti sees renderduv OpenHistoricalMapi MapLibre-vektorkiht. */
-const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year }) => {
+const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) => {
   const map = useMap();
   const [mapLibre, setMapLibre] = useState<MapLibreMap | null>(null);
   const originalFilters = useRef(new Map<string, FilterSpecification | null>());
@@ -103,6 +180,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year }) => {
       }
 
       enhanceAdministrativeReadability(mapLibre);
+      ensureRegionLayers(mapLibre);
     };
 
     if (mapLibre.isStyleLoaded()) applyYear();
@@ -111,6 +189,131 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year }) => {
       mapLibre.off('style.load', applyYear);
     };
   }, [mapLibre, year]);
+
+  useEffect(() => {
+    if (!mapLibre) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let controller: AbortController | null = null;
+
+    const loadRegions = async () => {
+      if (!mapLibre.getSource(REGION_SOURCE_ID)) return;
+      const bounds = map.getBounds();
+      const width = bounds.getEast() - bounds.getWest();
+      const height = bounds.getNorth() - bounds.getSouth();
+      const source = mapLibre.getSource(REGION_SOURCE_ID) as GeoJSONSource;
+
+      // Väga kaugel välja suumides oleks Overpassi vastus ebamõistlikult suur.
+      if (width > 140 || height > 90) {
+        source.setData(EMPTY_REGIONS);
+        return;
+      }
+
+      controller?.abort();
+      controller = new AbortController();
+      try {
+        const response = await fetchHistoricalRegions({
+          year,
+          south: Math.max(-85, bounds.getSouth()),
+          west: Math.max(-180, bounds.getWest()),
+          north: Math.min(85, bounds.getNorth()),
+          east: Math.min(180, bounds.getEast()),
+        }, controller.signal);
+        source.setData(response.geojson as unknown as FeatureCollection);
+      } catch (error) {
+        if ((error as Error).name !== 'AbortError') {
+          console.warn('Ajalooliste piirkondade laadimine ebaõnnestus', error);
+        }
+      }
+    };
+
+    const scheduleLoad = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(loadRegions, 450);
+    };
+
+    map.on('moveend', scheduleLoad);
+    mapLibre.on('style.load', scheduleLoad);
+    scheduleLoad();
+    return () => {
+      if (timer) clearTimeout(timer);
+      controller?.abort();
+      map.off('moveend', scheduleLoad);
+      mapLibre.off('style.load', scheduleLoad);
+    };
+  }, [map, mapLibre, year]);
+
+  useEffect(() => {
+    if (!mapLibre) return;
+    let hoveredId: string | number | null = null;
+    let pinned = false;
+    const tooltip = L.tooltip({
+      className: 'vutt-region-tooltip',
+      direction: 'top',
+      offset: [0, -8],
+      opacity: 0.96,
+    });
+
+    const clearHover = () => {
+      if (hoveredId !== null) {
+        mapLibre.setFeatureState({ source: REGION_SOURCE_ID, id: hoveredId }, { hover: false });
+        hoveredId = null;
+      }
+      map.getContainer().style.cursor = '';
+      if (!pinned) tooltip.remove();
+    };
+
+    const featureAt = (latlng: L.LatLng) => {
+      if (!mapLibre.getLayer(REGION_FILL_LAYER_ID)) return null;
+      const point = mapLibre.project([latlng.lng, latlng.lat]);
+      return mapLibre.queryRenderedFeatures(point, { layers: [REGION_FILL_LAYER_ID] })[0] ?? null;
+    };
+
+    const showFeature = (latlng: L.LatLng, feature: ReturnType<typeof featureAt>) => {
+      if (!feature || feature.id === undefined) {
+        clearHover();
+        return;
+      }
+      if (hoveredId !== feature.id) {
+        clearHover();
+        hoveredId = feature.id;
+        mapLibre.setFeatureState({ source: REGION_SOURCE_ID, id: hoveredId }, { hover: true });
+      }
+      map.getContainer().style.cursor = 'pointer';
+      tooltip
+        .setLatLng(latlng)
+        .setContent(regionTooltipContent(feature.properties as HistoricalRegionProperties, lang))
+        .addTo(map);
+    };
+
+    const onMouseMove = (event: L.LeafletMouseEvent) => {
+      if (!pinned) showFeature(event.latlng, featureAt(event.latlng));
+    };
+    const onClick = (event: L.LeafletMouseEvent) => {
+      const feature = featureAt(event.latlng);
+      if (!feature) {
+        pinned = false;
+        clearHover();
+        return;
+      }
+      pinned = true;
+      showFeature(event.latlng, feature);
+    };
+    const onMouseOut = () => {
+      if (!pinned) clearHover();
+    };
+
+    map.on('mousemove', onMouseMove);
+    map.on('click', onClick);
+    map.getContainer().addEventListener('mouseleave', onMouseOut);
+    return () => {
+      pinned = false;
+      clearHover();
+      tooltip.remove();
+      map.off('mousemove', onMouseMove);
+      map.off('click', onClick);
+      map.getContainer().removeEventListener('mouseleave', onMouseOut);
+    };
+  }, [lang, map, mapLibre]);
 
   return null;
 };

@@ -1,6 +1,6 @@
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
-import type { ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
+import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
 
@@ -102,6 +102,22 @@ export async function fetchPersonMapMarkers(params?: {
     timeout: 10000,
   });
   if (!resp.ok) throw new Error(`fetchPersonMapMarkers: ${resp.status}`);
+  return resp.json();
+}
+
+export async function fetchHistoricalRegions(params: {
+  year: number;
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}, signal?: AbortSignal): Promise<HistoricalRegionsResponse> {
+  const url = new URL(`${BASE}/map-regions`, window.location.origin);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, String(value));
+  }
+  const resp = await fetchWithTimeout(url.toString(), { signal, timeout: 90000 });
+  if (!resp.ok) throw new Error(`fetchHistoricalRegions: ${resp.status}`);
   return resp.json();
 }
 

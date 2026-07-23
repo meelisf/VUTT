@@ -381,6 +381,13 @@ hr.page-break::before {
   box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.38), 0 8px 18px rgba(15, 23, 42, 0.28);
 }
 
+.vutt-region-tooltip {
+  border: 1px solid rgba(100, 116, 107, 0.35);
+  border-radius: 0.5rem;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.18);
+  padding: 0.4rem 0.55rem;
+}
+
 /* 4. General Reader Typography */
 .markdown-preview p {
   margin-bottom: 1rem;

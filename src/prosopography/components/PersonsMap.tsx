@@ -255,7 +255,7 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
           scrollWheelZoom
           className="h-full w-full"
         >
-          <HistoricalMapLayer year={mapYear} />
+          <HistoricalMapLayer year={mapYear} lang={lang} />
           <FitMapToMarkers markers={data.markers} focusPlace={focusPlace} />
           {displayMarkers.map(marker => {
             const placeLabel = resolveLabel(marker.place_labels, lang) ?? marker.place_key ?? marker.place_id ?? '';
