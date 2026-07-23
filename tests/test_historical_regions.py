@@ -1,5 +1,6 @@
 from server.prosopography.historical_regions import (
     _build_overpass_query,
+    _fallback_all_inner_geometry,
     _normalize_geojson,
     _quantize_bbox,
     _region_color,
@@ -74,6 +75,15 @@ def test_normalize_geojson_keeps_only_needed_localized_properties():
         "end_date": "1700",
         "color": _region_color(123),
     }
+
+
+def test_all_inner_boundary_members_are_recovered_as_polygon():
+    element = _square_relation()["elements"][0]
+    element["members"][0]["role"] = "inner"
+    geometry = _fallback_all_inner_geometry(element)
+    assert geometry is not None
+    assert geometry.geom_type == "Polygon"
+    assert round(geometry.area, 3) == 1.0
 
 
 def test_region_color_is_stable():

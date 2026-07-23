@@ -151,7 +151,7 @@ RATE_LIMITS = {
     # valideerimine küsib tuhandeid URL-e lühikese aja jooksul ning serverini
     # jõuavad ülikooli pöördproksi tõttu eri kliendid sama IP-ga.
     '/prosopography/wikidata': (30, 60),  # 30 Wikidata-proksi päringut minutis IP kohta (anonüümne)
-    '/prosopography/map-regions': (20, 60),  # OHM Overpassi proksi; tulemused cache'itakse
+    '/prosopography/map-regions': (120, 60),  # Kaardi liigutamine võib teha mitu cache'itud päringut
 }
 
 # =========================================================

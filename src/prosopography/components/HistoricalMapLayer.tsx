@@ -119,6 +119,12 @@ function ensureRegionLayers(map: MapLibreMap): void {
   }
 }
 
+function yearFromHistoricalDate(value: string): string {
+  const match = value.match(/^-?\d{1,4}/);
+  if (!match) return value;
+  return String(Number(match[0]));
+}
+
 function regionTooltipContent(properties: HistoricalRegionProperties, lang: string): HTMLElement {
   const content = document.createElement('div');
   content.className = 'space-y-0.5';
@@ -134,7 +140,7 @@ function regionTooltipContent(properties: HistoricalRegionProperties, lang: stri
   if (properties.start_date || properties.end_date) {
     const dates = document.createElement('div');
     dates.className = 'text-[11px] text-gray-500';
-    dates.textContent = `${properties.start_date || '…'}–${properties.end_date || '…'}`;
+    dates.textContent = `${properties.start_date ? yearFromHistoricalDate(properties.start_date) : '…'}–${properties.end_date ? yearFromHistoricalDate(properties.end_date) : '…'}`;
     content.appendChild(dates);
   }
   return content;
@@ -194,6 +200,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
     if (!mapLibre) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let controller: AbortController | null = null;
+    let loadedBounds: { south: number; west: number; north: number; east: number } | null = null;
 
     const loadRegions = async () => {
       if (!mapLibre.getSource(REGION_SOURCE_ID)) return;
@@ -201,6 +208,16 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
       const width = bounds.getEast() - bounds.getWest();
       const height = bounds.getNorth() - bounds.getSouth();
       const source = mapLibre.getSource(REGION_SOURCE_ID) as GeoJSONSource;
+
+      // Backend tagastab vaatest laiema ruudustikuala. Selle sees liikudes uut
+      // päringut ei tehta, sest ekraanil vajalikud polügoonid on juba olemas.
+      if (
+        loadedBounds
+        && bounds.getSouth() >= loadedBounds.south
+        && bounds.getWest() >= loadedBounds.west
+        && bounds.getNorth() <= loadedBounds.north
+        && bounds.getEast() <= loadedBounds.east
+      ) return;
 
       // Väga kaugel välja suumides oleks Overpassi vastus ebamõistlikult suur.
       if (width > 140 || height > 90) {
@@ -219,6 +236,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
           east: Math.min(180, bounds.getEast()),
         }, controller.signal);
         source.setData(response.geojson as unknown as FeatureCollection);
+        loadedBounds = response.bounds;
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
           console.warn('Ajalooliste piirkondade laadimine ebaõnnestus', error);
@@ -245,7 +263,6 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
   useEffect(() => {
     if (!mapLibre) return;
     let hoveredId: string | number | null = null;
-    let pinned = false;
     const tooltip = L.tooltip({
       className: 'vutt-region-tooltip',
       direction: 'top',
@@ -259,7 +276,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
         hoveredId = null;
       }
       map.getContainer().style.cursor = '';
-      if (!pinned) tooltip.remove();
+      tooltip.remove();
     };
 
     const featureAt = (latlng: L.LatLng) => {
@@ -286,27 +303,17 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
     };
 
     const onMouseMove = (event: L.LeafletMouseEvent) => {
-      if (!pinned) showFeature(event.latlng, featureAt(event.latlng));
+      showFeature(event.latlng, featureAt(event.latlng));
     };
     const onClick = (event: L.LeafletMouseEvent) => {
-      const feature = featureAt(event.latlng);
-      if (!feature) {
-        pinned = false;
-        clearHover();
-        return;
-      }
-      pinned = true;
-      showFeature(event.latlng, feature);
+      showFeature(event.latlng, featureAt(event.latlng));
     };
-    const onMouseOut = () => {
-      if (!pinned) clearHover();
-    };
+    const onMouseOut = () => clearHover();
 
     map.on('mousemove', onMouseMove);
     map.on('click', onClick);
     map.getContainer().addEventListener('mouseleave', onMouseOut);
     return () => {
-      pinned = false;
       clearHover();
       tooltip.remove();
       map.off('mousemove', onMouseMove);

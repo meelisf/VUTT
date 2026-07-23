@@ -5,17 +5,19 @@ import math
 import threading
 import time
 from collections import OrderedDict
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import osm2geojson
 import requests
-from shapely.geometry import mapping, shape
+from shapely.geometry import LineString, mapping, shape
+from shapely.ops import polygonize, unary_union
 
 from ..config import get_logger
 
 logger = get_logger(__name__)
 
 OVERPASS_URL = "https://overpass-api.openhistoricalmap.org/api/interpreter"
+WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 OVERPASS_TIMEOUT_SECONDS = 75
 CACHE_TTL_SECONDS = 24 * 60 * 60
 CACHE_MAX_ENTRIES = 24
@@ -76,30 +78,95 @@ def _region_color(relation_id: int) -> str:
     return REGION_COLORS[int.from_bytes(digest[:2], "big") % len(REGION_COLORS)]
 
 
-def _localized_labels(tags: dict) -> dict:
+def _localized_labels(tags: dict, wikidata_labels: dict = None) -> dict:
     labels = {}
+    wikidata_labels = wikidata_labels or {}
     for lang in ("et", "en"):
-        label = tags.get(f"name:{lang}") or tags.get(f"alt_name:{lang}")
+        label = (
+            tags.get(f"name:{lang}")
+            or tags.get(f"alt_name:{lang}")
+            or wikidata_labels.get(lang)
+        )
         if label:
             labels[lang] = label
     return labels
 
 
-def _normalize_geojson(overpass_data: dict, tolerance: float) -> dict:
+def _fetch_wikidata_labels(overpass_data: dict) -> dict:
+    """Täidab OHM-is puuduvad eesti/inglise nimed ühe Wikidata batch-päringuga."""
+    qids = sorted({
+        element.get("tags", {}).get("wikidata")
+        for element in overpass_data.get("elements", [])
+        if (
+            element.get("tags", {}).get("wikidata", "").startswith("Q")
+            and element.get("tags", {}).get("wikidata", "")[1:].isdigit()
+        )
+    })
+    labels = {}
+    try:
+        for offset in range(0, len(qids), 50):
+            response = requests.get(
+                WIKIDATA_API_URL,
+                params={
+                    "action": "wbgetentities",
+                    "ids": "|".join(qids[offset:offset + 50]),
+                    "props": "labels",
+                    "languages": "et|en",
+                    "format": "json",
+                },
+                headers={"User-Agent": "VUTT historical regions/1.0"},
+                timeout=15,
+            )
+            response.raise_for_status()
+            for qid, entity in response.json().get("entities", {}).items():
+                labels[qid] = {
+                    lang: value.get("value")
+                    for lang, value in entity.get("labels", {}).items()
+                    if lang in ("et", "en") and value.get("value")
+                }
+    except (requests.RequestException, ValueError) as exc:
+        # Nimed on rikastus: Wikidata tõrge ei tohi piirkonnakihti ära võtta.
+        logger.warning("Ajalooliste piirkondade Wikidata nimede laadimine ebaõnnestus: %s", exc)
+    return labels
+
+
+def _fallback_all_inner_geometry(element: dict):
+    """Parandab OHM-i relatsioonid, mille kõik piirijupid on ekslikult inner-rolliga."""
+    members = [member for member in element.get("members", []) if member.get("geometry")]
+    if not members or any(member.get("role") not in ("", "inner", None) for member in members):
+        return None
+    lines = []
+    for member in members:
+        coordinates = [(point["lon"], point["lat"]) for point in member["geometry"]]
+        if len(coordinates) >= 2:
+            lines.append(LineString(coordinates))
+    if not lines:
+        return None
+    polygons = list(polygonize(unary_union(lines)))
+    return unary_union(polygons) if polygons else None
+
+
+def _normalize_geojson(overpass_data: dict, tolerance: float, wikidata_labels: dict = None) -> dict:
     """Teisendab Overpassi relatsioonid lihtsustatud ja väikseks GeoJSON-iks."""
     converted = osm2geojson.json2geojson(overpass_data, log_level="CRITICAL")
+    converted_geometries = {
+        feature.get("properties", {}).get("id"): feature.get("geometry")
+        for feature in converted.get("features", [])
+        if feature.get("geometry")
+    }
     features = []
 
-    for feature in converted.get("features", []):
-        geometry_data = feature.get("geometry")
-        properties = feature.get("properties") or {}
-        tags = properties.get("tags") or {}
-        relation_id = properties.get("id")
-        if not geometry_data or not isinstance(relation_id, int):
+    for element in overpass_data.get("elements", []):
+        relation_id = element.get("id")
+        tags = element.get("tags") or {}
+        geometry_data = converted_geometries.get(relation_id)
+        if not isinstance(relation_id, int):
             continue
 
         try:
-            geometry = shape(geometry_data)
+            geometry = shape(geometry_data) if geometry_data else _fallback_all_inner_geometry(element)
+            if geometry is None:
+                continue
             if not geometry.is_valid:
                 geometry = geometry.buffer(0)
             geometry = geometry.simplify(tolerance, preserve_topology=True)
@@ -110,7 +177,8 @@ def _normalize_geojson(overpass_data: dict, tolerance: float) -> dict:
         if geometry.is_empty or geometry.geom_type not in ("Polygon", "MultiPolygon"):
             continue
 
-        labels = _localized_labels(tags)
+        qid = tags.get("wikidata")
+        labels = _localized_labels(tags, (wikidata_labels or {}).get(qid, {}))
         canonical_name = tags.get("name") or labels.get("en") or labels.get("et") or str(relation_id)
         features.append({
             "type": "Feature",
@@ -148,7 +216,7 @@ def _fetch_regions(year: int, bbox: Tuple[float, float, float, float]) -> dict:
 
     # Ligikaudu üks ekraanipiksel madalal suumil; preserve_topology hoiab augud ja saared.
     tolerance = max(0.003, min(0.05, (bbox[3] - bbox[1]) / 3000))
-    geojson = _normalize_geojson(overpass_data, tolerance)
+    geojson = _normalize_geojson(overpass_data, tolerance, _fetch_wikidata_labels(overpass_data))
     return {
         "geojson": geojson,
         "year": year,
