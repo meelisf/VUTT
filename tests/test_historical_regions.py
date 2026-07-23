@@ -95,6 +95,40 @@ def test_disk_cache_survives_memory_cache(tmp_path, monkeypatch):
     assert historical_regions._read_disk_cache(key) == result
 
 
+def test_expired_cache_can_be_used_as_stale_fallback(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    key = (1650, 45, -10, 65, 35)
+    result = {"year": 1650}
+    historical_regions._write_disk_cache(key, result)
+    now = historical_regions.time.time()
+    monkeypatch.setattr(historical_regions.time, "time", lambda: now + 8 * 24 * 60 * 60)
+    assert historical_regions._read_disk_cache(key) is None
+    assert historical_regions._read_disk_cache(key, historical_regions.STALE_CACHE_TTL_SECONDS) == result
+
+
+def test_overpass_429_honors_retry_after(monkeypatch):
+    class FakeResponse:
+        def __init__(self, status_code, headers=None):
+            self.status_code = status_code
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise AssertionError(f"ootamatu HTTP {self.status_code}")
+
+        def json(self):
+            return {"elements": []}
+
+    responses = iter([FakeResponse(429, {"Retry-After": "3"}), FakeResponse(200)])
+    sleeps = []
+    monkeypatch.setattr(historical_regions, "OVERPASS_MIN_INTERVAL_SECONDS", 0)
+    monkeypatch.setattr(historical_regions.requests, "post", lambda *args, **kwargs: next(responses))
+    monkeypatch.setattr(historical_regions.time, "sleep", sleeps.append)
+
+    assert historical_regions._post_overpass("test") == {"elements": []}
+    assert sleeps == [3.0]
+
+
 def test_region_color_is_stable():
     assert _region_color(123) == _region_color(123)
     assert _region_color(123) != _region_color(124)

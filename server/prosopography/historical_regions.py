@@ -22,7 +22,11 @@ logger = get_logger(__name__)
 OVERPASS_URL = "https://overpass-api.openhistoricalmap.org/api/interpreter"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 OVERPASS_TIMEOUT_SECONDS = 75
+OVERPASS_MIN_INTERVAL_SECONDS = 1.5
+OVERPASS_MAX_RETRIES = 2
+OVERPASS_BACKOFF_BASE_SECONDS = 2
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+STALE_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 CACHE_MAX_ENTRIES = 24
 DISK_CACHE_MAX_ENTRIES = 100
 DISK_CACHE_DIR = os.path.join(os.getenv("VUTT_STATE_DIR", "state"), "historical_regions_cache")
@@ -44,6 +48,8 @@ REGION_COLORS = (
 _cache: "OrderedDict[Tuple, Tuple[float, dict]]" = OrderedDict()
 _cache_lock = threading.Lock()
 _key_locks: Dict[Tuple, threading.Lock] = {}
+_overpass_request_lock = threading.Lock()
+_last_overpass_request_at = 0.0
 
 
 class HistoricalRegionsError(RuntimeError):
@@ -55,14 +61,13 @@ def _disk_cache_path(key: Tuple) -> str:
     return os.path.join(DISK_CACHE_DIR, f"{digest}.json")
 
 
-def _read_disk_cache(key: Tuple) -> dict:
+def _read_disk_cache(key: Tuple, max_age_seconds: float = CACHE_TTL_SECONDS) -> dict:
     path = _disk_cache_path(key)
     try:
         with open(path, "r", encoding="utf-8") as handle:
             payload = json.load(handle)
-        if time.time() - payload["cached_at"] < CACHE_TTL_SECONDS:
+        if time.time() - payload["cached_at"] < max_age_seconds:
             return payload["result"]
-        os.remove(path)
     except FileNotFoundError:
         pass
     except (OSError, ValueError, KeyError, TypeError) as exc:
@@ -72,6 +77,55 @@ def _read_disk_cache(key: Tuple) -> dict:
         except OSError:
             pass
     return None
+
+
+def _retry_delay_seconds(response, attempt: int) -> float:
+    retry_after = response.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return max(0.0, min(120.0, float(retry_after)))
+        except ValueError:
+            pass
+    return OVERPASS_BACKOFF_BASE_SECONDS * (2 ** attempt)
+
+
+def _post_overpass(query: str) -> dict:
+    """Serialiseerib OHM-i päringud, piirab tempot ja kordab ajutise tõrke korral."""
+    global _last_overpass_request_at
+
+    with _overpass_request_lock:
+        for attempt in range(OVERPASS_MAX_RETRIES + 1):
+            wait_seconds = OVERPASS_MIN_INTERVAL_SECONDS - (time.monotonic() - _last_overpass_request_at)
+            if wait_seconds > 0:
+                time.sleep(wait_seconds)
+
+            _last_overpass_request_at = time.monotonic()
+            try:
+                response = requests.post(
+                    OVERPASS_URL,
+                    data={"data": query},
+                    headers={"User-Agent": "VUTT historical regions/1.0"},
+                    timeout=OVERPASS_TIMEOUT_SECONDS,
+                )
+            except requests.RequestException:
+                if attempt >= OVERPASS_MAX_RETRIES:
+                    raise
+                time.sleep(OVERPASS_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                continue
+
+            if response.status_code not in (429, 502, 503, 504) or attempt >= OVERPASS_MAX_RETRIES:
+                response.raise_for_status()
+                return response.json()
+
+            delay = _retry_delay_seconds(response, attempt)
+            logger.warning(
+                "OHM Overpass vastas %s; uus katse %.1f sekundi pärast",
+                response.status_code,
+                delay,
+            )
+            time.sleep(delay)
+
+    raise HistoricalRegionsError("OpenHistoricalMapi päring ei andnud vastust")
 
 
 def _write_disk_cache(key: Tuple, result: dict) -> None:
@@ -256,14 +310,7 @@ def _normalize_geojson(overpass_data: dict, tolerance: float, wikidata_labels: d
 def _fetch_regions(year: int, bbox: Tuple[float, float, float, float]) -> dict:
     query = _build_overpass_query(year, bbox)
     try:
-        response = requests.post(
-            OVERPASS_URL,
-            data={"data": query},
-            headers={"User-Agent": "VUTT historical regions/1.0"},
-            timeout=OVERPASS_TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        overpass_data = response.json()
+        overpass_data = _post_overpass(query)
     except (requests.RequestException, ValueError) as exc:
         raise HistoricalRegionsError(f"OpenHistoricalMapi päring ebaõnnestus: {exc}") from exc
 
@@ -311,7 +358,21 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
                 _key_locks.pop(key, None)
             return disk_cached
 
-        result = _fetch_regions(year, bbox)
+        try:
+            result = _fetch_regions(year, bbox)
+        except HistoricalRegionsError:
+            stale = _read_disk_cache(key, STALE_CACHE_TTL_SECONDS)
+            with _cache_lock:
+                _key_locks.pop(key, None)
+            if stale is not None:
+                logger.warning("OHM-i tõrke tõttu tagastatakse aegunud piirkondade cache")
+                return stale
+            raise
+        except Exception:
+            with _cache_lock:
+                _key_locks.pop(key, None)
+            raise
+
         _write_disk_cache(key, result)
         with _cache_lock:
             _cache[key] = (time.time(), result)
