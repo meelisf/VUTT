@@ -259,6 +259,7 @@
     "switchToCollection": "Ava „{{name}}\"",
     "showAllCollections": "Näita kõiki kollektsioone",
     "year": "Kaardi aasta",
+    "applyYear": "Rakenda",
     "yearHelp": "Ajaloolise kaardi aasta. Aastavahemiku korral kasutatakse vaikimisi selle keskpunkti."
   },
   "place": {

@@ -259,6 +259,7 @@
     "switchToCollection": "Open “{{name}}”",
     "showAllCollections": "Show all collections",
     "year": "Map year",
+    "applyYear": "Apply",
     "yearHelp": "Year shown on the historical map. The midpoint is used by default when a year range is selected."
   },
   "place": {

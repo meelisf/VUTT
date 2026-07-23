@@ -107,17 +107,22 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const derivedMapYear = deriveMapYear(filters);
+  const [mapYear, setMapYear] = useState(derivedMapYear);
   const [mapYearInput, setMapYearInput] = useState(String(derivedMapYear));
   const parsedMapYear = Number(mapYearInput);
-  const mapYear = Number.isInteger(parsedMapYear) && parsedMapYear >= 1 && parsedMapYear <= 9999
-    ? parsedMapYear
-    : derivedMapYear;
+  const isMapYearValid = Number.isInteger(parsedMapYear) && parsedMapYear >= 1 && parsedMapYear <= 9999;
 
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
+    setMapYear(derivedMapYear);
     setMapYearInput(String(derivedMapYear));
   }, [derivedMapYear]);
+
+  const applyMapYear = () => {
+    if (!isMapYearValid) return;
+    setMapYear(parsedMapYear);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -217,18 +222,29 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
             {resolveLabel(focusedMarker.place_labels, lang) ?? focusedMarker.place_key}
           </span>
         )}
-        <label className="ml-auto inline-flex items-center gap-2 text-gray-600" title={t('map.yearHelp')}>
-          <span className="font-medium">{t('map.year')}</span>
+        <div className="ml-auto inline-flex items-center gap-2 text-gray-600" title={t('map.yearHelp')}>
+          <label htmlFor="prosopo-map-year" className="font-medium">{t('map.year')}</label>
           <input
+            id="prosopo-map-year"
             type="number"
             min="1"
             max="9999"
             value={mapYearInput}
             onChange={event => setMapYearInput(event.target.value)}
-            onBlur={() => setMapYearInput(String(mapYear))}
+            onKeyDown={event => {
+              if (event.key === 'Enter') applyMapYear();
+            }}
             className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
-        </label>
+          <button
+            type="button"
+            onClick={applyMapYear}
+            disabled={!isMapYearValid || parsedMapYear === mapYear}
+            className="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {t('map.applyYear')}
+          </button>
+        </div>
       </div>
 
       <div className="h-[640px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
