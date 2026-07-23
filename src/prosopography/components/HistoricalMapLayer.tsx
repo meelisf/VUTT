@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import type { FeatureCollection } from 'geojson';
+import type { Feature, FeatureCollection } from 'geojson';
 import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from 'maplibre-gl';
 import { useMap } from 'react-leaflet';
 import { fetchHistoricalRegions } from '../services/prosopographyService';
@@ -13,6 +13,34 @@ const REGION_SOURCE_ID = 'vutt-historical-regions';
 const REGION_FILL_LAYER_ID = 'vutt-historical-regions-fill';
 const REGION_LINE_LAYER_ID = 'vutt-historical-regions-line';
 const EMPTY_REGIONS: FeatureCollection = { type: 'FeatureCollection', features: [] };
+const REGION_YEAR_CACHE_MAX_ENTRIES = 5;
+
+interface RegionYearCache {
+  features: Map<string | number, Feature>;
+  bounds: Array<{ south: number; west: number; north: number; east: number }>;
+}
+
+// Sama lehe sees säilivad juba laaditud piirkonnad ka siis, kui kasutaja liigub
+// teise riigi juurde ja tagasi. Backend hoiab samu vastuseid pikemalt kettal.
+const regionCacheByYear = new Map<number, RegionYearCache>();
+
+function regionCacheForYear(year: number): RegionYearCache {
+  let cached = regionCacheByYear.get(year);
+  if (!cached) {
+    cached = { features: new Map(), bounds: [] };
+    regionCacheByYear.set(year, cached);
+    while (regionCacheByYear.size > REGION_YEAR_CACHE_MAX_ENTRIES) {
+      const oldestYear = regionCacheByYear.keys().next().value;
+      if (oldestYear === undefined) break;
+      regionCacheByYear.delete(oldestYear);
+    }
+  }
+  return cached;
+}
+
+function cachedFeatureCollection(cached: RegionYearCache): FeatureCollection {
+  return { type: 'FeatureCollection', features: Array.from(cached.features.values()) };
+}
 
 interface HistoricalMapLayerProps {
   year: number;
@@ -200,7 +228,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
     if (!mapLibre) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let controller: AbortController | null = null;
-    let loadedBounds: { south: number; west: number; north: number; east: number } | null = null;
+    const yearCache = regionCacheForYear(year);
 
     const loadRegions = async () => {
       if (!mapLibre.getSource(REGION_SOURCE_ID)) return;
@@ -208,16 +236,17 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
       const width = bounds.getEast() - bounds.getWest();
       const height = bounds.getNorth() - bounds.getSouth();
       const source = mapLibre.getSource(REGION_SOURCE_ID) as GeoJSONSource;
+      source.setData(cachedFeatureCollection(yearCache));
 
-      // Backend tagastab vaatest laiema ruudustikuala. Selle sees liikudes uut
-      // päringut ei tehta, sest ekraanil vajalikud polügoonid on juba olemas.
-      if (
-        loadedBounds
-        && bounds.getSouth() >= loadedBounds.south
+      // Backend tagastab vaatest laiema ruudustikuala. Kõik aasta jooksul juba
+      // laaditud alad liidetakse, mitte ei asendata viimase vastusega.
+      const viewIsCached = yearCache.bounds.some(loadedBounds => (
+        bounds.getSouth() >= loadedBounds.south
         && bounds.getWest() >= loadedBounds.west
         && bounds.getNorth() <= loadedBounds.north
         && bounds.getEast() <= loadedBounds.east
-      ) return;
+      ));
+      if (viewIsCached) return;
 
       // Väga kaugel välja suumides oleks Overpassi vastus ebamõistlikult suur.
       if (width > 140 || height > 90) {
@@ -235,8 +264,13 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
           north: Math.min(85, bounds.getNorth()),
           east: Math.min(180, bounds.getEast()),
         }, controller.signal);
-        source.setData(response.geojson as unknown as FeatureCollection);
-        loadedBounds = response.bounds;
+        const received = response.geojson as unknown as FeatureCollection;
+        for (const feature of received.features) {
+          const id = feature.id ?? (feature.properties?.relation_id as string | number | undefined);
+          if (id !== undefined) yearCache.features.set(id, feature);
+        }
+        yearCache.bounds.push(response.bounds);
+        source.setData(cachedFeatureCollection(yearCache));
       } catch (error) {
         if ((error as Error).name !== 'AbortError') {
           console.warn('Ajalooliste piirkondade laadimine ebaõnnestus', error);

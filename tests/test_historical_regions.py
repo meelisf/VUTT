@@ -1,3 +1,4 @@
+import server.prosopography.historical_regions as historical_regions
 from server.prosopography.historical_regions import (
     _build_overpass_query,
     _fallback_all_inner_geometry,
@@ -84,6 +85,14 @@ def test_all_inner_boundary_members_are_recovered_as_polygon():
     assert geometry is not None
     assert geometry.geom_type == "Polygon"
     assert round(geometry.area, 3) == 1.0
+
+
+def test_disk_cache_survives_memory_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    key = (1650, 45, -10, 65, 35)
+    result = {"year": 1650, "geojson": {"type": "FeatureCollection", "features": []}}
+    historical_regions._write_disk_cache(key, result)
+    assert historical_regions._read_disk_cache(key) == result
 
 
 def test_region_color_is_stable():

@@ -1,7 +1,10 @@
 """OpenHistoricalMapi ajalooliste halduspiirkondade GeoJSON-proksi ja cache."""
 
 import hashlib
+import json
 import math
+import os
+import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -19,8 +22,10 @@ logger = get_logger(__name__)
 OVERPASS_URL = "https://overpass-api.openhistoricalmap.org/api/interpreter"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
 OVERPASS_TIMEOUT_SECONDS = 75
-CACHE_TTL_SECONDS = 24 * 60 * 60
+CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 CACHE_MAX_ENTRIES = 24
+DISK_CACHE_MAX_ENTRIES = 100
+DISK_CACHE_DIR = os.path.join(os.getenv("VUTT_STATE_DIR", "state"), "historical_regions_cache")
 MAX_BBOX_WIDTH = 140
 MAX_BBOX_HEIGHT = 90
 
@@ -43,6 +48,54 @@ _key_locks: Dict[Tuple, threading.Lock] = {}
 
 class HistoricalRegionsError(RuntimeError):
     """OHM-i piirkondade laadimine või teisendamine ebaõnnestus."""
+
+
+def _disk_cache_path(key: Tuple) -> str:
+    digest = hashlib.sha256(repr(key).encode("utf-8")).hexdigest()
+    return os.path.join(DISK_CACHE_DIR, f"{digest}.json")
+
+
+def _read_disk_cache(key: Tuple) -> dict:
+    path = _disk_cache_path(key)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if time.time() - payload["cached_at"] < CACHE_TTL_SECONDS:
+            return payload["result"]
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        logger.warning("Ajalooliste piirkondade ketta-cache lugemine ebaõnnestus: %s", exc)
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+    return None
+
+
+def _write_disk_cache(key: Tuple, result: dict) -> None:
+    try:
+        os.makedirs(DISK_CACHE_DIR, exist_ok=True)
+        fd, temp_path = tempfile.mkstemp(prefix="regions-", suffix=".tmp", dir=DISK_CACHE_DIR)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump({"cached_at": time.time(), "result": result}, handle, separators=(",", ":"))
+            os.replace(temp_path, _disk_cache_path(key))
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        files = sorted(
+            (os.path.join(DISK_CACHE_DIR, name) for name in os.listdir(DISK_CACHE_DIR) if name.endswith(".json")),
+            key=os.path.getmtime,
+            reverse=True,
+        )
+        for old_path in files[DISK_CACHE_MAX_ENTRIES:]:
+            os.remove(old_path)
+    except OSError as exc:
+        # Cache kirjutamise tõrge ei tohi kaarti katkestada.
+        logger.warning("Ajalooliste piirkondade ketta-cache kirjutamine ebaõnnestus: %s", exc)
 
 
 def _quantize_bbox(south: float, west: float, north: float, east: float) -> Tuple[float, float, float, float]:
@@ -248,7 +301,18 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
                 _cache.move_to_end(key)
                 return cached[1]
 
+        disk_cached = _read_disk_cache(key)
+        if disk_cached is not None:
+            with _cache_lock:
+                _cache[key] = (time.time(), disk_cached)
+                _cache.move_to_end(key)
+                while len(_cache) > CACHE_MAX_ENTRIES:
+                    _cache.popitem(last=False)
+                _key_locks.pop(key, None)
+            return disk_cached
+
         result = _fetch_regions(year, bbox)
+        _write_disk_cache(key, result)
         with _cache_lock:
             _cache[key] = (time.time(), result)
             _cache.move_to_end(key)
