@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LatLngBoundsExpression, divIcon } from 'leaflet';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, useMap } from 'react-leaflet';
 import { Loader2, MapPin, Users } from 'lucide-react';
 import { fetchPersonMapMarkers } from '../services/prosopographyService';
 import { useCollection } from '../../contexts/CollectionContext';
+import { deriveMapYear } from '../utils/mapYear';
+import HistoricalMapLayer from './HistoricalMapLayer';
 import type { ProsopoMapMarker, ProsopoMapResponse } from '../types';
 
 interface PersonsMapProps {
@@ -104,8 +106,18 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
   const [data, setData] = useState<ProsopoMapResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const derivedMapYear = deriveMapYear(filters);
+  const [mapYearInput, setMapYearInput] = useState(String(derivedMapYear));
+  const parsedMapYear = Number(mapYearInput);
+  const mapYear = Number.isInteger(parsedMapYear) && parsedMapYear >= 1 && parsedMapYear <= 9999
+    ? parsedMapYear
+    : derivedMapYear;
 
   const filterKey = JSON.stringify(filters);
+
+  useEffect(() => {
+    setMapYearInput(String(derivedMapYear));
+  }, [derivedMapYear]);
 
   useEffect(() => {
     setLoading(true);
@@ -201,23 +213,33 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
           <span>{t('map.withoutCoordinates', '{{count}} isikul puudub koordinaat', { count: data.without_coordinates })}</span>
         )}
         {focusedMarker && (
-          <span className="ml-auto rounded-full bg-primary-50 border border-primary-200 px-2 py-1 text-primary-700">
+          <span className="rounded-full bg-primary-50 border border-primary-200 px-2 py-1 text-primary-700">
             {resolveLabel(focusedMarker.place_labels, lang) ?? focusedMarker.place_key}
           </span>
         )}
+        <label className="ml-auto inline-flex items-center gap-2 text-gray-600" title={t('map.yearHelp')}>
+          <span className="font-medium">{t('map.year')}</span>
+          <input
+            type="number"
+            min="1"
+            max="9999"
+            value={mapYearInput}
+            onChange={event => setMapYearInput(event.target.value)}
+            onBlur={() => setMapYearInput(String(mapYear))}
+            className="w-20 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-800 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+        </label>
       </div>
 
       <div className="h-[640px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         <MapContainer
           center={[57.5, 24.5]}
           zoom={5}
+          minZoom={1}
           scrollWheelZoom
           className="h-full w-full"
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <HistoricalMapLayer year={mapYear} />
           <FitMapToMarkers markers={data.markers} focusPlace={focusPlace} />
           {displayMarkers.map(marker => {
             const placeLabel = resolveLabel(marker.place_labels, lang) ?? marker.place_key ?? marker.place_id ?? '';

@@ -257,7 +257,9 @@
     "collectionHintNamed": "{{name}} belongs to a different collection than the one currently selected (“{{selected}}”). Switch collection to see their relations.",
     "collectionHintGeneric": "The selected collection (“{{selected}}”) contains none of this person's relations.",
     "switchToCollection": "Open “{{name}}”",
-    "showAllCollections": "Show all collections"
+    "showAllCollections": "Show all collections",
+    "year": "Map year",
+    "yearHelp": "Year shown on the historical map. The midpoint is used by default when a year range is selected."
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",

@@ -257,7 +257,9 @@
     "collectionHintNamed": "{{name}} kuulub teise kollektsiooni kui praegu valitud („{{selected}}\"). Tema seoste nägemiseks vaheta kollektsiooni.",
     "collectionHintGeneric": "Valitud kollektsioonis („{{selected}}\") pole selle isiku seoseid.",
     "switchToCollection": "Ava „{{name}}\"",
-    "showAllCollections": "Näita kõiki kollektsioone"
+    "showAllCollections": "Näita kõiki kollektsioone",
+    "year": "Kaardi aasta",
+    "yearHelp": "Ajaloolise kaardi aasta. Aastavahemiku korral kasutatakse vaikimisi selle keskpunkti."
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",

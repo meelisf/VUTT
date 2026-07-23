@@ -6,7 +6,6 @@ import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X,
 import Header from '../../components/Header';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
-import PersonsMap from '../components/PersonsMap';
 import MergePersonsModal from '../components/MergePersonsModal';
 import PersonAdvancedFilters, { type GenderFilter } from '../components/PersonAdvancedFilters';
 import { getPersonFacets, listPersons, mergePersons } from '../services/prosopographyService';
@@ -16,6 +15,7 @@ import { useCollection } from '../../contexts/CollectionContext';
 import type { ProsopoIndexEntry } from '../types';
 
 const LIMIT = 48;
+const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
 
 const PersonsPage: React.FC = () => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
@@ -445,11 +445,13 @@ const PersonsPage: React.FC = () => {
 
         {/* Paginatsioon */}
         {view === 'map' && (
-          <PersonsMap
-            filters={mapFilters}
-            token={token}
-            focusPlace={focusPlace || undefined}
-          />
+          <React.Suspense fallback={<div className="h-[640px] rounded-xl border border-gray-200 bg-white" />}>
+            <PersonsMap
+              filters={mapFilters}
+              token={token}
+              focusPlace={focusPlace || undefined}
+            />
+          </React.Suspense>
         )}
 
         {view === 'list' && !loading && (
