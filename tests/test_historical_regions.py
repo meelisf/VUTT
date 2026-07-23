@@ -106,6 +106,39 @@ def test_expired_cache_can_be_used_as_stale_fallback(tmp_path, monkeypatch):
     assert historical_regions._read_disk_cache(key, historical_regions.STALE_CACHE_TTL_SECONDS) == result
 
 
+def test_default_snapshot_warmup_loads_fresh_disk_without_network(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    result = {"year": 1650, "region_count": 1}
+    historical_regions._write_disk_cache(historical_regions.DEFAULT_SNAPSHOT_KEY, result)
+    monkeypatch.setattr(
+        historical_regions,
+        "_fetch_regions",
+        lambda *args: (_ for _ in ()).throw(AssertionError("värsket snapshot'i ei tohi uuesti laadida")),
+    )
+    historical_regions._pinned_cache.pop(historical_regions.DEFAULT_SNAPSHOT_KEY, None)
+    try:
+        assert historical_regions._warm_default_snapshot_once() is False
+        assert historical_regions._pinned_cache[historical_regions.DEFAULT_SNAPSHOT_KEY] == result
+    finally:
+        historical_regions._pinned_cache.pop(historical_regions.DEFAULT_SNAPSHOT_KEY, None)
+
+
+def test_default_snapshot_warmup_refreshes_stale_snapshot(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    old_result = {"year": 1650, "region_count": 1}
+    new_result = {"year": 1650, "region_count": 2}
+    historical_regions._write_disk_cache(historical_regions.DEFAULT_SNAPSHOT_KEY, old_result)
+    monkeypatch.setattr(historical_regions, "_disk_cache_age_seconds", lambda key: float("inf"))
+    monkeypatch.setattr(historical_regions, "_fetch_regions", lambda year, bbox: new_result)
+    historical_regions._pinned_cache.pop(historical_regions.DEFAULT_SNAPSHOT_KEY, None)
+    try:
+        assert historical_regions._warm_default_snapshot_once() is True
+        assert historical_regions._pinned_cache[historical_regions.DEFAULT_SNAPSHOT_KEY] == new_result
+        assert historical_regions._read_disk_cache(historical_regions.DEFAULT_SNAPSHOT_KEY) == new_result
+    finally:
+        historical_regions._pinned_cache.pop(historical_regions.DEFAULT_SNAPSHOT_KEY, None)
+
+
 def test_overpass_429_honors_retry_after(monkeypatch):
     class FakeResponse:
         def __init__(self, status_code, headers=None):

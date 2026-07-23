@@ -16,6 +16,7 @@ from .heartbeat import snapshot as heartbeat_snapshot
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
 # server/__init__.py kaudu otse ops-moodulitest, seega main.py ei impordi neid.
 from .prosopography.router import router as prosopography_router
+from .prosopography.historical_regions import start_historical_regions_warm_loop
 from .routers.notifications import router as notifications_router
 from .routers.upload import router as upload_router
 from .routers.reocr import router as reocr_router
@@ -48,6 +49,7 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=metadata_watcher_loop, daemon=True).start()
     threading.Thread(target=_keepwarm_loop, daemon=True).start()
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
+    start_historical_regions_warm_loop()
     start_upload_sync_loop()  # upload taustasünk — AINULT API-protsessis (mitte image_server import)
     start_reocr_background()  # re-OCR restardi-jätkamine + orbude taaste (AINULT API-protsessis)
     yield

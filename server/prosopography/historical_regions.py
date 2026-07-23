@@ -30,6 +30,11 @@ STALE_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60
 CACHE_MAX_ENTRIES = 24
 DISK_CACHE_MAX_ENTRIES = 100
 DISK_CACHE_DIR = os.path.join(os.getenv("VUTT_STATE_DIR", "state"), "historical_regions_cache")
+DEFAULT_SNAPSHOT_YEAR = 1650
+DEFAULT_SNAPSHOT_BBOX = (30, -40, 70, 80)
+DEFAULT_SNAPSHOT_KEY = (DEFAULT_SNAPSHOT_YEAR, *DEFAULT_SNAPSHOT_BBOX)
+DEFAULT_SNAPSHOT_REFRESH_SECONDS = 7 * 24 * 60 * 60
+DEFAULT_SNAPSHOT_CHECK_SECONDS = 6 * 60 * 60
 MAX_BBOX_WIDTH = 140
 MAX_BBOX_HEIGHT = 90
 
@@ -49,6 +54,8 @@ _cache: "OrderedDict[Tuple, Tuple[float, dict]]" = OrderedDict()
 _cache_lock = threading.Lock()
 _key_locks: Dict[Tuple, threading.Lock] = {}
 _overpass_request_lock = threading.Lock()
+_default_snapshot_lock = threading.Lock()
+_pinned_cache: Dict[Tuple, dict] = {}
 _last_overpass_request_at = 0.0
 
 
@@ -66,7 +73,7 @@ def _read_disk_cache(key: Tuple, max_age_seconds: float = CACHE_TTL_SECONDS) -> 
     try:
         with open(path, "r", encoding="utf-8") as handle:
             payload = json.load(handle)
-        if time.time() - payload["cached_at"] < max_age_seconds:
+        if max_age_seconds is None or time.time() - payload["cached_at"] < max_age_seconds:
             return payload["result"]
     except FileNotFoundError:
         pass
@@ -145,7 +152,9 @@ def _write_disk_cache(key: Tuple, result: dict) -> None:
             key=os.path.getmtime,
             reverse=True,
         )
-        for old_path in files[DISK_CACHE_MAX_ENTRIES:]:
+        pinned_path = _disk_cache_path(DEFAULT_SNAPSHOT_KEY)
+        removable_files = [path for path in files if path != pinned_path]
+        for old_path in removable_files[DISK_CACHE_MAX_ENTRIES - 1:]:
             os.remove(old_path)
     except OSError as exc:
         # Cache kirjutamise tõrge ei tohi kaarti katkestada.
@@ -325,6 +334,56 @@ def _fetch_regions(year: int, bbox: Tuple[float, float, float, float]) -> dict:
     }
 
 
+def _disk_cache_age_seconds(key: Tuple) -> float:
+    try:
+        with open(_disk_cache_path(key), "r", encoding="utf-8") as handle:
+            return max(0.0, time.time() - float(json.load(handle)["cached_at"]))
+    except (OSError, ValueError, KeyError, TypeError):
+        return float("inf")
+
+
+def _warm_default_snapshot_once() -> bool:
+    """Laeb 1650 snapshot'i mällu ja värskendab selle vajadusel taustal."""
+    with _default_snapshot_lock:
+        existing = _read_disk_cache(DEFAULT_SNAPSHOT_KEY, None)
+        if existing is not None:
+            _pinned_cache[DEFAULT_SNAPSHOT_KEY] = existing
+        if existing is not None and _disk_cache_age_seconds(DEFAULT_SNAPSHOT_KEY) < DEFAULT_SNAPSHOT_REFRESH_SECONDS:
+            return False
+
+        try:
+            result = _fetch_regions(DEFAULT_SNAPSHOT_YEAR, DEFAULT_SNAPSHOT_BBOX)
+        except HistoricalRegionsError as exc:
+            if existing is not None:
+                logger.warning("1650 snapshot'i värskendamine ebaõnnestus, vana snapshot jääb kasutusse: %s", exc)
+                return False
+            logger.warning("1650 snapshot'i esmane laadimine ebaõnnestus: %s", exc)
+            return False
+
+        _write_disk_cache(DEFAULT_SNAPSHOT_KEY, result)
+        _pinned_cache[DEFAULT_SNAPSHOT_KEY] = result
+        logger.info("1650 Euroopa piirkondade snapshot värskendatud (%s piirkonda)", result["region_count"])
+        return True
+
+
+def _default_snapshot_warm_loop() -> None:
+    while True:
+        try:
+            _warm_default_snapshot_once()
+        except Exception as exc:
+            logger.exception("1650 snapshot'i taustavärskenduse viga: %s", exc)
+        time.sleep(DEFAULT_SNAPSHOT_CHECK_SECONDS)
+
+
+def start_historical_regions_warm_loop() -> None:
+    """Käivitab 1650 snapshot'i mitteblokeeriva perioodilise värskenduse."""
+    threading.Thread(
+        target=_default_snapshot_warm_loop,
+        name="historical-regions-warmup",
+        daemon=True,
+    ).start()
+
+
 def get_historical_regions(year: int, south: float, west: float, north: float, east: float) -> dict:
     """Tagastab admin_level=2 piirkonnad; cache võti kasutab ruudustikule laiendatud bbox'i."""
     _validate_bbox(south, west, north, east)
@@ -332,6 +391,10 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
     _validate_bbox(*bbox)
     key = (year, *bbox)
     now = time.time()
+
+    pinned = _pinned_cache.get(key)
+    if pinned is not None:
+        return pinned
 
     with _cache_lock:
         cached = _cache.get(key)
@@ -350,6 +413,8 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
 
         disk_cached = _read_disk_cache(key)
         if disk_cached is not None:
+            if key == DEFAULT_SNAPSHOT_KEY:
+                _pinned_cache[key] = disk_cached
             with _cache_lock:
                 _cache[key] = (time.time(), disk_cached)
                 _cache.move_to_end(key)
@@ -374,6 +439,8 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
             raise
 
         _write_disk_cache(key, result)
+        if key == DEFAULT_SNAPSHOT_KEY:
+            _pinned_cache[key] = result
         with _cache_lock:
             _cache[key] = (time.time(), result)
             _cache.move_to_end(key)

@@ -14,6 +14,8 @@ const REGION_FILL_LAYER_ID = 'vutt-historical-regions-fill';
 const REGION_LINE_LAYER_ID = 'vutt-historical-regions-line';
 const EMPTY_REGIONS: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const REGION_YEAR_CACHE_MAX_ENTRIES = 5;
+const DEFAULT_REGION_YEAR = 1650;
+const DEFAULT_REGION_BOUNDS = { south: 30, west: -40, north: 70, east: 80 };
 
 interface RegionYearCache {
   features: Map<string | number, Feature>;
@@ -248,8 +250,20 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
       ));
       if (viewIsCached) return;
 
+      // 1650 esimene laadimine kasutab serveris ettevalmistatud Euroopa snapshot'i.
+      // Väljaspool seda ala jätkub tavapärane vaatepõhine laadimine.
+      const useDefaultSnapshot = year === DEFAULT_REGION_YEAR && yearCache.bounds.length === 0;
+      const requestBounds = useDefaultSnapshot
+        ? DEFAULT_REGION_BOUNDS
+        : {
+            south: Math.max(-85, bounds.getSouth()),
+            west: Math.max(-180, bounds.getWest()),
+            north: Math.min(85, bounds.getNorth()),
+            east: Math.min(180, bounds.getEast()),
+          };
+
       // Väga kaugel välja suumides oleks Overpassi vastus ebamõistlikult suur.
-      if (width > 140 || height > 90) {
+      if (!useDefaultSnapshot && (width > 140 || height > 90)) {
         source.setData(EMPTY_REGIONS);
         return;
       }
@@ -257,13 +271,7 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
       controller?.abort();
       controller = new AbortController();
       try {
-        const response = await fetchHistoricalRegions({
-          year,
-          south: Math.max(-85, bounds.getSouth()),
-          west: Math.max(-180, bounds.getWest()),
-          north: Math.min(85, bounds.getNorth()),
-          east: Math.min(180, bounds.getEast()),
-        }, controller.signal);
+        const response = await fetchHistoricalRegions({ year, ...requestBounds }, controller.signal);
         const received = response.geojson as unknown as FeatureCollection;
         for (const feature of received.features) {
           const id = feature.id ?? (feature.properties?.relation_id as string | number | undefined);
