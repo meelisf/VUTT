@@ -1,87 +1,83 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
+import type { BackendModule, ReadCallback } from 'i18next';
+import {
+  detectInitialLanguageFromBrowser,
+  LANGUAGE_STORAGE_KEY,
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from './utils/detectLanguage';
+import { NAMESPACES } from './locales/namespaces';
 
-// Tõlked
-import etCommon from './locales/et/common.json';
-import etAuth from './locales/et/auth.json';
-import etDashboard from './locales/et/dashboard.json';
-import etWorkspace from './locales/et/workspace.json';
-import etSearch from './locales/et/search.json';
-import etStatistics from './locales/et/statistics.json';
-import etAdmin from './locales/et/admin.json';
-import etRegister from './locales/et/register.json';
-import etReview from './locales/et/review.json';
-import etUpload from './locales/et/upload.json';
-import etProsopography from './locales/et/prosopography.json';
-import etSettings from './locales/et/settings.json';
+// Dünaamiline import → üks chunk keele kohta. `import()` vahemälustab lubaduse,
+// seega 12 nimeruumi päringut ühe keele kohta toovad ikkagi ainult ühe chunki.
+const LOADERS: Record<SupportedLanguage, () => Promise<{ default: Record<string, object> }>> = {
+  et: () => import('./locales/et'),
+  en: () => import('./locales/en'),
+};
 
-import enCommon from './locales/en/common.json';
-import enAuth from './locales/en/auth.json';
-import enDashboard from './locales/en/dashboard.json';
-import enWorkspace from './locales/en/workspace.json';
-import enSearch from './locales/en/search.json';
-import enStatistics from './locales/en/statistics.json';
-import enAdmin from './locales/en/admin.json';
-import enRegister from './locales/en/register.json';
-import enReview from './locales/en/review.json';
-import enUpload from './locales/en/upload.json';
-import enProsopography from './locales/en/prosopography.json';
-import enSettings from './locales/en/settings.json';
-
-const resources = {
-  et: {
-    common: etCommon,
-    auth: etAuth,
-    dashboard: etDashboard,
-    workspace: etWorkspace,
-    search: etSearch,
-    statistics: etStatistics,
-    admin: etAdmin,
-    register: etRegister,
-    review: etReview,
-    upload: etUpload,
-    prosopography: etProsopography,
-    settings: etSettings,
-  },
-  en: {
-    common: enCommon,
-    auth: enAuth,
-    dashboard: enDashboard,
-    workspace: enWorkspace,
-    search: enSearch,
-    statistics: enStatistics,
-    admin: enAdmin,
-    register: enRegister,
-    review: enReview,
-    upload: enUpload,
-    prosopography: enProsopography,
-    settings: enSettings,
+/**
+ * Laisk backend: i18next küsib nimeruume vajaduse hetkel. Nii laeb esmasel
+ * laadimisel ainult kasutaja keel ja teine keel alles keelevahetusel.
+ *
+ * Varem olid mõlema keele kõik 12 nimeruumi staatiliselt entry chunk'is —
+ * 34,6 kB gzip, millest pool oli alati kasutu (#187).
+ */
+const lazyBackend: BackendModule = {
+  type: 'backend',
+  init: () => {},
+  read(language: string, namespace: string, callback: ReadCallback) {
+    const loader = LOADERS[language as SupportedLanguage];
+    if (!loader) {
+      callback(null, {});
+      return;
+    }
+    loader()
+      .then(module => callback(null, module.default[namespace] ?? {}))
+      .catch(error => callback(error, false));
   },
 };
 
-i18n
-  .use(LanguageDetector)
+const initialLanguage = detectInitialLanguageFromBrowser();
+
+export const i18nReady = i18n
+  .use(lazyBackend)
   .use(initReactI18next)
   .init({
-    resources,
-    // Mitte-eesti brauser → inglise (rahvusvaheline publik). Eesti brauser saab
-    // eesti keele (navigator tuvastab 'et'); tundmatu/muu keel langeb 'en' peale.
-    // Teine fallback 'et' = turvavõrk, kui mõni 'en' võti peaks puuduma.
-    // localStorage 'vutt_language' (käsitsi valik) on tuvastusjärjekorras esimene.
-    fallbackLng: ['en', 'et'],
+    lng: initialLanguage,
+    supportedLngs: [...SUPPORTED_LANGUAGES],
+    // Keeltevahelist varunduskeelt EI kasutata: see sunniks i18nexti laadima ka
+    // teise keele paki ja võit kaoks. Võtmete kattuvust hoiab selle asemel
+    // `localeParity.test.ts`, mis on rangem kui vaikne fallback.
+    fallbackLng: false,
     defaultNS: 'common',
-    ns: ['common', 'auth', 'dashboard', 'workspace', 'search', 'statistics', 'admin', 'register', 'review', 'upload', 'prosopography', 'settings'],
-
-    detection: {
-      order: ['localStorage', 'navigator'],
-      lookupLocalStorage: 'vutt_language',
-      caches: ['localStorage'],
-    },
-
+    ns: [...NAMESPACES],
     interpolation: {
       escapeValue: false, // React juba escapib
     },
   });
+
+// Käsitsi valik püsib üle seansside. Varem tegi seda LanguageDetectori
+// `caches: ['localStorage']`; detektor on nüüd asendatud oma tuvastusega.
+i18n.on('languageChanged', lng => {
+  try {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, lng);
+  } catch {
+    /* privaatrežiim — valik ei püsi, aga rakendus töötab */
+  }
+});
+
+/**
+ * Soojendab teise keele paki jõudeajal, et keelevahetus oleks kohene ega
+ * peataks rakendust Suspense'i taha.
+ */
+export function preloadOtherLanguage(): void {
+  const other = SUPPORTED_LANGUAGES.find(l => l !== i18n.language);
+  if (!other) return;
+  const run = () => { void LOADERS[other]().catch(() => { /* parim-pingutus */ }); };
+  const ric = (window as any).requestIdleCallback;
+  if (typeof ric === 'function') ric(run, { timeout: 5000 });
+  else window.setTimeout(run, 2000);
+}
 
 export default i18n;
