@@ -40,6 +40,8 @@ export interface DashboardSearchOptions {
   type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
   lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
   signal?: AbortSignal; // Poolelioleva Meilisearchi päringu katkestamine
+  offset?: number; // Serveripoolse lehekülgjaotuse algus
+  limit?: number; // Serveripoolse lehekülje suurus
 }
 
 // Facetide vastuse tüüp
@@ -352,17 +354,18 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
-      limit: 5000, // Tõstame limiiti, et kõik teosed jõuaksid dashboardile (client-side pagination)
+      offset: options?.offset ?? 0,
+      limit: options?.limit ?? 12,
+      // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
       facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
     };
 
-    // Relevantsuse puhul EI kasuta distinct, et säilitada Meilisearchi relevantsuse järjekord
-    // Muul juhul kasutame distinct, et saada üks tulemus teose kohta
-    const useDistinct = options?.sort !== 'relevance';
-    if (useDistinct) {
-      searchParams.distinct = 'work_id';
-    }
+    // Esimese lehe filter annab juba täpselt ühe dokumendi teose kohta, seega
+    // distinct oleks seal üleliigne. Seda vajab ainult „viimati muudetud“ vaade,
+    // mis otsib kõigilt lehekülgedelt.
+    const useDistinct = options?.onlyFirstPage === false && options?.sort !== 'relevance';
+    if (useDistinct) searchParams.distinct = 'work_id';
 
     // Sorting logic
     if (options?.sort) {
@@ -393,16 +396,13 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
 
     const response = await index.search(query, searchParams, options?.signal ? { signal: options.signal } : undefined);
 
-    // Kui kasutame distinct, siis iga hit on unikaalne teos
-    // Kui EI kasuta distinct (relevance), siis peame grupeerima frontendis, säilitades järjekorra
+    // Tavavaates tagab lehekylje_number=1 unikaalsuse. Kõigi lehekülgede
+    // relevantsusotsingu erijuhul eemaldame võimalikud duplikaadid vastusest.
     let uniqueHits = response.hits;
-    if (!useDistinct) {
-      // Grupeeri work_id järgi, võttes ainult esimese (kõrgeima relevantsusega) tulemuse
+    if (options?.onlyFirstPage === false && !useDistinct) {
       const seenWorkIds = new Set<string>();
       uniqueHits = response.hits.filter((hit: any) => {
-        if (seenWorkIds.has(hit.work_id)) {
-          return false;
-        }
+        if (seenWorkIds.has(hit.work_id)) return false;
         seenWorkIds.add(hit.work_id);
         return true;
       });

@@ -40,7 +40,7 @@ const SEARCH_DEBOUNCE_MS = 400;
 const Dashboard: React.FC = () => {
   const { t, i18n } = useTranslation(['dashboard', 'common', 'auth']);
   const { user } = useUser();
-  const { selectedCollection, setSelectedCollection, getCollectionName, collections } = useCollection();
+  const { selectedCollection, setSelectedCollection, getCollectionName, collections, isLoading: collectionsLoading } = useCollection();
   const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
@@ -64,6 +64,7 @@ const Dashboard: React.FC = () => {
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
+  const [totalHits, setTotalHits] = useState(0);
   const [facets, setFacets] = useState<FacetDistribution>({});
   const [currentPage, setCurrentPage] = useState(pageParam);
   const [loading, setLoading] = useState(true);
@@ -188,8 +189,7 @@ const Dashboard: React.FC = () => {
     };
   }, []);
 
-  // Sync state with URL params (e.g. back button, or navigation from WorkCard)
-  // NB: pageParam on eraldi efektis, et lehevahetuse puhul ei käivituks fetchWorks uuesti
+  // Sünkrooni filtrite state URL-iga (nt tagasi-navigatsioon või WorkCardilt naasmine).
   useEffect(() => {
     setInputValue(queryParam);
     if (yearStartParam) setYearStart(yearStartParam);
@@ -201,7 +201,8 @@ const Dashboard: React.FC = () => {
     setSelectedStatus(statusParam);
   }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam]);
 
-  // Sünkroniseeri lehekülje number URL parameetrist (nt tagasi-navigatsioon, otselink)
+  // Sünkroniseeri lehekülje number URL parameetrist (nt tagasi-navigatsioon, otselink).
+  // Serveripoolse lehekülgjaotuse tõttu käivitab currentPage nüüd uue päringu.
   useEffect(() => {
     setCurrentPage(pageParam);
   }, [pageParam]);
@@ -343,7 +344,9 @@ const Dashboard: React.FC = () => {
 
   // Perform search when params change
   useEffect(() => {
-    if (!index) return;
+    // Oota kollektsioonide alglaadimine ära, et mitte teha esmalt kallist „kõik
+    // teosed“ päringut ja kohe selle järel uut vaikimisi kollektsiooni päringut.
+    if (!index || collectionsLoading) return;
     const controller = new AbortController();
     let cancelled = false;
     const fetchWorks = async () => {
@@ -368,10 +371,13 @@ const Dashboard: React.FC = () => {
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
           lang: getLangCode(i18n.language),
+          offset: (currentPage - 1) * ITEMS_PER_PAGE,
+          limit: ITEMS_PER_PAGE,
           signal: controller.signal
         });
         if (cancelled) return;
         setWorks(result.works);
+        setTotalHits(result.totalHits);
         setFacets(result.facets);
 
         // Reset to page 1 when filters change (but not when page param changes)
@@ -399,12 +405,12 @@ const Dashboard: React.FC = () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, refreshCounter, i18n.language]);
+  }, [index, collectionsLoading, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, currentPage, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
   // shift+klõps valib vahemiku viimasest ankrust nähtaval leheküljel (nagu manage-lehel)
   const handleToggleSelect = (workId: string, shiftKey: boolean) => {
-    const visibleWorks = works.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+    const visibleWorks = works;
     const idx = visibleWorks.findIndex(w => w.work_id === workId);
     if (idx === -1) return;
     // Loe ankur ENNE setState'i (ref kirjutatakse allpool üle)
@@ -423,9 +429,7 @@ const Dashboard: React.FC = () => {
   };
 
   const selectAllVisible = () => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const currentWorks = works.slice(startIndex, endIndex);
+    const currentWorks = works;
     setSelectedWorkIds(prev => {
       const next = new Set(prev);
       currentWorks.forEach(w => next.add(w.work_id));
@@ -656,7 +660,7 @@ const Dashboard: React.FC = () => {
                 {printerParam && (
                   <div className="flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-md text-sm font-medium">
                     <span className="font-serif">¶</span>
-                    <span className="truncate max-w-32">{isQCode(printerParam) ? (publisherIdMap[printerParam] || printerParam) : printerParam}</span>
+                    <span className="truncate max-w-32">{isQCode(printerParam) ? (publisherIdMap[printerParam] || enrichedLabels[printerParam]?.[lang] || printerParam) : printerParam}</span>
                     <button
                       onClick={() => {
                         const newParams = new URLSearchParams(searchParams);
@@ -761,10 +765,8 @@ const Dashboard: React.FC = () => {
           <div className="max-w-7xl mx-auto">
             {(() => {
               // Server-side filtreerimine - works on juba filtreeritud teose_staatus järgi
-              const totalPages = Math.ceil(works.length / ITEMS_PER_PAGE);
-              const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-              const endIndex = startIndex + ITEMS_PER_PAGE;
-              const currentWorks = works.slice(startIndex, endIndex);
+              const totalPages = Math.ceil(totalHits / ITEMS_PER_PAGE);
+              const currentWorks = works;
 
               const handlePageChange = (newPage: number) => {
                 setCurrentPage(newPage);
@@ -797,7 +799,7 @@ const Dashboard: React.FC = () => {
                       select: t('bulkAssign.select'),
                       selectAllVisible: t('bulkAssign.selectAllVisible'),
                       clearSelection: t('bulkAssign.clearSelection'),
-                      worksCount: t('results.worksCount', { count: works.length }),
+                      worksCount: t('results.worksCount', { count: totalHits }),
                       filtered: t('results.filtered'),
                       pageOf: t('results.pageOf', { current: currentPage, total: totalPages }),
                     }}

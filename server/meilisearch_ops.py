@@ -492,7 +492,7 @@ def _dashboard_search_warmup_body(collection_id=None):
         ],
         "attributesToSearchOn": ["title", "authors_text", "tags_search"],
         "filter": filters,
-        "limit": 5000,
+        "limit": 12,
         "facets": ["genre_ids", "type_ids", "tags_ids", "teose_staatus"],
         "distinct": "work_id",
         "sort": ["year:asc"],

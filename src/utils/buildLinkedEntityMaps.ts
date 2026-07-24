@@ -19,6 +19,23 @@ export function buildLinkedEntityMaps(
   const idToLabel: Record<string, string> = {};
   const labelToId: Record<string, string> = {};
 
+  // Facet võib sisaldada ID-d, mida parajasti kuvatava serveripoolse lehe
+  // 12 teose hulgas pole. Seeme serveri kanoonilisest labeliregistrist tagab,
+  // et ka nende facetite nimed ja URL-i pöördkaardistus jäävad alles.
+  for (const [id, labels] of Object.entries(enrichedLabels)) {
+    const rawLabel = labels[lang] || labels.et || labels.en;
+    if (!rawLabel) continue;
+    const currentLabel = capitalizeFirst(rawLabel);
+    idToLabel[id] = currentLabel;
+    for (const label of Object.values(labels)) {
+      if (!label) continue;
+      idToLabel[label] = currentLabel;
+      idToLabel[capitalizeFirst(label)] = currentLabel;
+      labelToId[label] = id;
+      labelToId[capitalizeFirst(label)] = id;
+    }
+  }
+
   for (const item of items) {
     if (!item) continue;
 

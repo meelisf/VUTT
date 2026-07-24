@@ -127,6 +127,15 @@ describe('buildLinkedEntityMaps', () => {
     expect(result.idToLabel['Q861911']).toBe('Oratsioon');
   });
 
+  it('enrichedLabels täidab facet-kaardi ka siis, kui entity pole praegusel lehel', () => {
+    const result = buildLinkedEntityMaps([], 'et', {
+      Q861911: { et: 'kõne', en: 'speech' },
+    });
+    expect(result.idToLabel.Q861911).toBe('Kõne');
+    expect(result.labelToId.Kõne).toBe('Q861911');
+    expect(result.labelToId.speech).toBe('Q861911');
+  });
+
   it('mitu erinevat entity → kõik kaardis', () => {
     const result = buildLinkedEntityMaps([disputatsioon, oratsioon], 'et');
     expect(Object.keys(result.idToLabel)).toContain('Q1123131');
