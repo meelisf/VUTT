@@ -3,12 +3,15 @@ import { EditorView } from '@codemirror/view';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import { FILE_API_URL } from '../../config';
 import { Page } from '../../types';
+import { reocrPageIdentity } from './reocrPageIdentity';
 
 export type ReocrStatus = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 
 interface UseReOcrProps {
   page: Page;
   authToken: string | null;
+  /** Re-OCR endpointid on admin-only — muul juhul ei tehta ühtki päringut. */
+  isAdmin: boolean;
   viewRef: MutableRefObject<EditorView | null>;
   setIsDirty: (v: boolean) => void;
 }
@@ -33,35 +36,50 @@ const parseJsonResponse = async (response: Response): Promise<any> => {
   }
 };
 
-export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps): UseReOcrReturn {
+export function useReOcr({ page, authToken, isAdmin, viewRef, setIsDirty }: UseReOcrProps): UseReOcrReturn {
   const [reocrStatus, setReocrStatus] = useState<ReocrStatus>('idle');
   const [reocrText, setReocrText] = useState<string | null>(null);
   const [reocrError, setReocrError] = useState<string | null>(null);
   const reocrPollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Lehekülje failinimi (piltide URL-ist) — kasutatakse .ocr faili ja localStorage võtme jaoks
-  const pageFilename = page.image_url ? (page.image_url.split('/').pop() ?? null) : null;
-  // localStorage võti poolelioleva re-OCR töö job_id säilitamiseks
-  const reocrStorageKey = page.work_id && pageFilename
-    ? `reocr_job_${page.work_id}_${pageFilename}`
-    : null;
-  const didCheckStoredJobRef = useRef(false);
+  const { pageFilename, pageKey, storageKey: reocrStorageKey } = reocrPageIdentity(page.work_id, page.image_url);
 
-  // Poll cleanup
+  // Editor EI monteeru lehe vahetusel maha (ADR 0010), seega on see olek
+  // "kleepuv": ilma selgesõnalise lähtestuseta ripuks eelmise lehe banner ja
+  // tulemus kaasa igale järgmisele lehele. pageKeyRef valvab ka pooleliolevate
+  // async-vastuste eest — vana lehe poll ei tohi kirjutada uue lehe olekusse.
+  const pageKeyRef = useRef<string | null>(pageKey);
+  pageKeyRef.current = pageKey;
+
+  // Poll cleanup komponendi mahavõtmisel
   useEffect(() => {
     return () => {
       if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
     };
   }, []);
 
-  // Mountimisel: kontrolli esmalt .ocr faili (püsiv), siis localStorage (pooleliolev töö)
+  // Lehe vahetusel: lähtesta olek ja kontrolli UUE lehe seisu.
+  // 1. .ocr fail (püsiv, elab serveri restardi üle)
+  // 2. localStorage (pooleliolev töö)
   useEffect(() => {
-    if (didCheckStoredJobRef.current || !authToken || !page.work_id || !pageFilename) return;
-    didCheckStoredJobRef.current = true;
+    if (reocrPollRef.current) {
+      clearTimeout(reocrPollRef.current);
+      reocrPollRef.current = null;
+    }
+    setReocrStatus('idle');
+    setReocrText(null);
+    setReocrError(null);
+
+    if (!authToken || !isAdmin || !pageKey || !page.work_id || !pageFilename) return;
+
+    // Kõik hilisemad kirjutused käivad läbi selle valve — kui leht on vahepeal
+    // vahetunud, visatakse vastus lihtsalt ära.
+    const isCurrent = () => pageKeyRef.current === pageKey;
 
     const startPollingFromSaved = (jobId: string) => {
       setReocrStatus('processing');
       const poll = async () => {
+        if (!isCurrent()) return;
         try {
           const pr = await fetchWithTimeout(
             `${FILE_API_URL}/admin/reocr/${jobId}/status`,
@@ -69,38 +87,41 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
           const pd = await parseJsonResponse(pr);
+          if (!isCurrent()) return;
           if (pd.status === 'done') {
             setReocrStatus('done');
             setReocrText(pd.text ?? '');
           } else if (pd.status === 'error') {
             setReocrStatus('error');
             setReocrError(pd.error || 'Tundmatu viga');
-            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+            localStorage.removeItem(reocrStorageKey!);
           } else if (pd.status === 'not_found') {
             setReocrStatus('idle');
-            if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+            localStorage.removeItem(reocrStorageKey!);
           } else {
             reocrPollRef.current = setTimeout(poll, 3000);
           }
         } catch {
-          reocrPollRef.current = setTimeout(poll, 4000);
+          if (isCurrent()) reocrPollRef.current = setTimeout(poll, 4000);
         }
       };
       reocrPollRef.current = setTimeout(poll, 1000);
     };
 
     const checkAll = async () => {
-      // 1. Kontrolli .ocr faili (elab serverirestate üle)
+      // 1. Kontrolli .ocr faili (elab serveri restardi üle)
       try {
         const res = await fetchWithTimeout(
           `${FILE_API_URL}/admin/work/${page.work_id}/page-ocr?filename=${encodeURIComponent(pageFilename)}`,
           { headers: getAuthHeaders(authToken), timeout: 5000 }
         );
+        if (!isCurrent()) return;
         if (res.ok) {
           const data = await parseJsonResponse(res);
+          if (!isCurrent()) return;
           setReocrStatus('done');
           setReocrText(data.text ?? '');
-          if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+          localStorage.removeItem(reocrStorageKey!);
           return;
         }
       } catch {
@@ -108,8 +129,8 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
       }
 
       // 2. .ocr puudub — kontrolli localStorage (pooleliolev töö)
-      const savedJobId = reocrStorageKey ? localStorage.getItem(reocrStorageKey) : null;
-      if (!savedJobId) return;
+      const savedJobId = localStorage.getItem(reocrStorageKey!);
+      if (!savedJobId || !isCurrent()) return;
 
       try {
         const pr = await fetchWithTimeout(
@@ -117,13 +138,14 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
           { headers: getAuthHeaders(authToken), timeout: 10000 }
         );
         const pd = await parseJsonResponse(pr);
+        if (!isCurrent()) return;
         if (pd.status === 'done') {
           setReocrStatus('done');
           setReocrText(pd.text ?? '');
         } else if (pd.status === 'uploading' || pd.status === 'processing') {
           startPollingFromSaved(savedJobId);
         } else {
-          if (reocrStorageKey) localStorage.removeItem(reocrStorageKey);
+          localStorage.removeItem(reocrStorageKey!);
         }
       } catch {
         // Eiramine
@@ -131,11 +153,23 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
     };
 
     checkAll();
+
+    return () => {
+      if (reocrPollRef.current) {
+        clearTimeout(reocrPollRef.current);
+        reocrPollRef.current = null;
+      }
+    };
+  // pageKey katab work_id + failinime; ülejäänu on sellest tuletatud
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authToken]);
+  }, [authToken, isAdmin, pageKey]);
 
   const handleReOcr = useCallback(async () => {
-    if (!pageFilename || !authToken) return;
+    if (!pageFilename || !authToken || !pageKey) return;
+
+    // Töö kuulub sellele lehele — vastuseid ei tohi rakendada pärast lehe vahetust.
+    const jobPageKey = pageKey;
+    const isCurrent = () => pageKeyRef.current === jobPageKey;
 
     if (reocrPollRef.current) clearTimeout(reocrPollRef.current);
     setReocrStatus('uploading');
@@ -154,10 +188,14 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
         throw new Error(d.detail || 'Re-OCR alustamine ebaõnnestus');
       }
       const { job_id } = await parseJsonResponse(res);
+      // job_id salvestatakse ALATI — töö jookseb serveris ka siis, kui kasutaja
+      // on vahepeal lehte vahetanud; tagasi tulles leitakse see üles.
       if (reocrStorageKey) localStorage.setItem(reocrStorageKey, job_id);
+      if (!isCurrent()) return;
       setReocrStatus('processing');
 
       const poll = async () => {
+        if (!isCurrent()) return;
         try {
           const pr = await fetchWithTimeout(
             `${FILE_API_URL}/admin/reocr/${job_id}/status`,
@@ -165,6 +203,7 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
           );
           if (!pr.ok) throw new Error('Polling ebaõnnestus');
           const pd = await parseJsonResponse(pr);
+          if (!isCurrent()) return;
           if (pd.status === 'done') {
             setReocrStatus('done');
             setReocrText(pd.text ?? '');
@@ -176,15 +215,16 @@ export function useReOcr({ page, authToken, viewRef, setIsDirty }: UseReOcrProps
             reocrPollRef.current = setTimeout(poll, 3000);
           }
         } catch {
-          reocrPollRef.current = setTimeout(poll, 4000);
+          if (isCurrent()) reocrPollRef.current = setTimeout(poll, 4000);
         }
       };
       reocrPollRef.current = setTimeout(poll, 3000);
     } catch (e: any) {
+      if (!isCurrent()) return;
       setReocrStatus('error');
       setReocrError(e.message || 'Viga');
     }
-  }, [pageFilename, page.work_id, page.page_number, authToken, reocrStorageKey]);
+  }, [pageFilename, pageKey, page.work_id, page.page_number, authToken, reocrStorageKey]);
 
   const applyReOcr = useCallback(() => {
     if (reocrText !== null) {
