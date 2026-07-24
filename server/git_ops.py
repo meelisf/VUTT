@@ -264,6 +264,43 @@ def clear_git_failures():
         _git_failures.clear()
 
 
+GIT_COMMIT_GRAPH_INTERVAL = int(os.getenv("GIT_COMMIT_GRAPH_INTERVAL", "300"))
+
+
+def update_git_commit_graph():
+    """Uuendab failiajaloo Bloom-filtritega commit-graph'i.
+
+    ``--changed-paths`` kiirendab ``git log -- <fail>`` päringuid suures data-repos
+    kümneid kordi. Split-režiim lisab tavaliselt ainult vahepealsed commitid ega
+    kirjuta iga kord kogu graafi uuesti.
+    """
+    repo = get_or_init_repo()
+    started = time.monotonic()
+    try:
+        repo.git.commit_graph("write", "--reachable", "--changed-paths", "--split")
+        elapsed = time.monotonic() - started
+        logger.info(f"Git commit-graph uuendatud: {elapsed:.2f}s")
+        return True
+    except Exception as e:
+        logger.warning(f"Git commit-graph uuendamine ebaõnnestus: {e}")
+        return False
+
+
+def _git_commit_graph_loop():
+    while True:
+        update_git_commit_graph()
+        time.sleep(GIT_COMMIT_GRAPH_INTERVAL)
+
+
+def start_git_commit_graph_loop():
+    """Hoiab failipõhise Git-ajaloo indeksi taustal värskena."""
+    threading.Thread(
+        target=_git_commit_graph_loop,
+        daemon=True,
+        name="git-commit-graph",
+    ).start()
+
+
 def run_git_fsck():
     """
     Käivitab 'git fsck' repo terviklikkuse kontrolliks.

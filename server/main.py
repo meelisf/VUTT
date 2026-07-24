@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 from .meilisearch_ops import metadata_watcher_loop, _keepwarm_loop, _ensure_filterable_attributes, get_meilisearch_sync_status
 from .upload_ops import start_upload_sync_loop
 from .reocr_ops import start_reocr_background
-from .git_ops import run_git_fsck
+from .git_ops import run_git_fsck, start_git_commit_graph_loop
 from .heartbeat import snapshot as heartbeat_snapshot
 # NB: upload/re-OCR endpointid + nende ops-importid elavad nüüd routerites
 # (server/routers/upload.py, reocr.py). Paketi-tasandi re-eksport käib
@@ -42,7 +42,9 @@ async def lifespan(app: FastAPI):
         logger.error("places.json konfiguratsiooniviga: %s", e)
         raise SystemExit(1)
     build_work_id_cache()
-    run_git_fsck()
+    # Tervikluse kontroll ja ajalooindeksi hooldus ei pea API käivitumist blokeerima.
+    threading.Thread(target=run_git_fsck, daemon=True, name="git-fsck").start()
+    start_git_commit_graph_loop()
     from .auth import warn_if_no_superadmin
     warn_if_no_superadmin()
     threading.Thread(target=rebuild_indices, daemon=True).start()
