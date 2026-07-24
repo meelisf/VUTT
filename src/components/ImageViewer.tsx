@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { panOffsetForTop } from '../utils/imageViewerGeometry';
 
 interface ImageViewerProps {
   src: string;
@@ -28,11 +29,39 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const isImageLoading = !!src && src !== loadedSrc;
   const [showImageSpinner, setShowImageSpinner] = useState(false);
 
+  // Lehe vahetusel algab lugemine uue lehe algusest. Suurendustase jääb püsima
+  // (sama suurendus järgmisel lehel on lappamisel kasulik), aga asend viiakse
+  // ülaserva — muidu peaks kasutaja iga lehe alguses käsitsi üles kerima, sest
+  // eelmisel lehel jäi ta lehe lõppu.
+  const resetPanToTop = useCallback(() => {
+    const img = imgRef.current;
+    const container = containerRef.current;
+    if (!img || !container) {
+      setPosition({ x: 0, y: 0 });
+      return;
+    }
+    setPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight) });
+  }, [scale]);
+
+  // Iga src saab ülaserva-nihke täpselt ühe korra, et suurendamine või
+  // uuesti-renderdus ei viskaks kasutajat lehe algusesse tagasi.
+  const resetForSrcRef = useRef<string | null>(null);
+  const handleImageLoaded = useCallback(() => {
+    setLoadedSrc(src);
+    if (resetForSrcRef.current === src) return;
+    resetForSrcRef.current = src;
+    // rAF: paigutus peab olema arvutatud, enne kui clientHeight't loeme.
+    requestAnimationFrame(resetPanToTop);
+  }, [src, resetPanToTop]);
+
+  const handleImageLoadedRef = useRef(handleImageLoaded);
+  handleImageLoadedRef.current = handleImageLoaded;
+
   // Vahemälust (nt eellaetud kõrvalleht) tulev pilt võib olla valmis juba enne
   // kui React onLoad-i külge jõuab panna — siis onLoad ei käivituks kunagi.
   useEffect(() => {
     const el = imgRef.current;
-    if (el?.complete && el.naturalWidth > 0) setLoadedSrc(src);
+    if (el?.complete && el.naturalWidth > 0) handleImageLoadedRef.current();
   }, [src]);
 
   // Väike viivitus: eellaetud pilt jõuab kohale enne, nii et spinner ei vilgu
@@ -277,7 +306,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
             }`}
             style={{ maxHeight: '85vh', maxWidth: '85vw' }}
             onDragStart={preventDrag}
-            onLoad={() => setLoadedSrc(src)}
+            onLoad={handleImageLoaded}
             // Vea korral lõpetame ootamise — muidu jääks spinner igaveseks
             // keerlema. Katkise pildi käsitleb <img> ise (alt-tekst).
             onError={() => setLoadedSrc(src)}

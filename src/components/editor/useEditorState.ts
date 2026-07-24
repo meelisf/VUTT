@@ -67,6 +67,9 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
       if (currentText !== page.text_content) {
         view.dispatch({
           changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
+          // Uus leht algab algusest — muidu jääks kursor eelmise lehe pealt
+          // suvalisse kohta uues tekstis.
+          selection: { anchor: 0 },
           // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
           // avaks võõra ploki uuel lehel
           effects: closeAllMarginalia.of(null),
@@ -75,6 +78,11 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
           annotations: pageSwapAnnotation.of(true),
         });
       }
+      // Kerimine lehe algusesse. Tingimusest väljaspool, sest kaks järjestikust
+      // lehte võivad olla identse tekstiga (nt tühjad) — ka siis peab uus leht
+      // algama ülevalt. Alates #185-st ei monteerita editorit lehe vahetusel
+      // maha, seega kerimispositsioon jääks muidu eelmise lehe lõppu.
+      view.scrollDOM.scrollTop = 0;
     }
   }, [page, viewRef]);
 
