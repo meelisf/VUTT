@@ -380,10 +380,9 @@ const Dashboard: React.FC = () => {
         setTotalHits(result.totalHits);
         setFacets(result.facets);
 
-        // Reset to page 1 when filters change (but not when page param changes)
-        if (currentPage !== 1 && !searchParams.get('page')) {
-          setCurrentPage(1);
-        }
+        // Filtrite muutmisel lähtestab lehe URL-i sünkrooniv efekt. Siin ei tohi
+        // currentPage'i muuta: lehevahetuse päringu closure võib veel sisaldada
+        // eelmist searchParams objekti ja viiks lehe 2 ekslikult tagasi lehele 1.
         // Uue otsingutulemuse korral on shift-valiku ankur (lehekohalik) aegunud
         lastSelectedIndexRef.current = null;
       } catch (e: any) {
