@@ -33,6 +33,11 @@ _git_repo = None
 _git_failures = deque(maxlen=100)
 _git_failures_lock = threading.Lock()
 
+# Gitil on kogu repo kohta üks index.lock. Kuuma salvestustee write+add+commit
+# peab olema protsessi sees järjestatud, et samaaegsed salvestused ei saaks
+# teineteise sisu vale autori commiti sisse stage'ida.
+_git_write_lock = threading.RLock()
+
 # Cache teose ID-de jaoks (kausta nimi -> (work_id, slug))
 _work_ids_cache = {}
 
@@ -336,77 +341,122 @@ def run_git_fsck():
 
 
 def save_with_git(filepath, content, username, message=None, additional_files=None):
-    """
-    Salvestab faili ja teeb Git commiti.
+    """Salvestab failid ja teeb path-skoobitud native Git CLI commiti.
 
-    Args:
-        filepath: Absoluutne tee failini
-        content: Faili sisu
-        username: Kasutajanimi (commit author)
-        message: Commit sõnum (valikuline, genereeritakse automaatselt)
-        additional_files: List of (filepath, content) tuples to include in same commit
-
-    Returns:
-        dict: {"success": bool, "commit_hash": str, "is_first_commit": bool}
+    GitPythoni ``repo.index.commit`` kirjutas suure repo indeksi puhtas Pythonis
+    läbi ja võttis /data repos ~1,8 s. Native git teeb sama töö ~0,15 s-ga.
+    Kogu write+stage+commit tsükkel on lukus, et samaaegsed salvestused ei saaks
+    teineteise faili vale autori commiti sisse stage'ida.
     """
-    repo = get_or_init_repo()
+    get_or_init_repo()  # Initsialiseerib/valideerib repo nagu varem.
     relative_path = os.path.relpath(filepath, BASE_DIR)
+    extra = additional_files or []
+    files_to_add = [relative_path] + [os.path.relpath(path, BASE_DIR) for path, _ in extra]
+    git_env = os.environ.copy()
+    git_env.update({
+        "GIT_AUTHOR_NAME": username,
+        "GIT_AUTHOR_EMAIL": f"{username}@vutt.local",
+        "GIT_COMMITTER_NAME": username,
+        "GIT_COMMITTER_EMAIL": f"{username}@vutt.local",
+    })
 
-    # Kontrolli, kas see fail on juba repos (st kas on esimene commit)
-    is_first_commit = True
-    try:
-        # Kui faili ajalugu on olemas, pole esimene commit
-        list(repo.iter_commits(paths=relative_path, max_count=1))
-        is_first_commit = False
-    except Exception:
-        is_first_commit = True
+    with _git_write_lock:
+        # HEAD-puu kontroll vastab otse küsimusele, kas fail on juba jälgitud.
+        exists_result = subprocess.run(
+            ["git", "cat-file", "-e", f"HEAD:{relative_path}"],
+            cwd=BASE_DIR,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        is_first_commit = exists_result.returncode != 0
 
-    # Atomaarne kirjutus: ligipääsukontrolli lugeja ei tohi näha poolikut
-    # _metadata.json-i (sama helper sobib ka txt/json lisafailidele).
-    atomic_write_text(filepath, content)
-
-    # Kogu kõik failid indeksisse lisamiseks
-    files_to_add = [relative_path]
-
-    # Kirjuta ja lisa lisafailid
-    if additional_files:
-        for add_filepath, add_content in additional_files:
-            atomic_write_text(add_filepath, add_content)
-            add_relative = os.path.relpath(add_filepath, BASE_DIR)
-            files_to_add.append(add_relative)
-
-    # Genereeri commit sõnum
-    if not message:
-        if is_first_commit:
-            message = f"Originaal OCR: {relative_path}"
-        else:
-            message = f"Muuda: {relative_path}"
-
-    # Tee commit koos retry-ga git index.lock kollisiooni korral
-    author = Actor(username, f"{username}@vutt.local")
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            repo.index.add(files_to_add)
-            commit = repo.index.commit(
-                message,
-                author=author,
-                committer=author
+        if not message:
+            message = (
+                f"Originaal OCR: {relative_path}"
+                if is_first_commit else f"Muuda: {relative_path}"
             )
-            logger.info(f"Git commit: {commit.hexsha[:8]} - {message} (autor: {username})")
-            return {
-                "success": True,
-                "commit_hash": commit.hexsha,
-                "is_first_commit": is_first_commit
-            }
-        except GitCommandError as e:
-            if attempt < max_retries - 1 and "index.lock" in str(e):
-                logger.warning(f"Git index lukus, proovin uuesti ({attempt + 1}/{max_retries}): {relative_path}")
-                time.sleep(0.15 * (attempt + 1))
-                continue
-            logger.error(f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {e}")
-            _record_git_failure(relative_path, username, e)
-            return {"success": False, "error": str(e)}
+
+        # Kirjutamine peab olema sama luku sees kui stage'imine: muidu võiks
+        # teine lõim faili kahe sammu vahel üle kirjutada.
+        atomic_write_text(filepath, content)
+        for add_filepath, add_content in extra:
+            atomic_write_text(add_filepath, add_content)
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                subprocess.run(
+                    ["git", "add", "--", *files_to_add],
+                    cwd=BASE_DIR,
+                    env=git_env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+                # Muutusteta Ctrl+S ei tekita tühja commiti.
+                changed = subprocess.run(
+                    ["git", "diff", "--cached", "--quiet", "--", *files_to_add],
+                    cwd=BASE_DIR,
+                    env=git_env,
+                ).returncode
+                if changed == 0:
+                    head = subprocess.run(
+                        ["git", "rev-parse", "HEAD"],
+                        cwd=BASE_DIR,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout.strip()
+                    logger.info(f"Git commit vahele jäetud (muutusteta): {relative_path}")
+                    return {
+                        "success": True,
+                        "commit_hash": head,
+                        "is_first_commit": is_first_commit,
+                        "is_noop": True,
+                    }
+                if changed != 1:
+                    raise RuntimeError(f"git diff --cached ebaõnnestus (exit {changed})")
+
+                # --only jätab kõik varasemad mitteseotud staged failid indeksisse.
+                subprocess.run(
+                    [
+                        "git", "commit", "--only", "--no-verify", "--no-gpg-sign",
+                        "-m", message, "--", *files_to_add,
+                    ],
+                    cwd=BASE_DIR,
+                    env=git_env,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                commit_hash = subprocess.run(
+                    ["git", "rev-parse", "HEAD"],
+                    cwd=BASE_DIR,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                logger.info(f"Git commit: {commit_hash[:8]} - {message} (autor: {username})")
+                return {
+                    "success": True,
+                    "commit_hash": commit_hash,
+                    "is_first_commit": is_first_commit,
+                }
+            except (subprocess.CalledProcessError, RuntimeError) as e:
+                stderr = getattr(e, "stderr", "") or ""
+                error_text = f"{e}: {stderr.strip()}".strip()
+                if attempt < max_retries - 1 and "index.lock" in error_text:
+                    logger.warning(
+                        f"Git index lukus, proovin uuesti ({attempt + 1}/{max_retries}): {relative_path}"
+                    )
+                    time.sleep(0.15 * (attempt + 1))
+                    continue
+                logger.error(
+                    f"Git commit EBAÕNNESTUS: {relative_path} (kasutaja: {username}): {error_text}"
+                )
+                _record_git_failure(relative_path, username, e)
+                return {"success": False, "error": error_text}
 
 
 def get_file_git_history(paths, max_count=50):
