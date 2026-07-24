@@ -29,3 +29,5 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0007](0007-tuletatud-indeksid-read-modelid.md) | Tuletatud indeksid on nullist taastatavad read-modelid | kehtib |
 | [0008](0008-markdown-allowlist-xss.md) | Vabateksti markdown: allow-list, mitte kunagi toores HTML | kehtib |
 | [0009](0009-marginaalia-iga-fuusiline-rida-eraldi.md) | Iga füüsiline marginaaliarida on eraldi `<m>` plokk | kehtib |
+| [0010](0010-lehe-vahetus-ei-monteeri-editorit-maha.md) | Lehe vahetus ei monteeri editorit maha; sisuvahetus on märgistatud | kehtib |
+| [0011](0011-i18n-keelepakid-laisalt-ilma-fallbackita.md) | i18n laeb ühe keele korraga; `fallbackLng` väljas + pariteeditest | kehtib |

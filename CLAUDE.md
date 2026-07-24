@@ -235,6 +235,22 @@ Kaitseb tägi positsioone kasutaja juhuslike kustutamiste eest.
 - `isReplace && r.from < lastReplaceEnd`: ainult replace'id blokeeritakse, mitte markid
 - Protection filter peab jääma `vuttMarkupExtension` listi viimaseks (pärast `vuttMarkupField`)
 
+### 3. Lehe vahetus ei monteeri editorit maha (ADR 0010)
+
+Lehepööre sama teose sees **ei** võta CodeMirrorit maha — sisu vahetab
+`useEditorState` `page`-effect. Sellel on kaks tagajärge:
+
+- **Programmaatiline dokumendi asendus peab kandma `pageSwapAnnotation`-it**
+  (`editorAnnotations.ts`), muidu loeb updateListener selle kasutaja
+  muudatuseks ja lehelt lahkumisel küsitakse asjatult salvestamist.
+- **See märgistus EI TOHI olla `Transaction.userEvent`** — `marginaliaProtectionFilter`
+  ja `vuttAutoSanitizer` tegutsevad ainult userEvent-tehingutel ja hakkaksid
+  muidu kettalt laetud teksti muutma.
+
+Komponendisisene olek, mis varem lähtestus remountiga, tuleb nüüd lehe vahetuse
+effectis **selgesõnaliselt** lähtestada (`isDirty`, `annotationDraftDirty`,
+`saveError`, kerimispositsioon, pildi asend).
+
 ## Marginaalia — normaliseerimine ja kopeerimine
 
 **Kanooniline formaat:** iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
@@ -298,6 +314,17 @@ t('common:status.Valmis')  // From common namespace
 ```
 
 Files: `src/locales/{et,en}/*.json`
+
+**Keelepakid laetakse laisalt** — üks keel korraga, dünaamilise impordiga
+(`src/locales/{et,en}/index.ts` = üks chunk keele kohta). Keeletuvastus käib
+käsitsi `src/utils/detectLanguage.ts`-is **enne** i18n init'i, sest
+`fallbackLng` sunniks i18nexti laadima ka varukeele paki. Vt ADR 0011.
+
+**`fallbackLng` on VÄLJAS.** Puuduvat võtit ei võeta enam vaikselt teisest
+keelest → **uus võti tuleb lisada mõlemasse keelde korraga**, muidu katkeb
+build (`src/locales/__tests__/localeParity.test.ts`). Uus nimeruum lisa ka
+`src/locales/namespaces.ts`-i (mitte `i18n.ts`-i — selle importimine käivitab
+init'i).
 
 ## Common Patterns
 
