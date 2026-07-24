@@ -3,6 +3,7 @@ import { Page, PageStatus, Annotation, Work } from '../types';
 import type { Collections } from '../services/collectionService';
 import type { TextAnnotation } from '../types';
 import { useUser } from '../contexts/UserContext';
+import { isAtLeast } from '../utils/roleUtils';
 import EditorHeader from './editor/EditorHeader';
 import EditorEditTab from './editor/EditorEditTab';
 import EditorInfoHistoryTabs from './editor/EditorInfoHistoryTabs';
@@ -144,6 +145,7 @@ const TextEditor: React.FC<TextEditorProps> = ({ page, work, onSave, onUnsavedCh
   const { reocrStatus, reocrText, reocrError, handleReOcr, applyReOcr, deleteOcrFile } = useReOcr({
     page,
     authToken,
+    isAdmin: isAtLeast(user?.role, 'admin'),
     viewRef,
     setIsDirty,
   });

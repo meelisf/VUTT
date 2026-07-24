@@ -49,6 +49,17 @@ teinud.
   seni: `isDirty`, `annotationDraftDirty`, `saveError`, kerimispositsioon,
   pildi asend.
 
+- **Lehepõhine taustatöö olek vajab lehe-võtit, mitte mount-guardi.**
+  `useReOcr` hoidis re-OCR seisu (banner "Transkriptsioon käib", tulemuse
+  ülekate) ühekordse mount-kontrolliga (`didCheckStoredJobRef`) — see eeldas
+  remounti. Ilma remountita rippus eelmise lehe banner igal järgmisel lehel ja
+  valmiv töö kuvas võõra lehe teksti, mille "Rakenda" oleks kirjutanud
+  praegusesse dokumenti. Muster: identiteedivõti (`reocrPageIdentity` →
+  `work_id/failinimi`) effecti dep-listis, mis lähtestab oleku, + `pageKeyRef`
+  valve iga async-vastuse ees, et vana lehe poll ei kirjutaks uue lehe olekusse.
+  Sama põhjusel on `PageCommentsPanel`-il `key={page.id}` — mustandiväljad on
+  lehepõhised.
+
 - Teadlikult **säilivad** üle lehepöörete: redaktori sakk, suurendustase,
   otsingupaneeli olek, marginaaliavaate režiim. Need on lappamisel soovitud.
 

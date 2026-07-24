@@ -100,8 +100,11 @@ const AnnotationsTab: React.FC<AnnotationsTabProps> = ({
         lang={lang}
       />
 
-      {/* Comments */}
+      {/* Comments — key lähtestab mustandiväljad lehe vahetusel.
+          Editor ei monteeru enam lehe pöördel maha (ADR 0010), seega jääks
+          pooleli kirjutatud kommentaar muidu järgmisele lehele rippuma. */}
       <PageCommentsPanel
+        key={_page.id}
         comments={comments}
         setComments={setComments}
         onDraftChange={onDraftChange}
