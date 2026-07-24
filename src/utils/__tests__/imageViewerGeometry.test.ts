@@ -34,4 +34,28 @@ describe('panOffsetForTop', () => {
   it('mõõtmata element (NaN) annab tsentreeritud asendi', () => {
     expect(panOffsetForTop(NaN, 1, 800)).toBe(0);
   });
+
+  describe('topInset — varu pildi peal olevatele juhtnuppudele', () => {
+    it('nihutab suurendatud pilti veel varu võrra allapoole', () => {
+      // Ilma varuta 400; 62px riba alt algamiseks 462
+      expect(panOffsetForTop(800, 2, 800, 62)).toBe(462);
+    });
+
+    it('täpselt mahtuv pilt nihkub varu võrra, et ülaserv jääks riba alla', () => {
+      expect(panOffsetForTop(800, 1, 800, 62)).toBe(62);
+    });
+
+    it('väike pilt jääb tsentreerituks — varu ei tohi teda alla lükata', () => {
+      // Pilt on poole konteineri kõrgusest: ülaserv on niigi ribast allpool
+      expect(panOffsetForTop(400, 1, 800, 62)).toBe(0);
+    });
+
+    it('varu ei muuda tulemust negatiivseks', () => {
+      expect(panOffsetForTop(100, 1, 800, 20)).toBe(0);
+    });
+
+    it('mõõtmata riba (NaN) käitub nagu varu puuduks', () => {
+      expect(panOffsetForTop(800, 2, 800, NaN)).toBe(400);
+    });
+  });
 });

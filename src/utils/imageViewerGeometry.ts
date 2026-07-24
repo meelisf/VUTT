@@ -9,20 +9,31 @@
  */
 
 /**
- * Vertikaalne nihe, mis toob skaleeritud pildi ülaserva konteineri ülaserva.
+ * Vertikaalne nihe, mis toob skaleeritud pildi ülaserva nähtavale.
  *
  * Tsentreeritud pilt ulatub `C/2 - H*s/2` kuni `C/2 + H*s/2`. Ülaserva
  * nulli viimiseks on vaja `ty = (H*s - C) / 2`.
  *
- * Kui pilt mahub konteinerisse tervikuna (ülejääk ≤ 0), on õige asend
- * tsentreeritud ehk 0 — ülaserva "kleepimine" jätaks alla tühja ala.
+ * `topInset` nihutab veel allapoole, et pildi ülaserv ei jääks pealkattuvate
+ * juhtnuppude (suum / kärpimine / allalaadimine) alla — need on pildi peal
+ * `absolute` ribana ja kataksid muidu skaneeringu esimesed tekstiread.
+ *
+ * Kunagi ei nihutata tsentreeritud asendist ülespoole (tulem ≥ 0): väike pilt,
+ * mis mahub tervikuna ära, jääb keskele, mitte ei kleepu ülaserva tühja alaga.
  *
  * @param imageHeight Pildi paigutuslik kõrgus (skaleerimata, `clientHeight`)
  * @param scale Praegune suurendustegur
  * @param containerHeight Nähtava ala kõrgus
+ * @param topInset Ülaserva varu juhtnuppude jaoks (px)
  */
-export function panOffsetForTop(imageHeight: number, scale: number, containerHeight: number): number {
+export function panOffsetForTop(
+  imageHeight: number,
+  scale: number,
+  containerHeight: number,
+  topInset = 0,
+): number {
   const overflowY = imageHeight * scale - containerHeight;
-  if (!Number.isFinite(overflowY) || overflowY <= 0) return 0;
-  return overflowY / 2;
+  const inset = Number.isFinite(topInset) ? topInset : 0;
+  if (!Number.isFinite(overflowY)) return 0;
+  return Math.max(0, overflowY / 2 + inset);
 }

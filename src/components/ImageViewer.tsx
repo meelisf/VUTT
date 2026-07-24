@@ -3,6 +3,9 @@ import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'luci
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { panOffsetForTop } from '../utils/imageViewerGeometry';
 
+/** Hingamisruum juhtnuppude riba ja skaneeringu ülaserva vahel. */
+const CONTROLS_GAP_PX = 8;
+
 interface ImageViewerProps {
   src: string;
   pageNum?: number;
@@ -20,6 +23,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
 
   // Lehe vahetusel hoiab brauser <img>-is eelmise lehe dekodeeritud pilti kuni
   // uus on laetud. Tekst vahetub aga kohe, nii et vana skaneering jääks hetkeks
@@ -40,7 +44,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
       setPosition({ x: 0, y: 0 });
       return;
     }
-    setPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight) });
+    // Juhtnupud on pildi peal `absolute` ribana ja kataksid muidu skaneeringu
+    // esimesed tekstiread. Mõõdame riba päris kõrguse, et nuppude lisandumine
+    // ei jätaks arvutust vaikselt valeks.
+    const controls = controlsRef.current;
+    const topInset = controls ? controls.offsetTop + controls.offsetHeight + CONTROLS_GAP_PX : 0;
+    setPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight, topInset) });
   }, [scale]);
 
   // Iga src saab ülaserva-nihke täpselt ühe korra, et suurendamine või
@@ -220,7 +229,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
       onMouseLeave={() => { isHoveredRef.current = false; }}
     >
       {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
+      <div ref={controlsRef} className="absolute top-4 left-4 z-10 flex gap-2">
         <div className="bg-black/50 backdrop-blur-md rounded-lg p-1 flex gap-1 shadow-lg border border-white/10">
           <button
             onClick={() => handleZoom(0.25)}
