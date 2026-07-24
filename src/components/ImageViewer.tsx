@@ -18,6 +18,33 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Lehe vahetusel hoiab brauser <img>-is eelmise lehe dekodeeritud pilti kuni
+  // uus on laetud. Tekst vahetub aga kohe, nii et vana skaneering jääks hetkeks
+  // uue teksti kõrvale — segadusseajav. Seetõttu peidame pildi laadimise ajaks
+  // ja näitame spinnerit.
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const isImageLoading = !!src && src !== loadedSrc;
+  const [showImageSpinner, setShowImageSpinner] = useState(false);
+
+  // Vahemälust (nt eellaetud kõrvalleht) tulev pilt võib olla valmis juba enne
+  // kui React onLoad-i külge jõuab panna — siis onLoad ei käivituks kunagi.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el?.complete && el.naturalWidth > 0) setLoadedSrc(src);
+  }, [src]);
+
+  // Väike viivitus: eellaetud pilt jõuab kohale enne, nii et spinner ei vilgu
+  // ühe kaadri jagu iga pöörde peal.
+  useEffect(() => {
+    if (!isImageLoading) {
+      setShowImageSpinner(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowImageSpinner(true), 150);
+    return () => clearTimeout(timer);
+  }, [isImageLoading]);
 
   // Puuteekraani pinch-to-zoom ja drag tugi
   const touchStateRef = useRef<{
@@ -242,14 +269,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
           className="will-change-transform"
         >
           <img
+            ref={imgRef}
             src={src}
             alt="Faksiimile"
-            className="max-w-none shadow-2xl sepia-[0.3] pointer-events-none"
+            className={`max-w-none shadow-2xl sepia-[0.3] pointer-events-none transition-opacity duration-150 ${
+              isImageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
             style={{ maxHeight: '85vh', maxWidth: '85vw' }}
             onDragStart={preventDrag}
+            onLoad={() => setLoadedSrc(src)}
+            // Vea korral lõpetame ootamise — muidu jääks spinner igaveseks
+            // keerlema. Katkise pildi käsitleb <img> ise (alt-tekst).
+            onError={() => setLoadedSrc(src)}
           />
         </div>
       </div>
+
+      {showImageSpinner && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/70" />
+        </div>
+      )}
 
       <div className="absolute bottom-4 right-4 text-white/50 text-xs pointer-events-none bg-black/20 px-2 py-1 rounded">
         {Math.round(scale * 100)}%
