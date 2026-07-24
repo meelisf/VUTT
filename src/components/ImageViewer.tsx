@@ -1,6 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
+import { panOffsetForTop } from '../utils/imageViewerGeometry';
+
+/** Hingamisruum juhtnuppude riba ja skaneeringu ülaserva vahel. */
+const CONTROLS_GAP_PX = 8;
 
 interface ImageViewerProps {
   src: string;
@@ -18,6 +22,67 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isHoveredRef = useRef(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
+
+  // Lehe vahetusel hoiab brauser <img>-is eelmise lehe dekodeeritud pilti kuni
+  // uus on laetud. Tekst vahetub aga kohe, nii et vana skaneering jääks hetkeks
+  // uue teksti kõrvale — segadusseajav. Seetõttu peidame pildi laadimise ajaks
+  // ja näitame spinnerit.
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const isImageLoading = !!src && src !== loadedSrc;
+  const [showImageSpinner, setShowImageSpinner] = useState(false);
+
+  // Lehe vahetusel algab lugemine uue lehe algusest. Suurendustase jääb püsima
+  // (sama suurendus järgmisel lehel on lappamisel kasulik), aga asend viiakse
+  // ülaserva — muidu peaks kasutaja iga lehe alguses käsitsi üles kerima, sest
+  // eelmisel lehel jäi ta lehe lõppu.
+  const resetPanToTop = useCallback(() => {
+    const img = imgRef.current;
+    const container = containerRef.current;
+    if (!img || !container) {
+      setPosition({ x: 0, y: 0 });
+      return;
+    }
+    // Juhtnupud on pildi peal `absolute` ribana ja kataksid muidu skaneeringu
+    // esimesed tekstiread. Mõõdame riba päris kõrguse, et nuppude lisandumine
+    // ei jätaks arvutust vaikselt valeks.
+    const controls = controlsRef.current;
+    const topInset = controls ? controls.offsetTop + controls.offsetHeight + CONTROLS_GAP_PX : 0;
+    setPosition({ x: 0, y: panOffsetForTop(img.clientHeight, scale, container.clientHeight, topInset) });
+  }, [scale]);
+
+  // Iga src saab ülaserva-nihke täpselt ühe korra, et suurendamine või
+  // uuesti-renderdus ei viskaks kasutajat lehe algusesse tagasi.
+  const resetForSrcRef = useRef<string | null>(null);
+  const handleImageLoaded = useCallback(() => {
+    setLoadedSrc(src);
+    if (resetForSrcRef.current === src) return;
+    resetForSrcRef.current = src;
+    // rAF: paigutus peab olema arvutatud, enne kui clientHeight't loeme.
+    requestAnimationFrame(resetPanToTop);
+  }, [src, resetPanToTop]);
+
+  const handleImageLoadedRef = useRef(handleImageLoaded);
+  handleImageLoadedRef.current = handleImageLoaded;
+
+  // Vahemälust (nt eellaetud kõrvalleht) tulev pilt võib olla valmis juba enne
+  // kui React onLoad-i külge jõuab panna — siis onLoad ei käivituks kunagi.
+  useEffect(() => {
+    const el = imgRef.current;
+    if (el?.complete && el.naturalWidth > 0) handleImageLoadedRef.current();
+  }, [src]);
+
+  // Väike viivitus: eellaetud pilt jõuab kohale enne, nii et spinner ei vilgu
+  // ühe kaadri jagu iga pöörde peal.
+  useEffect(() => {
+    if (!isImageLoading) {
+      setShowImageSpinner(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowImageSpinner(true), 150);
+    return () => clearTimeout(timer);
+  }, [isImageLoading]);
 
   // Puuteekraani pinch-to-zoom ja drag tugi
   const touchStateRef = useRef<{
@@ -164,7 +229,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
       onMouseLeave={() => { isHoveredRef.current = false; }}
     >
       {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
+      <div ref={controlsRef} className="absolute top-4 left-4 z-10 flex gap-2">
         <div className="bg-black/50 backdrop-blur-md rounded-lg p-1 flex gap-1 shadow-lg border border-white/10">
           <button
             onClick={() => handleZoom(0.25)}
@@ -242,14 +307,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
           className="will-change-transform"
         >
           <img
+            ref={imgRef}
             src={src}
             alt="Faksiimile"
-            className="max-w-none shadow-2xl sepia-[0.3] pointer-events-none"
+            className={`max-w-none shadow-2xl sepia-[0.3] pointer-events-none transition-opacity duration-150 ${
+              isImageLoading ? 'opacity-0' : 'opacity-100'
+            }`}
             style={{ maxHeight: '85vh', maxWidth: '85vw' }}
             onDragStart={preventDrag}
+            onLoad={handleImageLoaded}
+            // Vea korral lõpetame ootamise — muidu jääks spinner igaveseks
+            // keerlema. Katkise pildi käsitleb <img> ise (alt-tekst).
+            onError={() => setLoadedSrc(src)}
           />
         </div>
       </div>
+
+      {showImageSpinner && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white/70" />
+        </div>
+      )}
 
       <div className="absolute bottom-4 right-4 text-white/50 text-xs pointer-events-none bg-black/20 px-2 py-1 rounded">
         {Math.round(scale * 100)}%

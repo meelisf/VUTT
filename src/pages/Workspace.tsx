@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { useAdjacentPagePrefetch } from '../hooks/useAdjacentPagePrefetch';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -42,6 +43,11 @@ const Workspace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [loading, setLoading] = useState(true);
+  // Lehe laadimine sama teose sees — ei võta editorit maha, näitab ainult riba.
+  const [pageLoading, setPageLoading] = useState(false);
+  // Viimati laetud teos. Eristab "teose vahetus" (spinner) ja "lehe vahetus
+  // samas teoses" (raam jääb püsima).
+  const loadedWorkIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [errorRequiresLogin, setErrorRequiresLogin] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
@@ -162,14 +168,17 @@ const Workspace: React.FC = () => {
         setLoading(false);
         return;
       }
-      setLoading(true);
+      // Spinner ainult teose vahetusel või esmalaadimisel. Sama teose sees lehte
+      // vahetades jääb raam püsima — TextEditor sünkroniseerib sisu ise
+      // (useEditorState `page`-effect), muidu monteeriks CodeMirror end iga
+      // pöörde peal maha ja uuesti.
+      const isWorkSwitch = loadedWorkIdRef.current !== workId;
+      if (isWorkSwitch) setLoading(true);
+      setPageLoading(true);
       setError(null);
       setErrorRequiresLogin(false);
       try {
-        let [pageData, workData] = await Promise.all([
-          getPage(effectiveIndex, workId, currentPageNum),
-          getWorkMetadata(effectiveIndex, workId)
-        ]);
+        const pageData = await getPage(effectiveIndex, workId, currentPageNum);
 
         // Shareable fallback: teos on piiratud kollektsioonis aga võib olla jagatud.
         // Saadame ka Authorization päise — kui Meili indeks on (veel/taas) anonüümses
@@ -208,23 +217,7 @@ const Workspace: React.FC = () => {
         } else {
           setPage(pageData);
           setCurrentStatus(pageData.status);
-          if (workData) {
-            let freshWorkData = workData;
-            if (authToken) {
-              try {
-                const metaResponse = await fetch(`${FILE_API_URL}/get-work-metadata`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-                  body: JSON.stringify({ work_id: workId, original_path: pageData.original_path }),
-                });
-                const metaData = await metaResponse.json();
-                if (metaData.status === 'success' && metaData.metadata && typeof metaData.metadata.shareable === 'boolean') {
-                  freshWorkData = { ...workData, shareable: metaData.metadata.shareable };
-                }
-              } catch { /* Meili väärtus jääb fallbackiks */ }
-            }
-            setWork(freshWorkData);
-          }
+          loadedWorkIdRef.current = workId;
           // Redirect logic: If we asked for page 1, but got page 5 (because book starts there),
           // update the URL to reflect reality.
           if (pageData.page_number !== currentPageNum) {
@@ -236,10 +229,55 @@ const Workspace: React.FC = () => {
         setError(e.message || "Viga andmete laadimisel. Palun kontrolli Meilisearchi ühendust.");
       } finally {
         setLoading(false);
+        setPageLoading(false);
       }
     };
     loadData();
   }, [effectiveIndex, workId, currentPageNum, navigate, viewerToken, authToken, sessionExpired, user, authInitializing, t]);
+
+  // Teose metaandmed — sõltuvad ainult teosest, mitte lehenumbrist. Eraldi
+  // effect, et lehe vahetus samas teoses ei tooks kaasa uut Meili päringut ega
+  // /get-work-metadata edasi-tagasi-käiku (#185). `effectiveIndex` on deps-listis,
+  // sest piiratud teose puhul saab metaandmed kätte alles viewer-tokeniga.
+  useEffect(() => {
+    if (!effectiveIndex) return;
+    if (authInitializing) return;
+    if (!workId) return;
+    let cancelled = false;
+
+    // Teost vahetades ei tohi eelmise teose metaandmed hetkeks alles jääda —
+    // lehe effect võib lõpetada enne seda ja renderdaks vale pealkirja/lehearvu.
+    setWork(prev => (prev && prev.work_id !== workId ? undefined : prev));
+
+    const loadWork = async () => {
+      try {
+        const workData = await getWorkMetadata(effectiveIndex, workId);
+        if (cancelled || !workData) return;
+        setWork(workData);
+
+        // `shareable` on autoriteetne ainult failisüsteemist — Meili väärtus võib
+        // olla vananenud. Endpoint nõuab editor-rolli, seega ülejäänutel jääb
+        // kehtima Meili väärtus. Ei blokeeri lehe renderdust.
+        if (!authToken) return;
+        const metaResponse = await fetch(`${FILE_API_URL}/get-work-metadata`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+          // original_path on endpointis ainult varuvariant (work_id on esmane) ja
+          // pärineb samast Meili väljast mis lehe oma (originaal_kataloog).
+          body: JSON.stringify({ work_id: workId, original_path: workData.catalog_name }),
+        });
+        const metaData = await metaResponse.json();
+        if (cancelled) return;
+        if (metaData.status === 'success' && metaData.metadata && typeof metaData.metadata.shareable === 'boolean') {
+          const { shareable } = metaData.metadata;
+          setWork(prev => (prev ? { ...prev, shareable } : prev));
+        }
+      } catch { /* Meili väärtus jääb fallbackiks */ }
+    };
+
+    loadWork();
+    return () => { cancelled = true; };
+  }, [effectiveIndex, workId, authToken, authInitializing]);
 
   // Metaandmete modaali avamine
   const openMetaModal = () => {
@@ -302,6 +340,17 @@ const Workspace: React.FC = () => {
     } catch { /* ignore */ }
     return appendImageToken(page.image_url);
   }, [appendImageToken, page?.image_url, page?.page_number, workId]);
+
+  // Kõrvallehtede skaneeringute eellaadimine (#186) — peab olema pärast
+  // appendImageToken'i definitsiooni.
+  useAdjacentPagePrefetch({
+    index: effectiveIndex,
+    workId,
+    currentPageNum,
+    pageCount: work?.page_count,
+    appendImageToken,
+    enabled: !loading && !error && !!page,
+  });
 
   const handleOpenGridView = useCallback(async () => {
     if (!work || !effectiveIndex) return;
@@ -514,6 +563,16 @@ const Workspace: React.FC = () => {
     <div className="workspace-container h-screen flex flex-col bg-gray-100 overflow-hidden">
       {/* COinS for Zotero - peidetud span bibliograafiliste andmetega */}
       {page && <span className="Z3988" title={generateCoins() || ''} />}
+
+      {/* Lehe vahetus samas teoses ei võta editorit maha (vt loadData) — õhuke
+          riba annab tagasiside, ilma et raam vahepeal kaoks. */}
+      {pageLoading && (
+        <div
+          className="fixed top-0 left-0 right-0 h-0.5 bg-primary-500/70 animate-pulse z-[60]"
+          role="status"
+          aria-label={t('common:labels.loading')}
+        />
+      )}
 
       {/* Top Navigation Bar (desktop only) */}
       <div className="hidden md:flex h-12 bg-white border-b border-gray-200 items-center justify-between px-4 shrink-0 shadow-sm relative z-50">
