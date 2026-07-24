@@ -233,7 +233,12 @@ const Review: React.FC = () => {
         url += `&user=${encodeURIComponent(selectedUser)}`;
       }
 
-      const response = await fetchWithTimeout(url, { headers: getAuthHeaders(token) });
+      // Git-ajaloo koostamine võib külma failisüsteemi või hõivatud threadpool'i korral
+      // võtta üle fetchWithTimeout'i vaikimisi 10 sekundi.
+      const response = await fetchWithTimeout(url, {
+        headers: getAuthHeaders(token),
+        timeout: 30000
+      });
       const data = await response.json();
 
       if (data.status === 'success') {

@@ -735,6 +735,34 @@ def delete_file_from_git(absolute_path: str, commit_msg: str, username: str = "V
         return False
 
 
+def _get_changed_paths_by_commit(repo, max_commits):
+    """Loeb commitite failiteed ühe git-protsessiga.
+
+    ``Commit.stats`` käivitab iga commiti kohta eraldi ``git diff`` protsessi;
+    Review-vaates tähendas see tavaliselt üle saja protsessi. NUL-eraldajaga
+    log säilitab ka tühikute ja mitte-ASCII märkidega failinimed.
+    """
+    marker = "VUTT_COMMIT:"
+    output = repo.git.log(
+        f"--max-count={max_commits}",
+        f"--format={marker}%H",
+        "--name-only",
+        "-z",
+    )
+    paths_by_hash = {}
+    current_hash = None
+    for raw_part in output.split("\0"):
+        part = raw_part.lstrip("\n")
+        if not part:
+            continue
+        if part.startswith(marker):
+            current_hash = part[len(marker):].strip()
+            paths_by_hash[current_hash] = []
+        elif current_hash is not None:
+            paths_by_hash[current_hash].append(part)
+    return paths_by_hash
+
+
 def get_recent_commits(username=None, limit=50, skip=0):
     """
     Tagastab viimased commitid, valikuliselt filtreerituna kasutaja järgi.
@@ -756,6 +784,13 @@ def get_recent_commits(username=None, limit=50, skip=0):
     except Exception:
         return {"commits": [], "has_more": False}
 
+    try:
+        changed_paths = _get_changed_paths_by_commit(repo, max_commits)
+    except Exception as e:
+        # Ühilduvusfallback ebatavalise/vana git-versiooni jaoks.
+        logger.warning(f"Git failiteede koondlugemine ebaõnnestus: {e}")
+        changed_paths = None
+
     results = []
     seen_files = set()  # Vältimaks duplikaate sama faili kohta
     skipped = 0
@@ -772,9 +807,13 @@ def get_recent_commits(username=None, limit=50, skip=0):
 
         # Leia muudetud failid selles commitis
         try:
-            # Optimeerimine: Kasutame stats.files, et saada ainult failinimed
-            # See väldib kulukat sisu võrdlemist (diff)
-            file_paths = list(commit.stats.files.keys())
+            # Tavatee kasutab ülal ühe git-protsessiga loetud failinimesid.
+            # Fallback käivitab vana GitPythoni stats-päringu commiti kaupa.
+            file_paths = (
+                changed_paths.get(commit.hexsha, [])
+                if changed_paths is not None
+                else list(commit.stats.files.keys())
+            )
 
             # Impordi commit: sisaldab kõiki lehe txt-faile + _metadata.json.
             # Näitame ainult ÜHT kirjet teose kohta (change_type="import").
