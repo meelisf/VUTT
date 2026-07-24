@@ -6,13 +6,17 @@ git commit, person_to_works indeks ja Meilisearch sync ühes kohas.
 """
 import json
 import os
+import time
 from typing import Callable
 
+from .config import get_logger
 from .utils import metadata_lock
 from .git_ops import save_with_git
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
 from .prosopography.indices import update_person_to_works, update_work_collections
 from .prosopography.person_crud import ensure_prosopo_stubs
+
+logger = get_logger(__name__)
 
 # Lubatud metaandmete väljad (v2 standard)
 ALLOWED_METADATA_FIELDS = {
@@ -136,6 +140,9 @@ def save_work_metadata(
 
     Tagastab uuendatud meta dict-i.
     """
+    started = time.monotonic()
+    slug = os.path.basename(os.path.dirname(meta_path))
+
     # Sanitiseeri archive_refs enne salvestamist (None = tühi, eemaldatakse meta-st)
     if 'archive_refs' in updates:
         updates['archive_refs'] = clean_archive_refs(updates['archive_refs'])
@@ -143,6 +150,7 @@ def save_work_metadata(
     # Loo prosopo stub kaardid Wikidata Q-koodiga creators/tags/publisher jaoks
     if any(k in updates for k in ("creators", "tags", "publisher")):
         updates = ensure_prosopo_stubs(updates, username)
+    stubs_done = time.monotonic()
 
     with metadata_lock:
         if os.path.exists(meta_path):
@@ -163,11 +171,11 @@ def save_work_metadata(
             username,
             message=git_message,
         )
-
-    slug = os.path.basename(os.path.dirname(meta_path))
+    git_done = time.monotonic()
 
     # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
     update_work_collections(meta.get("id"), meta.get("collections") or [])
+    collections_done = time.monotonic()
 
     if call_ptw:
         ptw_args = (
@@ -188,4 +196,15 @@ def save_work_metadata(
     elif background_tasks is not None:
         background_tasks.add_task(sync_work_to_meilisearch_async, slug)
 
+    finished = time.monotonic()
+    logger.info(
+        "METADATA SAVE timing (%s): total=%.0fms stubs=%.0fms git=%.0fms collections=%.0fms scheduling=%.0fms sync_meili=%s",
+        slug,
+        (finished - started) * 1000,
+        (stubs_done - started) * 1000,
+        (git_done - stubs_done) * 1000,
+        (collections_done - git_done) * 1000,
+        (finished - collections_done) * 1000,
+        sync_meili,
+    )
     return meta

@@ -401,6 +401,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
   };
 
   const handleSave = async () => {
+    const saveStartedAt = performance.now();
     setIsSaving(true);
     setSaveStatus('idle');
 
@@ -415,6 +416,8 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
       });
 
       const data = await response.json();
+      const responseMs = performance.now() - saveStartedAt;
+      console.info(`[Metadata] Serveri vastus: ${responseMs.toFixed(0)} ms`);
       if (data.status === 'success') {
         const { metadata: m } = payload;
         const successData = {
@@ -439,6 +442,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine
         // kestab edasi ka pärast serveri edukat vastust.
         setTimeout(() => {
+          console.info(`[Metadata] Salvestus kuni modaali sulgemiseni: ${(performance.now() - saveStartedAt).toFixed(0)} ms`);
           onClose();
           setSaveStatus('idle');
         }, 400);
