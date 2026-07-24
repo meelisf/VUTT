@@ -285,15 +285,17 @@ describe('insertMarginalia valikuga (simulatsioon)', () => {
     const from = doc.indexOf('valitud');
     const to = doc.length; // valik üle peidetud ploki kuni lõpuni
     const hidden = hiddenBlockRanges(state).filter(h => h.from < to && h.to > from);
-    const { changes } = marginaliaFromSelection(doc, from, to, hidden);
+    const { changes, openPositions } = marginaliaFromSelection(doc, from, to, hidden);
     state = state.update({
       changes,
+      effects: openPositions.map(pos => openMarginalia.of(pos)),
       annotations: Transaction.userEvent.of('input.format'),
     }).state;
 
     const result = state.doc.toString();
-    // uus plokk valiku algusrea kohal, sisus AINULT nähtav tekst
-    expect(result).toContain('<m>valitud tekst\nlõpp</m>');
+    // uued plokid valiku algusrea kohal, üks <m> paar iga füüsilise rea kohta
+    expect(result).toContain('<m>valitud tekst</m>\n<m>lõpp</m>');
+    expect(state.field(marginaliaField).openMarks).toHaveLength(2);
     // vana plokk säilib täpselt üks kord
     expect(result.match(/<m>vana<\/m>/g)).toHaveLength(1);
     // 'vana' ei esine väljaspool oma tägi

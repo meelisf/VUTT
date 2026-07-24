@@ -237,6 +237,11 @@ Kaitseb tägi positsioone kasutaja juhuslike kustutamiste eest.
 
 ## Marginaalia — normaliseerimine ja kopeerimine
 
+**Kanooniline formaat:** iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
+plokk; `<m>` ei sisalda reavahetust ega teist `<m>` tägi. Järjestikused plokid
+koondatakse üheks kaardiks ainult renderduses (`groupMarginaliaBlocks`), alusandmeid
+muutmata. Legacy-parser loeb ajutiselt ka vanu mitmerealisi plokke. Vt ADR 0009.
+
 **Põhimõte: ettearvatav, kogu aeg ühte moodi.** Koristus toimub ainult **salvestamisel**
 (`server/marginalia_normalize.py`), MITTE elavalt iga klahvivajutuse peal (see lõhuks
 kursori/voo). `normalize_marginalia_tags(text)` teeb kaks asja, idempotentselt:

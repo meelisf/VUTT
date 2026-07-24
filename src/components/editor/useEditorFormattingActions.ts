@@ -2,9 +2,9 @@ import { useCallback, type MouseEvent, type MutableRefObject } from 'react';
 import type { EditorView } from '@codemirror/view';
 import { EditorSelection, Transaction } from '@codemirror/state';
 import { vuttMarkupField } from './VuttMarkupExtension';
-import { hiddenBlockRanges, openMarginalia } from './MarginaliaExtension';
+import { hiddenBlockRanges, marginaliaField, openMarginalia } from './MarginaliaExtension';
 import { findContainer, findInnerPairs } from './wrapTagUtils';
-import { cleanMarkupSpecs, marginaliaFromSelection } from '../../utils/marginaliaUtils';
+import { cleanMarkupSpecs, marginaliaFromSelection, rangeTouchesOpenMarginalia } from '../../utils/marginaliaUtils';
 
 interface UseEditorFormattingActionsParams {
   viewRef: MutableRefObject<EditorView | null>;
@@ -183,6 +183,16 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
     const view = viewRef.current;
     if (!view || readOnly) return;
     let { from, to } = view.state.selection.main;
+    const marginaliaState = view.state.field(marginaliaField);
+
+    // Avatud marginaalia on juba marginaalia: nupp ei tohi selle sisse uut
+    // `<m>` paari tekitada. See oli pesastatud `<m><m>…` vigade põhiallikas.
+    if (rangeTouchesOpenMarginalia(
+      marginaliaState.blocks, marginaliaState.openMarks, from, to,
+    )) {
+      view.focus();
+      return;
+    }
 
     if (from === to) {
       const line = view.state.doc.lineAt(from);
@@ -204,13 +214,22 @@ export function useEditorFormattingActions({ viewRef, readOnly }: UseEditorForma
         to = Math.max(to, r.to);
       }
     }
+    // Tägipiirini laiendamine võib valikusse lisada avatud marginaalia, kuigi
+    // algne hiirevalik seda toorpositsioonides ei puudutanud.
+    if (rangeTouchesOpenMarginalia(
+      marginaliaState.blocks, marginaliaState.openMarks, from, to,
+    )) {
+      view.focus();
+      return;
+    }
+
     const hidden = hiddenBlockRanges(view.state).filter(h => h.from < to && h.to > from);
-    const { changes, cursor } = marginaliaFromSelection(
+    const { changes, openPositions, cursor } = marginaliaFromSelection(
       view.state.doc.toString(), from, to, hidden,
     );
     view.dispatch({
       changes,
-      effects: openMarginalia.of(changes[0].from + 3),
+      effects: openPositions.map(pos => openMarginalia.of(pos)),
       selection: EditorSelection.cursor(cursor),
       annotations: Transaction.userEvent.of('input.format'),
     });

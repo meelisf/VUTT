@@ -200,14 +200,67 @@ export function cleanMarkupSpecs(
 
 export interface MarginaliaFromSelection {
   changes: CleanChangeSpec[];
-  /** Kursori positsioon UUE dokumendi koordinaatides (sisu lõpp) */
+  /** Kõigi loodud plokkide sisupositsioonid UUE dokumendi koordinaatides. */
+  openPositions: number[];
+  /** Kursori positsioon UUE dokumendi koordinaatides (viimase ploki sisu lõpp). */
   cursor: number;
 }
 
 /**
- * Ehitab muudatused, mis tõstavad valitud teksti uude `<m>` plokki valiku
- * algusrea kohale. Peidetud marginaalia plokid jäetakse sisust välja (need
- * jäävad kaitsefiltri toel dokumenti alles; sisusse võttes dubleeruks tekst).
+ * Kas vahemik puudutab mõnda avatud marginaaliaplokki. Tühja vahemiku puhul
+ * kontrollitakse kursori asukohta. Kasutab editori toiming, et `<m>` sisse ei
+ * saaks Marginalia-nupuga uut `<m>` plokki tekitada.
+ */
+export function rangeTouchesOpenMarginalia(
+  blocks: MarginaliaBlock[],
+  openMarks: number[],
+  from: number,
+  to: number,
+): boolean {
+  return groupMarginaliaBlocks(blocks).some(group => {
+    const open = group.blocks.some(block =>
+      openMarks.some(p => p >= block.from && p <= block.to));
+    if (!open) return false;
+    return group.blocks.some(block => from === to
+      ? from >= block.from && from <= block.to
+      : from < block.to && to > block.from);
+  });
+}
+
+/**
+ * Iga füüsiline marginaaliarida saab oma `<m>…</m>` paari. Üle reavahetuse
+ * ulatuvad inline-tägid suletakse rea lõpus ja avatakse järgmisel real uuesti,
+ * et rea-põhine `<m>` ei tekitaks ristuvat kuju `<m><i>X</m>…`.
+ */
+function wrapMarginaliaLines(text: string): string {
+  const active: string[] = [];
+  const inlineTagRe = /<(\/?)((?:i|b|cs|hi)|(?:ann\d*))>/g;
+  return text.split('\n').map(line => {
+    const inherited = active.map(name => `<${name}>`).join('');
+    inlineTagRe.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = inlineTagRe.exec(line)) !== null) {
+      const name = match[2];
+      if (!match[1]) {
+        active.push(name);
+      } else {
+        const idx = active.lastIndexOf(name);
+        if (idx !== -1) active.splice(idx, 1);
+      }
+    }
+    // Ainult tagidest/tühikutest koosnev füüsiline rida ei vaja tühja <m>-i.
+    const visible = line.replace(/<\/?(?:(?:i|b|cs|hi)|(?:ann\d*))>/g, '').trim();
+    if (visible === '') return '';
+    const closes = [...active].reverse().map(name => `</${name}>`).join('');
+    return `<m>${inherited}${line}${closes}</m>`;
+  }).join('\n');
+}
+
+/**
+ * Ehitab muudatused, mis tõstavad valitud teksti uutesse rea-põhistesse `<m>`
+ * plokkidesse valiku algusrea kohale. Peidetud marginaalia plokid jäetakse
+ * sisust välja (need jäävad kaitsefiltri toel dokumenti alles; sisusse võttes
+ * dubleeruks tekst). Avatud marginaalia puudutamise peab kutsuja enne blokeerima.
  */
 export function marginaliaFromSelection(
   doc: string,
@@ -225,11 +278,21 @@ export function marginaliaFromSelection(
   selected += doc.slice(cursor, to);
 
   const lineStart = doc.lastIndexOf('\n', from - 1) + 1;
+  const wrapped = wrapMarginaliaLines(selected);
+  const insert = `${wrapped}\n`;
+  const openPositions: number[] = [];
+  const openRe = /<m>/g;
+  let openMatch: RegExpExecArray | null;
+  while ((openMatch = openRe.exec(wrapped)) !== null) {
+    openPositions.push(lineStart + openMatch.index + 3);
+  }
+  const lastClose = wrapped.lastIndexOf('</m>');
   return {
     changes: [
-      { from: lineStart, to: lineStart, insert: `<m>${selected}</m>\n` },
+      { from: lineStart, to: lineStart, insert },
       { from, to, insert: '' },
     ],
-    cursor: lineStart + 3 + selected.length,
+    openPositions,
+    cursor: lineStart + (lastClose >= 0 ? lastClose : wrapped.length),
   };
 }

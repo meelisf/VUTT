@@ -28,3 +28,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0006](0006-meili-legacy-valjanimed-uhine-meili-doc.md) | Meili eestikeelsed legacy-väljanimed + ühine `meili_doc.py` | kehtib |
 | [0007](0007-tuletatud-indeksid-read-modelid.md) | Tuletatud indeksid on nullist taastatavad read-modelid | kehtib |
 | [0008](0008-markdown-allowlist-xss.md) | Vabateksti markdown: allow-list, mitte kunagi toores HTML | kehtib |
+| [0009](0009-marginaalia-iga-fuusiline-rida-eraldi.md) | Iga füüsiline marginaaliarida on eraldi `<m>` plokk | kehtib |

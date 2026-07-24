@@ -1,6 +1,6 @@
 // src/utils/__tests__/marginaliaUtils.test.ts
 import { describe, it, expect } from 'vitest';
-import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks } from '../marginaliaUtils';
+import { findMarginaliaBlocks, stackMarginalia, cleanMarkupSpecs, marginaliaFromSelection, groupMarginaliaBlocks, rangeTouchesOpenMarginalia } from '../marginaliaUtils';
 
 describe('findMarginaliaBlocks', () => {
   it('leiab omaette real seisva ploki ja ankurdab järgmise rea külge', () => {
@@ -222,7 +222,8 @@ describe('marginaliaFromSelection', () => {
       { from: 13, to: 13, insert: '<m>teine valitud</m>\n' },
       { from, to, insert: '' },
     ]);
-    // kursor ploki sisu lõppu (uue doki koordinaadid)
+    // avamarker ja kursor jäävad loodud ploki sisu sisse
+    expect(r.openPositions).toEqual([13 + 3]);
     expect(r.cursor).toBe(13 + 3 + 'teine valitud'.length);
   });
 
@@ -230,12 +231,49 @@ describe('marginaliaFromSelection', () => {
     const doc = 'AA\n<m>vana</m>\nBB';
     // peidetud: '<m>vana</m>\n' = 3..15
     const r = marginaliaFromSelection(doc, 0, doc.length, [{ from: 3, to: 15 }]);
-    expect(r.changes[0].insert).toBe('<m>AA\nBB</m>\n');
+    expect(r.changes[0].insert).toBe('<m>AA</m>\n<m>BB</m>\n');
   });
 
-  it('mitmerealine valik säilitab reavahetused sisus', () => {
+  it('mitmerealine valik saab ühe <m> paari iga füüsilise rea kohta', () => {
     const doc = 'a\nb\nc';
     const r = marginaliaFromSelection(doc, 0, doc.length, []);
-    expect(r.changes[0].insert).toBe('<m>a\nb\nc</m>\n');
+    expect(r.changes[0].insert).toBe('<m>a</m>\n<m>b</m>\n<m>c</m>\n');
+    expect(r.changes[0].insert.trimEnd().split('\n').every(
+      line => /^<m>[^\n]*<\/m>$/.test(line),
+    )).toBe(true);
+    expect(r.openPositions).toEqual([
+      3,
+      '<m>a</m>\n'.length + 3,
+      '<m>a</m>\n<m>b</m>\n'.length + 3,
+    ]);
+    expect(r.cursor).toBe('<m>a</m>\n<m>b</m>\n<m>c'.length);
+  });
+
+  it('sulgeb ja taasavab üle rea ulatuva inline-tägi', () => {
+    const doc = '<i>esimene\nteine</i>';
+    const r = marginaliaFromSelection(doc, 0, doc.length, []);
+    expect(r.changes[0].insert).toBe(
+      '<m><i>esimene</i></m>\n<m><i>teine</i></m>\n',
+    );
+  });
+});
+
+describe('rangeTouchesOpenMarginalia', () => {
+  const text = 'enne\n<m>üks</m>\n<m>kaks</m>\nvahe\n<m>kolm</m>\npärast';
+  const blocks = findMarginaliaBlocks(text);
+  const openMarks = [blocks[0].contentFrom];
+
+  it('tunneb ära kursori ja valiku avatud ploki sees', () => {
+    expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[0].contentFrom, blocks[0].contentFrom)).toBe(true);
+    expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[0].from, blocks[0].to)).toBe(true);
+  });
+
+  it('käsitleb ühe markeriga avatud järjestikuse grupi kõiki liikmeid avatuna', () => {
+    expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[1].contentFrom, blocks[1].contentTo)).toBe(true);
+  });
+
+  it('ei blokeeri eraldi suletud plokki ega välist teksti', () => {
+    expect(rangeTouchesOpenMarginalia(blocks, openMarks, blocks[2].contentFrom, blocks[2].contentTo)).toBe(false);
+    expect(rangeTouchesOpenMarginalia(blocks, openMarks, 0, 4)).toBe(false);
   });
 });

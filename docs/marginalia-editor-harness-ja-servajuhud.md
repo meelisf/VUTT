@@ -18,6 +18,11 @@
 
 ## 1. Arhitektuur, mida pead teadma enne muudatust
 
+> **Kanooniline formaat (ADR 0009):** iga füüsiline marginaaliarida on eraldi
+> `<m>…</m>` plokk. Parser ja allolevad kustutustestid toetavad legacy-andmete tõttu
+> jätkuvalt ka vanu mitmerealisi plokke, kuid uued editoritoimingud ei tohi neid ega
+> pesastatud `<m>` paare juurde luua.
+
 ### Plokistruktuur (`MarginaliaBlock`, `marginaliaUtils.ts`)
 
 Iga `<m>…</m>` plokk parsitakse positsioonideks (märgi-offsetid dokumendis):
@@ -116,6 +121,8 @@ nähtaval-tühi → vaikimisi kustutus jätkub. Kood: `MarginaliaExtension.ts` ~
 | E5 | **Avatud** täiesti tühi plokk (`<m>\n</m>`), Backspace/Delete | kogu plokk kaob (`<m>` arv −1), tasakaalus |
 | E6 | **Suletud** plokk, kursor "sees", kustutus | kaitsefilter blokeerib → plokk puutumata (ohutu) |
 | E7 | Suvaline kustutus | `<m>` arv == `</m>` arv (tagid tasakaalus, ei jää orvuks `<m><m>`/`</m></m>`) |
+| E8 | Marginalia-nupp avatud marginaalias | no-op; uut ega pesastatud `<m>` paari ei teki |
+| E9 | Mitmerealine valik → Marginalia | iga füüsiline rida saab oma `<m>…</m>` paari |
 
 Lisaks: salvestusel `server/marginalia_normalize.py` koristab jääk-tühjad tägid
 (`strip_empty_tags`) ja teeb `<m>` välimiseks — seega editori-poolne väike "lohakus"

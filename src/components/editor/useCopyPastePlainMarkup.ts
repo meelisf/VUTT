@@ -68,7 +68,24 @@ export function useCopyPastePlainMarkup() {
       const text = event.clipboardData?.getData('text/plain');
       if (!text) return false;
       const { from, to } = view.state.selection.main;
-      if (pasteMarginaliaContext(view, from) !== 'wrap') return false;
+      const context = pasteMarginaliaContext(view, from);
+      if (context === 'outside') return false;
+
+      // Olemasoleva <m> sees ei lisa me ümbrist, kuid eemaldame välisest
+      // lõikelauast võimalikud VUTT-tägid. Rakenduse enda copy on juba plain,
+      // ent toor-.txt-st kopeeritud `<m>` tekitas varem pesastatud plokke.
+      if (context === 'inside') {
+        const plain = text.replace(/<\/?[a-z]+[^>]*>/g, '');
+        if (plain === text) return false;
+        view.dispatch({
+          changes: { from, to, insert: plain },
+          selection: { anchor: from + plain.length },
+          userEvent: 'input.paste',
+        });
+        event.preventDefault();
+        return true;
+      }
+
       const wrapped = text.split('\n')
         .map(line => {
           const s = line.replace(/<\/?[a-z]+[^>]*>/g, '');   // väldi pesastatud <m><m>
