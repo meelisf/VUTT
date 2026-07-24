@@ -9,6 +9,7 @@ import { closeAllMarginalia, marginaliaExtension, marginaliaField } from './Marg
 import type { MarginaliaMode } from './MarginaliaExtension';
 import { vuttTheme } from './VuttTheme';
 import { createVuttSearchPanel } from './VuttSearchPanel';
+import { isPageSwapUpdate } from './editorAnnotations';
 
 interface UseCodeMirrorLifecycleParams {
   page: Page;
@@ -90,7 +91,10 @@ export function useCodeMirrorLifecycle({
           ),
           vuttTheme,
           EditorView.updateListener.of((update) => {
-            if (update.docChanged) setIsDirty(true);
+            // Lehe vahetuse programmaatiline dokumendi-asendus ei ole kasutaja
+            // muudatus — muidu küsitaks lahkumisel salvestamist ilma et kasutaja
+            // oleks midagi teinud (vt editorAnnotations.ts).
+            if (update.docChanged && !isPageSwapUpdate(update.transactions)) setIsDirty(true);
             const count = update.state.field(marginaliaField).blocks.length;
             setMarginaliaCount(prev => (prev === count ? prev : count));
           }),

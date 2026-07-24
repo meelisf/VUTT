@@ -3,6 +3,7 @@ import type { EditorView } from '@codemirror/view';
 import type { Annotation, Page, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { closeAllMarginalia } from './MarginaliaExtension';
+import { pageSwapAnnotation } from './editorAnnotations';
 import type { EditorSavedState } from './useEditorSave';
 
 interface UseEditorStateParams {
@@ -54,6 +55,11 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
     setPageTags(page.page_tags || []);
     setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
     setIsDirty(false);
+    // Salvestamata kommentaarimustand kuulub eelmisele lehele — muidu jääks
+    // hoiatus "salvestamata muudatused" uuel lehel ekslikult püsima.
+    setAnnotationDraftDirty(false);
+    // Sama põhjus: eelmise lehe salvestusviga ei ole uuel lehel enam asjakohane.
+    setSaveError(null);
 
     const view = viewRef.current;
     if (view) {
@@ -64,6 +70,9 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
           // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
           // avaks võõra ploki uuel lehel
           effects: closeAllMarginalia.of(null),
+          // Programmaatiline asendus, mitte kasutaja muudatus — updateListener
+          // ei tohi seda dirty-ks lugeda (vt editorAnnotations.ts).
+          annotations: pageSwapAnnotation.of(true),
         });
       }
     }
