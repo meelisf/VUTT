@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MeiliSearch } from 'meilisearch';
 import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
+import { useAdjacentPagePrefetch } from '../hooks/useAdjacentPagePrefetch';
 import { getPage, savePage } from '../services/pageService';
 import { getWorkMetadata, getWorkPageImages } from '../services/workService';
 import type { Page, Work } from '../types';
@@ -339,6 +340,17 @@ const Workspace: React.FC = () => {
     } catch { /* ignore */ }
     return appendImageToken(page.image_url);
   }, [appendImageToken, page?.image_url, page?.page_number, workId]);
+
+  // Kõrvallehtede skaneeringute eellaadimine (#186) — peab olema pärast
+  // appendImageToken'i definitsiooni.
+  useAdjacentPagePrefetch({
+    index: effectiveIndex,
+    workId,
+    currentPageNum,
+    pageCount: work?.page_count,
+    appendImageToken,
+    enabled: !loading && !error && !!page,
+  });
 
   const handleOpenGridView = useCallback(async () => {
     if (!work || !effectiveIndex) return;
