@@ -129,8 +129,8 @@ def save_work_metadata(
       username        — git commit autor
       git_message     — git commit sõnum
       background_tasks — FastAPI BackgroundTasks; kui antud, ptw + async meili lähevad tausta
-      sync_meili      — True → sünkroonne Meilisearch sync (nt import, metadata update)
-                        False → async (nt bulk operatsioonid)
+      sync_meili      — True → sünkroonne Meilisearch sync (nt import)
+                        False → async, kui background_tasks on antud
       call_ptw        — True → kutsub update_person_to_works (nt tags/creators muutumisel)
                         False → jätab vahele (nt bulk-collection, bulk-genre)
 

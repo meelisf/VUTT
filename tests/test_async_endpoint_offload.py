@@ -142,8 +142,10 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
     seen = {}
     monkeypatch.setattr(editing, "find_directory_by_id", lambda _wid: "/tmp/work")
 
-    def fake_save(*_args, **_kwargs):
+    def fake_save(*_args, **kwargs):
         seen["thread"] = _worker_thread_name()
+        seen["sync_meili"] = kwargs.get("sync_meili")
+        seen["background_tasks"] = kwargs.get("background_tasks")
         return {"id": "w1"}
 
     monkeypatch.setattr(editing, "save_work_metadata", fake_save)
@@ -159,6 +161,8 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
 
     assert result == {"status": "success"}
     assert seen["thread"] != MAIN_THREAD
+    assert seen["sync_meili"] is False
+    assert isinstance(seen["background_tasks"], BackgroundTasks)
 
 
 def test_prosopography_create_jookseb_threadpoolis(monkeypatch):

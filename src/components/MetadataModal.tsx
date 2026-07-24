@@ -436,10 +436,12 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
         onSaveSuccess(successData as Partial<Page>, successData as Partial<Work>);
 
         setSaveStatus('success');
+        // Lühike kinnitus on piisav; pikk viivitus jättis mulje, et salvestamine
+        // kestab edasi ka pärast serveri edukat vastust.
         setTimeout(() => {
           onClose();
           setSaveStatus('idle');
-        }, 1500);
+        }, 400);
       } else {
         setSaveStatus('error');
         setSaveError(t('editor.saveErrorWithMessage', { message: data.message }));

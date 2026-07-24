@@ -150,7 +150,9 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         user['username'],
         f"Meta: {slug}",
         background_tasks=background_tasks,
-        sync_meili=True,
+        # Fail + Git peavad enne vastust valmis olema; Meilisearchi tuletatud
+        # indeks võib uueneda taustal nagu lehekülje salvestamisel.
+        sync_meili=False,
         call_ptw=True,
     )
     background_tasks.add_task(process_person_fields_metadata, meta)
