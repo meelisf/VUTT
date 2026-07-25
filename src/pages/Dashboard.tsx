@@ -44,7 +44,6 @@ const Dashboard: React.FC = () => {
   const index = useMeiliIndex();
   const lang = getLangCode(i18n.language);
   const [showAboutModal, setShowAboutModal] = useState(false);
-  const scrollContainerRef = useRef<HTMLElement>(null);
   const [aboutHtml, setAboutHtml] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
   const queryParam = searchParams.get('q') || '';
@@ -152,27 +151,41 @@ const Dashboard: React.FC = () => {
     // Seda ei tee, et säiliks kollektsiooni valik headeris
   }, [collectionParam, collections]);
 
-  // Taasta scroll positsioon pärast teoste laadimist
+  // Taasta scroll positsioon pärast teoste esimest laadimist.
+  //
+  // KERIB AKEN, MITTE `<main>`. `body` on `min-height: 100vh` ilma `height`-ita
+  // (src/index.css), seega `#root` ja `h-full` ahel lahenevad `auto`-ks ja
+  // `<main class="flex-1 overflow-y-auto">` ei ületa kunagi oma sisu — tema
+  // `scrollTop` jääb nulli. `height: 100vh` kehtib ainult Workspace'i lehel
+  // (`body:has(.workspace-container)`). Konteineri-põhine variant oli seetõttu
+  // tühikäik: salvestas alati "0".
+  //
+  // AINULT ÜKS KORD. `works` asendub ka pagineerimisel, filtri muutmisel ja
+  // värskendamisel — ilma valveta rakendataks salvestatud positsiooni iga kord
+  // uuesti ja kasutaja tõmmataks tagasi kohta, kust ta on juba edasi liikunud.
+  const scrollRestoredRef = useRef(false);
   useEffect(() => {
-    if (!loading && works.length > 0 && scrollContainerRef.current) {
-      const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
-      if (savedScroll) {
-        const scrollY = parseInt(savedScroll, 10);
-        // Kasuta setTimeout, et DOM jõuaks uuenduda
-        setTimeout(() => {
-          scrollContainerRef.current?.scrollTo(0, scrollY);
-        }, 50);
-      }
-    }
+    if (scrollRestoredRef.current) return;
+    if (loading || works.length === 0) return;
+    scrollRestoredRef.current = true;
+
+    const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
+    if (!savedScroll) return;
+    const scrollY = parseInt(savedScroll, 10);
+    if (!Number.isFinite(scrollY)) return;
+
+    // Viivitus, et DOM jõuaks uueneda. Cleanup on vajalik: ilma selleta võib
+    // taaste käivituda pärast seda, kui kasutaja on juba ise kerima hakanud.
+    const timer = setTimeout(() => {
+      window.scrollTo(0, scrollY);
+    }, 50);
+    return () => clearTimeout(timer);
   }, [loading, works]);
 
   // Salvesta scroll positsioon jooksvalt scrollimise ajal
   useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
     const handleScroll = () => {
-      sessionStorage.setItem(SCROLL_STORAGE_KEY, container.scrollTop.toString());
+      sessionStorage.setItem(SCROLL_STORAGE_KEY, window.scrollY.toString());
     };
 
     // Kasuta throttle'it, et mitte liiga tihti salvestada
@@ -182,9 +195,9 @@ const Dashboard: React.FC = () => {
       timeout = setTimeout(handleScroll, 100);
     };
 
-    container.addEventListener('scroll', throttledScroll);
+    window.addEventListener('scroll', throttledScroll, { passive: true });
     return () => {
-      container.removeEventListener('scroll', throttledScroll);
+      window.removeEventListener('scroll', throttledScroll);
       clearTimeout(timeout);
     };
   }, []);
@@ -525,7 +538,7 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col h-full bg-gray-50 font-sans">
       <Header />
 
-      <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto">
         {/* pb reserveerib ruumi hõljuvale action bar'ile select-mode'is (ühtlustatud manage-lehega) */}
         <div className={`max-w-7xl mx-auto px-4 py-4 sm:px-8 sm:py-8 ${selectMode && selectedWorkIds.size > 0 ? 'pb-32 sm:pb-36' : ''}`}>
 
