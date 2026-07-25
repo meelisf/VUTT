@@ -61,6 +61,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Baseline-lävi: olemasolevad hoiatused on lubatud, uued mitte.
+      # Kui parandad mõne, langeta arvu package.json-is (lint:ci).
+      - name: Lint (React Hooks)
+        run: npm run lint:ci
+
       - name: Run frontend tests
         run: npm test
 
