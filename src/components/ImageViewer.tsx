@@ -2,9 +2,18 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { panOffsetForTop } from '../utils/imageViewerGeometry';
+import { imageFadeStyle, FADE_OUT_MS } from '../utils/imageFadeTransition';
 
 /** Hingamisruum juhtnuppude riba ja skaneeringu ülaserva vahel. */
 const CONTROLS_GAP_PX = 8;
+
+/**
+ * Loeb OS-i liikumise-eelistuse. Väljaspool komponenti, et SSR-i/testide korral
+ * puuduv `matchMedia` ei kukutaks renderdust.
+ */
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+}
 
 interface ImageViewerProps {
   src: string;
@@ -32,6 +41,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const isImageLoading = !!src && src !== loadedSrc;
   const [showImageSpinner, setShowImageSpinner] = useState(false);
+
+  // Lehe vahetuse dip: pilt sunnitakse korraks peitu, et eellaetud (seega
+  // hetkeline) pööre oleks üldse märgatav. Vt `imageFadeTransition.ts` —
+  // seotud PAGENUM-i, mitte laadimisolekuga. `false` esmasel renderdusel on
+  // ohutu: pilt on siis niikuinii laadimisel, seega tulemus on tänasega sama.
+  const [dipDone, setDipDone] = useState(false);
+  const reducedMotion = prefersReducedMotion();
+
+  useEffect(() => {
+    setDipDone(false);
+    const timer = setTimeout(() => setDipDone(true), FADE_OUT_MS);
+    return () => clearTimeout(timer);
+  }, [pageNum]);
+
+  const fade = imageFadeStyle({ imageLoading: isImageLoading, dipDone, reducedMotion });
 
   // Lehe vahetusel algab lugemine uue lehe algusest. Suurendustase jääb püsima
   // (sama suurendus järgmisel lehel on lappamisel kasulik), aga asend viiakse
@@ -310,10 +334,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
             ref={imgRef}
             src={src}
             alt="Faksiimile"
-            className={`max-w-none shadow-2xl sepia-[0.3] pointer-events-none transition-opacity duration-150 ${
-              isImageLoading ? 'opacity-0' : 'opacity-100'
-            }`}
-            style={{ maxHeight: '85vh', maxWidth: '85vw' }}
+            className="max-w-none shadow-2xl sepia-[0.3] pointer-events-none"
+            style={{
+              maxHeight: '85vh',
+              maxWidth: '85vw',
+              opacity: fade.opacity,
+              // Inline, mitte Tailwindi klass: väljumise ja sissetuleku kestus
+              // erinevad, klassipaar seda ei väljenda.
+              transition: `opacity ${fade.durationMs}ms ease-out`,
+            }}
             onDragStart={preventDrag}
             onLoad={handleImageLoaded}
             // Vea korral lõpetame ootamise — muidu jääks spinner igaveseks
