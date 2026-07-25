@@ -152,18 +152,28 @@ const Dashboard: React.FC = () => {
     // Seda ei tee, et säiliks kollektsiooni valik headeris
   }, [collectionParam, collections]);
 
-  // Taasta scroll positsioon pärast teoste laadimist
+  // Taasta scroll positsioon pärast teoste esimest laadimist.
+  //
+  // AINULT ÜKS KORD. `works` asendub ka pagineerimisel, filtri muutmisel ja
+  // värskendamisel — ilma valveta rakendataks salvestatud positsiooni iga kord
+  // uuesti ja kasutaja tõmmataks tagasi kohta, kust ta on juba edasi liikunud.
+  const scrollRestoredRef = useRef(false);
   useEffect(() => {
-    if (!loading && works.length > 0 && scrollContainerRef.current) {
-      const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
-      if (savedScroll) {
-        const scrollY = parseInt(savedScroll, 10);
-        // Kasuta setTimeout, et DOM jõuaks uuenduda
-        setTimeout(() => {
-          scrollContainerRef.current?.scrollTo(0, scrollY);
-        }, 50);
-      }
-    }
+    if (scrollRestoredRef.current) return;
+    if (loading || works.length === 0 || !scrollContainerRef.current) return;
+    scrollRestoredRef.current = true;
+
+    const savedScroll = sessionStorage.getItem(SCROLL_STORAGE_KEY);
+    if (!savedScroll) return;
+    const scrollY = parseInt(savedScroll, 10);
+    if (!Number.isFinite(scrollY)) return;
+
+    // Viivitus, et DOM jõuaks uueneda. Cleanup on vajalik: ilma selleta võib
+    // taaste käivituda pärast seda, kui kasutaja on juba ise kerima hakanud.
+    const timer = setTimeout(() => {
+      scrollContainerRef.current?.scrollTo(0, scrollY);
+    }, 50);
+    return () => clearTimeout(timer);
   }, [loading, works]);
 
   // Salvesta scroll positsioon jooksvalt scrollimise ajal

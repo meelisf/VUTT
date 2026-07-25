@@ -112,6 +112,8 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
   const parsedMapYear = Number(mapYearInput);
   const isMapYearValid = Number.isInteger(parsedMapYear) && parsedMapYear >= 1 && parsedMapYear <= 9999;
 
+  // Filtrite sisuline võti. Vanem loob `filters`-objekti igal renderdusel uuesti,
+  // seega objekti-identiteet muutub ka siis, kui ükski filter ei muutunud.
   const filterKey = JSON.stringify(filters);
 
   useEffect(() => {
@@ -133,7 +135,11 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [filterKey, filters, token, t]);
+    // `filters` on TEADLIKULT dep-listist väljas — `filterKey` katab tema sisu.
+    // Objekti lisamine siia tühistaks võtme mõtte ja tooks uue võrgupäringu +
+    // laadimisvälke iga vanema renderduse peale.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, token, t]);
 
   const focusedMarker = useMemo(() => {
     if (!focusPlace || !data) return null;
