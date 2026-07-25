@@ -54,20 +54,33 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
 
   // Uuendame editori sisu lehe vahetusel.
   useEffect(() => {
-    setStatus(page.status);
-    setComments(page.comments);
-    setTextAnnotations(page.text_annotations || []);
-    setPageTags(page.page_tags || []);
-    setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
-    setIsDirty(false);
-    // Salvestamata kommentaarimustand kuulub eelmisele lehele — muidu jääks
-    // hoiatus "salvestamata muudatused" uuel lehel ekslikult püsima.
-    setAnnotationDraftDirty(false);
-    // Sama põhjus: eelmise lehe salvestusviga ei ole uuel lehel enam asjakohane.
-    setSaveError(null);
-
     const isSwap = isPageSwap(lastPageIdRef.current, page.id);
     lastPageIdRef.current = page.id;
+
+    // Redaktori oleku lähtestamine AINULT päris lehevahetusel. `page`-objekt
+    // asendub ka salvestamisel ja metaandmete salvestamisel (Workspace
+    // `setPage`), aga kasutaja on siis endiselt samal leheküljel ja tema
+    // salvestamata valikuid ei tohi vana objekti väärtustega üle kirjutada:
+    // `setIsDirty(false)` kaotaks hoiatuse ja tekstimuudatused läheksid
+    // lehevahetusel kaotsi (#194).
+    //
+    // Salvestamise järel teeb selle töö `useEditorSave` ise (`runSave` →
+    // `setSavedState` + `setIsDirty(false)`), täpselt sellega, mis tegelikult
+    // salvestati. Metaandmete modaal ei puuduta redaktori olekut üldse — selle
+    // vastus kannab ainult teose-taseme välju (title, year, genre, creators…).
+    if (isSwap) {
+      setStatus(page.status);
+      setComments(page.comments);
+      setTextAnnotations(page.text_annotations || []);
+      setPageTags(page.page_tags || []);
+      setSavedState({ status: page.status, comments: page.comments, page_tags: page.page_tags || [], text_annotations: page.text_annotations || [] });
+      setIsDirty(false);
+      // Salvestamata kommentaarimustand kuulub eelmisele lehele — muidu jääks
+      // hoiatus "salvestamata muudatused" uuel lehel ekslikult püsima.
+      setAnnotationDraftDirty(false);
+      // Sama põhjus: eelmise lehe salvestusviga ei ole uuel lehel enam asjakohane.
+      setSaveError(null);
+    }
 
     const view = viewRef.current;
     if (view) {
