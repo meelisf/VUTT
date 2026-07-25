@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState, type MutableRefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import type { EditorView } from '@codemirror/view';
 import type { Annotation, Page, TextAnnotation } from '../../types';
 import type { LinkedEntity } from '../../types/LinkedEntity';
 import { closeAllMarginalia } from './MarginaliaExtension';
 import { pageSwapAnnotation } from './editorAnnotations';
+import { isPageSwap, selectionAfterSync } from './editorPageSync';
 import type { EditorSavedState } from './useEditorSave';
 
 interface UseEditorStateParams {
@@ -47,6 +48,10 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
     return false;
   }, [isDirty, annotationDraftDirty, status, savedState.status, page_tags, savedState.page_tags, comments, savedState.comments, textAnnotations, savedState.text_annotations]);
 
+  // Viimati nähtud lehe ID. Effect jookseb iga `page`-objekti asendumise peale,
+  // aga ainult osa neist on päris lehevahetus — vt `editorPageSync.ts`.
+  const lastPageIdRef = useRef<string | null>(null);
+
   // Uuendame editori sisu lehe vahetusel.
   useEffect(() => {
     setStatus(page.status);
@@ -61,28 +66,41 @@ export function useEditorState({ page, viewRef, onUnsavedChanges }: UseEditorSta
     // Sama põhjus: eelmise lehe salvestusviga ei ole uuel lehel enam asjakohane.
     setSaveError(null);
 
+    const isSwap = isPageSwap(lastPageIdRef.current, page.id);
+    lastPageIdRef.current = page.id;
+
     const view = viewRef.current;
     if (view) {
       const currentText = view.state.doc.toString();
       if (currentText !== page.text_content) {
+        const newText = page.text_content || '';
         view.dispatch({
-          changes: { from: 0, to: currentText.length, insert: page.text_content || '' },
-          // Uus leht algab algusest — muidu jääks kursor eelmise lehe pealt
-          // suvalisse kohta uues tekstis.
-          selection: { anchor: 0 },
+          changes: { from: 0, to: currentText.length, insert: newText },
+          // Lehevahetusel algusesse; sama lehe värskendusel (salvestamine
+          // normaliseeris teksti) jääb kursor paigale.
+          selection: {
+            anchor: selectionAfterSync({
+              isSwap,
+              currentAnchor: view.state.selection.main.anchor,
+              newDocLength: newText.length,
+            }),
+          },
           // Lehevahetusel tühjendame openMarks — vana positsioon kukuks nulli ja
-          // avaks võõra ploki uuel lehel
-          effects: closeAllMarginalia.of(null),
+          // avaks võõra ploki uuel lehel. Sama lehe värskendusel jäävad avatud
+          // marginaalia-plokid alles, sest kasutaja on nendega parajasti töös.
+          effects: isSwap ? closeAllMarginalia.of(null) : [],
           // Programmaatiline asendus, mitte kasutaja muudatus — updateListener
           // ei tohi seda dirty-ks lugeda (vt editorAnnotations.ts).
           annotations: pageSwapAnnotation.of(true),
         });
       }
-      // Kerimine lehe algusesse. Tingimusest väljaspool, sest kaks järjestikust
-      // lehte võivad olla identse tekstiga (nt tühjad) — ka siis peab uus leht
-      // algama ülevalt. Alates #185-st ei monteerita editorit lehe vahetusel
-      // maha, seega kerimispositsioon jääks muidu eelmise lehe lõppu.
-      view.scrollDOM.scrollTop = 0;
+      // Kerimine lehe algusesse. Tekstimuutuse tingimusest väljaspool, sest kaks
+      // järjestikust lehte võivad olla identse tekstiga (nt tühjad) — ka siis
+      // peab uus leht algama ülevalt. Alates #185-st ei monteerita editorit lehe
+      // vahetusel maha, seega kerimispositsioon jääks muidu eelmise lehe lõppu.
+      // AINULT päris lehevahetusel: salvestamine asendab samuti `page`-objekti,
+      // ja kasutaja keset tööd ei tohi kerimist kaotada.
+      if (isSwap) view.scrollDOM.scrollTop = 0;
     }
   }, [page, viewRef]);
 
