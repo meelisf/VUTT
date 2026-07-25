@@ -483,7 +483,6 @@ export function useUploadWizard() {
     if (!match) return;
     resumeHandledRef.current = true;
     handleResume(match);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     navigate(window.location.pathname, { replace: true });
   }, [pendingUploads, searchParams, navigate]);
 
