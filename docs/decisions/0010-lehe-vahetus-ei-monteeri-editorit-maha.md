@@ -41,6 +41,13 @@ teinud.
    tekstis. Pildi nihe arvestab pealkattuvate juhtnuppude kõrgust, mis
    mõõdetakse DOM-ist, mitte ei kodeerita konstandina.
 
+5. **`page`-objekti asendumine EI OLE lehevahetus.** Lehevahetust tuvastatakse
+   `page.id` järgi (`editorPageSync.ts` → `isPageSwap`), mitte objekti-
+   identiteedi järgi. `Workspace` kutsub `setPage`-i kolmes kohas: lehe
+   laadimisel, teksti salvestamisel (`setPage(savedPage)`) ja metaandmete
+   salvestamisel (`handleMetadataSaved`). Ainult esimene neist on lehevahetus.
+   Punkti 4 lähtestused ja redaktori oleku lähtestused käivad **ainult** siis.
+
 ## Tagajärjed
 
 - **Enne komponendi remountist vabastamist tuleb tema sisemine olek läbi
@@ -60,6 +67,18 @@ teinud.
   Sama põhjusel on `PageCommentsPanel`-il `key={page.id}` — mustandiväljad on
   lehepõhised.
 
+- **Punkti 1 sõnastus "sisu vahetamise eest vastutab `page`-effect" oli lõks:**
+  effect on kirjutatud lehevahetuse jaoks, aga jookseb iga `page`-objekti
+  asendumise peale. See tekitas kaks viga, mõlemad avastatud 2026-07-25.
+  *Kerimine:* `view.scrollDOM.scrollTop = 0` jooksis ka salvestamisel, nii et
+  kasutaja kaotas keset tööd salvestades oma koha lehel. *Andmekadu (#194):*
+  `setIsDirty(false)` jooksis metaandmete salvestamisel ja kustutas
+  salvestamata teksti hoiatuse — lahkumisel ei küsitud salvestamist ja
+  muudatused läksid kaotsi; sama kirjutas üle salvestamata `status`,
+  `comments` ja `page_tags` valikud. Salvestamise järel teeb oleku korda
+  `useEditorSave.runSave` täpselt sellega, mis salvestati — effect ei tohi
+  seda dubleerida.
+
 - Teadlikult **säilivad** üle lehepöörete: redaktori sakk, suurendustase,
   otsingupaneeli olek, marginaaliavaate režiim. Need on lappamisel soovitud.
 
@@ -74,5 +93,6 @@ teinud.
 ## Viited
 
 - Issue #185, #186; PR #190
+- Issue #194 ja commitid `3b4ca17`, `9dc208a` — punkti 5 ajend
 - ADR [0009](0009-marginaalia-iga-fuusiline-rida-eraldi.md) — marginaalia parser,
   mille sanitiseerija invariant 3 kaitseb
