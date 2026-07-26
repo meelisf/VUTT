@@ -376,12 +376,25 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
-      offset: options?.offset ?? 0,
-      limit: options?.limit ?? 12,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
       facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
     };
+
+    // Lehekülgjaotus: `page`/`hitsPerPage` annab TÄPSE `totalHits`, `offset`/`limit`
+    // ainult `estimatedTotalHits`-i (otsingusõnaga võib olla ligikaudne → vale
+    // lehtede arv ja tühi viimane leht). Mõõdetud tootmises: page-režiim ei ole
+    // aeglasem (7,2 vs 8,6 ms keskmine). Kutsuja API jääb offset/limit peale;
+    // joondamata offset (ei tule ühestki praegusest kutsujast) langeb tagasi.
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? 12;
+    if (offset % limit === 0) {
+      searchParams.page = offset / limit + 1;
+      searchParams.hitsPerPage = limit;
+    } else {
+      searchParams.offset = offset;
+      searchParams.limit = limit;
+    }
 
     // Esimese lehe filter annab juba täpselt ühe dokumendi teose kohta, seega
     // distinct oleks seal üleliigne. Seda vajab ainult „viimati muudetud“ vaade,
@@ -434,27 +447,18 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
     // esimese lehe andmed (tags, page_tags) juba kaasa põhipäringuga.
     // Thumbnail tuleb serveripoolsest /_thumb endpointist (genereeritakse vajadusel).
 
+    // Järjestus tuleb TERVIKUNA Meilisearchist. Siin oli varem kliendipoolne
+    // works.sort(...) „kuna distinct + sort ei tööta alati õigesti“ — see ei saanud
+    // probleemi lahendada, sest sorteeris ainult ühe lehe (12 tulemust) juba
+    // serveripoolselt lõigatud aknas.
+    //
+    // Tootmises verifitseeritud (#183): distinct:'work_id' + sort:['last_modified:desc']
+    // annab korrektse järjestuse ja unikaalsed work_id-d ka üle lehepiiride; year:asc
+    // ja year:desc samuti. `az` juures oli ümbersort aktiivselt KAHJULIK: Meilisearch
+    // taandab diakriitikud (Börk < Bröms), localeCompare('et') paneb ö tähestiku lõppu
+    // (Bröms < Börk) — lehe sisu sorteeriti eesti kollatsiooniga, lehepiirid jäid Meili
+    // omasse, seega A–Z lehitsemine ei olnud monotoonne.
     const works: Work[] = uniqueHits.map(normalizeWork);
-
-    // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
-    // seega sorteerime frontendis uuesti (v.a. relevance, kus säilitame Meilisearchi järjekorra)
-    const sortKey = options?.sort || 'year_asc';
-    if (sortKey !== 'relevance') {
-      works.sort((a, b) => {
-        switch (sortKey) {
-          case 'year_desc':
-            return b.year - a.year;
-          case 'az':
-            return a.title.localeCompare(b.title, 'et');
-          case 'recent':
-            // Sorteerime last_modified järgi kahanevalt
-            return (b as any).last_modified - (a as any).last_modified;
-          case 'year_asc':
-          default:
-            return a.year - b.year;
-        }
-      });
-    }
 
     // Tagasta tulemused koos facetidega
     const facetDistribution = response.facetDistribution || {};
@@ -466,7 +470,9 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
         tags_ids: facetDistribution['tags_ids'],
         teose_staatus: facetDistribution['teose_staatus']
       } as FacetDistribution,
-      totalHits: response.estimatedTotalHits || works.length
+      // page-režiimis täpne totalHits; offset-režiimis (ja vanemate vastuste korral)
+      // estimatedTotalHits.
+      totalHits: (response as any).totalHits ?? response.estimatedTotalHits ?? works.length
     };
 
   } catch (error: any) {
