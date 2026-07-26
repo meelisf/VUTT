@@ -681,23 +681,33 @@ export const searchContent = async (index: Index, query: string, page: number = 
       // Lisa work_id facet (lehekülgede arvud) otse Meilisearchist
       calculatedFacets['work_id'] = pageCountResponse.facetDistribution?.['work_id'] || {};
 
-      // Kui stats-päring mahtus limiiti, on uniqueWorks.size täpne ja ühtib facetidega.
-      // Kui limiit löödi lõhki, kasutame distinctResponse.estimatedTotalHits (ligikaudne).
-      if ((statsResponse.estimatedTotalHits || 0) <= STATS_LIMIT) {
+      const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
+      const facetWorkIds = Object.keys(workHitCounts);
+
+      // work_id facet loendab KÕIKI vastavaid teoseid, sõltumata STATS_LIMIT-ist ja
+      // maxTotalHits=10000 lakkest. Varem võeti see arv üle piiri minnes
+      // distinctResponse.estimatedTotalHits-ist, mis loeb lehekülgi, mitte teoseid:
+      // "est" näitas 10 000 teost tegeliku 1074 asemel (~9x liiga palju).
+      // Facet on tasuta — see päring tehakse niikuinii lehekülgede arvude jaoks.
+      if (facetWorkIds.length > 0) {
+        totalWorks = facetWorkIds.length;
+      } else if ((statsResponse.estimatedTotalHits || 0) <= STATS_LIMIT) {
         totalWorks = uniqueWorks.size;
       } else {
         totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size;
       }
-
-      const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
         ...normalizeContentSearchHit(hit),
         hitCount: workHitCounts[hit.work_id] || 1
       }));
 
+      // Facet-väärtuste summa on täpne lehekülgede arv; estimatedTotalHits on
+      // maxTotalHits=10000 juures kärbitud.
+      const facetPageTotal = facetWorkIds.reduce((sum, id) => sum + (workHitCounts[id] || 0), 0);
+
       return {
         hits: hitsWithCounts as any,
-        totalHits: pageCountResponse.estimatedTotalHits || 0, // Lehekülgi kokku
+        totalHits: facetPageTotal || pageCountResponse.estimatedTotalHits || 0, // Lehekülgi kokku
         totalWorks: totalWorks,
         totalPages: Math.ceil(totalWorks / limit),
         page,
