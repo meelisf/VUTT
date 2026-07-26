@@ -8,7 +8,7 @@ import copy
 import json
 import os
 import time
-from typing import Callable, Tuple
+from typing import Callable, Iterable, Tuple
 
 from .config import get_logger
 from .utils import metadata_lock
@@ -54,66 +54,116 @@ def clean_archive_refs(value):
 _V1_FIELDS = ["pealkiri", "aasta", "koht", "trükkal", "autor", "respondens"]
 
 
-def bulk_update_field(
-    meta_path: str,
-    transform: Callable[[dict], dict],
+def bulk_update_works(
+    items: Iterable[Tuple[str, Callable[[dict], dict]]],
     username: str,
     git_message: str,
     *,
     background_tasks=None,
-    sync_meili: bool = False,
     call_ptw: bool = False,
-) -> None:
+) -> dict:
     """
-    Atomaarne bulk-uuendus: loeb, transformeerib ja kirjutab ühe metadata_lock tsükliga.
-    Väldib TOCTOU akent, mis tekib eraldi loe+kirjuta kutsete vahel.
+    Atomaarne bulk-uuendus mitmele teosele: üks lukutsükkel, üks Git commit.
 
-    transform(current_meta) → dict of field updates to apply.
+    items — järjend `(meta_path, transform)` paare; `transform(current_meta)`
+    tagastab rakendatavad väljad. Iga teos loetakse ja transformeeritakse sama
+    `metadata_lock` all, mis väldib TOCTOU akent loe+kirjuta vahel.
+
+    Muutusteta teosed jäetakse vahele (vt ADR 0012). Kõik päriselt muutunud
+    failid kirjutatakse ja commititakse ÜHE path-skoobitud commitina, misjärel
+    iga unikaalne teos saab täpselt ühe Meilisearchi sünki — bulk-muudatus ei
+    tohi jätta otsinguindeksit failisüsteemist maha (#175).
+
+    Tagastab loendurid `{"updated": n, "skipped": n, "failed": n}`.
     """
-    if not os.path.exists(meta_path):
-        return
+    originals = {}   # meta_path -> kettalt loetud seis
+    pending = {}     # meta_path -> jooksev seis (kordused ahelduvad)
+    order = []       # unikaalsed teed sisendjärjekorras
+    failed_paths = set()
 
     with metadata_lock:
-        with open(meta_path, "r", encoding="utf-8") as f:
-            meta = json.load(f)
+        for meta_path, transform in items:
+            if meta_path not in pending:
+                if not os.path.exists(meta_path):
+                    failed_paths.add(meta_path)
+                    logger.warning("BULK: metaandmete faili ei leitud: %s", meta_path)
+                    continue
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as f:
+                        meta = json.load(f)
+                except Exception as e:
+                    failed_paths.add(meta_path)
+                    logger.warning("BULK: metaandmeid ei saa lugeda (%s): %s", meta_path, e)
+                    continue
+                originals[meta_path] = copy.deepcopy(meta)
+                pending[meta_path] = meta
+                order.append(meta_path)
 
-        updates = transform(meta)
-        clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
-        meta.update(clean)
-        for field in _V1_FIELDS:
-            meta.pop(field, None)
+            meta = pending[meta_path]
+            try:
+                updates = transform(meta)
+                clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
+                meta.update(clean)
+                for field in _V1_FIELDS:
+                    meta.pop(field, None)
+            except Exception as e:
+                # Pooleli jäänud transform võis meta juba osaliselt muuta — see teos
+                # jääb tervikuna kirjutamata, ülejäänud partii läheb edasi.
+                failed_paths.add(meta_path)
+                logger.warning("BULK: teose uuendamine ebaõnnestus (%s): %s", meta_path, e)
 
-        save_with_git(
-            meta_path,
-            json.dumps(meta, indent=2, ensure_ascii=False),
-            username,
-            message=git_message,
-        )
+        usable = [p for p in order if p not in failed_paths]
+        changed = [p for p in usable if not metadata_unchanged(originals[p], pending[p])]
+        skipped = len(usable) - len(changed)
+        failed = len(failed_paths)
 
-    slug = os.path.basename(os.path.dirname(meta_path))
+        if changed:
+            first_path = changed[0]
+            extra = [
+                (path, json.dumps(pending[path], indent=2, ensure_ascii=False))
+                for path in changed[1:]
+            ]
+            save_with_git(
+                first_path,
+                json.dumps(pending[first_path], indent=2, ensure_ascii=False),
+                username,
+                message=git_message,
+                additional_files=extra or None,
+            )
 
-    # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
-    update_work_collections(meta.get("id"), meta.get("collections") or [])
+    # Tuletatud indeksid ja sünk ainult päriselt muutunud teostele, üks kord teose kohta.
+    for meta_path in changed:
+        meta = pending[meta_path]
+        slug = os.path.basename(os.path.dirname(meta_path))
 
-    if call_ptw:
-        ptw_args = (
-            meta.get("id"),
-            meta.get("creators", []),
-            meta.get("tags") or [],
-            meta.get("publisher"),
-            meta.get("title") or "",
-            meta.get("year"),
-        )
-        if background_tasks is not None:
-            background_tasks.add_task(update_person_to_works, *ptw_args)
-        else:
-            update_person_to_works(*ptw_args)
+        update_work_collections(meta.get("id"), meta.get("collections") or [])
 
-    if sync_meili:
+        if call_ptw:
+            ptw_args = (
+                meta.get("id"),
+                meta.get("creators", []),
+                meta.get("tags") or [],
+                meta.get("publisher"),
+                meta.get("title") or "",
+                meta.get("year"),
+            )
+            if background_tasks is not None:
+                background_tasks.add_task(update_person_to_works, *ptw_args)
+            else:
+                update_person_to_works(*ptw_args)
+
+        # Meilisearchi sünk on kohustuslik, mitte lipuga valitav: ilma selleta
+        # jäävad dashboardi filtrid failisüsteemist maha (#175).
         if background_tasks is not None:
             background_tasks.add_task(sync_work_to_meilisearch_async, slug)
         else:
             sync_work_to_meilisearch(slug)
+
+    logger.info(
+        "BULK: %s — uuendatud=%d vahele jäetud=%d ebaõnnestus=%d",
+        git_message, len(changed), skipped, failed,
+    )
+    return {"updated": len(changed), "skipped": skipped, "failed": failed}
 
 
 def save_work_metadata(

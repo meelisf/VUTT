@@ -76,8 +76,29 @@ järgi tühitöö: sisend on identne sellega, millest need indeksid juba ehitati
 - **Ajalugu muutub hõredamaks.** Lehe ajaloo vaates ei teki enam kirjeid,
   mille diff on ainult `updated_at`. See on eesmärk, mitte kõrvalmõju.
 
+## Laiendus: bulk-operatsioonid (#175)
+
+Sama võrdlus kehtib bulk-teel (`bulk_update_works`), kuid seal lisandub üks
+tugevam reegel:
+
+- **Meilisearchi sünk EI OLE bulk-teel lipuga valitav.** Varem oli
+  `bulk_update_field(sync_meili=False)` vaikimisi ja ükski kolmest bulk-endpointist
+  seda ei tõstnud — kollektsiooni, märksõnade ja žanri massimuudatused ei jõudnud
+  kunagi otsinguindeksisse ja dashboardi filtrid jäid vanaks kuni järgmise
+  üksiksalvestuse või reseed'ini. Iga päriselt muutunud teos saab nüüd täpselt ühe
+  sünki, olenemata sellest, mitu korda ta partiis esineb.
+
+- **Üks partii = üks Git commit.** Kõik muutunud `_metadata.json` failid lähevad
+  ühte path-skoobitud commiti (`save_with_git(..., additional_files=...)`).
+  Commiti sõnum loendab teoseid, mitte ei nimeta üht work_id-d.
+
+- **Osaline ebaõnnestumine ei katkesta partiid.** Vigase transformi või
+  loetamatu faili korral jääb SEE teos tervikuna kirjutamata (pooleli jäänud
+  transform võis meta juba osaliselt muuta) ja ülejäänud partii läheb edasi.
+  Endpoint tagastab `updated/skipped/failed`.
+
 ## Viited
 
-- Issue #173 (koondülevaade #182)
+- Issue #173, #175 (koondülevaade #182)
 - `server/save_diff.py`, `server/metadata_ops.py`, `server/routers/editing.py`
-- Testid: `tests/test_save_noop.py`
+- Testid: `tests/test_save_noop.py`, `tests/test_bulk_atomicity.py`

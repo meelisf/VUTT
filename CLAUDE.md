@@ -31,7 +31,8 @@ docker compose ps
 
 Frontend deploy (pärast `npm run build` lokaalses masinas):
 ```bash
-rsync -avz dist/ vutt:~/VUTT/dist/
+# --delete on tahtlik: ilma selleta kogunevad serverisse vanad hashitud chunk-failid
+rsync -avz --delete dist/ vutt:~/VUTT/dist/
 ```
 
 ## Architecture

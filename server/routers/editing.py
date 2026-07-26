@@ -28,7 +28,7 @@ from ..git_ops import (
 )
 from ..marginalia_normalize import normalize_marginalia_tags
 from ..meilisearch_ops import sync_work_to_meilisearch_async
-from ..metadata_ops import bulk_update_field, save_work_metadata
+from ..metadata_ops import bulk_update_works, save_work_metadata
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
 from ..save_diff import page_content_unchanged
@@ -190,6 +190,40 @@ async def metadata_suggestions(request: Request, user=Depends(require_role("edit
 # =========================================================
 # GIT AJALUGU JA BULK
 # =========================================================
+
+def _resolve_bulk_items(work_ids, transform):
+    """Lahendab work_id-d meta-teedeks. Tagastab (items, tundmatud_arv).
+
+    Failisüsteemi skaneering (`find_directory_by_id`) käib threadpoolis, mitte
+    event-loopis (ADR 0002).
+    """
+    items = []
+    unknown = 0
+    for work_id in work_ids or []:
+        path = find_directory_by_id(work_id)
+        meta_path = os.path.join(path, '_metadata.json') if path else None
+        if meta_path and os.path.exists(meta_path):
+            items.append((meta_path, transform))
+        else:
+            unknown += 1
+    return items, unknown
+
+
+async def _run_bulk(work_ids, transform, username, label, background_tasks, *, call_ptw=False):
+    """Ühine bulk-tee: üks commit, garanteeritud Meili sünk, loendurid (#175)."""
+    items, unknown = await run_in_threadpool(_resolve_bulk_items, work_ids, transform)
+    counts = await run_in_threadpool(
+        bulk_update_works,
+        items,
+        username,
+        f"{label}: {len(items)} teost",
+        background_tasks=background_tasks,
+        call_ptw=call_ptw,
+    )
+    counts["failed"] += unknown
+    _invalidate_all_caches()
+    return {"status": "success", **counts}
+
 
 @router.get("/recent-edits")
 async def recent_edits(request: Request, user=Depends(get_user)):
@@ -402,33 +436,23 @@ async def bulk_collection(request: Request, background_tasks: BackgroundTasks, u
     mode = data.get('mode', 'set')
     collection_id = data.get('collection_id') or data.get('collection')
 
-    for work_id in data.get('work_ids', []):
-        path = find_directory_by_id(work_id)
-        if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+    def make_transform(coll_id=collection_id, m=mode):
+        def transform(meta):
+            current = meta.get('collections', [])
+            if m == 'add':
+                if coll_id and coll_id not in current:
+                    return {'collections': current + [coll_id]}
+                return {'collections': current}
+            elif m == 'remove':
+                return {'collections': [c for c in current if c != coll_id]}
+            else:  # set
+                return {'collections': [coll_id] if coll_id else []}
+        return transform
 
-        def make_transform(coll_id=collection_id, m=mode):
-            def transform(meta):
-                current = meta.get('collections', [])
-                if m == 'add':
-                    if coll_id and coll_id not in current:
-                        return {'collections': current + [coll_id]}
-                    return {'collections': current}
-                elif m == 'remove':
-                    return {'collections': [c for c in current if c != coll_id]}
-                else:  # set
-                    return {'collections': [coll_id] if coll_id else []}
-            return transform
-
-        await run_in_threadpool(
-            bulk_update_field,
-            os.path.join(path, '_metadata.json'),
-            make_transform(),
-            user['username'],
-            f"Bulk collection: {work_id}",
-            background_tasks=background_tasks,
-        )
-    _invalidate_all_caches()
-    return {"status": "success"}
+    return await _run_bulk(
+        data.get('work_ids', []), make_transform(), user['username'],
+        "Bulk collection", background_tasks,
+    )
 
 @router.post("/works/bulk-tags")
 async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
@@ -436,40 +460,29 @@ async def bulk_tags(request: Request, background_tasks: BackgroundTasks, user=De
     tags_to_update = data.get('tags', [])
     tag_mode = data.get('mode', 'set')
 
-    for work_id in data.get('work_ids', []):
-        path = find_directory_by_id(work_id)
-        if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+    def make_transform(mode=tag_mode, new_tags=tags_to_update):
+        def transform(meta):
+            cur = list(meta.get('tags', []))
+            if mode == 'add':
+                for t in new_tags:
+                    if t not in cur:
+                        cur.append(t)
+            elif mode == 'remove':
+                remove_ids = {t['id'] for t in new_tags if t.get('id')}
+                remove_labels = {t.get('label', '').lower() for t in new_tags if not t.get('id')}
+                cur = [t for t in cur if not (
+                    (t.get('id') and t['id'] in remove_ids) or
+                    (not t.get('id') and t.get('label', '').lower() in remove_labels)
+                )]
+            else:
+                cur = list(new_tags)
+            return {'tags': cur}
+        return transform
 
-        def make_transform(mode=tag_mode, new_tags=tags_to_update):
-            def transform(meta):
-                cur = list(meta.get('tags', []))
-                if mode == 'add':
-                    for t in new_tags:
-                        if t not in cur:
-                            cur.append(t)
-                elif mode == 'remove':
-                    remove_ids = {t['id'] for t in new_tags if t.get('id')}
-                    remove_labels = {t.get('label', '').lower() for t in new_tags if not t.get('id')}
-                    cur = [t for t in cur if not (
-                        (t.get('id') and t['id'] in remove_ids) or
-                        (not t.get('id') and t.get('label', '').lower() in remove_labels)
-                    )]
-                else:
-                    cur = list(new_tags)
-                return {'tags': cur}
-            return transform
-
-        await run_in_threadpool(
-            bulk_update_field,
-            os.path.join(path, '_metadata.json'),
-            make_transform(),
-            user['username'],
-            f"Bulk tags: {work_id}",
-            background_tasks=background_tasks,
-            call_ptw=True,
-        )
-    _invalidate_all_caches()
-    return {"status": "success"}
+    return await _run_bulk(
+        data.get('work_ids', []), make_transform(), user['username'],
+        "Bulk tags", background_tasks, call_ptw=True,
+    )
 
 @router.post("/works/bulk-genre")
 async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=Depends(require_role("admin"))):
@@ -484,33 +497,23 @@ async def bulk_genre(request: Request, background_tasks: BackgroundTasks, user=D
     genre = data.get('genre')
     mode = data.get('mode', 'add')
 
-    for work_id in data.get('work_ids', []):
-        path = find_directory_by_id(work_id)
-        if not (path and os.path.exists(os.path.join(path, '_metadata.json'))): continue
+    def make_transform(g=genre, m=mode):
+        def transform(meta):
+            current = meta.get('genre', [])
+            if not isinstance(current, list):
+                current = [current] if current else []
+            if m == 'add':
+                if g and g not in current:
+                    current = current + [g]
+            elif m == 'remove':
+                current = [x for x in current if x != g]
+            else:  # set
+                current = [g] if g else []
+            return {'genre': current}
+        return transform
 
-        def make_transform(g=genre, m=mode):
-            def transform(meta):
-                current = meta.get('genre', [])
-                if not isinstance(current, list):
-                    current = [current] if current else []
-                if m == 'add':
-                    if g and g not in current:
-                        current = current + [g]
-                elif m == 'remove':
-                    current = [x for x in current if x != g]
-                else:  # set
-                    current = [g] if g else []
-                return {'genre': current}
-            return transform
-
-        await run_in_threadpool(
-            bulk_update_field,
-            os.path.join(path, '_metadata.json'),
-            make_transform(),
-            user['username'],
-            f"Bulk genre: {work_id}",
-            background_tasks=background_tasks,
-        )
-    _invalidate_all_caches()
-    return {"status": "success"}
+    return await _run_bulk(
+        data.get('work_ids', []), make_transform(), user['username'],
+        "Bulk genre", background_tasks,
+    )
 
