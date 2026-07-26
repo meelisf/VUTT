@@ -100,17 +100,10 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (verifiedUser && verifiedUser !== 'network-error') {
           setUser(verifiedUser);
           setAuthToken(storedToken);
-          // Taasta Meilisearchi kasutaja token (ilma selleta kasutatakse anonüümset filtrit)
-          try {
-            const mr = await fetch(`${FILE_API_URL}/api/meili-token/refresh`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${storedToken}` },
-            });
-            if (mr.ok) {
-              const { token: meiliToken } = await mr.json();
-              if (meiliToken) setUserToken(meiliToken);
-            }
-          } catch {}
+          // NB: Meili kasutaja-tokenit siin EI küsita. MeilisearchContext'i mount-effect
+          // teeb sessiooni olemasolul juba sama /api/meili-token/refresh päringu ja on
+          // tokeni ainuomanik. Kaks päringut andsid kaks Index-objekti → dashboardi
+          // otsing jooksis full reloadil kaks korda (#179).
           // Lae seaded serverist
           const settings = await loadUserSettings(storedToken);
           setUserSettings(settings);

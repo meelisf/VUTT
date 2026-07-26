@@ -25,20 +25,30 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
   const [index, setIndex] = useState<Index | null>(null);
   const tokenExpiresAt = useRef<number>(0);
   const isUserToken = useRef(false);
+  const currentToken = useRef<string>('');
+
+  // Uue Index-objekti paigaldamine on tarbijatele identiteedi-muutus: `index` on
+  // useEffect-deps'ides, seega iga vahetus käivitab otsingud uuesti. Sama tokeniga
+  // uut objekti EI paigaldata (#179).
+  const installToken = useCallback((token: string, asUserToken: boolean) => {
+    tokenExpiresAt.current = resolveTokenExpiresAt(token);
+    isUserToken.current = asUserToken;
+    if (token === currentToken.current) return;
+    currentToken.current = token;
+    setIndex(makeIndex(token));
+  }, []);
 
   const fetchAnonToken = useCallback(async () => {
     try {
       const r = await fetch('/api/files/api/meili-token');
       const { token } = await r.json();
       if (token) {
-        setIndex(makeIndex(token));
-        tokenExpiresAt.current = resolveTokenExpiresAt(token);
-        isUserToken.current = false;
+        installToken(token, false);
       }
     } catch (e) {
       console.error('Meili anonüümse tokeni laadimine ebaõnnestus', e);
     }
-  }, []);
+  }, [installToken]);
 
   // Kasutaja-tokeni värskendus/promotion. KRIITILINE: sessiooni olemasolu localStorage'is
   // (mitte `isUserToken.current`) on tõeallikas. See katab KAKS juhtu:
@@ -60,9 +70,7 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
         if (r.ok) {
           const { token } = await r.json();
           if (token) {
-            setIndex(makeIndex(token));
-            tokenExpiresAt.current = resolveTokenExpiresAt(token);
-            isUserToken.current = true;
+            installToken(token, true);
             return;
           }
           // ok aga tühi token — transientne, säilita olemasolev index.
@@ -82,13 +90,11 @@ export function MeilisearchProvider({ children }: { children: React.ReactNode })
     }
     // Sessiooni pole → anonüümne token.
     await fetchAnonToken();
-  }, [fetchAnonToken]);
+  }, [fetchAnonToken, installToken]);
 
   const setUserToken = useCallback((token: string) => {
-    setIndex(makeIndex(token));
-    tokenExpiresAt.current = resolveTokenExpiresAt(token);
-    isUserToken.current = true;
-  }, []);
+    installToken(token, true);
+  }, [installToken]);
 
   const clearUserToken = useCallback(() => {
     isUserToken.current = false;
