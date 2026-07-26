@@ -113,6 +113,7 @@ REOCR_BATCH_INACTIVITY_TIMEOUT = 1800  # Batch slow, kui X s pole ühegi lehe ko
 register_job("reocr_batch_poll", interval_seconds=10, description="Batch re-OCR tööde taustapoll")
 register_job("reocr_cleanup", interval_seconds=600, description="Vanade re-OCR tööde mälust puhastus")
 register_job("reocr_poll", interval_seconds=10, description="Üksiklehe re-OCR tööde taustapoll")
+register_job("reocr_startup_recovery", description="Käivitusaegne OCR-staging'u orbude taaste (taustal, ei blokeeri API-t)")
 
 _reocr_batch_jobs: Dict = {}  # {job_id: batch-job dict}
 _reocr_batch_jobs_lock = threading.Lock()
@@ -760,13 +761,34 @@ def _revive_dead_uploads(jobs: dict) -> int:
     return n
 
 
-def start_reocr_background() -> None:
+def _startup_recovery_and_reaper() -> None:
+    """Taustalõime keha: esimene reconciliation, seejärel perioodiline reaper.
+    Reaper käivitub ka siis, kui esimene skann ebaõnnestus — muidu ei taastuks
+    orvud ka hiljem, kui OCR-server tagasi tuleb."""
+    from . import reocr_recovery
+    try:
+        result = reocr_recovery.scan_and_recover()
+        logger.info(f"Re-OCR startup recovery: taastatud {len(result['recovered'])}, "
+                    f"skip {len(result['skipped'])}")
+        mark_success("reocr_startup_recovery", detail=result)
+    except Exception as e:
+        logger.warning(f"Re-OCR startup recovery viga: {e}")
+        mark_error("reocr_startup_recovery", e)
+    reocr_recovery.start_reaper_loop()
+
+
+def start_reocr_background() -> Optional[threading.Thread]:
     """Käivita re-OCR restardi-jätkamine + reconciliation. Kutsu AINULT main.py lifespan'ist
     (API-protsess). JÄRJEKORD KRIITILINE: load → recovery → reaper, et aktiivseid töid
-    ei peetaks orvuks."""
+    ei peetaks orvuks.
+
+    Load on SÜNKROONNE (kiire lokaalne faililugemine ja vajalik enne skanni), recovery +
+    reaper käivad TAUSTALÕIMES: scan_and_recover teeb SFTP-d OCR-serverisse ja hoidis
+    kättesaamatu serveri korral API käivitumist 20–50 s kinni (#181).
+
+    Tagastab recovery-lõime (testides join'itav) või None, kui upload on välja lülitatud."""
     if not UPLOAD_ENABLED:
-        return
-    from . import reocr_recovery
+        return None
     single, batch = _split_loaded(reocr_state.load_active_jobs())
     revived = _revive_dead_uploads(single) + _revive_dead_uploads(batch)
     with _reocr_jobs_lock:
@@ -777,10 +799,7 @@ def start_reocr_background() -> None:
                 f"({revived} surnud upload-i → processing)")
     if revived:
         _persist_active_jobs()  # kirjuta teisendatud staatus kohe tagasi
-    try:
-        result = reocr_recovery.scan_and_recover()
-        logger.info(f"Re-OCR startup recovery: taastatud {len(result['recovered'])}, "
-                    f"skip {len(result['skipped'])}")
-    except Exception as e:
-        logger.warning(f"Re-OCR startup recovery viga: {e}")
-    reocr_recovery.start_reaper_loop()
+    thread = threading.Thread(target=_startup_recovery_and_reaper, daemon=True,
+                              name="reocr-startup-recovery")
+    thread.start()
+    return thread

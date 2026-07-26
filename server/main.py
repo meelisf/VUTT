@@ -53,7 +53,9 @@ async def lifespan(app: FastAPI):
     threading.Thread(target=_ensure_filterable_attributes, daemon=True).start()
     start_historical_regions_warm_loop()
     start_upload_sync_loop()  # upload taustasünk — AINULT API-protsessis (mitte image_server import)
-    start_reocr_background()  # re-OCR restardi-jätkamine + orbude taaste (AINULT API-protsessis)
+    start_reocr_background()  # re-OCR restardi-jätkamine (AINULT API-protsessis); orbude
+                              # taaste + reaper käivad taustalõimes, et maas OCR-server ei
+                              # blokeeriks API käivitumist (#181)
     yield
     print("VUTT FastAPI sulgemine.")
 
