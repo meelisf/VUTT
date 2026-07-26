@@ -264,6 +264,9 @@ def delete_person(person_id: str, username: str) -> dict:
 
     _remove_aliases_entry(person_id)
 
+    from . import ext_id_index
+    ext_id_index.remove_person(person_id)  # jäädav kustutus (#180)
+
     return {"deleted": person_id, "work_refs": 0, "relation_refs": 0}
 
 

@@ -137,9 +137,17 @@ def _person_collections(person_id: str) -> list:
 
 
 def _update_index_entry(person: dict):
-    """Uuendab ühe kirje prosopography_index.json-s."""
+    """Uuendab ühe kirje prosopography_index.json-s.
+
+    Ühtlasi hoiab väliste ID-de pöördindeksit värskena (#180): see funktsioon on
+    ainus lehter, mida KÕIK isiku kirjutusteed läbivad (create, update,
+    add_identifier, enrichment, merge), seega piisab ühest haakepunktist.
+    """
     sync_from_facade()
     from .person_search import _index_entry_from_person
+    from . import ext_id_index
+
+    ext_id_index.update_for_person(person)
 
     person_id = person["id"]
     works = _load_person_to_works()
@@ -349,6 +357,10 @@ def rebuild_indices():
 
     with state._aliases_lock:
         state.atomic_write_json(state.PERSON_ALIASES_FILE, aliases_data)
+
+    # Väliste ID-de pöördindeks juba mällu laetud kaartidest — lisaskannita (#180).
+    from . import ext_id_index
+    ext_id_index.rebuild_from(all_persons, state.PROSOPOGRAPHY_DIR)
 
 
 def _remove_aliases_entry(person_id: str):
