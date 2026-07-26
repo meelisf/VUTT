@@ -34,6 +34,25 @@ describe('imageFadeStyle', () => {
     });
   });
 
+  it('instant korral pole üleminekut ja nähtavus sõltub ainult laadimisest', () => {
+    // Ruudustikust lehe valimine: kasutaja tegi valiku ise, muutuse
+    // märkamiseks pole fade'i vaja — ka mitte dipi ajal.
+    expect(imageFadeStyle({ imageLoading: false, dipDone: false, reducedMotion: false, instant: true })).toEqual({
+      opacity: 1,
+      durationMs: 0,
+    });
+    expect(imageFadeStyle({ imageLoading: true, dipDone: true, reducedMotion: false, instant: true })).toEqual({
+      opacity: 0,
+      durationMs: 0,
+    });
+  });
+
+  it('instant vaikimisi väljas — lehepöörde fade jääb alles', () => {
+    expect(imageFadeStyle({ imageLoading: false, dipDone: false, reducedMotion: false })).toEqual(
+      imageFadeStyle({ imageLoading: false, dipDone: false, reducedMotion: false, instant: false })
+    );
+  });
+
   it('kestused on mõistlikus vahemikus ka pärast timmimist', () => {
     // Kaitse hooletu timmimise vastu: liiga lühike ei ole märgatav, liiga pikk
     // võtab tagasi selle, milleks eellaadimine tehti.

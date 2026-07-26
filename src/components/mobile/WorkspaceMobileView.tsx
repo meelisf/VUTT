@@ -36,6 +36,8 @@ interface WorkspaceMobileViewProps {
   gridLoading: boolean;
   onOpenGrid: () => void;
   onSelectPage: (pageNum: number) => void;
+  /** Ruudustikust valitud leht — vt ImageViewer prop `skipFade`. */
+  skipImageFade?: boolean;
 }
 
 const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
@@ -53,6 +55,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
   gridLoading,
   onOpenGrid,
   onSelectPage,
+  skipImageFade = false,
 }) => {
   const { t, i18n } = useTranslation(['workspace', 'common', 'dashboard']);
   const { collections } = useCollection();
@@ -272,7 +275,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
         {activeTab === 'image' ? (
           <div className="h-full bg-slate-900">
             {imageSrc ? (
-              <ImageViewer src={imageSrc} pageNum={page.page_number} onGridView={handleOpenGrid} />
+              <ImageViewer src={imageSrc} pageNum={page.page_number} skipFade={skipImageFade} onGridView={handleOpenGrid} />
             ) : (
               <div className="flex items-center justify-center h-full text-white/50">
                 Pilt puudub

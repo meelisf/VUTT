@@ -18,13 +18,20 @@ function prefersReducedMotion(): boolean {
 interface ImageViewerProps {
   src: string;
   pageNum?: number;
+  /**
+   * Jäta lehevahetuse fade vahele. Fade'i mõte on teha märkamatuks jäänud
+   * pööre nähtavaks (vt `imageFadeTransition.ts`); ruudustikust lehe valimisel
+   * on kasutaja valiku ise teinud ja ruudustiku sulgumine on omaette
+   * tagasiside — seal on animatsioon üleliigne ja segav.
+   */
+  skipFade?: boolean;
   onGridView?: () => void;
   onNavigate?: (direction: 'prev' | 'next') => void;
   isAdmin?: boolean;
   onManage?: () => void;
 }
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onNavigate, isAdmin, onManage }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = false, onGridView, onNavigate, isAdmin, onManage }) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -49,13 +56,22 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, onGridView, onN
   const [dipDone, setDipDone] = useState(false);
   const reducedMotion = prefersReducedMotion();
 
+  // Refina, et dip sõltuks ainult lehenumbrist: lipu kustumine hiljem samal
+  // lehel ei tohi uut dippi käivitada.
+  const skipFadeRef = useRef(skipFade);
+  skipFadeRef.current = skipFade;
+
   useEffect(() => {
+    if (skipFadeRef.current) {
+      setDipDone(true);
+      return;
+    }
     setDipDone(false);
     const timer = setTimeout(() => setDipDone(true), FADE_OUT_MS);
     return () => clearTimeout(timer);
   }, [pageNum]);
 
-  const fade = imageFadeStyle({ imageLoading: isImageLoading, dipDone, reducedMotion });
+  const fade = imageFadeStyle({ imageLoading: isImageLoading, dipDone, reducedMotion, instant: skipFade });
 
   // Lehe vahetusel algab lugemine uue lehe algusest. Suurendustase jääb püsima
   // (sama suurendus järgmisel lehel on lappamisel kasulik), aga asend viiakse

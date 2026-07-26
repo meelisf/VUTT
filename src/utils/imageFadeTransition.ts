@@ -22,6 +22,11 @@ interface ImageFadeParams {
   dipDone: boolean;
   /** Kasutaja on OS-is liikumise vähendamise sisse lülitanud. */
   reducedMotion: boolean;
+  /**
+   * Üleminek tuleb teha ilma fade'ita (nt ruudustikust lehe valimine — vt
+   * `ImageViewer` prop `skipFade`).
+   */
+  instant?: boolean;
 }
 
 /**
@@ -36,11 +41,14 @@ export function imageFadeStyle({
   imageLoading,
   dipDone,
   reducedMotion,
+  instant = false,
 }: ImageFadeParams): { opacity: 0 | 1; durationMs: number } {
-  // Liikumise vähendamine: ei mingit fade'i, pilt vahetub otse. Katab nii
-  // vestibulaarsed kui valgustundlikkuse mured (kiirel lappamisel oleks tegu
-  // korduva hele–tume välgatusega suurel alal).
-  if (reducedMotion) {
+  // Ei mingit fade'i, pilt vahetub otse. Kaks põhjust:
+  //  - liikumise vähendamine: katab nii vestibulaarsed kui valgustundlikkuse
+  //    mured (kiirel lappamisel oleks tegu korduva hele–tume välgatusega
+  //    suurel alal);
+  //  - `instant`: kutsuja teab, et see vahetus ei vaja tähelepanu tõmbamist.
+  if (reducedMotion || instant) {
     return { opacity: imageLoading ? 0 : 1, durationMs: 0 };
   }
 

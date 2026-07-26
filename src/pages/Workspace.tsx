@@ -98,6 +98,12 @@ const Workspace: React.FC = () => {
   const [gridLoading, setGridLoading] = useState(false);
   const [gridCols, setGridCols] = useState(5); // min 3, max 10 (vt ThumbnailGrid)
 
+  // Ruudustikust valitud lehenumber: see üks vahetus tehakse ilma skaneeringu
+  // fade'ita (vt ImageViewer prop `skipFade`). Hoiame numbrit, mitte lippu —
+  // nii ei jää fade-vaba olek kehtima, kui vahepeal mujale liigutakse. Muud
+  // navigeerimisteed nullivad selle selgesõnaliselt.
+  const [gridSelectedPage, setGridSelectedPage] = useState<number | null>(null);
+
   const currentPageNum = parseInt(pageNum || '1', 10);
 
   // Lehekülje numbri sisestamise olek
@@ -135,6 +141,7 @@ const Workspace: React.FC = () => {
 
   const handlePageInputSubmit = () => {
     if (!workId) return;
+    setGridSelectedPage(null);
     const newPage = parseInt(inputPage, 10);
     const totalPages = work?.page_count || 0;
 
@@ -363,6 +370,7 @@ const Workspace: React.FC = () => {
 
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
+    setGridSelectedPage(pageNum);
     if (hasUnsavedChanges) {
       setPendingNavigation(() => () => navigate(`/work/${workId}/${pageNum}`, { replace: true }));
       return;
@@ -372,6 +380,9 @@ const Workspace: React.FC = () => {
 
   const navigatePage = useCallback((delta: number) => {
     if (!workId) return;
+
+    // Noolega lappamine on just see juhtum, mille jaoks fade tehti.
+    setGridSelectedPage(null);
 
     const newPage = currentPageNum + delta;
 
@@ -683,6 +694,7 @@ const Workspace: React.FC = () => {
             <ImageViewer
               src={currentImageSrc}
               pageNum={page.page_number}
+              skipFade={gridSelectedPage === page.page_number}
               onGridView={handleOpenGridView}
               onNavigate={(dir) => navigatePage(dir === 'next' ? 1 : -1)}
               isAdmin={isAdmin}
@@ -747,6 +759,7 @@ const Workspace: React.FC = () => {
           gridLoading={gridLoading}
           onOpenGrid={handleOpenGridView}
           onSelectPage={handleSelectFromGrid}
+          skipImageFade={gridSelectedPage === page.page_number}
         />
       </div>
 

@@ -166,3 +166,23 @@ Väravad: `npm run typecheck` ja `npm test`.
   puutumist ilma vastava võiduta; pilt on see, mida vaadatakse.
 - **Fade'i mahasurumine kiirel lappamisel** (nt < 400 ms vahega pöörded) — lisareegel,
   mille tarvet ei ole: kiireks lappamiseks on grid view.
+
+## Järelparandus 2026-07-26 — ruudustikust tulek ei tee fade'i
+
+**Sümptom:** ruudustikust lehte valides vilksatab õige pilt korraks ette ja alles siis
+tuleb ilmumise animatsioon.
+
+**Põhjus:** ruudustik hoiab valitud lehe skaneeringu juba dekodeerituna, nii et uus
+pilt on `<img>`-is kohal enne, kui dipi väljumisfaas jõuab mängida. Kasutaja näeb
+seetõttu õiget lehte, mis tuhmub ära (90 ms) ja tuleb siis tagasi (160 ms).
+
+**Lahendus:** `ImageViewer` prop `skipFade` (→ `imageFadeStyle({ instant })`): pilt
+vahetub otse, nagu `reducedMotion` haruski. `Workspace` hoiab ruudustikust valitud
+lehenumbrit (`gridSelectedPage`) ja annab `skipFade` ainult sellele ühele vahetusele;
+`navigatePage` ja lehenumbri sisestus nullivad selle.
+
+**Miks:** fade'i mõte on teha märkamatuks jäänud pööre nähtavaks. Ruudustikust
+valimisel on kasutaja valiku ise teinud ja ruudustiku sulgumine on omaette suur
+visuaalne muutus — seal on animatsioon üleliigne. Invariant ise (fade käib `pageNum`
+muutuse, mitte laadimisoleku külge) jääb kehtima; `skipFade` on selle teadlik erand,
+mille määrab kutsuja, mitte laadimisaeg.
