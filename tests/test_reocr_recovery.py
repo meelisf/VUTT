@@ -1,6 +1,8 @@
 """Reconciliation-reaper: taastab OCR-staging'usse orvuks jäänud üksik-lehe tulemused."""
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -8,6 +10,15 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import server.reocr_ops as reocr_ops
 import server.reocr_recovery as rec
+
+
+def _join(thread, timeout=5):
+    """start_reocr_background tagastab recovery-lõime; testis ootame selle lõpuni,
+    et monkeypatch ei kaoks jooksva lõime alt ära."""
+    assert thread is not None
+    thread.join(timeout=timeout)
+    assert not thread.is_alive(), "recovery-lõim ei lõpetanud"
+    return thread
 
 
 class _FakeSftp:
@@ -157,7 +168,7 @@ def test_startup_loads_active_before_recovery(monkeypatch, tmp_path):
     with r._reocr_jobs_lock:
         r._reocr_jobs.clear()
 
-    r.start_reocr_background()
+    _join(r.start_reocr_background())
 
     assert seen_active["orb_in_jobs"] is True
     with r._reocr_jobs_lock:
@@ -180,12 +191,93 @@ def test_startup_revives_dead_uploading_jobs(monkeypatch, tmp_path):
     with r._reocr_jobs_lock:
         r._reocr_jobs.clear()
 
-    r.start_reocr_background()
+    _join(r.start_reocr_background())
 
     with r._reocr_jobs_lock:
         assert r._reocr_jobs["zombie"]["status"] == "processing"   # teisendatud
         assert r._reocr_jobs["alive"]["status"] == "processing"    # muutumatu
         r._reocr_jobs.clear()
+
+
+def test_startup_ei_blokeeru_kattesaamatu_ocr_serveri_taga(monkeypatch, tmp_path):
+    """#181: scan_and_recover teeb SFTP-d OCR-serverisse. Kui server on maas, ei tohi
+    see API käivitumist kinni hoida — start_reocr_background peab kohe tagasi tulema."""
+    import server.reocr_state as st
+    import server.reocr_ops as r
+    monkeypatch.setattr(r, "UPLOAD_ENABLED", True)
+    monkeypatch.setattr(st, "REOCR_ACTIVE_FILE", str(tmp_path / "reocr_active.json"))
+    st.persist_active_jobs({"orb": {"status": "processing", "slug": "w1",
+                                    "page_filename": "w1-lk-007.jpg"}})
+    hangs = threading.Event()
+    reaper_started = threading.Event()
+
+    def _hanging_scan():
+        hangs.wait(timeout=10)  # imiteerib kättesaamatut SFTP-d
+        return {"recovered": [], "skipped": []}
+
+    monkeypatch.setattr(rec, "scan_and_recover", _hanging_scan)
+    monkeypatch.setattr(rec, "start_reaper_loop", reaper_started.set)
+    with r._reocr_jobs_lock:
+        r._reocr_jobs.clear()
+
+    t0 = time.monotonic()
+    thread = r.start_reocr_background()
+    elapsed = time.monotonic() - t0
+
+    try:
+        assert elapsed < 1.0, f"startup blokeerus {elapsed:.2f}s"
+        # Aktiivsed tööd on ikkagi KOHE mälus — muidu peaks reaper neid orvuks
+        with r._reocr_jobs_lock:
+            assert "orb" in r._reocr_jobs
+        # Reaper ei tohi käivituda enne esimese recovery lõppu
+        assert not reaper_started.is_set()
+    finally:
+        hangs.set()
+        _join(thread)
+    assert reaper_started.wait(timeout=5), "reaper ei käivitunud pärast recovery lõppu"
+    with r._reocr_jobs_lock:
+        r._reocr_jobs.clear()
+
+
+def test_reaper_kaivitub_ka_kui_recovery_ebaonnestub(monkeypatch, tmp_path):
+    """OCR-serveri viga ei tohi reaperit ära jätta — muidu ei taastuta ka hiljem."""
+    import server.reocr_state as st
+    import server.reocr_ops as r
+    monkeypatch.setattr(r, "UPLOAD_ENABLED", True)
+    monkeypatch.setattr(st, "REOCR_ACTIVE_FILE", str(tmp_path / "reocr_active.json"))
+    st.persist_active_jobs({})
+    reaper_started = threading.Event()
+
+    def _failing_scan():
+        raise OSError("SFTP timeout")
+
+    monkeypatch.setattr(rec, "scan_and_recover", _failing_scan)
+    monkeypatch.setattr(rec, "start_reaper_loop", reaper_started.set)
+    with r._reocr_jobs_lock:
+        r._reocr_jobs.clear()
+
+    _join(r.start_reocr_background())
+
+    assert reaper_started.is_set()
+
+
+def test_startup_recovery_kajastub_heartbeatis(monkeypatch, tmp_path):
+    """Recovery seis peab olema /admin/health/background kaudu nähtav."""
+    import server.reocr_state as st
+    import server.reocr_ops as r
+    from server import heartbeat
+    monkeypatch.setattr(r, "UPLOAD_ENABLED", True)
+    monkeypatch.setattr(st, "REOCR_ACTIVE_FILE", str(tmp_path / "reocr_active.json"))
+    st.persist_active_jobs({})
+    monkeypatch.setattr(rec, "scan_and_recover",
+                        lambda: {"recovered": ["a"], "skipped": []})
+    monkeypatch.setattr(rec, "start_reaper_loop", lambda: None)
+
+    _join(r.start_reocr_background())
+
+    job = next(j for j in heartbeat.snapshot()["jobs"] if j["name"] == "reocr_startup_recovery")
+    assert job["last_success_at"] is not None
+    assert job["last_detail"]["recovered"] == ["a"]
 
 
 def test_revive_dead_uploads_counts_only_uploading():

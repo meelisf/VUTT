@@ -113,10 +113,11 @@ const Statistics: React.FC = () => {
   useEffect(() => {
     if (!index) return;
     const fetchGenres = async () => {
-      const [result, labelMap] = await Promise.all([
-        getGenreFacets(index, selectedCollection || undefined, lang),
-        getGenreLabelMap(index, selectedCollection || undefined, lang),
-      ]);
+      // Järjestikku, mitte paralleelselt: labelid lahendatakse täpselt nende Q-koodide
+      // kohta, mis facetist tulid. Facet-päring on limit:0 (~9 ms) ja labelid tulevad
+      // cache'itud registrist, seega järjestikkus on odavam kui vana 5000-hiti skann.
+      const result = await getGenreFacets(index, selectedCollection || undefined, lang);
+      const labelMap = await getGenreLabelMap(index, result.map(g => g.value), lang);
       setGenres(result);
       setGenreLabelMap(labelMap);
       if (selectedGenre && !result.find(g => g.value === selectedGenre)) {

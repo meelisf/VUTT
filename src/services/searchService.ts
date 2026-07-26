@@ -7,6 +7,8 @@ import { MEILI_HOST } from '../config';
 import { checkMixedContent, normalizeWork, normalizeContentSearchHit } from './meiliService';
 import { buildTagFilter, buildPageTagFilter, buildGenreFilter, buildTypeFilter, buildPrinterFilter, buildMultiFilter } from '../utils/filterUtils';
 import { buildIdMap } from '../utils/buildObjectIdMap';
+import { getEntityLabelsCache } from './entityLabelsService';
+import { pickLabelByLang } from '../utils/labelUtils';
 import type { MatchingStrategies, Index } from 'meilisearch';
 import { HIGHLIGHT_PRE_TAG, HIGHLIGHT_POST_TAG } from '../utils/sanitizeHtml';
 
@@ -187,70 +189,90 @@ export const getTypeFacets = async (
   }
 };
 
-// Laeb žanri labelid (Q-kood → label) genre_object-ist
-export const getGenreLabelMap = async (
+// Registrist puuduvate Q-koodide lünga-täite ülempiir. Nii palju esilehti piisab, et
+// katta üksikud registrist puuduvad koodid; erinevalt vanast limit:5000-st on see
+// päring haruldane (normaalolukorras null päringut).
+const LABEL_GAPFILL_LIMIT = 200;
+
+/**
+ * Q-kood → label ANTUD koodide kohta, kanoonilisest `labels.json` registrist.
+ *
+ * Register tuleb `/entity-labels`-ist (module-cache ~26 KB, jagatud kõigi lehtedega),
+ * seega tavaolukorras EI tehta ühtegi Meili päringut. Varem skaneeriti labelite
+ * saamiseks dokumente (`limit: 5000` žanritel, `limit: 200` märksõnadel) — need olid
+ * nii aeglasemad kui ka vaikselt kärbitud (#179, #184).
+ *
+ * Register on tuletatud andmestik ja võib teosest maha jääda (nt teos, mida pole
+ * enrichimise lisandumise järel salvestatud), samuti pole seal VUTT isiku-ID-sid.
+ * Lüngad täidame ühe piiratud dokumendipäringuga; vea korral kukub UI tagasi
+ * Q-koodile nagu varemgi.
+ */
+const resolveLabelsFromRegistry = async (
   index: Index,
-  collection?: string,
-  lang: string = 'et',
+  qcodes: string[],
+  lang: string,
+  fields: { idsField: string; objectField: string },
+  signal?: AbortSignal,
 ): Promise<Record<string, string>> => {
-  checkMixedContent();
-  try {
-    const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) filter.push(`collections_hierarchy = "${collection}"`);
+  if (!qcodes.length) return {};
 
-    const response = await index.search('', {
-      filter,
-      limit: 5000,
-      attributesToRetrieve: ['genre_object'],
-    });
+  const map: Record<string, string> = {};
+  const missing: string[] = [];
 
-    return buildIdMap(response.hits, 'genre_object', lang);
-  } catch (error) {
-    console.error('getGenreLabelMap error:', error);
-    return {};
+  const registry = await getEntityLabelsCache();
+  for (const q of qcodes) {
+    const label = registry[q] ? pickLabelByLang(registry[q], lang) : '';
+    if (label) map[q] = label;
+    else missing.push(q);
   }
-};
+  if (!missing.length) return map;
 
-// Laeb tag labelid (Q-kood → label) collection esimeste lehekülgede tags_object-ist
-// Kasutatakse kui otsingutulemused puuduvad aga collection on valitud
-export const getTagsLabelMap = async (
-  index: Index,
-  collection?: string,
-  lang: string = 'et',
-  yearStart?: number,
-  yearEnd?: number,
-  signal?: AbortSignal
-): Promise<Record<string, string>> => {
   checkMixedContent();
   try {
-    const filter: string[] = ['lehekylje_number = 1'];
-    if (collection) filter.push(`collections_hierarchy = "${collection}"`);
-    pushYearFilter(filter, yearStart, yearEnd);
-
+    const values = missing.map(q => `"${q}"`).join(', ');
     const response = await index.search('', {
-      filter,
-      limit: 200,
-      attributesToRetrieve: ['tags_object'],
+      filter: ['lehekylje_number = 1', `${fields.idsField} IN [${values}]`],
+      limit: LABEL_GAPFILL_LIMIT,
+      attributesToRetrieve: [fields.objectField],
     }, signal ? { signal } : undefined);
-
-    const map: Record<string, string> = {};
-    const cap = (s: string) => s ? s[0].toUpperCase() + s.slice(1) : s;
-    for (const hit of response.hits) {
-      const tags = (hit as any).tags_object;
-      if (!Array.isArray(tags)) continue;
-      for (const tag of tags) {
-        if (!tag?.id) continue;
-        const rawLabel = tag.labels?.[lang] || tag.labels?.['et'] || tag.label;
-        if (rawLabel) map[tag.id] = cap(rawLabel);
-      }
+    const fromDocs = buildIdMap(response.hits, fields.objectField, lang);
+    for (const q of missing) {
+      if (fromDocs[q]) map[q] = fromDocs[q];
     }
-    return map;
   } catch (error) {
     if (signal?.aborted || isAbortError(error)) throw error;
-    console.error('getTagsLabelMap error:', error);
-    return {};
+    console.error(`Labelite lünga-täide ebaõnnestus (${fields.idsField}):`, error);
   }
+  return map;
 };
+
+/**
+ * Žanri labelid. Q-koodid tulevad `getGenreFacets`-ist, seega kollektsiooni-filtrit
+ * siin vaja pole: labelid on globaalsed ja kuvatav hulk on juba facetiga piiratud.
+ */
+export const getGenreLabelMap = (
+  index: Index,
+  qcodes: string[],
+  lang: string = 'et',
+): Promise<Record<string, string>> =>
+  resolveLabelsFromRegistry(index, qcodes, lang,
+    { idsField: 'genre_ids', objectField: 'genre_object' });
+
+/**
+ * Märksõna labelid külgriba facetitele. Q-koodid tulevad `getTeoseTagsFacets`-ist.
+ *
+ * Varem võeti need 200 esilehe `tags_object`-ist (~58 KB): see kattis ainult valimis
+ * esinevad märksõnad, seega facetist tulnud harvem esinev märksõna võis jääda ilma
+ * labelita. Register katab kõik ja on juba mälus.
+ */
+export const getTagsLabelMap = (
+  index: Index,
+  qcodes: string[],
+  lang: string = 'et',
+  signal?: AbortSignal
+): Promise<Record<string, string>> =>
+  resolveLabelsFromRegistry(index, qcodes, lang,
+    { idsField: 'tags_ids', objectField: 'tags_object' }, signal);
 
 // Autorite facetid (author_names väljast)
 export const getAuthorFacets = async (
@@ -354,12 +376,25 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
       attributesToSearchOn: ['title', 'authors_text', 'tags_search'], // Dashboard otsib pealkirjast, autoritest ja märksõnadest
       matchingStrategy: (query ? 'frequency' : 'last') as unknown as MatchingStrategies,
       filter: filter,
-      offset: options?.offset ?? 0,
-      limit: options?.limit ?? 12,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
       facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
     };
+
+    // Lehekülgjaotus: `page`/`hitsPerPage` annab TÄPSE `totalHits`, `offset`/`limit`
+    // ainult `estimatedTotalHits`-i (otsingusõnaga võib olla ligikaudne → vale
+    // lehtede arv ja tühi viimane leht). Mõõdetud tootmises: page-režiim ei ole
+    // aeglasem (7,2 vs 8,6 ms keskmine). Kutsuja API jääb offset/limit peale;
+    // joondamata offset (ei tule ühestki praegusest kutsujast) langeb tagasi.
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? 12;
+    if (offset % limit === 0) {
+      searchParams.page = offset / limit + 1;
+      searchParams.hitsPerPage = limit;
+    } else {
+      searchParams.offset = offset;
+      searchParams.limit = limit;
+    }
 
     // Esimese lehe filter annab juba täpselt ühe dokumendi teose kohta, seega
     // distinct oleks seal üleliigne. Seda vajab ainult „viimati muudetud“ vaade,
@@ -412,27 +447,18 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
     // esimese lehe andmed (tags, page_tags) juba kaasa põhipäringuga.
     // Thumbnail tuleb serveripoolsest /_thumb endpointist (genereeritakse vajadusel).
 
+    // Järjestus tuleb TERVIKUNA Meilisearchist. Siin oli varem kliendipoolne
+    // works.sort(...) „kuna distinct + sort ei tööta alati õigesti“ — see ei saanud
+    // probleemi lahendada, sest sorteeris ainult ühe lehe (12 tulemust) juba
+    // serveripoolselt lõigatud aknas.
+    //
+    // Tootmises verifitseeritud (#183): distinct:'work_id' + sort:['last_modified:desc']
+    // annab korrektse järjestuse ja unikaalsed work_id-d ka üle lehepiiride; year:asc
+    // ja year:desc samuti. `az` juures oli ümbersort aktiivselt KAHJULIK: Meilisearch
+    // taandab diakriitikud (Börk < Bröms), localeCompare('et') paneb ö tähestiku lõppu
+    // (Bröms < Börk) — lehe sisu sorteeriti eesti kollatsiooniga, lehepiirid jäid Meili
+    // omasse, seega A–Z lehitsemine ei olnud monotoonne.
     const works: Work[] = uniqueHits.map(normalizeWork);
-
-    // Meilisearch distinct + sort kombinatsioon ei tööta alati õigesti,
-    // seega sorteerime frontendis uuesti (v.a. relevance, kus säilitame Meilisearchi järjekorra)
-    const sortKey = options?.sort || 'year_asc';
-    if (sortKey !== 'relevance') {
-      works.sort((a, b) => {
-        switch (sortKey) {
-          case 'year_desc':
-            return b.year - a.year;
-          case 'az':
-            return a.title.localeCompare(b.title, 'et');
-          case 'recent':
-            // Sorteerime last_modified järgi kahanevalt
-            return (b as any).last_modified - (a as any).last_modified;
-          case 'year_asc':
-          default:
-            return a.year - b.year;
-        }
-      });
-    }
 
     // Tagasta tulemused koos facetidega
     const facetDistribution = response.facetDistribution || {};
@@ -444,7 +470,9 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
         tags_ids: facetDistribution['tags_ids'],
         teose_staatus: facetDistribution['teose_staatus']
       } as FacetDistribution,
-      totalHits: response.estimatedTotalHits || works.length
+      // page-režiimis täpne totalHits; offset-režiimis (ja vanemate vastuste korral)
+      // estimatedTotalHits.
+      totalHits: (response as any).totalHits ?? response.estimatedTotalHits ?? works.length
     };
 
   } catch (error: any) {

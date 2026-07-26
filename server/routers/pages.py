@@ -25,7 +25,7 @@ from ..admin_page_ops import (
 from ..config import BASE_DIR, get_logger
 from ..deps import get_json_data, require_role
 from ..git_ops import delete_page_from_git, save_with_git
-from ..image_server import generate_thumbnail
+from ..image_server import generate_thumbnail, invalidate_cover
 from ..meilisearch_ops import sync_work_to_meilisearch
 from ..utils import find_directory_by_id
 
@@ -181,6 +181,7 @@ def admin_replace_page_image(
         if os.path.exists(thumb_path):
             os.remove(thumb_path)
         generate_thumbnail(img_path, thumb_path)
+        invalidate_cover(path, img_name)  # dashboardi kaas on eraldi variant (#178)
 
         # Kirjuta püsiv logi
         log_path = os.path.join(BASE_DIR, "replace_image.log")

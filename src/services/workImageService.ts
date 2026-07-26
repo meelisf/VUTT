@@ -11,10 +11,16 @@ export const getFullImageUrl = (imagePath: string): string => {
   return `${IMAGE_BASE_URL}/${encodeURI(cleanPath)}`;
 };
 
-// Thumbnaili URL konstrueerimine (server leiab ise õige faili)
+// Dashboardi kaanepildi versioon — peab kattuma image_server.py COVER_VERSION-iga.
+// URL on stabiilne (/{work_id}/_thumb) ja pildid on 30 päeva brauseri-cache'is, seega
+// serveripoolsest failinime-versioonist üksi ei piisa: ilma ?v-ta näeks olemasolev
+// kasutaja vana 560 px pilti kuni cache aegumiseni.
+const COVER_VERSION = 1;
+
+// Kaanepildi URL konstrueerimine (server leiab ise õige faili)
 export const getThumbUrl = (workId: string): string => {
   if (!workId) return '';
-  return `${IMAGE_BASE_URL}/${workId}/_thumb`;
+  return `${IMAGE_BASE_URL}/${workId}/_thumb?v=${COVER_VERSION}`;
 };
 
 // Lehekülje thumbnaili URL (_thumbs/ alamkataloogist)

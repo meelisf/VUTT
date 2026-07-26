@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from . import state
+from . import ext_id_index
 from ._compat import sync_from_facade
 from .locks import person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
@@ -445,22 +446,19 @@ def apply_enrichment(person_id: str, approved: dict, username: str) -> dict:
 
 
 def _find_by_external_id(scheme: str, ext_id: str) -> Optional[dict]:
-    """Otsib prosopo kaarti välise identifikaatori (scheme + id) järgi."""
-    sync_from_facade()
-    for fpath in state._glob.glob(os.path.join(state.PROSOPOGRAPHY_DIR, "*.json")):
-        if state.PERSON_IMAGES_DIR_NAME in fpath:
-            continue
-        try:
-            with open(fpath, encoding="utf-8") as f:
-                p = json.load(f)
-        except Exception:
-            continue
-        if p.get("record_status") == "tombstone":
-            continue
-        for ident in p.get("identifiers") or []:
-            if ident.get("scheme") == scheme and ident.get("id") == ext_id:
-                return p
-    return None
+    """Otsib prosopo kaarti välise identifikaatori (scheme + id) järgi.
+
+    Käib pöördindeksi kaudu (#180) — varem skanniti kogu kausta iga ID kohta.
+    """
+    person_id = ext_id_index.find_person_id(scheme, ext_id)
+    if not person_id:
+        return None
+    person = get_person(person_id)
+    if person is None:
+        # Indeks viitab kaardile, mida enam pole (väline kustutus) — koristame kirje.
+        ext_id_index.remove_person(person_id)
+        return None
+    return person
 
 
 def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:

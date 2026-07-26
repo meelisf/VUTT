@@ -92,6 +92,13 @@ except ImportError:
 # Thumbnaili seaded
 THUMB_HEIGHT = 560  # Kõrgus pikslites (portree- ja topeltlehtedel ühtlane kõrgus)
 THUMB_QUALITY = 85  # JPEG kvaliteet (0-100)
+# Dashboardi kaanepilt on OMA variant: kaart kuvab seda 160 px kõrgusena, seega
+# 360 px katab Retina ja säästab ~60% baite võrreldes leheküljegridi 560/85-ga.
+# Eraldi nimeruum (_cover_) hoiab selle leheküljethumbidest lahus — vt
+# get_or_create_thumbnail koristusloogika.
+COVER_HEIGHT = 360
+COVER_QUALITY = 80
+COVER_VERSION = 1  # Muutmisel uueneb failinimi → vanad coverid genereeritakse ümber.
 OG_IMAGE_SIZE = (1200, 630)
 OG_IMAGE_QUALITY = 88
 OG_IMAGE_VERSION = 2  # Muutmisel uueneb failinimi ja jagamis-URL-i cache-võti.
@@ -136,7 +143,7 @@ def get_first_image(work_path):
     return images[0]
 
 
-def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
+def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THUMB_QUALITY):
     """Genereerib thumbnaili antud pildist.
 
     Skaleerib kõrguse järgi, et portree- ja topeltlehtedel oleks ühtlane
@@ -147,6 +154,7 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
         source_path: Lähtefaili tee
         thumb_path: Sihtfaili tee (_thumb_XXXX.jpg)
         height: Thumbnaili kõrgus (laius arvutatakse proportsionaalselt)
+        quality: JPEG kvaliteet (dashboardi kaas kasutab madalamat, vt COVER_QUALITY)
 
     Returns:
         True kui õnnestus, False kui mitte
@@ -172,7 +180,7 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT):
                 thumb = thumb.convert('RGB')
 
             # Salvesta JPEG formaadis
-            thumb.save(thumb_path, 'JPEG', quality=THUMB_QUALITY, optimize=True)
+            thumb.save(thumb_path, 'JPEG', quality=quality, optimize=True)
 
             # Sea õigused loetavaks
             os.chmod(thumb_path, 0o644)
@@ -244,16 +252,19 @@ def get_or_create_og_image(work_path):
 
 
 def get_or_create_thumbnail(work_path):
-    """Tagastab teose esilehe thumbnaili tee, genereerides selle vajadusel.
+    """Tagastab teose dashboardi-kaanepildi tee, genereerides selle vajadusel.
 
-    Thumbnailid salvestatakse _thumbs/ alamkataloogi (_thumb_NIMI.jpg).
-    Kui esimene leht on muutunud, kustutab vana ja genereerib uue.
+    Kaas on OMA variant (`_cover_v{N}_NIMI.jpg`, COVER_HEIGHT/COVER_QUALITY), mitte
+    leheküljegridi thumb. Nimeruum on tahtlikult eraldi: varem kandis kaas sama nime
+    kui esilehe grid-thumb (`_thumb_NIMI.jpg`) ja alumine koristus glob'is `_thumb_*.jpg`,
+    mistõttu iga dashboardi vaatamine kustutas KÕIK selle teose leheküljethumbid ja
+    Workspace pidi need Pillow'ga uuesti genereerima.
 
     Args:
         work_path: Teose kataloog
 
     Returns:
-        Thumbnaili failitee või None kui genereerimine ebaõnnestus
+        Kaanepildi failitee või None kui genereerimine ebaõnnestus
     """
     # 1. Leia praegune esimene leht
     first_image = get_first_image(work_path)
@@ -262,32 +273,50 @@ def get_or_create_thumbnail(work_path):
         return None
 
     first_image_name = os.path.basename(first_image)
-    thumb_base = os.path.splitext(first_image_name)[0]
-    expected_thumb_name = f"_thumb_{thumb_base}.jpg"
+    cover_base = os.path.splitext(first_image_name)[0]
+    expected_cover_name = f"_cover_v{COVER_VERSION}_{cover_base}.jpg"
 
-    # Thumbnailid _thumbs/ alamkataloogis
+    # Kaanepildid _thumbs/ alamkataloogis, koos lehe-thumbidega, aga eri prefiksiga
     thumbs_dir = os.path.join(work_path, '_thumbs')
-    expected_thumb_path = os.path.join(thumbs_dir, expected_thumb_name)
+    expected_cover_path = os.path.join(thumbs_dir, expected_cover_name)
 
-    # 2. Kustuta aegunud thumbnailid _thumbs/ kataloogist
+    # 2. Kustuta AINULT vananenud kaanepildid (muutunud esileht või vana versioon).
+    #    EI TOHI glob'ida `_thumb_*.jpg` — need on leheküljegridi omad.
     if os.path.exists(thumbs_dir):
-        existing_thumbs = glob.glob(os.path.join(thumbs_dir, "_thumb_*.jpg"))
-        for thumb in existing_thumbs:
-            if thumb != expected_thumb_path:
+        for cover in glob.glob(os.path.join(thumbs_dir, "_cover_*.jpg")):
+            if cover != expected_cover_path:
                 try:
-                    os.remove(thumb)
-                    print(f"[THUMB] Kustutatud aegunud: {thumb}")
+                    os.remove(cover)
+                    print(f"[THUMB] Kustutatud aegunud kaas: {cover}")
                 except OSError as e:
-                    print(f"[THUMB] Viga kustutamisel {thumb}: {e}")
+                    print(f"[THUMB] Viga kustutamisel {cover}: {e}")
 
     # 3. Genereeri vajadusel
-    if not os.path.exists(expected_thumb_path):
+    if not os.path.exists(expected_cover_path):
         os.makedirs(thumbs_dir, exist_ok=True)
-        success = generate_thumbnail(first_image, expected_thumb_path)
+        success = generate_thumbnail(first_image, expected_cover_path,
+                                     height=COVER_HEIGHT, quality=COVER_QUALITY)
         if not success:
             return None
 
-    return expected_thumb_path
+    return expected_cover_path
+
+
+def invalidate_cover(work_path, image_filename):
+    """Kustuta selle lehepildi pealt tehtud kaanepilt, kui see on olemas.
+
+    Kutsu KÕIGIS kohtades, kus lehepilti asendatakse või teisendatakse. Enne #178-t
+    kandis kaas sama nime kui esilehe grid-thumb, seega thumbi kustutamine invalideeris
+    kaane isetegevuslikult; nüüd on nimeruumid lahus ja seda tuleb teha selgesõnaliselt.
+    """
+    base = os.path.splitext(os.path.basename(image_filename))[0]
+    thumbs_dir = os.path.join(work_path, '_thumbs')
+    for cover in glob.glob(os.path.join(thumbs_dir, f"_cover_*_{base}.jpg")):
+        try:
+            os.remove(cover)
+            print(f"[THUMB] Kaas invalideeritud: {cover}")
+        except OSError as e:
+            print(f"[THUMB] Viga kaane kustutamisel {cover}: {e}")
 
 
 def get_or_create_page_thumbnail(work_path, thumb_filename):

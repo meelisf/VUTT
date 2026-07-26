@@ -62,13 +62,16 @@ export function useSearchFacets(
                 if (hasActiveContentFilters || !index) return;
 
                 const facetLang = getLangCode(lang);
-                const [tags, genres, types, authors, labels] = await Promise.all([
+                const [tags, genres, types, authors] = await Promise.all([
                     getTeoseTagsFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                     getGenreFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                     getTypeFacets(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                     getAuthorFacets(index, selectedCollection || undefined, urlParams.yearStart, urlParams.yearEnd, controller.signal),
-                    getTagsLabelMap(index, selectedCollection || undefined, facetLang, urlParams.yearStart, urlParams.yearEnd, controller.signal),
                 ]);
+                if (cancelled) return;
+                // Labelid lahendatakse facetist saadud Q-koodidele; register on juba
+                // mälus (useQCodeMaps laeb selle), seega tavaliselt lisapäringut pole (#179).
+                const labels = await getTagsLabelMap(index, tags.map(t => t.tag), facetLang, controller.signal);
                 if (cancelled) return;
                 setTagLabels(labels);
                 setAvailableTeoseTags(mergeSelectedIntoTags(tags, urlParams.teoseTags));
