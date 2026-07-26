@@ -35,6 +35,26 @@ Frontend deploy (pärast `npm run build` lokaalses masinas):
 rsync -avz --delete dist/ vutt:~/VUTT/dist/
 ```
 
+`npm run build` teeb Vite build'i JA eelkompressiooni (`scripts/precompress-dist.mjs`):
+iga tekstivara kõrvale tekib `.br` (brotli 11) ja `.gz` (gzip 9). nginx serveerib
+need `brotli_static`/`gzip_static` kaudu — **need failid PEAVAD rsync'iga kaasa
+minema**, muidu langeb server tagasi lennult pakkimisele (~15% suurem).
+
+### nginx konfiguratsioon
+
+Aktiivne config on serveris (`/etc/nginx/sites-available/vutt`), **mitte gitis** —
+repos on koopia `nginx.host.conf`. Muutmisel uuenda MÕLEMAT:
+
+```bash
+scp nginx.host.conf vutt:/tmp/vutt.nginx.new
+ssh vutt 'sudo cp /tmp/vutt.nginx.new /etc/nginx/sites-available/vutt && sudo nginx -t && sudo systemctl reload nginx'
+```
+
+Eeldused hostis (ei ole `nginx.host.conf`-is): rate-limit tsoonid
+`/etc/nginx/nginx.conf` http{} blokis (`vutt_auth` 1r/s, `vutt_api` 10r/s,
+`vutt_meili` 20r/s, `vutt_images` 60r/s) ja brotli moodulid
+(`libnginx-mod-http-brotli-filter`, `libnginx-mod-http-brotli-static`).
+
 ## Architecture
 
 ```
