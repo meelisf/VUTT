@@ -623,13 +623,14 @@ def transform_page_image(work_id, filename, angle=0.0, crop=None, quad=None, use
         # 5) Regenereeri thumbnail — vea korral ei rollback'i
         thumbnail_warning = False
         try:
-            from .image_server import generate_thumbnail
+            from .image_server import generate_thumbnail, invalidate_cover
             thumbs_dir = os.path.join(path, '_thumbs')
             os.makedirs(thumbs_dir, exist_ok=True)
             thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
             if os.path.exists(thumb_path):
                 os.remove(thumb_path)
             generate_thumbnail(img_path, thumb_path)
+            invalidate_cover(path, filename)  # dashboardi kaas on eraldi variant (#178)
         except Exception as e:
             logger.error(f"TRANSFORM: thumbnaili regen ebaõnnestus {filename}: {e}")
             thumbnail_warning = True
@@ -701,13 +702,14 @@ def restore_original_page_image(work_id, filename, username="admin"):
         # 3) Regenereeri thumbnail
         thumbnail_warning = False
         try:
-            from .image_server import generate_thumbnail
+            from .image_server import generate_thumbnail, invalidate_cover
             thumbs_dir = os.path.join(path, '_thumbs')
             os.makedirs(thumbs_dir, exist_ok=True)
             thumb_path = os.path.join(thumbs_dir, f"_thumb_{filename}")
             if os.path.exists(thumb_path):
                 os.remove(thumb_path)
             generate_thumbnail(img_path, thumb_path)
+            invalidate_cover(path, filename)  # dashboardi kaas on eraldi variant (#178)
         except Exception as e:
             logger.error(f"RESTORE: thumbnaili regen ebaõnnestus {filename}: {e}")
             thumbnail_warning = True

@@ -105,6 +105,119 @@ def test_get_or_create_og_image_uses_first_page_and_cache(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Dashboardi kaanepilt (#178)
+# ---------------------------------------------------------------------------
+
+def _make_work(tmp_path, pages=3, size=(400, 600)):
+    from PIL import Image
+    work = tmp_path / "work"
+    work.mkdir()
+    for i in range(1, pages + 1):
+        Image.new("RGB", size, "white").save(work / f"page_00{i}.jpg")
+        (work / f"page_00{i}.json").write_text('{"sequence": %d}' % i, encoding="utf-8")
+    return work
+
+
+def test_cover_on_eraldi_versioonitud_fail(tmp_path):
+    """Kaanepilt on oma nimeruumis + versioonis, et vanad 560 px coverid uueneksid."""
+    from server.image_server import get_or_create_thumbnail, COVER_VERSION
+
+    work = _make_work(tmp_path)
+    first = get_or_create_thumbnail(str(work))
+    second = get_or_create_thumbnail(str(work))
+
+    assert first == second  # cache
+    assert os.path.basename(first) == f"_cover_v{COVER_VERSION}_page_001.jpg"
+    assert os.path.exists(first)
+
+
+def test_cover_on_360px_korgusega(tmp_path):
+    """CSS kuvab 160 px; 360 px katab Retina. Varem 560 px."""
+    from PIL import Image
+    from server.image_server import get_or_create_thumbnail, COVER_HEIGHT
+
+    work = _make_work(tmp_path)
+    with Image.open(get_or_create_thumbnail(str(work))) as img:
+        assert img.height == COVER_HEIGHT == 360
+        assert img.width == 240  # 400x600 → proportsionaalne
+
+
+def test_cover_ei_kustuta_lehekulje_thumbe(tmp_path):
+    """REGRESSIOON: kaane genereerimine glob'is _thumb_*.jpg ja kustutas KÕIK
+    leheküljegridi thumbid → iga dashboardi vaatamine sundis Workspace'i neid
+    uuesti genereerima."""
+    from server.image_server import get_or_create_thumbnail, get_or_create_page_thumbnail
+
+    work = _make_work(tmp_path)
+    for i in (1, 2, 3):
+        get_or_create_page_thumbnail(str(work), f"_thumb_page_00{i}.jpg")
+
+    get_or_create_thumbnail(str(work))
+
+    thumbs = sorted(os.listdir(work / "_thumbs"))
+    assert "_thumb_page_001.jpg" in thumbs
+    assert "_thumb_page_002.jpg" in thumbs
+    assert "_thumb_page_003.jpg" in thumbs
+
+
+def test_cover_koristab_ainult_vananenud_coverid(tmp_path):
+    """Esilehe muutumisel/versiooni tõstmisel kaob vana cover, lehe-thumbid jäävad."""
+    from server.image_server import get_or_create_thumbnail
+
+    work = _make_work(tmp_path)
+    thumbs_dir = work / "_thumbs"
+    thumbs_dir.mkdir(exist_ok=True)
+    (thumbs_dir / "_cover_v0_vana.jpg").write_bytes(b"vana")
+    (thumbs_dir / "_thumb_page_002.jpg").write_bytes(b"lehe-thumb")
+
+    current = get_or_create_thumbnail(str(work))
+
+    listing = sorted(os.listdir(thumbs_dir))
+    assert "_cover_v0_vana.jpg" not in listing      # vananenud cover koristatud
+    assert "_thumb_page_002.jpg" in listing          # lehe-thumb puutumata
+    assert os.path.basename(current) in listing
+
+
+def test_invalidate_cover_kustutab_muudetud_lehe_kaane(tmp_path):
+    """Pildi asendamisel/pööramisel invalideeriti kaas varem "tasuta", sest kaas OLI
+    esilehe thumb. Eraldi nimeruumiga peab seda tegema selgesõnaliselt — muidu jääb
+    dashboardile vana pilt."""
+    from server.image_server import get_or_create_thumbnail, invalidate_cover
+
+    work = _make_work(tmp_path)
+    cover = get_or_create_thumbnail(str(work))
+    assert os.path.exists(cover)
+
+    invalidate_cover(str(work), "page_001.jpg")
+
+    assert not os.path.exists(cover)
+    assert os.path.exists(get_or_create_thumbnail(str(work)))  # regenereerub
+
+
+def test_invalidate_cover_ei_puutu_teise_lehe_muutmisel(tmp_path):
+    from server.image_server import get_or_create_thumbnail, invalidate_cover
+
+    work = _make_work(tmp_path)
+    cover = get_or_create_thumbnail(str(work))
+
+    invalidate_cover(str(work), "page_002.jpg")
+
+    assert os.path.exists(cover)
+
+
+def test_cover_on_vaiksem_kui_vana_560px_variant(tmp_path):
+    """Mõõdetav eesmärk: ~60% väiksem payload dashboardi kaardi kohta."""
+    from server.image_server import generate_thumbnail, get_or_create_thumbnail
+
+    work = _make_work(tmp_path, size=(1200, 1800))
+    vana = work / "vana_560.jpg"
+    generate_thumbnail(str(work / "page_001.jpg"), str(vana), height=560, quality=85)
+
+    uus = get_or_create_thumbnail(str(work))
+    assert os.path.getsize(uus) < os.path.getsize(vana)
+
+
+# ---------------------------------------------------------------------------
 # HMAC tokeni valideerimine
 # ---------------------------------------------------------------------------
 
