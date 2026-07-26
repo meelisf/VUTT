@@ -32,3 +32,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0010](0010-lehe-vahetus-ei-monteeri-editorit-maha.md) | Lehe vahetus ei monteeri editorit maha; sisuvahetus on märgistatud | kehtib |
 | [0011](0011-i18n-keelepakid-laisalt-ilma-fallbackita.md) | i18n laeb ühe keele korraga; `fallbackLng` väljas + pariteeditest | kehtib |
 | [0012](0012-muutusteta-salvestus-on-no-op.md) | Muutusteta salvestus ei kirjuta, ei commiti ega indekseeri | kehtib |
+| [0013](0013-meili-sunk-koondatakse-teose-kaupa.md) | Meili sünk koondatakse teose kaupa; dirty-lipp elab vea üle | kehtib |
