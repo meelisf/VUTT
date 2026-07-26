@@ -323,6 +323,15 @@ _meili_sync_last_error = None
 _meili_sync_last_error_at = None
 _meili_sync_last_success_at = None
 _meili_sync_completed = 0
+
+# Per-teose coalescing (#176): korraga üks aktiivne sünk teose kohta. Kui teose
+# kohta tuleb päring, kui sünk juba käib, märgitakse teos dirty'ks ja pärast
+# aktiivse töö lõppu tehakse TÄPSELT üks järeljooks — see loeb ketast uuesti,
+# seega kannab kõigi vahepealsete salvestuste tulemuse korraga.
+_meili_active_syncs = set()   # dir_name'id, mille sünk parasjagu käib
+_meili_dirty_syncs = set()    # dir_name'id, mis vajavad järeljooksu
+_meili_sync_requested = 0
+_meili_sync_coalesced = 0
 register_job("meilisearch_async_sync", description="Asünkroonne teoste sünkroonimine Meilisearchi")
 register_job("metadata_watcher", interval_seconds=60, description="Uute teosekaustade metaandmete jälgija")
 
@@ -347,8 +356,19 @@ def _sync_work_task(dir_name):
         mark_error("meilisearch_async_sync", e, detail={"dir_name": dir_name})
         logger.error(f"ASYNC MEILISEARCH VIGA ({dir_name}): {e}")
     finally:
+        # NB: finally, mitte try-haru — vea korral EI TOHI vahepeal saabunud
+        # muudatus kaduda, muidu jääks teos Meilisearchis vanaks.
         with _meili_sync_lock:
             _meili_sync_pending = max(0, _meili_sync_pending - 1)
+            rerun = dir_name in _meili_dirty_syncs
+            if rerun:
+                _meili_dirty_syncs.discard(dir_name)
+                _meili_sync_pending += 1  # teos jääb aktiivseks järeljooksu ajaks
+            else:
+                _meili_active_syncs.discard(dir_name)
+        if rerun:
+            logger.info(f"MEILI COALESCING: järeljooks ({dir_name})")
+            _meilisearch_executor.submit(_sync_work_task, dir_name)
 
 
 def get_meilisearch_sync_status():
@@ -360,6 +380,10 @@ def get_meilisearch_sync_status():
             "queued": queued,
             "pool_size": MEILISEARCH_POOL_SIZE,
             "completed": _meili_sync_completed,
+            "requested": _meili_sync_requested,
+            "coalesced": _meili_sync_coalesced,
+            "active": len(_meili_active_syncs),
+            "dirty": len(_meili_dirty_syncs),
             "last_success_at": datetime.fromtimestamp(_meili_sync_last_success_at, timezone.utc).isoformat() if _meili_sync_last_success_at else None,
             "last_error": _meili_sync_last_error,
             "last_error_at": datetime.fromtimestamp(_meili_sync_last_error_at, timezone.utc).isoformat() if _meili_sync_last_error_at else None,
@@ -372,11 +396,33 @@ def sync_work_to_meilisearch_async(dir_name):
     Kasutaja päring ei pea ootama indekseerimise lõppu.
     Vead logitakse, aga ei katkesta kasutaja tööd.
     Pool piirab samaagsete päringute arvu (max 10).
+
+    Sama teose järjestikused päringud koondatakse (#176): kui teose sünk juba
+    käib, märgitakse teos ainult dirty'ks ja järeljooks teeb töö ära korra.
+    Eri teosed käivad endiselt paralleelselt.
     """
-    global _meili_sync_pending
+    global _meili_sync_pending, _meili_sync_requested, _meili_sync_coalesced
     with _meili_sync_lock:
+        _meili_sync_requested += 1
+        if dir_name in _meili_active_syncs:
+            _meili_dirty_syncs.add(dir_name)
+            _meili_sync_coalesced += 1
+            return
+        _meili_active_syncs.add(dir_name)
         _meili_sync_pending += 1
     _meilisearch_executor.submit(_sync_work_task, dir_name)
+
+
+def _reset_sync_state_for_tests():
+    """Nullib coalescing-oleku ja loendurid. Ainult testide jaoks."""
+    global _meili_sync_pending, _meili_sync_requested, _meili_sync_coalesced, _meili_sync_completed
+    with _meili_sync_lock:
+        _meili_active_syncs.clear()
+        _meili_dirty_syncs.clear()
+        _meili_sync_pending = 0
+        _meili_sync_requested = 0
+        _meili_sync_coalesced = 0
+        _meili_sync_completed = 0
 
 
 def _ensure_filterable_attributes():
