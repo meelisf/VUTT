@@ -4,10 +4,11 @@ Metaandmete kirjutamise ühtne loogika.
 save_work_metadata() on ainus koht kus _metadata.json uuendatakse —
 git commit, person_to_works indeks ja Meilisearch sync ühes kohas.
 """
+import copy
 import json
 import os
 import time
-from typing import Callable
+from typing import Callable, Tuple
 
 from .config import get_logger
 from .utils import metadata_lock
@@ -15,6 +16,7 @@ from .git_ops import save_with_git
 from .meilisearch_ops import sync_work_to_meilisearch, sync_work_to_meilisearch_async
 from .prosopography.indices import update_person_to_works, update_work_collections
 from .prosopography.person_crud import ensure_prosopo_stubs
+from .save_diff import metadata_unchanged
 
 logger = get_logger(__name__)
 
@@ -123,7 +125,7 @@ def save_work_metadata(
     background_tasks=None,
     sync_meili: bool = True,
     call_ptw: bool = True,
-) -> dict:
+) -> Tuple[dict, bool]:
     """
     Kirjutab _metadata.json ja käivitab järeloperatsioonid.
 
@@ -138,7 +140,9 @@ def save_work_metadata(
       call_ptw        — True → kutsub update_person_to_works (nt tags/creators muutumisel)
                         False → jätab vahele (nt bulk-collection, bulk-genre)
 
-    Tagastab uuendatud meta dict-i.
+    Tagastab (meta, changed). changed=False tähendab, et salvestus oli sisuliselt
+    muutusteta — sel juhul jäävad Git commit, tuletatud indeksid ja Meilisearchi
+    sünk tegemata (#173).
     """
     started = time.monotonic()
     slug = os.path.basename(os.path.dirname(meta_path))
@@ -153,25 +157,41 @@ def save_work_metadata(
     stubs_done = time.monotonic()
 
     with metadata_lock:
-        if os.path.exists(meta_path):
+        file_existed = os.path.exists(meta_path)
+        if file_existed:
             with open(meta_path, "r", encoding="utf-8") as f:
                 meta = json.load(f)
         else:
             meta = {}
 
+        previous = copy.deepcopy(meta)
         clean = {k: v for k, v in updates.items() if k in ALLOWED_METADATA_FIELDS}
         meta.update(clean)
 
         for field in _V1_FIELDS:
             meta.pop(field, None)
 
-        save_with_git(
-            meta_path,
-            json.dumps(meta, indent=2, ensure_ascii=False),
-            username,
-            message=git_message,
-        )
+        changed = not file_existed or not metadata_unchanged(previous, meta)
+        if changed:
+            git_result = save_with_git(
+                meta_path,
+                json.dumps(meta, indent=2, ensure_ascii=False),
+                username,
+                message=git_message,
+            )
+            # Teine kaitsekiht: Git näeb faili baitidena ja võib leida, et kettal
+            # olev sisu on juba sama (nt vormindus). Siis on ka järeltegevused üleliigsed.
+            if isinstance(git_result, dict) and git_result.get("is_noop"):
+                changed = False
     git_done = time.monotonic()
+
+    if not changed:
+        logger.info(
+            "METADATA SAVE (%s): muutusteta — commit, indeksid ja Meili jäetakse vahele (%.0fms)",
+            slug,
+            (git_done - started) * 1000,
+        )
+        return meta, False
 
     # Kollektsioonid uuenevad ka bulk-collection teel (call_ptw=False) — tingimusteta
     update_work_collections(meta.get("id"), meta.get("collections") or [])
@@ -207,4 +227,4 @@ def save_work_metadata(
         (finished - collections_done) * 1000,
         sync_meili,
     )
-    return meta
+    return meta, True

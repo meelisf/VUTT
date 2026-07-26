@@ -146,7 +146,7 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
         seen["thread"] = _worker_thread_name()
         seen["sync_meili"] = kwargs.get("sync_meili")
         seen["background_tasks"] = kwargs.get("background_tasks")
-        return {"id": "w1"}
+        return {"id": "w1"}, True
 
     monkeypatch.setattr(editing, "save_work_metadata", fake_save)
     monkeypatch.setattr(editing, "process_person_fields_metadata", lambda *_a: None)
@@ -159,7 +159,7 @@ def test_metadata_save_jookseb_threadpoolis(monkeypatch):
         user={"username": "admin", "role": "admin"},
     ))
 
-    assert result == {"status": "success"}
+    assert result == {"status": "success", "changed": True}
     assert seen["thread"] != MAIN_THREAD
     assert seen["sync_meili"] is False
     assert isinstance(seen["background_tasks"], BackgroundTasks)

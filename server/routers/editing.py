@@ -31,6 +31,7 @@ from ..meilisearch_ops import sync_work_to_meilisearch_async
 from ..metadata_ops import bulk_update_field, save_work_metadata
 from ..people_ops import process_person_fields_metadata
 from ..prosopography.relations import update_page_person_mentions
+from ..save_diff import page_content_unchanged
 from ..utils import find_directory_by_id
 router = APIRouter()
 
@@ -93,6 +94,8 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
 
     txt_path = os.path.join(BASE_DIR, catalog, filename)
     additional = []
+    json_path = None
+    meta_content = None
     if data.get('meta_content'):
         json_path = os.path.join(BASE_DIR, catalog, os.path.splitext(filename)[0] + ".json")
         meta_content = data['meta_content']
@@ -106,6 +109,11 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
             except Exception:
                 pass
         additional.append((json_path, json.dumps(meta_content, indent=2, ensure_ascii=False)))
+
+    # Muutusteta Ctrl+S: ei kirjuta kettale, ei commiti ega indekseeri (#173).
+    # Kliendi värske updated_at üksi ei ole muudatus — vt server/save_diff.py.
+    if await run_in_threadpool(page_content_unchanged, txt_path, text, json_path, meta_content):
+        return {"status": "success", "changed": False, "git_committed": True, "commit_hash": ""}
 
     git_result = await run_in_threadpool(
         save_with_git,
@@ -126,7 +134,7 @@ async def save(request: Request, background_tasks: BackgroundTasks, user=Depends
     if page_tag_qcodes:
         background_tasks.add_task(enrich_entity_labels_async_qcodes, page_tag_qcodes)
 
-    response = {"status": "success", "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True}
+    response = {"status": "success", "changed": True, "commit_hash": git_result.get("commit_hash", "")[:8], "git_committed": True}
     if git_result.get("success") is False:
         response["git_committed"] = False
         response["warning"] = "Tekst salvestati kettale, aga Git versioonihalduse commit ebaõnnestus."
@@ -143,7 +151,7 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
     meta_path = os.path.join(path, '_metadata.json')
     slug = os.path.basename(path)
 
-    meta = await run_in_threadpool(
+    meta, changed = await run_in_threadpool(
         save_work_metadata,
         meta_path,
         data.get('metadata', {}),
@@ -155,10 +163,12 @@ async def update_work_metadata(request: Request, background_tasks: BackgroundTas
         sync_meili=False,
         call_ptw=True,
     )
-    background_tasks.add_task(process_person_fields_metadata, meta)
-    background_tasks.add_task(enrich_entity_labels_async, meta)
-    _invalidate_all_caches()
-    return {"status": "success"}
+    # Muutusteta salvestus ei vaja rikastamist ega cache'ide tühjendamist (#173).
+    if changed:
+        background_tasks.add_task(process_person_fields_metadata, meta)
+        background_tasks.add_task(enrich_entity_labels_async, meta)
+        _invalidate_all_caches()
+    return {"status": "success", "changed": changed}
 
 @router.post("/get-work-metadata")
 async def get_work_meta_direct(request: Request, user=Depends(require_role("editor"))):
