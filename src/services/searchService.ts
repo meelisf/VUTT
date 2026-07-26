@@ -454,6 +454,74 @@ export const searchWorks = async (index: Index, query: string, options?: Dashboa
   }
 };
 
+// Mitu teost korraga ühte work_id IN [...] filtrisse. Kogu korpus (~1300 teost)
+// mahub praegu ühte päringusse; partiideks jagamine hoiab filtri stringi ohjes,
+// kui korpus kasvab.
+const WORK_FACET_BATCH = 1000;
+
+/**
+ * Teosepõhised facet-loendurid: mitu TEOST (mitte lehekülge) vastab igale
+ * žanrile/tüübile/märksõnale/autorile.
+ *
+ * Meilisearchi facetDistribution loendab alati dokumente ega arvesta
+ * `distinct`-iga. Kuna indeksis on üks dokument lehekülje kohta ja metaandmed on
+ * igale leheküljele denormaliseeritud, saame teosepõhise loenduri, piirates
+ * dokumendihulga iga teose esimese leheküljega.
+ *
+ * Eeldus: igal teosel on indeksis `lehekylje_number = 1` (kontrollitud
+ * tootmiskorpusel 1264/1264). Kui mõnel puudub, jääb ta facet-loendurist välja,
+ * kuid teoste koguarv (work_id facet) on siiski õige.
+ */
+async function fetchWorkLevelFacets(
+  index: Index,
+  workIds: string[],
+  facetFields: string[],
+  requestConfig?: { signal?: AbortSignal },
+): Promise<Record<string, Record<string, number>>> {
+  const merged: Record<string, Record<string, number>> = {};
+  for (const field of [...facetFields, 'author_names', 'originaal_kataloog']) {
+    merged[field] = {};
+  }
+  if (workIds.length === 0) return merged;
+
+  const batches: string[][] = [];
+  for (let i = 0; i < workIds.length; i += WORK_FACET_BATCH) {
+    batches.push(workIds.slice(i, i + WORK_FACET_BATCH));
+  }
+
+  let responses;
+  try {
+    responses = await Promise.all(batches.map(batch => index.search('', {
+      limit: 0,
+      filter: [
+        `work_id IN [${batch.map(id => `"${id}"`).join(', ')}]`,
+        'lehekylje_number = 1',
+      ],
+      facets: [...facetFields, 'author_names', 'respondens_names', 'originaal_kataloog'],
+    }, requestConfig)));
+  } catch (error) {
+    // Katkestus peab läbi minema, muidu kirjutaks vana otsing uue tulemused üle.
+    if (requestConfig?.signal?.aborted || isAbortError(error)) throw error;
+    // Muu tõrge: tulemused ja koguarvud on juba käes — jäta külgriba filtrid tühjaks,
+    // ära võta kogu otsingut maha.
+    console.error('fetchWorkLevelFacets error:', error);
+    return merged;
+  }
+
+  for (const response of responses) {
+    const dist = (response as any).facetDistribution || {};
+    for (const [field, values] of Object.entries(dist)) {
+      // Respondendid on otsingu külgribas autorite all, nagu varasemas loogikas.
+      const target = field === 'respondens_names' ? 'author_names' : field;
+      if (!merged[target]) merged[target] = {};
+      for (const [value, count] of Object.entries(values as Record<string, number>)) {
+        merged[target][value] = (merged[target][value] || 0) + count;
+      }
+    }
+  }
+  return merged;
+}
+
 // Täisteksti otsing
 // Kui workId on määratud - otsib ainult sellest teosest (kõik vasted, ilma distinct'ita)
 // Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
@@ -607,22 +675,17 @@ export const searchContent = async (index: Index, query: string, page: number = 
     }
 
     // 2. Kui otsingusõna ON OLEMAS (sisuotsing)
-    // Siis me ei saa kasutada 'lehekylje_number = 1' filtrit, sest otsitav sõna võib olla mujal.
-    // Lahendus: Tõmbame "statistika päringuga" suure hulga vasteid (ainult ID ja meta) ja agregeerime brauseris.
+    // Otsitav sõna võib olla ükskõik millisel leheküljel, seega ei saa vasteid
+    // otse 'lehekylje_number = 1' filtriga teose tasandile viia.
+    //
+    // Kaheastmeline lahendus (#174): work_id facet annab KÕIK vastavad teosed
+    // (ei sõltu ühestki limiidist), seejärel küsime nende teoste facetid ühelt
+    // dokumendilt teose kohta. Varem tõmmati 5000 vastet ja agregeeriti brauseris —
+    // see oli kallutatud (laia päringu 5000 hitti katsid ~135 teost 1154-st),
+    // maksis ~1 s ja 5–7 MB (pakkimata) iga otsingu kohta.
     else {
-      // Optimeerimine: Küsime max 5000 vastet statistika jaoks.
-      // See katab 99% tavalistest otsingutest. Väga üldiste otsingute puhul ("a") on see ligikaudne.
-      const STATS_LIMIT = 5000;
-
-      const [statsResponse, distinctResponse, pageCountResponse] = await Promise.all([
-        // Päring 1: Statistika (kõik vasted, ainult metaandmed)
-        index.search(query, {
-          filter,
-          limit: STATS_LIMIT,
-          attributesToRetrieve: ['id', 'work_id', 'title', 'year', 'location', 'publisher', 'creators', 'genre_object', 'type_object', 'collections', 'collections_hierarchy', 'author_names', 'respondens_names', 'tags_object', genreFacetField, typeFacetField, tagsFacetField],
-          attributesToSearchOn: attributesToSearchOn
-        }, requestConfig),
-        // Päring 2: Sisu (kuvatavad teosed, distinct)
+      const [distinctResponse, pageCountResponse] = await Promise.all([
+        // Päring 1: Sisu (kuvatavad teosed, distinct)
         index.search(query, {
           offset,
           limit,
@@ -636,7 +699,8 @@ export const searchContent = async (index: Index, query: string, page: number = 
           highlightPostTag: HIGHLIGHT_POST_TAG,
           attributesToSearchOn: attributesToSearchOn
         }, requestConfig),
-        // Päring 3: Lehekülgede arvud teoste kaupa (work_id facet)
+        // Päring 2: Lehekülgede arvud teoste kaupa (work_id facet).
+        // Sama päring annab ka kõigi vastavate teoste ID-d ja täpsed koguarvud.
         index.search(query, {
           filter,
           limit: 0,
@@ -645,57 +709,28 @@ export const searchContent = async (index: Index, query: string, page: number = 
         }, requestConfig)
       ]);
 
-      // Arvuta unikaalsete teoste statistika käsitsi
-      const uniqueWorks = new Set<string>();
-      const calculatedFacets: Record<string, Record<string, number>> = {
-        [genreFacetField]: {},
-        [typeFacetField]: {},
-        [tagsFacetField]: {},
-        'author_names': {},
-        'originaal_kataloog': {} // Seda me stats querys ei küsinud, aga võiks
-      };
-
-      statsResponse.hits.forEach((hit: any) => {
-        const workId = hit.work_id;
-        if (workId && !uniqueWorks.has(workId)) {
-          uniqueWorks.add(workId);
-
-          // Helper stats
-          const addToStats = (field: string, value: string | string[]) => {
-             if (!value) return;
-             const values = Array.isArray(value) ? value : [value];
-             values.forEach(v => {
-               if (!calculatedFacets[field][v]) calculatedFacets[field][v] = 0;
-               calculatedFacets[field][v]++;
-             });
-          };
-
-          addToStats(genreFacetField, hit[genreFacetField]);
-          addToStats(typeFacetField, hit[typeFacetField]);
-          addToStats(tagsFacetField, hit[tagsFacetField]);
-          addToStats('author_names', hit.author_names);
-          addToStats('author_names', hit.respondens_names);
-        }
-      });
-
-      // Lisa work_id facet (lehekülgede arvud) otse Meilisearchist
-      calculatedFacets['work_id'] = pageCountResponse.facetDistribution?.['work_id'] || {};
-
-      const workHitCounts = pageCountResponse.facetDistribution?.['work_id'] || {};
+      const workIdFacet = pageCountResponse.facetDistribution?.['work_id'];
+      const workHitCounts = workIdFacet || {};
       const facetWorkIds = Object.keys(workHitCounts);
 
-      // work_id facet loendab KÕIKI vastavaid teoseid, sõltumata STATS_LIMIT-ist ja
-      // maxTotalHits=10000 lakkest. Varem võeti see arv üle piiri minnes
-      // distinctResponse.estimatedTotalHits-ist, mis loeb lehekülgi, mitte teoseid:
-      // "est" näitas 10 000 teost tegeliku 1074 asemel (~9x liiga palju).
-      // Facet on tasuta — see päring tehakse niikuinii lehekülgede arvude jaoks.
-      if (facetWorkIds.length > 0) {
-        totalWorks = facetWorkIds.length;
-      } else if ((statsResponse.estimatedTotalHits || 0) <= STATS_LIMIT) {
-        totalWorks = uniqueWorks.size;
-      } else {
-        totalWorks = distinctResponse.estimatedTotalHits || uniqueWorks.size;
-      }
+      // Päring 3: teosepõhised facetid — üks dokument teose kohta (esimene lehekülg).
+      // Meilisearchi facetDistribution EI arvesta distinct'iga (mõõdetud), seega
+      // ainus viis teosepõhiste loenduriteni on piirata dokumendihulk ühe leheküljega.
+      const calculatedFacets = await fetchWorkLevelFacets(
+        index, facetWorkIds,
+        [genreFacetField, typeFacetField, tagsFacetField],
+        requestConfig,
+      );
+
+      // Lisa work_id facet (lehekülgede arvud) otse Meilisearchist
+      calculatedFacets['work_id'] = workHitCounts;
+
+      // work_id facet loendab KÕIKI vastavaid teoseid, sõltumata maxTotalHits=10000
+      // lakkest. Varem võeti see arv distinctResponse.estimatedTotalHits-ist, mis
+      // loeb lehekülgi, mitte teoseid: "est" näitas 10 000 teost tegeliku 1074 asemel.
+      // Puuduv facet (nt indeksi seadistus katki) langeb tagasi vanale hinnangule —
+      // tühi facet tähendab seevastu päriselt nulli vastet.
+      totalWorks = workIdFacet ? facetWorkIds.length : (distinctResponse.estimatedTotalHits || 0);
       const hitsWithCounts = distinctResponse.hits.map((hit: any) => ({
         ...normalizeContentSearchHit(hit),
         hitCount: workHitCounts[hit.work_id] || 1
@@ -707,7 +742,7 @@ export const searchContent = async (index: Index, query: string, page: number = 
 
       return {
         hits: hitsWithCounts as any,
-        totalHits: facetPageTotal || pageCountResponse.estimatedTotalHits || 0, // Lehekülgi kokku
+        totalHits: (workIdFacet ? facetPageTotal : pageCountResponse.estimatedTotalHits) || 0, // Lehekülgi kokku
         totalWorks: totalWorks,
         totalPages: Math.ceil(totalWorks / limit),
         page,
