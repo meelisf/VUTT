@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle } from 'lucide-react';
 
@@ -13,6 +13,8 @@ interface ConfirmModalProps {
   onCancel: () => void;
   onExtra?: () => void;
   variant?: 'warning' | 'danger';
+  /** Kas taustaklõps sulgeb. Vaikimisi jah — cancel on ohutu tee. */
+  closeOnBackdrop?: boolean;
 }
 
 const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -25,9 +27,20 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
   onExtra,
-  variant = 'warning'
+  variant = 'warning',
+  closeOnBackdrop = true
 }) => {
   const { t } = useTranslation('common');
+
+  // Esc = tühista. Ohutu tee, seega alati lubatud.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onCancel]);
 
   const resolvedTitle = title ?? t('confirmation.title');
   const resolvedConfirmText = confirmText ?? t('buttons.confirm');
@@ -43,7 +56,10 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   const iconClass = variant === 'danger' ? 'text-red-600' : 'text-amber-600';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      onMouseDown={e => { if (closeOnBackdrop && e.target === e.currentTarget) onCancel(); }}
+    >
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-3">

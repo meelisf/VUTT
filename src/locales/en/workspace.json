@@ -112,6 +112,7 @@
     "reorderApply": "Apply (Enter)",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",
+    "reorderConfirmTitle": "Confirm reorder",
     "reorderError": "Failed to save page order",
     "dangerZone": "Danger zone",
     "managePageLink": "Manage work",
@@ -141,6 +142,7 @@
     },
     "reorder": {
       "discard": "Discard changes",
+      "discardTitle": "Discard order changes",
       "discardConfirm": "Discard all unsaved order changes?",
       "changedSummary": "{{count}} page(s) differ from the saved order"
     },
