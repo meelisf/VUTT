@@ -87,17 +87,26 @@ export function useUnsavedChangesGuard(
   const blockerRef = useRef(blocker);
   blockerRef.current = blocker;
 
+  /**
+   * Blokeeritud navigatsiooni jätkamine.
+   *
+   * `proceed()` EI käivita `shouldBlock`-i uuesti, seega `discard`/`finishSave`
+   * püsti pandud ühekordne luba jääks siin tarbimata ja lekiks järgmisse
+   * navigatsiooni. Tarbime selle käsitsi ära.
+   */
+  const proceedBlocked = useCallback(() => {
+    const { state: next } = consumeAllowance(stateRef.current);
+    apply(next);
+    blockerRef.current.proceed();
+  }, [apply]);
+
   // Router blokeeris navigatsiooni → pane see ootele samasse dialoogi.
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
-    const r = requestTransition(
-      stateRef.current,
-      true,
-      { run: () => blockerRef.current.proceed() },
-    );
-    if (r.runNow) { blockerRef.current.proceed(); return; }
+    const r = requestTransition(stateRef.current, true, { run: proceedBlocked });
+    if (r.runNow) { proceedBlocked(); return; }
     apply(r.state);
-  }, [blocker.state, apply]);
+  }, [blocker.state, apply, proceedBlocked]);
 
   const runGuarded = useCallback((fn: () => void) => {
     const r = requestTransition(stateRef.current, isDirtyRef.current, { run: fn });
