@@ -60,12 +60,17 @@ export function useEditorSave({
     t('editor.saveErrorWithMessage', { message: e.message || t('common:errors.unknownError') })
   ), [t]);
 
+  /**
+   * Tagastab `true` AINULT siis, kui salvestus õnnestus ja `savedState`/`isDirty`
+   * on uuendatud. Salvestamata muudatuste dialoog sõltub sellest: `false` korral
+   * ei tohi navigeerida, muidu kaob tekst (vt UnsavedChangesDialog).
+   */
   const runSave = useCallback(async (
     updatedPage: Page,
     savedState: EditorSavedState,
     afterSave?: () => void,
-  ) => {
-    if (isSavingRef.current) return;
+  ): Promise<boolean> => {
+    if (isSavingRef.current) return false;
     isSavingRef.current = true;
     setIsSaving(true);
     try {
@@ -73,28 +78,30 @@ export function useEditorSave({
       afterSave?.();
       setSavedState(savedState);
       setIsDirty(false);
+      return true;
     } catch (e: any) {
       console.error('Save error:', e);
       setSaveError(formatSaveError(e));
+      return false;
     } finally {
       isSavingRef.current = false;
       setIsSaving(false);
     }
   }, [formatSaveError, onSave, setIsDirty, setIsSaving, setSaveError, setSavedState]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(async (): Promise<boolean> => {
     const updatedPage = makePage(comments, textAnnotations);
-    await runSave(updatedPage, { status, comments, page_tags, text_annotations: textAnnotations });
+    return runSave(updatedPage, { status, comments, page_tags, text_annotations: textAnnotations });
   }, [comments, makePage, page_tags, runSave, status, textAnnotations]);
 
-  // Salvestus "Salvesta ja lahku" jaoks: enne salvestust liidab kommentaari-mustandi
+  // Salvestus "Salvesta ja jätka" jaoks: enne salvestust liidab kommentaari-mustandi
   // kommentaaride hulka, et see ei läheks kaduma.
-  const handleSaveWithDrafts = useCallback(async () => {
-    if (isSavingRef.current) return;
+  const handleSaveWithDrafts = useCallback(async (): Promise<boolean> => {
+    if (isSavingRef.current) return false;
     const flushed = commentFlushRef.current?.() ?? null;
     const effectiveComments = flushed ?? comments;
     const updatedPage = makePage(effectiveComments, textAnnotations);
-    await runSave(
+    return runSave(
       updatedPage,
       { status, comments: effectiveComments, page_tags, text_annotations: textAnnotations },
       flushed ? () => setComments(flushed) : undefined,

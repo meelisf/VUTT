@@ -34,7 +34,7 @@ interface TextEditorProps {
   statusDirty?: boolean;
   currentStatus?: PageStatus | null;
   onStatusChange?: (status: PageStatus) => void;
-  triggerSave?: React.MutableRefObject<(() => Promise<void>) | null>;
+  triggerSave?: React.MutableRefObject<(() => Promise<boolean>) | null>;
   onWorkUpdate?: (updatedWork: Partial<Work>) => void;
   collections?: Collections;
 }
