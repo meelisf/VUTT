@@ -111,7 +111,7 @@ def test_get_or_create_og_image_uses_first_page_and_cache(tmp_path):
 def _make_work(tmp_path, pages=3, size=(400, 600)):
     from PIL import Image
     work = tmp_path / "work"
-    work.mkdir()
+    work.mkdir(parents=True)
     for i in range(1, pages + 1):
         Image.new("RGB", size, "white").save(work / f"page_00{i}.jpg")
         (work / f"page_00{i}.json").write_text('{"sequence": %d}' % i, encoding="utf-8")
@@ -131,15 +131,30 @@ def test_cover_on_eraldi_versioonitud_fail(tmp_path):
     assert os.path.exists(first)
 
 
-def test_cover_on_360px_korgusega(tmp_path):
-    """CSS kuvab 160 px; 360 px katab Retina. Varem 560 px."""
+def test_cover_on_kaardi_kasti_moodus(tmp_path):
+    """Kaart on LAI kast (h-40 + object-cover) — kaas peab katma laiuse, mitte ainult
+    kõrguse. Ainult kõrguse järgi skaleerimine andis portreelehelt 241 px laia pildi,
+    mida kaart venitas ~1,3× (Retinal 2,6×) → udu."""
     from PIL import Image
-    from server.image_server import get_or_create_thumbnail, COVER_HEIGHT
+    from server.image_server import get_or_create_thumbnail, COVER_BOX
 
     work = _make_work(tmp_path)
     with Image.open(get_or_create_thumbnail(str(work))) as img:
-        assert img.height == COVER_HEIGHT == 360
-        assert img.width == 240  # 400x600 → proportsionaalne
+        assert img.size == COVER_BOX == (640, 320)
+
+
+def test_cover_on_sama_moodus_ka_topeltlehel(tmp_path):
+    """REGRESSIOON: portreeleht (udu) ja topeltleht (terav) said varem eri laiuse
+    (241 vs 497 px). Kaardi kast on sama → kaas peab olema sama."""
+    from PIL import Image
+    from server.image_server import get_or_create_thumbnail
+
+    portree = _make_work(tmp_path / "a", size=(2311, 3448))
+    topelt = _make_work(tmp_path / "b", size=(6118, 4428))
+
+    with Image.open(get_or_create_thumbnail(str(portree))) as a, \
+            Image.open(get_or_create_thumbnail(str(topelt))) as b:
+        assert a.size == b.size == (640, 320)
 
 
 def test_cover_ei_kustuta_lehekulje_thumbe(tmp_path):
@@ -206,7 +221,8 @@ def test_invalidate_cover_ei_puutu_teise_lehe_muutmisel(tmp_path):
 
 
 def test_cover_on_vaiksem_kui_vana_560px_variant(tmp_path):
-    """Mõõdetav eesmärk: ~60% väiksem payload dashboardi kaardi kohta."""
+    """Kaas peab jääma leheküljegridi thumbist kergemaks. Crop lisab laiust, aga võtab
+    ära üla-/alaserva, mida kaart niikuinii ei kuva — päris skaneeringul 75 → 60 kB."""
     from server.image_server import generate_thumbnail, get_or_create_thumbnail
 
     work = _make_work(tmp_path, size=(1200, 1800))
