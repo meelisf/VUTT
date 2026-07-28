@@ -15,7 +15,7 @@ export const getFullImageUrl = (imagePath: string): string => {
 // URL on stabiilne (/{work_id}/_thumb) ja pildid on 30 päeva brauseri-cache'is, seega
 // serveripoolsest failinime-versioonist üksi ei piisa: ilma ?v-ta näeks olemasolev
 // kasutaja vana 560 px pilti kuni cache aegumiseni.
-const COVER_VERSION = 1;
+const COVER_VERSION = 2;
 
 // Kaanepildi URL konstrueerimine (server leiab ise õige faili)
 export const getThumbUrl = (workId: string): string => {

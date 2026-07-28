@@ -92,13 +92,23 @@ except ImportError:
 # Thumbnaili seaded
 THUMB_HEIGHT = 560  # Kõrgus pikslites (portree- ja topeltlehtedel ühtlane kõrgus)
 THUMB_QUALITY = 85  # JPEG kvaliteet (0-100)
-# Dashboardi kaanepilt on OMA variant: kaart kuvab seda 160 px kõrgusena, seega
-# 360 px katab Retina ja säästab ~60% baite võrreldes leheküljegridi 560/85-ga.
+# Dashboardi kaanepilt on OMA variant, mis LÕIGATAKSE kaardi kastile (mitte ei
+# skaleerita proportsionaalselt nagu leheküljethumb). Kaart (`WorkCard`, `h-40` +
+# `object-cover`) on LAI kast ~320×160 CSS px, seega 640×320 katab Retina.
+#
+# MIKS crop, mitte kõrguse järgi skaleerimine: `object-cover` sobitab pildi kasti
+# SUUREMA teguri järgi. Portreelehelt (2311×3448) andis kõrguse-põhine 360 px vaid
+# 241 px laiust → kaart venitas seda 1,3× (Retinal 2,6×) ja kaas oli udune, samal ajal
+# kui topeltleht (6118×4428) sai 497 px ja näis terav. Crop annab täpselt need pikslid,
+# mida brauser kuvab: portreel kaob udu, topeltlehel kaob raisatud üla-/alaserv.
+#
 # Eraldi nimeruum (_cover_) hoiab selle leheküljethumbidest lahus — vt
 # get_or_create_thumbnail koristusloogika.
-COVER_HEIGHT = 360
-COVER_QUALITY = 80
-COVER_VERSION = 1  # Muutmisel uueneb failinimi → vanad coverid genereeritakse ümber.
+COVER_BOX = (640, 320)
+COVER_QUALITY = 78
+COVER_VERSION = 2  # Muutmisel uueneb failinimi → vanad coverid genereeritakse ümber.
+                   # NB: uuenda ka src/services/workImageService.ts COVER_VERSION-it,
+                   # muidu näeb olemasolev kasutaja brauseri cache'ist vana pilti.
 OG_IMAGE_SIZE = (1200, 630)
 OG_IMAGE_QUALITY = 88
 OG_IMAGE_VERSION = 2  # Muutmisel uueneb failinimi ja jagamis-URL-i cache-võti.
@@ -154,7 +164,9 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THU
         source_path: Lähtefaili tee
         thumb_path: Sihtfaili tee (_thumb_XXXX.jpg)
         height: Thumbnaili kõrgus (laius arvutatakse proportsionaalselt)
-        quality: JPEG kvaliteet (dashboardi kaas kasutab madalamat, vt COVER_QUALITY)
+        quality: JPEG kvaliteet
+
+    NB: dashboardi kaas EI kasuta seda funktsiooni — vt generate_cover/COVER_BOX.
 
     Returns:
         True kui õnnestus, False kui mitte
@@ -192,38 +204,59 @@ def generate_thumbnail(source_path, thumb_path, height=THUMB_HEIGHT, quality=THU
         return False
 
 
+def _generate_fitted_image(source_path, output_path, size, quality, log_tag):
+    """Lõikab pildi täpselt etteantud kasti (nagu CSS ``object-cover``) ja salvestab.
+
+    Kirjutus on atomaarne (tmp + ``os.replace``), sest pildiserver on mitmelõimeline —
+    pooleliolevat faili ei tohi teisele päringule serveerida.
+    """
+    if not PILLOW_AVAILABLE:
+        return False
+
+    tmp_path = None
+    try:
+        with Image.open(source_path) as source:
+            source = ImageOps.exif_transpose(source).convert('RGB')
+            fitted = ImageOps.fit(
+                source,
+                size,
+                method=Image.Resampling.LANCZOS,
+                centering=(0.5, 0.5),
+            )
+
+        tmp_path = f"{output_path}.tmp.{os.getpid()}.{time.time_ns()}"
+        fitted.save(tmp_path, 'JPEG', quality=quality, optimize=True)
+        os.chmod(tmp_path, 0o644)
+        os.replace(tmp_path, output_path)
+        return True
+    except Exception as e:
+        print(f"[{log_tag}] Viga genereerimisel {source_path}: {e}")
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
+        return False
+
+
 def generate_og_image(source_path, output_path):
     """Genereerib keele-neutraalse 1200×630 jagamispildi.
 
     Esileht täidab ala nagu dashboard'i CSS ``object-cover``. Teksti, gradienti
     ega märgendeid pilti ei lisata, sest sama URL-i jagatakse eri keeltes.
     """
-    if not PILLOW_AVAILABLE:
-        return False
+    return _generate_fitted_image(source_path, output_path, OG_IMAGE_SIZE,
+                                  OG_IMAGE_QUALITY, 'OG')
 
-    try:
-        with Image.open(source_path) as source:
-            source = ImageOps.exif_transpose(source).convert('RGB')
-            card = ImageOps.fit(
-                source,
-                OG_IMAGE_SIZE,
-                method=Image.Resampling.LANCZOS,
-                centering=(0.5, 0.5),
-            )
 
-        tmp_path = f"{output_path}.tmp.{os.getpid()}.{time.time_ns()}"
-        card.save(tmp_path, 'JPEG', quality=OG_IMAGE_QUALITY, optimize=True)
-        os.chmod(tmp_path, 0o644)
-        os.replace(tmp_path, output_path)
-        return True
-    except Exception as e:
-        print(f"[OG] Viga genereerimisel {source_path}: {e}")
-        try:
-            if 'tmp_path' in locals() and os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        except OSError:
-            pass
-        return False
+def generate_cover(source_path, cover_path):
+    """Genereerib dashboardi kaanepildi — esileht lõigatuna kaardi kastile.
+
+    EI kasuta ``generate_thumbnail``-i: see skaleerib kõrguse järgi, mis on õige
+    leheküljegridile (ühtlane kõrgus), aga vale laiale kaardile — vt COVER_BOX.
+    """
+    return _generate_fitted_image(source_path, cover_path, COVER_BOX,
+                                  COVER_QUALITY, 'THUMB')
 
 
 def get_or_create_og_image(work_path):
@@ -254,7 +287,7 @@ def get_or_create_og_image(work_path):
 def get_or_create_thumbnail(work_path):
     """Tagastab teose dashboardi-kaanepildi tee, genereerides selle vajadusel.
 
-    Kaas on OMA variant (`_cover_v{N}_NIMI.jpg`, COVER_HEIGHT/COVER_QUALITY), mitte
+    Kaas on OMA variant (`_cover_v{N}_NIMI.jpg`, COVER_BOX/COVER_QUALITY), mitte
     leheküljegridi thumb. Nimeruum on tahtlikult eraldi: varem kandis kaas sama nime
     kui esilehe grid-thumb (`_thumb_NIMI.jpg`) ja alumine koristus glob'is `_thumb_*.jpg`,
     mistõttu iga dashboardi vaatamine kustutas KÕIK selle teose leheküljethumbid ja
@@ -294,9 +327,7 @@ def get_or_create_thumbnail(work_path):
     # 3. Genereeri vajadusel
     if not os.path.exists(expected_cover_path):
         os.makedirs(thumbs_dir, exist_ok=True)
-        success = generate_thumbnail(first_image, expected_cover_path,
-                                     height=COVER_HEIGHT, quality=COVER_QUALITY)
-        if not success:
+        if not generate_cover(first_image, expected_cover_path):
             return None
 
     return expected_cover_path
