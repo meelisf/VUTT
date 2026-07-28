@@ -331,12 +331,6 @@
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
   },
-  "confirm": {
-    "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
-    "unsavedChangesPrompt": "You have unsaved changes. Do you want to save?",
-    "saveAndLeave": "Yes, save",
-    "leaveWithoutSaving": "No, leave"
-  },
   "mobile": {
     "imageTab": "Image",
     "gridTab": "Grid",

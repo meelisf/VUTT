@@ -163,10 +163,6 @@
     "saving": "Saving…",
     "cancel": "Cancel",
     "saveError": "Save failed",
-    "unsavedTitle": "Unsaved changes",
-    "unsavedBody": "This place has unsaved changes. Leave without saving?",
-    "unsavedStay": "Stay here",
-    "unsavedLeave": "Leave without saving",
     "labels": "Names",
     "type": "Type",
     "types": {

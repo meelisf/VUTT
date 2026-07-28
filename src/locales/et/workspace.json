@@ -331,12 +331,6 @@
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
   },
-  "confirm": {
-    "unsavedChanges": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
-    "unsavedChangesPrompt": "Sul on salvestamata muudatusi. Kas soovid salvestada?",
-    "saveAndLeave": "Jah, salvesta",
-    "leaveWithoutSaving": "Ei, lahku"
-  },
   "mobile": {
     "imageTab": "Pilt",
     "gridTab": "Ruudustik",
