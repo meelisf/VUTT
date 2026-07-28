@@ -12,7 +12,7 @@ import { PageStatus } from '../types';
 import ImageViewer from '../components/ImageViewer';
 import ThumbnailGrid from '../components/ThumbnailGrid';
 import TextEditor from '../components/TextEditor';
-import ConfirmModal from '../components/ConfirmModal';
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useUser } from '../contexts/UserContext';
 import { useCollection } from '../contexts/CollectionContext';
@@ -85,9 +85,8 @@ const Workspace: React.FC = () => {
   // Metaandmete muutmise modal
   const [isMetaModalOpen, setIsMetaModalOpen] = useState(false);
 
-  // Salvestamata muudatuste kinnitusdialoogi olek
-  const [pendingNavigation, setPendingNavigation] = useState<(() => void) | null>(null);
-  const editorSaveRef = useRef<(() => Promise<void>) | null>(null);
+  // Redaktori salvestus dialoogi jaoks (flush-variant, vt handleGuardSave)
+  const editorSaveRef = useRef<(() => Promise<boolean>) | null>(null);
 
   // Login modaali olek
   const [showLoginModal, setShowLoginModal] = useState(false);
@@ -132,12 +131,20 @@ const Workspace: React.FC = () => {
       .catch(() => {});
   }, [workId, authToken]);
 
-  // skipBlockerRef: tõese väärtuse korral ignoreerib blocker hasUnsavedChanges kontrolli
-  // (kasutatakse "Salvesta ja lahku" ajal — navigeerimiseks pärast salvestamist)
-  const skipBlockerRef = useRef(false);
+  // Salvestus dialoogi jaoks: flush-variant, mis liidab ka kommentaari-mustandi.
+  // Tagastab `false`, kui salvestamine ebaõnnestus — dialoog jääb siis avatuks.
+  //
+  // Registreerimata ref (redaktorit pole monteeritud) tagastab `true`: siis ei ole
+  // ka midagi salvestada ja kasutajat ei tohi dialoogi lõksu jätta.
+  const handleGuardSave = useCallback(async (): Promise<boolean> => {
+    if (!editorSaveRef.current) return true;
+    return editorSaveRef.current();
+  }, []);
 
-  const { isBlocked, blockedLocation, proceed, reset } = useUnsavedChangesGuard(hasUnsavedChanges, skipBlockerRef);
-  const isBlockerActive = isBlocked;
+  const { dialogProps, runGuarded } = useUnsavedChangesGuard({
+    isDirty: hasUnsavedChanges,
+    onSave: handleGuardSave,
+  });
 
   const handlePageInputSubmit = () => {
     if (!workId) return;
@@ -148,12 +155,7 @@ const Workspace: React.FC = () => {
     // Kontrollime, et number oleks valiidne ja piires (kui lehekülgede arv on teada)
     if (!isNaN(newPage) && newPage >= 1 && (totalPages === 0 || newPage <= totalPages)) {
       if (newPage !== currentPageNum) {
-        if (hasUnsavedChanges) {
-          setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`, { replace: true }));
-          setInputPage(currentPageNum.toString());
-          return;
-        }
-        navigate(`/work/${workId}/${newPage}`, { replace: true });
+        runGuarded(() => navigate(`/work/${workId}/${newPage}`, { replace: true }));
       }
     } else {
       // Taasta praegune number, kui sisestus oli vigane
@@ -371,12 +373,8 @@ const Workspace: React.FC = () => {
   const handleSelectFromGrid = useCallback((pageNum: number) => {
     setIsGridView(false);
     setGridSelectedPage(pageNum);
-    if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(`/work/${workId}/${pageNum}`, { replace: true }));
-      return;
-    }
-    navigate(`/work/${workId}/${pageNum}`, { replace: true });
-  }, [hasUnsavedChanges, navigate, workId]);
+    runGuarded(() => navigate(`/work/${workId}/${pageNum}`, { replace: true }));
+  }, [runGuarded, navigate, workId]);
 
   const navigatePage = useCallback((delta: number) => {
     if (!workId) return;
@@ -390,15 +388,9 @@ const Workspace: React.FC = () => {
     if (newPage < 1) return;
     if (work?.page_count && newPage > work.page_count) return;
 
-    // Hoiatus salvestamata muudatuste korral
-    if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(`/work/${workId}/${newPage}`, { replace: true }));
-      return;
-    }
-
     // ?q= jäetakse URL-ist välja — eesmärk: otsisõna paneel avaneb ainult esimesel lehel, mitte iga lehevahetusel
-    navigate(`/work/${workId}/${newPage}`, { replace: true });
-  }, [workId, currentPageNum, work?.page_count, hasUnsavedChanges, navigate]);
+    runGuarded(() => navigate(`/work/${workId}/${newPage}`, { replace: true }));
+  }, [workId, currentPageNum, work?.page_count, runGuarded, navigate]);
 
   if (loading) {
     return (
@@ -475,11 +467,7 @@ const Workspace: React.FC = () => {
   const getReturnUrl = () => sessionStorage.getItem('vutt_return_url') || '/';
   const handleNavigateBack = () => {
     const returnUrl = getReturnUrl();
-    if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(returnUrl));
-      return;
-    }
-    navigate(returnUrl);
+    runGuarded(() => navigate(returnUrl));
   };
 
   // Navigeerimine otsingusse (selle teose piires)
@@ -490,45 +478,8 @@ const Workspace: React.FC = () => {
     if (workCollection && !workCollections.includes(selectedCollection ?? '')) {
       setSelectedCollection(workCollection);
     }
-    if (hasUnsavedChanges) {
-      setPendingNavigation(() => () => navigate(`/search?work=${workId}`));
-      return;
-    }
-    navigate(`/search?work=${workId}`);
+    runGuarded(() => navigate(`/search?work=${workId}`));
   };
-
-  // Kinnitusdialoogi käsitlejad
-  const handleConfirmLeave = () => {
-    if (isBlocked) {
-      proceed();
-    } else if (pendingNavigation) {
-      pendingNavigation();
-      setPendingNavigation(null);
-    }
-  };
-
-  const handleSaveAndLeave = async () => {
-    const pendingLoc = blockedLocation;
-    const navCallback = pendingNavigation;
-
-    if (isBlocked) reset();
-    setPendingNavigation(null);
-
-    if (editorSaveRef.current) {
-      try { await editorSaveRef.current(); } catch { /* alert on juba TextEditoris */ }
-    }
-
-    // Blocker bypass: navigeerimisel ei pea hasUnsavedChanges kontrollima
-    skipBlockerRef.current = true;
-    if (pendingLoc) {
-      navigate(pendingLoc.pathname + pendingLoc.search + pendingLoc.hash);
-    } else if (navCallback) {
-      navCallback();
-    }
-    requestAnimationFrame(() => { skipBlockerRef.current = false; });
-  };
-
-  const showLeaveConfirm = isBlockerActive || pendingNavigation !== null;
 
   // COinS (ContextObjects in Spans) Zotero jaoks
   const generateCoins = () => {
@@ -778,17 +729,8 @@ const Workspace: React.FC = () => {
         />
       )}
 
-      {/* Salvestamata muudatuste kinnitusdialoog */}
-      <ConfirmModal
-        isOpen={showLeaveConfirm}
-        title={t('editor.unsavedChanges')}
-        message={t('confirm.unsavedChangesPrompt')}
-        confirmText={t('confirm.saveAndLeave')}
-        cancelText={t('confirm.leaveWithoutSaving')}
-        onConfirm={handleSaveAndLeave}
-        onCancel={handleConfirmLeave}
-        variant="warning"
-      />
+      {/* Salvestamata muudatuste dialoog */}
+      <UnsavedChangesDialog {...dialogProps} />
 
       {/* Login modaal (sessioon aegunud või käsitsi avatud) */}
       {loginModal}
