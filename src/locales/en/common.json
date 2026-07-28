@@ -197,10 +197,13 @@
     "back": "Go Back"
   },
   "unsavedChanges": {
-    "title": "Unsaved Changes",
-    "message": "You have unsaved changes. Are you sure you want to leave?",
-    "leave": "Leave without saving",
-    "stay": "Stay"
+    "title": "Unsaved changes",
+    "message": "You have unsaved changes.",
+    "discard": "Discard changes",
+    "stay": "Stay here",
+    "saveAndContinue": "Save and continue",
+    "saving": "Saving…",
+    "saveFailed": "Save failed — your changes are still here."
   },
   "markdownEditor": {
     "bold": "Bold",
