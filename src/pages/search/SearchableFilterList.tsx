@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search } from 'lucide-react';
 
 interface SearchableFilterListProps {
@@ -15,6 +16,7 @@ interface SearchableFilterListProps {
 const SearchableFilterList: React.FC<SearchableFilterListProps> = ({
     items, selectedValues, onToggle, placeholder, isRadio = false, renderItem
 }) => {
+    const { t } = useTranslation('common');
     const [searchQuery, setSearchQuery] = useState('');
     const showSearch = items.length > 10;
 
@@ -40,7 +42,7 @@ const SearchableFilterList: React.FC<SearchableFilterListProps> = ({
             )}
             <div className={`space-y-1 overflow-y-scroll custom-scrollbar pr-1 ${showSearch ? 'h-60' : ''}`}>
                 {filteredItems.length === 0 ? (
-                    <div className="text-xs text-gray-400 italic py-2 px-1">Ei leitud vasteid</div>
+                    <div className="text-xs text-gray-400 italic py-2 px-1">{t('labels.noMatches')}</div>
                 ) : (
                     filteredItems.map((item) => {
                         const isSelected = selectedValues.includes(item.value);

@@ -60,7 +60,9 @@
     "accessDenied": "Ligipääs keelatud.",
     "sessionExpiredProtectedWork": "Sinu sessioon on aegunud. Selle teose vaatamiseks logi uuesti sisse.",
     "loginRequiredProtectedWork": "See teos asub piiratud ligipääsuga kollektsioonis. Vaatamiseks logi sisse.",
-    "pageNotFound": "Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele."
+    "pageNotFound": "Lehekülge ei leitud. Võimalik, et dokumendi lehekülgi on vahepeal ümber tõstetud või kustutatud. Proovi minna teose avalehele.",
+    "workIdMissing": "Töö ID on puudu.",
+    "loadFailed": "Viga andmete laadimisel. Palun kontrolli Meilisearchi ühendust."
   },
   "management": {
     "title": "Teose haldus",
@@ -223,7 +225,11 @@
       "dragPanel": "Lohista nupud teise kohta",
       "applyError": "Toiming ebaõnnestus",
       "close": "Sulge"
-    }
+    },
+    "replaceHint": "Lae üles uus skänn. Metaandmed säilitatakse automaatselt.",
+    "replaceWarning": "Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.",
+    "openUploadWizard": "Ava üleslaadimise viisard",
+    "directory": "Kataloog"
   },
   "metadata": {
     "title": "Metaandmed",
@@ -277,7 +283,11 @@
     "classification": "Klassifikatsioon",
     "type": "Tüüp",
     "genre": "Žanr",
-    "languages": "Keeled"
+    "languages": "Keeled",
+    "typePlaceholder": "nt: trükis, käsikiri",
+    "viewPersonPage": "Vaata isiku lehte",
+    "noGenres": "Žanrid puuduvad",
+    "genrePlaceholder": "Lisa žanr..."
   },
   "download": {
     "title": "Lae alla",
@@ -326,7 +336,11 @@
     "noDeletedComments": "Kustutatud kommentaare ei leitud",
     "noOlderVersions": "Varasemaid versioone ei ole",
     "historyTruncated": "Näidatakse viimase 100 commiti ajalugu.",
-    "restoreError": "Taastamine ebaõnnestus"
+    "restoreError": "Taastamine ebaõnnestus",
+    "searchTagInCorpus": "Otsi seda märksõna kogu korpusest",
+    "openEsterRecord": "Ava ESTER-i kirje",
+    "editWorkMetadata": "Muuda teose metaandmeid",
+    "noImage": "Pilt puudub"
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
@@ -402,5 +416,28 @@
     "annotationLabel": "Märge",
     "addComment": "Lisa kommentaar",
     "deleteAnchor": "Kustuta ankur"
+  },
+  "imageViewer": {
+    "zoomIn": "Suumi sisse",
+    "zoomOut": "Suumi välja",
+    "resetView": "Taasta vaade",
+    "allPages": "Kõik leheküljed",
+    "managePage": "Halda lehte",
+    "downloadImage": "Lae pilt alla",
+    "facsimileAlt": "Faksiimile"
+  },
+  "thumbnails": {
+    "smaller": "Väiksemad pisipildid",
+    "larger": "Suuremad pisipildid",
+    "size": "Pisipiltide suurus",
+    "columns": "Veergude arv",
+    "closeEsc": "Sulge (ESC)"
+  },
+  "sharing": {
+    "title": "Jagamine",
+    "private": "Privaatne",
+    "shareable": "Jagatav (otselingiga)",
+    "copied": "Kopeeritud",
+    "copy": "Kopeeri"
   }
 }

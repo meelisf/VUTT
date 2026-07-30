@@ -278,7 +278,7 @@ const WorkspaceMobileView: React.FC<WorkspaceMobileViewProps> = ({
               <ImageViewer src={imageSrc} pageNum={page.page_number} skipFade={skipImageFade} onGridView={handleOpenGrid} />
             ) : (
               <div className="flex items-center justify-center h-full text-white/50">
-                Pilt puudub
+                {t('info.noImage')}
               </div>
             )}
           </div>

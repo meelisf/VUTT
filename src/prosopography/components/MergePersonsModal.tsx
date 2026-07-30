@@ -116,7 +116,7 @@ const MergePersonsModal: React.FC<MergePersonsModalProps> = ({
             disabled={loading}
             className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
           >
-            {t('common:cancel', 'Tühista')}
+            {t('common:buttons.cancel')}
           </button>
           <button
             onClick={() => onConfirm(source.id, target.id)}

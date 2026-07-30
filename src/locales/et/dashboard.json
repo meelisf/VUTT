@@ -55,7 +55,11 @@
     "openWorkspace": "Ava töölaud",
     "viewPerson": "Vaata isiku lehte",
     "searchAuthor": "Otsi autorit",
-    "showMetadata": "Näita metaandmeid"
+    "showMetadata": "Näita metaandmeid",
+    "select": "Vali teos",
+    "deselect": "Eemalda valikust",
+    "copied": "Kopeeritud",
+    "filterByCollection": "Filtreeri selle kollektsiooni järgi"
   },
   "bulkAssign": {
     "select": "Vali",

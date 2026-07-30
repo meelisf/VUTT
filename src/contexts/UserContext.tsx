@@ -203,11 +203,11 @@ export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         applySettings(settings);
         return { success: true };
       } else {
-        return { success: false, error: data.message || 'Sisselogimine ebaõnnestus' };
+        return { success: false, error: data.message || i18n.t('common:errors.loginFailed') };
       }
     } catch (e: any) {
       console.error('Login error:', e);
-      return { success: false, error: 'Serveriga ühendamine ebaõnnestus' };
+      return { success: false, error: i18n.t('common:errors.connectionFailed') };
     }
   }, [applySettings, setUserToken]);
 

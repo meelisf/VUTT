@@ -71,6 +71,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
   searchPlaceholder,
   getUnselectedClass
 }) => {
+  const { t } = useTranslation(['dashboard', 'common']);
   const [searchQuery, setSearchQuery] = useState('');
   const showSearch = items.length > 8;
 
@@ -107,7 +108,7 @@ const FilterSection: React.FC<FilterSectionProps> = ({
       <div className="max-h-32 overflow-y-auto custom-scrollbar pr-1">
         <div className="flex flex-wrap gap-2">
           {filteredItems.length === 0 ? (
-            <span className="text-sm text-gray-400 italic py-1">Ei leitud vasteid</span>
+            <span className="text-sm text-gray-400 italic py-1">{t('common:labels.noMatches')}</span>
           ) : (
             filteredItems.map(({ value, label, count }) => {
               const isSelected = selectedValues.includes(value);

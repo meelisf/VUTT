@@ -368,7 +368,7 @@ const PersonEditPage: React.FC = () => {
               }}
             >
               {imageUrl ? (
-                <img src={imageUrl} alt="Profiilipilt" className="w-full h-full object-cover" />
+                <img src={imageUrl} alt={t('form.profilePhoto')} className="w-full h-full object-cover" />
               ) : (
                 <ImagePlus size={24} className="text-gray-300" />
               )}
@@ -955,7 +955,7 @@ const PersonEditPage: React.FC = () => {
                     onClick={() => { setDeleteOpen(false); setDeleteError(null); }}
                     className="px-3 py-1.5 text-sm border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
                   >
-                    {t('common:actions.cancel')}
+                    {t('common:buttons.cancel')}
                   </button>
                 </div>
               </div>

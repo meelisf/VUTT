@@ -57,7 +57,7 @@ function renderTreeOptions(nodes: CollectionTreeNode[], depth = 0): React.ReactN
 
 
 const CollectionEditor: React.FC = () => {
-  const { t } = useTranslation('admin');
+  const { t } = useTranslation(['admin', 'common']);
   const { authToken } = useUser();
   const { collections, refreshCollections } = useCollection();
 
@@ -345,7 +345,7 @@ const CollectionEditor: React.FC = () => {
 
           {/* Nähtavus */}
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-2">Nähtavus</p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">{t('collections.visibility')}</p>
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
@@ -356,7 +356,7 @@ const CollectionEditor: React.FC = () => {
                   onChange={() => setEditVisibility('public')}
                   className="text-primary-600"
                 />
-                <span className="text-sm">Avalik</span>
+                <span className="text-sm">{t('collections.visibilityPublic')}</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
@@ -367,23 +367,23 @@ const CollectionEditor: React.FC = () => {
                   onChange={() => setEditVisibility('restricted')}
                   className="text-primary-600"
                 />
-                <span className="text-sm text-amber-700">Piiratud</span>
+                <span className="text-sm text-amber-700">{t('collections.visibilityRestricted')}</span>
               </label>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Piiratud kollektsiooni teosed on ligipääsetavad ainult antud kasutajatele ja adminidele.
+              {t('collections.visibilityHint')}
             </p>
 
             {editVisibility === 'restricted' && (
               <div className="mt-3 border border-amber-200 bg-amber-50 rounded-lg p-3">
-                <p className="text-sm font-medium text-gray-700 mb-2">Ligipääsuga kasutajad:</p>
+                <p className="text-sm font-medium text-gray-700 mb-2">{t('collections.allowedUsers')}</p>
                 {usersLoading ? (
                   <Loader2 size={14} className="animate-spin text-gray-400" />
                 ) : (
                   <>
                     <div className="flex flex-wrap gap-1 mb-2">
                       {allowedUsers.length === 0 && (
-                        <span className="text-xs text-gray-400">Pole ligipääsuga kasutajaid</span>
+                        <span className="text-xs text-gray-400">{t('collections.noAllowedUsers')}</span>
                       )}
                       {allowedUsers.map(username => {
                         const u = allUsers.find(x => x.username === username);
@@ -427,22 +427,22 @@ const CollectionEditor: React.FC = () => {
             <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.description')}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Eesti keeles</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEt')}</label>
                 <textarea
                   value={descEt}
                   onChange={e => setDescEt(e.target.value)}
                   rows={3}
-                  placeholder="Lühikirjeldus eesti keeles..."
+                  placeholder={t('collections.descriptionPlaceholderEt')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">In English</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEn')}</label>
                 <textarea
                   value={descEn}
                   onChange={e => setDescEn(e.target.value)}
                   rows={3}
-                  placeholder="Short description in English..."
+                  placeholder={t('collections.descriptionPlaceholderEn')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -455,22 +455,22 @@ const CollectionEditor: React.FC = () => {
             <p className="text-sm font-semibold text-gray-700 mb-3">{t('collections.descriptionLong')}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Eesti keeles</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEt')}</label>
                 <textarea
                   value={descLongEt}
                   onChange={e => setDescLongEt(e.target.value)}
                   rows={6}
-                  placeholder="Pikem tutvustus eesti keeles..."
+                  placeholder={t('collections.descriptionLongPlaceholderEt')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">In English</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">{t('collections.langEn')}</label>
                 <textarea
                   value={descLongEn}
                   onChange={e => setDescLongEn(e.target.value)}
                   rows={6}
-                  placeholder="Longer introduction in English..."
+                  placeholder={t('collections.descriptionLongPlaceholderEn')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -540,7 +540,7 @@ const CollectionEditor: React.FC = () => {
                   onClick={() => { setDeleteConfirming(false); setDeleteInput(''); setDeleteError(null); }}
                   className="px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Tühista
+                  {t('common:buttons.cancel')}
                 </button>
               </div>
             </div>
@@ -594,7 +594,7 @@ const CollectionEditor: React.FC = () => {
                   type="text"
                   value={newNameEt}
                   onChange={e => setNewNameEt(e.target.value)}
-                  placeholder="Nimi eesti keeles"
+                  placeholder={t('collections.createNameEt')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
@@ -604,7 +604,7 @@ const CollectionEditor: React.FC = () => {
                   type="text"
                   value={newNameEn}
                   onChange={e => setNewNameEn(e.target.value)}
-                  placeholder="Name in English"
+                  placeholder={t('collections.createNameEn')}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>

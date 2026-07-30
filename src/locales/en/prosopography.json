@@ -260,7 +260,8 @@
     "showAllCollections": "Show all collections",
     "year": "Map year",
     "applyYear": "Apply",
-    "yearHelp": "Year shown on the historical map. The midpoint is used by default when a year range is selected."
+    "yearHelp": "Year shown on the historical map. The midpoint is used by default when a year range is selected.",
+    "openPlace": "Show on map"
   },
   "place": {
     "searchPlaceholder": "Search city, parish, region…",
@@ -288,5 +289,15 @@
     "add": "Add",
     "wikidataError": "Wikidata query failed",
     "addError": "Adding failed"
-  }
+  },
+  "historyPanel": {
+    "original": "Original",
+    "restoreTitle": "Restore this version",
+    "restoreConfirm": "Are you sure you want to restore this version?",
+    "restoreError": "Restore failed",
+    "diffError": "Failed to load the diff",
+    "noChanges": "No changes found",
+    "empty": "No history yet"
+  },
+  "loadingVocab": "Loading…"
 }

@@ -173,7 +173,7 @@ const Workspace: React.FC = () => {
     if (authInitializing) return;
     const loadData = async () => {
       if (!workId) {
-        setError("Töö ID on puudu.");
+        setError(t('errors.workIdMissing'));
         setLoading(false);
         return;
       }
@@ -235,7 +235,7 @@ const Workspace: React.FC = () => {
         }
       } catch (e: any) {
         console.error("Failed to load page", e);
-        setError(e.message || "Viga andmete laadimisel. Palun kontrolli Meilisearchi ühendust.");
+        setError(e.message || t('errors.loadFailed'));
       } finally {
         setLoading(false);
         setPageLoading(false);
@@ -653,7 +653,7 @@ const Workspace: React.FC = () => {
             />
           ) : (
             <div className="flex items-center justify-center h-full text-white/50">
-              Pilt puudub
+              {t('info.noImage')}
             </div>
           )}
         </div>

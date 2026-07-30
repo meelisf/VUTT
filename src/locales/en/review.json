@@ -51,11 +51,18 @@
   "actions": {
     "openPage": "Open page",
     "openWork": "Open work",
-    "continue": "Continue working"
+    "continue": "Continue working",
+    "openPerson": "Open person record"
   },
   "changeType": {
     "metadata": "Metadata",
-    "import": "New work"
+    "import": "New work",
+    "personCreated": "New person",
+    "person": "Person",
+    "personDeleted": "Deleted",
+    "personMerged": "Merge",
+    "personRestored": "Restore",
+    "personMigrated": "Migration"
   },
   "loadMore": "Load more",
   "loadingMore": "Loading...",

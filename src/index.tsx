@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
+import { useTranslation } from 'react-i18next';
 import App from './App';
 import 'leaflet/dist/leaflet.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -13,10 +14,19 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 
+/**
+ * Laisa route-chunki ootamise vaade. Komponendina (mitte `i18n.t` kutsena
+ * render'i hetkel), et hilisem keelevahetus jõuaks ka siia teksti kohale.
+ */
+const LoadingFallback: React.FC = () => {
+  const { t } = useTranslation('common');
+  return <div className="h-screen flex items-center justify-center">{t('labels.loading')}</div>;
+};
+
 const render = () => {
   root.render(
     <React.StrictMode>
-      <Suspense fallback={<div className="h-screen flex items-center justify-center">Laadin...</div>}>
+      <Suspense fallback={<LoadingFallback />}>
         <App />
       </Suspense>
     </React.StrictMode>

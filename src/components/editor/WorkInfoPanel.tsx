@@ -190,7 +190,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                             <button
                               onClick={() => navigate(`/?printer=${encodeURIComponent(pubId && isQCode(pubId) ? pubId : getLabel(work.publisher, lang))}`)}
                               className="text-gray-400 hover:text-amber-600 transition-colors shrink-0"
-                              title="Filtreeri trükkali järgi"
+                              title={t('info.filterByPrinter')}
                             >
                               <BookDown size={14} />
                             </button>
@@ -347,7 +347,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-800 hover:underline"
-                  title="Ava ESTER-i kirje"
+                  title={t('info.openEsterRecord')}
                 >
                   <ExternalLink size={16} />
                   {t('info.viewInEster')}
@@ -371,7 +371,7 @@ const WorkInfoPanel: React.FC<WorkInfoPanelProps> = ({ work, lang, onOpenMetaMod
                 <button
                   onClick={onOpenMetaModal}
                   className="flex items-center gap-2 text-sm text-amber-600 hover:text-amber-800 hover:underline"
-                  title="Muuda teose metaandmeid"
+                  title={t('info.editWorkMetadata')}
                 >
                   <FileSliders size={16} />
                   {t('metadata.editMetadata')}

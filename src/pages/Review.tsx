@@ -97,7 +97,7 @@ interface DiffData {
 }
 
 const Review: React.FC = () => {
-  const { t } = useTranslation(['review', 'common']);
+  const { t } = useTranslation(['review', 'common', 'workspace']);
   const { user, authToken: token, isLoading: userLoading } = useUser();
   const navigate = useNavigate();
 
@@ -420,7 +420,7 @@ const Review: React.FC = () => {
     if (result.length === 0) {
       return (
         <div className="p-4 text-center text-gray-400 italic text-sm">
-          Ainult tehnilised muudatused (ajatempleid uuendatud)
+          {t('workspace:history.onlyTimestampChanges')}
         </div>
       );
     }
@@ -812,22 +812,22 @@ const Review: React.FC = () => {
                             <>
                               <span className="text-sm text-gray-700 truncate">{commit.person_name || commit.message}</span>
                               {commit.message.startsWith('Prosopo loomine:') && (
-                                <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">Uus isik</span>
+                                <span className="text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.personCreated')}</span>
                               )}
                               {commit.message.startsWith('Prosopo muudatus:') && (
-                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">Isik</span>
+                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.person')}</span>
                               )}
                               {commit.message.startsWith('Prosopo kustutamine:') && (
-                                <span className="text-xs text-red-700 bg-red-100 px-1.5 py-0.5 rounded flex-shrink-0">Kustutatud</span>
+                                <span className="text-xs text-red-700 bg-red-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.personDeleted')}</span>
                               )}
                               {commit.message.startsWith('Prosopo liitmine:') && (
-                                <span className="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded flex-shrink-0">Liitmine</span>
+                                <span className="text-xs text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.personMerged')}</span>
                               )}
                               {commit.message.startsWith('Prosopo taastamine:') && (
-                                <span className="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded flex-shrink-0">Taastamine</span>
+                                <span className="text-xs text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.personRestored')}</span>
                               )}
                               {commit.message.startsWith('Prosopo migratsioon:') && (
-                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">Migratsioon</span>
+                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded flex-shrink-0">{t('changeType.personMigrated')}</span>
                               )}
                             </>
                           ) : (
@@ -866,7 +866,7 @@ const Review: React.FC = () => {
                             <Link
                               to={`/persons/${commit.person_id}`}
                               className="inline-flex items-center gap-1 p-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition-colors"
-                              title="Ava isiku kaart"
+                              title={t('actions.openPerson')}
                               onClick={(e) => e.stopPropagation()}
                             >
                               <ExternalLink size={18} />

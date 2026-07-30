@@ -51,11 +51,18 @@
   "actions": {
     "openPage": "Ava lehekülg",
     "openWork": "Ava teos",
-    "continue": "Jätka tööd"
+    "continue": "Jätka tööd",
+    "openPerson": "Ava isiku kaart"
   },
   "changeType": {
     "metadata": "Metaandmed",
-    "import": "Uus teos"
+    "import": "Uus teos",
+    "personCreated": "Uus isik",
+    "person": "Isik",
+    "personDeleted": "Kustutatud",
+    "personMerged": "Liitmine",
+    "personRestored": "Taastamine",
+    "personMigrated": "Migratsioon"
   },
   "loadMore": "Laadi veel",
   "loadingMore": "Laadin...",

@@ -182,17 +182,17 @@ const SetPassword: React.FC = () => {
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">{isReset ? t('setPassword.resetSuccess') : t('setPassword.success')}</h1>
           <p className="text-gray-600 mb-2">
-            Sinu kasutajanimi: <strong className="text-primary-700">{createdUsername}</strong>
+            {t('setPassword.yourUsername')} <strong className="text-primary-700">{createdUsername}</strong>
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            Kasuta seda kasutajanime sisselogimisel
+            {t('setPassword.usernameHint')}
           </p>
           <Link
             to="/"
             className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             <ArrowLeft size={18} />
-            Mine sisselogimise lehele
+            {t('setPassword.goToLogin')}
           </Link>
         </div>
       </div>

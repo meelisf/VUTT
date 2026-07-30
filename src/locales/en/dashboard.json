@@ -55,7 +55,11 @@
     "openWorkspace": "Open workspace",
     "viewPerson": "View person page",
     "searchAuthor": "Search by author",
-    "showMetadata": "Show metadata"
+    "showMetadata": "Show metadata",
+    "select": "Select work",
+    "deselect": "Deselect",
+    "copied": "Copied",
+    "filterByCollection": "Filter by this collection"
   },
   "bulkAssign": {
     "select": "Select",

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ZoomIn, ZoomOut, Maximize2, Download, LayoutGrid, Scissors } from 'lucide-react';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { panOffsetForTop } from '../utils/imageViewerGeometry';
@@ -40,6 +41,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
   const isHoveredRef = useRef(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
+  const { t } = useTranslation('workspace');
 
   // Lehe vahetusel hoiab brauser <img>-is eelmise lehe dekodeeritud pilti kuni
   // uus on laetud. Tekst vahetub aga kohe, nii et vana skaneering jääks hetkeks
@@ -274,21 +276,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
           <button
             onClick={() => handleZoom(0.25)}
             className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-            title="Suumi sisse"
+            title={t('imageViewer.zoomIn')}
           >
             <ZoomIn size={20} />
           </button>
           <button
             onClick={() => handleZoom(-0.25)}
             className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-            title="Suumi välja"
+            title={t('imageViewer.zoomOut')}
           >
             <ZoomOut size={20} />
           </button>
           <button
             onClick={handleReset}
             className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-            title="Taasta vaade"
+            title={t('imageViewer.resetView')}
           >
             <Maximize2 size={20} />
           </button>
@@ -298,7 +300,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
               <button
                 onClick={onGridView}
                 className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-                title="Kõik leheküljed"
+                title={t('imageViewer.allPages')}
               >
                 <LayoutGrid size={20} />
               </button>
@@ -308,7 +310,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
             <button
               onClick={onManage}
               className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-              title="Halda lehte"
+              title={t('imageViewer.managePage')}
             >
               <Scissors size={20} />
             </button>
@@ -317,7 +319,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
           <button
             onClick={handleDownload}
             className="p-2 text-white hover:bg-white/20 rounded transition-colors"
-            title="Lae pilt alla"
+            title={t('imageViewer.downloadImage')}
           >
             <Download size={20} />
           </button>
@@ -349,7 +351,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ src, pageNum, skipFade = fals
           <img
             ref={imgRef}
             src={src}
-            alt="Faksiimile"
+            alt={t('imageViewer.facsimileAlt')}
             className="max-w-none shadow-2xl sepia-[0.3] pointer-events-none"
             style={{
               maxHeight: '85vh',

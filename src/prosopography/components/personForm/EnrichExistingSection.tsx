@@ -132,7 +132,7 @@ const EnrichExistingSection: React.FC<Props> = ({ personId, wikidataId, gndId, a
         className="w-full flex items-center gap-2 px-3 py-2 bg-blue-50/60 hover:bg-blue-50 text-left transition-colors"
       >
         <RefreshCw size={12} className="text-blue-400 shrink-0" />
-        <span className="text-xs font-medium text-blue-700">Välisallikatest rikastamine</span>
+        <span className="text-xs font-medium text-blue-700">{t('enrich.sectionTitle')}</span>
         <span className="ml-auto text-blue-300">{open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span>
       </button>
 

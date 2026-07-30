@@ -51,6 +51,9 @@
       "passwordMismatch": "Passwords do not match",
       "tokenInvalid": "Invite link is expired or invalid",
       "saveFailed": "Failed to save password"
-    }
+    },
+    "yourUsername": "Your username:",
+    "usernameHint": "Use this username when signing in",
+    "goToLogin": "Go to the sign-in page"
   }
 }

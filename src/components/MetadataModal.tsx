@@ -562,9 +562,9 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                       ))}
                       {!vocabularies && (
                         <>
-                          <option value="praeses">Praeses</option>
-                          <option value="respondens">Respondens</option>
-                          <option value="auctor">Autor</option>
+                          <option value="praeses">{t('metadata.roles.praeses')}</option>
+                          <option value="respondens">{t('metadata.roles.respondens')}</option>
+                          <option value="auctor">{t('metadata.roles.auctor')}</option>
                         </>
                       )}
                     </select>
@@ -702,7 +702,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                 type="topic"
                 value={metaForm.type}
                 onChange={val => setMetaForm({ ...metaForm, type: val })}
-                placeholder="nt: trükis, käsikiri"
+                placeholder={t('metadata.typePlaceholder')}
                 lang={lang}
                 localSuggestions={suggestions.types}
               />
@@ -735,7 +735,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
               <label className="block text-xs font-medium text-gray-500 mb-2">{t('metadata.tags')}</label>
               
               <div className="flex flex-wrap gap-2 mb-3">
-                {metaForm.tags.length === 0 && <span className="text-xs text-gray-400 italic">Märksõnad puuduvad</span>}
+                {metaForm.tags.length === 0 && <span className="text-xs text-gray-400 italic">{t('info.noTags')}</span>}
                 {metaForm.tags.map((tag, idx) => {
                   const tagObj = typeof tag !== 'string' ? tag as any : null;
                   const url = tagObj ? getEntityUrl(tagObj.id, tagObj.source) : null;
@@ -749,7 +749,7 @@ const MetadataModal: React.FC<MetadataModalProps> = ({
                     }`}>
                       {getLabel(tag, lang)}
                       {personId && (
-                        <Link to={`/persons/${personId}`} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title="Vaata isiku lehte" onClick={e => e.stopPropagation()}>
+                        <Link to={`/persons/${personId}`} target="_blank" rel="noopener noreferrer" className="opacity-50 hover:opacity-100" title={t('metadata.viewPersonPage')} onClick={e => e.stopPropagation()}>
                           <UserRound size={10} />
                         </Link>
                       )}

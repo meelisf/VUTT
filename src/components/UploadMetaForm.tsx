@@ -358,9 +358,9 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
                         ))
                       : (
                         <>
-                          <option value="praeses">Praeses</option>
-                          <option value="respondens">Respondens</option>
-                          <option value="auctor">Autor</option>
+                          <option value="praeses">{t('workspace:metadata.roles.praeses')}</option>
+                          <option value="respondens">{t('workspace:metadata.roles.respondens')}</option>
+                          <option value="auctor">{t('workspace:metadata.roles.auctor')}</option>
                         </>
                       )}
                   </select>
@@ -502,7 +502,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
               type="topic"
               value={form.type}
               onChange={(val) => setForm({ ...form, type: val })}
-              placeholder="nt: trükis, käsikiri"
+              placeholder={t('workspace:metadata.typePlaceholder')}
               lang={lang}
               localSuggestions={suggestions.types}
             />
@@ -540,7 +540,7 @@ const UploadMetaForm: React.FC<UploadMetaFormProps> = ({
             </label>
             <div className="flex flex-wrap gap-2 mb-2">
               {form.tags.length === 0 && (
-                <span className="text-xs text-gray-400 italic">Märksõnad puuduvad</span>
+                <span className="text-xs text-gray-400 italic">{t('workspace:info.noTags')}</span>
               )}
               {form.tags.map((tag, i) => (
                 <span

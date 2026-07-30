@@ -58,7 +58,8 @@
     "genre": "Žanr",
     "tags": "Märksõnad",
     "loading": "Laadin...",
-    "noData": "Andmed puuduvad"
+    "noData": "Andmed puuduvad",
+    "noMatches": "Ei leitud vasteid"
   },
   "errors": {
     "connectionFailed": "Serveriga ühendamine ebaõnnestus",
@@ -69,7 +70,8 @@
     "boundaryDescription": "Rakenduses tekkis ootamatu viga. Proovige lehekülge uuesti laadida.",
     "boundaryReload": "Lae uuesti",
     "boundaryHome": "Avalehele",
-    "boundaryDetails": "Veateade"
+    "boundaryDetails": "Veateade",
+    "notLoggedIn": "Logi sisse"
   },
   "language": {
     "switchTo": "Vaheta keeleks {{lang}}",
@@ -220,5 +222,10 @@
     "emptyPreview": "Pole midagi näidata",
     "boldPlaceholder": "paks tekst",
     "italicPlaceholder": "kursiiv"
+  },
+  "entityPicker": {
+    "viewPersonProfile": "Vaata isiku profiili",
+    "viewInDatabase": "Vaata andmebaasis",
+    "prosopographySource": "Prosopograafia"
   }
 }
