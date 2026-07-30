@@ -117,7 +117,7 @@ const PlacesGroupPanel: React.FC<PlacesGroupPanelProps> = ({
               type="text"
               value={newKey}
               onChange={e => setNewKey(e.target.value)}
-              placeholder="nt gootaland"
+              placeholder={t('places.groupKeyPlaceholder')}
               className="mt-0.5 w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono"
             />
           </div>

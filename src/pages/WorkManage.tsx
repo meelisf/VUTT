@@ -700,7 +700,7 @@ const WorkManage: React.FC = () => {
                     onClick={() => setGridCols((c) => Math.min(c + 1, MAX_COLS))}
                     disabled={gridCols >= MAX_COLS}
                     className="px-2 py-0.5 border rounded disabled:opacity-40"
-                    title="Väiksemad pisipildid"
+                    title={t('thumbnails.smaller')}
                   >−</button>
                   <input
                     type="range"
@@ -708,13 +708,13 @@ const WorkManage: React.FC = () => {
                     max={MAX_COLS}
                     value={MAX_COLS + MIN_COLS - gridCols}
                     onChange={(e) => setGridCols(MAX_COLS + MIN_COLS - Number(e.target.value))}
-                    aria-label="Veergude arv"
+                    aria-label={t('thumbnails.columns')}
                   />
                   <button
                     onClick={() => setGridCols((c) => Math.max(c - 1, MIN_COLS))}
                     disabled={gridCols <= MIN_COLS}
                     className="px-2 py-0.5 border rounded disabled:opacity-40"
-                    title="Suuremad pisipildid"
+                    title={t('thumbnails.larger')}
                   >+</button>
                 </div>
                 <div
@@ -1037,12 +1037,12 @@ const WorkManage: React.FC = () => {
             </div>
             <div className="p-5 space-y-4">
               <p className="text-sm text-gray-600">
-                Lae üles uus skänn. Metaandmed säilitatakse automaatselt.
+                {t('manage.replaceHint')}
               </p>
               <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800">
-                  Asendamine kustutab kõik praegused leheküljed ja asendab need uute OCR-itud lehekülgedega.
+                  {t('manage.replaceWarning')}
                 </p>
               </div>
               <button
@@ -1052,7 +1052,7 @@ const WorkManage: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Upload size={15} />
-                Ava üleslaadimise viisard
+                {t('manage.openUploadWizard')}
               </button>
             </div>
           </div>

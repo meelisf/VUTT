@@ -24,7 +24,10 @@
     "inviteLinkGenerated": "Kutse link on loodud",
     "copyLink": "Kopeeri link",
     "linkCopied": "Link kopeeritud!",
-    "sendEmail": "Saada e-kiri"
+    "sendEmail": "Saada e-kiri",
+    "loadError": "Viga taotluste laadimisel",
+    "approveError": "Kinnitamine ebaõnnestus",
+    "rejectError": "Tagasilükkamine ebaõnnestus"
   },
   "users": {
     "title": "Kasutajad",
@@ -110,7 +113,19 @@
     "creating": "Lisan...",
     "createSuccess": "Kollektsioon lisatud",
     "createError": "Lisamine ebaõnnestus",
-    "createErrorDuplicateId": "ID \"{{id}}\" on juba olemas"
+    "createErrorDuplicateId": "ID \"{{id}}\" on juba olemas",
+    "visibility": "Nähtavus",
+    "visibilityPublic": "Avalik",
+    "visibilityRestricted": "Piiratud",
+    "visibilityHint": "Piiratud kollektsiooni teosed on ligipääsetavad ainult antud kasutajatele ja adminidele.",
+    "allowedUsers": "Ligipääsuga kasutajad:",
+    "noAllowedUsers": "Pole ligipääsuga kasutajaid",
+    "descriptionPlaceholderEt": "Lühikirjeldus eesti keeles...",
+    "descriptionPlaceholderEn": "Short description in English...",
+    "langEt": "Eesti keeles",
+    "langEn": "In English",
+    "descriptionLongPlaceholderEt": "Pikem tutvustus eesti keeles...",
+    "descriptionLongPlaceholderEn": "Longer introduction in English..."
   },
   "cards": {
     "registrations": "Taotlused",
@@ -218,7 +233,13 @@
     "groupDeleting": "Kustutan…",
     "groupDeleteError": "Kustutamine ebaõnnestus",
     "groupCancel": "Tühista",
-    "groupEdit": "Redigeeri"
+    "groupEdit": "Redigeeri",
+    "clearSearch": "Tühista otsing",
+    "noSearchResults": "Tulemusi ei leitud",
+    "parentSearchPlaceholder": "Otsi ülempiirkonda…",
+    "historicalNamePlaceholder": "Lisa nimi + Enter",
+    "groupKeyPlaceholder": "nt gootaland",
+    "treeEmpty": "Kohti pole"
   },
   "trash": {
     "tab": "Prügikast",

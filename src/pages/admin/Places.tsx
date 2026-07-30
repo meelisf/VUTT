@@ -181,7 +181,7 @@ const Places: React.FC = () => {
               <button
                 onClick={() => setSearchQuery('')}
                 className="text-gray-400 hover:text-gray-600 shrink-0"
-                aria-label="Tühista otsing"
+                aria-label={t('places.clearSearch')}
               >
                 <X size={14} />
               </button>
@@ -224,7 +224,7 @@ const Places: React.FC = () => {
                 {searchResults ? (
                   <div className="py-2">
                     {searchResults.length === 0 ? (
-                      <p className="px-3 py-4 text-sm text-gray-400 italic">Tulemusi ei leitud</p>
+                      <p className="px-3 py-4 text-sm text-gray-400 italic">{t('places.noSearchResults')}</p>
                     ) : (
                       searchResults.map(([k, e]) => (
                         <button

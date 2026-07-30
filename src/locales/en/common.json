@@ -58,7 +58,8 @@
     "genre": "Genre",
     "tags": "Tags",
     "loading": "Loading...",
-    "noData": "No data available"
+    "noData": "No data available",
+    "noMatches": "No matches found"
   },
   "errors": {
     "connectionFailed": "Failed to connect to server",
@@ -69,7 +70,8 @@
     "boundaryDescription": "An unexpected error occurred in the application. Try reloading the page.",
     "boundaryReload": "Reload",
     "boundaryHome": "Go to Home",
-    "boundaryDetails": "Error details"
+    "boundaryDetails": "Error details",
+    "notLoggedIn": "Sign in"
   },
   "language": {
     "switchTo": "Switch language to {{lang}}",
@@ -220,5 +222,10 @@
     "emptyPreview": "Nothing to preview",
     "boldPlaceholder": "bold text",
     "italicPlaceholder": "italic"
+  },
+  "entityPicker": {
+    "viewPersonProfile": "View person profile",
+    "viewInDatabase": "View in external database",
+    "prosopographySource": "Prosopography"
   }
 }

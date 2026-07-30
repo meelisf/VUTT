@@ -97,7 +97,8 @@
     "label": "Replace existing work",
     "warning": "Replacement will delete all existing pages and replace them with new ones.",
     "selected": "Work to replace:",
-    "replaceBtn": "Replace: {{title}}"
+    "replaceBtn": "Replace: {{title}}",
+    "remove": "Remove replacement"
   },
   "status": {
     "pending": "Pending",

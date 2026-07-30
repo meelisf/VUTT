@@ -260,7 +260,8 @@
     "showAllCollections": "Näita kõiki kollektsioone",
     "year": "Kaardi aasta",
     "applyYear": "Rakenda",
-    "yearHelp": "Ajaloolise kaardi aasta. Aastavahemiku korral kasutatakse vaikimisi selle keskpunkti."
+    "yearHelp": "Ajaloolise kaardi aasta. Aastavahemiku korral kasutatakse vaikimisi selle keskpunkti.",
+    "openPlace": "Näita kaardil"
   },
   "place": {
     "searchPlaceholder": "Otsi linna, kihelkonda, piirkonda…",
@@ -288,5 +289,15 @@
     "add": "Lisa",
     "wikidataError": "Wikidata päring ebaõnnestus",
     "addError": "Lisamine ebaõnnestus"
-  }
+  },
+  "historyPanel": {
+    "original": "Originaal",
+    "restoreTitle": "Taasta see versioon",
+    "restoreConfirm": "Kas oled kindel, et soovid taastada selle versiooni?",
+    "restoreError": "Taastamine ebaõnnestus",
+    "diffError": "Diff laadimine ebaõnnestus",
+    "noChanges": "Muudatusi ei leitud",
+    "empty": "Ajalugu puudub"
+  },
+  "loadingVocab": "Laadin…"
 }

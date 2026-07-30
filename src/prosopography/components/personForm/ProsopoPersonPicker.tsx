@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Link2, X } from 'lucide-react';
 import { listPersons } from '../../services/prosopographyService';
 import type { ProsopoIndexEntry } from '../../types';
@@ -10,6 +11,7 @@ const ProsopoPersonPicker: React.FC<{
   token: string;
   currentId?: string;  // välistab iseenda tulemi
 }> = ({ value, onChange, token, currentId }) => {
+  const { t } = useTranslation('prosopography');
   const [query, setQuery] = useState(value.name);
   const [results, setResults] = useState<ProsopoIndexEntry[]>([]);
   const [open, setOpen] = useState(false);
@@ -66,7 +68,7 @@ const ProsopoPersonPicker: React.FC<{
               search(e.target.value);
             }}
             onFocus={() => { if (query) setOpen(true); }}
-            placeholder="Isiku nimi…"
+            placeholder={t('enrich.searchPlaceholder')}
             className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 outline-none pr-6"
           />
           {loading && <Loader2 size={12} className="absolute right-2 top-2.5 animate-spin text-gray-400" />}

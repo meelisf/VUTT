@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Globe, User, MapPin, BookOpen, Tag, X, Loader2, ExternalLink, Database, Library, BookMarked, UserPlus, Users, IdCard } from 'lucide-react';
 import { searchWikidata, getEntityLabels, WikidataSearchResult } from '../services/wikidataService';
@@ -83,6 +84,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
   defaultPersonSearch = false,
   token,
 }) => {
+  const { t } = useTranslation('common');
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -528,7 +530,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
           <Link
             to={`/persons/${entityId}`}
             className="absolute right-9 top-1/2 -translate-y-1/2 text-gray-400 hover:text-primary-600 p-0.5 rounded-full hover:bg-primary-50 transition-colors"
-            title="Vaata isiku profiili"
+            title={t('entityPicker.viewPersonProfile')}
             onClick={(e) => e.stopPropagation()}
           >
             <IdCard size={14} />
@@ -539,7 +541,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             target="_blank"
             rel="noopener noreferrer"
             className="absolute right-9 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-600 p-0.5 rounded-full hover:bg-blue-50 transition-colors"
-            title="Vaata andmebaasis"
+            title={t('entityPicker.viewInDatabase')}
             onClick={(e) => e.stopPropagation()}
           >
             <ExternalLink size={14} />
@@ -785,7 +787,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
             <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider flex items-center gap-2">
               {isPersonSearch ? (
                 <>
-                  <span className="flex items-center gap-1"><User size={10} className="text-indigo-400" /> Prosopograafia</span>
+                  <span className="flex items-center gap-1"><User size={10} className="text-indigo-400" /> {t('entityPicker.prosopographySource')}</span>
                   {showExternalSearch && <>
                     <span className="flex items-center gap-1"><Globe size={10} /> Wikidata</span>
                     <span className="flex items-center gap-1"><BookMarked size={10} className="text-orange-500" /> GND</span>

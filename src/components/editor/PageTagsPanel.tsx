@@ -135,7 +135,7 @@ const PageTagsPanel: React.FC<PageTagsPanelProps> = ({
                   ? navigate(`/search?pageTags=${encodeURIComponent(tagId)}`, { state: { pageTagsLabels: { [tagId]: label } } })
                   : navigate(`/search?q=${encodeURIComponent(label)}&scope=annotation`)}
                 className="pl-2.5 pr-1.5 py-1 hover:text-primary-600 flex items-center gap-1"
-                title="Otsi seda märksõna kogu korpusest"
+                title={t('info.searchTagInCorpus')}
               >
                 {label}
                 <Search size={12} className="opacity-0 group-hover:opacity-50" />

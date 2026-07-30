@@ -60,7 +60,9 @@
     "accessDenied": "Access denied.",
     "sessionExpiredProtectedWork": "Your session has expired. Please sign in again to view this work.",
     "loginRequiredProtectedWork": "This work belongs to a restricted collection. Please sign in to view it.",
-    "pageNotFound": "Page not found. The pages of this document may have been reordered or deleted. Try going to the beginning of the work."
+    "pageNotFound": "Page not found. The pages of this document may have been reordered or deleted. Try going to the beginning of the work.",
+    "workIdMissing": "Work ID is missing.",
+    "loadFailed": "Error loading data. Please check the Meilisearch connection."
   },
   "management": {
     "title": "Work management",
@@ -223,7 +225,11 @@
       "dragPanel": "Drag buttons elsewhere",
       "applyError": "Operation failed",
       "close": "Close"
-    }
+    },
+    "replaceHint": "Upload a new scan. Metadata is preserved automatically.",
+    "replaceWarning": "Replacing deletes all current pages and replaces them with newly OCR-processed pages.",
+    "openUploadWizard": "Open the upload wizard",
+    "directory": "Directory"
   },
   "metadata": {
     "title": "Metadata",
@@ -277,7 +283,11 @@
     "classification": "Classification",
     "type": "Type",
     "genre": "Genre",
-    "languages": "Languages"
+    "languages": "Languages",
+    "typePlaceholder": "e.g. print, manuscript",
+    "viewPersonPage": "View person page",
+    "noGenres": "No genres",
+    "genrePlaceholder": "Add a genre..."
   },
   "download": {
     "title": "Download",
@@ -326,7 +336,11 @@
     "noDeletedComments": "No deleted comments found",
     "noOlderVersions": "No earlier versions",
     "historyTruncated": "Showing history of the last 100 commits.",
-    "restoreError": "Restore failed"
+    "restoreError": "Restore failed",
+    "searchTagInCorpus": "Search for this tag across the whole corpus",
+    "openEsterRecord": "Open the ESTER record",
+    "editWorkMetadata": "Edit work metadata",
+    "noImage": "No image"
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
@@ -402,5 +416,28 @@
     "annotationLabel": "Annotation",
     "addComment": "Add comment",
     "deleteAnchor": "Delete anchor"
+  },
+  "imageViewer": {
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "resetView": "Reset view",
+    "allPages": "All pages",
+    "managePage": "Manage page",
+    "downloadImage": "Download image",
+    "facsimileAlt": "Facsimile"
+  },
+  "thumbnails": {
+    "smaller": "Smaller thumbnails",
+    "larger": "Larger thumbnails",
+    "size": "Thumbnail size",
+    "columns": "Number of columns",
+    "closeEsc": "Close (ESC)"
+  },
+  "sharing": {
+    "title": "Sharing",
+    "private": "Private",
+    "shareable": "Shareable (via direct link)",
+    "copied": "Copied",
+    "copy": "Copy"
   }
 }

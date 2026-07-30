@@ -86,11 +86,11 @@ const Registrations: React.FC = () => {
       if (data.status === 'success') {
         setRegistrations(data.registrations || []);
       } else {
-        setError(data.message || 'Viga taotluste laadimisel');
+        setError(data.message || t('registrations.loadError'));
       }
     } catch (e) {
       console.error('Load registrations error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
+      setError(t('common:errors.connectionFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -116,11 +116,11 @@ const Registrations: React.FC = () => {
         });
         await loadRegistrations();
       } else {
-        setError(data.message || 'Kinnitamine ebaõnnestus');
+        setError(data.message || t('registrations.approveError'));
       }
     } catch (e) {
       console.error('Approve error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
+      setError(t('common:errors.connectionFailed'));
     } finally {
       setProcessingId(null);
     }
@@ -137,11 +137,11 @@ const Registrations: React.FC = () => {
       if (data.status === 'success') {
         await loadRegistrations();
       } else {
-        setError(data.message || 'Tagasilükkamine ebaõnnestus');
+        setError(data.message || t('registrations.rejectError'));
       }
     } catch (e) {
       console.error('Reject error:', e);
-      setError('Serveriga ühendamine ebaõnnestus');
+      setError(t('common:errors.connectionFailed'));
     } finally {
       setProcessingId(null);
     }
@@ -386,7 +386,7 @@ const Registrations: React.FC = () => {
             className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
           >
             {isLoading ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-            {t('common:actions.refresh')}
+            {t('common:buttons.refresh')}
           </button>
         </div>
       </div>

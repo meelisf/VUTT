@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { X, Loader2, ZoomIn, ZoomOut } from 'lucide-react';
 import type { Work } from '../types';
 
@@ -29,6 +30,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
   cols,
   onColsChange,
 }) => {
+  const { t } = useTranslation(['workspace', 'common']);
   const MIN_COLS = 3;
   const MAX_COLS = 10;
 
@@ -93,7 +95,7 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             onClick={() => onColsChange(Math.min(cols + 1, MAX_COLS))}
             disabled={cols >= MAX_COLS}
             className="p-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            title="Väiksemad pisipildid"
+            title={t('thumbnails.smaller')}
           >
             <ZoomOut size={14} />
           </button>
@@ -105,13 +107,13 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
             value={sliderValue}
             onChange={handleSlider}
             className="w-24 accent-white/50 cursor-pointer"
-            title="Thumbnailide suurus"
+            title={t('thumbnails.size')}
           />
           <button
             onClick={() => onColsChange(Math.max(cols - 1, MIN_COLS))}
             disabled={cols <= MIN_COLS}
             className="p-1 text-white/40 hover:text-white/80 hover:bg-white/10 rounded transition-colors disabled:opacity-20 disabled:cursor-not-allowed"
-            title="Suuremad pisipildid"
+            title={t('thumbnails.larger')}
           >
             <ZoomIn size={14} />
           </button>
@@ -120,12 +122,12 @@ const ThumbnailGrid: React.FC<ThumbnailGridProps> = ({
         {/* Paremal: lehtede arv + sulge */}
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-white/30 text-xs tabular-nums">
-            {loading ? '…' : `${pages.length} lk`}
+            {loading ? '…' : `${pages.length} ${t('common:labels.pages')}`}
           </span>
           <button
             onClick={onClose}
             className="p-1.5 text-white/60 hover:text-white hover:bg-white/15 rounded transition-colors"
-            title="Sulge (ESC)"
+            title={t('thumbnails.closeEsc')}
           >
             <X size={18} />
           </button>

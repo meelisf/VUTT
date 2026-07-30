@@ -578,7 +578,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
         <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-5 py-3 border-b border-gray-100">
             <Link size={15} className="text-gray-400" />
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Jagamine</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">{t('sharing.title')}</span>
           </div>
           <div className="px-5 py-4">
             <div className="flex items-center gap-6">
@@ -591,7 +591,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   disabled={shareableSaving}
                   className="text-primary-600"
                 />
-                <span className="text-sm text-gray-700">Privaatne</span>
+                <span className="text-sm text-gray-700">{t('sharing.private')}</span>
               </label>
               <label className="flex items-center gap-1.5 cursor-pointer">
                 <input
@@ -602,7 +602,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   disabled={shareableSaving}
                   className="text-primary-600"
                 />
-                <span className="text-sm text-gray-700">Jagatav (otselingiga)</span>
+                <span className="text-sm text-gray-700">{t('sharing.shareable')}</span>
               </label>
               {shareableSaving && <Loader2 size={13} className="animate-spin text-gray-400" />}
             </div>
@@ -620,7 +620,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
                   className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 bg-gray-50 hover:bg-gray-100 rounded transition-colors"
                 >
                   {linkCopied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                  {linkCopied ? 'Kopeeritud' : 'Kopeeri'}
+                  {linkCopied ? t('sharing.copied') : t('sharing.copy')}
                 </button>
               </div>
             )}
@@ -665,7 +665,7 @@ const HistoryTab: React.FC<HistoryTabProps> = ({
           {slug && (
             <div className="px-5 py-4 flex items-center justify-between gap-4 border-b border-gray-100">
               <div className="min-w-0">
-                <p className="text-xs text-gray-400 mb-1">Kataloog</p>
+                <p className="text-xs text-gray-400 mb-1">{t('manage.directory')}</p>
                 <code className="text-xs font-mono text-gray-700 truncate block">data/{slug}/</code>
               </div>
               <button

@@ -24,7 +24,10 @@
     "inviteLinkGenerated": "Invite link generated",
     "copyLink": "Copy link",
     "linkCopied": "Link copied!",
-    "sendEmail": "Send email"
+    "sendEmail": "Send email",
+    "loadError": "Error loading registration requests",
+    "approveError": "Approval failed",
+    "rejectError": "Rejection failed"
   },
   "users": {
     "title": "Users",
@@ -110,7 +113,19 @@
     "creating": "Adding...",
     "createSuccess": "Collection added",
     "createError": "Failed to add",
-    "createErrorDuplicateId": "ID \"{{id}}\" already exists"
+    "createErrorDuplicateId": "ID \"{{id}}\" already exists",
+    "visibility": "Visibility",
+    "visibilityPublic": "Public",
+    "visibilityRestricted": "Restricted",
+    "visibilityHint": "Works in a restricted collection are accessible only to the listed users and to admins.",
+    "allowedUsers": "Users with access:",
+    "noAllowedUsers": "No users have access",
+    "descriptionPlaceholderEt": "Short description in Estonian...",
+    "descriptionPlaceholderEn": "Short description in English...",
+    "langEt": "In Estonian",
+    "langEn": "In English",
+    "descriptionLongPlaceholderEt": "Longer introduction in Estonian...",
+    "descriptionLongPlaceholderEn": "Longer introduction in English..."
   },
   "cards": {
     "registrations": "Registrations",
@@ -218,7 +233,13 @@
     "groupDeleting": "Deleting…",
     "groupDeleteError": "Delete failed",
     "groupCancel": "Cancel",
-    "groupEdit": "Edit"
+    "groupEdit": "Edit",
+    "clearSearch": "Clear search",
+    "noSearchResults": "No results found",
+    "parentSearchPlaceholder": "Search for a parent region…",
+    "historicalNamePlaceholder": "Add a name + Enter",
+    "groupKeyPlaceholder": "e.g. gotaland",
+    "treeEmpty": "No places"
   },
   "trash": {
     "tab": "Trash",

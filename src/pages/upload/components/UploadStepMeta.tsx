@@ -85,7 +85,7 @@ const UploadStepMeta: React.FC<UploadStepMetaProps> = ({
               type="button"
               onClick={onReplaceDismiss}
               className="p-0.5 text-amber-600 hover:text-red-600 transition-colors shrink-0"
-              title="Eemalda asendus"
+              title={t('replaceWork.remove')}
             >
               <X size={14} />
             </button>

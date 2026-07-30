@@ -81,7 +81,7 @@ function TreeNode({
           <span className="text-xs text-gray-400 shrink-0">{t(`places.types.${node.entry.type}`, node.entry.type)}</span>
         )}
         {!hasQCode && (
-          <span title="Q-kood puudub"><AlertTriangle size={11} className="text-amber-400 shrink-0" /></span>
+          <span title={t('places.noQCode')}><AlertTriangle size={11} className="text-amber-400 shrink-0" /></span>
         )}
       </button>
       {hasChildren && open && (
@@ -138,7 +138,7 @@ const PlacesTree: React.FC<PlacesTreeProps> = ({ groups, selectedKey, onSelect, 
   const { t } = useTranslation('admin');
 
   if (groups.length === 0) {
-    return <p className="px-3 py-4 text-sm text-gray-400 italic">Kohti pole</p>;
+    return <p className="px-3 py-4 text-sm text-gray-400 italic">{t('places.treeEmpty')}</p>;
   }
 
   return (

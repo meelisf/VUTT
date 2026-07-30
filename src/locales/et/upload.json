@@ -97,7 +97,8 @@
     "label": "Asenda olemasolevat teost",
     "warning": "Asendamine kustutab kõik olemasolevad leheküljed ja asendab need uutega.",
     "selected": "Asendatav teos:",
-    "replaceBtn": "Asenda: {{title}}"
+    "replaceBtn": "Asenda: {{title}}",
+    "remove": "Eemalda asendus"
   },
   "status": {
     "pending": "Ootel",

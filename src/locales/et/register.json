@@ -51,6 +51,9 @@
       "passwordMismatch": "Paroolid ei ühti",
       "tokenInvalid": "Kutse link on aegunud või vigane",
       "saveFailed": "Parooli salvestamine ebaõnnestus"
-    }
+    },
+    "yourUsername": "Sinu kasutajanimi:",
+    "usernameHint": "Kasuta seda kasutajanime sisselogimisel",
+    "goToLogin": "Mine sisselogimise lehele"
   }
 }
