@@ -1,4 +1,4 @@
-# 0011 — i18n laeb ühe keele korraga; `fallbackLng` on väljas ja asendatud pariteeditestiga
+# 0011 — i18n laeb ühe keele korraga; `fallbackLng` on väljas ja asendatud kahe tõlkevalvuriga
 
 **Staatus:** kehtib
 
@@ -39,12 +39,34 @@ kuju:
    sünkroonis (0 lahknevat võtit kummaski suunas), st varuvõrk ei rakendunud
    praktikas kunagi.
 
+5. **Teine valvur katab pariteedi pimeala** (lisatud PR #204).
+   Pariteeditest võrdleb keeli omavahel — seega on ta pime võtme suhtes, mis
+   puudub **mõlemas** keeles. Selline `t()` kutse ei katkesta build'i ega
+   tüübikontrolli: i18next renderdab vaikselt `defaultValue`'i või, kui seda
+   pole, **toore võtme** (`common:actions.cancel`) otse kasutajale.
+
+   `src/locales/__tests__/translationKeysResolve.test.ts` kontrollib iga
+   staatilise `t('võti')` literaali lahenduvust mõlemas keeles ja raporteerib
+   faili + rea. Dünaamiliselt koostatud võtmed (`t(\`places.types.${x}\`)`)
+   jäetakse teadlikult välja — neid ei saa staatiliselt kontrollida.
+
 ## Tagajärjed
 
 - **Uus tõlkevõti tuleb lisada mõlemasse keelde korraga.** Varem võttis
   puuduva võtme vaikselt teine keel; nüüd katkeb build. See on teadlikult
   rangem — vaikne fallback laseks puuduva tõlke märkamatult teise keele teksti
   taha kaduda.
+
+- **Kaks testi, erinev roll — kumbki ei asenda teist.** `localeParity` võrdleb
+  keeli omavahel (kas et ja en on sünkroonis); `translationKeysResolve` võrdleb
+  koodi lokaatidega (kas kutsutud võti üldse eksisteerib). Võti, mis puudub
+  mõlemas keeles, läbib pariteedi laitmatult.
+
+- **`t()` vaikeväärtus ei ole tõlge.** `t('mingi.võti', 'Eestikeelne tekst')`
+  näeb koodis välja korrektne, aga kui võtit lokaatides pole, kuvatakse see
+  eestikeelne tekst ka ingliskeelses UI-s. Vaikeväärtus on lubatud ainult
+  koos päris võtmega mõlemas keeles. PR #204 leidis sel viisil 17 kutset,
+  neist 3 ilma vaikeväärtuseta — need renderdasid toore võtme kasutajale.
 
 - **Uus nimeruum** tuleb lisada nii `src/locales/namespaces.ts`-i kui mõlemasse
   keelekausta; `localeParity` test kontrollib vastavust.
@@ -69,4 +91,6 @@ kuju:
 ## Viited
 
 - Issue #187, #188; PR #192
+- PR #204 — teine valvur (`translationKeysResolve.test.ts`) ja ~50 kõvakodeeritud
+  eesti stringi eemaldamine UI-st
 - Mõõdetud: entry chunk 193,22 → 59,13 kB gzip; esmane laadimine ~221 → ~202 kB
