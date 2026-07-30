@@ -26,7 +26,7 @@ import { formatRelationOwnerName, formatRelationTypeLabel } from '../utils/eston
 import { getVocabularies } from '../../services/collectionService';
 import type { VocabularySeisusItem } from '../../services/collectionService';
 import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
-import ConfirmModal from '../../components/ConfirmModal';
+import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
 
 const PersonEditPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -184,11 +184,16 @@ const PersonEditPage: React.FC = () => {
 
   const set = (patch: Partial<FormDraft>) => { setIsDirty(true); setDraft(d => ({ ...d, ...patch })); };
 
-  const skipGuardRef = useRef(false);
-  const { isBlocked, proceed, reset } = useUnsavedChangesGuard(isDirty, skipGuardRef);
+  // Uue isiku ID tekib alles salvestamisel — hoiame selle navigeerimiseks alles.
+  const createdIdRef = useRef<string | null>(null);
 
-  const handleSave = async () => {
-    if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return; }
+  /**
+   * Salvestab isiku. EI navigeeri — sihtkoha valib kutsuja (nupp läheb profiilile,
+   * salvestamata muudatuste dialoog jätkab kasutaja algatatud üleminekut).
+   * Tagastab `true` ainult siis, kui kõik on püsivalt salvestatud.
+   */
+  const savePerson = async (): Promise<boolean> => {
+    if (!draft.name_label.trim()) { setError(t('form.nameRequired')); return false; }
     setSaving(true);
     setError(null);
     try {
@@ -204,23 +209,38 @@ const PersonEditPage: React.FC = () => {
         );
         const payload = draftToPayload(draft, created, seisused, konfessioonid);
         await updatePerson(created.id, { ...payload, updated_at: created.updated_at }, token);
-        skipGuardRef.current = true;
-        navigate(`/persons/${created.id}`);
+        createdIdRef.current = created.id;
       } else {
         const payload = draftToPayload(draft, original ?? undefined, seisused, konfessioonid);
         await updatePerson(id!, payload, token);
-        skipGuardRef.current = true;
-        navigate(`/persons/${id!}`);
       }
+      setIsDirty(false);
+      return true;
     } catch (e: any) {
       if (e?.conflict) {
         setError(t('form.conflictError'));
       } else {
         setError(t('form.saveError'));
       }
+      return false;
     } finally {
       setSaving(false);
     }
+  };
+
+  const { dialogProps, allowNextNavigation } = useUnsavedChangesGuard({
+    isDirty,
+    onSave: savePerson,
+  });
+
+  /** Lehe oma SALVESTA nupp: salvestab ja läheb profiilile. */
+  const handleSave = async () => {
+    const ok = await savePerson();
+    if (!ok) return;
+    // Guard ei tohi seda navigatsiooni blokeerida: `isDirty` on Reacti järgmise
+    // renderduseni tõenäoliselt veel `true`.
+    allowNextNavigation();
+    navigate(`/persons/${createdIdRef.current ?? id!}`);
   };
 
   // ── Loading ──────────────────────────────────────────────
@@ -946,16 +966,7 @@ const PersonEditPage: React.FC = () => {
       </div>
     </div>
 
-    <ConfirmModal
-      isOpen={isBlocked}
-      title={t('common:unsavedChanges.title')}
-      message={t('common:unsavedChanges.message')}
-      confirmText={t('common:unsavedChanges.leave')}
-      cancelText={t('common:unsavedChanges.stay')}
-      onConfirm={proceed}
-      onCancel={reset}
-      variant="warning"
-    />
+    <UnsavedChangesDialog {...dialogProps} />
     </>
   );
 };

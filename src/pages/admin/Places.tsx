@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -14,6 +14,8 @@ import PlacesTree from './PlacesTree';
 import PlacesDetail from './PlacesDetail';
 import PlacesGroupPanel from './PlacesGroupPanel';
 import AddPlaceModal from '../../prosopography/components/AddPlaceModal';
+import UnsavedChangesDialog from '../../components/UnsavedChangesDialog';
+import { useUnsavedChangesGuard } from '../../hooks/useUnsavedChangesGuard';
 
 const MAX_PERSON_SAMPLE = 5;
 
@@ -38,7 +40,17 @@ const Places: React.FC = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showGroupPanel, setShowGroupPanel] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const [pendingKey, setPendingKey] = useState<string | null>(null);
+  const placeSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+
+  const handleGuardSave = useCallback(async (): Promise<boolean> => {
+    if (!placeSaveRef.current) return true;
+    return placeSaveRef.current();
+  }, []);
+
+  const { dialogProps, runGuarded } = useUnsavedChangesGuard({
+    isDirty,
+    onSave: handleGuardSave,
+  });
 
   const [personCounts, setPersonCounts] = useState<Record<string, number>>({});
   const [personSamples, setPersonSamples] = useState<
@@ -129,12 +141,9 @@ const Places: React.FC = () => {
   }, []);
 
   const handleSelectKey = useCallback((key: string | null) => {
-    if (isDirty && key !== selectedKey) {
-      setPendingKey(key);
-    } else {
-      setSelectedKey(key);
-    }
-  }, [isDirty, selectedKey]);
+    if (key === selectedKey) return;
+    runGuarded(() => setSelectedKey(key));
+  }, [runGuarded, selectedKey]);
 
   if (userLoading || !user) {
     return (
@@ -256,8 +265,9 @@ const Places: React.FC = () => {
                     onUpdated={handleUpdated}
                     onMerged={handleMerged}
                     onDeleted={handleDeleted}
-                    onSelectKey={setSelectedKey}
+                    onSelectKey={handleSelectKey}
                     onDirtyChange={setIsDirty}
+                    saveRef={placeSaveRef}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-sm text-gray-400 italic">
@@ -279,34 +289,15 @@ const Places: React.FC = () => {
           onAdd={(key, entry) => {
             setPlaces(prev => ({ ...prev, [key]: entry }));
             setShowAddModal(false);
-            setSelectedKey(key);
+            // Ka uue koha loomine vahetab valikut — see peab käima guardist läbi,
+            // muidu kaoks pooleliolev muudatus vaikselt.
+            handleSelectKey(key);
           }}
           onClose={() => setShowAddModal(false)}
         />
       )}
 
-      {pendingKey !== null && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
-            <h3 className="font-semibold text-gray-900 mb-2">{t('places.unsavedTitle')}</h3>
-            <p className="text-sm text-gray-600 mb-5">{t('places.unsavedBody')}</p>
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => setPendingKey(null)}
-                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
-              >
-                {t('places.unsavedStay')}
-              </button>
-              <button
-                onClick={() => { setSelectedKey(pendingKey); setPendingKey(null); }}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
-              >
-                {t('places.unsavedLeave')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <UnsavedChangesDialog {...dialogProps} />
     </div>
   );
 };

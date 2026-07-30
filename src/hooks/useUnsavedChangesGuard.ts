@@ -1,18 +1,69 @@
-import { useEffect, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBlocker } from 'react-router-dom';
+import type { UnsavedChangesDialogProps } from '../components/UnsavedChangesDialog';
+import {
+  initialGuardState,
+  requestTransition,
+  stay,
+  discard,
+  beginSave,
+  finishSave,
+  allowNextTransition,
+  consumeAllowance,
+  type GuardState,
+} from './unsavedChangesFlow';
+
+interface UnsavedChangesGuardOptions {
+  /** Kas on salvestamata muudatusi. */
+  isDirty: boolean;
+  /**
+   * Salvestab ja tagastab `true` AINULT siis, kui kõik on püsivalt salvestatud ja
+   * kohalikud dirty-lipud on uuendatud. `false` = ebaõnnestus. Visatud erindit
+   * käsitleb hook kaitseks samamoodi nagu `false`.
+   */
+  onSave: () => Promise<boolean>;
+}
+
+interface UnsavedChangesGuardResult {
+  dialogProps: UnsavedChangesDialogProps;
+  /**
+   * Lehesisene üleminek (lehepööre, koha vahetus). Puhta oleku korral käivitub
+   * `fn` kohe, dialoogi avamata; muidu läheb ootele.
+   */
+  runGuarded: (fn: () => void) => void;
+  /**
+   * Märgib järgmise navigatsiooni lubatuks. Mõeldud lehtedele, mis salvestavad OMA
+   * nupuga ja navigeerivad ise (nt PersonEditPage → /persons/{id}) — see on
+   * dialoogivoost sõltumatu. Luba on ühekordne.
+   */
+  allowNextNavigation: () => void;
+}
 
 /**
- * Blokeerib lehelt lahkumise salvestamata muudatuste korral.
- * Käsitleb nii React Router navigeerimist (useBlocker) kui ka
- * brauseri tab sulgemist / välist navigeerimist (beforeunload).
+ * Blokeerib lehelt lahkumise ja lehesisesed üleminekud salvestamata muudatuste korral.
  *
- * @param isDirty  - kas on salvestamata muudatusi
- * @param skip     - kui ref.current === true, blocker ignoreeritakse (nt pärast salvestamist)
+ * Kolm sisendit, üks dialoog:
+ *   - React Routeri `useBlocker` — lahkumine
+ *   - `beforeunload` — tab-i sulgemine (brauseri oma dialoog, seda me ei kontrolli)
+ *   - `runGuarded` — lehesisene üleminek
+ *
+ * Otsused elavad `unsavedChangesFlow`-s, siin on ainult Reacti ja Routeri ühendus.
  */
 export function useUnsavedChangesGuard(
-  isDirty: boolean,
-  skip?: MutableRefObject<boolean>,
-) {
+  { isDirty, onSave }: UnsavedChangesGuardOptions,
+): UnsavedChangesGuardResult {
+  const [state, setState] = useState<GuardState>(initialGuardState);
+
+  // Blocker-callback ja async salvestus vajavad värsket olekut väljaspool renderdust.
+  const stateRef = useRef(state);
+  const isDirtyRef = useRef(isDirty);
+  isDirtyRef.current = isDirty;
+
+  const apply = useCallback((next: GuardState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
+
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (isDirty) { e.preventDefault(); e.returnValue = ''; }
@@ -21,15 +72,97 @@ export function useUnsavedChangesGuard(
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      !(skip?.current) && isDirty && currentLocation.pathname !== nextLocation.pathname,
-  );
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (currentLocation.pathname === nextLocation.pathname) return false;
+    // Ühekordne möödapääs tarbitakse siin: pärast edukat salvestust või loobumist
+    // on `isDirty` Reacti järgmise renderduseni veel `true`, seega ilma selleta
+    // avaneks dialoog kohe uuesti.
+    const { state: next, allowed } = consumeAllowance(stateRef.current);
+    if (allowed) { apply(next); return false; }
+    return isDirtyRef.current;
+  });
+
+  // `useBlocker` tagastab igal renderdusel uue objekti — effect ja callback'id
+  // tohivad sõltuda ainult `blocker.state`-ist, muidu tekib lõputu tsükkel.
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
+
+  /**
+   * Blokeeritud navigatsiooni jätkamine.
+   *
+   * `proceed()` EI käivita `shouldBlock`-i uuesti, seega `discard`/`finishSave`
+   * püsti pandud ühekordne luba jääks siin tarbimata ja lekiks järgmisse
+   * navigatsiooni. Tarbime selle käsitsi ära.
+   */
+  const proceedBlocked = useCallback(() => {
+    const { state: next } = consumeAllowance(stateRef.current);
+    apply(next);
+    blockerRef.current.proceed();
+  }, [apply]);
+
+  // Router blokeeris navigatsiooni → pane see ootele samasse dialoogi.
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    const r = requestTransition(stateRef.current, true, { run: proceedBlocked });
+    if (r.runNow) { proceedBlocked(); return; }
+    apply(r.state);
+  }, [blocker.state, apply, proceedBlocked]);
+
+  const runGuarded = useCallback((fn: () => void) => {
+    const r = requestTransition(stateRef.current, isDirtyRef.current, { run: fn });
+    if (r.runNow) { fn(); return; }
+    apply(r.state);
+  }, [apply]);
+
+  const allowNextNavigation = useCallback(() => {
+    apply(allowNextTransition(stateRef.current));
+  }, [apply]);
+
+  const onStay = useCallback(() => {
+    if (stateRef.current.saving) return;
+    // Blokeeritud navigatsioon tuleb Routerile tagasi öelda, muidu jääb blocker
+    // "blocked" olekusse ja järgmine sama navigatsioon ei käivitu.
+    if (blockerRef.current.state === 'blocked') blockerRef.current.reset();
+    apply(stay(stateRef.current));
+  }, [apply]);
+
+  const onDiscard = useCallback(() => {
+    if (stateRef.current.saving) return;
+    const r = discard(stateRef.current);
+    apply(r.state);
+    r.action?.();
+  }, [apply]);
+
+  const onSaveAndContinue = useCallback(async () => {
+    const begun = beginSave(stateRef.current);
+    if (!begun.start) return;
+    apply(begun.state);
+
+    let saved = false;
+    try {
+      saved = await onSave();
+    } catch {
+      // Ükski praegune kasutuskoht ei viska, aga tulevane refaktor ei tohi jätta
+      // dialoogi igaveseks `saving`-olekusse ega tekitada käsitlemata rejection'it.
+      saved = false;
+    }
+
+    const r = finishSave(stateRef.current, saved);
+    // Olek uuendatakse ENNE tegevust: kui tegevus viskab, ei jää guard rippu.
+    apply(r.state);
+    r.action?.();
+  }, [apply, onSave]);
 
   return {
-    isBlocked: blocker.state === 'blocked',
-    blockedLocation: blocker.state === 'blocked' ? blocker.location : null,
-    proceed: () => { if (blocker.state === 'blocked') blocker.proceed(); },
-    reset: () => { if (blocker.state === 'blocked') blocker.reset(); },
+    dialogProps: {
+      open: state.pending !== null,
+      saving: state.saving,
+      saveFailed: state.saveFailed,
+      onDiscard,
+      onStay,
+      onSaveAndContinue,
+    },
+    runGuarded,
+    allowNextNavigation,
   };
 }

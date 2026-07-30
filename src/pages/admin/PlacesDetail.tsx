@@ -34,6 +34,58 @@ function resolveLabel(labels: Record<string, string> | null | undefined, lang: s
   return labels[lang] ?? labels.et ?? labels.en ?? Object.values(labels)[0] ?? '';
 }
 
+/** Vormi mustand — üks objekt, et baasseisuga võrdlemine oleks üks võrdlus. */
+interface PlaceFormDraft {
+  labels: Record<string, string>;
+  placeType: string;
+  qCode: string;
+  parentKey: string;
+  group: string;
+  historicalNames: string[];
+  lat: string;
+  lon: string;
+  notes: string;
+}
+
+/**
+ * Normaliseerib mustandi võrdluseks. Ilma selleta annaks `undefined` vs tühi string,
+ * puuduv võti vs tühi objekt ja trimmimata sisestus valepositiivse dirty-lipu.
+ */
+function normalizeDraft(d: PlaceFormDraft): string {
+  const labels = Object.fromEntries(
+    Object.entries(d.labels)
+      .map(([k, v]) => [k, v.trim()])
+      .filter(([, v]) => v !== '')
+      .sort(([a], [b]) => a.localeCompare(b)),
+  );
+  return JSON.stringify({
+    labels,
+    placeType: d.placeType.trim(),
+    qCode: d.qCode.trim(),
+    parentKey: d.parentKey.trim(),
+    group: d.group.trim(),
+    historicalNames: d.historicalNames.map(n => n.trim()).filter(n => n !== ''),
+    lat: d.lat.trim(),
+    lon: d.lon.trim(),
+    notes: d.notes.trim(),
+  });
+}
+
+/** Baasseis kirjest: sama kuju, mis vorm avamisel saab. */
+function draftFromEntry(entry: PlaceEntry): PlaceFormDraft {
+  return {
+    labels: { ...(entry.labels ?? {}) },
+    placeType: entry.type ?? '',
+    qCode: entry.id ?? '',
+    parentKey: entry.parent_key ?? '',
+    group: entry.group ?? '',
+    historicalNames: [...(entry.historical_names ?? [])],
+    lat: entry.coordinates?.lat != null ? String(entry.coordinates.lat) : '',
+    lon: entry.coordinates?.lon != null ? String(entry.coordinates.lon) : '',
+    notes: entry.notes ?? '',
+  };
+}
+
 interface PlacesDetailProps {
   placeKey: string;
   entry: PlaceEntry;
@@ -48,11 +100,13 @@ interface PlacesDetailProps {
   onDeleted: (key: string) => void;
   onSelectKey: (key: string) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  /** Vanem paneb siia salvestusfunktsiooni, et dialoog saaks seda kutsuda. */
+  saveRef?: React.MutableRefObject<(() => Promise<boolean>) | null>;
 }
 
 const PlacesDetail: React.FC<PlacesDetailProps> = ({
   placeKey, entry, places, meta, personCount, personSample,
-  token, lang, onUpdated, onMerged, onDeleted, onSelectKey, onDirtyChange,
+  token, lang, onUpdated, onMerged, onDeleted, onSelectKey, onDirtyChange, saveRef,
 }) => {
   const { t } = useTranslation('admin');
   const [editing, setEditing] = useState(false);
@@ -107,9 +161,19 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
     setEditing(false);
   }, [placeKey]);
 
+  // Baasseis: viimati laaditud või edukalt salvestatud väärtused. Dirty = mustand
+  // erineb sellest. `editing` ise EI tee vormi dirty'ks — muidu hüppaks salvestamata
+  // muudatuste dialoog ette iga kord, kui kasutaja on koha andmeid lihtsalt vaadanud.
+  const [baseline, setBaseline] = useState<string>('');
+
+  const currentDraft: PlaceFormDraft = {
+    labels, placeType, qCode, parentKey, group, historicalNames, lat, lon, notes,
+  };
+  const isDirty = editing && normalizeDraft(currentDraft) !== baseline;
+
   useEffect(() => {
-    onDirtyChange?.(editing);
-  }, [editing]);
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   useEffect(() => {
     if (editing) {
@@ -126,6 +190,7 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
       setLat(entry.coordinates?.lat != null ? String(entry.coordinates.lat) : '');
       setLon(entry.coordinates?.lon != null ? String(entry.coordinates.lon) : '');
       setNotes(entry.notes ?? '');
+      setBaseline(normalizeDraft(draftFromEntry(entry)));
       setSaveError(null);
     }
   }, [editing]);
@@ -142,7 +207,11 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
     })
     .slice(0, 8);
 
-  const handleSave = async () => {
+  /**
+   * Tagastab `true` ainult siis, kui salvestus õnnestus. Salvestamata muudatuste
+   * dialoog sõltub sellest: `false` korral ei tohi kohta vahetada ega lahkuda.
+   */
+  const handleSave = async (): Promise<boolean> => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -166,13 +235,22 @@ const PlacesDetail: React.FC<PlacesDetailProps> = ({
 
       const result = await updatePlace(placeKey, data, token);
       onUpdated(result.key, result.entry);
+      // Edukas salvestamine teeb praegustest väärtustest uue baasseisu.
+      setBaseline(normalizeDraft(currentDraft));
       setEditing(false);
+      return true;
     } catch (e: any) {
       setSaveError(e.message ?? t('places.saveError'));
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  // Vanem vajab salvestust, et salvestamata muudatuste dialoog saaks seda kutsuda.
+  useEffect(() => {
+    if (saveRef) saveRef.current = handleSave;
+  });
 
   const coords = entry.coordinates;
   const hasCoords = coords && typeof coords.lat === 'number' && typeof coords.lon === 'number';

@@ -112,6 +112,7 @@
     "reorderApply": "Rakenda (Enter)",
     "reorderSave": "Salvesta järjekord",
     "reorderConfirm": "Oled kindel, et soovid lehekülgede järjekorda muuta?",
+    "reorderConfirmTitle": "Kinnita järjekorra muutmine",
     "reorderError": "Järjekorra salvestamine ebaõnnestus",
     "dangerZone": "Ohutsoon",
     "managePageLink": "Halda teost",
@@ -141,6 +142,7 @@
     },
     "reorder": {
       "discard": "Tühista muudatused",
+      "discardTitle": "Tühista järjekorra muudatused",
       "discardConfirm": "Tühistada kõik salvestamata järjekorra muudatused?",
       "changedSummary": "{{count}} lehe asukoht erineb salvestatud järjekorrast"
     },
@@ -328,12 +330,6 @@
   },
   "zotero": {
     "hint": "Zotero: kasuta brauserilaiendi \"Save to Zotero\" nuppu"
-  },
-  "confirm": {
-    "unsavedChanges": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
-    "unsavedChangesPrompt": "Sul on salvestamata muudatusi. Kas soovid salvestada?",
-    "saveAndLeave": "Jah, salvesta",
-    "leaveWithoutSaving": "Ei, lahku"
   },
   "mobile": {
     "imageTab": "Pilt",

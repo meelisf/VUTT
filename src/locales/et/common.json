@@ -198,9 +198,12 @@
   },
   "unsavedChanges": {
     "title": "Salvestamata muudatused",
-    "message": "Sul on salvestamata muudatusi. Kas oled kindel, et soovid lahkuda?",
-    "leave": "Lahku ilma salvestamata",
-    "stay": "Jää"
+    "message": "Sul on salvestamata muudatusi.",
+    "discard": "Loobu muudatustest",
+    "stay": "Jää siia",
+    "saveAndContinue": "Salvesta ja jätka",
+    "saving": "Salvestan…",
+    "saveFailed": "Salvestamine ebaõnnestus — muudatused on alles."
   },
   "markdownEditor": {
     "bold": "Paks",

@@ -15,6 +15,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Header from '../components/Header';
+import ConfirmModal from '../components/ConfirmModal';
+import UnsavedChangesDialog from '../components/UnsavedChangesDialog';
+import { useUnsavedChangesGuard } from '../hooks/useUnsavedChangesGuard';
 import PageImageEditorModal from '../components/PageImageEditorModal';
 import { useUser } from '../contexts/UserContext';
 import { ApiError } from '../services/apiClient';
@@ -94,6 +97,8 @@ const WorkManage: React.FC = () => {
   const [draftPositions, setDraftPositions] = useState<Record<string, number>>({});
   const [reorderSaving, setReorderSaving] = useState(false);
   const [reorderError, setReorderError] = useState<string | null>(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [reorderConfirmOpen, setReorderConfirmOpen] = useState(false);
 
   // Hulgivalik + liigutamine
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
@@ -365,17 +370,28 @@ const WorkManage: React.FC = () => {
   };
 
   // Tühista kõik salvestamata järjekorra muudatused
-  const handleDiscardReorder = () => {
-    if (changedCount > 2 && !window.confirm(t('manage.reorder.discardConfirm'))) return;
+  const applyDiscardReorder = () => {
     const init: Record<string, number> = {};
     pages.forEach((p) => { init[p.filename] = p.page_num; });
     setDraftPositions(init);
+    setDiscardConfirmOpen(false);
   };
 
-  const handleReorderSave = async () => {
-    if (!workId || !authToken) return;
-    const confirmed = window.confirm(t('manage.reorderConfirm'));
-    if (!confirmed) return;
+  const handleDiscardReorder = () => {
+    if (changedCount > 2) { setDiscardConfirmOpen(true); return; }
+    applyDiscardReorder();
+  };
+
+  /**
+   * Salvestab järjekorra ILMA kinnituseta. Kasutab nii nupu-handler (mis küsib
+   * kinnituse enne) kui ka salvestamata muudatuste dialoog — muidu hüppaks
+   * dialoogi "Salvesta ja jätka" peale teine kinnitus ette.
+   *
+   * Tagastab `true` ainult siis, kui salvestus õnnestus.
+   */
+  const saveReorder = async (): Promise<boolean> => {
+    if (!workId || !authToken) return false;
+    setReorderConfirmOpen(false);
 
     // Sorteeri pages draftPositions järgi, võta filename järjekord
     const sorted = [...pages].sort((a, b) => {
@@ -393,12 +409,24 @@ const WorkManage: React.FC = () => {
       // Salvestus = commit → tühjenda valik (uue protsessi eeldus). NB: Liiguta
       // (mustand) EI tühjenda, et saaks sama plokki uuesti liigutada.
       handleClearSelection();
+      return true;
     } catch (e: any) {
       setReorderError(e.message || t('manage.reorderError'));
+      return false;
     } finally {
       setReorderSaving(false);
     }
   };
+
+  const handleReorderSave = () => { setReorderConfirmOpen(true); };
+
+  // Salvestamata järjekorra mustand on samasugune salvestamata muudatus nagu tekst.
+  // NB: `saveReorder` (mitte `handleReorderSave`) — dialoog ei tohi küsida teist
+  // kinnitust "Salvesta ja jätka" peale.
+  const { dialogProps } = useUnsavedChangesGuard({
+    isDirty: changedCount > 0,
+    onSave: saveReorder,
+  });
 
   const handleBulkDelete = async () => {
     if (!workId || !authToken || selectedFiles.size === 0) return;
@@ -1082,6 +1110,25 @@ const WorkManage: React.FC = () => {
           onDiscardReorder={handleDiscardReorder}
         />
       )}
+
+      <ConfirmModal
+        isOpen={discardConfirmOpen}
+        title={t('manage.reorder.discardTitle')}
+        message={t('manage.reorder.discardConfirm')}
+        onConfirm={applyDiscardReorder}
+        onCancel={() => setDiscardConfirmOpen(false)}
+        variant="danger"
+      />
+
+      <ConfirmModal
+        isOpen={reorderConfirmOpen}
+        title={t('manage.reorderConfirmTitle')}
+        message={t('manage.reorderConfirm')}
+        onConfirm={() => { void saveReorder(); }}
+        onCancel={() => setReorderConfirmOpen(false)}
+      />
+
+      <UnsavedChangesDialog {...dialogProps} />
     </div>
   );
 };

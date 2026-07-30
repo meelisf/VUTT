@@ -163,10 +163,6 @@
     "saving": "Salvestan…",
     "cancel": "Tühista",
     "saveError": "Salvestamine ebaõnnestus",
-    "unsavedTitle": "Salvestamata muudatused",
-    "unsavedBody": "Kohale on salvestamata muudatused. Kas lahkud ilma salvestamata?",
-    "unsavedStay": "Jää siia",
-    "unsavedLeave": "Lahku ilma salvestamata",
     "labels": "Nimed",
     "type": "Tüüp",
     "types": {

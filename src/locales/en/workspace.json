@@ -112,6 +112,7 @@
     "reorderApply": "Apply (Enter)",
     "reorderSave": "Save order",
     "reorderConfirm": "Are you sure you want to change the page order?",
+    "reorderConfirmTitle": "Confirm reorder",
     "reorderError": "Failed to save page order",
     "dangerZone": "Danger zone",
     "managePageLink": "Manage work",
@@ -141,6 +142,7 @@
     },
     "reorder": {
       "discard": "Discard changes",
+      "discardTitle": "Discard order changes",
       "discardConfirm": "Discard all unsaved order changes?",
       "changedSummary": "{{count}} page(s) differ from the saved order"
     },
@@ -328,12 +330,6 @@
   },
   "zotero": {
     "hint": "Zotero: use the browser extension's \"Save to Zotero\" button"
-  },
-  "confirm": {
-    "unsavedChanges": "You have unsaved changes. Are you sure you want to leave?",
-    "unsavedChangesPrompt": "You have unsaved changes. Do you want to save?",
-    "saveAndLeave": "Yes, save",
-    "leaveWithoutSaving": "No, leave"
   },
   "mobile": {
     "imageTab": "Image",
