@@ -259,3 +259,63 @@ def test_facets_tag_selection_does_not_narrow_facets(indexed):
     """get_person_facets ei võta tag-parameetrit — signatuur ei muutu."""
     with pytest.raises(TypeError):
         indexed.get_person_facets(tags=["Q193664"])
+
+
+# ---- HTTP-tasand ----
+
+@pytest.fixture
+def http(client, ops, monkeypatch):
+    monkeypatch.setattr(ops, "_load_index", lambda: FAKE_INDEX)
+    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
+    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
+    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+    return client
+
+
+def test_get_persons_single_tag(http):
+    resp = http.get("/prosopography", params={"tag": "Q193664"})
+    assert resp.status_code == 200
+    assert [r["id"] for r in resp.json()["results"]] == ["p1"]
+
+
+def test_get_persons_repeated_tag_params_use_and_logic(http):
+    resp = http.get("/prosopography?tag=Q193664&tag=Q175151")
+    assert resp.status_code == 200
+    assert [r["id"] for r in resp.json()["results"]] == ["p1"]
+
+
+def test_get_persons_without_tag_returns_all(http):
+    resp = http.get("/prosopography")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 4
+
+
+def test_get_persons_empty_tag_is_no_filter(http):
+    resp = http.get("/prosopography?tag=")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 4
+
+
+def test_post_query_accepts_tag_as_string(http):
+    resp = http.post("/prosopography/query", json={"tag": "Q193664", "ids": ["p1", "p2", "p3", "p4"]})
+    assert resp.status_code == 200
+    assert [r["id"] for r in resp.json()["results"]] == ["p1"]
+
+
+def test_post_query_accepts_tag_as_list(http):
+    resp = http.post("/prosopography/query", json={"tag": ["Q193664", "Q175151"], "ids": ["p1", "p2", "p3", "p4"]})
+    assert resp.status_code == 200
+    assert [r["id"] for r in resp.json()["results"]] == ["p1"]
+
+
+def test_map_endpoint_applies_tag_filter(http):
+    resp = http.get("/prosopography/map", params={"tag": "Q193664"})
+    assert resp.status_code == 200
+    assert resp.json()["total_persons"] == 1
+
+
+def test_facets_endpoint_returns_tags(http):
+    resp = http.get("/prosopography/facets")
+    assert resp.status_code == 200
+    assert any(t["value"] == "Q175151" for t in resp.json()["tags"])
