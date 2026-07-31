@@ -219,9 +219,14 @@ def update_person_to_works(
     with state._works_lock:
         data = _load_person_to_works()
 
-        # Eemalda kõik olemasolevad viited sellele teosele.
+        # Eemalda selle teose metaandmetest tuletatud viited.
+        # 'mentioned' tuleb leheküljefailide page_tags-ist (update_page_person_mentions)
+        # — seda me siin uuesti ei arvuta, seega ei tohi seda ka kustutada.
         for pid_entries in data.values():
-            pid_entries[:] = [e for e in pid_entries if e.get("work_id") != work_id]
+            pid_entries[:] = [
+                e for e in pid_entries
+                if e.get("work_id") != work_id or e.get("role") == "mentioned"
+            ]
 
         # Lisa uued.
         for pid, roles in new_entries.items():

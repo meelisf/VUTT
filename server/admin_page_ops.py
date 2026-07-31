@@ -22,6 +22,7 @@ from .config import BASE_DIR, get_logger
 from .git_ops import get_or_init_repo, save_with_git, delete_page_from_git, delete_pages_from_git
 from .utils import find_directory_by_id, generate_nanoid
 from .meilisearch_ops import sync_work_to_meilisearch
+from .prosopography.relations import update_page_person_mentions
 
 logger = get_logger(__name__)
 
@@ -1045,5 +1046,10 @@ def delete_pages(work_id, base_names, username):
             raise
 
         sync_work_to_meilisearch(folder_name)
+        # Kustutatud lehe isiku-tägid ei tohi 'mentioned' indeksisse rippuma jääda.
+        try:
+            update_page_person_mentions(work_id, path)
+        except Exception:
+            logger.exception(f"delete_pages: mainimiste indeksi uuendus ebaõnnestus ({work_id})")
         new_page_count = len(get_sorted_images(path))
         return {"status": "success", "deleted": list(base_names), "new_page_count": new_page_count}
