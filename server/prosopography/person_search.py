@@ -209,6 +209,7 @@ def _filter_index_entries(
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
 ) -> list[dict]:
     sync_from_facade()
     index = _load_index()
@@ -254,6 +255,17 @@ def _filter_index_entries(
         ]
     if status_id:
         results = [e for e in results if status_id in (e.get("status_ids") or [])]
+    tag_queries = _normalize_tag_query(tags)
+    if tag_queries:
+        wanted = [t.casefold() for t in tag_queries]
+
+        def _entry_has_all_tags(entry: dict) -> bool:
+            entry_keys: set = set()
+            for tag in _entry_tags(entry):
+                entry_keys |= _tag_match_keys(tag)
+            return all(w in entry_keys for w in wanted)
+
+        results = [e for e in results if _entry_has_all_tags(e)]
     if verification_level:
         results = [e for e in results if e.get("verification_level") == verification_level]
     if source:
@@ -287,6 +299,7 @@ def list_persons(
     imm_year_to: Optional[int] = None,
     sort_by: Optional[str] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
     collection: Optional[str] = None,
     limit: int = 48,
     offset: int = 0,
@@ -315,6 +328,7 @@ def list_persons(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,
+        tags=tags,
     )
 
     if sort_by == "birth_year":
@@ -348,6 +362,7 @@ def get_person_map_markers(
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
     related_to: Optional[str] = None,
     collection: Optional[str] = None,
 ) -> dict:
@@ -378,6 +393,7 @@ def get_person_map_markers(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,
+        tags=tags,
     )
 
     markers_by_place: dict[str, dict] = {}
