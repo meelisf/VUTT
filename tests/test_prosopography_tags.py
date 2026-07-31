@@ -194,3 +194,68 @@ def test_q_still_matches_names(indexed):
 def test_q_qcode_matches_exactly_not_partially(indexed):
     """Q-koodi osaline vaste ei tohi kogu registrit tagastada."""
     assert _ids(indexed.list_persons(q="Q19")) == []
+
+
+# ---- facetid ----
+
+def test_facets_include_tags_with_counts(indexed):
+    facets = indexed.get_person_facets()
+    by_value = {t["value"]: t for t in facets["tags"]}
+    assert by_value["Q175151"]["count"] == 2
+    assert by_value["Q193664"]["count"] == 1
+    assert by_value["Q193664"]["label"] == "pietism"
+    assert by_value["Q193664"]["labels"]["en"] == "Pietism"
+
+
+def test_facets_tags_sorted_by_count_desc(indexed):
+    values = [t["value"] for t in indexed.get_person_facets()["tags"]]
+    assert values[0] == "Q175151"
+
+
+def test_facets_legacy_string_tag_uses_label_as_value(indexed):
+    by_value = {t["value"]: t for t in indexed.get_person_facets()["tags"]}
+    assert by_value["kantsler"]["count"] == 1
+
+
+def _facets_for(ops, monkeypatch, tags_value):
+    index = {
+        "entries": [{
+            "id": "p1", "label": "Dup", "sort_name": "Dup", "record_status": "draft",
+            "tags": tags_value,
+        }]
+    }
+    monkeypatch.setattr(ops, "_load_index", lambda: index)
+    monkeypatch.setattr(ops, "_load_person_to_works", lambda: {})
+    monkeypatch.setattr(ops, "_entry_occupations", lambda e: [])
+    monkeypatch.setattr(ops, "_load_person_aliases", lambda: {})
+    monkeypatch.setattr(ops, "_load_origin_groups", lambda: {})
+    return [(t["value"], t["count"]) for t in ops.get_person_facets()["tags"]]
+
+
+def test_facets_duplicate_tag_on_one_person_counts_once(ops, monkeypatch):
+    """Sama märksõna kaks korda ühel isikul ei tohi loendurit topeltada."""
+    result = _facets_for(ops, monkeypatch, [
+        {"label": "pietism", "id": "Q193664"},
+        {"label": "Pietism", "id": "Q193664"},
+    ])
+    assert result == [("Q193664", 1)]
+
+
+def test_facets_qcode_and_bare_label_are_separate_rows(ops, monkeypatch):
+    """Grupeerimisvõti on Q-kood kui olemas, muidu label.
+
+    Q-koodiga ja Q-koodita märksõna on seega eraldi read, isegi kui label
+    kattub. Label-põhine liitmine oleks mitmemõtteline: kui sama labeliga on
+    kaks eri Q-koodi, ei ole ühest vastust, kumma alla paljas label kuulub.
+    """
+    result = _facets_for(ops, monkeypatch, [
+        {"label": "pietism", "id": "Q193664"},
+        "pietism",
+    ])
+    assert sorted(result) == [("Q193664", 1), ("pietism", 1)]
+
+
+def test_facets_tag_selection_does_not_narrow_facets(indexed):
+    """get_person_facets ei võta tag-parameetrit — signatuur ei muutu."""
+    with pytest.raises(TypeError):
+        indexed.get_person_facets(tags=["Q193664"])

@@ -522,9 +522,35 @@ def get_person_facets(
     ]
     institutions.sort(key=lambda x: (-x["count"], x["value"].lower()))
 
+    # Märksõnad — üks isik tõstab loendurit maksimaalselt ühe võrra.
+    tag_counts: dict = {}
+    tag_meta: dict = {}
+    for entry in filtered:
+        seen_keys: set = set()
+        for tag in _entry_tags(entry):
+            key = tag["id"].casefold() if tag.get("id") else (tag.get("label") or "").casefold()
+            if not key or key in seen_keys:
+                continue
+            seen_keys.add(key)
+            tag_counts[key] = tag_counts.get(key, 0) + 1
+            if key not in tag_meta:
+                tag_meta[key] = tag
+
+    tags_facet = []
+    for key, count in tag_counts.items():
+        meta = tag_meta[key]
+        tags_facet.append({
+            "value": meta["id"] or meta["label"],
+            "label": meta["label"],
+            "labels": meta.get("labels"),
+            "count": count,
+        })
+    tags_facet.sort(key=lambda x: (-x["count"], (x["label"] or "").lower()))
+
     return {
         "origin_groups": origin_groups,
         "institutions": institutions,
+        "tags": tags_facet,
         "occupations": [],  # tagasiühilduvus
     }
 
