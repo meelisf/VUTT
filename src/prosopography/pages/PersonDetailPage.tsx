@@ -404,7 +404,7 @@ const PersonDetailPage: React.FC = () => {
     const range = parseYearDisplayRange(null, meta?.year_display);
     return range ? Math.floor((range.start + range.end) / 2) : 9999;
   };
-  const works: { work_id: string; role: string }[] = [...(person.works ?? [])].sort(
+  const works: { work_id: string; role: string; pages?: number[] }[] = [...(person.works ?? [])].sort(
     (a, b) => sortYear(a.work_id) - sortYear(b.work_id)
   );
   const identifiers = (person.identifiers ?? []).filter(i => i.id);
@@ -690,8 +690,10 @@ const PersonDetailPage: React.FC = () => {
               </div>
             )}
             <div className="space-y-1">
-              {displayedWorks.map(({ work_id, role }) => {
+              {displayedWorks.map(({ work_id, role, pages }) => {
                 const roleLabel = t(`workspace:metadata.roles.${role}`, { defaultValue: role });
+                // Mainimise puhul vii lehele, kus isikut mainitakse (muidu esimene lehekülg)
+                const targetPage = pages?.[0] ?? 1;
                 const meta = workTitles[work_id];
                 const title = meta?.title ?? work_id;
                 // Eelista kuvatavat aastat (nt "ca. 1750"); muidu number-aasta, kui see pole 0
@@ -724,7 +726,7 @@ const PersonDetailPage: React.FC = () => {
                 return (
                   <Link
                     key={`${work_id}-${role}`}
-                    to={`/work/${work_id}/1`}
+                    to={`/work/${work_id}/${targetPage}`}
                     className={`flex items-center justify-between py-2 -mx-1 px-1 rounded group transition-colors ${inCollection ? `${colorClasses?.bg} hover:opacity-90` : 'hover:bg-gray-50'}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">

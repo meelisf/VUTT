@@ -9,6 +9,53 @@ from typing import Any, Optional
 
 from . import state
 from ._compat import sync_from_facade
+from ..meili_doc import enumerate_page_images
+
+
+def collect_page_person_mentions(work_dir: str) -> dict[str, list[int]]:
+    """Kogub teose leheküljefailidest isiku-tägid: { person_id: [leheküljenumbrid] }.
+
+    Leheküljenumber on 1-põhine positsioon `enumerate_page_images` järjekorras —
+    sama numeratsioon, mida kasutavad vaade /work/{id}/{nr} ja Meilisearch.
+    Ilma pildita .json (orb) loeb isiku ikka mainituks, aga numbrita.
+    """
+    mentions: dict[str, list[int]] = {}
+    try:
+        page_nums = {
+            os.path.splitext(img)[0]: idx
+            for idx, img in enumerate(enumerate_page_images(work_dir), start=1)
+        }
+    except Exception:
+        page_nums = {}
+
+    try:
+        page_files = sorted(os.listdir(work_dir))
+    except Exception:
+        return mentions
+
+    for page_fname in page_files:
+        if not page_fname.endswith('.json') or page_fname == '_metadata.json':
+            continue
+        try:
+            with open(os.path.join(work_dir, page_fname), 'r', encoding='utf-8') as f:
+                page_data = json.load(f)
+        except Exception:
+            continue
+        source = page_data.get('meta_content', page_data)
+        page_num = page_nums.get(os.path.splitext(page_fname)[0])
+        for tag in source.get('page_tags') or []:
+            if not isinstance(tag, dict):
+                continue
+            pid = tag.get('id') or ''
+            if not pid.startswith('vutt:P'):
+                continue
+            pages = mentions.setdefault(pid, [])
+            if page_num is not None and page_num not in pages:
+                pages.append(page_num)
+
+    for pages in mentions.values():
+        pages.sort()
+    return mentions
 
 
 def _load_json_or_default(path: str, default: Any) -> Any:
@@ -298,27 +345,10 @@ def rebuild_indices():
                 if pid.startswith("vutt:P"):
                     ptw.setdefault(pid, []).append({"work_id": work_id, "role": "publisher"})
 
-            mentioned_ids: set[str] = set()
-            try:
-                for page_fname in os.listdir(entry.path):
-                    if not page_fname.endswith('.json') or page_fname == '_metadata.json':
-                        continue
-                    page_fpath = os.path.join(entry.path, page_fname)
-                    try:
-                        with open(page_fpath, 'r', encoding='utf-8') as pf:
-                            page_data = json.load(pf)
-                        source = page_data.get('meta_content', page_data)
-                        for tag in source.get('page_tags', []):
-                            if isinstance(tag, dict):
-                                pid = tag.get('id') or ''
-                                if pid.startswith('vutt:P'):
-                                    mentioned_ids.add(pid)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-            for pid in mentioned_ids:
-                ptw.setdefault(pid, []).append({'work_id': work_id, 'role': 'mentioned'})
+            for pid, pages in collect_page_person_mentions(entry.path).items():
+                ptw.setdefault(pid, []).append(
+                    {'work_id': work_id, 'role': 'mentioned', 'pages': pages}
+                )
 
     with state._works_lock:
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, ptw)

@@ -7,7 +7,7 @@ import time
 from typing import Optional
 
 from . import state
-from .indices import _load_index, _load_person_to_works
+from .indices import _load_index, _load_person_to_works, collect_page_person_mentions
 from .person_crud import get_person
 from ._compat import sync_from_facade
 
@@ -129,23 +129,8 @@ def update_page_person_mentions(work_id: str, work_dir: str):
         return
     sync_from_facade()
 
-    person_ids: set[str] = set()
     try:
-        for fname in os.listdir(work_dir):
-            if not fname.endswith('.json') or fname == '_metadata.json':
-                continue
-            fpath = os.path.join(work_dir, fname)
-            try:
-                with open(fpath, 'r', encoding='utf-8') as f:
-                    page = json.load(f)
-                source = page.get('meta_content', page)
-                for tag in source.get('page_tags', []):
-                    if isinstance(tag, dict):
-                        pid = tag.get('id') or ''
-                        if pid.startswith('vutt:P'):
-                            person_ids.add(pid)
-            except Exception:
-                pass
+        mentions = collect_page_person_mentions(work_dir)
     except Exception as e:
         print(f"update_page_person_mentions viga: {e}")
         return
@@ -159,10 +144,10 @@ def update_page_person_mentions(work_id: str, work_dir: str):
                 if not (e.get('work_id') == work_id and e.get('role') == 'mentioned')
             ]
         # Lisa uued.
-        for pid in person_ids:
+        for pid, pages in mentions.items():
             if pid not in data:
                 data[pid] = []
-            data[pid].append({'work_id': work_id, 'role': 'mentioned'})
+            data[pid].append({'work_id': work_id, 'role': 'mentioned', 'pages': pages})
         state.atomic_write_json(state.PERSON_TO_WORKS_FILE, data)
 
 
