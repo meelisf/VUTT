@@ -59,6 +59,80 @@ def _extract_occupation_entries(person: dict) -> list[dict]:
     return sorted(deduped.values(), key=lambda item: (item.get("label") or "").lower())
 
 
+def _entry_tags(entry: dict) -> list[dict]:
+    """Normaliseerib indeksikirje märksõnad kujule {id, label, labels}.
+
+    Indeks on täielik (kõigil kirjetel on `tags` väli), seega täiskaardilt
+    varuvarianti lugema ei pea — erinevalt `_entry_occupations`-ist.
+    """
+    result: list[dict] = []
+    for item in (entry.get("tags") or []):
+        if isinstance(item, str):
+            label = item.strip()
+            if label:
+                result.append({"id": None, "label": label, "labels": None})
+            continue
+        if not isinstance(item, dict):
+            continue
+        labels = item.get("labels")
+        normalized_labels = {
+            key: value.strip()
+            for key, value in labels.items()
+            if isinstance(key, str) and isinstance(value, str) and value.strip()
+        } if isinstance(labels, dict) else None
+        label = item.get("label")
+        label = label.strip() if isinstance(label, str) else ""
+        if not label and normalized_labels:
+            label = (
+                normalized_labels.get("et")
+                or normalized_labels.get("en")
+                or next(iter(normalized_labels.values()), "")
+            )
+        tag_id = item.get("id")
+        tag_id = tag_id.strip() if isinstance(tag_id, str) and tag_id.strip() else None
+        if not label and not tag_id:
+            continue
+        result.append({"id": tag_id, "label": label, "labels": normalized_labels or None})
+    return result
+
+
+def _normalize_tag_query(value) -> list[str]:
+    """Puhastab märksõna-päringu: string või loend → puhastatud unikaalne loend.
+
+    Tühi tulemus tähendab "filtrit pole", mitte "ükski kirje ei vasta".
+    """
+    if value is None:
+        return []
+    raw = [value] if isinstance(value, str) else list(value)
+    seen: set = set()
+    result: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(cleaned)
+    return result
+
+
+def _tag_match_keys(tag: dict) -> set:
+    """Kõik casefold-võtmed, millega märksõna võib vastata (id, label, kõik keeled)."""
+    keys = set()
+    if tag.get("id"):
+        keys.add(tag["id"].casefold())
+    if tag.get("label"):
+        keys.add(tag["label"].casefold())
+    for value in (tag.get("labels") or {}).values():
+        if isinstance(value, str) and value.strip():
+            keys.add(value.strip().casefold())
+    return keys
+
+
 def _entry_occupations(entry: dict) -> list[dict]:
     occupations = entry.get("occupations")
     if occupations is not None:
@@ -572,4 +646,4 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     }
 
 
-__all__ = ['list_persons', '_filter_index_entries', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations']
+__all__ = ['list_persons', '_filter_index_entries', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']
