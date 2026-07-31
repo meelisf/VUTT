@@ -44,6 +44,8 @@
   "sortImmYear": "Immatrikuleerumine",
   "filterInstitutionAll": "Haridusasutus",
   "filterInstitutionSearch": "Otsi asutust…",
+  "filterTags": "Märksõnad",
+  "filterTagsSearch": "Otsi märksõna…",
   "filterSourceAll": "Allikas",
   "filterSourceAA": "Album Academicum",
   "filterLevelAll": "Olek",

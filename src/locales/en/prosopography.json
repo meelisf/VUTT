@@ -44,6 +44,8 @@
   "sortImmYear": "Matriculation",
   "filterInstitutionAll": "Institution",
   "filterInstitutionSearch": "Search institution…",
+  "filterTags": "Keywords",
+  "filterTagsSearch": "Search keyword…",
   "filterSourceAll": "Source",
   "filterSourceAA": "Album Academicum",
   "filterLevelAll": "Level",

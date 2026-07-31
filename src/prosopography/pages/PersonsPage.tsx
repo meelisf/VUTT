@@ -58,6 +58,7 @@ const PersonsPage: React.FC = () => {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
+  const [tagFacets, setTagFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
@@ -100,6 +101,15 @@ const PersonsPage: React.FC = () => {
   const setYearFrom = (v: string)     => setYearParam('year_from', 'imm_year_from', v);
   const setYearTo = (v: string)       => setYearParam('year_to', 'imm_year_to', v);
   const setStatusId = (v: string)     => setFilterParam('status_id', v);
+  // Uus valik asendab kõik senised märksõnad (UI on üksikvalik).
+  const setTag = (v: string) =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      n.delete('tag');
+      if (v) n.append('tag', v);
+      n.delete('offset');
+      return n;
+    }, { replace: true });
   const setSortBy = (v: string)       => setFilterParam('sort_by', v === 'alpha' ? '' : v);
   const setView = (v: 'list' | 'map') =>
     setSearchParams(p => {
@@ -186,8 +196,13 @@ const PersonsPage: React.FC = () => {
           count: item.count,
         })));
         setInstitutionFacets(data.institutions || []);
+        setTagFacets((data.tags || []).map(item => ({
+          value: item.value,
+          label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.label,
+          count: item.count,
+        })));
       })
-      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); });
+      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); setTagFacets([]); });
   }, [query, gender, effectiveSelectedCollection, token, i18n.language]);
 
   useEffect(() => {
@@ -365,8 +380,10 @@ const PersonsPage: React.FC = () => {
             yearFrom={yearFrom}
             yearTo={yearTo}
             statusId={statusId}
+            tag={tags[0] ?? ''}
             originGroups={originGroupFacets}
             institutions={institutionFacets}
+            tagFacets={tagFacets}
             seisused={seisused}
             onOriginGroupChange={setOriginGroup}
             onOriginPlaceChange={setOriginPlace}
@@ -376,6 +393,7 @@ const PersonsPage: React.FC = () => {
             onYearFromChange={setYearFrom}
             onYearToChange={setYearTo}
             onStatusIdChange={setStatusId}
+            onTagChange={setTag}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
               ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'offset'].forEach(k => n.delete(k));
