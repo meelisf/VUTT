@@ -190,5 +190,5 @@ export interface ProsopoRecord {
   image_url: string | null;
   source_data: Record<string, any>;
   // lisatakse GET /prosopography/{id} vastuses
-  works?: { work_id: string; role: string }[];
+  works?: { work_id: string; role: string; pages?: number[] }[];
 }

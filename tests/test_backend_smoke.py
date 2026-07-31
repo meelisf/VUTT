@@ -277,9 +277,9 @@ def test_update_page_person_mentions(tmp_path, monkeypatch):
     assert "subject" in roles_a, f"subject peab säilima: {data['vutt:Paaa']}"
     assert "mentioned" in roles_a, f"mentioned peab lisanduma: {data['vutt:Paaa']}"
 
-    # Isik B: ainult 'mentioned'
+    # Isik B: ainult 'mentioned'. Pildifaile pole → lehenumbrit ei saa tuletada.
     assert "vutt:Pbbb" in data
-    assert data["vutt:Pbbb"] == [{"work_id": work_id, "role": "mentioned"}]
+    assert data["vutt:Pbbb"] == [{"work_id": work_id, "role": "mentioned", "pages": []}]
 
     # Q-kood ei tohi olla lisatud
     assert "Q99999" not in data
@@ -347,6 +347,82 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     # Sama isik mitmel lehel — ainult üks 'mentioned' kirje teose kohta
     mentioned_entries = [e for e in data["vutt:Pxxx"] if e["role"] == "mentioned"]
     assert len(mentioned_entries) == 1, f"Peaks olema täpselt 1 'mentioned' kirje, sain: {mentioned_entries}"
+
+
+def test_page_mentions_record_page_numbers(tmp_path, monkeypatch):
+    """
+    'mentioned' kirje peab kandma leheküljenumbreid, et isikukaardi link
+    viiks lehele, kus isikut mainitakse (/work/{id}/{nr}).
+    Numeratsioon = enumerate_page_images järjekord (sequence, siis failinimi).
+    """
+    import server.prosopography.ops as prosopo_ops
+
+    work_id = "workAAA"
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(json.dumps({"id": work_id}), encoding="utf-8")
+
+    # Kolm lehte; sequence määrab järjekorra, failinimi on tahtlikult teises järjekorras
+    for name, seq, tags in [
+        ("Page_02", 100, []),
+        ("Page_03", 200, [{"id": "vutt:Pmmm", "label": "Isik", "entity_type": "person"}]),
+        ("Page_04", 300, [{"id": "vutt:Pmmm", "label": "Isik", "entity_type": "person"}]),
+    ]:
+        (work_dir / f"{name}.jpg").write_bytes(b"fake")
+        (work_dir / f"{name}.json").write_text(
+            json.dumps({"sequence": seq, "page_tags": tags}), encoding="utf-8"
+        )
+
+    ptw_file = tmp_path / "person_to_works.json"
+    ptw_file.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+
+    prosopo_ops.update_page_person_mentions(work_id, str(work_dir))
+
+    data = json.loads(ptw_file.read_text(encoding="utf-8"))
+    entries = data.get("vutt:Pmmm") or []
+    assert len(entries) == 1, f"üks 'mentioned' kirje teose kohta: {entries}"
+    assert entries[0]["work_id"] == work_id
+    assert entries[0]["role"] == "mentioned"
+    assert entries[0].get("pages") == [2, 3], f"lehenumbrid peavad olema [2, 3], sain: {entries[0]}"
+
+
+def test_rebuild_indices_records_mention_page_numbers(tmp_path, monkeypatch):
+    """rebuild_indices() peab 'mentioned' kirjetele samamoodi lehenumbrid andma."""
+    import server.prosopography.ops as prosopo_ops
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    teos1 = data_dir / "teos1"
+    teos1.mkdir()
+    (teos1 / "_metadata.json").write_text(json.dumps({
+        "id": "workAAA", "creators": [], "tags": [], "publisher": None,
+    }), encoding="utf-8")
+    for name, seq, tags in [
+        ("Page_02", 100, []),
+        ("Page_03", 200, [{"id": "vutt:Pxxx", "label": "Test Isik", "entity_type": "person"}]),
+    ]:
+        (teos1 / f"{name}.jpg").write_bytes(b"fake")
+        (teos1 / f"{name}.json").write_text(
+            json.dumps({"sequence": seq, "page_tags": tags}), encoding="utf-8"
+        )
+
+    prosopo_dir = tmp_path / "prosopography"
+    prosopo_dir.mkdir()
+    ptw_file = tmp_path / "person_to_works.json"
+
+    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_INDEX_FILE", str(tmp_path / "index.json"))
+    monkeypatch.setattr(prosopo_ops, "PERSON_ALIASES_FILE", str(tmp_path / "aliases.json"))
+    monkeypatch.setattr(prosopo_ops, "PROSOPOGRAPHY_DIR", str(prosopo_dir))
+    monkeypatch.setattr(prosopo_ops, "BASE_DIR", str(data_dir))
+
+    prosopo_ops.rebuild_indices()
+
+    data = json.loads(ptw_file.read_text(encoding="utf-8"))
+    entries = [e for e in data.get("vutt:Pxxx", []) if e["role"] == "mentioned"]
+    assert len(entries) == 1, f"üks 'mentioned' kirje: {entries}"
+    assert entries[0].get("pages") == [2], f"lehenumber peab olema [2], sain: {entries[0]}"
 
 
 def test_update_person_to_works_preserves_mentioned(tmp_path, monkeypatch):
