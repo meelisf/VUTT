@@ -1,5 +1,6 @@
 import { FILE_API_URL } from '../../config';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
+import { appendTagParams } from './tagParams';
 import type { HistoricalRegionsResponse, ProsopoIndexEntry, ProsopoMapResponse, ProsopoRecord, PlaceEntry } from '../types';
 
 const BASE = `${FILE_API_URL}/prosopography`;
@@ -12,6 +13,7 @@ export async function listPersons(params?: {
   origin_place?: string;
   institution?: string;
   status_id?: string;
+  tag?: string | string[];
   source?: string;
   verification_level?: string;
   year_from?: number;
@@ -43,6 +45,7 @@ export async function listPersons(params?: {
   if (params?.origin_place) url.searchParams.set('origin_place', params.origin_place);
   if (params?.institution) url.searchParams.set('institution', params.institution);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
+  appendTagParams(url.searchParams, params?.tag);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
   if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
@@ -70,6 +73,7 @@ export async function fetchPersonMapMarkers(params?: {
   origin_group?: string;
   institution?: string;
   status_id?: string;
+  tag?: string | string[];
   source?: string;
   verification_level?: string;
   year_from?: number;
@@ -87,6 +91,7 @@ export async function fetchPersonMapMarkers(params?: {
   if (params?.origin_group) url.searchParams.set('origin_group', params.origin_group);
   if (params?.institution) url.searchParams.set('institution', params.institution);
   if (params?.status_id) url.searchParams.set('status_id', params.status_id);
+  appendTagParams(url.searchParams, params?.tag);
   if (params?.source) url.searchParams.set('source', params.source);
   if (params?.verification_level) url.searchParams.set('verification_level', params.verification_level);
   if (params?.year_from != null) url.searchParams.set('year_from', String(params.year_from));
@@ -129,6 +134,7 @@ export async function getPersonFacets(params?: {
 }, token?: string): Promise<{
   origin_groups: { value: string; labels: Record<string, string>; label_et: string; label_en: string; count: number }[];
   institutions: { value: string; count: number }[];
+  tags: { value: string; label: string; labels?: Record<string, string> | null; count: number }[];
   occupations: any[];
 }> {
   if (params?.ids?.length) {
