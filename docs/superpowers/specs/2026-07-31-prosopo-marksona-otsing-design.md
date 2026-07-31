@@ -34,7 +34,7 @@ Kolm sisenemisteed märksõnani, kõik sama filtri peal:
 ### Mitmikvaliku-valmidus
 
 Mitut märksõna korraga valida praegu ei saa, aga vajadus võib tekkida. Seetõttu on
-**andmelepe massiiv juba algusest peale** — hilisem laiendus puudutab ainult UI-kihti:
+**andmelepe massiiv juba algusest peale** — backendi ei ole hiljem vaja puutuda:
 
 - sisemine filter võtab `tags: Optional[list[str]]`, mitte skalaari;
 - HTTP-leping toetab kordust: `?tag=Q193664&tag=Q159318`;
@@ -43,6 +43,16 @@ Mitut märksõna korraga valida praegu ei saa, aga vajadus võib tekkida. Seetõ
 **Semantika: JA** — isikul peavad olema kõik loetletud märksõnad. Ühe väärtuse korral
 on JA ja VÕI identsed, seega tänane käitumine sellest ei sõltu; JA on facet-filtrite
 tavapärane kitsendav käitumine.
+
+**Teadlikult aktsepteeritud piirang:** kui URL-is on mitu `tag` väärtust, mõjuvad kõik
+tulemusele, aga külgriba filter näitab valituna ainult esimest. Ülejäänud on seega
+nähtamatu, kuid toimiv filter — "power user" režiim käsitsi koostatud või jagatud
+URL-ide jaoks. Frontend **ei** kanoniseeri URL-i laadimisel ega kuva liigseid väärtusi.
+(Uue märksõna valimine külgribalt asendab kõik senised — see on kasutaja tegevus,
+mitte vaikne ümberkirjutus.) Mitmikvaliku UI ehitamisel see piirang kaob.
+
+Väide, et hilisem mitmikvalik puudutab "ainult UI-kihti", kehtib backendi lepingu
+kohta. Frontendis tuleb siis üle vaadata ka aktiivsete filtrite esitus ja URL-testid.
 
 ## Backend
 
@@ -53,11 +63,24 @@ tavapärane kitsendav käitumine.
 aga **ei** loe varuvariandina täiskaardilt: indeks on täielik. Tühjad/vigased elemendid
 jäetakse vahele.
 
+**Sisendi normaliseerimine — `_normalize_tag_query(value) -> list[str]`**
+
+Ühine kõigile teedele (GET, POST, kaart). Teeb järjekorras:
+
+1. string → üheelemendiline loend; loend → loend; `None` → `[]`;
+2. `strip()` iga väärtuse ümbert;
+3. tühjade väärtuste eemaldus (`?tag=` ei tekita filtrit);
+4. duplikaatide eemaldus **järjekorda säilitades**;
+5. **tühi tulemus tähendab „filtrit pole"**, mitte „ükski kirje ei vasta".
+
+Võrdlus on tõstutundetu `casefold()` kaudu — see kehtib **nii labelitele kui
+Q-koodidele**, seega töötab ka käsitsi kirjutatud `q193664`.
+
 **`q`-otsing** (`_filter_index_entries`) laieneb märksõnadele. Vaste, kui otsingusõna
 (tõstutundetult):
 - sisaldub märksõna `label`-is, **või**
 - sisaldub mõne keele `labels`-väärtuses (et/en/de/la — kõik, mis kirjes on), **või**
-- võrdub märksõna `id`-ga (nii leiab ka `Q193664`).
+- võrdub `casefold()`-itult märksõna `id`-ga (nii leiab nii `Q193664` kui `q193664`).
 
 Olemasolev nime/aliase-vaste jääb muutmata; märksõna-vaste lisandub VÕI-harusse.
 
@@ -65,9 +88,9 @@ Olemasolev nime/aliase-vaste jääb muutmata; märksõna-vaste lisandub VÕI-har
 `_filter_index_entries`, `list_persons`, `get_person_map_markers`.
 
 Kirje läbib filtri, kui **iga** loetletud väärtuse kohta leidub kirjel vastav märksõna.
-Üksiku väärtuse vaste on andestav (käsitsi kirjutatud URL peab töötama):
-`value == t.id` **või** `value.lower()` võrdub `t.label`-i või mõne `labels`-väärtusega
-(tõstutundetult).
+Üksiku väärtuse vaste on andestav (käsitsi kirjutatud URL peab töötama): normaliseeritud
+väärtus võrdub `casefold()`-itult kas märksõna `id`-ga, `label`-iga või mõne
+`labels`-väärtusega.
 
 **`get_person_facets`** tagastab uue välja:
 
@@ -75,9 +98,19 @@ Kirje läbib filtri, kui **iga** loetletud väärtuse kohta leidub kirjel vastav
 "tags": [{ "value": "Q193664", "label": "pietism", "labels": {"et": "…", "en": "…"}, "count": 1 }]
 ```
 
-`value` = Q-kood kui olemas, muidu label. Arvutus filtreeritud hulga pealt, sama mustriga
-nagu `institutions`; järjestus `(-count, label.lower())`. Facets-funktsiooni signatuur
-ei muutu (facetid ei ole ristfiltreeritud — nagu praegugi).
+`value` = Q-kood kui olemas, muidu label; järjestus `(-count, label.lower())`.
+
+**Loenduse dedup:** ühe isiku sama märksõna tõstab `count`-i **maksimaalselt ühe võrra**.
+Grupeerimisvõti: normaliseeritud Q-kood kui olemas, muidu `casefold()`-itud label.
+`_entry_tags` talub nii dict- kui string-kuju ja vanades andmetes võib sama märksõna
+korduda, seega on dedup vajalik, mitte teoreetiline. Kui sama Q-koodiga kirjetel on
+erinevad `labels`, võidab esimene kohatud täisobjekt.
+
+**Facets-funktsiooni signatuur ei muutu** ja `tag` **ei** lisandu sinna. Täpsuse mõttes:
+`get_person_facets` ei ole täielikult globaalne — see kutsub `list_persons(q, gender,
+ids, collection)`, st arvutab filtreeritud hulga pealt, aga **ei** arvesta külgriba
+filtreid (`origin_group`, `institution`, `status_id` jt). Märksõna-facet järgib sama
+käitumist: `tag` valik ei kitsenda facet-loendeid.
 
 ### `server/prosopography/router.py`
 
@@ -86,8 +119,11 @@ ei muutu (facetid ei ole ristfiltreeritud — nagu praegugi).
 | Endpoint | Kuju |
 |----------|------|
 | `GET /prosopography` | `tag: Optional[List[str]] = Query(None)` |
-| `POST /prosopography/query` | `data.get("tag")` — normaliseeritakse `_as_list` abifunktsiooniga (string → üheelemendiline loend, loend → loend, `None` → `None`) |
+| `POST /prosopography/query` | `data.get("tag")` — talub nii stringi kui loendit |
 | `GET /prosopography/map` | `tag: Optional[List[str]] = Query(None)` |
+
+Kõik kolm annavad väärtuse edasi `_normalize_tag_query` kaudu, seega on käitumine
+teede vahel identne.
 
 Facets-endpointi signatuur ei muutu.
 
@@ -96,14 +132,19 @@ Facets-endpointi signatuur ei muutu.
 ### `src/prosopography/services/prosopographyService.ts`
 
 - `listPersons`, query-variant ja kaardi-päring: `tag?: string | string[]`.
-- URL-i kirjutamine `append`-iga igale väärtusele (mitte `set`).
+- URL-i kirjutamine `append`-iga igale väärtusele (mitte `set`) — see on selle failis
+  ainus koht, kus korduv parameeter tekib, ja seetõttu kõige tõenäolisem regressioonikoht.
+  Serialiseerimine eraldatakse puhtaks abifunktsiooniks (nt `appendTagParams(url, tag)`),
+  et see oleks vitestiga kaetav ilma DOM-ita.
 - Facets-tüüpi lisandub `tags: { value: string; label: string; labels?: Record<string, string>; count: number }[]`.
+- **`tag` ei lähe facets-päringusse.**
 
 ### `src/prosopography/pages/PersonsPage.tsx`
 
 - `const tags = searchParams.getAll('tag')` — olek on **loend**.
-- `setTag(v: string)` kirjutab praegu ühe väärtuse (asendab olemasoleva).
-- `tags` edasi nii listingu-, kaardi- kui facets-päringusse.
+- `setTag(v: string)` kirjutab ühe väärtuse: kustutab kõik senised `tag` võtmed ja
+  lisab uue, säilitades muud filtrid ja nullides `offset`-i.
+- `tags` edasi listingu- ja kaardipäringusse. **Mitte** facets-päringusse.
 - Lisandub "puhasta kõik" võtmete hulka (rida ~371) ja filtrimuutusel offseti nullimisse.
 
 ### `src/prosopography/components/PersonAdvancedFilters.tsx`
@@ -123,9 +164,22 @@ ka mitme väärtusega URL-i puhul. `hasActive` arvestab `tags.length > 0`.
 
 Olemasolevad märksõna-sildid (read 115–127) muutuvad klikitavaks → `/persons?tag=<value>`.
 
-Kaart on ise `Link`, seega **pesastatud `<a>` ei sobi** (kehtetu HTML). Kasutame
-`<button>` + `e.preventDefault()` + `e.stopPropagation()` + `useNavigate`.
-Valikurežiimis (`selectMode`) klikk **ei** navigeeri — valiku-käitumine jääb peale.
+**Kaardi juur ei ole `<Link>`** — see on `div role="link"` + `onClick` + `onKeyDown`
+(`PersonCard.tsx:284-293`). Pesastatud ankru probleemi seega ei teki ja DOM-i ümber
+ehitama ei pea.
+
+Koodis on täpselt see muster juba olemas: päritolukoht (`PersonCard.tsx:154-165`) on
+`<button type="button" onClick={e => { e.stopPropagation(); onOriginClick(); }}>` sama
+diviga sees. Märksõnad järgivad identset mustrit — `onTagClick` prop `CardInner`-ile,
+`useNavigate` `PersonCard`-is, `stopPropagation` et kaardiklikk isikuvaatesse ei käivituks.
+
+Valikurežiimis (`selectMode`) renderdatakse märksõnad **mitteklikitavate siltidena**
+(`onTagClick` jäetakse andmata) — valiku-käitumine jääb peale, nagu ka `onOriginClick`
+puhul praegu (`PersonCard.tsx:266` ei anna seda edasi).
+
+Teadaolev piirang, mida see muudatus **ei** lahenda: interaktiivne element
+`role="link"` sees ei ole a11y mõttes ideaalne. See on koodibaasi väljakujunenud muster
+ja selle parandamine on eraldi töö, mitte selle featuuri osa.
 
 ### `src/prosopography/pages/PersonDetailPage.tsx`
 
@@ -140,15 +194,29 @@ Ei kasutata `t()` vaikeväärtust varuvariandina (ADR 0011 lõks).
 
 ## Testid
 
-**Pytest** (`server/prosopography` testid):
-- `tags`-filter Q-koodi järgi;
+**Pytest — filtriloogika** (`tests/test_prosopography_ops.py` mustri järgi):
+- `tags`-filter Q-koodi järgi, sh tõstutundetult (`q193664`);
 - `tags`-filter labeli järgi (tõstutundetu, ka mitte-eesti keeles);
 - **kahe märksõnaga päring → JA-loogika** — lukustab lepingu enne, kui UI selleni jõuab;
+- normaliseerimine: tühikud ümber, tühi `?tag=`, duplikaadid — tühi tulemus = filtrit pole;
+- legacy string-kujul märksõna indeksikirjes;
 - `q` leiab isiku märksõna labeli järgi (et ja en), samuti Q-koodi järgi;
 - `get_person_facets` tagastab `tags` õigete loenditega;
+- sama märksõna duplikaat ühel isikul **ei** suurenda facet-`count`-i;
 - märksõnadeta isik ei lekki tulemustesse.
 
-**Frontend:** `npm run typecheck` + olemasolev `localeParity.test.ts`.
+**Pytest — HTTP-tasand** (`TestClient`, olemas `tests/conftest.py`-s):
+- `GET` korduvate parameetritega `?tag=A&tag=B`;
+- `POST /query`, kus `tag` on kord string ja kord loend — sama tulemus;
+- `GET /map` rakendab sama filtrit.
+
+**Frontend:** `npm run typecheck`, olemasolev `localeParity.test.ts` ja üks vitest
+`appendTagParams` peal (string vs loend vs `undefined` → õige arv `tag` võtmeid).
+
+**Komponenditeste ei kirjutata.** Projektis ei ole `@testing-library`-t ega jsdom'i ja
+ühtki `.test.tsx` faili ei eksisteeri — testitakse ainult puhtaid funktsioone. Terve
+komponenditesti-stäki lisamine on selle featuuri skoobist väljas; kaardi klikikäitumine
+kontrollitakse käsitsi.
 
 ## Mida teadlikult EI tehta
 
@@ -156,6 +224,12 @@ Ei kasutata `t()` vaikeväärtust varuvariandina (ADR 0011 lõks).
 - **Märksõnade sünkimine Meilisearchi** — isikuotsing käib indeksifailist, mitte Meilist.
 - **Migratsioon ega indeksi ümberehitus** — `tags` on indeksis juba olemas.
 - **`FilterSection`-i üldistamine mitmikvalikuks** — tehakse siis, kui vaja.
+- **Aktiivsete filtrite sildiriba** — mitmikvaliku UI osa, mitte selle featuuri oma.
+- **Facetide ristfiltreerimine** — märksõna valik ei kitsenda facet-loendeid, täpselt
+  nagu ükski teine külgriba filter praegu.
+- **Facetide sortimine kuvatava tõlke järgi** — backend sordib põhilabeli järgi;
+  nelja märksõna juures pole vahet.
+- **Komponenditestide stäkk** (`@testing-library`, jsdom).
 
 ## Teadaolev tagajärg
 
