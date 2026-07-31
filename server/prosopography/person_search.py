@@ -59,6 +59,80 @@ def _extract_occupation_entries(person: dict) -> list[dict]:
     return sorted(deduped.values(), key=lambda item: (item.get("label") or "").lower())
 
 
+def _entry_tags(entry: dict) -> list[dict]:
+    """Normaliseerib indeksikirje märksõnad kujule {id, label, labels}.
+
+    Indeks on täielik (kõigil kirjetel on `tags` väli), seega täiskaardilt
+    varuvarianti lugema ei pea — erinevalt `_entry_occupations`-ist.
+    """
+    result: list[dict] = []
+    for item in (entry.get("tags") or []):
+        if isinstance(item, str):
+            label = item.strip()
+            if label:
+                result.append({"id": None, "label": label, "labels": None})
+            continue
+        if not isinstance(item, dict):
+            continue
+        labels = item.get("labels")
+        normalized_labels = {
+            key: value.strip()
+            for key, value in labels.items()
+            if isinstance(key, str) and isinstance(value, str) and value.strip()
+        } if isinstance(labels, dict) else None
+        label = item.get("label")
+        label = label.strip() if isinstance(label, str) else ""
+        if not label and normalized_labels:
+            label = (
+                normalized_labels.get("et")
+                or normalized_labels.get("en")
+                or next(iter(normalized_labels.values()), "")
+            )
+        tag_id = item.get("id")
+        tag_id = tag_id.strip() if isinstance(tag_id, str) and tag_id.strip() else None
+        if not label and not tag_id:
+            continue
+        result.append({"id": tag_id, "label": label, "labels": normalized_labels or None})
+    return result
+
+
+def _normalize_tag_query(value) -> list[str]:
+    """Puhastab märksõna-päringu: string või loend → puhastatud unikaalne loend.
+
+    Tühi tulemus tähendab "filtrit pole", mitte "ükski kirje ei vasta".
+    """
+    if value is None:
+        return []
+    raw = [value] if isinstance(value, str) else list(value)
+    seen: set = set()
+    result: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        cleaned = item.strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(cleaned)
+    return result
+
+
+def _tag_match_keys(tag: dict) -> set:
+    """Kõik casefold-võtmed, millega märksõna võib vastata (id, label, kõik keeled)."""
+    keys = set()
+    if tag.get("id"):
+        keys.add(tag["id"].casefold())
+    if tag.get("label"):
+        keys.add(tag["label"].casefold())
+    for value in (tag.get("labels") or {}).values():
+        if isinstance(value, str) and value.strip():
+            keys.add(value.strip().casefold())
+    return keys
+
+
 def _entry_occupations(entry: dict) -> list[dict]:
     occupations = entry.get("occupations")
     if occupations is not None:
@@ -135,6 +209,7 @@ def _filter_index_entries(
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
 ) -> list[dict]:
     sync_from_facade()
     index = _load_index()
@@ -147,14 +222,28 @@ def _filter_index_entries(
         id_set = set(ids)
         results = [e for e in results if e.get("id") in id_set]
     if q:
-        q_lower = q.lower()
+        q_lower = q.casefold()
         aliases_data = _load_person_aliases()
+
+        def _matches_tags(entry: dict) -> bool:
+            for tag in _entry_tags(entry):
+                tag_id = (tag.get("id") or "").casefold()
+                # Q-kood: täpne vaste (osaline annaks liiga laia tulemuse).
+                if tag_id and tag_id == q_lower:
+                    return True
+                # Labelid: osaline vaste, nagu nimeotsingul.
+                for key in _tag_match_keys(tag):
+                    if key != tag_id and q_lower in key:
+                        return True
+            return False
+
         results = [
             e for e in results
-            if q_lower in (e.get("label") or "").lower()
-            or q_lower in (e.get("sort_name") or "").lower()
-            or any(q_lower in a.lower() for a in (e.get("aliases") or []))
-            or any(q_lower in a.lower() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
+            if q_lower in (e.get("label") or "").casefold()
+            or q_lower in (e.get("sort_name") or "").casefold()
+            or any(q_lower in a.casefold() for a in (e.get("aliases") or []))
+            or any(q_lower in a.casefold() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
+            or _matches_tags(e)
         ]
     if gender:
         results = [e for e in results if e.get("gender") == gender]
@@ -180,6 +269,17 @@ def _filter_index_entries(
         ]
     if status_id:
         results = [e for e in results if status_id in (e.get("status_ids") or [])]
+    tag_queries = _normalize_tag_query(tags)
+    if tag_queries:
+        wanted = [t.casefold() for t in tag_queries]
+
+        def _entry_has_all_tags(entry: dict) -> bool:
+            entry_keys: set = set()
+            for tag in _entry_tags(entry):
+                entry_keys |= _tag_match_keys(tag)
+            return all(w in entry_keys for w in wanted)
+
+        results = [e for e in results if _entry_has_all_tags(e)]
     if verification_level:
         results = [e for e in results if e.get("verification_level") == verification_level]
     if source:
@@ -213,6 +313,7 @@ def list_persons(
     imm_year_to: Optional[int] = None,
     sort_by: Optional[str] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
     collection: Optional[str] = None,
     limit: int = 48,
     offset: int = 0,
@@ -241,6 +342,7 @@ def list_persons(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,
+        tags=tags,
     )
 
     if sort_by == "birth_year":
@@ -274,6 +376,7 @@ def get_person_map_markers(
     imm_year_from: Optional[int] = None,
     imm_year_to: Optional[int] = None,
     ids: Optional[list] = None,
+    tags: Optional[list] = None,
     related_to: Optional[str] = None,
     collection: Optional[str] = None,
 ) -> dict:
@@ -304,6 +407,7 @@ def get_person_map_markers(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=ids,
+        tags=tags,
     )
 
     markers_by_place: dict[str, dict] = {}
@@ -418,9 +522,35 @@ def get_person_facets(
     ]
     institutions.sort(key=lambda x: (-x["count"], x["value"].lower()))
 
+    # Märksõnad — üks isik tõstab loendurit maksimaalselt ühe võrra.
+    tag_counts: dict = {}
+    tag_meta: dict = {}
+    for entry in filtered:
+        seen_keys: set = set()
+        for tag in _entry_tags(entry):
+            key = tag["id"].casefold() if tag.get("id") else (tag.get("label") or "").casefold()
+            if not key or key in seen_keys:
+                continue
+            seen_keys.add(key)
+            tag_counts[key] = tag_counts.get(key, 0) + 1
+            if key not in tag_meta:
+                tag_meta[key] = tag
+
+    tags_facet = []
+    for key, count in tag_counts.items():
+        meta = tag_meta[key]
+        tags_facet.append({
+            "value": meta["id"] or meta["label"],
+            "label": meta["label"],
+            "labels": meta.get("labels"),
+            "count": count,
+        })
+    tags_facet.sort(key=lambda x: (-x["count"], (x["label"] or "").lower()))
+
     return {
         "origin_groups": origin_groups,
         "institutions": institutions,
+        "tags": tags_facet,
         "occupations": [],  # tagasiühilduvus
     }
 
@@ -572,4 +702,4 @@ def _index_entry_from_person(person: dict, work_count: int = 0) -> dict:
     }
 
 
-__all__ = ['list_persons', '_filter_index_entries', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations']
+__all__ = ['list_persons', '_filter_index_entries', '_entry_matches_year_range', 'get_person_map_markers', 'get_person_facets', '_load_person_aliases', '_index_entry_from_person', '_extract_occupation_entries', '_entry_occupations', '_entry_tags', '_normalize_tag_query', '_tag_match_keys']

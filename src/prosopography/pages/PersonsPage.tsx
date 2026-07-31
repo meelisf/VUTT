@@ -15,6 +15,9 @@ import { useCollection } from '../../contexts/CollectionContext';
 import type { ProsopoIndexEntry } from '../types';
 
 const LIMIT = 48;
+// Unit Separator — märksõna ise võib sisaldada tühikuid ja komasid
+// ("kreeka keele professor"), seega tavaline eraldaja ei sobi.
+const TAG_SEP = '\u001F';
 const PersonsMap = React.lazy(() => import('../components/PersonsMap'));
 
 const PersonsPage: React.FC = () => {
@@ -43,6 +46,11 @@ const PersonsPage: React.FC = () => {
   const yearTo = explicitYearTo ?? legacyImmYearTo ?? '';
   const hasExplicitYearRange = explicitYearFrom !== null || explicitYearTo !== null;
   const statusId = searchParams.get('status_id') ?? '';
+  // Märksõnad — URL toetab kordust (?tag=A&tag=B), UI valib praegu ühe.
+  // Stabiilne string on vajalik, sest getAll() annab igal renderdusel uue massiivi
+  // ja see destabiliseeriks useCallback deps-listi (lõputu päringutsükkel).
+  const tagsKey = searchParams.getAll('tag').join(TAG_SEP);
+  const tags = useMemo(() => (tagsKey ? tagsKey.split(TAG_SEP) : []), [tagsKey]);
   const sortBy = searchParams.get('sort_by') ?? 'alpha';
   const view = searchParams.get('view') === 'map' ? 'map' : 'list';
   const focusPlace = searchParams.get('focus_place') ?? '';
@@ -50,6 +58,7 @@ const PersonsPage: React.FC = () => {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0;
   const [originGroupFacets, setOriginGroupFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [institutionFacets, setInstitutionFacets] = useState<{ value: string; count: number }[]>([]);
+  const [tagFacets, setTagFacets] = useState<{ value: string; label: string; count: number }[]>([]);
   const [seisused, setSeisused] = useState<{ id: string; label: { et: string; en: string } }[]>([]);
 
   // Eraldi state otsingukastile — debounce enne URL uuendamist
@@ -92,6 +101,15 @@ const PersonsPage: React.FC = () => {
   const setYearFrom = (v: string)     => setYearParam('year_from', 'imm_year_from', v);
   const setYearTo = (v: string)       => setYearParam('year_to', 'imm_year_to', v);
   const setStatusId = (v: string)     => setFilterParam('status_id', v);
+  // Uus valik asendab kõik senised märksõnad (UI on üksikvalik).
+  const setTag = (v: string) =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      n.delete('tag');
+      if (v) n.append('tag', v);
+      n.delete('offset');
+      return n;
+    }, { replace: true });
   const setSortBy = (v: string)       => setFilterParam('sort_by', v === 'alpha' ? '' : v);
   const setView = (v: 'list' | 'map') =>
     setSearchParams(p => {
@@ -149,6 +167,7 @@ const PersonsPage: React.FC = () => {
       imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
       imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
       status_id: statusId || undefined,
+      tag: tags.length ? tags : undefined,
       sort_by: sortBy !== 'alpha' ? sortBy : undefined,
       collection: effectiveSelectedCollection || undefined,
       limit: LIMIT,
@@ -161,7 +180,7 @@ const PersonsPage: React.FC = () => {
       })
       .catch(() => setError(t('loadError', 'Isikute laadimine ebaõnnestus.')))
       .finally(() => setLoading(false));
-  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, sortBy, effectiveSelectedCollection, offset, token, t]);
+  }, [view, query, originGroup, institution, source, gender, yearFrom, yearTo, hasExplicitYearRange, legacyImmYearFrom, legacyImmYearTo, statusId, tags, sortBy, effectiveSelectedCollection, offset, token, t]);
 
   const fetchFacets = useCallback(() => {
     getPersonFacets({
@@ -177,8 +196,13 @@ const PersonsPage: React.FC = () => {
           count: item.count,
         })));
         setInstitutionFacets(data.institutions || []);
+        setTagFacets((data.tags || []).map(item => ({
+          value: item.value,
+          label: item.labels?.[lang] ?? item.labels?.['et'] ?? item.labels?.['en'] ?? item.label,
+          count: item.count,
+        })));
       })
-      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); });
+      .catch(() => { setOriginGroupFacets([]); setInstitutionFacets([]); setTagFacets([]); });
   }, [query, gender, effectiveSelectedCollection, token, i18n.language]);
 
   useEffect(() => {
@@ -193,7 +217,7 @@ const PersonsPage: React.FC = () => {
     getVocabularies().then(v => { if (v.seisused) setSeisused(v.seisused); }).catch(() => {});
   }, []);
 
-  const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId);
+  const hasActiveFilters = !!(originGroup || originPlace || institution || source || gender || yearFrom || yearTo || statusId || tags.length);
   const totalPages = Math.ceil(total / LIMIT);
   const currentPage = Math.floor(offset / LIMIT) + 1;
   const mapFilters = {
@@ -207,6 +231,7 @@ const PersonsPage: React.FC = () => {
     imm_year_from: !hasExplicitYearRange && legacyImmYearFrom ? parseInt(legacyImmYearFrom) : undefined,
     imm_year_to: !hasExplicitYearRange && legacyImmYearTo ? parseInt(legacyImmYearTo) : undefined,
     status_id: statusId || undefined,
+    tag: tags.length ? tags : undefined,
     related_to: relatedTo || undefined,
     collection: effectiveSelectedCollection || undefined,
   };
@@ -355,8 +380,10 @@ const PersonsPage: React.FC = () => {
             yearFrom={yearFrom}
             yearTo={yearTo}
             statusId={statusId}
+            tag={tags[0] ?? ''}
             originGroups={originGroupFacets}
             institutions={institutionFacets}
+            tagFacets={tagFacets}
             seisused={seisused}
             onOriginGroupChange={setOriginGroup}
             onOriginPlaceChange={setOriginPlace}
@@ -366,9 +393,10 @@ const PersonsPage: React.FC = () => {
             onYearFromChange={setYearFrom}
             onYearToChange={setYearTo}
             onStatusIdChange={setStatusId}
+            onTagChange={setTag}
             onClearAll={() => setSearchParams(p => {
               const n = new URLSearchParams(p);
-              ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'offset'].forEach(k => n.delete(k));
+              ['origin_group', 'origin_place', 'institution', 'source', 'gender', 'year_from', 'year_to', 'imm_year_from', 'imm_year_to', 'status_id', 'tag', 'offset'].forEach(k => n.delete(k));
               return n;
             }, { replace: true })}
           />

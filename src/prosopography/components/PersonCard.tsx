@@ -79,9 +79,10 @@ const CardInner: React.FC<{
   person: ProsopoIndexEntry;
   lifespan: React.ReactNode;
   onOriginClick?: () => void;
+  onTagClick?: (value: string) => void;
   statusVocab?: VocabularySeisusItem[];
 }> = ({
-  person, lifespan, onOriginClick, statusVocab,
+  person, lifespan, onOriginClick, onTagClick, statusVocab,
 }) => {
   const { t, i18n } = useTranslation(['prosopography']);
   return (
@@ -117,10 +118,22 @@ const CardInner: React.FC<{
               {(person.tags ?? []).map((tag, i) => {
                 const lang = i18n.language?.slice(0, 2) ?? 'et';
                 const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
+                const value = tag.id || tag.label;
+                const chipClass = 'px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100/90 text-blue-700 border border-blue-200';
+                // Valikurežiimis onTagClick puudub → silt jääb passiivseks (sama muster mis onOriginClick).
+                if (!onTagClick || !value) {
+                  return <span key={i} className={chipClass}>{label}</span>;
+                }
                 return (
-                  <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100/90 text-blue-700 border border-blue-200">
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onTagClick(value); }}
+                    className={`${chipClass} hover:bg-blue-200 transition-colors`}
+                    title={t('filterTags')}
+                  >
                     {label}
-                  </span>
+                  </button>
                 );
               })}
             </div>
@@ -281,6 +294,12 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
     navigate(`/persons?${params.toString()}`);
   };
 
+  const openTagFilter = (value: string) => {
+    const params = new URLSearchParams();
+    params.append('tag', value);
+    navigate(`/persons?${params.toString()}`);
+  };
+
   return (
     <div
       role="link"
@@ -289,7 +308,7 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
       onKeyDown={e => e.key === 'Enter' && openPerson()}
       className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 flex flex-col overflow-hidden cursor-pointer"
     >
-      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} statusVocab={statusVocab} />
+      <CardInner person={person} lifespan={lifespanNode} onOriginClick={openOriginMap} onTagClick={openTagFilter} statusVocab={statusVocab} />
     </div>
   );
 };

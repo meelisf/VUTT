@@ -4,6 +4,8 @@ Registreeritakse main.py-s: app.include_router(router, prefix="/prosopography")
 """
 import json
 import os
+from typing import List, Optional
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Depends, Query
 from fastapi.responses import FileResponse
 from starlette.concurrency import run_in_threadpool
@@ -23,7 +25,7 @@ from .person_crud import (
     bulk_update_occupation,
     _safe_nanoid,
 )
-from .person_search import list_persons, get_person_map_markers, get_person_facets
+from .person_search import list_persons, get_person_map_markers, get_person_facets, _normalize_tag_query
 from .historical_regions import HistoricalRegionsError, get_historical_regions
 from .relations import get_person_with_works, get_relation_type_suggestions
 from .merge_ops import merge_person, delete_person
@@ -127,6 +129,7 @@ def prosopography_list(
     imm_year_to: int = None,
     sort_by: str = None,
     ids: str = None,
+    tag: Optional[List[str]] = Query(None),
     collection: str = None,
     limit: int = 48,
     offset: int = 0,
@@ -150,6 +153,7 @@ def prosopography_list(
         imm_year_to=imm_year_to,
         sort_by=sort_by,
         ids=id_list,
+        tags=_normalize_tag_query(tag),
         collection=collection,
         limit=limit,
         offset=offset,
@@ -179,6 +183,7 @@ async def prosopography_query(request: Request):
         imm_year_to=data.get("imm_year_to"),
         sort_by=data.get("sort_by"),
         ids=data.get("ids"),
+        tags=_normalize_tag_query(data.get("tag")),
         collection=data.get("collection"),
         limit=data.get("limit", 48),
         offset=data.get("offset", 0),
@@ -201,6 +206,7 @@ def prosopography_map(
     imm_year_from: int = None,
     imm_year_to: int = None,
     ids: str = None,
+    tag: Optional[List[str]] = Query(None),
     related_to: str = None,
     collection: str = None,
     user=Depends(_optional_user),
@@ -221,6 +227,7 @@ def prosopography_map(
         imm_year_from=imm_year_from,
         imm_year_to=imm_year_to,
         ids=id_list,
+        tags=_normalize_tag_query(tag),
         related_to=related_to,
         collection=collection,
     )

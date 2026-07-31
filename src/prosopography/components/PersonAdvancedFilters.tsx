@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BookOpen, CalendarDays, ChevronDown, ChevronRight, Crown, Database, MapPin, Search, Venus, X } from 'lucide-react';
+import { BookOpen, CalendarDays, ChevronDown, ChevronRight, Crown, Database, MapPin, Search, Tag, Venus, X } from 'lucide-react';
 
 export type GenderFilter = '' | 'M' | 'F';
 
@@ -34,8 +34,10 @@ interface PersonAdvancedFiltersProps {
   yearFrom: string;
   yearTo: string;
   statusId: string;
+  tag: string;
   originGroups: FacetItem[];
   institutions: InstitutionItem[];
+  tagFacets: FacetItem[];
   seisused: { id: string; label: { et: string; en: string } }[];
   onGenderChange: (v: GenderFilter) => void;
   onOriginGroupChange: (v: string) => void;
@@ -45,6 +47,7 @@ interface PersonAdvancedFiltersProps {
   onYearFromChange: (v: string) => void;
   onYearToChange: (v: string) => void;
   onStatusIdChange: (v: string) => void;
+  onTagChange: (v: string) => void;
   onClearAll: () => void;
 }
 
@@ -107,16 +110,16 @@ const FilterSection: React.FC<FilterSectionProps> = ({
 };
 
 const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
-  gender, originGroup, originPlace, institution, source, yearFrom, yearTo, statusId,
-  originGroups, institutions, seisused,
+  gender, originGroup, originPlace, institution, source, yearFrom, yearTo, statusId, tag,
+  originGroups, institutions, tagFacets, seisused,
   onGenderChange, onOriginGroupChange, onOriginPlaceChange, onInstitutionChange, onSourceChange,
-  onYearFromChange, onYearToChange, onStatusIdChange,
+  onYearFromChange, onYearToChange, onStatusIdChange, onTagChange,
   onClearAll,
 }) => {
   const { t, i18n } = useTranslation('prosopography');
   const hasYearRange = !!(yearFrom || yearTo);
-  const hasActive = !!(originGroup || originPlace || institution || source || gender || hasYearRange || statusId);
-  const activeCount = [originGroup, originPlace, institution, source, gender, hasYearRange ? '1' : '', statusId].filter(Boolean).length;
+  const hasActive = !!(originGroup || originPlace || institution || source || gender || hasYearRange || statusId || tag);
+  const activeCount = [originGroup, originPlace, institution, source, gender, hasYearRange ? '1' : '', statusId, tag].filter(Boolean).length;
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -165,6 +168,16 @@ const PersonAdvancedFilters: React.FC<PersonAdvancedFiltersProps> = ({
             selectedValue={institution}
             onSelect={onInstitutionChange}
             searchPlaceholder={t('filterInstitutionSearch', 'Otsi asutust…')}
+            emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
+          />
+
+          <FilterSection
+            title={t('filterTags')}
+            icon={<Tag size={13} />}
+            items={tagFacets}
+            selectedValue={tag}
+            onSelect={onTagChange}
+            searchPlaceholder={t('filterTagsSearch')}
             emptyLabel={t('filterNoMatches', 'Ei leitud vasteid')}
           />
 

@@ -589,14 +589,23 @@ const PersonDetailPage: React.FC = () => {
                 {(person.tags ?? []).map((tag: any, i: number) => {
                   const label = tag.labels?.[lang] ?? tag.labels?.en ?? tag.label;
                   const url = tag.id && isQCode(tag.id) ? `https://www.wikidata.org/wiki/${tag.id}` : null;
+                  // Sildi tekst viib VUTT-i märksõnafiltrisse; Wikidata jääb eraldi ikoonile.
+                  const value = tag.id || tag.label;
                   return (
                     <span key={i} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-gray-100 text-gray-700 border border-gray-200 rounded">
-                      {url ? (
-                        <a href={url} target="_blank" rel="noopener noreferrer"
+                      {value ? (
+                        <Link to={`/persons?tag=${encodeURIComponent(value)}`}
                           className="hover:text-primary-700 transition-colors">
                           {label}
-                        </a>
+                        </Link>
                       ) : label}
+                      {url && (
+                        <a href={url} target="_blank" rel="noopener noreferrer"
+                          className="text-gray-400 hover:text-primary-700 transition-colors"
+                          title="Wikidata">
+                          <ExternalLink size={10} />
+                        </a>
+                      )}
                       {canEdit && (
                         <button
                           onClick={async () => {

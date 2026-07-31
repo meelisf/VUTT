@@ -37,6 +37,7 @@ _SYNC_NAMES = {
     "_build_work_to_persons",
     "_structured_relation_ids",
     "_entry_occupations",
+    "_entry_tags",
     "_extract_occupation_entries",
     "_entry_matches_year_range",
     "_update_index_entry",
