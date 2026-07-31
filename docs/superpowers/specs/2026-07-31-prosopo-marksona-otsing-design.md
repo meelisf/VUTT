@@ -183,8 +183,16 @@ ja selle parandamine on eraldi töö, mitte selle featuuri osa.
 
 ### `src/prosopography/pages/PersonDetailPage.tsx`
 
-Sama sildil (read ~589+). Kustutusnupp (`X`) jääb muutmata; klikitavaks muutub
-ainult sildi tekstiosa.
+Sildi tekst on praegu **link Wikidatasse**, kui Q-kood olemas (`PersonDetailPage.tsx:594-597`).
+Uus jaotus:
+
+- **sildi tekst** → `/persons?tag=<value>` (sisemine filter, sama mis kaardil) — see on
+  see, mida kasutaja märksõnalt eelkõige ootab;
+- **väike välislingi ikoon** (`ExternalLink`, 10 px) sildi tekstist paremal → Wikidata,
+  ainult kui `isQCode(tag.id)`;
+- kustutusnupp (`X`) jääb muutmata, ikoonide järjekord: tekst · Wikidata · X.
+
+Ilma Q-koodita märksõnal on ainult sisemine link.
 
 ### i18n
 
