@@ -12,6 +12,7 @@ import { formatYearDisplay, parseYearDisplayRange } from '../../utils/yearDispla
 import Header from '../../components/Header';
 import { getPerson, updatePerson, fetchPersonHistory, fetchPersonDiff, restorePerson, getWorkTitles } from '../services/prosopographyService';
 import EntityPicker from '../../components/EntityPicker';
+import { usePersonTagSuggestions } from '../hooks/usePersonTagSuggestions';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
@@ -253,6 +254,9 @@ const PersonDetailPage: React.FC = () => {
   const token = authToken ?? '';
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
+
+  // Isikutel juba kasutusel olevad märksõnad — soovitused märksõna-pickerile.
+  const tagSuggestions = usePersonTagSuggestions(lang, canEdit, token);
 
   const [history, setHistory] = useState<{ hash: string; full_hash: string; author: string; formatted_date: string; message: string; is_original: boolean }[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -642,6 +646,7 @@ const PersonDetailPage: React.FC = () => {
                       finally { setTagsSaving(false); }
                     }}
                     lang={lang}
+                    localSuggestions={tagSuggestions}
                   />
                 </div>
               )}

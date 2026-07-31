@@ -18,6 +18,7 @@ import DateField from '../components/personForm/DateField';
 import AliasesList from '../components/personForm/AliasesList';
 import ProsopoPersonPicker from '../components/personForm/ProsopoPersonPicker';
 import TagsList from '../components/personForm/TagsList';
+import { usePersonTagSuggestions } from '../hooks/usePersonTagSuggestions';
 import { CollapsibleSection, DynamicList } from '../components/personForm/CollapsibleSection';
 import EnrichmentSearch from '../components/personForm/EnrichmentSearch';
 import EnrichExistingSection from '../components/personForm/EnrichExistingSection';
@@ -78,6 +79,9 @@ const PersonEditPage: React.FC = () => {
 
   const canEdit = isAtLeast(user?.role, 'editor');
   const isAdmin = isAtLeast(user?.role, 'admin');
+
+  // Isikutel juba kasutusel olevad märksõnad — soovitused TagsList'ile.
+  const tagSuggestions = usePersonTagSuggestions(lang, canEdit, authToken ?? undefined);
 
   // Kustutamine
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -783,7 +787,7 @@ const PersonEditPage: React.FC = () => {
             onChange={items => set({ education: items })}
           />
 
-          <TagsList tags={draft.tags} onChange={v => set({ tags: v })} />
+          <TagsList tags={draft.tags} onChange={v => set({ tags: v })} suggestions={tagSuggestions} />
         </CollapsibleSection>
 
         {/* ── Seosed ja märkmed (klapitav) ── */}

@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import EntityPicker from '../../../components/EntityPicker';
 import type { TagDraft } from './types';
+import type { TagSuggestion } from '../../utils/tagSuggestions';
 
 const TagsList: React.FC<{
   tags: TagDraft[];
   onChange: (v: TagDraft[]) => void;
-}> = ({ tags, onChange }) => {
+  suggestions?: TagSuggestion[];
+}> = ({ tags, onChange, suggestions }) => {
   const { t } = useTranslation(['prosopography']);
   const [pickerValue, setPickerValue] = useState<any>(null);
 
@@ -43,6 +45,7 @@ const TagsList: React.FC<{
         value={pickerValue}
         onChange={v => { if (v) add(v); else setPickerValue(null); }}
         lang="et"
+        localSuggestions={suggestions}
       />
     </div>
   );
