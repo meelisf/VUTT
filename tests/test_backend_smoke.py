@@ -349,6 +349,76 @@ def test_rebuild_indices_includes_page_person_mentions(tmp_path, monkeypatch):
     assert len(mentioned_entries) == 1, f"Peaks olema täpselt 1 'mentioned' kirje, sain: {mentioned_entries}"
 
 
+def test_update_person_to_works_preserves_mentioned(tmp_path, monkeypatch):
+    """
+    Teose metaandmete salvestus (update_person_to_works) EI TOHI kustutada
+    lehe-tägidest tuletatud 'mentioned' rolle — need tulevad teisest allikast
+    (leheküljefailid) ja neid see funktsioon uuesti ei arvuta.
+    """
+    import server.prosopography.ops as prosopo_ops
+    import server.prosopography.work_relations_ops as work_relations_ops
+
+    work_id = "workAAA"
+    ptw_file = tmp_path / "person_to_works.json"
+    ptw_file.write_text(json.dumps({
+        # Lehe-täg: ainult 'mentioned' selle teose kohta
+        "vutt:Pmmm": [{"work_id": work_id, "role": "mentioned"}],
+        # Vana loojaroll, mis TULEB üle kirjutada (isik eemaldati creators-ist)
+        "vutt:Pold": [{"work_id": work_id, "role": "auctor"}],
+    }), encoding="utf-8")
+
+    monkeypatch.setattr(prosopo_ops, "PERSON_TO_WORKS_FILE", str(ptw_file))
+    monkeypatch.setattr(
+        work_relations_ops, "WORKS_CREATORS_INDEX_FILE", str(tmp_path / "works_creators_index.json")
+    )
+
+    prosopo_ops.update_person_to_works(
+        work_id,
+        creators=[{"id": "vutt:Pnew", "role": "auctor"}],
+        tags=[{"id": "Q201676", "label": "matus"}],
+        publisher={"id": "vutt:Ppub", "label": "Trükkal"},
+        title="Test",
+        year=1695,
+    )
+
+    data = json.loads(ptw_file.read_text(encoding="utf-8"))
+
+    assert data.get("vutt:Pmmm") == [{"work_id": work_id, "role": "mentioned"}], \
+        f"'mentioned' peab säilima, sain: {data.get('vutt:Pmmm')!r}"
+    assert data.get("vutt:Pold") == [], f"vana loojaroll peab kaduma, sain: {data.get('vutt:Pold')!r}"
+    assert data["vutt:Pnew"] == [{"work_id": work_id, "role": "auctor"}]
+    assert data["vutt:Ppub"] == [{"work_id": work_id, "role": "publisher"}]
+
+
+def test_delete_pages_refreshes_person_mentions(tmp_path, monkeypatch):
+    """
+    Lehekülgede kustutamine peab lehe-tägidest tuletatud 'mentioned' rollid
+    üle arvutama — muidu jääb kustutatud lehe isik indeksisse rippuma.
+    """
+    import server.admin_page_ops as admin_page_ops
+
+    work_id = "workAAA"
+    work_dir = tmp_path / "teos1"
+    work_dir.mkdir()
+    (work_dir / "leht1.jpg").write_bytes(b"fake")
+
+    monkeypatch.setattr(admin_page_ops, "find_directory_by_id", lambda wid: str(work_dir))
+    monkeypatch.setattr(admin_page_ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(admin_page_ops, "delete_pages_from_git", lambda *a, **kw: None)
+    monkeypatch.setattr(admin_page_ops, "sync_work_to_meilisearch", lambda *a, **kw: None)
+
+    calls = []
+    monkeypatch.setattr(
+        admin_page_ops, "update_page_person_mentions", lambda wid, wdir: calls.append((wid, wdir))
+    )
+
+    result = admin_page_ops.delete_pages(work_id, ["leht1"], username="admin")
+
+    assert result["status"] == "success", result
+    assert calls == [(work_id, str(work_dir))], \
+        f"update_page_person_mentions peaks olema kutsutud 1 kord, sain: {calls}"
+
+
 def test_save_triggers_page_person_mentions_update(client, login, monkeypatch, tmp_path):
     """
     POST /save peab käivitama update_page_person_mentions background task-i
