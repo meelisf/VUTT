@@ -222,14 +222,28 @@ def _filter_index_entries(
         id_set = set(ids)
         results = [e for e in results if e.get("id") in id_set]
     if q:
-        q_lower = q.lower()
+        q_lower = q.casefold()
         aliases_data = _load_person_aliases()
+
+        def _matches_tags(entry: dict) -> bool:
+            for tag in _entry_tags(entry):
+                tag_id = (tag.get("id") or "").casefold()
+                # Q-kood: täpne vaste (osaline annaks liiga laia tulemuse).
+                if tag_id and tag_id == q_lower:
+                    return True
+                # Labelid: osaline vaste, nagu nimeotsingul.
+                for key in _tag_match_keys(tag):
+                    if key != tag_id and q_lower in key:
+                        return True
+            return False
+
         results = [
             e for e in results
-            if q_lower in (e.get("label") or "").lower()
-            or q_lower in (e.get("sort_name") or "").lower()
-            or any(q_lower in a.lower() for a in (e.get("aliases") or []))
-            or any(q_lower in a.lower() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
+            if q_lower in (e.get("label") or "").casefold()
+            or q_lower in (e.get("sort_name") or "").casefold()
+            or any(q_lower in a.casefold() for a in (e.get("aliases") or []))
+            or any(q_lower in a.casefold() for a in (aliases_data.get(e.get("id"), {}).get("aliases") or []))
+            or _matches_tags(e)
         ]
     if gender:
         results = [e for e in results if e.get("gender") == gender]

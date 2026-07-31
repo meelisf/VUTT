@@ -161,3 +161,36 @@ def test_tags_filter_unknown_value_matches_nobody(indexed):
 def test_tags_filter_applies_to_map_markers(indexed):
     result = indexed.get_person_map_markers(tags=["Q193664"])
     assert result["total_persons"] == 1
+
+
+# ---- q-otsing märksõnades ----
+
+def test_q_finds_person_by_estonian_tag_label(indexed):
+    assert _ids(indexed.list_persons(q="pietism")) == ["p1"]
+
+
+def test_q_finds_person_by_english_tag_label(indexed):
+    assert _ids(indexed.list_persons(q="Pietism")) == ["p1"]
+
+
+def test_q_finds_person_by_tag_qcode(indexed):
+    assert _ids(indexed.list_persons(q="Q193664")) == ["p1"]
+
+
+def test_q_tag_qcode_is_case_insensitive(indexed):
+    assert _ids(indexed.list_persons(q="q193664")) == ["p1"]
+
+
+def test_q_matches_partial_tag_label(indexed):
+    """Osaline vaste — nagu nimeotsingutki."""
+    assert sorted(_ids(indexed.list_persons(q="rükka"))) == ["p1", "p2"]
+
+
+def test_q_still_matches_names(indexed):
+    """Nimevaste ei tohi kaduda."""
+    assert _ids(indexed.list_persons(q="Plain")) == ["p3"]
+
+
+def test_q_qcode_matches_exactly_not_partially(indexed):
+    """Q-koodi osaline vaste ei tohi kogu registrit tagastada."""
+    assert _ids(indexed.list_persons(q="Q19")) == []
