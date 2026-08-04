@@ -2,7 +2,7 @@
 Ühised FastAPI dependency'd autentimiseks ja JSON-body lugemiseks.
 
 Need on tõstetud ``server/main.py``-st Faas 0 refaktoreeringus
-(``docs/REFACTOR_main_py_2026-06-25.md``), et luua üks tõene allikas
+(``docs/_archive/REFACTOR_main_py_2026-06-25.md``), et luua üks tõene allikas
 auth-dependency'dele, mida kõik domeeni-routerid saavad jagada.
 
 Semantika (main.py päritolu):

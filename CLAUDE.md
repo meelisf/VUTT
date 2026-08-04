@@ -1,459 +1,275 @@
 # CLAUDE.md
 
-Estonian early modern text transcription workbench (React/TypeScript SPA). UI: Estonian + English. Code comments: Estonian.
+Varauusaegsete tekstide transkriptsioonitöölaud (vutt.utlib.ut.ee).
+Frontend: React 19 + TypeScript + Tailwind + Vite. Backend: FastAPI + Meilisearch.
+UI eesti + inglise keeles. **Koodikommentaarid eesti keeles.**
 
-## Commands
+## Töökord
 
-**NB: arendus toimub LOKAALSELT. Server on eraldi masin (`ssh vutt`). Ära eelda, et käsud töötavad serveris — vaata Deploy sektsiooni.**
+- **Skoop:** tee see, mida küsiti, küsitud ulatuses. Rutiinsed otsused langeta ise; küsi ainult siis, kui erinevad tõlgendused annaksid sisuliselt erineva töö. Kui ülesanne tundub vale või on parem tee, ütle seda ühe lausega ja tee siis küsitu — ära vaikselt kitsenda, laienda ega asenda.
+- **Vastus:** alusta tulemusest, siis detailid. Vahepealne uudis siis, kui leiad midagi olulist või muudad suunda.
+- **Enne muutmist loe `docs/decisions/`** (ADR-register). Seal on invariandid, mille rikkumine on varem rikke põhjustanud. Uus arhitektuuriotsus → uus ADR-fail, mitte ainult vestlus. Ülejäänud dokumentide kaart: `docs/README.md` (elav) vs `docs/_archive/` (ajalugu, ei pruugi kehtida).
+- **Kui sama käsk ebaõnnestub kaks korda samamoodi**, peatu ja ütle, mis blokeerib. Ära proovi variatsioone edasi.
+- **Subagendid:** ainult suurele, tõeliselt sõltumatule tööle (nt lai mitmefaililine otsing). Mitte oma töö ülekontrollimiseks ega tööks, mille teed ise mõne tööriistakutsega ära.
+- **Andmed elavad serveril.** Lokaalne `data/` ja `state/` EI peegelda tootmist — ära tee järeldusi nende sisu põhjal (vt [Andmeasukohad](#andmeasukohad)).
+- **Suuremad featuurid** planeeritakse GitHub Issues kaudu (`gh issue list`, `gh issue create`).
+
+## Käsud
+
+**Arendus toimub LOKAALSELT. Server on eraldi masin (`ssh vutt`).** Lokaalsed käsud ei tööta serveris ja vastupidi.
 
 ```bash
-# Lokaalne arendus
-npm install && npm run dev    # Frontend dev (localhost:5173)
-npm run build                 # Production build to dist/
+npm install && npm run dev    # localhost:5173
+npm run build                 # → dist/ + eelkompressioon (.br/.gz)
 ```
 
-**Python/testid lokaalselt:** kasuta alati projekti venv-i (`.venv/bin/python`, `.venv/bin/pytest`). Süsteemi `python3`/`pytest` ei pruugi omada vajalikke sõltuvusi.
+Väravad (samad jooksevad CI-s, `.github/workflows/ci.yml`):
 
+| Käsk | Märkus |
+|------|--------|
+| `npm run typecheck` | Vite EI typecheck'i — `build` üksi ei püüa tüübivigu |
+| `npm test` | vitest |
+| `npm run lint:ci` | ESLint (ainult `react-hooks`, teadlikult kitsas), lävi `--max-warnings 55` — parandades LANGETA arvu |
+| `.venv/bin/pytest tests/` | Kasuta ALATI projekti venv-i (`.venv/bin/python`), süsteemi `python3`-l puuduvad sõltuvused |
 
-### Deploy serverisse
+CI käivitub ainult main'i-PR-idel: virnastatud PR checke ei saa (baasi ümbersuunamine EI käivita, close+reopen käivitab). Merge-stiil = merge-commit.
+
+### Deploy
 
 ```bash
-ssh vutt
-cd ~/VUTT
+# Backend (Python) — serveris
+ssh vutt && cd ~/VUTT
+./scripts/server_update.sh --no-cache   # git pull + docker build + restart; --no-cache on Python-muudatusel kohustuslik
+./scripts/server_seed_data.sh           # Meilisearch reindeks (kui andmed/skeem muutusid)
+docker logs vutt-backend                # backend jookseb Dockeris (vutt-backend)
 
-./scripts/server_update.sh       # git pull + docker rebuild + restart (Python kood)
-./scripts/server_seed_data.sh    # Meilisearch indeksi uuendamine (kui andmed muutusid)
-
-# Manuaalselt backend logid vaatamiseks:
-docker logs vutt-backend
-docker compose ps
+# Frontend — lokaalses masinas
+npm run build && rsync -avz --delete dist/ vutt:~/VUTT/dist/
 ```
 
-Frontend deploy (pärast `npm run build` lokaalses masinas):
-```bash
-# --delete on tahtlik: ilma selleta kogunevad serverisse vanad hashitud chunk-failid
-rsync -avz --delete dist/ vutt:~/VUTT/dist/
-```
+`--delete` on tahtlik: ilma selleta kogunevad vanad hashitud chunk-failid.
+`.br`/`.gz` failid PEAVAD rsync'iga kaasa minema — nginx serveerib need
+`brotli_static`/`gzip_static` kaudu, muidu vaikne ~15% kaotus.
 
-`npm run build` teeb Vite build'i JA eelkompressiooni (`scripts/precompress-dist.mjs`):
-iga tekstivara kõrvale tekib `.br` (brotli 11) ja `.gz` (gzip 9). nginx serveerib
-need `brotli_static`/`gzip_static` kaudu — **need failid PEAVAD rsync'iga kaasa
-minema**, muidu langeb server tagasi lennult pakkimisele (~15% suurem).
+### nginx
 
-### nginx konfiguratsioon
-
-Aktiivne config on serveris (`/etc/nginx/sites-available/vutt`), **mitte gitis** —
-repos on koopia `nginx.host.conf`. Muutmisel uuenda MÕLEMAT:
+Aktiivne config on **hostis** (`/etc/nginx/sites-available/vutt`), mitte gitis ega Dockeris; repos on koopia `nginx.host.conf`. **Muutmisel uuenda MÕLEMAT:**
 
 ```bash
 scp nginx.host.conf vutt:/tmp/vutt.nginx.new
 ssh vutt 'sudo cp /tmp/vutt.nginx.new /etc/nginx/sites-available/vutt && sudo nginx -t && sudo systemctl reload nginx'
 ```
 
-Eeldused hostis (ei ole `nginx.host.conf`-is): rate-limit tsoonid
-`/etc/nginx/nginx.conf` http{} blokis (`vutt_auth` 1r/s, `vutt_api` 10r/s,
-`vutt_meili` 20r/s, `vutt_images` 60r/s) ja brotli moodulid
-(`libnginx-mod-http-brotli-filter`, `libnginx-mod-http-brotli-static`).
+Eeldused hostis (ei ole `nginx.host.conf`-is): rate-limit tsoonid `nginx.conf` http{} blokis
+(`vutt_auth` 1r/s, `vutt_api` 10r/s, `vutt_meili` 20r/s, `vutt_images` 60r/s) ja brotli moodulid.
 
-## Architecture
+**`/api/files/` proksib KÕIK backend-teed avalikult** — sisemist infot lekitav endpoint pane
+`/admin/` alla JA lisa `require_role("admin")`.
+
+## Arhitektuur
 
 ```
-Frontend (Vite + React 19 + TypeScript + Tailwind)
-├── Meilisearch (7700) - Search & metadata (index: teosed)
-├── Image Server (8001) - Scanned .jpg images
-└── File Server (8002) - Edits, auth, backups
+Frontend (Vite/React 19)
+├── Meilisearch (7700) — otsing + metaandmed (indeks: teosed)
+├── Image Server (8001) — skaneeringud .jpg
+└── File Server (8002) — FastAPI: toimetamine, auth, git, prosopograafia
     ↓
-Filesystem: data/{work-folder}/{page}.txt + .jpg + .json + _metadata.json
+Failisüsteem: data/{kaust}/{lehekülg}.txt + .jpg + .json + _metadata.json
 ```
 
-**Key IDs:**
-- `work_id` (nanoid) - used everywhere: routing, filters, API
-- `slug` (folder name) - only in filesystem
+Backend-pordid (7700, 8001, 8002) ei ole väljapoole avatud. HTTPS + HSTS, CSP nginx-is
+(**kahel real — muuda mõlemat**). Meilisearch: frontend kasutab search-only võtit.
 
-## Andmeasukohad
+**Võtme-ID-d:** `work_id` (nanoid) — marsruutimine, filtrid, API. `slug` (kaustanimi) — ainult failisüsteemis.
 
-Kaks eraldi kausta serveril, mõlemad mountitud Dockerisse:
+### Andmeasukohad
 
-| Kaust (serveril) | Docker mount | Mis seal on | Git | Lokaalselt |
-|-----------------|-------------|-------------|-----|------------|
-| `~/VUTT/state/` | `./state:/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `prosopography/` isikukaardid, `user_settings/` | Ei | Ei (ainult serveril) |
-| `~/VUTT/data/` | `./data:/data` | Teosed, leheküljed, `data/config/` konfiguratsioon | Sisemises gitis (`data/` oma git) | Ei |
+Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server/config.py`-st:
 
-**`data/config/` sisaldab** (backend loeb/kirjutab siia Dockerist):
+| Kaust (host) | Docker | Sisu | Git |
+|---|---|---|---|
+| `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `user_settings/`, `notifications/`, `prosopography/images/` | ei |
 
-| Fail | Sisu |
-|------|------|
-| `collections.json` | Kollektsioonide hierarhia ja värvid |
-| `vocabularies.json` | Taksonoomia sõnavarad |
-| `places.json` | Kohtade register |
-| `labels.json` | Q-kood → label register (kanooniline) |
-| `person_aliases.json` | Isikute nimevariantide register |
-| `prosopography_index.json` | Tuletatud prosopograafia indeks |
-| `person_to_works.json` | Tuletatud isiku→teosed indeks |
-| `works_creators_index.json` | Tuletatud teoste loojate indeks (teostest tuletatud isiku-isiku seosed) |
+`data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
+`labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`prosopography/{nanoid}.json`**
+(~2200 isikukaarti; **kaardid ise on siin, ainult pildid on `state/`-is**) ning tuletatud indeksid
+`prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
 
-**Oluline:** lokaalne masin ei peegelda `data/` ega `state/` sisu. Kõik need failid elavad ainult serveril.
+Tuletatud indeksid on read-modelid — nullist taastatavad (`rebuild_indices()` jookseb serveri
+stardil taustalõimes), vt ADR 0007. Skriptides:
 
-Konfiguratsioonifaili serverist alla tõmbamiseks:
-```bash
-scp vutt:~/VUTT/data/config/collections.json ./data-config-backup/
-```
-
-`data/config/` asukohta kontrollib `VUTT_DATA_DIR` env muutuja (`/data` Dockeris). Skriptides kasuta:
 ```python
-DATA_ROOT_DIR = os.getenv("VUTT_DATA_DIR", "data")
-CONFIG_DIR = os.path.join(DATA_ROOT_DIR, "config")   # ← ÕIGE
-# MIS MITTE: os.path.join(os.path.dirname(__file__), "../state")  # vale — Dockeris /app/state (runtime), mitte /data/config (konfig)
+from server.config import DATA_CONFIG_DIR, STATE_DIR   # ← ainuõige allikas
+# MITTE: os.path.join(os.path.dirname(__file__), "../state")
 ```
 
-**Kriitilised teed:**
-- `data/config/` (hostil) = `/data/config/` (Dockeris) — konfiguratsioon (`collections.json` jne) ← `VUTT_DATA_DIR/config`
-- `state/` (hostil) = `/app/state/` (Dockeris) — runtime (`users.json`, sessioonid, `user_settings/`) ← MITTE konfiguratsioon
+Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json ./`
 
-## Data Layers
+## Koodi paigutus
 
-```
-_metadata.json (V2 English)     →  Meilisearch (Estonian fields)  →  Frontend (V2)
-title, year, creators[]            pealkiri, aasta, autor            title, year
-```
+### Backend (`server/`)
 
-**Text Search vs Editor Text:**
-Meilisearch index contains two text fields to balance search accuracy and editor integrity:
-- `lehekylje_tekst`: **Cleaned for search**. Hyphens at line-ends removed (`Spen- \ner` → `Spener`), markdown (`*`), code-switch (`~`), marginalia (`[[m:]]`) and footnotes (`[^n]`) removed. Searchable.
-- `text_content`: **Raw for editor**. Original text with all markers. Retrievable but not searchable.
+`main.py` on ~140 rida: lifespan (taustalõimed, indeksid, keep-warm) + routerite ühendamine.
+**Endpointid elavad routerites** — uus endpoint lisa õigesse routerisse, mitte `main.py`-sse.
 
-Meilisearch uses Estonian field names (legacy). Frontend maps them. Don't change Meilisearch schema without full reindex.
+| Asukoht | Sisu |
+|---|---|
+| `routers/` | `auth`, `admin`, `pages`, `editing`, `public`, `public_registries`, `collections`, `notifications`, `upload`, `reocr`, `ocr_jobs`, `user_settings` |
+| `prosopography/` | Oma alampakett + `router.py`: `person_crud`, `person_search`, `merge_ops`, `relations`, `reciprocal_ops`, `work_relations_ops`, `indices`, `places_ops`, `enrichment`, `git_history`, `locks` |
+| `config.py` | Kõik teed, pordid, rate-limitid, CORS, saladuste stardikontroll |
+| `deps.py` | `get_user`, `require_role`, `get_json_data` — üks tõene allikas |
+| `metadata_ops.py` | `save_work_metadata()` — **KÕIK `_metadata.json` uuendused** käivad siit (`sync_meili`, `call_ptw`, `background_tasks`) |
+| `meili_doc.py` | Puhas `_metadata.json` → Meili-dokument kaardistus (side-effect-vaba) |
+| `meilisearch_ops.py` | Meili sünk, ThreadPoolExecutor, keep-warm |
+| `git_ops.py`, `auth.py`, `cache.py`, `rate_limit.py` | Versioonihaldus, autentimine, cache (TTL 5 min), rate-limit |
+| `upload/`, `upload_ops.py` | Upload-viisard + OCR-serveri integratsioon |
+| `marginalia_normalize.py` | `normalize_marginalia_tags()` — kutsutakse KÕIGIS kirjutusteedes |
 
-## Key Files
+**Python 3.9 ühilduvus:** `Optional[dict]`, mitte `dict | None`.
+Blokeeriv I/O `async def` sees on keelatud (ADR 0002) — kas sync `def` route või `run_in_threadpool`.
+Funktsiooni eemaldamisel kontrolli ka `server/__init__.py` re-eksporte.
 
-| Location | Purpose |
-|----------|---------|
-| `src/pages/` | Dashboard, Workspace, SearchPage, Statistics, Review, Admin |
-| `src/services/meiliService.ts` | All Meilisearch operations |
-| `src/services/collectionService.ts` | Collection helpers, color classes |
-| `src/contexts/CollectionContext.tsx` | Collection state (React Context) |
-| `src/components/EntityPicker.tsx` | Wikidata linked data picker |
-| `src/components/MarkdownEditor.tsx` | Markdown-redaktor (nupuriba + eelvaade) vabateksti väljadele |
-| `src/components/MarkdownView.tsx` | Turvaline markdown-renderdaja (allow-list, ei luba toorest HTML-i) |
-| `server/main.py` | FastAPI backend, kõik endpointid |
-| `server/auth.py` | Autentimine, rollid, sessioonid |
-| `server/git_ops.py` | Git version control |
-| `server/meilisearch_ops.py` | Meilisearch sync, ThreadPoolExecutor |
-| `server/cache.py` | Collections/people/suggestions cache (TTL 5 min) |
-| `server/upload_ops.py` | Upload wizard, OCR server integratsioon |
-| `state/` | Runtime andmed (ei ole gitis): `users.json`, `pending_registrations.json`, `invite_tokens.json`, `prosopography/`, `user_settings/` |
-| `data/config/` | Konfiguratsioon (sisemises gitis): `collections.json`, `vocabularies.json`, `places.json`, `labels.json`, `person_aliases.json`, `prosopography_index.json`, `person_to_works.json` |
-| `docs/decisions/` | ADR-otsuste logi — arhitektuuriotsused ja kriitilised invariandid (loe ENNE nende alade muutmist) |
+### Frontend (`src/`)
 
-## Linked Data (Wikidata)
+| Asukoht | Sisu |
+|---|---|
+| `pages/` | Dashboard, Workspace, SearchPage, Statistics, Review, Admin, WorkManage, Settings, Notifications + alamkaustad `admin/`, `manage/`, `search/`, `upload/` |
+| `prosopography/` | Oma alampuu: `pages/` (PersonsPage + detail/edit), `components/` (PersonCard, personForm, PersonsMap — kaardivaade on PersonsPage'i sees, laisalt laetud), `services/`, `utils/` |
+| `components/editor/` | TextEditor'i osad: CodeMirror-laiendid (`VuttMarkupExtension`, `MarginaliaExtension`), paneelid, hookid (`useEditorState`, `useEditorSave`) |
+| `services/meiliService.ts` | Kõik Meilisearch-operatsioonid (`normalizeWork()` mapib legacy väljanimed) |
+| `contexts/` | `UserContext`, `CollectionContext`, `MeilisearchContext` |
+| `components/` | `EntityPicker` (Wikidata), `MarkdownEditor`/`MarkdownView`, `UnsavedChangesDialog`, `Pagination`, `PageImageEditorModal` |
 
-All metadata fields support LinkedEntity objects:
-```json
-{ "label": "Tartu", "id": "Q3258", "labels": {"et": "Tartu", "en": "Tartu"}, "source": "wikidata" }
-```
+## Invariandid
 
-Supported: `genre`, `type`, `location`, `publisher`, `tags`, `creators[]`
+Iga rida siin on midagi, mis on varem katki läinud. Detailid: `docs/decisions/`.
 
-Links: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123` - no public URL)
-
-## Collections
-
-Hierarchical collections with configurable colors. State managed via `CollectionContext`.
-
-**Config:** `data/config/collections.json` (sisemises gitis serveril, koopia lokaalsel arenduses scp-ga)
-
-```json
-{
-  "academia-gustaviana": {
-    "name": { "et": "Academia Gustaviana", "en": "Academia Gustaviana" },
-    "parent": "universitas-dorpatensis-1",
-    "color": "amber"
-  }
-}
-```
-
-**Colors:** Tailwind color names (`red`, `amber`, `teal`, `violet`, etc.). Default: `indigo`.
-
-**Usage:**
-```tsx
-import { getCollectionColorClasses } from '../services/collectionService';
-const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
-// Returns: { bg: 'bg-amber-50', text: 'text-amber-700', ... }
-```
-
-Collection displayed in: Dashboard cards, Workspace info panel, SearchPage results, Header indicator.
-
-## Person Aliases & People Register
-
-To handle historical name variants (e.g., *Lorenz Luden* vs *Laurentius Ludenius*), the system uses a central register.
-
-**File:** `data/config/person_aliases.json` (sisemises gitis serveril)
-
-**Workflow:**
-1. Admin saves metadata with a Wikidata/GND ID.
-2. Server (`people_ops.py`) automatically fetches aliases in background (only for `et`, `en`, `de`, `la`).
-3. Aliases are saved to `data/config/person_aliases.json` under all associated IDs (cross-referencing).
-4. Meilisearch indexer (`meilisearch_ops.py`) reads this file and adds aliases to `authors_text` field.
-
-**Search:**
-- Users can search for any variant (e.g., "Ludenius").
-- Search result shows the canonical name from `_metadata.json` (e.g., "Lorenz Luden").
-- Author filter sidebar shows only the canonical names to avoid duplicates.
-
-## Authentication
-
-- Roles: `contributor` < `editor` < `admin`
-  - `contributor`: muudatused lähevad ülevaatusele (pending edits)
-  - `editor`: saab otse salvestada, staatust muuta
-  - `admin`: täielik ligipääs, versiooni taastamine, kasutajate haldus
-- Token-based (UUID, 24h expiry)
-- localStorage: `vutt_user`, `vutt_token`
-
-## Git Version Control
-
-- Every save commits both `.txt` and `.json` to git
-- `_metadata.json` changes also tracked
-- First commit = original OCR (always restorable)
-- Admin can restore via "Ajalugu" tab in Workspace
-
-## CodeMirror Editor (VuttMarkupExtension)
-
-**File:** `src/components/editor/VuttMarkupExtension.ts`
-
-XML-tägide peitmise ja kaitse süsteem CodeMirror 6-s. Kaks komponenti:
-
-### 1. `vuttMarkupField` (StateField)
-
-Parsib dokumendi igal muutusel ja loob kolm andmestruktuuri:
-- **`deco`** — visuaalsed dekoratsioonid: tägid `Decoration.replace({})` (peidetud, ei võta ruumi), sisu `Decoration.mark({ class })` (kursiiv, marginalia jms)
-- **`atomic`** — `EditorView.atomicRanges`: kursor ei saa tägide sisse sattuda, hüppab üle tervikuna
-- **`tagRanges`** — tägide raw positsioonid `{from, to}[]`, kasutatakse protection filtris
-
-**Kriitilised reeglid `RangeSetBuilder` jaoks:**
-- `add()` nõuab rangeid **kasvavalt**: `from ASC`, sama `from` korral `to ASC` (mitte DESC!)
-- Kattuvad `replace` dekoratsioonid ei ole lubatud — filter: `if (isReplace && r.from < lastReplaceEnd) continue`
-- `mark` dekoratsioonid **võivad** `replace`-idega kattuda — ära blokeeri neid `lastReplaceEnd`-iga
-
-**Tägide tüübid:**
-```
-<i>, <b>, <cs>, <m>, <hi>  → replace (peida täg) + mark (sisu stiil)
-<pb/>                        → replace + PageBreakWidget
-<fn>1</fn>                   → kogu blokk ühe replace + FootnoteWidget
-```
-
-**Ristuvad tägid** (nt `<cs><i>tekst</cs></i>`) on toetatud — stack-põhine parser, `lastIndexOf` leiab lähima avava tägi.
-
-### 2. `vuttTagProtectionFilter` (transactionFilter)
-
-Kaitseb tägi positsioone kasutaja juhuslike kustutamiste eest.
-
-**Loogika:** kui kasutaja kustutamine (shift+del, ctrl+k jms) kattub tägi positsiooniga, lõigatakse täg muudatusest välja — kustutamine kehtib ainult nähtava teksti kohta.
-
-**Filtreeritakse:** ainult `Transaction.userEvent` annotatsiooniga tehingud (kasutaja input/delete). Programmaatilised muudatused (laadimine, toolbar-nupud) jäetakse puutumata.
-
-**EI TOHI muuta:**
-- `sortFn`: peab olema `to ASC` sama `from` korral (mitte `to DESC`)
-- `isReplace && r.from < lastReplaceEnd`: ainult replace'id blokeeritakse, mitte markid
-- Protection filter peab jääma `vuttMarkupExtension` listi viimaseks (pärast `vuttMarkupField`)
-
-### 3. Lehe vahetus ei monteeri editorit maha (ADR 0010)
-
-Lehepööre sama teose sees **ei** võta CodeMirrorit maha — sisu vahetab
-`useEditorState` `page`-effect. Sellel on kaks tagajärge:
-
-- **Programmaatiline dokumendi asendus peab kandma `pageSwapAnnotation`-it**
-  (`editorAnnotations.ts`), muidu loeb updateListener selle kasutaja
-  muudatuseks ja lehelt lahkumisel küsitakse asjatult salvestamist.
-- **See märgistus EI TOHI olla `Transaction.userEvent`** — `marginaliaProtectionFilter`
-  ja `vuttAutoSanitizer` tegutsevad ainult userEvent-tehingutel ja hakkaksid
-  muidu kettalt laetud teksti muutma.
-
-Komponendisisene olek, mis varem lähtestus remountiga, tuleb nüüd lehe vahetuse
-effectis **selgesõnaliselt** lähtestada (`isDirty`, `annotationDraftDirty`,
-`saveError`, kerimispositsioon, pildi asend).
-
-## Marginaalia — normaliseerimine ja kopeerimine
-
-**Kanooniline formaat:** iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
-plokk; `<m>` ei sisalda reavahetust ega teist `<m>` tägi. Järjestikused plokid
-koondatakse üheks kaardiks ainult renderduses (`groupMarginaliaBlocks`), alusandmeid
-muutmata. Legacy-parser loeb ajutiselt ka vanu mitmerealisi plokke. Vt ADR 0009.
-
-**Põhimõte: ettearvatav, kogu aeg ühte moodi.** Koristus toimub ainult **salvestamisel**
-(`server/marginalia_normalize.py`), MITTE elavalt iga klahvivajutuse peal (see lõhuks
-kursori/voo). `normalize_marginalia_tags(text)` teeb kaks asja, idempotentselt:
-1. **`<m>` välimiseks tägiks** real, mis on tervikuna marginaalia-plokk (ristuvate
-   OCR-tägide `<i><m>X</i></m>` parandus).
-2. **`strip_empty_tags`** — eemaldab tühjad paaris-tagid (`<m></m>`, `<i></i>`,
-   `<m><i></i></m>` pesastatud püsipunktini). Komplekt: `m, i, b, cs, hi`. Säilitab sisu
-   (ws ei kao: `<i> </i>` → ` `). **EI puutu** `ann\d*` (ID), `fn`, `pb`.
-
-Kutsutud KÕIGIS kirjutusteedes: `/save` (`main.py`), `import_as_work` (`upload_ops.py`),
-meili/consolidate `split_marginalia`. Olemasolevate failide koristus:
-`scripts/migrate_marginalia_normalize.py` (serveris Dockeris, `--dry-run` → `--apply --commit`).
-
-**Kopeerimise mudel (oluline, ettearvatav):** kopeeritud marginaalia-sisu on alati **plain**
-— `TextEditor.tsx` copy-handler eemaldab tagid. **Sihtkoht määrab vormingu**: marginaaliasse
-(avatud plokk) kleepides → marginaalia, põhiteksti → tavatekst. Üle ploki-piiri kustutus
-avatud plokis liidab `<m>` plokid; jäänused koristab salvestamisel `strip_empty_tags`.
-
-## Markdown-redaktor (Märkmed / Elulugu)
-
-Vabateksti väljade (prosopograafia **Märkmed** ja **Elulugu**) jaoks on eraldi,
-**domeeni-neutraalne** markdown-redaktor. EI OLE seotud transkriptsiooni CodeMirror-
-editoriga (`VuttMarkupExtension`) — see kasutab XML-tägisid, siin on tavaline markdown.
-Salvestus on tavaline markdown-string (`notes`/`biography` `_metadata.json`-is); backend/
-andmemudel/migratsioon ei muutu.
-
-**Komponendid (`src/components/`):**
-- `markdownEditorHelpers.ts` — puhtad tekstiteisendused (`applyWrap`, `applyLinePrefix`,
-  `looksLikeUrl`, `linkPrefillFromSelection`, `insertLink`, `normalizeLinkUrl`); DOM-vabad,
-  unit-testitud (`__tests__/markdownEditorHelpers.test.ts`)
-- `MarkdownEditor.tsx` — nupuriba (Paks/Kursiiv/Pealkiri/Link/Loend/`?`), Kirjuta/Eelvaade
-  tabid (vaikimisi Kirjuta), lingi-popover (valikupõhine eeltäide + fookusehaldus),
-  autosuurus (jäetakse vahele kui kasutaja on käsitsi suurust muutnud). API:
-  `{ value, onChange, placeholder?, minRows?, id?, disabled? }`
-- `MarkdownView.tsx` — `react-markdown` + `remark-gfm`, **allow-list** (`allowedElements`
-  + `unwrapDisallowed`); tagastab `null` tühja sisu korral
-
-**Turvalisus (KRIITILINE):** ainult markdown, **EI kasuta `rehype-raw`-i** → toores HTML
-escape'itud. Renderduv DOM on piiratud: `p, strong, em, del, a, ul, ol, li, h1-h3,
-blockquote, code, br`. Lingid `_blank`/`noopener`; react-markdowni `urlTransform` lubab
-ainult kindlaid protokolle (`javascript:` blokeeritud). GFM on sees AINULT autolinkimiseks
-— tabelid/footnote'd/tasklist'id ei renderdu struktuurina (tekst säilib `unwrapDisallowed`-ga).
-
-**Stiil:** `.vutt-md` klass `src/index.css`-is (eraldi transkriptsiooni `.markdown-preview`-st).
-**i18n:** `common` namespace, võti `markdownEditor`. **Nupud v1 ainult lisavad süntaksit**
-(pole toggle-eemaldust). Disain/plaan: `docs/superpowers/{specs,plans}/2026-06-29-markdown-notes-editor*`.
-
-## i18n
+**i18n (ADR 0011)** — `fallbackLng` on VÄLJAS: uus võti tuleb lisada **mõlemasse keelde korraga**,
+muidu katkeb build. Kaks valvurit: `localeParity.test.ts` (et/en võtmestik identne) ja
+`translationKeysResolve.test.ts`. Uus nimeruum → `src/locales/namespaces.ts` (MITTE `i18n.ts`,
+selle import käivitab init'i). Keeletuvastus käib enne init'i `utils/detectLanguage.ts`-is.
 
 ```tsx
 const { t } = useTranslation(['workspace', 'common']);
-t('tabs.edit')  // From workspace namespace
-t('common:status.Valmis')  // From common namespace
+t('tabs.edit'); t('common:status.Valmis');
 ```
 
-Files: `src/locales/{et,en}/*.json`
+**Meilisearch (ADR 0006)** — indeks kasutab eestikeelseid legacy-väljanimesid (`pealkiri`,
+`aasta`, `lehekylje_tekst`, `genre_et`, `type_ids`…). Ümbernimetamine nõuab täisreindeksit +
+kõigi filtrite muutmist → eraldi projekt, mitte möödaminnes. **Uus indekseeritav väli läheb
+AINULT `meili_doc.py`-sse** — mõlemad teed (live `meilisearch_ops.py` + seed
+`scripts/1-1_consolidate_data.py`) impordivad sealt. `attributesToSearchOn` väli PEAB
+dokumendis eksisteerima. `*_object` väljad on ainult Meili dokumentides; `work_id` peab olema KÕIGIS.
 
-**Keelepakid laetakse laisalt** — üks keel korraga, dünaamilise impordiga
-(`src/locales/{et,en}/index.ts` = üks chunk keele kohta). Keeletuvastus käib
-käsitsi `src/utils/detectLanguage.ts`-is **enne** i18n init'i, sest
-`fallbackLng` sunniks i18nexti laadima ka varukeele paki. Vt ADR 0011.
+Kaks tekstivälja: `lehekylje_tekst` (**otsinguks puhastatud** — reavahetuse sidekriipsud liidetud,
+markup eemaldatud) vs `text_content` (**toores, redaktorile** — kõik märgendid alles, otsitav ei ole).
 
-**`fallbackLng` on VÄLJAS.** Puuduvat võtit ei võeta enam vaikselt teisest
-keelest → **uus võti tuleb lisada mõlemasse keelde korraga**, muidu katkeb
-build (`src/locales/__tests__/localeParity.test.ts`). Uus nimeruum lisa ka
-`src/locales/namespaces.ts`-i (mitte `i18n.ts`-i — selle importimine käivitab
-init'i).
+**Salvestus (ADR 0012)** — muutusteta salvestus on no-op: ei kirjuta, ei commiti, ei indekseeri.
+`save_work_metadata` tagastab `(meta, changed)`. Salvestamine EI paranda enam Meili lahknevust —
+selleks on reindeks. Meili sünk koondatakse teose kaupa, dirty-lipp elab vea üle (ADR 0013).
 
-## Common Patterns
+**Marginaalia (ADR 0003, 0009)** — iga sisuline füüsiline marginaaliarida on eraldi `<m>…</m>`
+plokk; `<m>` on VÄLIMINE täg ega sisalda reavahetust. Järjestikused plokid koondatakse üheks
+kaardiks ainult renderduses (`groupMarginaliaBlocks`). Normaliseerimine toimub **ainult
+salvestamisel** (`normalize_marginalia_tags` — `<m>` väliseks + `strip_empty_tags`), MITTE elavalt
+iga klahvivajutuse peal. Kopeeritud marginaalia-sisu on alati **plain**; vormingu määrab sihtkoht.
 
-**Adding new field:**
-1. `types.ts` - add to interface
-2. `meiliService.ts` - add to attributesToRetrieve
-3. `1-1_consolidate_data.py` - if from filesystem
-4. Component - display it
+**CodeMirror `VuttMarkupExtension`** — paaristägid (`<i> <b> <cs> <m> <hi> <ann>`) on
+**mark-dekoratsioon + `atomicRanges`**, MITTE `Decoration.replace` (replace murdis plain-kursori
+nooleliikumise, kuigi Shift+Nool töötas). Replace/widget on ainult `<pb/>` ja `<fn>…</fn>` jaoks.
+`RangeSetBuilder.add()` nõuab `from ASC`, sama `from` korral `to ASC` (**mitte DESC**).
+Replace-dekoratsioonid EI TOHI kattuda (`isReplace && r.from < lastReplaceEnd`); mark-dekoratsioonid
+VÕIVAD — ära blokeeri neid `lastReplaceEnd`-iga. Naaber-atomic-vahemikke EI ühendata (kursor jäi
+ühendatud vahemikku kinni). Orvud tägid koristab `vuttAutoSanitizer` (updateListener) — ainult
+pärast userEvent-tehingut, `SANITIZE`-annotatsioon väldib rekursiooni.
 
-**Adding translations:**
-1. Add to both `locales/et/` and `locales/en/`
-2. Use `t('key')` in component
+Kustutamise eest kaitseb `marginaliaProtectionFilter` (`MarginaliaExtension.ts`): peidetud plokid
+lõigatakse kasutaja muudatusest välja. See peab jääma `marginaliaExtension()` listis **viimaseks**
+ja tegutseb ainult `Transaction.userEvent`-tehingutel; ümberkirjutatud tehing peab `effects`-id
+kaasa võtma. `wrapWithTag` ja annotatsioonitegevused kasutavad `userEvent.of('input.format')` —
+filtrid peavad selle läbi laskma.
 
-## Security Notes
+**Lehe vahetus (ADR 0010)** — lehepööre sama teose sees EI monteeri CodeMirrorit maha.
+Programmaatiline dokumendi asendus peab kandma `pageSwapAnnotation`-it (`editorAnnotations.ts`),
+ja see **EI TOHI olla `Transaction.userEvent`** (muidu hakkavad sanitiseerijad kettalt laetud
+teksti muutma). Komponendisisene olek, mis varem lähtestus remountiga (`isDirty`, `saveError`,
+kerimispositsioon), tuleb lehevahetuse effectis **selgesõnaliselt** lähtestada. Üldisemalt:
+remount on vaikiv olekulähtestaja — early-returni eemaldamisel auditeeri kogu komponendi olek.
 
-- HTTPS + HSTS enabled
-- Rate limiting on auth endpoints
-- Meilisearch: frontend uses search-only API key
-- Backend ports (7700, 8001, 8002) not exposed
+**Markdown (ADR 0008)** — vabateksti väljad (Märkmed, Elulugu) kasutavad `MarkdownEditor` +
+`MarkdownView`. **Ei mingit `rehype-raw`-i**, toores HTML escape'itakse; renderduv DOM on
+allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `urlTransform`
+blokeerib `javascript:`. GFM on sees AINULT autolinkimiseks. See on eraldi süsteem
+transkriptsiooni XML-märgendusest.
 
-## Performance Optimizations
+**Frontend, muu** — number-sisenditel `type="text" + inputMode="numeric"` (mitte `type="number"`,
+tühjendamine katki). Salvestamata muudatuste jaoks on ÜKS dialoog (`UnsavedChangesDialog` +
+`useUnsavedChangesGuard`) — ära lisa uut confirm-varianti. Kerib AKEN, mitte konteiner (v.a
+Workspace). `LoginModal` `isOpen` EI TOHI olla seotud `sessionExpired`-iga.
 
-Server on optimeeritud ~300 samaaegse kasutaja jaoks. Tehtud optimeeringud:
+## Domeen
 
-**Async Meilisearch sync** (`meilisearch_ops.py`)
-- `/save` ei blokeeru Meilisearch indekseerimist oodates
-- `ThreadPoolExecutor` (max 10 töötajat) piirab samaagseid päringuid
-- Kasutaja saab vastuse kohe pärast Git commit'i (~100-500ms vs varem kuni 30s)
+**Linked data** — kõik metaandmeväljad toetavad `LinkedEntity`-objekte:
+`{ label, id, labels: {et, en}, source }`. Toetatud: `genre`, `type`, `location`, `publisher`,
+`tags`, `creators[]`. Allikad: Wikidata (`Q12345`), VIAF (`viaf:12345`), Album Academicum (`AA:123`).
+Label-resolutsioon `et→en→la→de`, register `data/config/labels.json`, abiline `useEntityLabel`.
+Prosopograafia massiiviväljad (`statuses[]`, `confessions[]`) kannavad inline `labels{et,en}`.
 
-**Cache'imine** (`server/cache.py`)
-- `users.json` - laetakse stardil, uuendatakse ainult muudatuste korral (`auth.py`)
-- `collections.json`, `vocabularies.json`, `person_aliases.json` - cache TTL 5 min
-- Suggestions cache TTL 5 min
+**Kollektsioonid** — hierarhilised, `data/config/collections.json`; olek `CollectionContext`.
+Värvid on Tailwindi värvinimed (vaikimisi `indigo`):
 
-**Meilisearch keep-warm** (`meilisearch_ops.py`)
-- `_keepwarm_loop`: iga 2h sync-ib ühe teose Meilisearchi
-- Väldib ~60s cold-start viivitust esimesel indekseerimistehingul pärast pikka pausi
-- Põhjus: `prefixSearch: "indexingTime"` skannib kogu sõnavara FST-i igal updateil —
-  esimesel kord pärast pikka pausi on B-puu LMDB-s külm (vt `MEILI_KEEPWARM_INTERVAL`)
-- `prefixSearch: "disabled"` EI SOBI — "risin" ei leia "Risingh" (2 editi > typo piir)
-
-**Automaatne puhastus (daemon threads)**
-- Aegunud sessioonid - iga 5 min (`auth.py`)
-- Tühjad rate limit IP kirjed - iga 10 min (`rate_limit.py`)
-
-**Konfigureeritavad konstandid:**
-```python
-# meilisearch_ops.py
-MEILISEARCH_POOL_SIZE = 10      # Max samaagseid Meilisearch päringuid
-
-# server/cache.py
-CACHE_TTL_SECONDS = 300          # Collections/vocabularies cache TTL
-
-# auth.py
-SESSION_CLEANUP_INTERVAL = 300   # Sessioonide puhastuse intervall
-
-# rate_limit.py
-RATE_LIMIT_CLEANUP_INTERVAL = 600  # Rate limit puhastuse intervall
+```tsx
+const { bg, text, border, hoverBg } = getCollectionColorClasses(collection);
 ```
 
-## Töövoog
+**Isikute nimevariandid** — *Lorenz Luden* vs *Laurentius Ludenius*: admin salvestab Wikidata/GND
+ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_aliases.json` →
+`authors_text` Meilis. Otsing leiab kõik variandid, kuvatakse kanooniline nimi.
 
-Suuremad muudatused ja featuurid planeeritakse ja jälgitakse **GitHub Issues** kaudu:
-```bash
-gh issue list                    # Vaata avatud issueid
-gh issue create --title "..."    # Loo uus issue
-gh issue view 1                  # Vaata issue detaile
-```
+**`person_to_works.json` — kaks kirjutajat:** metaandmete rollid (autor jne) JA lehe-tägide
+`mentioned`. **Kumbki ei tohi teise kirjeid pühkida.**
+
+**Autentimine** — rollid `contributor` < `editor` < `admin` < `superadmin`. Kontroll ALATI
+`is_at_least()` / `isAtLeast()`, **mitte** `role == "admin"`. Token UUID, 24h;
+localStorage `vutt_user`, `vutt_token`. `contributor` muudatused lähevad ülevaatusele.
+Login: kahekihiline rate-limit (nginx 1r/s + app 5/60s) + konto-lockout.
+
+**Git-versioonihaldus** — iga salvestus commitib `.txt` + `.json`; esimene commit = originaal-OCR
+(alati taastatav). Sama kehtib prosopograafia kaartidele (`save_with_git`). Admin taastab
+Workspace'i „Ajalugu" tabist. **Kommentaaride taaste = ÜKS git-commit** (`onCommentsRestored`).
+
+**Upload (admin, `/upload`)** — kolmeastmeline viisard: metaandmed → fail → ülevaatus.
+Failitüüp tuvastatakse magic byte'idest (mitte laiendist). PDF → `pdfinfo` → SFTP → OCR-server
+lõhub lehekülgedeks; JPG/PNG → SFTP otse. Import: SFTP alla → `_metadata.json` + lehe-JSON-id →
+git commit → **sünkroonne** Meili sünk → navigeerimine teosele. Staging `uploads/{upload_id}/`
+säilib üle seansi. Kausta nimi = `{slug}-{work_id}`.
+
+**Uue metaandmevälja lisamine:** `types.ts` → `meiliService.ts` (`attributesToRetrieve`) →
+`meili_doc.py` (kui indekseeritav) → komponent.
+
+## Jõudlus
+
+Sihtkoormus ~300 samaaegset kasutajat. Peamised valikud:
+
+- **Async Meili sünk** — `/save` ei oota indekseerimist; `ThreadPoolExecutor` (`MEILISEARCH_POOL_SIZE = 10`).
+- **Keep-warm** (`MEILI_KEEPWARM_INTERVAL = 7200`) — väldib ~60s cold-startit; põhjus:
+  `prefixSearch: "indexingTime"` skannib igal updateil kogu FST-i. `prefixSearch: "disabled"`
+  EI SOBI — „risin" ei leiaks „Risingh" (ADR 0005).
+- **Cache** (`server/cache.py`, `CACHE_TTL_SECONDS = 300`) + `users.json` mälus.
+- **Taustapuhastus** — sessioonid 5 min (`auth.py`), rate-limit 10 min (`rate_limit.py`).
+- **Dashboard** — server-side pagineerimine, 12/lk, `page`/`hitsPerPage` (mitte `estimatedTotalHits`,
+  oli 7,5× vale). `distinct` EI mõjuta Meili `facetDistribution`-it.
+- Kaanepilt mõõdetakse kaardi kastile (`object-cover` seob LAIUSE); `COVER_VERSION` tõsta MÕLEMAS otsas.
+- Jõudlusliin #182 on lõpetatud — mõõda muudatusi ALATI gzip'itud suurusega.
 
 ## TODO
 
-| Task | Priority |
-|------|----------|
-| Automatic backup system | High (waiting for IT) |
-| JSON cleanup (page_number removal) | Low |
-| Code fallback removal | Low |
+| Ülesanne | Prioriteet |
+|---|---|
+| Varunduse kontroll (varundamise teeb ülikool, #131) | kesk |
+| `tags`-fallbacki eemaldamine (35 lk kasutab veel vana välja) | madal |
+| JSON-i koristus (`page_number` eemaldamine) | madal |
 
-### Skaleerimise TODO (kui koormus kasvab)
-
-| Task | Millal vaja |
-|------|-------------|
-| FastAPI + gunicorn (praegu uvicorn single-worker) | Kui Python GIL hakkab piirama (>500 kasutajat) |
-| Lisa Redis sessioonide ja cache jaoks | Kui vaja mitut serveri instantsi (horisontaalne skaleerimine) |
-| Lisa metrics endpoint (Prometheus) | Kui vaja jälgida mälukasutust ja jõudlust tootmises |
-
-## Upload Workflow (Admin)
-
-Admin saab lisada uue teose PDF-i või pildina (`/upload`). Kolmeastmeline viisard:
-
-**Samm 1 — Metaandmed:** pealkiri, aasta, slug (kaustanimi), kollektsioon.
-
-**Samm 2 — Faili üleslaadimine:** PDF, JPG või PNG.
-- Failitüüp tuvastatakse **magic bytes** alusel (`_detect_file_type()` in `upload_ops.py`), mitte failinime järgi
-- **PDF:** `pdfinfo` → lehekülgede arv → SFTP → `AUTO-OCR/{id}/slug.pdf` → OCR server lõhub lehekülgedeks
-- **JPG/PNG:** SFTP otse → `AUTO-OCR/{id}/slug/slug_pg_001.jpg` → OCR server teeb OCR ilma PDF-i lahti lõhkumata (PNG teisendatakse JPEG-iks Pillowiga)
-- Kuni üleslaadimise lõpuni: "Sulge — jätkan hiljem" sulgeb viisardi ilma uploadi katkestamata; kasutaja näeb pooleliolevate nimekirja
-- "Katkesta üleslaadimine ja kustuta" kustutab ka OCR serveri staging kausta
-
-**Samm 3 — Ülevaatus:** OCR server töötleb taustal. Polling iga 2–5s. Pisipiltide ruudustik, võimalik üksikuid lehekülgi kustutada.
-
-**Import:** "Impordi VUTT-i" → `import_as_work()`:
-1. SFTP: laeb alla JPG + TXT OCR serverist → `data/{slug}/`
-2. Loob `_metadata.json` + lehekülgede `.json` failid
-3. Git commit (originaal OCR)
-4. Meilisearch sync (**sünkroonne** — ootab lõpuni, et teos oleks kohe kättesaadav)
-5. Navigeerib otse teose lehele
-
-**Staging:** `uploads/{upload_id}/state.json` + `thumbs/`. Pooleliolevad uploadid säilivad üle seansi.
-
-**Key file:** `server/upload_ops.py` — `create_upload`, `save_and_transfer_to_ocr`, `poll_and_sync_thumbs`, `import_as_work`, `cancel_upload`
-
+Skaleerimine (kui koormus kasvab): gunicorn mitme workeriga (praegu uvicorn single-worker,
+kui GIL hakkab piirama), Redis sessioonidele (mitu instantsi), Prometheuse metrics-endpoint.

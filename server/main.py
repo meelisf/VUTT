@@ -91,7 +91,7 @@ app.add_middleware(
 # =========================================================
 # Refaktoreeringu Faas 0: funktsioonid on tõstetud server/deps.py-sse, et
 # luua üks tõene allikas kõigile domeeni-routeritele (vt
-# docs/REFACTOR_main_py_2026-06-25.md). Siin jäetakse backward-compat
+# docs/_archive/REFACTOR_main_py_2026-06-25.md). Siin jäetakse backward-compat
 # re-eksport, sest osa main.py endpointe ja teste viitab neile nimedele.
 from .deps import get_user, require_role, get_json_data
 

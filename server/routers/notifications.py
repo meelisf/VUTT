@@ -2,7 +2,7 @@
 Teavituste (notifications) FastAPI router.
 
 Tõstetud ``server/main.py``-st refaktoreeringu Faas 1-s
-(``docs/REFACTOR_main_py_2026-06-25.md``). Äraloogika elab ``server/notifications_ops.py``-s;
+(``docs/_archive/REFACTOR_main_py_2026-06-25.md``). Äraloogika elab ``server/notifications_ops.py``-s;
 siin on õhukesed endpoint'id, mis kasutavad ühiseid dependency'sid (``server/deps.py``).
 
 Endpoint'id:
