@@ -13,7 +13,7 @@ VUTT süsteemis on **kolm andmekihti**:
 │     Näide: title, year, location, publisher, creators[], tags          │
 └─────────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼ server/meilisearch_ops.py sync_work_to_meilisearch()
+                              ▼ server/meili_doc.py build_work_documents()  (ADR 0006)
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  2. MEILISEARCH INDEKS: teosed                                         │
 │     Formaat: Ingliskeelsed väljad + filtrid/sortimine eesti keeles     │
@@ -71,7 +71,7 @@ VUTT süsteemis on **kolm andmekihti**:
 | `id` | `{work_id}-{page_num}` (nt "cymbv7-1") |
 | `lehekylje_number` | Lehekülje number (1, 2, 3...) |
 | `lehekylje_tekst` | **Otsinguväli:** Puhastatud tekst (ilma poolituste ja vormindusmärgita). Kasutatakse ainult Meilisearchi otsinguks. |
-| `text_content` | **Kuvamisväli:** Algne (toores) tekst koos vormindusmärkidega (`~`, `*`, `[[m:]]`). Kasutatakse redaktoris. |
+| `text_content` | **Kuvamisväli:** Algne (toores) tekst koos XML-märgendusega (`<i>`, `<m>`, `<fn>`, `<pb/>`) ja vanemate markdown-märkidega. Kasutatakse redaktoris. |
 | `lehekylje_pilt` | Pildi suhteline tee |
 | `status` | Lehekülje staatus (Toores/Töös/Parandatud/Valmis) |
 | `teose_staatus` | Teose koondstaatus |
@@ -85,7 +85,7 @@ Kuna transkribeeritud tekst sisaldab palju vormindusmärke ja poolitusi, on otsi
 1. **`lehekylje_tekst` (Otsingu jaoks):**
    - Eemaldatakse Markdown märgid (`**`, `*`).
    - Eemaldatakse koodivahetuse märgid (`~`).
-   - Eemaldatakse ääremärkuste ja viidete tähised (`[[m:]]`, `[^n]`).
+   - Eemaldatakse XML-tägid (`<i>`, `<cs>`, `<m>`, `<fn>`, `<pb/>`, `<ann1>`) ja vanemad tähised (`[[m:]]`, `[^n]`).
    - **Liidetakse rea lõpu poolitused:** `Spen-\ner` muutub `Spener`.
    - See väli on Meilisearchis märgitud kui `searchableAttribute`.
 
@@ -159,7 +159,8 @@ Otsinguväljad (`attributesToSearchOn`):
 
 | Fail | Vastutus |
 |------|----------|
-| `server/meilisearch_ops.py` | _metadata.json → Meilisearch mapping |
+| `server/meili_doc.py` | _metadata.json → Meilisearch mapping (AINUS koht; mõlemad indekseerimisteed impordivad siit) |
+| `server/meilisearch_ops.py` | Live-sünk: kutsub `meili_doc`-i, saadab Meilisse |
 | `src/services/meiliService.ts` | Meilisearch → Frontend mapping |
 | `src/types.ts` | TypeScript tüübid |
 | `scripts/1-1_consolidate_data.py` | JSONL genereerimine (bulk import) |

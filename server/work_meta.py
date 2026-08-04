@@ -2,7 +2,7 @@
 Teose _metadata.json lugemise ühised helperid.
 
 Tõstetud ``server/main.py``-st Faas 0 refaktoreeringus
-(``docs/REFACTOR_main_py_2026-06-25.md``). Neid kasutavad mitu domeeni:
+(``docs/_archive/REFACTOR_main_py_2026-06-25.md``). Neid kasutavad mitu domeeni:
 public/SEO (meta, sitemap), collections (ligipääsukontroll), download,
 shareable, viewer-token.
 

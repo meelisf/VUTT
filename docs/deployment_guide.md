@@ -1,11 +1,12 @@
 # VUTT Paigaldus- ja Migratsioonijuhend (2026)
 
-> **KIIRVIIDE:** Igapäevaseks halduseks vaata [docs/CHEAT_SHEET.md](CHEAT_SHEET.md).
-> Seal on käsud uuendamiseks, andmete laadimiseks ja frontendi saatmiseks.
+> **Kellele:** serveri nullist püstipanek või kolimine (katastroofitaaste).
+> Igapäevased deploy-käsud on CLAUDE.md „Käsud → Deploy" all, mitte siin.
+> Migratsioon `vutt.utlib.ut.ee`-le on tehtud — siinne on püstipaneku retsept.
 
 See dokument kirjeldab VUTT rakenduse migreerimist uuele serverile (`vutt.utlib.ut.ee`) ja selle seadistamist.
 
-**Viimati uuendatud:** 21. jaanuar 2026
+**Viimati uuendatud:** 21. jaanuar 2026 (osad käsud võivad olla vananenud — kontrolli CLAUDE.md vastu)
 
 ## 1. Serveri Nõuded
 

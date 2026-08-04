@@ -1,136 +1,112 @@
-# Tegemata tööd / Tehniline võlg
+# Tegemata tööd / tehniline võlg
 
-Siia kogutakse teadaolevad parandused ja puhtamad lahendused, mis on praegu edasi lükatud.
+Teadaolevad parandused, mis on teadlikult edasi lükatud. **Iga kirje on koodi vastu üle
+kontrollitud 2026-08-04** — valmis saanud kirjed on siit eemaldatud (ajalugu: `git log`).
 
----
-
-## `find_directory_by_id` — slug-match ilma `sanitize_id`-ta
-
-**Fail:** `server/utils.py`, funktsioon `find_directory_by_id`, step 4
-
-**Probleem:**  
-Praegune kood võrdleb: `sanitize_id(entry.name) == target_id`  
-`sanitize_id` stripib lõpus olevad alakriipsud ja teeb muid teisendusi, mistõttu slugid nagu `1633-19-..._precatione_` (lõpus `_`) ei leia vastet — kuigi kataloog täpselt selle nimega eksisteerib.
-
-**Tagajärg:**  
-Slug-põhised pildi-URLid (nt `/{slug}/pilt.jpg`) saavad 403, kui slug lõpeb alakriipsuga. Praegu toimib asi tänu `translate_path` fallback-ile `image_server.py`-s, mis teeb `os.path.join(DIRECTORY, *parts)` otse.
-
-**Soovituslik parandus:**  
-Step 4 peaks kasutama otse kataloognime, mitte `sanitize_id` versiooni:
-```python
-# Praegu (vale):
-if sanitize_id(entry.name) == target_id:
-
-# Parem:
-if entry.name == target_id:
-```
-
-Kaaluda tuleks, kas `sanitize_id` kasutamine step 4-s oli algselt mõeldud mingil põhjusel (nt URL-dekooditav nimi vs. failisüsteem) — kui ei, siis otse-võrdlus on õige.
+Suuremad tööd elavad GitHub Issues'is (`gh issue list`), mitte siin. Praegu avatud:
+**#131** varundus (pildid + `state/` off-site), **#132** OCR job-state → SQLite,
+**#133** vea-agregatsioon (plaan: `docs/superpowers/plans/2026-07-11-glitchtip-deploy.md`),
+**#134** andmete eksport (TEI / dump).
 
 ---
 
-## Meilisearch `lehekylje_pilt` — slug vs. NanoID
+## Backend
 
-**Failid:** `scripts/1-1_consolidate_data.py`, `server/meilisearch_ops.py`
+### `find_directory_by_id` — slug-match ilma `sanitize_id`-ta
 
-**Probleem:**  
-`lehekylje_pilt` väli Meilisearchis sisaldab slug-põhist teed (`slug/pilt.jpg`), mitte NanoID-põhist (`nanoid/pilt.jpg`). NanoID on nüüd kanooniline viide, slug on ebastabiilne (muudetav).
+**Fail:** `server/utils.py:240`
 
-**Tagajärg:**  
-Image server peab tegema slug → kataloog tõlkimise iga pildi-päringu puhul (aeglane, cache-miss). Slug muutumise korral lähevad pildi-URLid katki.
+`sanitize_id(entry.name) == target_id` — `sanitize_id` stripib lõpus olevad alakriipsud,
+mistõttu slug `..._precatione_` ei leia vastet, kuigi kataloog täpselt selle nimega on olemas.
+Slug-põhised pildi-URLid saaksid 403; praegu päästab `image_server.translate_path` fallback.
 
-**Soovituslik parandus:**  
-Uuendada `lehekylje_pilt` Meilisearchi indekseerimise käigus NanoID + failinimeks. Nõuab reindekseerimist (`server_seed_data.sh`).
+**Parandus:** step 4 peaks võrdlema otse `entry.name == target_id`. Enne kontrolli, kas
+`sanitize_id` seal oli mõeldud URL-dekodeeritud nime jaoks.
 
----
+### `_check_image_access` on fail-OPEN, kui metaandmeid ei õnnestu laadida
 
-## Tehniline võlg — koodibaasi dubleerimine ja fallbackid
+**Fail:** `server/image_server.py` — `if meta is None ... return True`
 
-Analüüsitud 2026-06-07, vt `docs/codebase_duplication_fallback_review_2026-06-07.md`.
+Kui `_metadata.json` on rikutud/loetamatu, muutub piiratud teose pilt avalikuks.
+**Parandus:** eralda „ei ole piiratud" ja „ei suutnud lugeda" — viimane peaks keelama.
+(Leitud käsitsi-ülevaatusel 2026-07-21, N2.)
 
-### ✅ P1: Backend LinkedEntity utiliidid konsolideeritud (2026-06-08)
+### `get_client_ip` usaldab kliendi-kontrollitavaid päiseid
 
-`scripts/1-1_consolidate_data.py` impordib nüüd LinkedEntity funktsioonid `server/utils.py`-st (fake-package mustriga, väldib `__init__.py` kõrvalefekte). Eemaldati ~130 rida duplikaatkoodi. `labels.json` kanooniline register laaditakse indekseerimise käigus ja edastatakse `get_labels_by_lang` väljakutsetele — indeks ja runtime näitavad nüüd samu kanoonilisi silte. 13/13 testi rohelised.
+**Fail:** `server/rate_limit.py:87`
 
-### P1: Frontend label fallback ühtlustamine
+`X-Real-IP` / `X-Forwarded-For` võetakse vastu tingimusteta. Otseühendusel backendiga saaks
+rate-limitist mööda päisega. Praegu leevendab see, et backend ei ole avalikult avatud ja nginx
+kirjutab päise üle. **Parandus:** usalda päist ainult teadaolevatelt proksi-IP-delt.
+(Leitud käsitsi-ülevaatusel 2026-07-21, N3.)
 
-`labelUtils.ts`, `metadataUtils.ts` ja `server/cache.py` kasutavad eri fallback-ahelaid. Kanooniline peaks olema `UI keel → et → en → la → de → raw Q-kood`. Vt review dok lõik "Keele fallbackid".
+### Meilisearch `lehekylje_pilt` — katalooginimi, mitte nanoid
 
-### P2: Frontendi normaliseerijad tugevdada
+**Fail:** `server/meili_doc.py:364` — `os.path.join(dir_name, img_name)`
 
-`normalizePage` / `normalizeWork` (`meiliService.ts`) ei kata kõiki erijuhte mis `pageService.ts` ja `workService.ts` teevad (`page_tags_object`, `languages` fallback). Enne asendamist täiendada jagatud normaliseerijaid. Vt review dok lõik 2.
+Väli sisaldab kaustapõhist teed. Nanoid on kanooniline viide, kaustanimi on muudetav →
+kaustanime muutumisel lähevad pildi-URLid katki ja image server peab tegema tõlkimise.
+**Parandus:** indekseeri nanoid + failinimi. Nõuab reindeksit (`server_seed_data.sh`).
 
-### P2: Bulk-operatsioonide atomic write
+### Legacy fallbackid (P3, avatud alates 2026-06-08)
 
-`main.py` `bulk_collection`, `bulk_tags`, `bulk_genre` — TOCTOU risk: luku vabastamine arvutuse ajal. Lisa helper mis hoiab lukku terve read-compute-write tsükli vältel. Vt review dok lõik 4.
+- Kohtade lineaarne label-otsing runtime'is (`server/prosopography/places_ops.py`)
+- `status`/`confession` legacy fallbackid (`server/prosopography/ops.py`)
 
-### P3: Legacy fallbackid sulgeda migratsioonidega
-
-Kohtade labeli järgi lineaarne runtime-otsing (`places_ops.py`), `status`/`confession` legacy fallbackid (`prosopography/ops.py`). Siduda migratsiooniskriptidega või lisada diagnostiline hoiatus.
-
----
-
-## `PageThumbnail` — jagatud komponent (praegu duplitseeritud)
-
-**Failid:** `src/pages/search/SearchResults.tsx`, `src/pages/WorkManage.tsx`
-
-**Probleem:**  
-Viewer-token retry loogika (piiratud kollektsioonide pisipiltide laadimiseks) on duplikeeritud kahes kohas lokaalsete komponentidena (`PageThumbnail` SearchResults-is, `PageThumb` WorkManage-s). Mõlemad teevad sama asja: 403-viga → küsi viewer-token → lisa `exp`+`sig` parameetrid URLi.
-
-`ThumbnailGrid.tsx` (töölaua pisipildivaade) samuti ei kasuta viewer-tokenit.
-
-**Soovituslik parandus:**  
-Luua `src/components/PageThumbnail.tsx` jagatud komponent ja asendada kõik kolm kasutuskohta sellega.
+Sulge migratsiooniskriptiga või lisa diagnostiline hoiatus, et näha, kas neid veel tabatakse.
 
 ---
 
-## TODO CLAUDE.md-st (üle toodud siia)
+## Frontend
 
-| Ülesanne | Prioriteet |
-|----------|-----------|
-| Automaatne backup-süsteem | Kõrge (ootab IT-d) |
-| JSON cleanup (`page_number` eemaldamine) | Madal |
-| `crossLangTypeMap` eemaldamine AdvancedFilters-ist | Madal (kui kõigil teostel on `type_ids` indekseeritud) |
+### `PageThumbnail` — duplikeeritud viewer-tokeni loogika
 
-=== MINU LISANDUSED ===
-Arhiiviviidetel puudub inglise keel praegu.
+Viewer-tokeni retry (piiratud kollektsioonide pisipildid: 403 → küsi token → lisa `exp`+`sig`)
+on kahes kohas eraldi: `src/pages/search/SearchResults.tsx` ja `src/pages/manage/PageThumb.tsx`.
+Kolmas pisipildivaade `src/components/ThumbnailGrid.tsx` ei kasuta viewer-tokenit üldse.
+**Parandus:** üks jagatud `src/components/PageThumbnail.tsx` kõigile kolmele.
 
-main.py on hiigelsuureks kasvanud
+### Normaliseerijad ei kata kõiki erijuhte (P2)
 
-Oleks vaja võimalust valida manage all mitu lehekülge ja need kustutada või mitu lehekülge ja need liigutada teise kohta. ✅ TEHTUD (feat/bulk-page-select-move-delete, 2026-06-21)
+`normalizePage` / `normalizeWork` (`meiliService.ts`) vs `pageService.ts` / `workService.ts`
+(`page_tags_object`, `languages` fallback). Enne asendamist täienda jagatud normaliseerijaid.
+
+### WorkManage — hulgivaliku ülevaatuse jäägid (2026-06-21)
+
+| # | Fail / koht | Probleem | Parandus |
+|---|---|---|---|
+| 1 | `WorkManage.tsx` `handleBulkDelete`, 409-haru | valik tühjendatakse, aga `bulkDeleteConfirm` jääb `true` → „Kustutada 0 lehekülge?" | `setBulkDeleteConfirm(false)` ka 409-harusse |
+| 2 | `WorkManage.tsx:250` `hasReorderChanges` | esmarenderil on `draftPositions` tühi → riba välgatab | `useMemo` või init otse `useState`-s (`?? page_num`) |
+| 3 | `WorkManage.tsx` `handleDeletePage` | üksik-kustutus ei ole draft-järjekorra ajal blokeeritud (bulk on) → salvestamata järjekord kaob hoiatuseta | sama blokeering või hoiatus |
+
+### Fallbackide eemaldamine
+
+- **`tags`-fallback** — 35 lehte kasutab veel vana `tags` välja; pärast puhastamist eemalda
+  fallback `server/meili_doc.py`-st.
+- **JSON-i koristus** — `page_number` lehe-JSON-idest välja.
+
+> `crossLangTypeMap` / `crossLangGenreMap` EI OLE enam tegemata töö — vt selgitust
+> `src/components/AdvancedFilters.tsx:186`: need lahendavad vanade/jagatud URL-ide
+> label-sisendit, mitte facetide keeleneutraalsust (issue #18).
 
 ---
 
-## Manage hulgivalik — ülevaatuse leiud (2026-06-21)
+## Lahtised küsimused (vajavad otsust, mitte koodi)
 
-Featuur (hulgivalik + liigutamine + kustutamine) on töökindel ja testitud (util 13 testi,
-server 14 testi, tsc puhas). Allesjäänud väiksed lahtised:
+### Isiku kaardivaade ja kollektsioonifilter
 
-### Bug 1: 409 conflict jätab segase kinnitusriba rippuma
-**Fail:** `src/pages/WorkManage.tsx`, `handleBulkDelete` (409-haru)
-409-harus tühjendatakse valik (`setSelectedFiles(new Set())`), aga `bulkDeleteConfirm`
-jääb `true`. Kinnituspaneel renderdub valikust sõltumatult → kuvab "Kustutada 0 lehekülge?"
-töötava nupuga, mis siis no-op'ib. **Fix:** lisa `setBulkDeleteConfirm(false)` 409-harusse.
+Isikul, kellel on päritolukoht märgitud, aga ühtegi *seost* ei ole (nt
+`/persons/vutt:Ptdn4lxy`), ütleb kaart „Valitud kollektsioonis pole selle isiku seoseid",
+kuigi isik ise kuulub Academia Gustaviana üliõpilaste hulka. Kas kollektsioonifilter peaks
+kaardil käima isiku enda kuuluvuse, mitte seoste järgi?
 
-### Bug 2: lühike vale-välgatus lehtede laadimisel
-**Fail:** `src/pages/WorkManage.tsx:209, 221` (`hasReorderChanges`, `changedCount`)
-Esmarenderil on `draftPositions` tühi → `draftPositions[p.filename]` on `undefined !== page_num`
-→ `hasReorderChanges` hetkeks `true` (kuni `useEffect` rida 203 jookseb). Tähendab "Salvesta
-järjekord"-riba välgatust ja bulk-kustutuse hetkelist keelamist. Järjekord ise OK (`?? page_num`).
-**Fix:** `useMemo` või init otse `useState`-s.
+### Arhiiviviidetel puudub keelevariantide tugi
 
-### Bug 3: üksik-kustutus pole draft'i ajal blokeeritud (bulk on)
-**Fail:** `src/pages/WorkManage.tsx`, `handleDeletePage`
-Bulk-kustutus on `disabled={hasReorderChanges}` (vihjega). Üksik prügikasti-nupp töötab ka
-salvestamata draft'i ajal ja `handleDeletePage → loadPages → useEffect` nullib vaikselt
-draft-järjekorra. Loogiliselt korrektne (kustutab serveri `page_num` järgi), aga kasutaja
-kaotab salvestamata järjekorra ette hoiatamata. **Fix:** sama blokeering või hoiatus.
+`data/config/archives.json` kirjel on üks `name` (arhiivi enda keeles, nt „Latvijas Valsts
+vēstures arhīvs"). Kui UI vajab eesti/inglise vastet, tuleb lisada `labels{et,en}` nagu
+mujal LinkedEntity-väljadel.
 
-### ✅ Visuaalne: pildiredaktori modaali X kättesaamatu väiksel ekraanil (2026-06-21)
-**Fail:** `src/components/PageImageEditorModal.tsx`
-App-i `<Header>` on `sticky top-0 z-[1200]`, aga modaali ülekate oli vaid `z-50` → app-i päis
-renderdus modaali peale. Vertikaalselt tsentreeritud `max-h-[92vh]` modaali ülemine serv (X-nupp)
-libises väiksel ekraanil app-i päise taha ega olnud klikitav (Esc töötas). **Parandatud:**
-modaali ülekate `z-50` → `z-[1300]` (app-i päisest kõrgemale).
+### „Loengukava" märksõna
 
-probleem: kui ma olen https://vutt.utlib.ut.ee/persons/vutt:Ptdn4lxy isiku lehel, kellel pole ühtegi teost, siis kui ma vaatan tema seoste kaarti, siis ta ütleb, et see isik ei kuulu valitud kollektsiooni (Kaardile kantavaid päritolukohti ei leitud. Valitud kollektsioonis („Academia Gustaviana (1632–1665)") pole selle isiku seoseid.) ja on printsiibis tõsi, et sellel isikul ei ole _seoseid_ aga tal on päritolukoht siiski märgitud ja fakt on see, et ta kuulub Academia Gustaviana üliõpilaste hulka. kuidas lahendada? 
+Pole Q-koodi ega ingliskeelset vastet (~18 teost). Vajab otsust: leia Wikidata vaste või
+märgi teadlikult kohalikuks terminiks.

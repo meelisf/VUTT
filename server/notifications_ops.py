@@ -2,7 +2,7 @@
 Kasutajateavituste (notifications) äraloogika.
 
 Tõstetud ``server/main.py``-st refaktoreeringu Faas 1-s
-(``docs/REFACTOR_main_py_2026-06-25.md``). Domeen on täielikult iseseisev:
+(``docs/_archive/REFACTOR_main_py_2026-06-25.md``). Domeen on täielikult iseseisev:
 teavitused salvestatakse iga kasutaja kohta eraldi JSON-faili
 (``state/notifications/{username}.json``), piiratud 200 uuema teatisega.
 

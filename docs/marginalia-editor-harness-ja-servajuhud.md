@@ -10,7 +10,7 @@
 > Seotud failid:
 > - `src/components/editor/MarginaliaExtension.ts` — editor-loogika (see dokument keskendub siia)
 > - `src/utils/marginaliaUtils.ts` — `findMarginaliaBlocks`, plokistruktuur
-> - `docs/superpowers/plans/2026-06-13-marginalia-overlay-rendering.md` — overlay-arhitektuur
+> - `docs/_archive/superpowers/plans/done/2026-06-13-marginalia-overlay-rendering.md` — overlay-arhitektuur
 > - `server/marginalia_normalize.py` — salvestus-aegne normaliseerimine (`<m>` välimiseks, `strip_empty_tags`)
 > - CLAUDE.md → "Marginaalia — normaliseerimine ja kopeerimine"
 

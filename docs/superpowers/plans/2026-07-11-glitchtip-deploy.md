@@ -1,6 +1,9 @@
 # GlitchTip self-hosted deploy — vea-aggregatsioon (issue #133)
 
-**Seis:** integratsioonikiht on koodis olemas (PR #170, `docs/error-reporting.md`).
+**Seis (kontrollitud 2026-08-04):** integratsioonikiht EI OLE main'is — PR #170 on endiselt
+avatud, harul `feature/issue-133-error-reporting` (sealt ka `docs/error-reporting.md`,
+`server/error_reporting.py`, `src/services/errorReporting.ts`). Enne infrastruktuuri
+püstitamist tuleb PR #170 üle vaadata ja mergida.
 See plaan katab **infrastruktuuri** — GlitchTipi püstitamine ja DSN-ide sidumine.
 
 **Otsus:** GlitchTip jookseb **eraldi VM-il/instantsis** (mitte VUTT-serveril), et
