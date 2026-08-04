@@ -207,10 +207,21 @@ Pärast restore'i kontrolli õiguseid:
 ssh new-vutt 'chmod 700 ~/VUTT/state && cd ~/VUTT && docker compose ps'
 ```
 
-## Vana `backup_prosopography.sh`
+## Vana `backup_prosopography.sh` — KUSTUTATUD 2026-08-04
 
-`scripts/backup_prosopography.sh` on ajalooline skript, mis kopeerib
-`state/prosopography/` → `data/prosopography/` ja commitib selle. Pärast prosopograafia
-JSON-ide migreerimist `data/config/prosopography/` alla ei kata see tervikbackup'i vajadust
-ning ei varunda pilte ega `state/` tervikuna. Hoia alles ainult seni, kuni serveri cronid on
-üle vaadatud; uut backup'i tee `vutt_backup.py` abil.
+Kuni 2026-08-04 jooksis VUTT serveri cronist (`50 1 * * *`) skript
+`scripts/backup_prosopography.sh`, mis kopeeris `state/prosopography/` →
+`data/prosopography/` ja commitis selle, et öine git-push viiks kaardid GitHubi.
+
+Prosopograafia JSON-id migreeriti 2026-05-25 `data/config/prosopography/` alla (kus need on
+juba gitis). `state/prosopography/` jäi külmunud migratsioonieelsesse seisu — 2243 vana
+kaarti, samal ajal kui elavaid on 2352. Skript kopeeris seega **surnud andmeid**: viimane
+sisuline commit on 2026-05-25 ja iga öö pärast seda logis see „muudatusi pole".
+
+Skript **kustutati**, mitte ei märgitud aegunuks: selle `rsync -a --delete` oleks kirjutanud
+`data/prosopography/` üle 2026-05-25 seisuga, ehk käivitamine oli aktiivselt kahjulik.
+Vajadusel `git log -- scripts/backup_prosopography.sh`.
+
+Katte võtab üle `vutt_backup.py`, mis varundab `state/` tervikuna, sh isikupildid
+(`state/prosopography/images/`). Serveri crontab'is on eemaldamise kohta selgitav
+kommentaar; varukoopia vanast crontab'ist: `vutt:~/crontab.bak-20260804`.
