@@ -41,6 +41,28 @@ VUTT_BACKUP_HEALTHCHECK_URL=https://hc-ping.com/...
 VUTT_BACKUP_KEEP_DAYS=90
 ```
 
+## Eeltingimuse kontroll — loetavus
+
+**`--dry-run` EI tabaks õiguste viga.** rsync ehitab kuivkäitusel ainult failinimekirja
+(`readdir` + `stat`) ega ava faile; `failed to open ... Permission denied` tuleb välja alles
+päris ülekandel. Loetavust kontrolli **allikas**, oma tavavõtmega (backup-võti on rrsync'iga
+piiratud ega saa `find`-i käivitada):
+
+```bash
+ssh vutt 'find ~/VUTT/state ~/VUTT/data ! -readable'
+```
+
+Tühi väljund = korras. Kui midagi tuleb, otsusta iga kirje kohta eraldi:
+
+- **tuletatud vahemälu** (taastub ise) → lisa `DEFAULT_EXCLUDES`-i skriptis;
+- **päris andmed** → paranda õigused allikas, ÄRA excludeeri.
+
+Taust: backend kirjutab Dockerist root'ina. Enamik `state/` faile tuleb moodiga 0644
+(`users.json`, `invite_tokens.json`, `notifications/`) ja on `meelisf`-ile loetavad, aga
+`historical_regions_cache/` tuli 0600 root:root → esimene backup (2026-08-04) kukkus rsync
+exit 23-ga. `data/` sama probleemi ei ole, sest `server_update.sh` teeb selle peale
+`sudo chown -R meelisf:meelisf data/`.
+
 ## Snapshot-mudel
 
 Skript loob kataloogid:
@@ -60,6 +82,16 @@ Skript loob kataloogid:
 Iga uus snapshot kasutab eelmist `--link-dest` allikana: muutumata failid on hardlinkid,
 aga iga snapshot on iseseisvalt taastatav tervikvaade. `--delete` on siin lubatud, sest
 kustutatud failid kaovad ainult uuest snapshot'ist; vanad snapshot'id säilitavad need.
+
+**Pooleli jäänud jooks jäetakse alles.** Ebaõnnestumisel jääb `<ts>.partial` kataloog
+kettale ja **järgmine jooks jätkab sealt** (rsync jätab identsed failid vahele) — 40 GB
+uuesti tõmbamine mõne vea pärast oleks ebaproportsionaalne. Kustutamiseks on
+`--discard-partial`. Kuivkäitus ei kaaperda ega kustuta olemasolevat `.partial`-it.
+
+**Hardlink-hoiatus:** ära muuda faile snapshot'i sees kohapeal — need on jagatud
+varasemate snapshot'idega ja in-place muudatus muudaks neid kõiki korraga. Loe snapshot'ist,
+kirjuta mujale. Sama kehtib snapshot-puu kopeerimisel teisele kettale: **`rsync -aH`**
+(ilma `-H`-ta kaovad hardlingid ja maht kordistub).
 
 ## Cron
 

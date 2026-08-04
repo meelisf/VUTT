@@ -27,6 +27,19 @@ DEFAULT_SOURCE_ROOT = "~/VUTT"
 DEFAULT_DEST_ROOT = "~/vutt-backups"
 LOCK_FILENAME = ".vutt_backup.lock"
 
+# Tuletatud vahemälud, mida EI varundata. Need taastuvad ise ega ole andmed.
+#
+# `historical_regions_cache/` on lisaks LOETAMATU: backend kirjutab need Dockerist
+# root'ina moodiga 0600, aga rsync jookseb `meelisf`-ina → "Permission denied" ja
+# rsync exit 23 (2026-08-04 esimene backup kukkus täpselt selle taha).
+#
+# NB: see nimekiri on TAHTLIKULT lühike. Iga uus loetamatu fail state/-is peab
+# backupi katki tegema, mitte vaikselt vahele jääma — muidu ei saa kunagi teada,
+# et midagi jäi varundamata.
+DEFAULT_EXCLUDES = [
+    "historical_regions_cache/",
+]
+
 
 def _expand(path: str) -> Path:
     return Path(path).expanduser().resolve()
@@ -64,6 +77,20 @@ def latest_snapshot(snapshots_dir: Path) -> Path | None:
     return sorted(candidates)[-1] if candidates else None
 
 
+def latest_partial(snapshots_dir: Path) -> Path | None:
+    """Pooleli jäänud snapshot, mille pealt saab jätkata.
+
+    Ebaõnnestunud jooksu `.partial` jäetakse tahtlikult alles: 40 GB uuesti
+    tõmbamine mõne loetamatu faili pärast on ebaproportsionaalne. rsync võrdleb
+    sihtkohas juba olemasolevaid faile ja jätab identsed vahele, seega jätkamine
+    on odav.
+    """
+    if not snapshots_dir.exists():
+        return None
+    candidates = [p for p in snapshots_dir.iterdir() if p.is_dir() and p.name.endswith(".partial")]
+    return sorted(candidates)[-1] if candidates else None
+
+
 def run_rsync(
     *,
     source: str,
@@ -71,6 +98,7 @@ def run_rsync(
     previous_destination: Path | None,
     ssh_command: str | None,
     dry_run: bool,
+    excludes: list[str] | None = None,
 ) -> None:
     destination.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -81,6 +109,8 @@ def run_rsync(
         "--delete-excluded",
         "--info=stats2,progress2",
     ]
+    for pattern in excludes or []:
+        cmd.append(f"--exclude={pattern}")
     if dry_run:
         cmd.append("--dry-run")
     if ssh_command:
@@ -130,7 +160,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--healthcheck-url", default=os.getenv("VUTT_BACKUP_HEALTHCHECK_URL"))
     parser.add_argument("--keep-days", type=int, default=int(os.getenv("VUTT_BACKUP_KEEP_DAYS", "0")), help="0 = ära kustuta vanu snapshot'e")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--keep-partial", action="store_true", help="jäta ebaõnnestunud .partial kataloog alles debugimiseks")
+    parser.add_argument(
+        "--exclude",
+        action="append",
+        default=list(DEFAULT_EXCLUDES),
+        # argparse append+default: antud mustrid LISANDUVAD vaikeväärtustele, ei asenda neid
+        help="rsync exclude-muster; korratav, lisandub vaikeväärtustele (" + ", ".join(DEFAULT_EXCLUDES) + ")",
+    )
+    parser.add_argument(
+        "--discard-partial",
+        action="store_true",
+        help="kustuta ebaõnnestunud .partial kataloog (vaikimisi jäetakse alles, et järgmine jooks saaks jätkata)",
+    )
     return parser.parse_args()
 
 
@@ -150,8 +191,14 @@ def main() -> int:
             return 2
 
         previous = latest_snapshot(snapshots_dir)
-        stamp = _timestamp()
-        partial = snapshots_dir / f"{stamp}.partial"
+        # Dry-run ei tohi päris pooleliolevat snapshot'i kaaperdada ega kustutada.
+        resumed = None if args.dry_run else latest_partial(snapshots_dir)
+        if resumed is not None:
+            partial = resumed
+            stamp = partial.name[: -len(".partial")]
+        else:
+            stamp = _timestamp()
+            partial = snapshots_dir / f"{stamp}.partial"
         final = snapshots_dir / stamp
 
         ping(args.healthcheck_url, "/start")
@@ -162,10 +209,12 @@ def main() -> int:
             else:
                 log("Eelmist snapshot'i pole; teen täiskoopia")
 
-            if partial.exists():
+            if resumed is not None:
+                log(f"Jätkan pooleli jäänud snapshot'ist: {partial}")
+            elif partial.exists():
                 shutil.rmtree(partial)
-            (partial / "data").mkdir(parents=True)
-            (partial / "state").mkdir(parents=True)
+            (partial / "data").mkdir(parents=True, exist_ok=True)
+            (partial / "state").mkdir(parents=True, exist_ok=True)
             chmod_state_private(partial / "state")
 
             run_rsync(
@@ -174,6 +223,7 @@ def main() -> int:
                 previous_destination=(previous / "data") if previous else None,
                 ssh_command=args.ssh_command,
                 dry_run=args.dry_run,
+                excludes=args.exclude,
             )
             run_rsync(
                 source=remote_path(args.source_host, args.source_root, "state"),
@@ -181,6 +231,7 @@ def main() -> int:
                 previous_destination=(previous / "state") if previous else None,
                 ssh_command=args.ssh_command,
                 dry_run=args.dry_run,
+                excludes=args.exclude,
             )
             chmod_state_private(partial / "state")
 
@@ -197,8 +248,11 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - cronis tahame iga vea logida ja pingida
             log(f"VIGA: backup ebaõnnestus: {exc}")
             ping(args.healthcheck_url, "/fail", str(exc))
-            if partial.exists() and not args.keep_partial:
-                shutil.rmtree(partial, ignore_errors=True)
+            if partial.exists():
+                if args.discard_partial:
+                    shutil.rmtree(partial, ignore_errors=True)
+                else:
+                    log(f"Pooleli jäänud snapshot jäetakse alles, järgmine jooks jätkab: {partial}")
             return 1
 
 
