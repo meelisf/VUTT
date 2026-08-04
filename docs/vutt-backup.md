@@ -140,19 +140,30 @@ Kaks tagajärge, mida tasub teada:
 Vana `vutt_sync.py` jooksis **ilma `--delete`-ita**, seega serverist kustutatud lehed jäid
 kohalikku koopiasse alles ja rändasid vaikselt treeningandmestikku. Snapshot on autoriteetne.
 
-## Cron
+## Cron ja valve
 
-Paigaldatud `loss`-is (`crontab -l`). Näide:
+Paigaldatud `loss`-is (`crontab -l`), üks rida:
 
 ```cron
-# VUTT tervikbackup iga öö kell 03:15
-15 3 * * * cd ~/VUTT && ./scripts/vutt_backup.py --dest-root /srv/backups/vutt --keep-days 120 2>&1 | logger -t vutt-backup
+15 3 * * * VUTT_BACKUP_HEALTHCHECK_URL=https://hc-ping.com/UUID /home/mf/bin/vutt_backup.py --source-host vutt-backup --source-root . --dest-root /home/mf/vutt-backups --keep-days 365 2>&1 | logger -t vutt-backup
 ```
 
-Healthchecks.io kasutamisel:
+Skript pingib healthchecks.io-d kolmes kohas: `/start` alguses, õnnestumisel puhas URL,
+veal `/fail` koos erindi tekstiga. **Ping ei saa backup'i kukutada** — pingiviga ainult
+logitakse.
 
-```cron
-15 3 * * * cd ~/VUTT && VUTT_BACKUP_HEALTHCHECK_URL=https://hc-ping.com/UUID ./scripts/vutt_backup.py --dest-root /srv/backups/vutt --keep-days 120 2>&1 | logger -t vutt-backup
+Seaded healthchecks.io poolel: **Period 1 day, Grace 3 h.** Grace peab katma kõige aeglasema
+realistliku jooksu, mitte tavalise. Esimene täisjooks võttis 57 min (100 Mbit link),
+igapäevane inkrementaalne paar minutit — aga suur upload-partii või eelmisest jooksust
+jäänud `.partial`-i jätkamine venitab. Liiga napp grace annab valehäireid, mis õpetavad
+teate ignoreerima; tund hiljem saabuv päris häire ei muuda öise varunduse puhul midagi.
+
+**Cron-keskkonda testi eraldi.** Kõige tavalisem vaikne rike on see, et käsk töötab sinu
+shellis, aga mitte cron'i minimaalses keskkonnas (PATH, `~/.ssh/config`, agendi puudumine):
+
+```bash
+env -i HOME=/home/mf PATH=/usr/bin:/bin /bin/sh -c \
+  'rsync --list-only vutt-backup:state/users.json'
 ```
 
 Logide kontroll:
