@@ -10,15 +10,42 @@ Eesmärk: varundada VUTT **tervikuna** teisele masinale snapshot'idena:
 `state/` sisaldab paroole/tokeneid/hash'e, seega peab backup-sihtkataloog olema privaatne
 (`chmod 700`) ja seda ei tohi GitHubi ega avalikku pilve krüpteerimata panna.
 
-## Käivituskoht
+## Päris seadistus (loss, alates 2026-08-04)
 
-Käivita backup **sihtmasinas** (nt OCR-serveris), mis tõmbab andmed VUTT serverist SSH/rsync abil:
+Backup **tõmmatakse**, mitte ei lükata: sihtmasin `loss` (füüsiliselt teine masin, ülikooli
+võrgus) võtab VUTT serverist. Nii ei ole VUTT serveril kirjutusõigust backupidesse — kui
+VUTT kompromiteeritakse, ei saa ründaja koopiaid kustutada.
+
+| | |
+|---|---|
+| Sihtmasin | `loss` (`ssh loss`) |
+| Skript sihtmasinas | `/home/mf/bin/vutt_backup.py` (koopia siit repost) |
+| Snapshot'id | `/home/mf/vutt-backups/snapshots/`, `latest` symlink |
+| SSH-alias | `vutt-backup` → `meelisf@193.40.22.30`, võti `~/.ssh/vutt_backup` |
+| Cron | `15 3 * * *`, `--keep-days 365`, `logger -t vutt-backup` |
+| Maht | 39 GB / snapshot, hardlinkidega ~55 GB/aasta (eelarve 200 GB) |
 
 ```bash
-cd ~/VUTT
-./scripts/vutt_backup.py --dest-root ~/vutt-backups --dry-run
-./scripts/vutt_backup.py --dest-root ~/vutt-backups
+# käsitsi jooksutamine loss-is
+~/bin/vutt_backup.py --source-host vutt-backup --source-root . --dest-root ~/vutt-backups
 ```
+
+**`--source-root .` on KOHUSTUSLIK.** VUTT serveri `authorized_keys` piirab võtme
+`command="rrsync -ro /home/meelisf/VUTT",restrict` abil ainult lugevale rsyncile.
+`rrsync` juurib tee ise, seega absoluutne tee (`~/VUTT`) annab `Not allowed`.
+Sama põhjusel ei saa selle võtmega jooksutada `ssh vutt-backup <mis-tahes-käsk>` —
+see on tahtlik.
+
+VUTT serveri `~/.ssh/authorized_keys` rida:
+
+```text
+command="rrsync -ro /home/meelisf/VUTT",restrict ssh-ed25519 AAAA... vutt-backup
+```
+
+Võti PEAB olema **paroolita**. Tavavõti `id_ed25519` on parooliga ja töötab ainult
+interaktiivselt agendiga — cronis vaikselt ei tööta.
+
+### Üldkuju
 
 Vaikimisi loetakse allikas `vutt:~/VUTT/{data,state}`. Vajadusel:
 
@@ -93,9 +120,29 @@ varasemate snapshot'idega ja in-place muudatus muudaks neid kõiki korraga. Loe 
 kirjuta mujale. Sama kehtib snapshot-puu kopeerimisel teisele kettale: **`rsync -aH`**
 (ilma `-H`-ta kaovad hardlingid ja maht kordistub).
 
+## Snapshot on ka LLM-treeningu lähteandmestik
+
+`loss`-is olev qwen-treeningu repo (`~/Dokumendid/LLM/qwen3.5`,
+[qwen-mudeli-treenimine](https://github.com/meelisf/qwen-mudeli-treenimine)) ehitab
+treeningandmestiku **otse snapshot'ist** — `build_vutt_dataset.py` vaikimisi allikas on
+`~/vutt-backups/latest/data`. Eraldi tõmmet (`vutt_sync.py` → `data/vutt-raw/`) enam ei ole;
+see kataloog kustutati 2026-08-04 (36 GB) ja skript on märgitud aegunuks.
+
+Kaks tagajärge, mida tasub teada:
+
+- **Backup on nüüd treeningu eeltingimus.** Kui öine jooks kukub, on järgmine andmestik vana.
+  `journalctl -t vutt-backup --since today` enne ehitamist.
+- **Andmestik on reprodutseeritav.** Ehitus kirjutab `data/vutt/SOURCE.txt`, kus on
+  lahendatud snapshot'i tee (`.../snapshots/20260804T143956Z/data`), ehitusaeg ja lehtede arv.
+  Skript resolvib `latest` symlingi ÜKS kord käivitamisel, seega samal ajal lõppev backup ei
+  vaheta allikat töö keskel.
+
+Vana `vutt_sync.py` jooksis **ilma `--delete`-ita**, seega serverist kustutatud lehed jäid
+kohalikku koopiasse alles ja rändasid vaikselt treeningandmestikku. Snapshot on autoriteetne.
+
 ## Cron
 
-Näide sihtmasina crontab'i:
+Paigaldatud `loss`-is (`crontab -l`). Näide:
 
 ```cron
 # VUTT tervikbackup iga öö kell 03:15
@@ -116,17 +163,25 @@ journalctl -t vutt-backup --since today
 
 ## Restore-test
 
-Osaline restore näiteks ühe isikupildi või ühe teose piltide kontrolliks:
+**Backup, mida ei ole taastatud, ei ole backup.** Tee seda vähemalt korra pärast iga
+seadistusmuudatust. Sisu võrdlus peab käima **räsidega**, mitte failiarvuga.
 
 ```bash
-# Vaata viimast snapshot'i
-ls -la /srv/backups/vutt/latest/data
-ls -la /srv/backups/vutt/latest/state
+# loss-is: taasta üks teos + users.json ajutisse kohta
+W=$(ls ~/vutt-backups/latest/data | grep -v '^config$' | head -1)
+rm -rf /tmp/vutt-restore-test && mkdir -p /tmp/vutt-restore-test
+rsync -a ~/vutt-backups/latest/data/"$W" ~/vutt-backups/latest/state/users.json /tmp/vutt-restore-test/
+cd /tmp/vutt-restore-test/"$W" && find . -type f | LC_ALL=C sort | xargs md5sum | md5sum
 
-# Taasta fail ajutisse kohta
-mkdir -p /tmp/vutt-restore-test
-rsync -a /srv/backups/vutt/latest/state/users.json /tmp/vutt-restore-test/
+# vutt-is: sama teos, sama arvutus
+ssh vutt "cd ~/VUTT/data/$W && find . -type f | LC_ALL=C sort | xargs md5sum | md5sum"
 ```
+
+`LC_ALL=C` on oluline: kahe masina erinev `LC_COLLATE` sorteerib punktiga algavad failid
+(`.vutt-lock`) eri kohta ja summad lahknevad, kuigi sisu on identne. Kui summad ikka
+erinevad, võrdle failikaupa (`diff` kahest `md5sum`-loendist) — nii näeb, KUMB fail lahkneb.
+
+Tehtud 2026-08-04: 47 faili, kõik identsed; `users.json` bait-täpselt sama.
 
 Täisrestore uuele serverile:
 
