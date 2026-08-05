@@ -106,14 +106,18 @@ def _entity_slots(person):
             slots.append((edu, "id", "labels", False))
     for rel in person.get("relations") or []:
         if isinstance(rel, dict):
-            slots.append((rel, "type", "type_labels", False))
+            # Q-kood on `type_id`; vanades kirjetes võib olla `type` sees.
+            slots.append((rel, ("type_id", "type"), "type_labels", False))
     return slots
 
 
 def _slot_qcode(obj, id_key):
-    qid = obj.get(id_key)
-    if isinstance(qid, str) and qid.startswith("Q"):
-        return qid
+    """Pesa Q-kood. `id_key` võib olla korteež — võetakse esimene, mis on Q-kood."""
+    keys = id_key if isinstance(id_key, tuple) else (id_key,)
+    for key in keys:
+        qid = obj.get(key)
+        if isinstance(qid, str) and qid.startswith("Q"):
+            return qid
     return None
 
 
@@ -185,43 +189,83 @@ def fill_person_labels_from_registry(person):
     return fill_entity_labels(person, load_entity_labels())
 
 
-def sync_prosopography_inline_labels(registry=None, username="Automaatne"):
+def _load_prosopography_records(prosopo_dir):
+    """Loeb kõik kaardid: [(path, person)]. Vigased failid jäetakse vahele."""
+    records = []
+    for name in sorted(os.listdir(prosopo_dir)):
+        if not name.endswith(".json"):
+            continue
+        path = os.path.join(prosopo_dir, name)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                records.append((path, json.load(f)))
+        except Exception as e:
+            print(f"LABELS: {name} lugemine ebaõnnestus: {e}")
+    return records
+
+
+def _fetch_missing_into_registry(records, registry):
+    """Toob Wikidatast Q-koodid, mida registris pole või kus mõni sihtkeel puudub.
+
+    Ilma selleta ei jõua kaartidel esinev, aga registrisse kunagi sattumata
+    Q-kood sinna KUNAGI: `refresh_all_entity_labels` värskendab ainult neid
+    koode, mis registris juba on.
+    """
+    qcodes = set()
+    for _path, person in records:
+        qcodes |= collect_entity_qcodes(person)
+    to_fetch = {q for q in qcodes
+                if q not in registry or any(l not in registry[q] for l in _TARGET_LANGS)}
+    if not to_fetch:
+        return 0
+    print(f"LABELS: pärin {len(to_fetch)} puuduvat/poolikut Q-koodi Wikidatast")
+    fetched = _fetch_wikidata_labels(to_fetch)
+    if not fetched:
+        return 0
+    with _LABELS_LOCK:
+        current = load_entity_labels()
+        current.update(fetched)
+        registry.update(fetched)
+        atomic_write_json(LABELS_FILE, current)
+    return len(fetched)
+
+
+def sync_prosopography_inline_labels(registry=None, username="Automaatne", fetch_missing=True):
     """Kannab värske labels.json registri prosopograafia kaartide inline labels'itesse.
 
     Registri värskendamine ÜKSI ei muuda kuvatavat teksti: frontend loeb
     kaardi inline `labels[lang]`-i, mitte registrit. Ilma selle sammuta
     jääb „Värskenda sildid Wikidatast" kasutajale nähtamatuks.
 
+    `fetch_missing=True` toob enne täitmist Wikidatast need kaartidel
+    esinevad Q-koodid, mida registris pole või mis on poolikud.
+
     Kõik muudetud kaardid lähevad ÜHE git-commitiga.
-    Tagastab {"files": n, "slots": m}.
+    Tagastab {"files": n, "slots": m, "fetched": k}.
     """
     from .config import PROSOPOGRAPHY_DIR
     from .git_ops import save_with_git
 
     if registry is None:
         registry = load_entity_labels()
-    if not registry or not os.path.isdir(PROSOPOGRAPHY_DIR):
-        return {"files": 0, "slots": 0}
+    if not os.path.isdir(PROSOPOGRAPHY_DIR):
+        return {"files": 0, "slots": 0, "fetched": 0}
+
+    records = _load_prosopography_records(PROSOPOGRAPHY_DIR)
+    fetched = _fetch_missing_into_registry(records, registry) if fetch_missing else 0
+    if not registry:
+        return {"files": 0, "slots": 0, "fetched": fetched}
 
     changed_files = []
     slots = 0
-    for name in sorted(os.listdir(PROSOPOGRAPHY_DIR)):
-        if not name.endswith(".json"):
-            continue
-        path = os.path.join(PROSOPOGRAPHY_DIR, name)
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                person = json.load(f)
-        except Exception as e:
-            print(f"LABELS: {name} lugemine ebaõnnestus: {e}")
-            continue
+    for path, person in records:
         n = fill_entity_labels(person, registry, heal_stubs=True)
         if n:
             slots += n
             changed_files.append((path, json.dumps(person, ensure_ascii=False, indent=2)))
 
     if not changed_files:
-        return {"files": 0, "slots": 0}
+        return {"files": 0, "slots": 0, "fetched": fetched}
 
     first_path, first_content = changed_files[0]
     save_with_git(
@@ -230,7 +274,7 @@ def sync_prosopography_inline_labels(registry=None, username="Automaatne"):
         additional_files=changed_files[1:],
     )
     print(f"LABELS: prosopograafia sünk — {len(changed_files)} kaarti, {slots} välja")
-    return {"files": len(changed_files), "slots": slots}
+    return {"files": len(changed_files), "slots": slots, "fetched": fetched}
 
 
 def _collect_qcodes_from_person(person):

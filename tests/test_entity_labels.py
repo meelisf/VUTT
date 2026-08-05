@@ -143,6 +143,8 @@ def test_sync_prosopography_inline_labels_writes_and_commits(tmp_path, monkeypat
 
     monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
     monkeypatch.setattr("server.git_ops.save_with_git", fake_save, raising=False)
+    # Ükski test ei tohi Wikidatasse minna
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels", lambda q: {})
 
     result = elo.sync_prosopography_inline_labels(
         registry={"Q107555801": {"et": "meditsiiniprofessor", "en": "professor of medicine"},
@@ -150,7 +152,7 @@ def test_sync_prosopography_inline_labels_writes_and_commits(tmp_path, monkeypat
         username="meelis",
     )
 
-    assert result == {"files": 1, "slots": 2}
+    assert result == {"files": 1, "slots": 2, "fetched": 0}
     assert saved["path"] == str(card)
     assert saved["username"] == "meelis"
     assert saved["extra"] == []
@@ -171,9 +173,10 @@ def test_sync_prosopography_inline_labels_noop_without_changes(tmp_path, monkeyp
 
     monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
     monkeypatch.setattr("server.git_ops.save_with_git", boom, raising=False)
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels", lambda q: {})
 
     assert elo.sync_prosopography_inline_labels(
-        registry={"Q1": {"et": "iks", "en": "X"}}) == {"files": 0, "slots": 0}
+        registry={"Q1": {"et": "iks", "en": "X"}}) == {"files": 0, "slots": 0, "fetched": 0}
 
 
 # --- heal_stubs: mida EI TOHI puutuda (päris andmete regressioonid) -------
@@ -217,3 +220,76 @@ def test_heal_stubs_needs_inline_english():
     elo.fill_entity_labels(person, registry, heal_stubs=True)
     # gap-fill lisab en, aga et jääb (pole tõestust, et see on koopia)
     assert person["occupations"][0]["labels"]["et"] == "Professor of medicine"
+
+
+# --- seose tüüp: Q-kood on type_id, mitte type ---------------------------
+
+def test_collect_qcodes_reads_relation_type_id():
+    """Seose Q-kood elab `type_id`-s; `type` on inimloetav string."""
+    person = {"relations": [{"name": "X", "type": "nephew", "type_id": "Q15224724"}]}
+    assert elo.collect_entity_qcodes(person) == {"Q15224724"}
+
+
+def test_collect_qcodes_relation_legacy_qcode_in_type():
+    """Vanad kirjed hoidsid Q-koodi `type` väljal — jääb toetatuks."""
+    person = {"relations": [{"type": "Q100"}]}
+    assert elo.collect_entity_qcodes(person) == {"Q100"}
+
+
+def test_relation_type_labels_healed_from_registry():
+    """`type_labels.et` == `en` (ingliskeelne koopia) → registri tõlge."""
+    person = {"relations": [{"name": "Jakob Friedrich Below", "type": "nephew",
+                             "type_id": "Q15224724",
+                             "type_labels": {"et": "nephew", "en": "nephew",
+                                             "de": "Neffe", "la": "nepos"}}]}
+    registry = {"Q15224724": {"et": "vennapoeg", "en": "nephew",
+                              "de": "Neffe", "la": "nepos"}}
+    changed = elo.fill_entity_labels(person, registry, heal_stubs=True)
+    assert person["relations"][0]["type_labels"]["et"] == "vennapoeg"
+    assert changed == 1
+
+
+def test_sync_fetches_qcodes_missing_from_registry(tmp_path, monkeypatch):
+    """Kaardil olev, registrist puuduv Q-kood tuuakse Wikidatast."""
+    import json as _json
+    card = tmp_path / "abc.json"
+    card.write_text(_json.dumps({
+        "relations": [{"type": "nephew", "type_id": "Q15224724",
+                       "type_labels": {"et": "nephew", "en": "nephew"}}],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    asked = {}
+
+    def fake_fetch(qcodes):
+        asked["qcodes"] = set(qcodes)
+        return {"Q15224724": {"et": "vennapoeg", "en": "nephew", "de": "Neffe", "la": "nepos"}}
+
+    written = {}
+    monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels", fake_fetch)
+    monkeypatch.setattr(elo, "load_entity_labels", lambda: {})
+    monkeypatch.setattr(elo, "atomic_write_json", lambda path, data: written.update({"data": data}))
+    monkeypatch.setattr("server.git_ops.save_with_git",
+                        lambda path, content, username, message=None, additional_files=None:
+                        open(path, "w", encoding="utf-8").write(content), raising=False)
+
+    result = elo.sync_prosopography_inline_labels(registry={}, username="meelis")
+
+    assert asked["qcodes"] == {"Q15224724"}
+    assert written["data"]["Q15224724"]["et"] == "vennapoeg"
+    assert result["fetched"] == 1
+    assert result["files"] == 1
+    assert _json.loads(card.read_text(encoding="utf-8"))["relations"][0]["type_labels"]["et"] == "vennapoeg"
+
+
+def test_sync_skips_fetch_when_disabled(tmp_path, monkeypatch):
+    import json as _json
+    (tmp_path / "abc.json").write_text(_json.dumps({"relations": [{"type_id": "Q1"}]}), encoding="utf-8")
+
+    def boom(_qcodes):
+        raise AssertionError("fetch_missing=False ei tohi Wikidatasse minna")
+
+    monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
+    monkeypatch.setattr(elo, "_fetch_wikidata_labels", boom)
+    assert elo.sync_prosopography_inline_labels(
+        registry={}, fetch_missing=False) == {"files": 0, "slots": 0, "fetched": 0}
