@@ -78,33 +78,35 @@ def _collect_qcodes(metadata):
     return qcodes
 
 
-# Entiteedi-pesad: (id-võti, labels-võti). Kasutatakse nii Q-koodide
-# kogumiseks kui inline labels täitmiseks.
+# Entiteedi-pesad: (obj, id-võti, labels-võti, is_place). Kasutatakse nii
+# Q-koodide kogumiseks kui inline labels täitmiseks. `is_place` märgib
+# kohanime-pesad, kus AJALOOLINE nimi (Reval, Dorpat, Elbing) on tahtlik
+# ega tohi Wikidata moodsa nimega asenduda.
 def _entity_slots(person):
-    """Tagastab [(obj, id_key, labels_key)] kõigi entiteedi-pesade kohta."""
+    """Tagastab [(obj, id_key, labels_key, is_place)] kõigi entiteedi-pesade kohta."""
     slots = []
     for parent_key in ("birth", "death"):
         parent = person.get(parent_key)
         if isinstance(parent, dict) and isinstance(parent.get("place"), dict):
-            slots.append((parent["place"], "id", "labels"))
+            slots.append((parent["place"], "id", "labels", True))
     origin = person.get("origin")
     if isinstance(origin, dict):
-        slots.append((origin, "place_id", "place_labels"))
+        slots.append((origin, "place_id", "place_labels", True))
     for key in ("statuses", "confessions", "tags"):
         for item in person.get(key) or []:
             if isinstance(item, dict):
-                slots.append((item, "id", "labels"))
+                slots.append((item, "id", "labels", False))
     for occ in person.get("occupations") or []:
         if isinstance(occ, dict):
-            slots.append((occ, "id", "labels"))
-            slots.append((occ, "institution_id", "institution_labels"))
+            slots.append((occ, "id", "labels", False))
+            slots.append((occ, "institution_id", "institution_labels", False))
     for edu in person.get("education") or []:
         if isinstance(edu, dict):
-            slots.append((edu, "institution_id", "institution_labels"))
-            slots.append((edu, "id", "labels"))
+            slots.append((edu, "institution_id", "institution_labels", False))
+            slots.append((edu, "id", "labels", False))
     for rel in person.get("relations") or []:
         if isinstance(rel, dict):
-            slots.append((rel, "type", "type_labels"))
+            slots.append((rel, "type", "type_labels", False))
     return slots
 
 
@@ -118,7 +120,7 @@ def _slot_qcode(obj, id_key):
 def collect_entity_qcodes(person):
     """Kogub kõik Q-koodid prosopograafia kirje entiteedi-väljadelt."""
     qcodes = set()
-    for obj, id_key, _labels_key in _entity_slots(person):
+    for obj, id_key, _labels_key, _is_place in _entity_slots(person):
         qid = _slot_qcode(obj, id_key)
         if qid:
             qcodes.add(qid)
@@ -126,21 +128,26 @@ def collect_entity_qcodes(person):
 
 
 def _heal_stub_labels(merged, existing, reg):
-    """Asendab pseudo-tõlked registri omadega (kohapeal, `merged` sees).
+    """Asendab INGLISKEELSE koopia registri tõlkega (kohapeal, `merged` sees).
 
-    Kui inline `labels[lang]` on täht-täheline koopia mõne teise keele
-    labelist (nt EntityPicker kirjutas `et`-sse ingliskeelse otsingutulemuse,
-    sest Wikidatas polnud tol hetkel eestikeelset silti) ja registris on
-    selle keele jaoks päris tõlge, võtab registri väärtuse. Gap-fill üksi
-    ei paranda seda KUNAGI, sest väli ei ole tühi.
+    EntityPicker kirjutas Wikidata-valikul teise keele pessa (nt `et`)
+    ingliskeelse otsingutulemuse, kui Wikidatas polnud tol hetkel selle
+    keele silti. Gap-fill ei paranda seda KUNAGI, sest väli ei ole tühi.
+
+    Rangelt ainult ingliskeelne koopia: kahe MITTE-inglise keele kokkulangevus
+    on tavaline ja tahtlik (sv „Reval" = de „Reval", sv „Elbing" = et „Elbing")
+    ning selle „parandamine" hävitaks ajaloolise nimekuju.
     """
+    english = existing.get("en")
+    if not isinstance(english, str) or not english.strip():
+        return
     for lang, reg_val in reg.items():
+        if lang == "en":
+            continue
         current = merged.get(lang)
         if not current or current.lower() == reg_val.lower():
             continue
-        others = [v for other_lang, v in existing.items()
-                  if other_lang != lang and isinstance(v, str)]
-        if any(current.lower() == other.lower() for other in others):
+        if current.lower() == english.lower():
             merged[lang] = reg_val
 
 
@@ -150,7 +157,7 @@ def fill_entity_labels(person, registry, heal_stubs=False):
     `heal_stubs=True` lisaks parandab pseudo-tõlked (vt `_heal_stub_labels`).
     """
     changed = 0
-    for obj, id_key, labels_key in _entity_slots(person):
+    for obj, id_key, labels_key, is_place in _entity_slots(person):
         qid = _slot_qcode(obj, id_key)
         if not qid or qid not in registry:
             continue
@@ -163,7 +170,9 @@ def fill_entity_labels(person, registry, heal_stubs=False):
         # Registri väärtused täidavad AUGUD; olemasolevad keeled jäävad peale
         merged = {**reg, **{k: v for k, v in existing.items()
                             if isinstance(v, str) and v.strip()}}
-        if heal_stubs:
+        # Kohanime-pesi EI ravita: seal on ajalooline nimi (Reval, Dorpat)
+        # tahtlik ja Wikidata moodne nimi oleks vale.
+        if heal_stubs and not is_place:
             _heal_stub_labels(merged, existing, reg)
         if merged != existing:
             obj[labels_key] = merged

@@ -174,3 +174,46 @@ def test_sync_prosopography_inline_labels_noop_without_changes(tmp_path, monkeyp
 
     assert elo.sync_prosopography_inline_labels(
         registry={"Q1": {"et": "iks", "en": "X"}}) == {"files": 0, "slots": 0}
+
+
+# --- heal_stubs: mida EI TOHI puutuda (päris andmete regressioonid) -------
+
+def test_heal_stubs_never_touches_place_labels():
+    """Ajalooline kohanimi (Reval, Elbing) EI tohi Wikidata moodsaks muutuda."""
+    person = {
+        "origin": {"place": "Reval", "place_id": "Q1770",
+                   "place_labels": {"et": "Tallinn", "en": "Tallinn",
+                                    "de": "Reval", "la": "Revalia", "sv": "Reval"}},
+        "birth": {"place": {"id": "Q104712",
+                            "labels": {"et": "Elbing", "en": "Elbląg",
+                                       "de": "Elbląg", "sv": "Elbing"}}},
+    }
+    registry = {
+        "Q1770": {"et": "Tallinn", "en": "Tallinn", "de": "Tallinn", "la": "Revalia"},
+        "Q104712": {"et": "Elbląg", "en": "Elbląg", "de": "Elbląg"},
+    }
+    changed = elo.fill_entity_labels(person, registry, heal_stubs=True)
+    assert person["origin"]["place_labels"]["de"] == "Reval"
+    assert person["origin"]["place_labels"]["sv"] == "Reval"
+    assert person["birth"]["place"]["labels"]["et"] == "Elbing"
+    assert changed == 0
+
+
+def test_heal_stubs_ignores_non_english_coincidence():
+    """sv == de kokkulangevus ei ole pseudo-tõlge — ei paranda."""
+    person = {"occupations": [{"id": "Q1",
+                               "labels": {"et": "kroonik", "en": "chronicler",
+                                          "de": "Chronist", "sv": "Chronist"}}]}
+    registry = {"Q1": {"et": "kroonik", "en": "chronicler", "de": "Chronist", "sv": "krönikör"}}
+    changed = elo.fill_entity_labels(person, registry, heal_stubs=True)
+    assert person["occupations"][0]["labels"]["sv"] == "Chronist"
+    assert changed == 0
+
+
+def test_heal_stubs_needs_inline_english():
+    """Ilma inline `en`-ita pole võrdlusalust — ei muuda midagi."""
+    person = {"occupations": [{"id": "Q1", "labels": {"et": "Professor of medicine"}}]}
+    registry = {"Q1": {"et": "meditsiiniprofessor", "en": "professor of medicine"}}
+    elo.fill_entity_labels(person, registry, heal_stubs=True)
+    # gap-fill lisab en, aga et jääb (pole tõestust, et see on koopia)
+    assert person["occupations"][0]["labels"]["et"] == "Professor of medicine"
