@@ -45,7 +45,12 @@ def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
     """
     count = refresh_all_entity_labels()
     synced = sync_prosopography_inline_labels(username=user.get("username", "Automaatne"))
-    return {"updated": count, "persons_updated": synced["files"], "slots_updated": synced["slots"]}
+    return {
+        "updated": count,
+        "persons_updated": synced["files"],
+        "slots_updated": synced["slots"],
+        "fetched_new": synced["fetched"],
+    }
 
 
 # sync def → threadpool: skannib kõiki lehekülje-JSON-e (raske faililugemine)
