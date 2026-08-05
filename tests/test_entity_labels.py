@@ -74,3 +74,103 @@ def test_fill_person_labels_from_registry_uses_labels_json(monkeypatch):
     person = {"occupations": [{"id": "Q30185", "label": "linnapea"}]}
     assert elo.fill_person_labels_from_registry(person) == 1
     assert person["occupations"][0]["labels"]["en"] == "mayor"
+
+
+# --- heal_stubs: pseudo-tõlgete parandamine ------------------------------
+
+def test_heal_stubs_replaces_english_copy_in_et_slot():
+    """et == en (EntityPicker kirjutas ingliskeelse silti) → registri tõlge võidab."""
+    person = {"occupations": [{"id": "Q107555801", "label": "Professor of medicine",
+                               "labels": {"et": "Professor of medicine",
+                                          "en": "professor of medicine",
+                                          "de": "Medizinprofessor"}}]}
+    registry = {"Q107555801": {"et": "meditsiiniprofessor",
+                               "en": "professor of medicine",
+                               "de": "Medizinprofessor"}}
+    changed = elo.fill_entity_labels(person, registry, heal_stubs=True)
+    assert person["occupations"][0]["labels"]["et"] == "meditsiiniprofessor"
+    assert changed == 1
+
+
+def test_heal_stubs_off_by_default():
+    person = {"occupations": [{"id": "Q107555801",
+                               "labels": {"et": "Professor of medicine",
+                                          "en": "professor of medicine"}}]}
+    registry = {"Q107555801": {"et": "meditsiiniprofessor", "en": "professor of medicine"}}
+    assert elo.fill_entity_labels(person, registry) == 0
+    assert person["occupations"][0]["labels"]["et"] == "Professor of medicine"
+
+
+def test_heal_stubs_preserves_curated_translation():
+    """Päris eestikeelne (mitte teise keele koopia) tõlge jääb puutumata."""
+    person = {"statuses": [{"id": "Q39631",
+                            "labels": {"et": "Arst", "en": "physician"}}]}
+    registry = {"Q39631": {"et": "arst", "en": "physician"}}
+    changed = elo.fill_entity_labels(person, registry, heal_stubs=True)
+    assert person["statuses"][0]["labels"]["et"] == "Arst"
+    assert changed == 0
+
+
+def test_heal_stubs_idempotent():
+    person = {"occupations": [{"id": "Q1", "labels": {"et": "X", "en": "X"}}]}
+    registry = {"Q1": {"et": "iks", "en": "X"}}
+    assert elo.fill_entity_labels(person, registry, heal_stubs=True) == 1
+    assert elo.fill_entity_labels(person, registry, heal_stubs=True) == 0
+
+
+def test_sync_prosopography_inline_labels_writes_and_commits(tmp_path, monkeypatch):
+    import json as _json
+    card = tmp_path / "abc123.json"
+    card.write_text(_json.dumps({
+        "id": "vutt:abc123",
+        "occupations": [{"id": "Q107555801",
+                         "labels": {"et": "Professor of medicine",
+                                    "en": "professor of medicine"},
+                         "institution_id": "Q28966944"}],
+    }, ensure_ascii=False), encoding="utf-8")
+    untouched = tmp_path / "def456.json"
+    untouched.write_text(_json.dumps({"id": "vutt:def456", "occupations": []}), encoding="utf-8")
+
+    saved = {}
+
+    def fake_save(path, content, username, message=None, additional_files=None):
+        saved["path"] = path
+        saved["username"] = username
+        saved["message"] = message
+        saved["extra"] = additional_files or []
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+    monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
+    monkeypatch.setattr("server.git_ops.save_with_git", fake_save, raising=False)
+
+    result = elo.sync_prosopography_inline_labels(
+        registry={"Q107555801": {"et": "meditsiiniprofessor", "en": "professor of medicine"},
+                  "Q28966944": {"et": "Academia Gustaviana", "en": "Academia Gustaviana"}},
+        username="meelis",
+    )
+
+    assert result == {"files": 1, "slots": 2}
+    assert saved["path"] == str(card)
+    assert saved["username"] == "meelis"
+    assert saved["extra"] == []
+    written = _json.loads(card.read_text(encoding="utf-8"))
+    assert written["occupations"][0]["labels"]["et"] == "meditsiiniprofessor"
+    assert written["occupations"][0]["institution_labels"]["et"] == "Academia Gustaviana"
+    # muutumatu kaart jääb puutumata
+    assert _json.loads(untouched.read_text(encoding="utf-8")) == {"id": "vutt:def456", "occupations": []}
+
+
+def test_sync_prosopography_inline_labels_noop_without_changes(tmp_path, monkeypatch):
+    import json as _json
+    (tmp_path / "abc.json").write_text(_json.dumps(
+        {"occupations": [{"id": "Q1", "labels": {"et": "iks", "en": "X"}}]}), encoding="utf-8")
+
+    def boom(*a, **kw):
+        raise AssertionError("muutusteta sünk ei tohi commitida")
+
+    monkeypatch.setattr("server.config.PROSOPOGRAPHY_DIR", str(tmp_path), raising=False)
+    monkeypatch.setattr("server.git_ops.save_with_git", boom, raising=False)
+
+    assert elo.sync_prosopography_inline_labels(
+        registry={"Q1": {"et": "iks", "en": "X"}}) == {"files": 0, "slots": 0}

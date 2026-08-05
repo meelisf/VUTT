@@ -19,6 +19,8 @@ const Maintenance: React.FC = () => {
   const [placeLabelsCount, setPlaceLabelsCount] = useState<number | null>(null);
   const [entityLabelsState, setEntityLabelsState] = useState<ActionState>('idle');
   const [entityLabelsCount, setEntityLabelsCount] = useState<number | null>(null);
+  // Mitmele isikukaardile värsked sildid päriselt jõudsid (registri uuendus üksi ei kuva)
+  const [entityLabelsPersons, setEntityLabelsPersons] = useState<number | null>(null);
   const [enrichPageTagsState, setEnrichPageTagsState] = useState<ActionState>('idle');
   const [enrichPageTagsCount, setEnrichPageTagsCount] = useState<number | null>(null);
   const [archives, setArchives] = useState<Record<string, { name: string; url?: string }>>({});
@@ -86,6 +88,7 @@ const Maintenance: React.FC = () => {
     if (!authToken) return;
     setEntityLabelsState('running');
     setEntityLabelsCount(null);
+    setEntityLabelsPersons(null);
     try {
       const resp = await fetchWithTimeout(`${FILE_API_URL}/admin/refresh-entity-labels`, {
         method: 'POST',
@@ -95,6 +98,7 @@ const Maintenance: React.FC = () => {
       if (!resp.ok) throw new Error(String(resp.status));
       const data = await resp.json();
       setEntityLabelsCount(data.updated ?? 0);
+      setEntityLabelsPersons(data.persons_updated ?? 0);
       setEntityLabelsState('done');
     } catch {
       setEntityLabelsState('error');
@@ -181,6 +185,7 @@ const Maintenance: React.FC = () => {
       state: placeLabelsState,
       count: placeLabelsCount,
       doneKey: 'refreshPlaceLabelsDone' as const,
+      extra: null as string | null,
       onClick: handleRefreshPlaceLabels,
     },
     {
@@ -190,6 +195,9 @@ const Maintenance: React.FC = () => {
       state: entityLabelsState,
       count: entityLabelsCount,
       doneKey: 'refreshEntityLabelsDone' as const,
+      extra: entityLabelsPersons
+        ? t('admin:maintenance.refreshEntityLabelsPersons', { count: entityLabelsPersons })
+        : null,
       onClick: handleRefreshEntityLabels,
     },
     {
@@ -199,6 +207,7 @@ const Maintenance: React.FC = () => {
       state: enrichPageTagsState,
       count: enrichPageTagsCount,
       doneKey: 'enrichPageTagLabelsDone' as const,
+      extra: null as string | null,
       onClick: handleEnrichPageTagLabels,
     },
   ];
@@ -385,7 +394,7 @@ const Maintenance: React.FC = () => {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {actions.map(({ key, label, desc, state, count, doneKey, onClick }) => (
+          {actions.map(({ key, label, desc, state, count, doneKey, onClick, extra }) => (
             <div key={key} className="flex items-center justify-between px-4 py-4 gap-4">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">{label}</p>
@@ -393,6 +402,7 @@ const Maintenance: React.FC = () => {
                 {state === 'done' && count !== null && (
                   <p className="text-xs text-green-700 mt-1">
                     {t(`admin:maintenance.${doneKey}`, { count })}
+                    {extra ? ` · ${extra}` : ''}
                   </p>
                 )}
                 {state === 'error' && (

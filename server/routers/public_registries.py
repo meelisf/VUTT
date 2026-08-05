@@ -6,7 +6,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends
 from ..cache import get_cached_people_aliases, get_cached_people_register, get_cached_vocabularies
 from ..config import BASE_DIR
 from ..deps import require_role
-from ..entity_labels_ops import load_entity_labels, refresh_all_entity_labels, enrich_entity_labels_async_qcodes
+from ..entity_labels_ops import (
+    load_entity_labels, refresh_all_entity_labels, enrich_entity_labels_async_qcodes,
+    sync_prosopography_inline_labels,
+)
 
 router = APIRouter()
 
@@ -35,9 +38,14 @@ def entity_labels():
 # sync def → threadpool: Wikidata võrgupäringud + failikirjutused ei blokeeri event-loopi
 @router.post("/admin/refresh-entity-labels")
 def admin_refresh_entity_labels(user=Depends(require_role("admin"))):
-    """Värskendab kõik labels.json Q-koodid Wikidatast (admin)."""
+    """Värskendab labels.json Q-koodid Wikidatast JA kannab need kaartidele (admin).
+
+    Ainult registri värskendamisest ei piisa: prosopograafia kuvab kirje
+    inline `labels`-välja, mitte registrit.
+    """
     count = refresh_all_entity_labels()
-    return {"updated": count}
+    synced = sync_prosopography_inline_labels(username=user.get("username", "Automaatne"))
+    return {"updated": count, "persons_updated": synced["files"], "slots_updated": synced["slots"]}
 
 
 # sync def → threadpool: skannib kõiki lehekülje-JSON-e (raske faililugemine)

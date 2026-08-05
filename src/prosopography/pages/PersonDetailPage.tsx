@@ -152,10 +152,6 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
       value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
     });
   }
-  const aliases = person.name.aliases ?? [];
-  if (aliases.length > 0) {
-    rows.push({ label: t('aliases', 'Nimevariandid'), value: aliases.join(', ') });
-  }
   // Amet ja haridus: iga kirje omal real koos asutuse ja ajavahemikuga —
   // „millal keegi Tartus professor oli" on sisuline info, mitte lisadetail.
   if (person.occupations?.length > 0) {
@@ -224,6 +220,11 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
         </span>
       ),
     });
+  }
+  // Nimevariandid on sekundaarne info — viimasena, ameti ja seoste järel.
+  const aliases = person.name.aliases ?? [];
+  if (aliases.length > 0) {
+    rows.push({ label: t('aliases', 'Nimevariandid'), value: aliases.join(', ') });
   }
 
   if (rows.length === 0) return null;
