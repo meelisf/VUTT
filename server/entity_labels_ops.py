@@ -125,8 +125,30 @@ def collect_entity_qcodes(person):
     return qcodes
 
 
-def fill_entity_labels(person, registry):
-    """Täidab inline labels registrist (gap-fill, kohapeal). Tagastab muudetud pesade arvu."""
+def _heal_stub_labels(merged, existing, reg):
+    """Asendab pseudo-tõlked registri omadega (kohapeal, `merged` sees).
+
+    Kui inline `labels[lang]` on täht-täheline koopia mõne teise keele
+    labelist (nt EntityPicker kirjutas `et`-sse ingliskeelse otsingutulemuse,
+    sest Wikidatas polnud tol hetkel eestikeelset silti) ja registris on
+    selle keele jaoks päris tõlge, võtab registri väärtuse. Gap-fill üksi
+    ei paranda seda KUNAGI, sest väli ei ole tühi.
+    """
+    for lang, reg_val in reg.items():
+        current = merged.get(lang)
+        if not current or current.lower() == reg_val.lower():
+            continue
+        others = [v for other_lang, v in existing.items()
+                  if other_lang != lang and isinstance(v, str)]
+        if any(current.lower() == other.lower() for other in others):
+            merged[lang] = reg_val
+
+
+def fill_entity_labels(person, registry, heal_stubs=False):
+    """Täidab inline labels registrist (gap-fill, kohapeal). Tagastab muudetud pesade arvu.
+
+    `heal_stubs=True` lisaks parandab pseudo-tõlked (vt `_heal_stub_labels`).
+    """
     changed = 0
     for obj, id_key, labels_key in _entity_slots(person):
         qid = _slot_qcode(obj, id_key)
@@ -141,6 +163,8 @@ def fill_entity_labels(person, registry):
         # Registri väärtused täidavad AUGUD; olemasolevad keeled jäävad peale
         merged = {**reg, **{k: v for k, v in existing.items()
                             if isinstance(v, str) and v.strip()}}
+        if heal_stubs:
+            _heal_stub_labels(merged, existing, reg)
         if merged != existing:
             obj[labels_key] = merged
             changed += 1
@@ -150,6 +174,54 @@ def fill_entity_labels(person, registry):
 def fill_person_labels_from_registry(person):
     """Täidab kirje inline labels labels.json registrist (sünkroonne, kiire)."""
     return fill_entity_labels(person, load_entity_labels())
+
+
+def sync_prosopography_inline_labels(registry=None, username="Automaatne"):
+    """Kannab värske labels.json registri prosopograafia kaartide inline labels'itesse.
+
+    Registri värskendamine ÜKSI ei muuda kuvatavat teksti: frontend loeb
+    kaardi inline `labels[lang]`-i, mitte registrit. Ilma selle sammuta
+    jääb „Värskenda sildid Wikidatast" kasutajale nähtamatuks.
+
+    Kõik muudetud kaardid lähevad ÜHE git-commitiga.
+    Tagastab {"files": n, "slots": m}.
+    """
+    from .config import PROSOPOGRAPHY_DIR
+    from .git_ops import save_with_git
+
+    if registry is None:
+        registry = load_entity_labels()
+    if not registry or not os.path.isdir(PROSOPOGRAPHY_DIR):
+        return {"files": 0, "slots": 0}
+
+    changed_files = []
+    slots = 0
+    for name in sorted(os.listdir(PROSOPOGRAPHY_DIR)):
+        if not name.endswith(".json"):
+            continue
+        path = os.path.join(PROSOPOGRAPHY_DIR, name)
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                person = json.load(f)
+        except Exception as e:
+            print(f"LABELS: {name} lugemine ebaõnnestus: {e}")
+            continue
+        n = fill_entity_labels(person, registry, heal_stubs=True)
+        if n:
+            slots += n
+            changed_files.append((path, json.dumps(person, ensure_ascii=False, indent=2)))
+
+    if not changed_files:
+        return {"files": 0, "slots": 0}
+
+    first_path, first_content = changed_files[0]
+    save_with_git(
+        first_path, first_content, username,
+        message=f"Sildid Wikidatast: {len(changed_files)} kaarti, {slots} välja",
+        additional_files=changed_files[1:],
+    )
+    print(f"LABELS: prosopograafia sünk — {len(changed_files)} kaarti, {slots} välja")
+    return {"files": len(changed_files), "slots": slots}
 
 
 def _collect_qcodes_from_person(person):

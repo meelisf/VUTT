@@ -18,6 +18,7 @@ import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
+import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import WorkRelationsCard from '../components/WorkRelationsCard';
 
 // =========================================================
@@ -123,7 +124,8 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
   const getLabel = useEntityLabel();
   const [open, setOpen] = useState(true);
 
-  const rows: { label: string; value: React.ReactNode }[] = [];
+  const rows: { label: string; value: React.ReactNode; wide?: boolean }[] = [];
+  const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
 
   if (person.gender) {
     rows.push({
@@ -150,25 +152,50 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
       value: (person.confessions ?? []).map(c => getLabel(c) || c.label).filter(Boolean).join(', '),
     });
   }
-  const aliases = person.name.aliases ?? [];
-  if (aliases.length > 0) {
-    rows.push({ label: t('aliases', 'Nimevariandid'), value: aliases.join(', ') });
-  }
+  // Amet ja haridus: iga kirje omal real koos asutuse ja ajavahemikuga —
+  // „millal keegi Tartus professor oli" on sisuline info, mitte lisadetail.
   if (person.occupations?.length > 0) {
     rows.push({
       label: t('occupations', 'Ametid'),
-      value: person.occupations.map((o: any) => getLabel(o) || o).join(', '),
+      wide: true,
+      value: (
+        <span className="block space-y-0.5">
+          {person.occupations.map((o: any, i: number) => {
+            const name = typeof o === 'string' ? o : (getLabel(o) || o.label || '');
+            const inst = institutionLabel(o, lang);
+            const period = formatEntryPeriod(o, boundLabels);
+            return (
+              <span key={i} className="block">
+                {name}
+                {inst ? `, ${inst}` : ''}
+                {period ? ` (${period})` : ''}
+              </span>
+            );
+          })}
+        </span>
+      ),
     });
   }
   if (person.education?.length > 0) {
     rows.push({
       label: t('education', 'Haridus'),
-      value: person.education.map((e: any) => {
-        const loc = e.institution_labels
-          ? (e.institution_labels[lang] ?? e.institution_labels['en'] ?? e.institution_labels['et'])
-          : null;
-        return loc || e.institution || getLabel(e) || e;
-      }).join(', '),
+      wide: true,
+      value: (
+        <span className="block space-y-0.5">
+          {person.education.map((e: any, i: number) => {
+            const name = typeof e === 'string'
+              ? e
+              : (institutionLabel(e, lang) || getLabel(e) || e.label || '');
+            const period = formatEntryPeriod(e, boundLabels);
+            return (
+              <span key={i} className="block">
+                {name}
+                {period ? ` (${period})` : ''}
+              </span>
+            );
+          })}
+        </span>
+      ),
     });
   }
   if (person.relations?.length > 0) {
@@ -194,6 +221,11 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
       ),
     });
   }
+  // Nimevariandid on sekundaarne info — viimasena, ameti ja seoste järel.
+  const aliases = person.name.aliases ?? [];
+  if (aliases.length > 0) {
+    rows.push({ label: t('aliases', 'Nimevariandid'), value: aliases.join(', ') });
+  }
 
   if (rows.length === 0) return null;
 
@@ -215,8 +247,8 @@ const StructuredInfoCard: React.FC<{ person: ProsopoRecord }> = ({ person }) => 
       {open && (
         <div className="mt-4 border-t border-gray-100 pt-4">
           <div className="grid grid-cols-2 gap-4 text-sm">
-            {rows.map(({ label, value }) => (
-              <div key={label} className={typeof value === 'string' && value.length > 40 ? 'col-span-2' : ''}>
+            {rows.map(({ label, value, wide }) => (
+              <div key={label} className={wide || (typeof value === 'string' && value.length > 40) ? 'col-span-2' : ''}>
                 <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">{label}</span>
                 <p className="text-gray-900">{value}</p>
               </div>

@@ -395,8 +395,11 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
     } else if (result.isLocal && !/^Q\d+$/.test(result.id)) {
       entity = { id: result.id.startsWith('local-') ? null : result.id, label: result.label, source: 'manual', labels: { et: result.label } };
     } else {
-      // Wikidata Q-kood — fetch kõik keeled
-      let multilingualLabels: Record<string, string> = result.labels ? { ...result.labels } : { et: result.label };
+      // Wikidata Q-kood — fetch kõik keeled.
+      // NB: `et`-i EI seemendata otsingutulemuse labeliga — see on tavaliselt
+      // ingliskeelne ja jääks püsivalt ette, sest registri gap-fill täidab
+      // ainult TÜHJU keeli. Kuvamisel katab puuduva `et` niikuinii `label`.
+      let multilingualLabels: Record<string, string> = result.labels ? { ...result.labels } : {};
       try {
         multilingualLabels = { ...multilingualLabels, ...(await getEntityLabels(result.id)) };
       } catch (e) {
