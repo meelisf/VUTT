@@ -2190,4 +2190,609 @@ git commit -m "feat(prepress): lähtefail jääb VUTT-i poolele kuni sammu 3 ots
 
 ---
 
-Plaani ülejäänud osa (Task 8–14) kirjutan järgmisena samasse faili.
+### Task 8: Endpointid
+
+Kõik `/admin/` all JA `require_role("admin")` — nginx `/api/files/` proksib kogu backendi avalikult.
+
+**Files:**
+- Modify: `server/routers/upload.py` (lisa endpointid pärast `admin_upload_thumb`)
+- Test: `tests/test_prepress_endpoints.py`
+
+**Interfaces:**
+- Consumes: `prepress.start_preview`, `prepress.get_gutter_strip`, `prepress.preview_path`, `prepress_apply.start_apply`, `prepress_plan.is_trivial_plan`, `prepress_plan.output_page_count`, `store_source.transfer_stored_source`, `state.mutate_prepress`
+- Produces: kuus endpointi (vt allpool). Vastuse kujud on frontendi lepingu alus (Task 9).
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/test_prepress_endpoints.py`:
+
+```python
+"""Prepress-endpointid: rollikontroll, valideerimine, idempotentsus."""
+import pytest
+
+
+@pytest.fixture
+def client_admin(backend_env):
+    """backend_env fixture on tests/conftest.py-s: TestClient + admin token."""
+    return backend_env
+
+
+def test_koik_prepress_teed_on_admin_all(client_admin):
+    """nginx proksib /api/files/ kaudu KÕIK backend-teed avalikult."""
+    from server.routers import upload as upload_router
+    prepress_routes = [
+        r.path for r in upload_router.router.routes if "prepress" in r.path
+        or "/preview/" in r.path or "/strip/" in r.path
+    ]
+    assert prepress_routes, "prepress-endpointe ei leitud"
+    assert all(p.startswith("/admin/") for p in prepress_routes)
+
+
+def test_strip_valideerib_x_vahemiku(client_admin):
+    client, headers, upload_id = client_admin
+    for bad in ("0", "1", "-0.5", "1.5", "abc"):
+        resp = client.get(
+            "/admin/upload/{}/strip/1?x={}".format(upload_id, bad), headers=headers
+        )
+        assert resp.status_code == 400, "x={} oleks pidanud 400 andma".format(bad)
+
+
+def test_strip_valideerib_lehenumbri(client_admin):
+    client, headers, upload_id = client_admin
+    assert client.get(
+        "/admin/upload/{}/strip/0?x=0.5".format(upload_id), headers=headers
+    ).status_code == 400
+    assert client.get(
+        "/admin/upload/{}/strip/9999?x=0.5".format(upload_id), headers=headers
+    ).status_code == 404
+
+
+def test_apply_teine_kutse_annab_409(client_admin):
+    """Topeltklikk, retry või brauseri refresh ei tohi käivitada teist tööd."""
+    client, headers, upload_id = client_admin
+    first = client.post(
+        "/admin/upload/{}/prepress/apply".format(upload_id), headers=headers
+    )
+    assert first.status_code == 200
+    second = client.post(
+        "/admin/upload/{}/prepress/apply".format(upload_id), headers=headers
+    )
+    assert second.status_code == 409
+    assert "status" in second.json()
+
+
+def test_plaani_salvestamine_ei_luba_vigast_mode_i(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post(
+        "/admin/upload/{}/prepress".format(upload_id),
+        json={"enabled": True, "default_split_x": 0.5,
+              "pages": [{"n": 1, "mode": "kustuta_koik"}]},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_plaani_salvestamine_ei_luba_vigast_split_x_i(client_admin):
+    client, headers, upload_id = client_admin
+    resp = client.post(
+        "/admin/upload/{}/prepress".format(upload_id),
+        json={"enabled": True, "default_split_x": 1.5, "pages": []},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_get_prepress_annab_kokkuvotte(client_admin):
+    client, headers, upload_id = client_admin
+    data = client.get(
+        "/admin/upload/{}/prepress".format(upload_id), headers=headers
+    ).json()
+    assert set(["enabled", "default_split_x", "preview_status", "preview_done",
+                "pages", "page_count", "output_page_count", "trivial"]) <= set(data)
+```
+
+> **Märkus testi kirjutajale:** `tests/conftest.py` `backend_env` fixture ei tagasta praegu upload'i. Laienda seda või kirjuta kohalik fixture, mis loob `create_upload`-iga uploadi, kirjutab `uploads/{id}/source.pdf` kohatäitefaili ja seab `status="awaiting_split"` + `init_prepress(uid, 3)`. Muster: vaata `tests/test_notifications_endpoints.py`.
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv/bin/pytest tests/test_prepress_endpoints.py -v`
+Expected: FAIL — 404 kõigile prepress-teedele
+
+- [ ] **Step 3: Write the implementation**
+
+Modify `server/routers/upload.py`. Lisa importidesse:
+
+```python
+from ..upload import prepress, prepress_apply, prepress_plan, store_source
+from ..upload import state as upload_state
+```
+
+Lisa endpointid pärast `admin_upload_thumb`:
+
+```python
+def _load_prepress(upload_id: str) -> tuple:
+    """Ühine eeltöö: valideeri upload_id, loe state ja plaan."""
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    state = upload_state.read_state(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Uploadi ei leitud")
+    return state, state.get("prepress")
+
+
+def _validate_split_x(value) -> float:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Vigane x")
+    if not (0.0 < x < 1.0):
+        raise HTTPException(status_code=400, detail="x peab olema vahemikus (0, 1)")
+    return x
+
+
+@router.get("/admin/upload/{upload_id}/prepress")
+def admin_prepress_get(upload_id: str, user=Depends(require_role("admin"))):
+    """Plaan + tindiskoorid + eelvaate edenemine. Sync def — loeb ainult ketast."""
+    state, plan = _load_prepress(upload_id)
+    page_count = len((plan or {}).get("pages", []))
+    result = dict(plan or prepress_plan.default_plan(0))
+    result["page_count"] = page_count
+    result["output_page_count"] = prepress_plan.output_page_count(plan, page_count)
+    result["trivial"] = prepress_plan.is_trivial_plan(plan)
+    result["status"] = state.get("status")
+    return result
+
+
+@router.post("/admin/upload/{upload_id}/prepress/start")
+def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
+    """Lülitab prepressi sisse ja käivitab 100 DPI eelvaate.
+
+    Kuni seda ei kutsuta, EI renderdata ühtki pikslit — kogu prepress on opt-in.
+    """
+    state, plan = _load_prepress(upload_id)
+    if state.get("status") not in ("awaiting_split", "prepping"):
+        raise HTTPException(status_code=409, detail="Upload ei ole poolitamise ootel")
+    upload_state.mutate_prepress(upload_id, lambda p: p.update(enabled=True))
+    prepress.start_preview(upload_id)
+    return {"status": "started"}
+
+
+@router.get("/admin/upload/{upload_id}/preview/{page_num}")
+def admin_prepress_preview(upload_id: str, page_num: int,
+                           user=Depends(require_role("admin"))):
+    """100 DPI kontaktlehe pisipilt."""
+    _load_prepress(upload_id)
+    path = prepress.preview_path(upload_id, page_num)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.get("/admin/upload/{upload_id}/strip/{page_num}")
+def admin_prepress_strip(upload_id: str, page_num: int, x: str = "0.5",
+                         user=Depends(require_role("admin"))):
+    """300 DPI köitevahe-riba. Sync def — pdftoppm on blokeeriv (ADR 0002)."""
+    state, plan = _load_prepress(upload_id)
+    x_frac = _validate_split_x(x)
+    page_count = len((plan or {}).get("pages", []))
+    if page_num < 1:
+        raise HTTPException(status_code=400, detail="Vigane lehenumber")
+    if page_num > page_count:
+        raise HTTPException(status_code=404, detail="Lehte ei ole")
+    try:
+        path = prepress.get_gutter_strip(upload_id, page_num, x_frac)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Lähteallikat ei leitud")
+    except RuntimeError as e:
+        logger.error("Riba renderdus {} lk {}: {}".format(upload_id, page_num, e))
+        raise HTTPException(status_code=500, detail="Riba renderdamine ebaõnnestus")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.post("/admin/upload/{upload_id}/prepress")
+async def admin_prepress_save(upload_id: str, request: Request,
+                              user=Depends(require_role("admin"))):
+    """Salvestab plaani. Kirjutab AINULT plaani välju (mutate_prepress)."""
+    data = await get_json_data(request)
+    _load_prepress(upload_id)
+
+    default_x = _validate_split_x(data.get("default_split_x", 0.5))
+    incoming = data.get("pages") or []
+    if not isinstance(incoming, list):
+        raise HTTPException(status_code=400, detail="pages peab olema list")
+
+    clean = {}
+    for entry in incoming:
+        if not isinstance(entry, dict):
+            raise HTTPException(status_code=400, detail="Vigane lehekirje")
+        mode = entry.get("mode", "default")
+        if mode not in ("default", "custom", "nosplit"):
+            raise HTTPException(status_code=400, detail="Vigane mode: {}".format(mode))
+        split_x = entry.get("split_x")
+        if mode == "custom":
+            split_x = _validate_split_x(split_x)
+        clean[entry.get("n")] = {
+            "mode": mode,
+            "split_x": split_x if mode == "custom" else None,
+            "excluded": bool(entry.get("excluded")),
+        }
+
+    enabled = bool(data.get("enabled"))
+
+    def _apply(plan):
+        plan["enabled"] = enabled
+        plan["default_split_x"] = default_x
+        for page in plan.get("pages", []):
+            update = clean.get(page.get("n"))
+            if update:
+                page.update(update)
+
+    plan = await run_in_threadpool(upload_state.mutate_prepress, upload_id, _apply)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plaani ei leitud")
+    page_count = len(plan.get("pages", []))
+    return {
+        "status": "saved",
+        "output_page_count": prepress_plan.output_page_count(plan, page_count),
+        "trivial": prepress_plan.is_trivial_plan(plan),
+    }
+
+
+@router.post("/admin/upload/{upload_id}/prepress/apply")
+def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
+    """Lõpetab sammu 3. Valib teekonna plaani järgi.
+
+    Sync def — try_begin_applying on blokeeriv faililukk (ADR 0002).
+    """
+    state, plan = _load_prepress(upload_id)
+
+    if prepress_plan.is_trivial_plan(plan):
+        # Tänane tee: originaalfail muutmata OCR-serverisse.
+        if not upload_state.try_begin_applying(upload_id):
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "Töö juba käib", "status": state.get("status")},
+            )
+        store_source.transfer_stored_source(upload_id)
+        return {"status": "transferring", "path": "original"}
+
+    if not prepress_apply.start_apply(upload_id):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Töö juba käib", "status": state.get("status")},
+        )
+    return {"status": "applying", "path": "split"}
+```
+
+Lisa faili algusse import: `from fastapi.responses import FileResponse, JSONResponse`.
+
+> **NB `transfer_stored_source` ja CAS:** `try_begin_applying` seab staatuse `applying`, seejärel `transfer_stored_source` seab `uploading` → `processing`. Nii saab ka triviaalne tee sama topeltkliki-kaitse.
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `.venv/bin/pytest tests/test_prepress_endpoints.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Run the whole backend suite**
+
+Run: `.venv/bin/pytest tests/ -q`
+Expected: PASS. Kui `test_async_endpoint_offload.py` kaebab uute sync-marsruutide üle, kontrolli, et see test lubab sync `def`-i — ADR 0002 nõuab just seda blokeeriva I/O korral.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/routers/upload.py tests/test_prepress_endpoints.py
+git commit -m "feat(prepress): endpointid — plaan, eelvaade, riba, apply (409 korduskutsel)"
+```
+
+---
+
+### Task 9: Frontend — tüübid, API-klient ja viisardi neljas samm
+
+Ainult juhtmestik. Komponendid tulevad Task 10–13.
+
+**Files:**
+- Modify: `src/pages/upload/types.ts`, `src/pages/upload/uploadApi.ts`, `src/pages/upload/useUploadWizard.ts`, `src/pages/upload/UploadPage.tsx`, `src/pages/upload/components/StepIndicator.tsx`
+- Modify: `src/locales/et/upload.json`, `src/locales/en/upload.json`
+- Test: `src/pages/upload/__tests__/prepressPlan.test.ts`
+
+**Interfaces:**
+- Consumes: Task 8 endpointid
+- Produces:
+  - tüübid `PrepressMode`, `PrepressPage`, `PrepressPlan`, `PrepressSaveResult`
+  - `getPrepress`, `startPrepress`, `savePrepress`, `applyPrepress`, `prepressPreviewUrl`, `prepressStripUrl`
+  - reduktor `applyGlobalSplit(plan, x): PrepressPlan`
+  - `StepIndicator` võtab nüüd `1|2|3|4` ja neli silti
+
+- [ ] **Step 1: Write the failing test**
+
+Create `src/pages/upload/__tests__/prepressPlan.test.ts`:
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { applyGlobalSplit, countOutputPages } from '../prepressPlan';
+import type { PrepressPlan } from '../types';
+
+function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
+  return {
+    enabled: true,
+    default_split_x: 0.5,
+    preview_status: 'ready',
+    preview_done: 3,
+    page_count: 3,
+    output_page_count: 6,
+    trivial: false,
+    status: 'awaiting_split',
+    pages: [
+      { n: 1, mode: 'default', split_x: null, excluded: false, ink: 0.08 },
+      { n: 2, mode: 'custom', split_x: 0.459, excluded: false, ink: 0.99 },
+      { n: 3, mode: 'nosplit', split_x: null, excluded: false, ink: 0.02 },
+    ],
+    ...overrides,
+  };
+}
+
+describe('applyGlobalSplit', () => {
+  it('muudab globaalset joont', () => {
+    expect(applyGlobalSplit(plan(), 0.48).default_split_x).toBe(0.48);
+  });
+
+  it('EI kirjuta üle custom-lehti', () => {
+    const next = applyGlobalSplit(plan(), 0.48);
+    expect(next.pages[1].mode).toBe('custom');
+    expect(next.pages[1].split_x).toBe(0.459);
+  });
+
+  it('EI muuda nosplit-lehti', () => {
+    expect(applyGlobalSplit(plan(), 0.48).pages[2].mode).toBe('nosplit');
+  });
+
+  it('ei muteeri sisendit', () => {
+    const original = plan();
+    applyGlobalSplit(original, 0.48);
+    expect(original.default_split_x).toBe(0.5);
+  });
+});
+
+describe('countOutputPages', () => {
+  it('loeb poolitatud lehed kaks korda', () => {
+    // leht 1 default → 2, leht 2 custom → 2, leht 3 nosplit → 1
+    expect(countOutputPages(plan())).toBe(5);
+  });
+
+  it('jätab väljajäetud lehed välja', () => {
+    const p = plan();
+    p.pages[0].excluded = true;
+    expect(countOutputPages(p)).toBe(3);
+  });
+
+  it('enabled=false → iga leht üks', () => {
+    expect(countOutputPages(plan({ enabled: false }))).toBe(3);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts`
+Expected: FAIL — `Cannot find module '../prepressPlan'`
+
+- [ ] **Step 3: Add the types**
+
+Append to `src/pages/upload/types.ts`:
+
+```ts
+export type PrepressMode = 'default' | 'custom' | 'nosplit';
+export type PreviewStatus = 'idle' | 'rendering' | 'ready' | 'error';
+
+export interface PrepressPage {
+  n: number;
+  mode: PrepressMode;
+  split_x: number | null;
+  excluded: boolean;
+  /** Tindiosakaal joonel. Usaldusväärne AINULT kõrge väärtuse suunas. */
+  ink: number | null;
+}
+
+export interface PrepressPlan {
+  enabled: boolean;
+  default_split_x: number;
+  preview_status: PreviewStatus;
+  preview_done: number;
+  pages: PrepressPage[];
+  page_count: number;
+  output_page_count: number;
+  trivial: boolean;
+  status: string;
+}
+
+export interface PrepressSaveResult {
+  status: string;
+  output_page_count: number;
+  trivial: boolean;
+}
+```
+
+- [ ] **Step 4: Write the reducer**
+
+Create `src/pages/upload/prepressPlan.ts`:
+
+```ts
+import type { PrepressPlan } from './types';
+
+/**
+ * Muudab globaalset poolitusjoont. `custom` ja `nosplit` lehti EI puutu —
+ * admini käsitsi tehtud töö peab jääma alles.
+ */
+export function applyGlobalSplit(plan: PrepressPlan, x: number): PrepressPlan {
+  return { ...plan, default_split_x: x, pages: plan.pages.map((p) => ({ ...p })) };
+}
+
+/** Mitu lehte OCR-i läheb. Peegeldab serveri output_page_count loogikat. */
+export function countOutputPages(plan: PrepressPlan): number {
+  return plan.pages.reduce((total, page) => {
+    if (page.excluded) return total;
+    if (!plan.enabled || page.mode === 'nosplit') return total + 1;
+    if (page.mode === 'custom' && page.split_x == null) return total + 1;
+    return total + 2;
+  }, 0);
+}
+```
+
+- [ ] **Step 5: Add the API client functions**
+
+Append to `src/pages/upload/uploadApi.ts`:
+
+```ts
+export function getPrepress(uploadId: string, token: string | null): Promise<PrepressPlan> {
+  return apiGet<PrepressPlan>(`/admin/upload/${uploadId}/prepress`, { token });
+}
+
+export function startPrepress(uploadId: string, token: string | null): Promise<{ status: string }> {
+  return apiPost<{ status: string }>(`/admin/upload/${uploadId}/prepress/start`, {}, { token });
+}
+
+export function savePrepress(
+  uploadId: string,
+  plan: Pick<PrepressPlan, 'enabled' | 'default_split_x' | 'pages'>,
+  token: string | null,
+): Promise<PrepressSaveResult> {
+  return apiPost<PrepressSaveResult>(`/admin/upload/${uploadId}/prepress`, plan, { token });
+}
+
+export function applyPrepress(
+  uploadId: string,
+  token: string | null,
+): Promise<{ status: string; path: string }> {
+  return apiPost<{ status: string; path: string }>(
+    `/admin/upload/${uploadId}/prepress/apply`, {}, { token },
+  );
+}
+
+/** Pildipäringud lähevad <img src>-ina, mitte fetchiga — auth käib küpsise/tokeniga URL-is. */
+export function prepressPreviewUrl(uploadId: string, n: number): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}`;
+}
+
+export function prepressStripUrl(uploadId: string, n: number, x: number): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/strip/${n}?x=${x.toFixed(5)}`;
+}
+```
+
+Lisa `types` importi: `PrepressPlan`, `PrepressSaveResult`.
+
+> **NB autentimine piltidel:** `<img src>` ei saada `Authorization` päist. Kontrolli, kuidas `admin_upload_thumb` (olemasolev endpoint, `/admin/upload/{id}/thumb/{n}`) seda praegu lahendab, ja kasuta **sama mustrit** — ära leiuta uut. Kui olemasolev tee kasutab tokenit query-parameetrina, tee samuti; kui pildid laetakse `fetch` + `URL.createObjectURL` kaudu, siis samuti.
+
+- [ ] **Step 6: Renumber the wizard to four steps**
+
+Modify `src/pages/upload/useUploadWizard.ts`:
+
+- `const [step, setStep] = useState<1 | 2 | 3>(1);` → `useState<1 | 2 | 3 | 4>(1)`
+- Kõik olemasolevad `setStep(3)` kutsed (read ~202, ~457) viitavad **ülevaatusele** → `setStep(4)`
+- Lisa olek: `const [prepress, setPrepress] = useState<PrepressPlan | null>(null);`
+- Lisa üleminek: kui `pollResult.status === 'awaiting_split'` → `setStep(3)`
+- Lisa tagastusse: `prepress`, `setPrepress`
+
+Modify `src/pages/upload/UploadPage.tsx`:
+
+- `stepLabels` → neli silti: `t('steps.metadata'), t('steps.upload'), t('steps.split'), t('steps.review')`
+- `wizard.step === 3` → `<UploadStepSplit …>` (Task 10)
+- `wizard.step === 3` (vana ülevaatus) → `wizard.step === 4`
+
+Modify `src/pages/upload/components/StepIndicator.tsx`:
+
+```tsx
+const StepIndicator: React.FC<{
+  step: 1 | 2 | 3 | 4;
+  labels: [string, string, string, string];
+}> = ({ step, labels }) => (
+  <div className="flex items-center gap-0 mb-8">
+    {labels.map((label, i) => {
+      const num = (i + 1) as 1 | 2 | 3 | 4;
+      const active = num === step;
+      const done = num < step;
+      return (
+        <React.Fragment key={num}>
+          {/* … muutmata sisu … */}
+          {i < labels.length - 1 && <div className="flex-1 h-0.5 bg-gray-200 mx-3" />}
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
+```
+
+`i < 2` → `i < labels.length - 1` on kohustuslik: muidu jääb neljanda sammu ette joon puudu.
+
+- [ ] **Step 7: Add the i18n keys**
+
+`src/locales/et/upload.json` — `steps` alla `"split": "Poolitamine"`. Lisa uus plokk:
+
+```json
+"step3split": {
+  "title": "Topeltlehtede poolitamine",
+  "optIn": "Poolita topeltlehed enne OCR-i",
+  "optInHint": "Lülita sisse ainult siis, kui skaneeringul on kaks lehekülge ühel pildil. Muidu vajuta lihtsalt Edasi — kõik käib nagu tavaliselt.",
+  "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
+  "renderError": "Eelvaate valmistamine ebaõnnestus",
+  "globalLine": "Poolitusjoon (% laiusest)",
+  "viewSheet": "Kontaktleht",
+  "viewStrip": "Köitevahe-riba",
+  "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
+  "inkWarning": "Joon lõikab kirja",
+  "exclude": "Jäta välja",
+  "include": "Võta tagasi",
+  "noSplit": "Ära poolita",
+  "resetToGlobal": "Kasuta üldist joont",
+  "openPage": "Ava leht",
+  "applying": "Töötlen ja saadan OCR-i…",
+  "continue": "Edasi"
+}
+```
+
+`src/locales/en/upload.json` — **samad võtmed, sama struktuur** (ADR 0011: `fallbackLng` on väljas, puuduv võti katkestab build'i):
+
+```json
+"step3split": {
+  "title": "Split double pages",
+  "optIn": "Split double pages before OCR",
+  "optInHint": "Turn this on only if a single scan holds two book pages. Otherwise just press Continue — everything works as before.",
+  "rendering": "Preparing preview: {{done}} / {{total}}",
+  "renderError": "Preview generation failed",
+  "globalLine": "Split line (% of width)",
+  "viewSheet": "Contact sheet",
+  "viewStrip": "Gutter strip",
+  "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
+  "inkWarning": "The line cuts through writing",
+  "exclude": "Exclude",
+  "include": "Restore",
+  "noSplit": "Don't split",
+  "resetToGlobal": "Use the global line",
+  "openPage": "Open page",
+  "applying": "Processing and sending to OCR…",
+  "continue": "Continue"
+}
+```
+
+Ja `steps.split`: `"Splitting"`.
+
+- [ ] **Step 8: Run the tests and gates**
+
+Run:
+```bash
+npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts
+npm run typecheck
+npm test
+```
+Expected: PASS. `localeParity.test.ts` peab olema roheline — see valvab et/en võtmestiku identsust.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/pages/upload src/locales
+git commit -m "feat(prepress): frontendi tüübid, API-klient ja viisardi neljas samm"
+```
+
+---
+
+Plaani ülejäänud osa (Task 10–14) kirjutan järgmisena samasse faili.
