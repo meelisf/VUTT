@@ -6,6 +6,7 @@ import {
   inkLevel,
   isPreviewReady,
   summarizePlan,
+  willSplit,
 } from '../prepressPlan';
 import type { PrepressPlan } from '../types';
 
@@ -146,5 +147,39 @@ describe('isPreviewReady', () => {
   it('idle: enne opt-in-i pole ühtki pikslit renderdatud', () => {
     const p = plan({ preview_status: 'idle', preview_done: 0 });
     expect(isPreviewReady(p, 1)).toBe(false);
+  });
+});
+
+describe('willSplit', () => {
+  it('vaikeseades leht poolitatakse', () => {
+    expect(willSplit(plan(), 1)).toBe(true);
+  });
+
+  it('custom joonega leht poolitatakse', () => {
+    expect(willSplit(plan(), 2)).toBe(true);
+  });
+
+  it('nosplit-lehte EI poolitata', () => {
+    expect(willSplit(plan(), 3)).toBe(false);
+  });
+
+  it('väljajäetud lehte EI poolitata (ka default-moodis)', () => {
+    const p = plan();
+    p.pages[0].excluded = true;
+    expect(willSplit(p, 1)).toBe(false);
+  });
+
+  it('enabled=false → ühtki lehte ei poolitata', () => {
+    expect(willSplit(plan({ enabled: false }), 1)).toBe(false);
+  });
+
+  it('custom ilma split_x-ita ei poolita (sama loogika mis countOutputPages)', () => {
+    const p = plan();
+    p.pages[1].split_x = null;
+    expect(willSplit(p, 2)).toBe(false);
+  });
+
+  it('tundmatu leht', () => {
+    expect(willSplit(plan(), 99)).toBe(false);
   });
 });

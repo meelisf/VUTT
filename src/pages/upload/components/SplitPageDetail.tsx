@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Ban, EyeOff } from 'lucide-react';
 import { prepressPreviewUrl, prepressStripUrl } from '../uploadApi';
-import { clampSplitX } from '../prepressPlan';
+import { clampSplitX, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 const STRIP_DEBOUNCE_MS = 400;
@@ -38,6 +38,12 @@ const SplitPageDetail: React.FC<Props> = ({
   const [stripX, setStripX] = useState(liveX);
   const [dragging, setDragging] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
+
+  // Kas seda lehte päriselt poolitatakse. Joon ja käepide EI TOHI olla nähtaval,
+  // kui vastus on ei — muidu näitab vaade tegevust, mida ei toimu.
+  const splits = page ? willSplit(plan, pageNum) : false;
+  const excluded = Boolean(page?.excluded);
+  const noSplitMode = page?.mode === 'nosplit';
 
   const index = plan.pages.findIndex((p) => p.n === pageNum);
   const hasPrev = index > 0;
@@ -115,7 +121,7 @@ const SplitPageDetail: React.FC<Props> = ({
               / {plan.pages.length}
             </span>
             <span className="ml-3 text-sm font-normal text-gray-500">
-              {Math.round(liveX * 1000) / 10}%
+              {splits ? `${Math.round(liveX * 1000) / 10}%` : '—'}
             </span>
           </h3>
           <button
@@ -132,8 +138,8 @@ const SplitPageDetail: React.FC<Props> = ({
           <div className="flex flex-col gap-4 md:flex-row">
             <div
               ref={imageRef}
-              className="relative flex-1 cursor-col-resize select-none touch-none"
-              onPointerDown={(e) => xFromClient(e.clientX)}
+              className={`relative flex-1 select-none touch-none ${splits ? 'cursor-col-resize' : ''}`}
+              onPointerDown={(e) => { if (splits) xFromClient(e.clientX); }}
             >
               <img
                 src={prepressPreviewUrl(uploadId, pageNum, token)}
@@ -141,27 +147,45 @@ const SplitPageDetail: React.FC<Props> = ({
                 className="block w-full"
                 draggable={false}
               />
-              {/* Joon + käepide: sama kuju nagu Manage-lehe poolitamisel. */}
-              <div
-                data-testid="detail-line"
-                className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-red-500 opacity-90"
-                style={{ left: `${liveX * 100}%` }}
-              />
-              <div
-                data-testid="detail-handle"
-                className="absolute top-1/2 flex h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded bg-red-500 shadow-md"
-                style={{ left: `${liveX * 100}%` }}
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
-              >
-                <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-                <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
-              </div>
+              {/* Joon + käepide: sama kuju nagu Manage-lehe poolitamisel.
+                  Nähtaval AINULT siis, kui leht päriselt poolitatakse. */}
+              {splits && (
+                <>
+                  <div
+                    data-testid="detail-line"
+                    className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-red-500 opacity-90"
+                    style={{ left: `${liveX * 100}%` }}
+                  />
+                  <div
+                    data-testid="detail-handle"
+                    className="absolute top-1/2 flex h-10 w-5 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded bg-red-500 shadow-md"
+                    style={{ left: `${liveX * 100}%` }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setDragging(true); }}
+                  >
+                    <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
+                    <div className="mx-0.5 h-6 w-0.5 bg-white/70" />
+                  </div>
+                </>
+              )}
+
+              {!splits && (
+                <div
+                  data-testid="detail-nosplit-badge"
+                  className="pointer-events-none absolute inset-0 flex items-start justify-center bg-white/40 pt-6"
+                >
+                  <span className="flex items-center gap-2 rounded-full bg-gray-900/85 px-4 py-2 text-sm font-medium text-white shadow-lg">
+                    {excluded ? <EyeOff size={15} /> : <Ban size={15} />}
+                    {excluded ? t('step3split.isExcluded') : t('step3split.willNotSplit')}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Piksli-tõe paan: object-none + object-center näitab riba
                 TÄPSELT 1:1, keskele joone peale kärbituna. `w-auto` + fikseeritud
                 kõrgus skaleeriks 224 px laia riba ~53 px-le ja kogu natiivse
                 lahutuse mõte kaoks (sel põhjusel kadus eraldi ribavaade). */}
+            {splits && (
             <div className="flex-none self-center md:self-start">
               <img
                 data-testid="detail-strip"
@@ -171,6 +195,7 @@ const SplitPageDetail: React.FC<Props> = ({
               />
               <div className="mt-1 text-center text-[11px] text-gray-400">1:1</div>
             </div>
+            )}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -201,14 +226,27 @@ const SplitPageDetail: React.FC<Props> = ({
 
             <div className="flex flex-wrap items-center gap-2">
               <button
-                type="button" className="rounded border px-3 py-1 text-sm"
+                type="button"
+                className={`rounded border px-3 py-1 text-sm ${
+                  page.mode === 'default'
+                    ? 'border-primary-600 bg-primary-50 font-medium text-primary-700'
+                    : 'border-gray-300'
+                }`}
                 onClick={() => onPageChange(pageNum, { mode: 'default', split_x: null })}
               >
                 {t('step3split.resetToGlobal')}
               </button>
               <button
-                type="button" className="rounded border px-3 py-1 text-sm"
-                onClick={() => onPageChange(pageNum, { mode: 'nosplit', split_x: null })}
+                type="button"
+                aria-pressed={noSplitMode}
+                className={`rounded border px-3 py-1 text-sm ${
+                  noSplitMode
+                    ? 'border-gray-900 bg-gray-900 font-medium text-white'
+                    : 'border-gray-300'
+                }`}
+                onClick={() => onPageChange(pageNum, {
+                  mode: noSplitMode ? 'default' : 'nosplit', split_x: null,
+                })}
               >
                 {t('step3split.noSplit')}
               </button>

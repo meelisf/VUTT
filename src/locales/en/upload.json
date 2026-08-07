@@ -93,7 +93,9 @@
     "resetToGlobal": "Use the global line",
     "openPage": "Open page",
     "applying": "Processing and sending to OCR…",
-    "continue": "Continue"
+    "continue": "Continue",
+    "willNotSplit": "This page will not be split",
+    "isExcluded": "This page is excluded from OCR"
   },
   "notice": {
     "title": "Upload and processing takes {{time}}",

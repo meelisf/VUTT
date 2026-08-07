@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { EyeOff, Eye, Maximize2, Loader2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { inkLevel, isPreviewReady } from '../prepressPlan';
+import { inkLevel, isPreviewReady, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 const BORDER: Record<string, string> = {
@@ -36,7 +36,7 @@ const SplitContactSheet: React.FC<Props> = ({
       {plan.pages.map((page) => {
         const level = inkLevel(page.ink);
         const ready = isPreviewReady(plan, page.n);
-        const splits = plan.enabled && page.mode !== 'nosplit';
+        const splits = willSplit(plan, page.n);
         const x = page.mode === 'custom' && page.split_x != null
           ? page.split_x
           : plan.default_split_x;
@@ -73,7 +73,7 @@ const SplitContactSheet: React.FC<Props> = ({
               )}
             </button>
 
-            {ready && splits && !page.excluded && (
+            {ready && splits && (
               <div
                 data-testid={`line-${page.n}`}
                 className="absolute top-0 bottom-0 w-px bg-rose-600 pointer-events-none"

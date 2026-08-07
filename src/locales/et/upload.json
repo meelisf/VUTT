@@ -93,7 +93,9 @@
     "resetToGlobal": "Kasuta üldist joont",
     "openPage": "Ava leht",
     "applying": "Töötlen ja saadan OCR-i…",
-    "continue": "Edasi"
+    "continue": "Edasi",
+    "willNotSplit": "Seda lehte ei poolitata",
+    "isExcluded": "See leht jäetakse OCR-ist välja"
   },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",

@@ -74,3 +74,18 @@ export function isPreviewReady(plan: PrepressPlan, n: number): boolean {
   if (plan.preview_status === 'ready') return true;
   return n <= plan.preview_done;
 }
+
+/**
+ * Kas leht n TEGELIKULT poolitatakse. Üks tõe allikas kõigile vaadetele:
+ * kontaktlehe joon, üksiklehe joon+käepide ja kokkuvõtte arvud peavad kõik
+ * sama vastust andma. Peegeldab serveri `effective_split_x` + `is_excluded`
+ * loogikat (server/upload/prepress_plan.py).
+ */
+export function willSplit(plan: PrepressPlan, n: number): boolean {
+  if (!plan.enabled) return false;
+  const page = plan.pages.find((p) => p.n === n);
+  if (!page || page.excluded) return false;
+  if (page.mode === 'nosplit') return false;
+  if (page.mode === 'custom' && page.split_x == null) return false;
+  return true;
+}
