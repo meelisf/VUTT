@@ -1,13 +1,18 @@
 """
-Väliste allikate rikastus: Wikidata SPARQL + GND (lobid.org REST) + AA (kohalik fail).
+Väliste allikate rikastus: Wikidata SPARQL + GND (lobid.org REST) + VIAF (RDF/XML)
++ AA (kohalik fail).
 fetch_and_diff(scheme, ext_id, person) → {auto_filled, conflicts}
 """
 import json
+import logging
 import os
 import re
 import urllib.request
 import urllib.parse
+import xml.etree.ElementTree as ET
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 HEADERS = {
     "User-Agent": "VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)"
@@ -242,18 +247,98 @@ LIMIT 10
 
 
 # =========================================================
-# GND (lobid.org)
+# GND (lobid.org, varutee d-nb.info)
 # =========================================================
 
+_GND_NS = "https://d-nb.info/standards/elementset/gnd#"
+
+# lobid saab tavapärasest lühema timeouti, sest tema järel on veel varutee.
+# Kliendi fetchWithTimeout katkestab 15 s pealt — 15 + 1 ei mahuks sinna ära.
+_LOBID_TIMEOUT = 4
+
+
+def _date_precision(date_str: str) -> str:
+    """GND kuupäev on "1805", "1805-08" või "1805-08-28"."""
+    return "year" if len(date_str) <= 4 else ("month" if len(date_str) <= 7 else "day")
+
+
+def _parse_dnb_jsonld(nodes: list, gnd_id: str) -> dict:
+    """Sõelub DNB laiendatud JSON-LD vastuse. Eraldi funktsioon, et olla testitav.
+
+    Katab nimed, kuupäevad ja soo. Sünni-/surmakohta ega ameteid EI anna:
+    DNB viitab neile ainult GND-URI-ga ilma sildita (lobid lahendas sildid ise),
+    nende kättesaamine nõuaks eraldi päringut iga viite kohta.
+    """
+    main = next(
+        (n for n in nodes if str(n.get("@id", "")).rstrip("/").endswith(f"gnd/{gnd_id}")),
+        None,
+    )
+    if main is None:
+        return {}
+
+    def _values(prop: str) -> list:
+        return [v.get("@value") for v in main.get(_GND_NS + prop, [])
+                if isinstance(v, dict) and v.get("@value")]
+
+    result: dict = {}
+
+    preferred = _values("preferredNameForThePerson")
+    if preferred:
+        result["name.label"] = preferred[0]
+
+    variants = _values("variantNameForThePerson")
+    if variants:
+        result["name.aliases"] = variants[:10]
+
+    for prop, field in (("dateOfBirth", "birth"), ("dateOfDeath", "death")):
+        dates = _values(prop)
+        if dates:
+            date_str = str(dates[0]).strip()
+            result[f"{field}.date"] = date_str[:10]
+            result[f"{field}.precision"] = _date_precision(date_str)
+
+    for g in main.get(_GND_NS + "gender", []):
+        g_id = str(g.get("@id", "")).rsplit("#", 1)[-1].lower()
+        if g_id == "female":
+            result["gender"] = "F"
+        elif g_id == "male":
+            result["gender"] = "M"
+
+    return result
+
+
+def _fetch_gnd_dnb(gnd_id: str) -> Optional[dict]:
+    """Varutee otse Saksa rahvusraamatukogust, kui lobid.org ei vasta."""
+    url = f"https://d-nb.info/gnd/{gnd_id}/about/lds.jsonld"
+    try:
+        req = urllib.request.Request(url, headers=dict(HEADERS, Accept="application/json"))
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            nodes = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logger.warning("GND varutee (d-nb.info) ebaõnnestus (%s): %s", url, e)
+        return None
+
+    try:
+        return _parse_dnb_jsonld(nodes, gnd_id)
+    except Exception as e:
+        logger.warning("GND varutee vastuse sõelumine ebaõnnestus (%s): %s", url, e)
+        return None
+
+
 def _fetch_gnd(gnd_id: str) -> Optional[dict]:
-    """Küsib GND andmed lobid.org REST API kaudu."""
+    """Küsib GND andmed lobid.org REST API kaudu, tõrke korral d-nb.info-st.
+
+    lobid annab rohkem (kohad ja ametid siltidega), aga on üksik veapunkt —
+    2026-08-07 oli päev otsa täiesti kättesaamatu.
+    """
     url = f"https://lobid.org/gnd/{gnd_id}.json"
     try:
         req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=_LOBID_TIMEOUT) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
-        return None
+    except Exception as e:
+        logger.warning("GND rikastus lobid.org kaudu ebaõnnestus (%s): %s — proovin d-nb.info", url, e)
+        return _fetch_gnd_dnb(gnd_id)
 
     result = {}
 
@@ -337,99 +422,94 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
 # VIAF (Virtual International Authority File)
 # =========================================================
 
-def _fetch_viaf(viaf_id: str) -> Optional[dict]:
-    """Küsib VIAF andmed JSON API kaudu.
+_SCHEMA_NS = "{http://schema.org/}"
+_RDF_NS = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
+
+
+def _parse_viaf_rdf(xml_text: str) -> dict:
+    """Sõelub VIAF RDF/XML kirje. Eraldi funktsioon, et olla ilma võrguta testitav.
 
     Tagastab:
-      name.aliases  — nimevariandid kõigist kirjetest
+      name.aliases     — nimevariandid (schema:name + schema:alternateName)
       _linked_wikidata — Wikidata Q-kood (kui leidub)
       _linked_gnd      — GND ID (kui leidub)
+    """
+    root = ET.fromstring(xml_text)
+
+    # VIAF liidab ees- ja perekonnanime tühikuta ("KarlKühlstaedt"), aga annab
+    # samas kirjes ka osad eraldi — nende järgi saab tühiku täpselt tagasi panna.
+    givens = {el.text.strip() for el in root.iter(_SCHEMA_NS + "givenName")
+              if el.text and el.text.strip()}
+    families = {el.text.strip() for el in root.iter(_SCHEMA_NS + "familyName")
+                if el.text and el.text.strip()}
+
+    def _unglue(text: str) -> str:
+        for g in givens:
+            if text.startswith(g) and text[len(g):] in families:
+                return f"{g} {text[len(g):]}"
+        return text
+
+    result: dict = {}
+
+    # Nimevariandid. skos:altLabel jäetakse teadlikult välja — need on
+    # pööratud kujul ja eluaastad on nime külge liidetud ("Kühlstädt, Karl1805-1838").
+    seen = set()
+    aliases = []
+    for tag in ("name", "alternateName"):
+        for el in root.iter(_SCHEMA_NS + tag):
+            text = (el.text or "").strip()
+            if not text:
+                continue
+            text = _unglue(text)
+            if text not in seen and len(aliases) < 20:
+                seen.add(text)
+                aliases.append(text)
+    if aliases:
+        result["name.aliases"] = aliases
+
+    # Seotud identifikaatorid — AINULT schema:sameAs alt. Wikidata Q-koode esineb
+    # kirjes ka mujal (nt schema:gender rdf:resource = Q6581097 „mees").
+    for same_as in root.iter(_SCHEMA_NS + "sameAs"):
+        for desc in same_as.iter(_RDF_NS + "Description"):
+            about = (desc.get(_RDF_NS + "about") or "").strip()
+            m = re.search(r"wikidata\.org/entity/(Q\d+)", about)
+            if m and "_linked_wikidata" not in result:
+                result["_linked_wikidata"] = m.group(1)
+            m = re.search(r"d-nb\.info/gnd/([\w-]+)", about)
+            if m and "_linked_gnd" not in result:
+                result["_linked_gnd"] = m.group(1)
+
+    return result
+
+
+def _fetch_viaf(viaf_id: str) -> Optional[dict]:
+    """Küsib VIAF andmed RDF/XML kujul sisusobituse (content negotiation) kaudu.
+
+    Vanad JSON-teed (`justlinks.json`, `viaf.json`) on VIAF-i 2025. a uuenduse
+    järel kadunud (404) ja uus veebiliides on Cloudflare'i taga JS-rakendus.
+    `Accept: application/rdf+xml` `/viaf/{id}` peal töötab endiselt ja annab
+    kogu vajaliku sisu.
     """
     # Puhasta ID (eralda "VIAF:" prefiksist kui on)
     raw_id = viaf_id.replace("VIAF:", "").replace("viaf:", "").strip()
     if not raw_id.isdigit():
         return None
 
-    url = f"https://viaf.org/viaf/{raw_id}/justlinks.json"
+    url = f"https://viaf.org/viaf/{raw_id}"
+    headers = dict(HEADERS, Accept="application/rdf+xml")
     try:
-        req = urllib.request.Request(url, headers=HEADERS)
+        req = urllib.request.Request(url, headers=headers)
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception:
+            xml_text = resp.read().decode("utf-8")
+    except Exception as e:
+        logger.warning("VIAF rikastus ebaõnnestus (%s): %s", url, e)
         return None
 
-    result = {}
-
-    # Seotud identifikaatorid: Wikidata + GND
     try:
-        wd_list = data.get("WKP") or []
-        if not isinstance(wd_list, list):
-            wd_list = [wd_list]
-        for item in wd_list:
-            qid = (item.get("@") if isinstance(item, dict) else str(item)).strip()
-            if qid.startswith("Q") and qid[1:].isdigit():
-                result["_linked_wikidata"] = qid
-                break
-    except Exception:
-        pass
-
-    try:
-        gnd_list = data.get("DNB") or []
-        if not isinstance(gnd_list, list):
-            gnd_list = [gnd_list]
-        for item in gnd_list:
-            gnd_id = (item.get("@") if isinstance(item, dict) else str(item)).strip()
-            if gnd_id:
-                result["_linked_gnd"] = gnd_id
-                break
-    except Exception:
-        pass
-
-    # Nimevariandid — küsi täiskirje
-    try:
-        names_url = f"https://viaf.org/viaf/{raw_id}/viaf.json"
-        req2 = urllib.request.Request(names_url, headers=HEADERS)
-        with urllib.request.urlopen(req2, timeout=15) as resp2:
-            full = json.loads(resp2.read().decode("utf-8"))
-
-        seen = set()
-        aliases = []
-
-        # mainHeadings
-        main = full.get("mainHeadings") or {}
-        headings = main.get("data") or []
-        if not isinstance(headings, list):
-            headings = [headings]
-        for h in headings:
-            text = h.get("text") if isinstance(h, dict) else None
-            if text and text not in seen:
-                seen.add(text)
-                aliases.append(text)
-
-        # x400 (variantNamesForThePerson)
-        x400 = full.get("x400s") or {}
-        x400_data = x400.get("x400") or []
-        if not isinstance(x400_data, list):
-            x400_data = [x400_data]
-        for entry in x400_data:
-            if not isinstance(entry, dict):
-                continue
-            subfields = entry.get("datafield", {}).get("subfield") or []
-            if not isinstance(subfields, list):
-                subfields = [subfields]
-            parts = [sf.get("#text", "") for sf in subfields
-                     if isinstance(sf, dict) and sf.get("@code") in ("a", "b", "c")]
-            name = " ".join(p.strip().rstrip(",") for p in parts if p.strip())
-            if name and name not in seen and len(aliases) < 20:
-                seen.add(name)
-                aliases.append(name)
-
-        if aliases:
-            result["name.aliases"] = aliases
-    except Exception:
-        pass
-
-    return result if result else {}
+        return _parse_viaf_rdf(xml_text)
+    except Exception as e:
+        logger.warning("VIAF vastuse sõelumine ebaõnnestus (%s): %s", url, e)
+        return None
 
 
 # =========================================================
