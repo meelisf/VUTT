@@ -1,8 +1,8 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { EyeOff, Eye, Maximize2 } from 'lucide-react';
+import { EyeOff, Eye, Maximize2, Loader2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { inkLevel } from '../prepressPlan';
+import { inkLevel, isPreviewReady } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 
 const BORDER: Record<string, string> = {
@@ -35,6 +35,7 @@ const SplitContactSheet: React.FC<Props> = ({
     >
       {plan.pages.map((page) => {
         const level = inkLevel(page.ink);
+        const ready = isPreviewReady(plan, page.n);
         const splits = plan.enabled && page.mode !== 'nosplit';
         const x = page.mode === 'custom' && page.split_x != null
           ? page.split_x
@@ -52,17 +53,27 @@ const SplitContactSheet: React.FC<Props> = ({
               data-testid={`open-${page.n}`}
               title={t('step3split.openPage')}
               className={`block w-full border-2 ${BORDER[level]}`}
+              disabled={!ready}
               onClick={() => onOpenPage(page.n)}
             >
-              <img
-                src={prepressPreviewUrl(uploadId, page.n, token)}
-                alt={`${page.n}`}
-                loading="lazy"
-                className="block w-full"
-              />
+              {ready ? (
+                <img
+                  src={prepressPreviewUrl(uploadId, page.n, token)}
+                  alt={`${page.n}`}
+                  loading="lazy"
+                  className="block w-full"
+                />
+              ) : (
+                <div
+                  data-testid={`placeholder-${page.n}`}
+                  className="flex aspect-[3/4] w-full items-center justify-center bg-gray-100"
+                >
+                  <Loader2 size={18} className="animate-spin text-gray-400" />
+                </div>
+              )}
             </button>
 
-            {splits && !page.excluded && (
+            {ready && splits && !page.excluded && (
               <div
                 data-testid={`line-${page.n}`}
                 className="absolute top-0 bottom-0 w-px bg-rose-600 pointer-events-none"

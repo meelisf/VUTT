@@ -4,6 +4,7 @@ import {
   clampSplitX,
   countOutputPages,
   inkLevel,
+  isPreviewReady,
   summarizePlan,
   visibleWindow,
 } from '../prepressPlan';
@@ -138,5 +139,37 @@ describe('clampSplitX', () => {
     // server: cut = max(1, min(width - 1, round(width * x)))
     expect(clampSplitX(0)).toBeGreaterThan(0);
     expect(clampSplitX(1)).toBeLessThan(1);
+  });
+});
+
+describe('isPreviewReady', () => {
+  it('renderdamise ajal on valmis ainult juba tehtud lehed', () => {
+    // REGRESSIOON: <img src> valmimata lehele annab 404 ja jääb PÜSIVALT
+    // katki — polling ei muuda src-i, seega React ei loo uut img-elementi.
+    const p = plan({ preview_status: 'rendering', preview_done: 2 });
+    expect(isPreviewReady(p, 1)).toBe(true);
+    expect(isPreviewReady(p, 2)).toBe(true);
+    expect(isPreviewReady(p, 3)).toBe(false);
+  });
+
+  it('alguses ei ole ükski leht valmis', () => {
+    const p = plan({ preview_status: 'rendering', preview_done: 0 });
+    expect(isPreviewReady(p, 1)).toBe(false);
+  });
+
+  it('ready-olekus on kõik lehed valmis', () => {
+    const p = plan({ preview_status: 'ready', preview_done: 3 });
+    expect(isPreviewReady(p, 3)).toBe(true);
+  });
+
+  it('katkenud renderdus jätab juba tehtud lehed nähtavaks', () => {
+    const p = plan({ preview_status: 'error', preview_done: 2 });
+    expect(isPreviewReady(p, 2)).toBe(true);
+    expect(isPreviewReady(p, 3)).toBe(false);
+  });
+
+  it('idle: enne opt-in-i pole ühtki pikslit renderdatud', () => {
+    const p = plan({ preview_status: 'idle', preview_done: 0 });
+    expect(isPreviewReady(p, 1)).toBe(false);
   });
 });

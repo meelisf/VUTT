@@ -76,3 +76,20 @@ export function clampSplitX(x: number): number {
   if (!Number.isFinite(x)) return 0.5;
   return Math.min(0.95, Math.max(0.05, x));
 }
+
+/**
+ * Kas lehe n eelvaate fail on serveris juba olemas.
+ *
+ * KRIITILINE `<img src>` jaoks: valmimata lehe pilt annab 404 ja jääb
+ * PÜSIVALT katki — eelvaate polling uuendab plaani, aga `src` string ei
+ * muutu, seega React ei puutu DOM-i img-elementi ja brauser ei proovi
+ * uuesti. Ainult remount (vaate vahetus, lehe laadimine) päästaks.
+ * Sama muster nagu UploadStepReview `entry.has_ocr` juures.
+ *
+ * `preview_done` on serveris usaldusväärne: `_render_previews` seab selle
+ * alles PÄRAST faili kirjutamist.
+ */
+export function isPreviewReady(plan: PrepressPlan, n: number): boolean {
+  if (plan.preview_status === 'ready') return true;
+  return n <= plan.preview_done;
+}
