@@ -181,24 +181,37 @@ const SplitPageDetail: React.FC<Props> = ({
               )}
             </div>
 
-            {/* Piksli-tõe paan: object-none + object-center näitab riba
-                TÄPSELT 1:1, keskele joone peale kärbituna. `w-auto` + fikseeritud
-                kõrgus skaleeriks 224 px laia riba ~53 px-le ja kogu natiivse
-                lahutuse mõte kaoks (sel põhjusel kadus eraldi ribavaade). */}
-            {splits && (
-            <div className="flex-none self-center md:self-start">
-              <img
-                data-testid="detail-strip"
-                src={prepressStripUrl(uploadId, pageNum, stripX, token)}
-                alt=""
-                className="block h-[220px] w-[240px] border border-gray-300 bg-gray-100 object-none object-center md:h-[420px]"
-              />
-              <div className="mt-1 text-center text-[11px] text-gray-400">1:1</div>
-            </div>
-            )}
-          </div>
+            {/* Piksli-tõe paan: object-none + object-center näitab riba TÄPSELT
+                1:1, keskele joone peale kärbituna. `w-auto` + fikseeritud kõrgus
+                skaleeriks 224 px laia riba ~53 px-le ja kogu natiivse lahutuse
+                mõte kaoks (sel põhjusel kadus eraldi ribavaade).
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                Pesa hoiab mõõdud ka siis, kui lõiget ei tehta — kui element
+                kaoks, laieneks pildiveerg ja vaade hüppaks lehti sirvides. */}
+            <div className="flex-none self-center md:self-start">
+              {splits ? (
+                <img
+                  data-testid="detail-strip"
+                  src={prepressStripUrl(uploadId, pageNum, stripX, token)}
+                  alt=""
+                  className="block h-[220px] w-[240px] border border-gray-300 bg-gray-100 object-none object-center md:h-[420px]"
+                />
+              ) : (
+                <div
+                  data-testid="detail-strip-empty"
+                  className="flex h-[220px] w-[240px] items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 md:h-[420px]"
+                >
+                  <Ban size={20} className="text-gray-300" />
+                </div>
+              )}
+              <div className="mt-1 text-center text-[11px] text-gray-400">
+                {splits ? '1:1' : '\u00a0'}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 rounded-b border-t border-gray-200 bg-white px-4 py-3">
             {/* Lehe vahetus — sama kuju ja klahvid nagu Manage pildiredaktoris.
                 Joont nihutab kasutaja AINULT hiirega (käepide või klõps pildil). */}
             <div className="flex items-center gap-1">
@@ -251,7 +264,6 @@ const SplitPageDetail: React.FC<Props> = ({
                 {t('step3split.noSplit')}
               </button>
             </div>
-          </div>
         </div>
       </div>
     </div>
