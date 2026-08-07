@@ -137,6 +137,48 @@ export function startReocrBatch(
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/reocr-batch`, body, authJson(token, { timeout: 30000 }));
 }
 
+export interface ReocrFailure {
+  filename: string;
+  error: string;
+}
+
+export interface ReocrApplyResponse extends ApiStatusResponse {
+  applied?: string[];
+  failed?: ReocrFailure[];
+  commit_hash?: string;
+  git_committed?: boolean;
+}
+
+export interface ReocrDiscardResponse extends ApiStatusResponse {
+  discarded?: string[];
+  failed?: ReocrFailure[];
+}
+
+export function applyReocrResults(
+  workId: string,
+  token: string,
+  pageFilenames: string[],
+): Promise<ReocrApplyResponse> {
+  // Pikk timeout: suure teose puhul kirjutatakse sadu faile + üks git-commit.
+  return apiPost<ReocrApplyResponse>(
+    `/admin/work/${workId}/reocr-apply`,
+    { page_filenames: pageFilenames },
+    authJson(token, { timeout: 120000 }),
+  );
+}
+
+export function discardReocrResults(
+  workId: string,
+  token: string,
+  pageFilenames: string[],
+): Promise<ReocrDiscardResponse> {
+  return apiPost<ReocrDiscardResponse>(
+    `/admin/work/${workId}/reocr-discard`,
+    { page_filenames: pageFilenames },
+    authJson(token, { timeout: 30000 }),
+  );
+}
+
 export function reorderWorkPages(workId: string, token: string, order: string[]): Promise<ApiStatusResponse> {
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/reorder-pages`, { order }, authJson(token, { timeout: 30000 }));
 }

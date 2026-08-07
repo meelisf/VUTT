@@ -172,6 +172,23 @@
         "cancel": "Cancel"
       },
       "error": "Failed to start re-OCR.",
+      "pending": {
+        "count": "{{count}} re-OCR results pending",
+        "applyAll": "Apply all",
+        "discardAll": "Discard all",
+        "confirmApply": "Applying re-OCR results for {{count}} pages.",
+        "confirmApplyWithText": "{{count}} pages already have text — it will be overwritten. The previous version stays in the Git history and can be restored from the Workspace \"History\" tab.",
+        "confirmFallback": "Batch information is no longer available (the server restarted) — ALL pending results for this work will be applied, including any that may not be yours.",
+        "confirmDiscard": "Deleting {{count}} pending re-OCR results. Page text will not change.",
+        "applyGo": "Apply",
+        "discardGo": "Delete",
+        "applied": "{{count}} pages applied",
+        "appliedPartial": "{{applied}} pages applied, {{failed}} failed",
+        "gitWarning": "Text was saved, but the Git commit failed.",
+        "discarded": "{{count}} results deleted",
+        "applyError": "Applying failed.",
+        "discardError": "Deleting failed."
+      },
       "badge": {
         "noText": "no text",
         "processing": "OCR running",

@@ -172,6 +172,23 @@
         "cancel": "Tühista"
       },
       "error": "Re-OCR alustamine ebaõnnestus.",
+      "pending": {
+        "count": "{{count}} re-OCR tulemust ootel",
+        "applyAll": "Rakenda kõik",
+        "discardAll": "Lükka kõik tagasi",
+        "confirmApply": "Rakendan {{count}} lehe re-OCR tulemused.",
+        "confirmApplyWithText": "{{count}} lehel on juba tekst — see kirjutatakse üle. Vana versioon jääb git-ajalukku ja on taastatav Workspace'i „Ajalugu\" tabist.",
+        "confirmFallback": "Batch'i info ei ole enam teada (server taaskäivitati) — rakendatakse KÕIK selle teose ootel tulemused, ka need, mis ei pruugi olla sinu omad.",
+        "confirmDiscard": "Kustutan {{count}} ootel re-OCR tulemust. Lehtede tekst ei muutu.",
+        "applyGo": "Rakenda",
+        "discardGo": "Kustuta",
+        "applied": "{{count}} lehte rakendatud",
+        "appliedPartial": "{{applied}} lehte rakendatud, {{failed}} ebaõnnestus",
+        "gitWarning": "Tekst salvestati, aga Git-commit ebaõnnestus.",
+        "discarded": "{{count}} tulemust kustutatud",
+        "applyError": "Rakendamine ebaõnnestus.",
+        "discardError": "Kustutamine ebaõnnestus."
+      },
       "badge": {
         "noText": "tekstita",
         "processing": "OCR töötab",

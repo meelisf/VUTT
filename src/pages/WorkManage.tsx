@@ -23,9 +23,11 @@ import { useUser } from '../contexts/UserContext';
 import { ApiError } from '../services/apiClient';
 import {
   addWorkPages,
+  applyReocrResults,
   deleteWork,
   deleteWorkPages,
   DeletedWorkPage,
+  discardReocrResults,
   getDeletedWorkPages,
   getReocrStatus,
   getViewerToken,
@@ -42,7 +44,7 @@ import { planChunks } from '../utils/bulkAddChunks';
 import { computeBlockMoveOrder, VisiblePage } from '../utils/blockReorder';
 import PageCard from './manage/PageCard';
 import PageActionBar from './manage/PageActionBar';
-import { mapReocrState, selectableNoTextFiles, ReocrStatusResponse } from '../utils/reocrStatus';
+import { mapReocrState, selectableNoTextFiles, applicableReocrPages, ReocrStatusResponse } from '../utils/reocrStatus';
 
 const CHUNK_MAX_FILES = 20;
 const CHUNK_MAX_BYTES = 200 * 1024 * 1024;
@@ -115,6 +117,12 @@ const WorkManage: React.FC = () => {
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
   const [reocrPollNonce, setReocrPollNonce] = useState(0); // batch-käivitusel taaskäivitab poll-effecti
+
+  // Ootel re-OCR tulemuste hulgi-tegevused (kinnitus avaneb inline, nagu bulkDelete)
+  const [pendingConfirm, setPendingConfirm] = useState<'apply' | 'discard' | null>(null);
+  const [pendingBusy, setPendingBusy] = useState(false);
+  const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingResult, setPendingResult] = useState<string | null>(null);
 
   // Teose kustutamine
   const [deleteWorkConfirm, setDeleteWorkConfirm] = useState(false);
@@ -356,6 +364,48 @@ const WorkManage: React.FC = () => {
       setReocrPollNonce((n) => n + 1);
     } catch (e: any) {
       setBatchError(e.message || t('manage.reocr.error'));
+    }
+  };
+
+  // Rakendatavad lehed: viimase batchi ootel tulemused (vt applicableReocrPages)
+  const applicable = applicableReocrPages(pages, reocrStatus);
+
+  const handleApplyAll = async () => {
+    if (!workId || !authToken || applicable.filenames.length === 0) return;
+    setPendingBusy(true);
+    setPendingError(null);
+    try {
+      const res = await applyReocrResults(workId, authToken, applicable.filenames);
+      const applied = res.applied?.length ?? 0;
+      const failed = res.failed?.length ?? 0;
+      let msg = failed > 0
+        ? t('manage.reocr.pending.appliedPartial', { applied, failed })
+        : t('manage.reocr.pending.applied', { count: applied });
+      if (res.git_committed === false) msg += ` ${t('manage.reocr.pending.gitWarning')}`;
+      setPendingResult(msg);
+      setPendingConfirm(null);
+      await loadPages();                 // has_text uueneb
+      setReocrPollNonce((n) => n + 1);   // staatus uueneb (ootel loend tühjeneb)
+    } catch (e: any) {
+      setPendingError(e.message || t('manage.reocr.pending.applyError'));
+    } finally {
+      setPendingBusy(false);
+    }
+  };
+
+  const handleDiscardAll = async () => {
+    if (!workId || !authToken || applicable.filenames.length === 0) return;
+    setPendingBusy(true);
+    setPendingError(null);
+    try {
+      const res = await discardReocrResults(workId, authToken, applicable.filenames);
+      setPendingResult(t('manage.reocr.pending.discarded', { count: res.discarded?.length ?? 0 }));
+      setPendingConfirm(null);
+      setReocrPollNonce((n) => n + 1);
+    } catch (e: any) {
+      setPendingError(e.message || t('manage.reocr.pending.discardError'));
+    } finally {
+      setPendingBusy(false);
     }
   };
 
@@ -693,6 +743,78 @@ const WorkManage: React.FC = () => {
                       errors: reocrStatus.progress.errors,
                     })}
                   </div>
+                )}
+
+                {/* Ootel re-OCR tulemused: hulgi-rakendus / hulgi-tagasilükkamine.
+                    Teose tasemel tegevus → siin, mitte valikupõhises PageActionBar-is. */}
+                {applicable.filenames.length > 0 && (
+                  <div className="mx-4 mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm text-amber-900">
+                        {t('manage.reocr.pending.count', { count: applicable.filenames.length })}
+                      </span>
+                      <button
+                        onClick={() => { setPendingConfirm('apply'); setPendingResult(null); }}
+                        disabled={pendingBusy}
+                        className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded"
+                      >
+                        {t('manage.reocr.pending.applyAll')}
+                      </button>
+                      <button
+                        onClick={() => { setPendingConfirm('discard'); setPendingResult(null); }}
+                        disabled={pendingBusy}
+                        className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-white disabled:opacity-50"
+                      >
+                        {t('manage.reocr.pending.discardAll')}
+                      </button>
+                    </div>
+
+                    {pendingConfirm === 'apply' && (
+                      <div className="mt-2 border-t border-amber-200 pt-2 text-sm text-amber-900">
+                        <p>{t('manage.reocr.pending.confirmApply', { count: applicable.filenames.length })}</p>
+                        {applicable.withTextCount > 0 && (
+                          <p className="mt-1">
+                            {t('manage.reocr.pending.confirmApplyWithText', { count: applicable.withTextCount })}
+                          </p>
+                        )}
+                        {applicable.isFallback && (
+                          <p className="mt-1 font-medium">{t('manage.reocr.pending.confirmFallback')}</p>
+                        )}
+                        <div className="mt-2 flex items-center gap-2">
+                          <button onClick={handleApplyAll} disabled={pendingBusy}
+                            className="px-3 py-1 text-sm bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded">
+                            {pendingBusy ? <Loader2 size={13} className="animate-spin inline" /> : t('manage.reocr.pending.applyGo')}
+                          </button>
+                          <button onClick={() => setPendingConfirm(null)} disabled={pendingBusy}
+                            className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-white">
+                            {t('common:buttons.cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pendingConfirm === 'discard' && (
+                      <div className="mt-2 border-t border-amber-200 pt-2 text-sm text-amber-900">
+                        <p>{t('manage.reocr.pending.confirmDiscard', { count: applicable.filenames.length })}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <button onClick={handleDiscardAll} disabled={pendingBusy}
+                            className="px-3 py-1 text-sm bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded">
+                            {pendingBusy ? <Loader2 size={13} className="animate-spin inline" /> : t('manage.reocr.pending.discardGo')}
+                          </button>
+                          <button onClick={() => setPendingConfirm(null)} disabled={pendingBusy}
+                            className="px-3 py-1 text-sm border border-gray-300 text-gray-600 rounded hover:bg-white">
+                            {t('common:buttons.cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {pendingError && <p className="mt-2 text-sm text-red-700">{pendingError}</p>}
+                  </div>
+                )}
+
+                {pendingResult && (
+                  <div className="mx-4 mb-2 text-sm text-green-700">{pendingResult}</div>
                 )}
 
                 <div className="flex items-center gap-2 px-4 pt-2 text-sm text-gray-600">
