@@ -2795,4 +2795,638 @@ git commit -m "feat(prepress): frontendi tüübid, API-klient ja viisardi neljas
 
 ---
 
-Plaani ülejäänud osa (Task 10–14) kirjutan järgmisena samasse faili.
+### Task 10: `UploadStepSplit` — opt-in värav ja kokkuvõte
+
+Samm avaneb ilma midagi renderdamata. See ongi see, mis teeb invariandi „tühi plaan = tänane tee" tugevaks.
+
+**Files:**
+- Create: `src/pages/upload/components/UploadStepSplit.tsx`
+- Modify: `src/pages/upload/UploadPage.tsx` (ühenda samm 3)
+- Test: `src/pages/upload/__tests__/UploadStepSplit.test.tsx`
+
+**Interfaces:**
+- Consumes: `getPrepress`, `startPrepress`, `savePrepress`, `applyPrepress` (Task 9), `countOutputPages`
+- Produces: `UploadStepSplit` propsidega `{ uploadId, token, onDone }`; alamkomponentide props-leping (Task 11–13):
+  - `SplitContactSheet: { uploadId, plan, onPageChange(n, patch), onOpenPage(n) }`
+  - `SplitGutterStrip: { uploadId, plan, onPageChange(n, patch), onOpenPage(n) }`
+  - `SplitPageDetail: { uploadId, plan, pageNum, onPageChange(n, patch), onClose() }`
+  - `patch: Partial<Pick<PrepressPage, 'mode' | 'split_x' | 'excluded'>>`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `src/pages/upload/__tests__/UploadStepSplit.test.tsx`:
+
+```tsx
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import UploadStepSplit from '../components/UploadStepSplit';
+import * as api from '../uploadApi';
+import type { PrepressPlan } from '../types';
+
+vi.mock('../uploadApi');
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
+}));
+
+function plan(over: Partial<PrepressPlan> = {}): PrepressPlan {
+  return {
+    enabled: false, default_split_x: 0.5, preview_status: 'idle', preview_done: 0,
+    page_count: 3, output_page_count: 3, trivial: true, status: 'awaiting_split',
+    pages: [
+      { n: 1, mode: 'default', split_x: null, excluded: false, ink: null },
+      { n: 2, mode: 'default', split_x: null, excluded: false, ink: null },
+      { n: 3, mode: 'default', split_x: null, excluded: false, ink: null },
+    ],
+    ...over,
+  };
+}
+
+beforeEach(() => {
+  vi.mocked(api.getPrepress).mockResolvedValue(plan());
+  vi.mocked(api.startPrepress).mockResolvedValue({ status: 'started' });
+  vi.mocked(api.savePrepress).mockResolvedValue({
+    status: 'saved', output_page_count: 6, trivial: false,
+  });
+  vi.mocked(api.applyPrepress).mockResolvedValue({ status: 'transferring', path: 'original' });
+});
+
+it('EI renderda midagi enne, kui lüliti on sisse lülitatud', async () => {
+  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
+  await screen.findByText('step3split.optIn');
+  expect(api.startPrepress).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('split-contact-sheet')).toBeNull();
+});
+
+it('lüliti sisselülitamine käivitab eelvaate', async () => {
+  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
+  await userEvent.click(await screen.findByRole('checkbox'));
+  await waitFor(() => expect(api.startPrepress).toHaveBeenCalledWith('u1', 't'));
+});
+
+it('puutumata lülitiga Edasi saadab originaali ilma plaani muutmata', async () => {
+  const onDone = vi.fn();
+  render(<UploadStepSplit uploadId="u1" token="t" onDone={onDone} />);
+  await userEvent.click(await screen.findByText('step3split.continue'));
+  expect(api.startPrepress).not.toHaveBeenCalled();
+  await waitFor(() => expect(api.applyPrepress).toHaveBeenCalledWith('u1', 't'));
+  await waitFor(() => expect(onDone).toHaveBeenCalled());
+});
+
+it('kuvab eelvaate edenemist', async () => {
+  vi.mocked(api.getPrepress).mockResolvedValue(
+    plan({ enabled: true, preview_status: 'rendering', preview_done: 42, page_count: 300 }),
+  );
+  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
+  expect(await screen.findByText(/step3split.rendering/)).toBeTruthy();
+});
+
+it('apply 409 ei kutsu onDone ega jää igavesti laadima', async () => {
+  vi.mocked(api.applyPrepress).mockRejectedValue(
+    Object.assign(new Error('Töö juba käib'), { status: 409 }),
+  );
+  const onDone = vi.fn();
+  render(<UploadStepSplit uploadId="u1" token="t" onDone={onDone} />);
+  await userEvent.click(await screen.findByText('step3split.continue'));
+  await waitFor(() => expect(screen.getByText('step3split.continue')).toBeTruthy());
+  expect(onDone).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/pages/upload/__tests__/UploadStepSplit.test.tsx`
+Expected: FAIL — `Cannot find module '../components/UploadStepSplit'`
+
+- [ ] **Step 3: Write the component**
+
+Create `src/pages/upload/components/UploadStepSplit.tsx`:
+
+```tsx
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Grid3x3, Columns, AlertTriangle } from 'lucide-react';
+import {
+  applyPrepress, getPrepress, savePrepress, startPrepress,
+} from '../uploadApi';
+import { countOutputPages } from '../prepressPlan';
+import type { PrepressPage, PrepressPlan } from '../types';
+import SplitContactSheet from './SplitContactSheet';
+import SplitGutterStrip from './SplitGutterStrip';
+import SplitPageDetail from './SplitPageDetail';
+
+const POLL_MS = 1500;
+
+interface Props {
+  uploadId: string;
+  token: string | null;
+  onDone: () => void;
+}
+
+/**
+ * Viisardi 3. samm: topeltlehtede poolitamine enne OCR-i.
+ *
+ * Kogu prepress on OPT-IN. Kuni lülitit ei puututa, ei renderdata ühtki
+ * pikslit ja "Edasi" käitub täpselt nagu enne selle featuuri lisamist.
+ */
+const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
+  const { t } = useTranslation(['upload', 'common']);
+  const [plan, setPlan] = useState<PrepressPlan | null>(null);
+  const [view, setView] = useState<'sheet' | 'strip'>('sheet');
+  const [detailPage, setDetailPage] = useState<number | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState('');
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPrepress(uploadId, token)
+      .then((p) => { if (!cancelled) setPlan(p); })
+      .catch(() => { if (!cancelled) setError(t('step3split.renderError')); });
+    return () => { cancelled = true; };
+  }, [uploadId, token, t]);
+
+  // Eelvaate edenemise polling — ainult renderdamise ajal.
+  useEffect(() => {
+    if (plan?.preview_status !== 'rendering') return;
+    const id = setInterval(() => {
+      getPrepress(uploadId, token).then(setPlan).catch(() => undefined);
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [plan?.preview_status, uploadId, token]);
+
+  /** Salvestab plaani debounce'itult — joone nihutamine ei tohi POST-e tulistada. */
+  const persist = useCallback((next: PrepressPlan) => {
+    setPlan(next);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      savePrepress(
+        uploadId,
+        { enabled: next.enabled, default_split_x: next.default_split_x, pages: next.pages },
+        token,
+      ).catch(() => setError(t('errors.networkError')));
+    }, 400);
+  }, [uploadId, token, t]);
+
+  const handleOptIn = async () => {
+    if (!plan) return;
+    persist({ ...plan, enabled: true });
+    try {
+      await startPrepress(uploadId, token);
+      setPlan(await getPrepress(uploadId, token));
+    } catch {
+      setError(t('step3split.renderError'));
+    }
+  };
+
+  const handlePageChange = (n: number, patch: Partial<PrepressPage>) => {
+    if (!plan) return;
+    persist({
+      ...plan,
+      pages: plan.pages.map((p) => (p.n === n ? { ...p, ...patch } : p)),
+    });
+  };
+
+  const handleGlobalLine = (percent: string) => {
+    if (!plan) return;
+    const value = Number(percent);
+    if (!Number.isFinite(value) || value <= 0 || value >= 100) return;
+    persist({ ...plan, default_split_x: value / 100 });
+  };
+
+  const handleContinue = async () => {
+    setApplying(true);
+    setError('');
+    try {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (plan?.enabled) {
+        await savePrepress(
+          uploadId,
+          { enabled: plan.enabled, default_split_x: plan.default_split_x, pages: plan.pages },
+          token,
+        );
+      }
+      await applyPrepress(uploadId, token);
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('errors.networkError'));
+      setApplying(false);
+    }
+  };
+
+  if (!plan) return <div className="py-12 text-center text-gray-500">…</div>;
+
+  const splitCount = plan.enabled
+    ? plan.pages.filter((p) => !p.excluded && p.mode !== 'nosplit').length
+    : 0;
+  const excludedCount = plan.pages.filter((p) => p.excluded).length;
+  const rendering = plan.preview_status === 'rendering';
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold mb-1">{t('step3split.title')}</h2>
+
+      <label className="flex items-start gap-3 p-4 mb-6 rounded border border-gray-200 bg-gray-50">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={plan.enabled}
+          onChange={(e) => (e.target.checked
+            ? handleOptIn()
+            : persist({ ...plan, enabled: false }))}
+        />
+        <span>
+          <span className="font-medium block">{t('step3split.optIn')}</span>
+          <span className="text-sm text-gray-600">{t('step3split.optInHint')}</span>
+        </span>
+      </label>
+
+      {plan.enabled && (
+        <>
+          {rendering && (
+            <div className="mb-4 text-sm text-gray-600">
+              {t('step3split.rendering', {
+                done: plan.preview_done, total: plan.page_count,
+              })}
+            </div>
+          )}
+          {plan.preview_status === 'error' && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-red-700">
+              <AlertTriangle size={16} />{t('step3split.renderError')}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <label className="flex items-center gap-2 text-sm">
+              {t('step3split.globalLine')}
+              <input
+                type="text"
+                inputMode="numeric"
+                className="w-20 px-2 py-1 border rounded"
+                value={Math.round(plan.default_split_x * 1000) / 10}
+                onChange={(e) => handleGlobalLine(e.target.value)}
+              />
+            </label>
+            <div className="flex rounded border overflow-hidden">
+              <button
+                type="button"
+                className={`px-3 py-1 text-sm flex items-center gap-1 ${view === 'sheet' ? 'bg-primary-600 text-white' : 'bg-white'}`}
+                onClick={() => setView('sheet')}
+              >
+                <Grid3x3 size={14} />{t('step3split.viewSheet')}
+              </button>
+              <button
+                type="button"
+                className={`px-3 py-1 text-sm flex items-center gap-1 ${view === 'strip' ? 'bg-primary-600 text-white' : 'bg-white'}`}
+                onClick={() => setView('strip')}
+              >
+                <Columns size={14} />{t('step3split.viewStrip')}
+              </button>
+            </div>
+          </div>
+
+          <p className="mb-4 text-sm text-gray-700">
+            {t('step3split.summary', {
+              pages: plan.page_count,
+              split: splitCount,
+              excluded: excludedCount,
+              output: countOutputPages(plan),
+            })}
+          </p>
+
+          {view === 'sheet' ? (
+            <SplitContactSheet
+              uploadId={uploadId}
+              plan={plan}
+              onPageChange={handlePageChange}
+              onOpenPage={setDetailPage}
+            />
+          ) : (
+            <SplitGutterStrip
+              uploadId={uploadId}
+              plan={plan}
+              onPageChange={handlePageChange}
+              onOpenPage={setDetailPage}
+            />
+          )}
+        </>
+      )}
+
+      {error && <div className="mt-4 text-sm text-red-700">{error}</div>}
+
+      <div className="mt-8">
+        <button
+          type="button"
+          className="px-5 py-2 rounded bg-primary-600 text-white disabled:opacity-50"
+          disabled={applying}
+          onClick={handleContinue}
+        >
+          {applying ? t('step3split.applying') : t('step3split.continue')}
+        </button>
+      </div>
+
+      {detailPage !== null && (
+        <SplitPageDetail
+          uploadId={uploadId}
+          plan={plan}
+          pageNum={detailPage}
+          onPageChange={handlePageChange}
+          onClose={() => setDetailPage(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+export default UploadStepSplit;
+```
+
+- [ ] **Step 4: Wire it into UploadPage**
+
+Modify `src/pages/upload/UploadPage.tsx` — lisa `wizard.step === 3` haru enne olemasolevat (nüüd `=== 4`) ülevaatuse haru:
+
+```tsx
+{wizard.step === 3 && wizard.uploadId && (
+  <UploadStepSplit
+    uploadId={wizard.uploadId}
+    token={authToken}
+    onDone={() => wizard.setStep(4)}
+  />
+)}
+```
+
+`useUploadWizard` peab tagastama `setStep`. Kui ta seda veel ei tee, lisa see tagastusobjekti.
+
+- [ ] **Step 5: Create component stubs so the test can run**
+
+Loo minimaalsed `SplitContactSheet.tsx`, `SplitGutterStrip.tsx` ja `SplitPageDetail.tsx`, mis renderdavad ainult `<div data-testid="split-contact-sheet" />` jms. Päris teostus tuleb Task 11–13. Ilma nendeta ei kompileeru import.
+
+- [ ] **Step 6: Run tests and gates**
+
+Run:
+```bash
+npx vitest run src/pages/upload/__tests__/UploadStepSplit.test.tsx
+npm run typecheck
+npm run lint:ci
+```
+Expected: PASS. `lint:ci` lävi on `--max-warnings 55` — parandades LANGETA arvu, ära tõsta.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/pages/upload
+git commit -m "feat(prepress): UploadStepSplit — opt-in värav, kokkuvõte, apply"
+```
+
+---
+
+### Task 11: `SplitContactSheet` — peavaade tindihoiatusega
+
+100 DPI pisipiltide ruudustik. Tindiskoor tõstab kahtlased esile; pisipilt ise ei tõesta midagi, seetõttu viib klikk ribale või üksiklehele.
+
+**Files:**
+- Create (asenda stub): `src/pages/upload/components/SplitContactSheet.tsx`
+- Test: `src/pages/upload/__tests__/SplitContactSheet.test.tsx`
+
+**Interfaces:**
+- Consumes: `prepressPreviewUrl`, `PrepressPlan`, `PrepressPage`
+- Produces: `SplitContactSheet` propsidega `{ uploadId, plan, onPageChange, onOpenPage }`; eksporditud puhas abifunktsioon `inkLevel(ink: number | null): 'ok' | 'warn' | 'bad'`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `src/pages/upload/__tests__/SplitContactSheet.test.tsx`:
+
+```tsx
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
+import SplitContactSheet, { inkLevel } from '../components/SplitContactSheet';
+import type { PrepressPlan } from '../types';
+
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
+
+const plan: PrepressPlan = {
+  enabled: true, default_split_x: 0.5, preview_status: 'ready', preview_done: 3,
+  page_count: 3, output_page_count: 6, trivial: false, status: 'awaiting_split',
+  pages: [
+    { n: 1, mode: 'default', split_x: null, excluded: false, ink: 0.08 },
+    { n: 2, mode: 'default', split_x: null, excluded: false, ink: 0.48 },
+    { n: 3, mode: 'default', split_x: null, excluded: false, ink: 0.99 },
+  ],
+};
+
+describe('inkLevel', () => {
+  it('mõõdetud väärtused päris materjalilt', () => {
+    expect(inkLevel(0.08)).toBe('ok');
+    expect(inkLevel(0.48)).toBe('warn');
+    expect(inkLevel(0.99)).toBe('bad');
+  });
+
+  it('arvutamata skoor on ok, mitte hoiatus', () => {
+    expect(inkLevel(null)).toBe('ok');
+  });
+});
+
+describe('SplitContactSheet', () => {
+  it('renderdab iga lehe kohta pisipildi', () => {
+    render(
+      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
+    );
+    expect(screen.getAllByRole('img')).toHaveLength(3);
+  });
+
+  it('märgib kõrge tindiskooriga lehe', () => {
+    render(
+      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
+    );
+    expect(screen.getByTestId('page-3')).toHaveAttribute('data-ink-level', 'bad');
+    expect(screen.getByTestId('page-1')).toHaveAttribute('data-ink-level', 'ok');
+  });
+
+  it('poolitusjoont ei kuvata nosplit-lehel', () => {
+    const p = { ...plan, pages: plan.pages.map((x) => (x.n === 2 ? { ...x, mode: 'nosplit' as const } : x)) };
+    render(
+      <SplitContactSheet uploadId="u1" plan={p} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
+    );
+    expect(screen.queryByTestId('line-2')).toBeNull();
+    expect(screen.getByTestId('line-1')).toBeTruthy();
+  });
+
+  it('väljajätmise lüliti kutsub onPageChange', async () => {
+    const onPageChange = vi.fn();
+    render(
+      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={onPageChange} onOpenPage={vi.fn()} />,
+    );
+    await userEvent.click(screen.getByTestId('exclude-2'));
+    expect(onPageChange).toHaveBeenCalledWith(2, { excluded: true });
+  });
+
+  it('pisipildil klikkimine avab üksiklehe', async () => {
+    const onOpenPage = vi.fn();
+    render(
+      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={onOpenPage} />,
+    );
+    await userEvent.click(screen.getByTestId('open-3'));
+    expect(onOpenPage).toHaveBeenCalledWith(3);
+  });
+
+  it('väljajäetud leht on visuaalselt maha võetud', () => {
+    const p = { ...plan, pages: plan.pages.map((x) => (x.n === 1 ? { ...x, excluded: true } : x)) };
+    render(
+      <SplitContactSheet uploadId="u1" plan={p} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
+    );
+    expect(screen.getByTestId('page-1')).toHaveAttribute('data-excluded', 'true');
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/pages/upload/__tests__/SplitContactSheet.test.tsx`
+Expected: FAIL — stub ei ekspordi `inkLevel`-i ega renderda pisipilte
+
+- [ ] **Step 3: Write the component**
+
+Replace `src/pages/upload/components/SplitContactSheet.tsx`:
+
+```tsx
+import React from 'react';
+import { useTranslation } from 'react-i18next';
+import { EyeOff, Eye, Maximize2 } from 'lucide-react';
+import { prepressPreviewUrl } from '../uploadApi';
+import type { PrepressPage, PrepressPlan } from '../types';
+
+/**
+ * Tindiskoori tase. Usaldusväärne AINULT kõrge väärtuse suunas: kõrge skoor
+ * tähendab, et joon lõikab kindlasti midagi; madal skoor EI tõesta õiget
+ * kohta (tühi veeris skoorib samuti 0). Läved on mõõdetud EAA 1253 materjalil.
+ */
+export function inkLevel(ink: number | null): 'ok' | 'warn' | 'bad' {
+  if (ink == null) return 'ok';
+  if (ink >= 0.8) return 'bad';
+  if (ink >= 0.25) return 'warn';
+  return 'ok';
+}
+
+const BORDER: Record<string, string> = {
+  ok: 'border-green-500',
+  warn: 'border-amber-500',
+  bad: 'border-red-600',
+};
+
+interface Props {
+  uploadId: string;
+  plan: PrepressPlan;
+  onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
+  onOpenPage: (n: number) => void;
+}
+
+const SplitContactSheet: React.FC<Props> = ({ uploadId, plan, onPageChange, onOpenPage }) => {
+  const { t } = useTranslation(['upload']);
+
+  return (
+    <div
+      data-testid="split-contact-sheet"
+      className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]"
+    >
+      {plan.pages.map((page) => {
+        const level = inkLevel(page.ink);
+        const splits = plan.enabled && page.mode !== 'nosplit';
+        const x = page.mode === 'custom' && page.split_x != null
+          ? page.split_x
+          : plan.default_split_x;
+        return (
+          <div
+            key={page.n}
+            data-testid={`page-${page.n}`}
+            data-ink-level={level}
+            data-excluded={page.excluded ? 'true' : 'false'}
+            className={`relative ${page.excluded ? 'opacity-35' : ''}`}
+          >
+            <button
+              type="button"
+              data-testid={`open-${page.n}`}
+              title={t('step3split.openPage')}
+              className={`block w-full border-2 ${BORDER[level]}`}
+              onClick={() => onOpenPage(page.n)}
+            >
+              <img
+                src={prepressPreviewUrl(uploadId, page.n)}
+                alt={`${page.n}`}
+                loading="lazy"
+                className="block w-full"
+              />
+            </button>
+
+            {splits && !page.excluded && (
+              <div
+                data-testid={`line-${page.n}`}
+                className="absolute top-0 bottom-0 w-px bg-rose-600 pointer-events-none"
+                style={{ left: `${x * 100}%` }}
+              />
+            )}
+
+            <div className="absolute top-1 left-1 flex gap-1">
+              <span className="text-[10px] px-1 rounded bg-black/60 text-white">{page.n}</span>
+              {level !== 'ok' && (
+                <span
+                  className="text-[10px] px-1 rounded bg-red-700 text-white"
+                  title={t('step3split.inkWarning')}
+                >
+                  {page.ink?.toFixed(2)}
+                </span>
+              )}
+            </div>
+
+            <div className="absolute top-1 right-1 flex gap-1">
+              <button
+                type="button"
+                data-testid={`exclude-${page.n}`}
+                title={page.excluded ? t('step3split.include') : t('step3split.exclude')}
+                className="p-1 rounded bg-black/60 text-white"
+                onClick={() => onPageChange(page.n, { excluded: !page.excluded })}
+              >
+                {page.excluded ? <Eye size={12} /> : <EyeOff size={12} />}
+              </button>
+              <button
+                type="button"
+                data-testid={`nosplit-${page.n}`}
+                title={t('step3split.noSplit')}
+                className="p-1 rounded bg-black/60 text-white"
+                onClick={() => onPageChange(page.n, {
+                  mode: page.mode === 'nosplit' ? 'default' : 'nosplit',
+                  split_x: null,
+                })}
+              >
+                <Maximize2 size={12} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+export default SplitContactSheet;
+```
+
+- [ ] **Step 4: Run tests and gates**
+
+Run:
+```bash
+npx vitest run src/pages/upload/__tests__/SplitContactSheet.test.tsx
+npm run typecheck
+```
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/pages/upload/components/SplitContactSheet.tsx src/pages/upload/__tests__/SplitContactSheet.test.tsx
+git commit -m "feat(prepress): SplitContactSheet — pisipiltide ruudustik tindihoiatusega"
+```
+
+---
+
+Plaani ülejäänud osa (Task 12–14) kirjutan järgmisena samasse faili.
