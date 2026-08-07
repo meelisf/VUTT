@@ -128,3 +128,10 @@ lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 
 `reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma
 `.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Eraldi issue.
+
+**`RENDER_SEMAPHORE` hoitakse terve partii vältel** (`_render_previews` ja
+`apply_and_transfer`), mitte lehe kaupa. Iga interaktiivne päring — nt
+köitevahe-riba — seisab seega kogu partii taga; 300-lehelise teose `apply`
+korral on see minuteid. Ettepanek on võtta semafor ühe lehe renderduse ümber,
+teadlikult lubades partiide põimumist (semafori eesmärk on CPU kaitse, mitte
+partiide järjestamine). Vt issue #219.
