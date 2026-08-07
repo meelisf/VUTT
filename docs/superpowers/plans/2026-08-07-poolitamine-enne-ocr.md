@@ -1486,4 +1486,708 @@ git commit -m "feat(prepress): köitevahe-riba nõudmisel, kvantitud x + LRU vah
 
 ---
 
-Plaani ülejäänud osa (Task 6–14) kirjutan järgmisena samasse faili.
+### Task 6: 300 DPI läbikäik ja aatomiline avaldamine
+
+Voogedastus lehthaaval: renderda → lõika → saada → kustuta. Kogu teost ei materialiseerita (300-leheline topeltlehtedega teos oleks ~1 GB).
+
+**Files:**
+- Create: `server/upload/prepress_apply.py`
+- Test: `tests/test_prepress_apply.py`
+
+**Interfaces:**
+- Consumes: `prepress_plan.page_cuts`, `prepress_plan.is_trivial_plan`, `page_source.open_page_source`, `prepress.source_path`, `prepress.RENDER_SEMAPHORE`, `ocr_client.sftp_open`, `ocr_client.ensure_remote_dirs`
+- Produces:
+  - `remote_page_name(slug: str, out_index: int) -> str`
+  - `publish_atomic(sftp, local_path: str, remote_path: str) -> None`
+  - `apply_and_transfer(upload_id: str) -> None` (taustalõime siht)
+  - `start_apply(upload_id: str) -> bool`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/test_prepress_apply.py`:
+
+```python
+"""300 DPI läbikäik: nimetamine, aatomiline avaldamine, voogedastus."""
+import os
+
+import pytest
+from PIL import Image
+
+from server.upload import prepress_apply
+
+
+class FakeSftp:
+    """Salvestab put/rename kutsed, et saaks kontrollida .tmp+rename mustrit."""
+
+    def __init__(self):
+        self.puts = []
+        self.renames = []
+        self.closed = False
+
+    def put(self, local, remote, callback=None):
+        self.puts.append(remote)
+
+    def rename(self, src, dst):
+        self.renames.append((src, dst))
+
+    def stat(self, path):
+        raise FileNotFoundError(path)
+
+    def mkdir(self, path):
+        pass
+
+    def close(self):
+        self.closed = True
+
+
+# --- nimetamine ---
+
+def test_remote_page_name_on_ocr_serveri_konventsioonis():
+    """OCR-server leiab pildid rglob-iga; nimi peab järgima {slug}_pg_NNN.jpg."""
+    assert prepress_apply.remote_page_name("kirik-abc", 1) == "kirik-abc_pg_001.jpg"
+    assert prepress_apply.remote_page_name("kirik-abc", 42) == "kirik-abc_pg_042.jpg"
+    assert prepress_apply.remote_page_name("kirik-abc", 1234) == "kirik-abc_pg_1234.jpg"
+
+
+# --- aatomiline avaldamine ---
+
+def test_publish_atomic_laeb_tmp_nimega_ja_nimetab_ymber(tmp_path):
+    """OCR-serveri valvuril EI OLE piltidele stabiilsuskontrolli
+    (wait_for_file_stable kutsutakse ainult PDF-ide peale). Poolik JPG satuks
+    OCR-i. .jpg.tmp jääb valvuri EXTENSIONS filtrist välja."""
+    local = tmp_path / "a.jpg"
+    local.write_bytes(b"jpeg")
+    sftp = FakeSftp()
+    prepress_apply.publish_atomic(sftp, str(local), "/remote/x_pg_001.jpg")
+    assert sftp.puts == ["/remote/x_pg_001.jpg.tmp"]
+    assert sftp.renames == [("/remote/x_pg_001.jpg.tmp", "/remote/x_pg_001.jpg")]
+
+
+# --- voogedastus ---
+
+@pytest.fixture
+def upload(tmp_path, monkeypatch):
+    """Kolme lehega pildikaust lähteallikaks."""
+    uid = "u1"
+    base = tmp_path / uid
+    src = base / "source"
+    src.mkdir(parents=True)
+    for n, width in enumerate([400, 500, 400], start=1):
+        Image.new("RGB", (width, 300), "white").save(src / "pg_{:03d}.jpg".format(n))
+    monkeypatch.setattr(
+        prepress_apply.upload_state, "upload_dir", lambda i: str(base)
+    )
+    monkeypatch.setattr(prepress_apply.prepress, "source_path", lambda i: str(src))
+    return uid, base
+
+
+def _plan(**over):
+    from server.upload import prepress_plan
+    plan = prepress_plan.default_plan(3)
+    plan.update(over)
+    return plan
+
+
+def test_poolitatud_lehed_saadetakse_vasak_parem_jarjekorras(upload, monkeypatch):
+    uid, base = upload
+    sftp = FakeSftp()
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+    prepress_apply._transfer_pages(uid, "kirik-abc", "/remote", _plan(enabled=True))
+
+    assert sftp.renames == [
+        ("/remote/kirik-abc_pg_001.jpg.tmp", "/remote/kirik-abc_pg_001.jpg"),
+        ("/remote/kirik-abc_pg_002.jpg.tmp", "/remote/kirik-abc_pg_002.jpg"),
+        ("/remote/kirik-abc_pg_003.jpg.tmp", "/remote/kirik-abc_pg_003.jpg"),
+        ("/remote/kirik-abc_pg_004.jpg.tmp", "/remote/kirik-abc_pg_004.jpg"),
+        ("/remote/kirik-abc_pg_005.jpg.tmp", "/remote/kirik-abc_pg_005.jpg"),
+        ("/remote/kirik-abc_pg_006.jpg.tmp", "/remote/kirik-abc_pg_006.jpg"),
+    ]
+
+
+def test_valjajaetud_lehte_ei_renderdata_ega_saadeta(upload, monkeypatch):
+    uid, base = upload
+    sftp = FakeSftp()
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+    plan = _plan(enabled=True)
+    plan["pages"][1]["excluded"] = True
+    prepress_apply._transfer_pages(uid, "s", "/remote", plan)
+    assert len(sftp.renames) == 4     # lehed 1 ja 3 poolitatud, leht 2 välja
+
+
+def test_ajutised_failid_kustutatakse_kohe(upload, monkeypatch):
+    """Voogedastus: kogu teost ei materialiseerita lokaalselt."""
+    uid, base = upload
+    sftp = FakeSftp()
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+    prepress_apply._transfer_pages(uid, "s", "/remote", _plan(enabled=True))
+    work = base / "apply_tmp"
+    assert not work.exists() or os.listdir(str(work)) == []
+
+
+def test_poolituse_laius_tuleb_iga_lehe_enda_moodust(upload, monkeypatch):
+    """Leht 1 on 400 px, leht 2 on 500 px — cut_px peab erinema."""
+    uid, base = upload
+    widths = []
+    sftp = FakeSftp()
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+    orig = prepress_apply._write_cut
+
+    def spy(src_img, x0, x1, dst):
+        widths.append(x1 - x0)
+        return orig(src_img, x0, x1, dst)
+
+    monkeypatch.setattr(prepress_apply, "_write_cut", spy)
+    prepress_apply._transfer_pages(uid, "s", "/remote", _plan(enabled=True))
+    assert widths[:4] == [200, 200, 250, 250]
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv/bin/pytest tests/test_prepress_apply.py -v`
+Expected: FAIL — `ModuleNotFoundError: No module named 'server.upload.prepress_apply'`
+
+- [ ] **Step 3: Write the implementation**
+
+Create `server/upload/prepress_apply.py`:
+
+```python
+"""300 DPI läbikäik: renderda → lõika → saada → kustuta, lehthaaval.
+
+Eraldi moodul prepress.py-st, sest see on ainus koht, mis puudutab SFTP-d ja
+OCR-serveri nimekonventsiooni.
+
+Voogedastus, mitte materialiseerimine: 300-leheline topeltlehtedega teos annaks
+~1 GB JPG-sid. Kõrvalefektina alustab OCR-server lehest 1 sel ajal, kui meie
+alles renderdame lehte 50.
+"""
+import os
+import shutil
+import threading
+from typing import Optional
+
+from ..config import OCR_SERVER_PATH, get_logger
+from . import ocr_client, page_source, prepress, prepress_plan
+from . import state as upload_state
+
+logger = get_logger(__name__)
+
+
+def remote_page_name(slug: str, out_index: int) -> str:
+    """OCR-serveri nimekonventsioon: valvur leiab pildid rglob-iga."""
+    return "{}_pg_{:03d}.jpg".format(slug, out_index)
+
+
+def publish_atomic(sftp, local_path: str, remote_path: str) -> None:
+    """Laeb üles .tmp nimega ja nimetab alles siis ümber.
+
+    OCR-serveri valvuril EI OLE piltide jaoks stabiilsuskontrolli —
+    wait_for_file_stable() kutsutakse seal ainult PDF-ide peale. Pildid
+    korjatakse rglob-iga, filtrina EXTENSIONS = {".jpg", ".jpeg", ...}.
+    Poolik JPG satuks OCR-i; .jpg.tmp jääb filtrist välja.
+
+    Kataloogi tervikuna EI varjata: valvur töötab pildi kaupa, nii et poolik
+    kataloog on konveier, mille me tahame alles jätta.
+    """
+    tmp_remote = remote_path + ".tmp"
+    sftp.put(local_path, tmp_remote)
+    sftp.rename(tmp_remote, remote_path)
+
+
+def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
+    """Kirjutab lõike [x0, x1) eraldi JPG-na. x1 == laius → tervikleht."""
+    from PIL import Image
+
+    with Image.open(src_img_path) as im:
+        rgb = im.convert("RGB")
+        if x0 == 0 and x1 >= rgb.size[0]:
+            rgb.save(dst, "JPEG", quality=page_source.JPEG_QUALITY)
+            return
+        rgb.crop((x0, 0, x1, rgb.size[1])).save(
+            dst, "JPEG", quality=page_source.JPEG_QUALITY
+        )
+
+
+def _transfer_pages(upload_id: str, slug: str, remote_work: str,
+                    plan: Optional[dict]) -> int:
+    """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu."""
+    src_path = prepress.source_path(upload_id)
+    if not src_path:
+        raise FileNotFoundError("Lähteallikat ei leitud: {}".format(upload_id))
+
+    source = page_source.open_page_source(src_path)
+    count = source.page_count()
+    work_dir = os.path.join(upload_state.upload_dir(upload_id), "apply_tmp")
+    os.makedirs(work_dir, exist_ok=True)
+
+    sftp = ocr_client.sftp_open(upload_id)
+    out_index = 0
+    try:
+        ocr_client.ensure_remote_dirs(sftp, (remote_work,))
+        for n in range(1, count + 1):
+            if prepress_plan.is_excluded(plan, n):
+                continue
+
+            full = os.path.join(work_dir, "full.jpg")
+            source.render_full(n, full)
+            try:
+                from PIL import Image
+                with Image.open(full) as im:
+                    width = im.size[0]
+
+                for (x0, x1) in prepress_plan.page_cuts(plan, n, width):
+                    out_index += 1
+                    name = remote_page_name(slug, out_index)
+                    cut = os.path.join(work_dir, name)
+                    try:
+                        _write_cut(full, x0, x1, cut)
+                        publish_atomic(sftp, cut, "{}/{}".format(remote_work, name))
+                    finally:
+                        if os.path.exists(cut):
+                            os.unlink(cut)
+            finally:
+                if os.path.exists(full):
+                    os.unlink(full)
+
+            upload_state.mutate_prepress(
+                upload_id, lambda p, n=n: p.update(applied_done=n)
+            )
+    finally:
+        try:
+            sftp.close()
+        except Exception:
+            pass
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+    return out_index
+
+
+def apply_and_transfer(upload_id: str) -> None:
+    """Taustalõime siht. Eeldab, et try_begin_applying on juba loa andnud."""
+    state = upload_state.read_state(upload_id)
+    if not state:
+        return
+    slug = state["meta"]["slug"]
+    remote_work = "{}/{}".format(OCR_SERVER_PATH, state["remote_work_path"])
+    plan = state.get("prepress")
+
+    try:
+        with prepress.RENDER_SEMAPHORE:
+            sent = _transfer_pages(upload_id, slug, remote_work, plan)
+        upload_state.set_upload_state(
+            upload_id, status="processing", expected_pages=sent
+        )
+        logger.info("Prepress apply valmis: {} → {} lehte".format(upload_id, sent))
+    except Exception as e:
+        logger.error("Prepress apply {}: {}".format(upload_id, e))
+        upload_state.set_upload_state(
+            upload_id, status="error", error_message=str(e)
+        )
+
+
+def start_apply(upload_id: str) -> bool:
+    """CAS + taustalõim. False = töö juba käib (topeltklikk, retry, refresh)."""
+    if not upload_state.try_begin_applying(upload_id):
+        return False
+    threading.Thread(
+        target=apply_and_transfer, args=(upload_id,),
+        daemon=True, name="prepress-apply-{}".format(upload_id),
+    ).start()
+    return True
+```
+
+- [ ] **Step 4: Run test to verify it passes**
+
+Run: `.venv/bin/pytest tests/test_prepress_apply.py -v`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/upload/prepress_apply.py tests/test_prepress_apply.py
+git commit -m "feat(prepress): 300 DPI läbikäik, voogedastus ja .tmp+rename avaldamine"
+```
+
+---
+
+### Task 7: Lähtefaili hoidmine VUTT-i poolel
+
+Kõige riskantsem ülesanne: muudab olemasolevat üleslaadimise voogu. Fail ei lähe enam kohe OCR-serverisse — muidu on poolitamiseks hilja.
+
+**Files:**
+- Modify: `server/upload_ops.py:401-450` (`save_and_transfer_to_ocr`), `server/upload_ops.py:477-605` (`add_image_page`)
+- Create: `server/upload/store_source.py`
+- Test: `tests/test_store_source.py`
+
+**Interfaces:**
+- Consumes: `file_detection.detect_file_type`, `file_detection.count_pdf_pages`, `file_detection.validate_upload_image`, `state.init_prepress`
+- Produces:
+  - `store_pdf(upload_id: str, tmp_path: str) -> int`
+  - `store_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages: int) -> int`
+  - `transfer_stored_source(upload_id: str) -> None` — tänane PDF-tee, aga salvestatud failist
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/test_store_source.py`:
+
+```python
+"""Lähtefail jääb VUTT-i poolele, kuni admin on sammu 3 läbinud."""
+import os
+
+import pytest
+from PIL import Image
+
+from server.upload import store_source
+from server.upload import state as upload_state
+
+
+@pytest.fixture
+def upload(tmp_path, monkeypatch):
+    uid = "u1"
+    base = tmp_path / uid
+    base.mkdir(parents=True)
+    monkeypatch.setattr(upload_state, "upload_dir", lambda i: str(base))
+    monkeypatch.setattr(store_source.upload_state, "upload_dir", lambda i: str(base))
+    upload_state.write_state(uid, {
+        "id": uid, "status": "pending", "files": [],
+        "meta": {"slug": "kirik-abc"},
+        "remote_staging_path": "AUTO-OCR/print/u1",
+        "remote_work_path": "AUTO-OCR/print/u1/kirik-abc",
+    })
+    return uid, base
+
+
+def test_pdf_salvestatakse_lokaalselt_ja_ei_saadeta_kohe(upload, monkeypatch):
+    uid, base = upload
+    src = base / "incoming.pdf"
+    src.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "pdf")
+    monkeypatch.setattr(store_source.file_detection, "count_pdf_pages", lambda p: 12)
+    sent = []
+    monkeypatch.setattr(store_source, "transfer_stored_source", lambda i: sent.append(i))
+
+    pages = store_source.store_pdf(uid, str(src))
+
+    assert pages == 12
+    assert (base / "source.pdf").is_file()
+    assert sent == []                                  # MIDAGI ei saadetud
+    state = upload_state.read_state(uid)
+    assert state["status"] == "awaiting_split"
+    assert state["expected_pages"] == 12
+    assert len(state["prepress"]["pages"]) == 12
+    assert state["prepress"]["enabled"] is False       # opt-in
+
+
+def test_pdf_salvestamine_kustutab_ajutise_faili(upload, monkeypatch):
+    uid, base = upload
+    src = base / "incoming.pdf"
+    src.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "pdf")
+    monkeypatch.setattr(store_source.file_detection, "count_pdf_pages", lambda p: 3)
+    store_source.store_pdf(uid, str(src))
+    assert not src.exists()
+
+
+def test_toetamata_formaat_toustab_valueerrori(upload, monkeypatch):
+    uid, base = upload
+    src = base / "x.bin"
+    src.write_bytes(b"\x00\x01")
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "unknown")
+    with pytest.raises(ValueError, match="Toetamata"):
+        store_source.store_pdf(uid, str(src))
+
+
+def test_pildilehed_kogunevad_source_kausta(upload, monkeypatch):
+    uid, base = upload
+    monkeypatch.setattr(
+        store_source.file_detection, "validate_upload_image", lambda p: (100, 200)
+    )
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "jpeg")
+    for n in (1, 2, 3):
+        tmp = base / "in_{}.jpg".format(n)
+        Image.new("RGB", (100, 200), "white").save(tmp, "JPEG")
+        store_source.store_image_page(uid, str(tmp), n, 3)
+
+    files = sorted(os.listdir(str(base / "source")))
+    assert files == ["pg_001.jpg", "pg_002.jpg", "pg_003.jpg"]
+    state = upload_state.read_state(uid)
+    assert state["status"] == "awaiting_split"          # viimane leht → valmis
+    assert len(state["prepress"]["pages"]) == 3
+
+
+def test_pildilehed_jaavad_kogumisolekusse_kuni_viimaseni(upload, monkeypatch):
+    uid, base = upload
+    monkeypatch.setattr(
+        store_source.file_detection, "validate_upload_image", lambda p: (100, 200)
+    )
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "jpeg")
+    tmp = base / "in_1.jpg"
+    Image.new("RGB", (100, 200), "white").save(tmp, "JPEG")
+    store_source.store_image_page(uid, str(tmp), 1, 3)
+    assert upload_state.read_state(uid)["status"] == "collecting_images"
+
+
+def test_png_konverteeritakse_jpeg_iks(upload, monkeypatch):
+    uid, base = upload
+    monkeypatch.setattr(
+        store_source.file_detection, "validate_upload_image", lambda p: (100, 200)
+    )
+    monkeypatch.setattr(store_source.file_detection, "detect_file_type", lambda p: "png")
+    tmp = base / "in.png"
+    Image.new("RGB", (100, 200), "white").save(tmp, "PNG")
+    store_source.store_image_page(uid, str(tmp), 1, 1)
+    with Image.open(str(base / "source" / "pg_001.jpg")) as im:
+        assert im.format == "JPEG"
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv/bin/pytest tests/test_store_source.py -v`
+Expected: FAIL — `ModuleNotFoundError: No module named 'server.upload.store_source'`
+
+- [ ] **Step 3: Write the implementation**
+
+Create `server/upload/store_source.py`:
+
+```python
+"""Lähtefaili salvestamine VUTT-i poolele.
+
+MUUDATUS TÄNASE VOO SUHTES: fail EI lähe enam kohe OCR-serverisse. Ta jääb
+uploads/{id}/source.pdf-i (või source/ kausta), kuni admin on sammu 3 läbinud.
+Muidu oleks poolitamiseks hilja — OCR oleks juba alanud.
+
+Tegelik edastus toimub prepress/apply endpointist:
+  - triviaalne plaan → transfer_stored_source() (tänane PDF-tee)
+  - poolitusi on   → prepress_apply.start_apply() (300 DPI JPG-d)
+"""
+import os
+import shutil
+import threading
+from typing import Optional
+
+from ..config import get_logger
+from . import file_detection, ocr_client
+from . import state as upload_state
+
+logger = get_logger(__name__)
+
+
+def source_pdf_path(upload_id: str) -> str:
+    return os.path.join(upload_state.upload_dir(upload_id), "source.pdf")
+
+
+def source_images_dir(upload_id: str) -> str:
+    return os.path.join(upload_state.upload_dir(upload_id), "source")
+
+
+def store_pdf(upload_id: str, tmp_path: str) -> int:
+    """Salvestab üleslaaditud PDF-i lokaalselt ja loob prepress-plaani.
+
+    Tagastab lehtede arvu. Tõstab ValueError vigase või toetamata faili korral.
+    """
+    file_type = file_detection.detect_file_type(tmp_path)
+    if file_type != "pdf":
+        file_detection.safe_unlink(tmp_path)
+        raise ValueError(
+            "Toetamata failivorming. Palun laadi üles PDF, JPG, PNG või TIFF fail."
+        )
+
+    # count_pdf_pages kustutab vigase PDF-i ise — see on siin õige käitumine.
+    pages = file_detection.count_pdf_pages(tmp_path)
+
+    dst = source_pdf_path(upload_id)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.move(tmp_path, dst)
+    os.chmod(dst, 0o644)
+
+    upload_state.set_upload_state(
+        upload_id, status="awaiting_split", expected_pages=pages
+    )
+    upload_state.init_prepress(upload_id, pages)
+    logger.info("Lähte-PDF salvestatud: {} ({} lk)".format(upload_id, pages))
+    return pages
+
+
+def store_image_page(upload_id: str, tmp_path: str, page_number: int,
+                     total_pages: int) -> int:
+    """Salvestab ühe pildilehe source/ kausta. Rasteriseerimist ei ole."""
+    file_detection.validate_upload_image(tmp_path)
+    file_type = file_detection.detect_file_type(tmp_path)
+
+    directory = source_images_dir(upload_id)
+    os.makedirs(directory, exist_ok=True)
+    dst = os.path.join(directory, "pg_{:03d}.jpg".format(page_number))
+
+    if file_type in ("png", "tiff"):
+        from PIL import Image
+        with Image.open(tmp_path) as im:
+            im.convert("RGB").save(dst, "JPEG", quality=95)
+        file_detection.safe_unlink(tmp_path)
+    else:
+        shutil.move(tmp_path, dst)
+    os.chmod(dst, 0o644)
+
+    if page_number >= total_pages:
+        upload_state.set_upload_state(
+            upload_id, status="awaiting_split", expected_pages=total_pages
+        )
+        upload_state.init_prepress(upload_id, total_pages)
+    else:
+        upload_state.set_upload_state(
+            upload_id, status="collecting_images", expected_pages=total_pages
+        )
+    return total_pages
+
+
+def transfer_stored_source(upload_id: str) -> None:
+    """Triviaalse plaani tee: saadab salvestatud originaali muutmata.
+
+    See on TÄNANE käitumine, ainult lähtekoht on muutunud (uploads/{id}/ tmp
+    faili asemel). Lähtefail jääb alles kuni impordini.
+    """
+    state = upload_state.read_state(upload_id)
+    if not state:
+        return
+
+    pdf = source_pdf_path(upload_id)
+    if os.path.isfile(pdf):
+        _transfer_pdf_thread(upload_id, state, pdf)
+        return
+
+    directory = source_images_dir(upload_id)
+    if os.path.isdir(directory):
+        _transfer_images_thread(upload_id, state, directory)
+        return
+
+    upload_state.set_upload_state(
+        upload_id, status="error", error_message="Lähteallikat ei leitud"
+    )
+
+
+def _transfer_pdf_thread(upload_id: str, state: dict, pdf: str) -> None:
+    from ..config import OCR_SERVER_PATH
+
+    slug = state["meta"]["slug"]
+    staging = "{}/{}".format(OCR_SERVER_PATH, state["remote_staging_path"])
+    remote_tmp = "{}/{}.pdf.tmp".format(staging, slug)
+    remote_dst = "{}/{}.pdf".format(staging, slug)
+
+    def _run():
+        sftp = None
+        try:
+            sftp = ocr_client.sftp_open(upload_id)
+            ocr_client.ensure_remote_dirs(sftp, (staging,))
+            sftp.put(pdf, remote_tmp)
+            sftp.rename(remote_tmp, remote_dst)
+            upload_state.set_upload_state(upload_id, status="processing")
+            logger.info("Lähte-PDF edastatud OCR-serverisse: {}".format(upload_id))
+        except Exception as e:
+            logger.error("PDF edastus {}: {}".format(upload_id, e))
+            upload_state.set_upload_state(
+                upload_id, status="error", error_message=str(e)
+            )
+        finally:
+            if sftp:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+
+    upload_state.set_upload_state(upload_id, status="uploading")
+    threading.Thread(
+        target=_run, daemon=True, name="store-pdf-{}".format(upload_id)
+    ).start()
+
+
+def _transfer_images_thread(upload_id: str, state: dict, directory: str) -> None:
+    from ..config import OCR_SERVER_PATH
+    from .prepress_apply import publish_atomic
+
+    slug = state["meta"]["slug"]
+    remote_work = "{}/{}".format(OCR_SERVER_PATH, state["remote_work_path"])
+
+    def _run():
+        sftp = None
+        try:
+            sftp = ocr_client.sftp_open(upload_id)
+            ocr_client.ensure_remote_dirs(sftp, (remote_work,))
+            for i, name in enumerate(sorted(os.listdir(directory)), start=1):
+                publish_atomic(
+                    sftp,
+                    os.path.join(directory, name),
+                    "{}/{}_pg_{:03d}.jpg".format(remote_work, slug, i),
+                )
+            upload_state.set_upload_state(upload_id, status="processing")
+        except Exception as e:
+            logger.error("Piltide edastus {}: {}".format(upload_id, e))
+            upload_state.set_upload_state(
+                upload_id, status="error", error_message=str(e)
+            )
+        finally:
+            if sftp:
+                try:
+                    sftp.close()
+                except Exception:
+                    pass
+
+    upload_state.set_upload_state(upload_id, status="uploading")
+    threading.Thread(
+        target=_run, daemon=True, name="store-img-{}".format(upload_id)
+    ).start()
+```
+
+- [ ] **Step 4: Rewire the existing entry points**
+
+Modify `server/upload_ops.py`. Asenda `save_and_transfer_to_ocr` keha (read 401–450) sellega — vana SFTP-loogika on nüüd `store_source`-is:
+
+```python
+def save_and_transfer_to_ocr(upload_id: str, tmp_path: str) -> int:
+    """Salvestab üleslaaditud faili VUTT-i poolele.
+
+    NIMI ON AJALOOLINE: fail EI lähe enam kohe OCR-serverisse (vt
+    server/upload/store_source.py). Edastus toimub prepress/apply
+    endpointist, kui admin on sammu 3 läbinud.
+
+    JPG/PNG/TIFF üksikpilt käsitletakse ühelehelise pildikaustana.
+    """
+    from .upload import store_source
+
+    with _get_upload_lock(upload_id):
+        state = _read_state(upload_id)
+    if not state:
+        raise ValueError(f"Upload {upload_id} ei leitud")
+
+    file_type = _detect_file_type(tmp_path)
+    if file_type in ('jpeg', 'png', 'tiff'):
+        return store_source.store_image_page(upload_id, tmp_path, 1, 1)
+    return store_source.store_pdf(upload_id, tmp_path)
+```
+
+Ja `add_image_page` keha (read 477–605) → delegeeri:
+
+```python
+def add_image_page(upload_id: str, tmp_path: str, page_number: int, total_pages: int) -> int:
+    """Lisab ühe pildilehe multi-image üleslaadimisse.
+
+    Pildid kogutakse uploads/{id}/source/ kausta, mitte enam otse
+    OCR-serverisse — muidu oleks poolitamiseks hilja.
+    """
+    from .upload import store_source
+
+    return store_source.store_image_page(upload_id, tmp_path, page_number, total_pages)
+```
+
+- [ ] **Step 5: Run the tests**
+
+Run: `.venv/bin/pytest tests/test_store_source.py tests/test_upload_ssh_timeout.py tests/test_upload_background_sync.py -v`
+Expected: PASS. Kui `test_upload_ssh_timeout.py` viitab eemaldatud sisemistele funktsioonidele, kohanda test uuele teele — SSH timeout'i kate peab jääma.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add server/upload/store_source.py server/upload_ops.py tests/test_store_source.py
+git commit -m "feat(prepress): lähtefail jääb VUTT-i poolele kuni sammu 3 otsuseni"
+```
+
+---
+
+Plaani ülejäänud osa (Task 8–14) kirjutan järgmisena samasse faili.
