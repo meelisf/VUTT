@@ -109,7 +109,10 @@ const SplitPageDetail: React.FC<Props> = ({
   if (!page) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-2 sm:p-4">
+    // z-[1300]: Header on `sticky z-[1200]` ja kataks muidu modaali ülemise
+    // serva — just seal, kus on sulgemisnupp. Sama väärtus nagu
+    // PageImageEditorModal'is; tegevusribad on `z-[1100]` ehk päise all.
+    <div className="fixed inset-0 z-[1300] flex items-start justify-center overflow-y-auto bg-black/70 p-2 sm:p-4">
       {/* flex-col + max-h: päis on omaette flex-laps ja EI keri kaasa —
           varem oli päis kerimiskonteineri sees ja kadus väikesel ekraanil
           ülemise serva taha. */}

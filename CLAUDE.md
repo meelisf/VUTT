@@ -213,6 +213,11 @@ kaudu (`set_upload_state(**extra)` seab terve ülemise taseme võtme ja pühiks
 paralleelse muudatuse). `apply` on ühekordne (`awaiting_split → applying` CAS,
 kordus = 409). Tindiskoor on hoiataja, mitte pakkuja.
 
+**z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
+(nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
+väikesel ekraanil ära. Tegevusribad (`PageActionBar`, `DashboardBulkActionBar`) on `z-[1100]`
+ehk teadlikult päise all. `z-50` EI OLE piisav.
+
 **Frontend, muu** — number-sisenditel `type="text" + inputMode="numeric"` (mitte `type="number"`,
 tühjendamine katki). Salvestamata muudatuste jaoks on ÜKS dialoog (`UnsavedChangesDialog` +
 `useUnsavedChangesGuard`) — ära lisa uut confirm-varianti. Kerib AKEN, mitte konteiner (v.a
