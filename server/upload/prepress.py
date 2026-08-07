@@ -248,3 +248,20 @@ def get_gutter_strip(upload_id: str, n: int, x_frac: float) -> str:
 
     prune_strip_cache(upload_id, n)
     return dst
+
+
+def cleanup_prepress_artifacts(upload_id: str) -> None:
+    """Kustutab prepress-artefaktid pärast importi.
+
+    thumbs/ EI kuulu siia — see on OCR-järgse ülevaatuse (samm 4) oma.
+    cancel_upload teeb rmtree kogu kaustale, nii et seda teed siin ei kata.
+    """
+    import shutil
+
+    base = upload_state.upload_dir(upload_id)
+    for name in ("preview", "strips", "apply_tmp", "source"):
+        shutil.rmtree(os.path.join(base, name), ignore_errors=True)
+    try:
+        os.unlink(os.path.join(base, "source.pdf"))
+    except OSError:
+        pass
