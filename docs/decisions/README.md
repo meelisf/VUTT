@@ -34,3 +34,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0012](0012-muutusteta-salvestus-on-no-op.md) | Muutusteta salvestus ei kirjuta, ei commiti ega indekseeri | kehtib |
 | [0013](0013-meili-sunk-koondatakse-teose-kaupa.md) | Meili sünk koondatakse teose kaupa; dirty-lipp elab vea üle | kehtib |
 | [0014](0014-inline-sildid-vs-labels-register.md) | Inline sildid on kuvatav tõde; register täidab augud, ei kirjuta ajaloolisi kohanimesid üle | kehtib |
+| [0015](0015-reocr-hulgi-vastuvott.md) | Batch re-OCR tulemused võetakse vastu hulgi, ühe git-commiti ja ühe Meili sünkina | kehtib |
