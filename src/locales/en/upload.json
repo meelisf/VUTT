@@ -4,6 +4,7 @@
   "steps": {
     "metadata": "Metadata",
     "upload": "Upload",
+    "split": "Splitting",
     "review": "Review"
   },
   "pending": {
@@ -77,6 +78,25 @@
     "importError": "Import failed",
     "gitCommitWarning": "Work was imported, but the Git version-control commit failed."
   },
+  "step3split": {
+    "title": "Split double pages",
+    "optIn": "Split double pages before OCR",
+    "optInHint": "Turn this on only if a single scan holds two book pages. Otherwise just press Continue — everything works as before.",
+    "rendering": "Preparing preview: {{done}} / {{total}}",
+    "renderError": "Preview generation failed",
+    "globalLine": "Split line (% of width)",
+    "viewSheet": "Contact sheet",
+    "viewStrip": "Gutter strip",
+    "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
+    "inkWarning": "The line cuts through writing",
+    "exclude": "Exclude",
+    "include": "Restore",
+    "noSplit": "Don't split",
+    "resetToGlobal": "Use the global line",
+    "openPage": "Open page",
+    "applying": "Processing and sending to OCR…",
+    "continue": "Continue"
+  },
   "notice": {
     "title": "Upload and processing takes {{time}}",
     "body": "After adding the PDF, OCR processing runs in the background. You can leave this page and return later — your progress is saved automatically."
@@ -108,6 +128,9 @@
     "reviewing": "Reviewing",
     "done": "Done",
     "error": "Error",
-    "imported": "Imported"
+    "imported": "Imported",
+    "awaiting_split": "Awaiting split",
+    "prepping": "Preparing preview",
+    "applying": "Processing and sending"
   }
 }

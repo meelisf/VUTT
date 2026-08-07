@@ -4,6 +4,7 @@
   "steps": {
     "metadata": "Metaandmed",
     "upload": "Üleslaadimine",
+    "split": "Poolitamine",
     "review": "Ülevaatus"
   },
   "pending": {
@@ -77,6 +78,25 @@
     "importError": "Importimine ebaõnnestus",
     "gitCommitWarning": "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus."
   },
+  "step3split": {
+    "title": "Topeltlehtede poolitamine",
+    "optIn": "Poolita topeltlehed enne OCR-i",
+    "optInHint": "Lülita sisse ainult siis, kui skaneeringul on kaks lehekülge ühel pildil. Muidu vajuta lihtsalt Edasi — kõik käib nagu tavaliselt.",
+    "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
+    "renderError": "Eelvaate valmistamine ebaõnnestus",
+    "globalLine": "Poolitusjoon (% laiusest)",
+    "viewSheet": "Kontaktleht",
+    "viewStrip": "Köitevahe-riba",
+    "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
+    "inkWarning": "Joon lõikab kirja",
+    "exclude": "Jäta välja",
+    "include": "Võta tagasi",
+    "noSplit": "Ära poolita",
+    "resetToGlobal": "Kasuta üldist joont",
+    "openPage": "Ava leht",
+    "applying": "Töötlen ja saadan OCR-i…",
+    "continue": "Edasi"
+  },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",
     "body": "Pärast PDF-i lisamist käivitub OCR töötlemine taustal. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse automaatselt."
@@ -108,6 +128,9 @@
     "reviewing": "Ülevaatamisel",
     "done": "Valmis",
     "error": "Viga",
-    "imported": "Imporditud"
+    "imported": "Imporditud",
+    "awaiting_split": "Poolitamise ootel",
+    "prepping": "Eelvaadet valmistamas",
+    "applying": "Töötleb ja saadab"
   }
 }

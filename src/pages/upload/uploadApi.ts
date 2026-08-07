@@ -3,6 +3,8 @@ import { apiDelete, apiGet, apiPost, ApiError } from '../../services/apiClient';
 import { fetchWithTimeout, getAuthHeaders } from '../../utils/fetchWithTimeout';
 import type {
   PollResult,
+  PrepressPlan,
+  PrepressSaveResult,
   UploadCreateResponse,
   UploadImportResponse,
   UploadListResponse,
@@ -81,4 +83,49 @@ export function replaceWorkUpload(uploadId: string, workId: string, token: strin
 
 export function deleteUpload(uploadId: string, token: string | null): Promise<unknown> {
   return apiDelete<unknown>(`/admin/upload/${uploadId}`, { token });
+}
+
+// ---------------------------------------------------------------------------
+// Prepress — topeltlehtede poolitamine enne OCR-i
+// ---------------------------------------------------------------------------
+
+export function getPrepress(uploadId: string, token: string | null): Promise<PrepressPlan> {
+  return apiGet<PrepressPlan>(`/admin/upload/${uploadId}/prepress`, { token });
+}
+
+export function startPrepress(uploadId: string, token: string | null): Promise<{ status: string }> {
+  return apiPost<{ status: string }>(`/admin/upload/${uploadId}/prepress/start`, {}, { token });
+}
+
+export function savePrepress(
+  uploadId: string,
+  plan: Pick<PrepressPlan, 'enabled' | 'default_split_x' | 'pages'>,
+  token: string | null,
+): Promise<PrepressSaveResult> {
+  return apiPost<PrepressSaveResult>(`/admin/upload/${uploadId}/prepress`, plan, { token });
+}
+
+export function applyPrepress(
+  uploadId: string,
+  token: string | null,
+): Promise<{ status: string; path: string }> {
+  return apiPost<{ status: string; path: string }>(
+    `/admin/upload/${uploadId}/prepress/apply`, {}, { token },
+  );
+}
+
+/**
+ * Pildipäringud lähevad <img src>-ina, mis EI saada Authorization päist.
+ * Token käib query-parameetrina — SAMA muster nagu olemasoleval pisipildil
+ * (UploadStepReview.tsx: `/admin/upload/${uploadId}/thumb/${page}?token=…`).
+ */
+export function prepressPreviewUrl(uploadId: string, n: number, token: string | null): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}`;
+}
+
+export function prepressStripUrl(
+  uploadId: string, n: number, x: number, token: string | null,
+): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/strip/${n}`
+    + `?x=${x.toFixed(5)}&token=${token ?? ''}`;
 }

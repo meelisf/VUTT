@@ -30,6 +30,9 @@ import {
 } from './uploadApi';
 import type { PollResult, SavedUpload } from './types';
 
+/** Staatused, mille korral fail on VUTT-i poolel ja poolitamise samm on avatud. */
+const PREPRESS_STATUSES = ['awaiting_split', 'prepping', 'applying'];
+
 export function useUploadWizard() {
   const { t } = useTranslation(['upload', 'common']);
   const { authToken } = useUser();
@@ -37,7 +40,7 @@ export function useUploadWizard() {
   const [searchParams] = useSearchParams();
 
   // --- Samm ja upload olek ---
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [pollResult, setPollResult] = useState<PollResult | null>(null);
 
@@ -198,8 +201,13 @@ export function useUploadWizard() {
       try {
         const d: PollResult = await getUploadStatus(id, authToken);
         setPollResult(d);
-        if (['processing', 'reviewing', 'done'].includes(d.status)) {
+        // Poolitamise samm (3) — fail on VUTT-i poolel, OCR pole veel alanud.
+        if (PREPRESS_STATUSES.includes(d.status)) {
           setStep(3);
+          setFileUploading(false);
+        }
+        if (['processing', 'reviewing', 'done'].includes(d.status)) {
+          setStep(4);
           if (ocrStartedAt === null) setOcrStartedAt(Date.now());
         }
         if (['done', 'error', 'imported'].includes(d.status)) {
@@ -453,8 +461,10 @@ export function useUploadWizard() {
     setPollResult(poll);
     setLocalDeleted(new Set(saved.files.filter((f) => f.deleted).map((f) => f.page)));
 
-    if (['reviewing', 'done', 'processing'].includes(saved.status)) {
-      setStep(3);
+    if (PREPRESS_STATUSES.includes(saved.status)) {
+      setStep(3); // poolitamise ootel — eelvaate olek loetakse UploadStepSplit'is
+    } else if (['reviewing', 'done', 'processing'].includes(saved.status)) {
+      setStep(4);
       setFileUploading(true);
       setOcrStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
       fetchStatus(saved.id); // Vahetu päring — ära kuva vananenud cached andmeid
@@ -494,7 +504,7 @@ export function useUploadWizard() {
 
   return {
     // Olek
-    step,
+    step, setStep,
     uploadId,
     pollResult,
     pendingUploads,

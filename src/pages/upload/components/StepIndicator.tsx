@@ -2,13 +2,16 @@ import React from 'react';
 import { CheckCircle } from 'lucide-react';
 
 /** Sammuindikaator upload-viisardi ülaosas. */
-const StepIndicator: React.FC<{ step: 1 | 2 | 3; labels: [string, string, string] }> = ({
+const StepIndicator: React.FC<{
+  step: 1 | 2 | 3 | 4;
+  labels: [string, string, string, string];
+}> = ({
   step,
   labels,
 }) => (
   <div className="flex items-center gap-0 mb-8">
     {labels.map((label, i) => {
-      const num = (i + 1) as 1 | 2 | 3;
+      const num = (i + 1) as 1 | 2 | 3 | 4;
       const active = num === step;
       const done = num < step;
       return (
@@ -33,7 +36,7 @@ const StepIndicator: React.FC<{ step: 1 | 2 | 3; labels: [string, string, string
               {label}
             </span>
           </div>
-          {i < 2 && <div className="flex-1 h-0.5 bg-gray-200 mx-3" />}
+          {i < labels.length - 1 && <div className="flex-1 h-0.5 bg-gray-200 mx-3" />}
         </React.Fragment>
       );
     })}
