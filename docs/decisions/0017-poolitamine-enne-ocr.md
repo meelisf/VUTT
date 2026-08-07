@@ -59,6 +59,30 @@ pildi-OCR teed pidi. OCR-serverit ei muudeta.
   `tests/test_save_and_transfer.py` dispatch-testid kirjutati ümber: nad
   lukustasid vana käitumise (kohene SFTP-thread), mille see otsus muudab.
 
+## Revisjon 2026-08-08: eraldi köitevahe-riba vaade eemaldatud
+
+Algne disain nägi ette kolm taset: kontaktleht → köitevahe-riba → üksikleht.
+**Ribavaade eemaldati esimese päriskasutuse järel.**
+
+Põhjus mõõdetuna: server renderdas riba korrektselt (224 × 1776 px natiivselt),
+aga UI kuvas seda 120 × 300 px kastis `objectFit: 'fill'`-iga — 1,9× horisontaalne
+vähendus, **5,9× vertikaalne kokkusurumine** ja ~3:1 moonutus. Kogu natiivne
+lahutus, mille pärast riba eksisteeris, visati CSS-is minema; tekst muutus
+loetamatuks määrdeks. Vaade dubleeris kontaktlehte, ainult halvemini.
+
+Sisuline põhjus kaalus tehnilise üles: üksikleht annab **sama info pluss
+tegutsemisvõimaluse** — joont saab kohe nihutada ja korraga näeb tervet lehte.
+Kitsam vaade ilma tegutsemisvõimaluseta ei teeni oma koodi.
+
+Natiivse lahutuse idee ise jäi alles, aga ainult seal, kus seda kasutatakse:
+üksiklehe kõrval-paan kuvab riba `object-none` + `object-center`-iga **1:1**,
+joone peale kärbituna. `w-auto` + fikseeritud kõrgus oleks kuivatanud selle
+~53 px sliveriks — sama viga väiksemas mastaabis.
+
+Töövoog on nüüd kaheastmeline: kontaktleht (ülevaade + tindihoiatus) → üksikleht
+(kontrolli ja paranda). Backend jäi muutmata — `/strip/` endpoint, `get_gutter_strip`
+ja LRU-vahemälu teenindavad endiselt üksiklehe paani.
+
 ## Teadaolev, siin mitte parandatud
 
 `reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma

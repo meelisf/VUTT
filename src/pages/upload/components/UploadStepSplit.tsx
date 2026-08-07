@@ -1,13 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Grid3x3, Columns, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   applyPrepress, getPrepress, savePrepress, startPrepress,
 } from '../uploadApi';
 import { summarizePlan } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 import SplitContactSheet from './SplitContactSheet';
-import SplitGutterStrip from './SplitGutterStrip';
 import SplitPageDetail from './SplitPageDetail';
 
 const POLL_MS = 1500;
@@ -27,7 +26,6 @@ interface Props {
 const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
   const { t } = useTranslation(['upload', 'common']);
   const [plan, setPlan] = useState<PrepressPlan | null>(null);
-  const [view, setView] = useState<'sheet' | 'strip'>('sheet');
   const [detailPage, setDetailPage] = useState<number | null>(null);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
@@ -159,22 +157,6 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
                 onChange={(e) => handleGlobalLine(e.target.value)}
               />
             </label>
-            <div className="flex rounded border overflow-hidden">
-              <button
-                type="button"
-                className={`px-3 py-1 text-sm flex items-center gap-1 ${view === 'sheet' ? 'bg-primary-600 text-white' : 'bg-white'}`}
-                onClick={() => setView('sheet')}
-              >
-                <Grid3x3 size={14} />{t('step3split.viewSheet')}
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1 text-sm flex items-center gap-1 ${view === 'strip' ? 'bg-primary-600 text-white' : 'bg-white'}`}
-                onClick={() => setView('strip')}
-              >
-                <Columns size={14} />{t('step3split.viewStrip')}
-              </button>
-            </div>
           </div>
 
           <p className="mb-4 text-sm text-gray-700">
@@ -186,23 +168,13 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
             })}
           </p>
 
-          {view === 'sheet' ? (
-            <SplitContactSheet
-              uploadId={uploadId}
-              token={token}
-              plan={plan}
-              onPageChange={handlePageChange}
-              onOpenPage={setDetailPage}
-            />
-          ) : (
-            <SplitGutterStrip
-              uploadId={uploadId}
-              token={token}
-              plan={plan}
-              onPageChange={handlePageChange}
-              onOpenPage={setDetailPage}
-            />
-          )}
+          <SplitContactSheet
+            uploadId={uploadId}
+            token={token}
+            plan={plan}
+            onPageChange={handlePageChange}
+            onOpenPage={setDetailPage}
+          />
         </>
       )}
 

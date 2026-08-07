@@ -85,8 +85,6 @@
     "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
-    "viewSheet": "Kontaktleht",
-    "viewStrip": "Köitevahe-riba",
     "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
     "inkWarning": "Joon lõikab kirja",
     "exclude": "Jäta välja",

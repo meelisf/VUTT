@@ -85,8 +85,6 @@
     "rendering": "Preparing preview: {{done}} / {{total}}",
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",
-    "viewSheet": "Contact sheet",
-    "viewStrip": "Gutter strip",
     "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
     "inkWarning": "The line cuts through writing",
     "exclude": "Exclude",

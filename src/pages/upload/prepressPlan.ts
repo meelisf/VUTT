@@ -49,25 +49,6 @@ export function inkLevel(ink: number | null): 'ok' | 'warn' | 'bad' {
 }
 
 /**
- * Virtualiseerimise aken [start, end) horisontaalses ribavaates.
- * 300-lehelise teose puhul ei tohi kõiki ribasid korraga tellida — iga riba
- * on eraldi 300 DPI renderdus serveris.
- */
-export function visibleWindow(
-  scrollLeft: number,
-  itemWidth: number,
-  viewportWidth: number,
-  total: number,
-  overscan = 3,
-): [number, number] {
-  const first = Math.floor(scrollLeft / itemWidth);
-  const last = first + Math.ceil(viewportWidth / itemWidth);
-  const end = Math.min(total, last + overscan);
-  const start = Math.min(Math.max(0, first - overscan), end);
-  return [start, end];
-}
-
-/**
  * Hoiab poolitusjoone vahemikus, kus mõlemad pooled jäävad sisukaks.
  * Vastab backendi `page_cuts` servapiirangule (`max(1, min(width - 1, …))`),
  * ainult heldemalt — 5% servast pole kunagi õige poolituskoht.

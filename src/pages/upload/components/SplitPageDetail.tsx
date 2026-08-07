@@ -158,13 +158,18 @@ const SplitPageDetail: React.FC<Props> = ({
               </div>
             </div>
 
+            {/* Piksli-tõe paan: object-none + object-center näitab riba
+                TÄPSELT 1:1, keskele joone peale kärbituna. `w-auto` + fikseeritud
+                kõrgus skaleeriks 224 px laia riba ~53 px-le ja kogu natiivse
+                lahutuse mõte kaoks (sel põhjusel kadus eraldi ribavaade). */}
             <div className="flex-none self-center md:self-start">
               <img
                 data-testid="detail-strip"
                 src={prepressStripUrl(uploadId, pageNum, stripX, token)}
                 alt=""
-                className="block h-[220px] w-auto border md:h-[420px]"
+                className="block h-[220px] w-[240px] border border-gray-300 bg-gray-100 object-none object-center md:h-[420px]"
               />
+              <div className="mt-1 text-center text-[11px] text-gray-400">1:1</div>
             </div>
           </div>
 

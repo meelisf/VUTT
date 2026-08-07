@@ -6,7 +6,6 @@ import {
   inkLevel,
   isPreviewReady,
   summarizePlan,
-  visibleWindow,
 } from '../prepressPlan';
 import type { PrepressPlan } from '../types';
 
@@ -95,30 +94,6 @@ describe('inkLevel', () => {
     expect(inkLevel(0.8)).toBe('bad');
     expect(inkLevel(0.25)).toBe('warn');
     expect(inkLevel(0.2499)).toBe('ok');
-  });
-});
-
-describe('visibleWindow', () => {
-  it('annab ainult nähtava akna pluss overscan', () => {
-    // 500 px laius / 100 px element = 5 nähtavat; +2 overscan mõlemale poole
-    expect(visibleWindow(0, 100, 500, 300, 2)).toEqual([0, 7]);
-  });
-
-  it('keskel kerides nihkub aken kaasa', () => {
-    expect(visibleWindow(1000, 100, 500, 300, 2)).toEqual([8, 17]);
-  });
-
-  it('EI lae 300-lehelise teose puhul kõiki ribasid', () => {
-    const [start, end] = visibleWindow(0, 132, 1200, 300, 3);
-    expect(end - start).toBeLessThan(20);
-  });
-
-  it('ei lähe üle lehtede arvu', () => {
-    expect(visibleWindow(100000, 100, 500, 12, 2)[1]).toBeLessThanOrEqual(12);
-  });
-
-  it('ei anna negatiivset algust', () => {
-    expect(visibleWindow(0, 100, 500, 300, 5)[0]).toBe(0);
   });
 });
 
