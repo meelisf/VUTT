@@ -7,6 +7,12 @@ _sftp_transfer_pdf, _count_pdf_pages) + ühised helperid (_set_upload_state,
 _init_upload_progress, _sftp_progress_cb, _ensure_remote_dirs,
 _close_sftp_and_unlink).
 
+NB: „poolitamine enne OCR-i" (2026-08-07) muutis dispatch'i tahtlikult — fail
+salvestatakse nüüd VUTT-i poolele (uploads/{id}/source.pdf või source/) ja
+SFTP-threadi enam ei käivitata. _sftp_transfer_* funktsioonid ise ja nende
+testid jäid alles; neid kutsub nüüd upload/store_source.py prepress/apply
+otsuse järel.
+
 Need testid lukustavad refaktoringu käitumise (käitumismuudatuseta):
 - dispatch: pilt/PDF/tundmatu → õige haru
 - pdfinfo vead (_count_pdf_pages): vigane PDF / puuduv pdfinfo / timeout / puuduv 'Pages:'
@@ -29,6 +35,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from server import upload_ops
+from server.upload import file_detection as _file_detection
 from server.upload import state as upload_state
 
 
@@ -363,43 +370,42 @@ class TestDispatch:
             upload_ops.save_and_transfer_to_ocr(upload_id, path)
         assert not os.path.exists(path), "tundmatu tüüp peab tmp_path kustutama"
 
-    def test_pilt_dispatch_käivitab_image_thread(self, make_state, monkeypatch,
-                                                 fake_file, capture_threads, uploads_dir):
+    def test_pilt_salvestatakse_lokaalselt_ilma_sftp_ta(self, make_state, monkeypatch,
+                                                        fake_file, capture_threads, uploads_dir):
+        """Poolitamine enne OCR-i: pilt jääb uploads/{id}/source/ kausta, kuni
+        admin on prepress-sammu läbinud. SFTP-threadi enam ei käivitata."""
         upload_id, _ = make_state()
         path = fake_file("img.jpg", b"\xff\xd8\xff\xe0")
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
-        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
+        monkeypatch.setattr(
+            _file_detection, "validate_upload_image", lambda p: (10, 10))
 
         pages = upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
         assert pages == 1
-        assert len(capture_threads) == 1
-        t = capture_threads[0]
-        assert t.target == upload_ops._sftp_transfer_image
-        assert t.name == f"sftp-img-{upload_id}"
-        # args: (upload_id, tmp_path, file_type, remote_dirs, remote_tmp, remote_dst, remote_img_name)
-        assert t.args[0] == upload_id
-        assert t.args[1] == path
-        assert t.args[2] == 'jpeg'
+        assert capture_threads == []
+        assert (uploads_dir / upload_id / "source" / "pg_001.jpg").is_file()
+        assert not os.path.exists(path), "tmp_path liigutatakse source/ alla"
         s = _read_state(uploads_dir, upload_id)
-        assert s['status'] == 'uploading'
+        assert s['status'] == 'awaiting_split'
         assert s['expected_pages'] == 1
-        # progress init
-        assert upload_ops.upload_progress[upload_id]['bytes_total'] > 0
-        assert upload_ops.upload_progress[upload_id]['error'] is None
+        assert s['prepress']['enabled'] is False   # opt-in
 
-    def test_liiga_suur_pilt_katkestab_enne_threadi(self, make_state, monkeypatch,
-                                                     fake_file, capture_threads):
+    def test_liiga_suur_pilt_katkestab_enne_salvestamist(self, make_state, monkeypatch,
+                                                         fake_file, capture_threads, uploads_dir):
         upload_id, _ = make_state()
         path = fake_file("img.jpg", b"\xff\xd8\xff\xe0")
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
-        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
+        monkeypatch.setattr(
+            _file_detection, "validate_upload_image",
+            lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
 
         with pytest.raises(ValueError, match="Pilt on liiga suur"):
             upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
         assert not os.path.exists(path), "tagasilükatud pildi tmp_path kustutatakse"
         assert capture_threads == []
+        assert not (uploads_dir / upload_id / "source").exists()
 
     def test_validate_upload_image_pikslipiir(self, monkeypatch, tmp_path):
         from PIL import Image
@@ -416,41 +422,40 @@ class TestDispatch:
         with pytest.raises(ValueError, match="Vigane pildifail"):
             upload_ops._validate_upload_image(path)
 
-    def test_pdf_dispatch_käivitab_pdf_thread(self, make_state, monkeypatch,
-                                              fake_file, capture_threads, uploads_dir):
+    def test_pdf_salvestatakse_lokaalselt_ilma_sftp_ta(self, make_state, monkeypatch,
+                                                       fake_file, capture_threads, uploads_dir):
+        """PDF jääb uploads/{id}/source.pdf-i — muidu oleks poolitamiseks hilja."""
         upload_id, _ = make_state()
         path = fake_file("doc.pdf", b"%PDF-1.4")
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'pdf')
-        monkeypatch.setattr(upload_ops, "_count_pdf_pages", lambda p: 15)
+        monkeypatch.setattr(_file_detection, "count_pdf_pages", lambda p: 15)
 
         pages = upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
         assert pages == 15
-        assert len(capture_threads) == 1
-        t = capture_threads[0]
-        assert t.target == upload_ops._sftp_transfer_pdf
-        assert t.name == f"sftp-{upload_id}"
-        # args: (upload_id, tmp_path, remote_dirs, remote_tmp, remote_dst, pages, file_size)
-        assert t.args[0] == upload_id
-        assert t.args[1] == path
-        assert t.args[5] == 15  # pages
-        assert t.args[6] == os.path.getsize(path)  # file_size
+        assert capture_threads == []
+        assert (uploads_dir / upload_id / "source.pdf").is_file()
+        assert not os.path.exists(path)
         s = _read_state(uploads_dir, upload_id)
-        assert s['status'] == 'uploading'
+        assert s['status'] == 'awaiting_split'
         assert s['expected_pages'] == 15
+        assert len(s['prepress']['pages']) == 15
 
-    def test_png_dispatch_kasutab_image_haru(self, make_state, monkeypatch,
-                                             fake_file, capture_threads):
+    def test_png_konverteeritakse_jpeg_iks_source_kaustas(self, make_state, monkeypatch,
+                                                          fake_file, capture_threads, uploads_dir):
+        from PIL import Image
         upload_id, _ = make_state()
-        path = fake_file("img.png", b"\x89PNG\r\n\x1a\n")
+        buf = io.BytesIO()
+        Image.new("RGB", (4, 4), (10, 20, 30)).save(buf, format="PNG")
+        path = fake_file("img.png", buf.getvalue())
         monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'png')
-        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (10, 10))
 
         pages = upload_ops.save_and_transfer_to_ocr(upload_id, path)
 
         assert pages == 1
-        assert capture_threads[0].target == upload_ops._sftp_transfer_image
-        assert capture_threads[0].args[2] == 'png'  # file_type edastatakse konverteerimiseks
+        assert capture_threads == []
+        with Image.open(str(uploads_dir / upload_id / "source" / "pg_001.jpg")) as im:
+            assert im.format == "JPEG"
 
 
 # =========================================================
@@ -458,11 +463,13 @@ class TestDispatch:
 # =========================================================
 
 class TestAddImagePage:
-    def test_liiga_suur_multi_image_katkestab_enne_sftp(self, make_state, monkeypatch, fake_file):
+    def test_liiga_suur_multi_image_katkestab_enne_salvestamist(self, make_state, monkeypatch,
+                                                                fake_file, uploads_dir):
         upload_id, _ = make_state(status='pending')
         path = fake_file("page.jpg", b"\xff\xd8\xff\xe0")
-        monkeypatch.setattr(upload_ops, "_detect_file_type", lambda p: 'jpeg')
-        monkeypatch.setattr(upload_ops, "_validate_upload_image", lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
+        monkeypatch.setattr(
+            _file_detection, "validate_upload_image",
+            lambda p: (_ for _ in ()).throw(ValueError("Pilt on liiga suur")))
         sftp_open = MagicMock()
         monkeypatch.setattr(upload_ops, "_sftp_open", sftp_open)
 
@@ -471,6 +478,25 @@ class TestAddImagePage:
 
         assert not os.path.exists(path)
         sftp_open.assert_not_called()
+        assert not (uploads_dir / upload_id / "source").exists()
+
+    def test_multi_image_lehed_kogunevad_source_kausta(self, make_state, monkeypatch,
+                                                       fake_file, uploads_dir):
+        """Pildid ei lähe enam otse OCR-serverisse — kogumine käib lokaalselt."""
+        upload_id, _ = make_state(status='pending')
+        monkeypatch.setattr(_file_detection, "validate_upload_image", lambda p: (10, 10))
+        sftp_open = MagicMock()
+        monkeypatch.setattr(upload_ops, "_sftp_open", sftp_open)
+
+        for n in (1, 2):
+            path = fake_file(f"page{n}.jpg", b"\xff\xd8\xff\xe0")
+            upload_ops.add_image_page(upload_id, path, n, 2)
+
+        sftp_open.assert_not_called()
+        source = uploads_dir / upload_id / "source"
+        assert sorted(os.listdir(str(source))) == ["pg_001.jpg", "pg_002.jpg"]
+        s = _read_state(uploads_dir, upload_id)
+        assert s['status'] == 'awaiting_split'   # viimane leht → prepress ootab
 
 
 # =========================================================
