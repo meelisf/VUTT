@@ -21,6 +21,12 @@
 - **`FULL_DPI = 300` ja `JPEG_QUALITY = 95` peavad kattuma** OCR-serveri `kataloogi-jalgimine-ja-ocr.py` väärtustega `PDF_DPI = 300` ja `img.save(..., quality=95)`.
 - **Testid:** `.venv/bin/pytest` (mitte süsteemi `python3`). Väravad enne igat commiti, mis puudutab frontendi: `npm run typecheck`.
 - Number-sisendid frontendis: `type="text"` + `inputMode="numeric"`, MITTE `type="number"`.
+- **Frontendi testid katavad AINULT puhtaid funktsioone.** `vitest.config.ts` on
+  `environment: 'node'` ja `include: ['src/**/*.test.ts']` — `.tsx` faile ei koguta ning
+  `@testing-library/react`, `jsdom` ja `jest-dom` puuduvad `package.json`-ist. Komponenditestide
+  pinu lisamine on eraldi otsus, MITTE selle featuuri osa. Kogu poolitamise puhas loogika elab
+  seetõttu `src/pages/upload/prepressPlan.ts`-is ja komponendid impordivad sealt. Renderdust
+  kontrollitakse käsitsi läbimänguga (plaani lõpus).
 
 ---
 
@@ -2282,6 +2288,31 @@ def test_plaani_salvestamine_ei_luba_vigast_split_x_i(client_admin):
     assert resp.status_code == 400
 
 
+def test_opt_in_ilma_startita_ei_renderda_midagi(client_admin, tmp_path):
+    """KÕIGE OLULISEM INVARIANT: kuni /prepress/start pole kutsutud, ei tohi
+    tekkida ühtki eelvaate faili. Kogu prepress on opt-in."""
+    import os
+    from server.upload import prepress
+
+    client, headers, upload_id = client_admin
+    client.get("/admin/upload/{}/prepress".format(upload_id), headers=headers)
+    client.get("/admin/upload/{}/prepress".format(upload_id), headers=headers)
+    assert not os.path.isdir(prepress.preview_dir(upload_id))
+
+
+def test_start_kaivitab_eelvaate(client_admin, monkeypatch):
+    started = []
+    from server.upload import prepress
+    monkeypatch.setattr(prepress, "start_preview", lambda uid: started.append(uid))
+
+    client, headers, upload_id = client_admin
+    resp = client.post(
+        "/admin/upload/{}/prepress/start".format(upload_id), headers=headers
+    )
+    assert resp.status_code == 200
+    assert started == [upload_id]
+
+
 def test_get_prepress_annab_kokkuvotte(client_admin):
     client, headers, upload_id = client_admin
     data = client.get(
@@ -2501,7 +2532,9 @@ Ainult juhtmestik. Komponendid tulevad Task 10–13.
 - Produces:
   - tüübid `PrepressMode`, `PrepressPage`, `PrepressPlan`, `PrepressSaveResult`
   - `getPrepress`, `startPrepress`, `savePrepress`, `applyPrepress`, `prepressPreviewUrl`, `prepressStripUrl`
-  - reduktor `applyGlobalSplit(plan, x): PrepressPlan`
+  - `src/pages/upload/prepressPlan.ts` — KÕIK poolitamise puhtad funktsioonid:
+    `applyGlobalSplit(plan, x)`, `countOutputPages(plan)`, `summarizePlan(plan)`,
+    `inkLevel(ink)` (Task 11), `visibleWindow(...)` (Task 12), `clampSplitX(x)` (Task 13)
   - `StepIndicator` võtab nüüd `1|2|3|4` ja neli silti
 
 - [ ] **Step 1: Write the failing test**
@@ -2510,7 +2543,7 @@ Create `src/pages/upload/__tests__/prepressPlan.test.ts`:
 
 ```ts
 import { describe, expect, it } from 'vitest';
-import { applyGlobalSplit, countOutputPages } from '../prepressPlan';
+import { applyGlobalSplit, countOutputPages, summarizePlan } from '../prepressPlan';
 import type { PrepressPlan } from '../types';
 
 function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
@@ -2568,6 +2601,18 @@ describe('countOutputPages', () => {
 
   it('enabled=false → iga leht üks', () => {
     expect(countOutputPages(plan({ enabled: false }))).toBe(3);
+  });
+});
+
+describe('summarizePlan', () => {
+  it('loeb poolitatavad, väljajäetud ja väljundlehed', () => {
+    const p = plan();
+    p.pages[0].excluded = true;
+    expect(summarizePlan(p)).toEqual({ split: 1, excluded: 1, output: 3 });
+  });
+
+  it('enabled=false → ühtki lehte ei poolitata', () => {
+    expect(summarizePlan(plan({ enabled: false })).split).toBe(0);
   });
 });
 ```
@@ -2628,6 +2673,23 @@ export function applyGlobalSplit(plan: PrepressPlan, x: number): PrepressPlan {
   return { ...plan, default_split_x: x, pages: plan.pages.map((p) => ({ ...p })) };
 }
 
+export interface PlanSummary {
+  split: number;
+  excluded: number;
+  output: number;
+}
+
+/** Kokkuvõtteriba arvud. Puhas — komponent ainult vormindab. */
+export function summarizePlan(plan: PrepressPlan): PlanSummary {
+  return {
+    split: plan.enabled
+      ? plan.pages.filter((p) => !p.excluded && p.mode !== 'nosplit').length
+      : 0,
+    excluded: plan.pages.filter((p) => p.excluded).length,
+    output: countOutputPages(plan),
+  };
+}
+
 /** Mitu lehte OCR-i läheb. Peegeldab serveri output_page_count loogikat. */
 export function countOutputPages(plan: PrepressPlan): number {
   return plan.pages.reduce((total, page) => {
@@ -2669,19 +2731,24 @@ export function applyPrepress(
   );
 }
 
-/** Pildipäringud lähevad <img src>-ina, mitte fetchiga — auth käib küpsise/tokeniga URL-is. */
-export function prepressPreviewUrl(uploadId: string, n: number): string {
-  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}`;
+/**
+ * Pildipäringud lähevad <img src>-ina, mis EI saada Authorization päist.
+ * Token käib query-parameetrina — SAMA muster nagu olemasoleval pisipildil
+ * (UploadStepReview.tsx:14: `/admin/upload/${uploadId}/thumb/${page}?token=…`).
+ */
+export function prepressPreviewUrl(uploadId: string, n: number, token: string | null): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}`;
 }
 
-export function prepressStripUrl(uploadId: string, n: number, x: number): string {
-  return `${FILE_API_URL}/admin/upload/${uploadId}/strip/${n}?x=${x.toFixed(5)}`;
+export function prepressStripUrl(
+  uploadId: string, n: number, x: number, token: string | null,
+): string {
+  return `${FILE_API_URL}/admin/upload/${uploadId}/strip/${n}`
+    + `?x=${x.toFixed(5)}&token=${token ?? ''}`;
 }
 ```
 
 Lisa `types` importi: `PrepressPlan`, `PrepressSaveResult`.
-
-> **NB autentimine piltidel:** `<img src>` ei saada `Authorization` päist. Kontrolli, kuidas `admin_upload_thumb` (olemasolev endpoint, `/admin/upload/{id}/thumb/{n}`) seda praegu lahendab, ja kasuta **sama mustrit** — ära leiuta uut. Kui olemasolev tee kasutab tokenit query-parameetrina, tee samuti; kui pildid laetakse `fetch` + `URL.createObjectURL` kaudu, siis samuti.
 
 - [ ] **Step 6: Renumber the wizard to four steps**
 
@@ -2802,101 +2869,37 @@ Samm avaneb ilma midagi renderdamata. See ongi see, mis teeb invariandi „tühi
 **Files:**
 - Create: `src/pages/upload/components/UploadStepSplit.tsx`
 - Modify: `src/pages/upload/UploadPage.tsx` (ühenda samm 3)
-- Test: `src/pages/upload/__tests__/UploadStepSplit.test.tsx`
+- Test: kaetud Task 8 backend-testiga (`test_opt_in_ilma_startita_ei_renderda_midagi`) + Task 9 `summarizePlan` testidega; oma testifaili EI lisata (vt globaalseid piiranguid)
 
 **Interfaces:**
 - Consumes: `getPrepress`, `startPrepress`, `savePrepress`, `applyPrepress` (Task 9), `countOutputPages`
 - Produces: `UploadStepSplit` propsidega `{ uploadId, token, onDone }`; alamkomponentide props-leping (Task 11–13):
-  - `SplitContactSheet: { uploadId, plan, onPageChange(n, patch), onOpenPage(n) }`
-  - `SplitGutterStrip: { uploadId, plan, onPageChange(n, patch), onOpenPage(n) }`
-  - `SplitPageDetail: { uploadId, plan, pageNum, onPageChange(n, patch), onClose() }`
+  - `SplitContactSheet: { uploadId, token, plan, onPageChange(n, patch), onOpenPage(n) }`
+  - `SplitGutterStrip: { uploadId, token, plan, onPageChange(n, patch), onOpenPage(n) }`
+  - `SplitPageDetail: { uploadId, token, plan, pageNum, onPageChange(n, patch), onClose() }`
   - `patch: Partial<Pick<PrepressPage, 'mode' | 'split_x' | 'excluded'>>`
+  - **`token` on kohustuslik kõigil kolmel** — pildid laetakse `<img src>`-ina ja
+    autentimine käib query-parameetriga (vt Task 9).
 
-- [ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Confirm the invariant is already covered by a backend test**
 
-Create `src/pages/upload/__tests__/UploadStepSplit.test.tsx`:
+Selle ülesande kõige olulisem käitumine — **opt-in: kuni lülitit ei puututa, ei renderdata
+ühtki pikslit** — on kaetud Task 8 testiga `test_opt_in_ilma_startita_ei_renderda_midagi`.
+See on tugevam koht seda kontrollida kui React: test tõestab, et CPU-d ei kulutata, mitte
+et mingi div puudub.
 
-```tsx
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import UploadStepSplit from '../components/UploadStepSplit';
-import * as api from '../uploadApi';
-import type { PrepressPlan } from '../types';
+Jooksuta see üle, enne kui komponenti kirjutama hakkad:
 
-vi.mock('../uploadApi');
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
-}));
+Run: `.venv/bin/pytest tests/test_prepress_endpoints.py -k opt_in -v`
+Expected: PASS
 
-function plan(over: Partial<PrepressPlan> = {}): PrepressPlan {
-  return {
-    enabled: false, default_split_x: 0.5, preview_status: 'idle', preview_done: 0,
-    page_count: 3, output_page_count: 3, trivial: true, status: 'awaiting_split',
-    pages: [
-      { n: 1, mode: 'default', split_x: null, excluded: false, ink: null },
-      { n: 2, mode: 'default', split_x: null, excluded: false, ink: null },
-      { n: 3, mode: 'default', split_x: null, excluded: false, ink: null },
-    ],
-    ...over,
-  };
-}
+- [ ] **Step 2: Note why this task has no unit test of its own**
 
-beforeEach(() => {
-  vi.mocked(api.getPrepress).mockResolvedValue(plan());
-  vi.mocked(api.startPrepress).mockResolvedValue({ status: 'started' });
-  vi.mocked(api.savePrepress).mockResolvedValue({
-    status: 'saved', output_page_count: 6, trivial: false,
-  });
-  vi.mocked(api.applyPrepress).mockResolvedValue({ status: 'transferring', path: 'original' });
-});
-
-it('EI renderda midagi enne, kui lüliti on sisse lülitatud', async () => {
-  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
-  await screen.findByText('step3split.optIn');
-  expect(api.startPrepress).not.toHaveBeenCalled();
-  expect(screen.queryByTestId('split-contact-sheet')).toBeNull();
-});
-
-it('lüliti sisselülitamine käivitab eelvaate', async () => {
-  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
-  await userEvent.click(await screen.findByRole('checkbox'));
-  await waitFor(() => expect(api.startPrepress).toHaveBeenCalledWith('u1', 't'));
-});
-
-it('puutumata lülitiga Edasi saadab originaali ilma plaani muutmata', async () => {
-  const onDone = vi.fn();
-  render(<UploadStepSplit uploadId="u1" token="t" onDone={onDone} />);
-  await userEvent.click(await screen.findByText('step3split.continue'));
-  expect(api.startPrepress).not.toHaveBeenCalled();
-  await waitFor(() => expect(api.applyPrepress).toHaveBeenCalledWith('u1', 't'));
-  await waitFor(() => expect(onDone).toHaveBeenCalled());
-});
-
-it('kuvab eelvaate edenemist', async () => {
-  vi.mocked(api.getPrepress).mockResolvedValue(
-    plan({ enabled: true, preview_status: 'rendering', preview_done: 42, page_count: 300 }),
-  );
-  render(<UploadStepSplit uploadId="u1" token="t" onDone={vi.fn()} />);
-  expect(await screen.findByText(/step3split.rendering/)).toBeTruthy();
-});
-
-it('apply 409 ei kutsu onDone ega jää igavesti laadima', async () => {
-  vi.mocked(api.applyPrepress).mockRejectedValue(
-    Object.assign(new Error('Töö juba käib'), { status: 409 }),
-  );
-  const onDone = vi.fn();
-  render(<UploadStepSplit uploadId="u1" token="t" onDone={onDone} />);
-  await userEvent.click(await screen.findByText('step3split.continue'));
-  await waitFor(() => expect(screen.getByText('step3split.continue')).toBeTruthy());
-  expect(onDone).not.toHaveBeenCalled();
-});
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-Run: `npx vitest run src/pages/upload/__tests__/UploadStepSplit.test.tsx`
-Expected: FAIL — `Cannot find module '../components/UploadStepSplit'`
+`vitest.config.ts` on `environment: 'node'` ja `include: ['src/**/*.test.ts']`;
+`@testing-library/react` ja `jsdom` puuduvad. Komponenditestide pinu lisamine on eraldi
+otsus. Selle komponendi puhas loogika (`summarizePlan`, `countOutputPages`) on juba
+testitud Task 9-s; ülejäänu väravad on `typecheck` + `lint:ci` + `build` ja plaani lõpus
+olev käsitsi läbimäng. **Ära lisa siia `.test.tsx` faili** — see ei käivituks.
 
 - [ ] **Step 3: Write the component**
 
@@ -2909,7 +2912,7 @@ import { Grid3x3, Columns, AlertTriangle } from 'lucide-react';
 import {
   applyPrepress, getPrepress, savePrepress, startPrepress,
 } from '../uploadApi';
-import { countOutputPages } from '../prepressPlan';
+import { summarizePlan } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 import SplitContactSheet from './SplitContactSheet';
 import SplitGutterStrip from './SplitGutterStrip';
@@ -3016,10 +3019,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
 
   if (!plan) return <div className="py-12 text-center text-gray-500">…</div>;
 
-  const splitCount = plan.enabled
-    ? plan.pages.filter((p) => !p.excluded && p.mode !== 'nosplit').length
-    : 0;
-  const excludedCount = plan.pages.filter((p) => p.excluded).length;
+  const summary = summarizePlan(plan);
   const rendering = plan.preview_status === 'rendering';
 
   return (
@@ -3088,15 +3088,16 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
           <p className="mb-4 text-sm text-gray-700">
             {t('step3split.summary', {
               pages: plan.page_count,
-              split: splitCount,
-              excluded: excludedCount,
-              output: countOutputPages(plan),
+              split: summary.split,
+              excluded: summary.excluded,
+              output: summary.output,
             })}
           </p>
 
           {view === 'sheet' ? (
             <SplitContactSheet
               uploadId={uploadId}
+              token={token}
               plan={plan}
               onPageChange={handlePageChange}
               onOpenPage={setDetailPage}
@@ -3104,6 +3105,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
           ) : (
             <SplitGutterStrip
               uploadId={uploadId}
+              token={token}
               plan={plan}
               onPageChange={handlePageChange}
               onOpenPage={setDetailPage}
@@ -3128,6 +3130,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
       {detailPage !== null && (
         <SplitPageDetail
           uploadId={uploadId}
+          token={token}
           plan={plan}
           pageNum={detailPage}
           onPageChange={handlePageChange}
@@ -3157,21 +3160,23 @@ Modify `src/pages/upload/UploadPage.tsx` — lisa `wizard.step === 3` haru enne 
 
 `useUploadWizard` peab tagastama `setStep`. Kui ta seda veel ei tee, lisa see tagastusobjekti.
 
-- [ ] **Step 5: Create component stubs so the test can run**
+- [ ] **Step 6: Create component stubs so it compiles**
 
-Loo minimaalsed `SplitContactSheet.tsx`, `SplitGutterStrip.tsx` ja `SplitPageDetail.tsx`, mis renderdavad ainult `<div data-testid="split-contact-sheet" />` jms. Päris teostus tuleb Task 11–13. Ilma nendeta ei kompileeru import.
+Loo minimaalsed `SplitContactSheet.tsx`, `SplitGutterStrip.tsx` ja `SplitPageDetail.tsx`,
+mis võtavad Task 10 liidese propsid ja renderdavad tühja `<div />`. Päris teostus tuleb
+Task 11–13. Ilma nendeta ei kompileeru import.
 
-- [ ] **Step 6: Run tests and gates**
+- [ ] **Step 7: Run the gates**
 
 Run:
 ```bash
-npx vitest run src/pages/upload/__tests__/UploadStepSplit.test.tsx
 npm run typecheck
 npm run lint:ci
+npm test
 ```
 Expected: PASS. `lint:ci` lävi on `--max-warnings 55` — parandades LANGETA arvu, ära tõsta.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add src/pages/upload
@@ -3186,104 +3191,46 @@ git commit -m "feat(prepress): UploadStepSplit — opt-in värav, kokkuvõte, ap
 
 **Files:**
 - Create (asenda stub): `src/pages/upload/components/SplitContactSheet.tsx`
-- Test: `src/pages/upload/__tests__/SplitContactSheet.test.tsx`
+- Test: `src/pages/upload/__tests__/prepressPlan.test.ts` (lisandub puhas funktsioon)
 
 **Interfaces:**
 - Consumes: `prepressPreviewUrl`, `PrepressPlan`, `PrepressPage`
-- Produces: `SplitContactSheet` propsidega `{ uploadId, plan, onPageChange, onOpenPage }`; eksporditud puhas abifunktsioon `inkLevel(ink: number | null): 'ok' | 'warn' | 'bad'`
+- Produces:
+  - `inkLevel(ink: number | null): 'ok' | 'warn' | 'bad'` — **lisatakse
+    `src/pages/upload/prepressPlan.ts`-i**, mitte komponenti; Task 12 impordib sealt
+  - `SplitContactSheet` propsidega `{ uploadId, token, plan, onPageChange, onOpenPage }`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `src/pages/upload/__tests__/SplitContactSheet.test.tsx`:
+Append to `src/pages/upload/__tests__/prepressPlan.test.ts` (sama fail mis Task 9 —
+projektis on ainult `.test.ts`, `.tsx` faile vitest ei kogu):
 
-```tsx
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
-import SplitContactSheet, { inkLevel } from '../components/SplitContactSheet';
-import type { PrepressPlan } from '../types';
-
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }));
-
-const plan: PrepressPlan = {
-  enabled: true, default_split_x: 0.5, preview_status: 'ready', preview_done: 3,
-  page_count: 3, output_page_count: 6, trivial: false, status: 'awaiting_split',
-  pages: [
-    { n: 1, mode: 'default', split_x: null, excluded: false, ink: 0.08 },
-    { n: 2, mode: 'default', split_x: null, excluded: false, ink: 0.48 },
-    { n: 3, mode: 'default', split_x: null, excluded: false, ink: 0.99 },
-  ],
-};
+```ts
+import { inkLevel } from '../prepressPlan';
 
 describe('inkLevel', () => {
-  it('mõõdetud väärtused päris materjalilt', () => {
-    expect(inkLevel(0.08)).toBe('ok');
-    expect(inkLevel(0.48)).toBe('warn');
-    expect(inkLevel(0.99)).toBe('bad');
+  it('mõõdetud väärtused päris materjalilt (EAA 1253)', () => {
+    expect(inkLevel(0.08)).toBe('ok');    // leht 1: puhas
+    expect(inkLevel(0.48)).toBe('warn');  // leht 2: kiri läheb joonest üle
+    expect(inkLevel(0.99)).toBe('bad');   // leht 3: joon on murdevarjus
   });
 
   it('arvutamata skoor on ok, mitte hoiatus', () => {
     expect(inkLevel(null)).toBe('ok');
   });
-});
 
-describe('SplitContactSheet', () => {
-  it('renderdab iga lehe kohta pisipildi', () => {
-    render(
-      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
-    );
-    expect(screen.getAllByRole('img')).toHaveLength(3);
-  });
-
-  it('märgib kõrge tindiskooriga lehe', () => {
-    render(
-      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
-    );
-    expect(screen.getByTestId('page-3')).toHaveAttribute('data-ink-level', 'bad');
-    expect(screen.getByTestId('page-1')).toHaveAttribute('data-ink-level', 'ok');
-  });
-
-  it('poolitusjoont ei kuvata nosplit-lehel', () => {
-    const p = { ...plan, pages: plan.pages.map((x) => (x.n === 2 ? { ...x, mode: 'nosplit' as const } : x)) };
-    render(
-      <SplitContactSheet uploadId="u1" plan={p} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
-    );
-    expect(screen.queryByTestId('line-2')).toBeNull();
-    expect(screen.getByTestId('line-1')).toBeTruthy();
-  });
-
-  it('väljajätmise lüliti kutsub onPageChange', async () => {
-    const onPageChange = vi.fn();
-    render(
-      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={onPageChange} onOpenPage={vi.fn()} />,
-    );
-    await userEvent.click(screen.getByTestId('exclude-2'));
-    expect(onPageChange).toHaveBeenCalledWith(2, { excluded: true });
-  });
-
-  it('pisipildil klikkimine avab üksiklehe', async () => {
-    const onOpenPage = vi.fn();
-    render(
-      <SplitContactSheet uploadId="u1" plan={plan} onPageChange={vi.fn()} onOpenPage={onOpenPage} />,
-    );
-    await userEvent.click(screen.getByTestId('open-3'));
-    expect(onOpenPage).toHaveBeenCalledWith(3);
-  });
-
-  it('väljajäetud leht on visuaalselt maha võetud', () => {
-    const p = { ...plan, pages: plan.pages.map((x) => (x.n === 1 ? { ...x, excluded: true } : x)) };
-    render(
-      <SplitContactSheet uploadId="u1" plan={p} onPageChange={vi.fn()} onOpenPage={vi.fn()} />,
-    );
-    expect(screen.getByTestId('page-1')).toHaveAttribute('data-excluded', 'true');
+  it('läved on kaasavad', () => {
+    expect(inkLevel(0.8)).toBe('bad');
+    expect(inkLevel(0.25)).toBe('warn');
+    expect(inkLevel(0.2499)).toBe('ok');
   });
 });
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npx vitest run src/pages/upload/__tests__/SplitContactSheet.test.tsx`
-Expected: FAIL — stub ei ekspordi `inkLevel`-i ega renderda pisipilte
+Run: `npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts`
+Expected: FAIL — `inkLevel` puudub `prepressPlan.ts`-ist
 
 - [ ] **Step 3: Write the component**
 
@@ -3294,19 +3241,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { EyeOff, Eye, Maximize2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
+import { inkLevel } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
-
-/**
- * Tindiskoori tase. Usaldusväärne AINULT kõrge väärtuse suunas: kõrge skoor
- * tähendab, et joon lõikab kindlasti midagi; madal skoor EI tõesta õiget
- * kohta (tühi veeris skoorib samuti 0). Läved on mõõdetud EAA 1253 materjalil.
- */
-export function inkLevel(ink: number | null): 'ok' | 'warn' | 'bad' {
-  if (ink == null) return 'ok';
-  if (ink >= 0.8) return 'bad';
-  if (ink >= 0.25) return 'warn';
-  return 'ok';
-}
 
 const BORDER: Record<string, string> = {
   ok: 'border-green-500',
@@ -3316,12 +3252,15 @@ const BORDER: Record<string, string> = {
 
 interface Props {
   uploadId: string;
+  token: string | null;
   plan: PrepressPlan;
   onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
   onOpenPage: (n: number) => void;
 }
 
-const SplitContactSheet: React.FC<Props> = ({ uploadId, plan, onPageChange, onOpenPage }) => {
+const SplitContactSheet: React.FC<Props> = ({
+  uploadId, token, plan, onPageChange, onOpenPage,
+}) => {
   const { t } = useTranslation(['upload']);
 
   return (
@@ -3351,7 +3290,7 @@ const SplitContactSheet: React.FC<Props> = ({ uploadId, plan, onPageChange, onOp
               onClick={() => onOpenPage(page.n)}
             >
               <img
-                src={prepressPreviewUrl(uploadId, page.n)}
+                src={prepressPreviewUrl(uploadId, page.n, token)}
                 alt={`${page.n}`}
                 loading="lazy"
                 className="block w-full"
@@ -3415,18 +3354,655 @@ export default SplitContactSheet;
 
 Run:
 ```bash
-npx vitest run src/pages/upload/__tests__/SplitContactSheet.test.tsx
+npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts
 npm run typecheck
+npm run lint:ci
 ```
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/pages/upload/components/SplitContactSheet.tsx src/pages/upload/__tests__/SplitContactSheet.test.tsx
+git add src/pages/upload/components/SplitContactSheet.tsx \
+        src/pages/upload/prepressPlan.ts \
+        src/pages/upload/__tests__/prepressPlan.test.ts
 git commit -m "feat(prepress): SplitContactSheet — pisipiltide ruudustik tindihoiatusega"
 ```
 
 ---
 
-Plaani ülejäänud osa (Task 12–14) kirjutan järgmisena samasse faili.
+### Task 12: `SplitGutterStrip` — natiivse lahutusega köitevahe-riba
+
+Featuuri süda. Pisipilt ei tõesta midagi; see vaade tõestab. Virtualiseeritud, muidu 300 päringut korraga.
+
+**Files:**
+- Create (asenda stub): `src/pages/upload/components/SplitGutterStrip.tsx`
+- Test: `src/pages/upload/__tests__/prepressPlan.test.ts` (lisandub puhas funktsioon)
+
+**Interfaces:**
+- Consumes: `prepressStripUrl`, `PrepressPlan`, `inkLevel` (Task 11, `prepressPlan.ts`-ist)
+- Produces:
+  - `visibleWindow(scrollLeft, itemWidth, viewportWidth, total, overscan?): [number, number]`
+    — **lisatakse `src/pages/upload/prepressPlan.ts`-i**
+  - `SplitGutterStrip` propsidega `{ uploadId, token, plan, onPageChange, onOpenPage }`
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `src/pages/upload/__tests__/prepressPlan.test.ts`:
+
+```ts
+import { visibleWindow } from '../prepressPlan';
+
+describe('visibleWindow', () => {
+  it('annab ainult nähtava akna pluss overscan', () => {
+    // 500 px laius / 100 px element = 5 nähtavat; +2 overscan mõlemale poole
+    expect(visibleWindow(0, 100, 500, 300, 2)).toEqual([0, 7]);
+  });
+
+  it('keskel kerides nihkub aken kaasa', () => {
+    expect(visibleWindow(1000, 100, 500, 300, 2)).toEqual([8, 17]);
+  });
+
+  it('EI lae 300-lehelise teose puhul kõiki ribasid', () => {
+    const [start, end] = visibleWindow(0, 132, 1200, 300, 3);
+    expect(end - start).toBeLessThan(20);
+  });
+
+  it('ei lähe üle lehtede arvu', () => {
+    expect(visibleWindow(100000, 100, 500, 12, 2)[1]).toBeLessThanOrEqual(12);
+  });
+
+  it('ei anna negatiivset algust', () => {
+    expect(visibleWindow(0, 100, 500, 300, 5)[0]).toBe(0);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts`
+Expected: FAIL — `visibleWindow` puudub `prepressPlan.ts`-ist
+
+- [ ] **Step 3: Write the component**
+
+Replace `src/pages/upload/components/SplitGutterStrip.tsx`:
+
+```tsx
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { prepressStripUrl } from '../uploadApi';
+import { inkLevel, visibleWindow } from '../prepressPlan';
+import type { PrepressPage, PrepressPlan } from '../types';
+
+const ITEM_WIDTH = 132;   // riba laius + vahe (px)
+const STRIP_HEIGHT = 300; // vertikaalne surumine: laius jääb natiivseks
+const X_DEBOUNCE_MS = 400;
+
+const BORDER: Record<string, string> = {
+  ok: 'border-green-500',
+  warn: 'border-amber-500',
+  bad: 'border-red-600',
+};
+
+interface Props {
+  uploadId: string;
+  token: string | null;
+  plan: PrepressPlan;
+  onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
+  onOpenPage: (n: number) => void;
+}
+
+/**
+ * Köitevahe-riba: igast lehest kitsas NATIIVSE lahutusega vertikaalne lõige
+ * joone ümbert. Lehe kõrgus on kokku surutud, laius mitte — "kas tint ületab
+ * joone" on horisontaalne küsimus, nii et vertikaalne surumine ei kaota infot.
+ */
+const SplitGutterStrip: React.FC<Props> = ({
+  uploadId, token, plan, onPageChange, onOpenPage,
+}) => {
+  const { t } = useTranslation(['upload']);
+  const ref = useRef<HTMLDivElement>(null);
+  const [range, setRange] = useState<[number, number]>([0, 12]);
+
+  const pages = plan.pages.filter((p) => !p.excluded);
+
+  // Globaalse joone sisestusväli muutub iga klahvivajutusega. Ilma
+  // debounce'ita tellitaks igale nähtavale lehele uus 300 DPI renderdus.
+  const [debouncedGlobal, setDebouncedGlobal] = useState(plan.default_split_x);
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedGlobal(plan.default_split_x), X_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [plan.default_split_x]);
+
+  /** Lehe joon ribapäringu jaoks: custom rakendub kohe, globaalne viivitusega. */
+  const debouncedX = (page: PrepressPage): number =>
+    (page.mode === 'custom' && page.split_x != null ? page.split_x : debouncedGlobal);
+
+  const recompute = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    setRange(visibleWindow(el.scrollLeft, ITEM_WIDTH, el.clientWidth, pages.length));
+  }, [pages.length]);
+
+  useEffect(() => {
+    recompute();
+    const el = ref.current;
+    if (!el) return;
+    el.addEventListener('scroll', recompute, { passive: true });
+    window.addEventListener('resize', recompute);
+    return () => {
+      el.removeEventListener('scroll', recompute);
+      window.removeEventListener('resize', recompute);
+    };
+  }, [recompute]);
+
+  const [start, end] = range;
+
+  return (
+    <div
+      ref={ref}
+      data-testid="split-gutter-strip"
+      className="flex gap-2 overflow-x-auto bg-gray-100 p-2 rounded"
+      style={{ minHeight: STRIP_HEIGHT + 24 }}
+    >
+      <div style={{ width: start * ITEM_WIDTH, flex: '0 0 auto' }} aria-hidden />
+      {pages.slice(start, end).map((page) => {
+        const level = inkLevel(page.ink);
+        return (
+          <div key={page.n} className="relative flex-none" style={{ width: ITEM_WIDTH - 8 }}>
+            <button
+              type="button"
+              title={t('step3split.openPage')}
+              className={`block border-2 ${BORDER[level]}`}
+              onClick={() => onOpenPage(page.n)}
+            >
+              <img
+                src={prepressStripUrl(uploadId, page.n, debouncedX(page), token)}
+                alt={`${page.n}`}
+                loading="lazy"
+                style={{ height: STRIP_HEIGHT, width: ITEM_WIDTH - 12, objectFit: 'fill' }}
+                className="block"
+              />
+            </button>
+            <div
+              className="absolute top-0 w-px bg-rose-600 pointer-events-none"
+              style={{ left: '50%', height: STRIP_HEIGHT }}
+            />
+            <div className="text-center text-[10px] mt-1">{page.n}</div>
+          </div>
+        );
+      })}
+      <div
+        style={{ width: Math.max(0, (pages.length - end) * ITEM_WIDTH), flex: '0 0 auto' }}
+        aria-hidden
+      />
+    </div>
+  );
+};
+
+export default SplitGutterStrip;
+```
+
+> **NB `objectFit: 'fill'`:** see ongi tahtlik vertikaalne surumine. Riba on natiivse laiusega ja kõrgus surutakse `STRIP_HEIGHT`-i. Ära asenda seda `contain`-iga — see vähendaks ka laiust ja kaotaks kogu mõtte.
+
+- [ ] **Step 4: Run tests and gates**
+
+Run:
+```bash
+npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts
+npm run typecheck
+npm run lint:ci
+```
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/pages/upload/components/SplitGutterStrip.tsx \
+        src/pages/upload/prepressPlan.ts \
+        src/pages/upload/__tests__/prepressPlan.test.ts
+git commit -m "feat(prepress): SplitGutterStrip — natiivne köitevahe-riba, virtualiseeritud"
+```
+
+---
+
+### Task 13: `SplitPageDetail` — üksikleht lohistatava joonega
+
+Kolmas tase: ühe lehe erand. Lohistamine debounce'itakse, muidu tulistab iga `pointermove` uue 300 DPI ribapäringu.
+
+**Files:**
+- Create (asenda stub): `src/pages/upload/components/SplitPageDetail.tsx`
+- Test: `src/pages/upload/__tests__/prepressPlan.test.ts` (lisandub puhas funktsioon)
+
+**Interfaces:**
+- Consumes: `prepressPreviewUrl`, `prepressStripUrl`, `PrepressPlan`
+- Produces:
+  - `clampSplitX(x: number): number` — **lisatakse `src/pages/upload/prepressPlan.ts`-i**
+  - `SplitPageDetail` propsidega `{ uploadId, token, plan, pageNum, onPageChange, onClose }`
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `src/pages/upload/__tests__/prepressPlan.test.ts`:
+
+```ts
+import { clampSplitX } from '../prepressPlan';
+
+describe('clampSplitX', () => {
+  it('jätab kehtiva väärtuse puutumata', () => {
+    expect(clampSplitX(0.5)).toBe(0.5);
+    expect(clampSplitX(0.459)).toBe(0.459);
+  });
+
+  it('hoiab vahemikus, kus mõlemad pooled jäävad olemas', () => {
+    expect(clampSplitX(-1)).toBe(0.05);
+    expect(clampSplitX(2)).toBe(0.95);
+    expect(clampSplitX(0.01)).toBe(0.05);
+    expect(clampSplitX(0.99)).toBe(0.95);
+  });
+
+  it('vastab backendi page_cuts servapiirangule', () => {
+    // server: cut = max(1, min(width - 1, round(width * x)))
+    expect(clampSplitX(0)).toBeGreaterThan(0);
+    expect(clampSplitX(1)).toBeLessThan(1);
+  });
+});
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts`
+Expected: FAIL — `clampSplitX` puudub `prepressPlan.ts`-ist
+
+- [ ] **Step 3: Write the component**
+
+Replace `src/pages/upload/components/SplitPageDetail.tsx`:
+
+```tsx
+import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { prepressPreviewUrl, prepressStripUrl } from '../uploadApi';
+import { clampSplitX } from '../prepressPlan';
+import type { PrepressPage, PrepressPlan } from '../types';
+
+const NUDGE = 0.005;      // ühe nupuvajutuse samm (0,5% laiusest)
+const STRIP_DEBOUNCE_MS = 400;
+
+interface Props {
+  uploadId: string;
+  token: string | null;
+  plan: PrepressPlan;
+  pageNum: number;
+  onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
+  onClose: () => void;
+}
+
+/**
+ * Kolmas tase: üks leht suurelt, lohistatava joonega. Kõrval natiivse
+ * lahutusega riba, mille päringut debounce'itakse — lohistamine ei tohi
+ * tulistada iga pointermove'i peale uut 300 DPI renderdust.
+ */
+const SplitPageDetail: React.FC<Props> = ({
+  uploadId, token, plan, pageNum, onPageChange, onClose,
+}) => {
+  const { t } = useTranslation(['upload', 'common']);
+  const page = plan.pages.find((p) => p.n === pageNum);
+  const liveX = page?.mode === 'custom' && page.split_x != null
+    ? page.split_x
+    : plan.default_split_x;
+
+  const [stripX, setStripX] = useState(liveX);
+  const imageRef = useRef<HTMLDivElement>(null);
+  const dragging = useRef(false);
+
+  // Debounce: riba päritakse alles pärast pausi.
+  useEffect(() => {
+    const id = setTimeout(() => setStripX(liveX), STRIP_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [liveX]);
+
+  const setX = (x: number) =>
+    onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
+
+  const handlePointer = (e: React.PointerEvent) => {
+    if (!dragging.current || !imageRef.current) return;
+    const rect = imageRef.current.getBoundingClientRect();
+    setX((e.clientX - rect.left) / rect.width);
+  };
+
+  if (!page) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div className="bg-white rounded max-w-6xl w-full max-h-full overflow-auto p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold">{pageNum}</h3>
+          <button type="button" onClick={onClose} aria-label={t('common:buttons.close')}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex gap-4">
+          <div
+            ref={imageRef}
+            className="relative flex-1 select-none touch-none"
+            onPointerDown={(e) => { dragging.current = true; handlePointer(e); }}
+            onPointerMove={handlePointer}
+            onPointerUp={() => { dragging.current = false; }}
+            onPointerLeave={() => { dragging.current = false; }}
+          >
+            <img
+              src={prepressPreviewUrl(uploadId, pageNum, token)}
+              alt={`${pageNum}`}
+              className="block w-full"
+            />
+            <div
+              data-testid="detail-line"
+              className="absolute top-0 bottom-0 w-0.5 bg-rose-600 cursor-ew-resize"
+              style={{ left: `${liveX * 100}%` }}
+            />
+          </div>
+
+          <div className="flex-none">
+            <img
+              data-testid="detail-strip"
+              src={prepressStripUrl(uploadId, pageNum, stripX, token)}
+              alt=""
+              style={{ height: 420, width: 'auto' }}
+              className="block border"
+            />
+            <div className="text-center text-[11px] mt-1">
+              {Math.round(liveX * 1000) / 10}%
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            type="button" data-testid="nudge-left" className="p-1 border rounded"
+            onClick={() => setX(liveX - NUDGE)}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button" data-testid="nudge-right" className="p-1 border rounded"
+            onClick={() => setX(liveX + NUDGE)}
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            type="button" className="px-3 py-1 text-sm border rounded"
+            onClick={() => onPageChange(pageNum, { mode: 'default', split_x: null })}
+          >
+            {t('step3split.resetToGlobal')}
+          </button>
+          <button
+            type="button" className="px-3 py-1 text-sm border rounded"
+            onClick={() => onPageChange(pageNum, { mode: 'nosplit', split_x: null })}
+          >
+            {t('step3split.noSplit')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SplitPageDetail;
+```
+
+- [ ] **Step 4: Run tests and gates**
+
+Run:
+```bash
+npx vitest run src/pages/upload/__tests__/prepressPlan.test.ts
+npm run typecheck
+npm run lint:ci
+```
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/pages/upload/components/SplitPageDetail.tsx \
+        src/pages/upload/prepressPlan.ts \
+        src/pages/upload/__tests__/prepressPlan.test.ts
+git commit -m "feat(prepress): SplitPageDetail — lohistatav joon, debounce'itud riba"
+```
+
+---
+
+### Task 14: Elutsükkel, ADR ja lõppväravad
+
+Ilma koristuseta koguneksid `strips/` ja `preview/` failid `uploads/` alla märkamatult.
+
+**Files:**
+- Modify: `server/upload/import_work.py:280` (impordi lõpp)
+- Create: `docs/decisions/0016-poolitamine-enne-ocr.md`
+- Modify: `docs/decisions/README.md`, `CLAUDE.md`
+- Test: `tests/test_prepress_lifecycle.py`
+
+**Interfaces:**
+- Consumes: kõik eelnev
+- Produces: `cleanup_prepress_artifacts(upload_id: str) -> None`
+
+- [ ] **Step 1: Write the failing test**
+
+Create `tests/test_prepress_lifecycle.py`:
+
+```python
+"""Prepress-artefaktide elutsükkel: mis kaob millal."""
+import os
+
+import pytest
+
+from server.upload import prepress
+from server.upload import state as upload_state
+
+
+@pytest.fixture
+def upload(tmp_path, monkeypatch):
+    uid = "u1"
+    base = tmp_path / uid
+    (base / "preview").mkdir(parents=True)
+    (base / "strips").mkdir()
+    (base / "preview" / "pg_0001.jpg").write_bytes(b"x")
+    (base / "strips" / "0001_100.jpg").write_bytes(b"x")
+    (base / "source.pdf").write_bytes(b"%PDF")
+    (base / "thumbs").mkdir()
+    (base / "thumbs" / "001.jpg").write_bytes(b"x")
+    monkeypatch.setattr(upload_state, "upload_dir", lambda i: str(base))
+    monkeypatch.setattr(prepress.upload_state, "upload_dir", lambda i: str(base))
+    return uid, base
+
+
+def test_koristus_kustutab_preview_strips_ja_source(upload):
+    uid, base = upload
+    prepress.cleanup_prepress_artifacts(uid)
+    assert not (base / "preview").exists()
+    assert not (base / "strips").exists()
+    assert not (base / "source.pdf").exists()
+
+
+def test_koristus_ei_puutu_thumbs_kausta(upload):
+    """thumbs/ on OCR-järgse ülevaatuse oma — sellest sõltub samm 4."""
+    uid, base = upload
+    prepress.cleanup_prepress_artifacts(uid)
+    assert (base / "thumbs" / "001.jpg").exists()
+
+
+def test_koristus_on_idempotentne(upload):
+    uid, _ = upload
+    prepress.cleanup_prepress_artifacts(uid)
+    prepress.cleanup_prepress_artifacts(uid)   # ei tohi visata
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `.venv/bin/pytest tests/test_prepress_lifecycle.py -v`
+Expected: FAIL — `AttributeError: … has no attribute 'cleanup_prepress_artifacts'`
+
+- [ ] **Step 3: Write the cleanup**
+
+Append to `server/upload/prepress.py`:
+
+```python
+def cleanup_prepress_artifacts(upload_id: str) -> None:
+    """Kustutab prepress-artefaktid pärast importi.
+
+    thumbs/ EI kuulu siia — see on OCR-järgse ülevaatuse (samm 4) oma.
+    cancel_upload teeb rmtree kogu kaustale, nii et seda teed siin ei kata.
+    """
+    import shutil
+
+    base = upload_state.upload_dir(upload_id)
+    for name in ("preview", "strips", "apply_tmp", "source"):
+        shutil.rmtree(os.path.join(base, name), ignore_errors=True)
+    try:
+        os.unlink(os.path.join(base, "source.pdf"))
+    except OSError:
+        pass
+```
+
+- [ ] **Step 4: Call it from import**
+
+Modify `server/upload/import_work.py`. Leia impordi lõpust plokk, kus `s['status'] = 'imported'` (~rida 280–285), ja lisa vahetult pärast state'i kirjutamist:
+
+```python
+    # Prepress-artefaktid ei ole enam vajalikud — preview/ ja eriti strips/
+    # koguneksid muidu uploads/ alla märkamatult.
+    try:
+        from .prepress import cleanup_prepress_artifacts
+        cleanup_prepress_artifacts(upload_id)
+    except Exception as e:
+        logger.warning(f"Prepress-artefaktide koristus ebaõnnestus {upload_id}: {e}")
+```
+
+- [ ] **Step 5: Write the ADR**
+
+Create `docs/decisions/0016-poolitamine-enne-ocr.md`:
+
+```markdown
+# ADR 0016 — Poolitamine enne OCR-i: rasteriseerimine VUTT-i poolel
+
+**Kuupäev:** 2026-08-07
+**Staatus:** vastu võetud
+
+## Kontekst
+
+Topeltlehti sai poolitada alles pärast importi, mis tähendas kaht täielikku
+OCR-läbikäiku (300-leheline teos ≈ 2 h × 2). Blokeeriv põhjus: PDF läks
+tervikuna OCR-serverisse, mis rasteriseeris selle ise.
+
+OCR-server oskab aga juba vastu võtta valmis JPG-sid (kaustapõhine pildi-OCR,
+mida batch re-OCR iga päev kasutab), ja poppler on VUTT-i Dockeris olemas.
+
+## Otsus
+
+VUTT rasteriseerib PDF-i ise ja saadab poolitatud lehed olemasolevat
+pildi-OCR teed pidi. OCR-serverit ei muudeta.
+
+## Invariandid
+
+- **Prepress on tervikuna opt-in.** Puutumata lülitiga upload ei renderda ühtki
+  pikslit ja käib tänast teed. `enabled` vaikeväärtus on `false` — poolitamine
+  on destruktiivne teisendus ja „Edasi" ei tohi 300 lehte 600-ks teha.
+- **Plaan-JSON on liides**, mille taha saab 300 DPI läbikäigu hiljem
+  OCR-serverisse tõsta, kui CPU-koormus VUTT-is osutub liiga kalliks.
+- **`FULL_DPI = 300` ja `JPEG_QUALITY = 95` peavad kattuma** OCR-serveri
+  `PDF_DPI` ja `quality=95` väärtustega (`qwen3.5/kataloogi-jalgimine-ja-ocr.py`).
+  Kui need seal muutuvad, tuleb muuta ka `server/upload/page_source.py`.
+- **Automaatika on hoiataja, mitte pakkuja.** Tindiskoor on usaldusväärne
+  ainult kõrge väärtuse suunas: kõrge skoor = joon lõikab kindlasti kirja;
+  madal skoor ≠ õige koht (tühi veeris skoorib samuti 0). Köitevahe globaalne
+  tuvastamine mõõdeti ebausaldusväärseks (pakutav x hüppas 0,38–0,61 vahel).
+- **OCR-serverisse avaldatakse failipõhise `.tmp`+rename-ga.** Valvuril EI OLE
+  piltide jaoks stabiilsuskontrolli — `wait_for_file_stable()` kutsutakse seal
+  ainult PDF-ide peale. Kataloogi tervikuna ei varjata: valvur töötab pildi
+  kaupa, nii et poolik kataloog on konveier, mille me tahame alles jätta.
+- **`prepress` alamvälju muudetakse ainult `mutate_prepress` kaudu**, sama luku
+  sees. `set_upload_state(**extra)` seab terveid ülemise taseme võtmeid ja
+  pühiks paralleelse plaanimuudatuse maha.
+- **`apply` on ühekordne:** `awaiting_split → applying` CAS, kordus annab 409.
+- **`Semaphore(1)` on protsessi-lokaalne** kaitse. Mitme uvicorni workeri peale
+  minnes ei ole see enam globaalne piirang. Praegu ei lahendata.
+- **Poolituse geomeetria:** `cut_px = round(width * split_x)`, vasak `[0, cut)`,
+  parem `[cut, width)`, ükski piksliveerg ei kao ega dubleeru, järjekord alati
+  vasak → parem. `width` on RENDERDATUD lehe laius — PDF `/Rotate` ja CropBox
+  on `pdftoppm` väljundis juba rakendatud.
+
+## Tagajärjed
+
+- Uus CPU-koormus VUTT-i veebiserveril, mida varem kandis OCR-server.
+  Leevendused: opt-in, `Semaphore(1)`, `nice(10)`, voogedastus lehthaaval.
+- Lähtefail jääb VUTT-i poolele kuni sammu 3 otsuseni — OCR algab hiljem kui
+  varem, admini otsustusaja võrra.
+- Ainult-väljajätmise plaan on triviaalne ja saadab originaali muutmata.
+  PDF-i ümberehitus mõõdeti (qpdf 36 s / 775 MB) ja jäeti teadlikult välja.
+- Olemasolev OCR-järgne poolitamine (`admin_page_ops.split_page`) jääb alles.
+
+## Teadaolev, siin mitte parandatud
+
+`reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma
+`.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Eraldi issue.
+```
+
+- [ ] **Step 6: Register the ADR and update CLAUDE.md**
+
+`docs/decisions/README.md` — lisa rida ADR 0016 kohta, järgides olemasolevat vormingut.
+
+`CLAUDE.md` — „Invariandid" jakku lisa:
+
+```markdown
+**Poolitamine enne OCR-i (ADR 0016)** — prepress on tervikuna **opt-in**:
+puutumata lülitiga upload ei renderda ühtki pikslit ja käib tänast PDF-teed.
+`FULL_DPI`/`JPEG_QUALITY` (`server/upload/page_source.py`) PEAVAD kattuma
+OCR-serveri `PDF_DPI = 300` / `quality=95` väärtustega. OCR-serverisse
+avaldatakse **failipõhise `.tmp`+rename-ga** — valvuril pole piltidele
+stabiilsuskontrolli. `prepress` alamvälju muudetakse AINULT `mutate_prepress`
+kaudu (`set_upload_state(**extra)` seab terve ülemise taseme võtme ja pühiks
+paralleelse muudatuse). Tindiskoor on hoiataja, mitte pakkuja.
+```
+
+Ja „Koodi paigutus → Backend" tabelisse `upload/`, `upload_ops.py` rea juurde märkus, et prepress elab `upload/prepress*.py` moodulites.
+
+- [ ] **Step 7: Run every gate**
+
+Run:
+```bash
+.venv/bin/pytest tests/ -q
+npm run typecheck
+npm test
+npm run lint:ci
+npm run build
+```
+Expected: kõik roheline. `lint:ci` lävi on `--max-warnings 55` — kui uus kood tõstab arvu üle, paranda hoiatused, ära tõsta läve.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add server/upload/prepress.py server/upload/import_work.py \
+        tests/test_prepress_lifecycle.py docs/decisions CLAUDE.md
+git commit -m "feat(prepress): artefaktide koristus impordil + ADR 0016"
+```
+
+---
+
+## Käsitsi läbimäng enne merge'i
+
+Automaattestid ei kata pilditöötluse visuaalset õigsust. Enne merge'i:
+
+1. Laadi üles **tavaline üheleheline PDF**, ära puuduta lülitit, vajuta Edasi.
+   Kontrolli: `docker logs vutt-backend` ei näita ühtki `pdftoppm` kutset;
+   OCR algab nagu varem; imporditud teos on identne.
+2. Laadi üles **topeltlehtedega PDF** (nt EAA 1253 kirikuraamat), lülita
+   poolitamine sisse. Kontrolli: kontaktleht täitub; kõrge tindiskooriga lehed
+   on punased; köitevahe-riba näitab loetavat natiivset lahutust.
+3. Nihuta üksiklehel joont ja kontrolli `uploads/{id}/strips/` sisu — faile ei
+   tohi tekkida rohkem kui `STRIP_CACHE_PER_PAGE` lehe kohta.
+4. Vajuta Edasi kaks korda kiiresti — teine kutse peab andma 409, mitte teist
+   renderdust. Kontrolli `docker logs vutt-backend`.
+5. Pärast importi kontrolli, et `uploads/{id}/preview` ja `strips` on kadunud.
+6. Ava imporditud teos ja veendu, et lehed on õiges järjekorras vasak → parem
+   ja et ükski tekstiveerg ei ole poolitusel katki lõigatud.
+
