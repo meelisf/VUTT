@@ -35,4 +35,5 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0013](0013-meili-sunk-koondatakse-teose-kaupa.md) | Meili sünk koondatakse teose kaupa; dirty-lipp elab vea üle | kehtib |
 | [0014](0014-inline-sildid-vs-labels-register.md) | Inline sildid on kuvatav tõde; register täidab augud, ei kirjuta ajaloolisi kohanimesid üle | kehtib |
 | [0015](0015-reocr-hulgi-vastuvott.md) | Batch re-OCR tulemused võetakse vastu hulgi, ühe git-commiti ja ühe Meili sünkina | kehtib |
-| [0016](0016-poolitamine-enne-ocr.md) | Topeltlehtede poolitamine enne OCR-i: VUTT rasteriseerib ise, prepress on opt-in | kehtib |
+| [0016](0016-rikastuse-allikatel-on-varuteed.md) | Igal välisel rikastusallikal on varutee ja lühike timeout | kehtib |
+| [0017](0017-poolitamine-enne-ocr.md) | Topeltlehtede poolitamine enne OCR-i: VUTT rasteriseerib ise, prepress on opt-in | kehtib |

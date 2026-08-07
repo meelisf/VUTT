@@ -1,4 +1,4 @@
-# ADR 0016 — Poolitamine enne OCR-i: rasteriseerimine VUTT-i poolel
+# ADR 0017 — Poolitamine enne OCR-i: rasteriseerimine VUTT-i poolel
 
 **Kuupäev:** 2026-08-07
 **Staatus:** vastu võetud

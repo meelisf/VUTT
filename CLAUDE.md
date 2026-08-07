@@ -203,7 +203,7 @@ allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `
 blokeerib `javascript:`. GFM on sees AINULT autolinkimiseks. See on eraldi süsteem
 transkriptsiooni XML-märgendusest.
 
-**Poolitamine enne OCR-i (ADR 0016)** — prepress on tervikuna **opt-in**:
+**Poolitamine enne OCR-i (ADR 0017)** — prepress on tervikuna **opt-in**:
 puutumata lülitiga upload ei renderda ühtki pikslit ja käib tänast PDF-teed.
 `FULL_DPI`/`JPEG_QUALITY` (`server/upload/page_source.py`) PEAVAD kattuma
 OCR-serveri `PDF_DPI = 300` / `quality=95` väärtustega. OCR-serverisse
