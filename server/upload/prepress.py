@@ -177,3 +177,74 @@ def start_preview(upload_id: str) -> None:
         target=_render_previews, args=(upload_id,),
         daemon=True, name="prepress-preview-{}".format(upload_id),
     ).start()
+
+
+# --- Köitevahe-riba ---
+
+def quantize_x(x_frac: float, full_width: int) -> int:
+    """x → tegelik FULL_DPI pikslikoordinaat.
+
+    See on AINUS koht, kus x normaliseeritakse, ja sama väärtus on nii
+    renderduse argument kui vahemälu võti. Ilma selleta tekitaks joone
+    lohistamine (0.5001, 0.5002, …) sadu peaaegu identseid ribafaile.
+    """
+    x_px = int(round(full_width * x_frac))
+    return max(1, min(full_width - 1, x_px))
+
+
+def strip_cache_path(upload_id: str, n: int, x_px: int) -> str:
+    return os.path.join(strips_dir(upload_id), "{:04d}_{}.jpg".format(n, x_px))
+
+
+def prune_strip_cache(upload_id: str, n: int, keep: int = STRIP_CACHE_PER_PAGE) -> None:
+    """LRU: hoiab lehe kohta ainult `keep` uusimat riba.
+
+    Ilma selleta koguneksid strips/ failid uploads/ alla märkamatult, eriti
+    kui admin joont pikalt nihutab.
+    """
+    prefix = "{:04d}_".format(n)
+    directory = strips_dir(upload_id)
+    try:
+        entries = [f for f in os.listdir(directory) if f.startswith(prefix)]
+    except FileNotFoundError:
+        return
+    if len(entries) <= keep:
+        return
+    entries.sort(key=lambda f: os.path.getmtime(os.path.join(directory, f)))
+    for name in entries[:-keep]:
+        try:
+            os.unlink(os.path.join(directory, name))
+        except OSError:
+            pass
+
+
+def get_gutter_strip(upload_id: str, n: int, x_frac: float) -> str:
+    """Tagastab natiivse FULL_DPI riba tee, renderdades ainult vajadusel.
+
+    Riba on ±STRIP_FRAC joonest. Renderdatakse AINULT see piirkond
+    (pdftoppm -x -y -W -H), mitte terve leht — mõõdetuna 0,09 s/lk vs 0,47.
+    """
+    src = source_path(upload_id)
+    if not src:
+        raise FileNotFoundError("Uploadi lähteallikat ei leitud: {}".format(upload_id))
+
+    source = page_source.open_page_source(src)
+    full_width = source.full_width(n)
+    x_px = quantize_x(x_frac, full_width)
+
+    dst = strip_cache_path(upload_id, n, x_px)
+    if os.path.isfile(dst):
+        return dst
+
+    os.makedirs(strips_dir(upload_id), exist_ok=True)
+    half = max(1, int(round(full_width * STRIP_FRAC)))
+    region_x = max(0, x_px - half)
+    region_w = min(full_width - region_x, 2 * half)
+
+    tmp = dst + ".tmp"
+    with RENDER_SEMAPHORE:
+        source.render_region(n, region_x, region_w, tmp)
+    os.replace(tmp, dst)
+
+    prune_strip_cache(upload_id, n)
+    return dst
