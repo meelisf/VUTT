@@ -365,3 +365,72 @@ def test_list_reocr_batch_jobs_summary():
     assert out["b1"]["started_at"] == 123.0
     with r._reocr_batch_jobs_lock:
         r._reocr_batch_jobs.clear()
+
+
+def test_build_reocr_status_batch_ready_ainult_viimasest_batchist(tmp_path, monkeypatch):
+    """batch_ready = viimase batch-töö lehed, mille .ocr on kettal. Võõras .ocr jääb välja."""
+    from server import reocr_ops
+    work_dir = tmp_path / "teos"
+    work_dir.mkdir()
+    for stem in ("a", "b", "voeras"):
+        (work_dir / f"{stem}.ocr").write_text("valmis", encoding="utf-8")
+
+    reocr_ops._reocr_batch_jobs["VANA"] = {
+        "kind": "batch", "work_id": "w", "slug": "teos", "status": "done",
+        "started_at": 100, "finished_at": 200, "last_progress_at": 200,
+        "remote_work": "r", "pages": [
+            {"page_filename": "z.jpg", "stem": "z", "status": "ready", "error": None},
+        ],
+    }
+    reocr_ops._reocr_batch_jobs["UUS"] = {
+        "kind": "batch", "work_id": "w", "slug": "teos", "status": "done",
+        "started_at": 300, "finished_at": 400, "last_progress_at": 400,
+        "remote_work": "r", "pages": [
+            {"page_filename": "a.jpg", "stem": "a", "status": "ready", "error": None},
+            {"page_filename": "b.jpg", "stem": "b", "status": "ready", "error": None},
+            {"page_filename": "c.jpg", "stem": "c", "status": "error", "error": "x"},
+        ],
+    }
+    try:
+        st = reocr_ops.build_reocr_status("w", str(work_dir))
+        assert st["batch_known"] is True
+        assert st["batch_ready"] == ["a", "b"]   # c-l pole .ocr, "voeras" pole batchist
+        assert "voeras" in st["ocr_ready"]        # ocr_ready näitab endiselt kõike
+    finally:
+        del reocr_ops._reocr_batch_jobs["VANA"]
+        del reocr_ops._reocr_batch_jobs["UUS"]
+
+
+def test_build_reocr_status_ilma_batch_kirjeta(tmp_path):
+    """Serveri restart kaotab batch-kirje → batch_known False, batch_ready tühi."""
+    from server import reocr_ops
+    work_dir = tmp_path / "teos2"
+    work_dir.mkdir()
+    (work_dir / "a.ocr").write_text("valmis", encoding="utf-8")
+
+    st = reocr_ops.build_reocr_status("tundmatu-teos", str(work_dir))
+
+    assert st["batch_known"] is False
+    assert st["batch_ready"] == []
+    assert st["ocr_ready"] == ["a"]
+
+
+def test_build_reocr_status_talub_stem_ita_kirjet(tmp_path):
+    """reocr_active.json-ist elustatud kirjel pole 'stem' välja — ei tohi KeyError-it visata."""
+    from server import reocr_ops
+    work_dir = tmp_path / "teos3"
+    work_dir.mkdir()
+    (work_dir / "a.ocr").write_text("valmis", encoding="utf-8")
+
+    reocr_ops._reocr_batch_jobs["ELUSTATUD"] = {
+        "kind": "batch", "work_id": "w3", "slug": "teos3", "status": "processing",
+        "started_at": 1, "finished_at": None, "last_progress_at": 1,
+        "remote_work": "r", "pages": [
+            {"page_filename": "a.jpg", "status": "ready", "error": None},  # ilma stem-ita
+        ],
+    }
+    try:
+        st = reocr_ops.build_reocr_status("w3", str(work_dir))
+        assert st["batch_ready"] == ["a"]
+    finally:
+        del reocr_ops._reocr_batch_jobs["ELUSTATUD"]

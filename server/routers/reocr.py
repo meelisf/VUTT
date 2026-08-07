@@ -2,10 +2,12 @@ import json
 import os
 import shutil
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ..deps import get_json_data, require_role
+from ..meilisearch_ops import sync_work_to_meilisearch_async
+from ..reocr_apply import apply_ocr_results, discard_ocr_results
 from ..reocr_ops import (
     REOCR_MAX_CONCURRENT,
     build_reocr_status,
@@ -194,3 +196,56 @@ def admin_reocr_status_for_work(work_id: str, user=Depends(require_role("admin")
     if not path:
         raise HTTPException(status_code=404, detail="Teost ei leitud")
     return {"status": "success", **build_reocr_status(work_id, path)}
+
+
+def _validate_apply_pages(page_filenames) -> list:
+    """Ainult mittetühi list bare failinimesid — väldi path traversal'i.
+
+    Sama kaitse nagu _validate_batch_pages, aga ilma kettakontrollita (puuduv
+    .ocr ei ole viga, see läheb 'failed' loendisse).
+    """
+    if not isinstance(page_filenames, list) or not page_filenames:
+        raise HTTPException(status_code=400, detail="page_filenames puudub või tühi")
+    for fn in page_filenames:
+        if not isinstance(fn, str) or not fn or fn != os.path.basename(fn):
+            raise HTTPException(status_code=400, detail=f"Vigane failinimi: {fn}")
+    return page_filenames
+
+
+@router.post("/admin/work/{work_id}/reocr-apply")
+async def admin_reocr_apply(
+    work_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    user=Depends(require_role("admin")),
+):
+    """Rakendab ootel .ocr tulemused .txt failidesse: ÜKS git-commit, ÜKS Meili sünk.
+
+    Lehtede loend tuleb kliendilt, mitte serveri "võta kõik" loogikast — nii
+    rakendatakse täpselt see, mida kasutajale kinnitusdialoogis näidati.
+    """
+    path = await run_in_threadpool(find_directory_by_id, work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    data = await get_json_data(request)
+    page_filenames = _validate_apply_pages(data.get("page_filenames"))
+    result = await run_in_threadpool(
+        apply_ocr_results, path, page_filenames, user["username"]
+    )
+    if result["applied"]:
+        background_tasks.add_task(sync_work_to_meilisearch_async, os.path.basename(path))
+    return {"status": "success", **result}
+
+
+@router.post("/admin/work/{work_id}/reocr-discard")
+async def admin_reocr_discard(
+    work_id: str, request: Request, user=Depends(require_role("admin"))
+):
+    """Kustutab ootel .ocr tulemused ilma rakendamata. Sisu ei muutu → Meili sünki pole."""
+    path = await run_in_threadpool(find_directory_by_id, work_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Teost ei leitud")
+    data = await get_json_data(request)
+    page_filenames = _validate_apply_pages(data.get("page_filenames"))
+    result = await run_in_threadpool(discard_ocr_results, path, page_filenames)
+    return {"status": "success", **result}

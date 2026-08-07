@@ -462,7 +462,36 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
     except FileNotFoundError:
         pass
     ocr_ready.sort()  # Deterministlik järjekord
-    return {"active": active, "ocr_ready": ocr_ready, "errors": errors, "progress": progress}
+
+    # Hulgi-rakenduse ulatus: AINULT selle teose viimase batch-töö lehed, et
+    # kellegi teise üksik ootel tulemus samas teoses jääks puutumata.
+    # NB: elustatud kirjel võib 'stem' puududa → tuletame page_filename-ist.
+    batch_stems: List[str] = []
+    batch_known = False
+    latest_started = float("-inf")
+    with _reocr_batch_jobs_lock:
+        for j in _reocr_batch_jobs.values():
+            if j["work_id"] != work_id:
+                continue
+            started = j.get("started_at") or 0
+            if started >= latest_started:
+                latest_started = started
+                batch_stems = [
+                    e.get("stem") or os.path.splitext(e["page_filename"])[0]
+                    for e in j.get("pages", [])
+                ]
+                batch_known = True
+    ready_set = set(ocr_ready)
+    batch_ready = sorted(s for s in batch_stems if s in ready_set)
+
+    return {
+        "active": active,
+        "ocr_ready": ocr_ready,
+        "errors": errors,
+        "progress": progress,
+        "batch_ready": batch_ready,
+        "batch_known": batch_known,
+    }
 
 
 def _poll_iteration(now: float) -> None:
