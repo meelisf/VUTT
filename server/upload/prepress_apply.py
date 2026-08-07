@@ -1,0 +1,142 @@
+"""300 DPI läbikäik: renderda → lõika → saada → kustuta, lehthaaval.
+
+Eraldi moodul prepress.py-st, sest see on ainus koht, mis puudutab SFTP-d ja
+OCR-serveri nimekonventsiooni.
+
+Voogedastus, mitte materialiseerimine: 300-leheline topeltlehtedega teos annaks
+~1 GB JPG-sid. Kõrvalefektina alustab OCR-server lehest 1 sel ajal, kui meie
+alles renderdame lehte 50.
+"""
+import os
+import shutil
+import threading
+from typing import Optional
+
+from ..config import OCR_SERVER_PATH, get_logger
+from . import ocr_client, page_source, prepress, prepress_plan
+from . import state as upload_state
+
+logger = get_logger(__name__)
+
+
+def remote_page_name(slug: str, out_index: int) -> str:
+    """OCR-serveri nimekonventsioon: valvur leiab pildid rglob-iga."""
+    return "{}_pg_{:03d}.jpg".format(slug, out_index)
+
+
+def publish_atomic(sftp, local_path: str, remote_path: str) -> None:
+    """Laeb üles .tmp nimega ja nimetab alles siis ümber.
+
+    OCR-serveri valvuril EI OLE piltide jaoks stabiilsuskontrolli —
+    wait_for_file_stable() kutsutakse seal ainult PDF-ide peale. Pildid
+    korjatakse rglob-iga, filtrina EXTENSIONS = {".jpg", ".jpeg", ...}.
+    Poolik JPG satuks OCR-i; .jpg.tmp jääb filtrist välja.
+
+    Kataloogi tervikuna EI varjata: valvur töötab pildi kaupa, nii et poolik
+    kataloog on konveier, mille me tahame alles jätta.
+    """
+    tmp_remote = remote_path + ".tmp"
+    sftp.put(local_path, tmp_remote)
+    sftp.rename(tmp_remote, remote_path)
+
+
+def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
+    """Kirjutab lõike [x0, x1) eraldi JPG-na. x1 == laius → tervikleht."""
+    from PIL import Image
+
+    with Image.open(src_img_path) as im:
+        rgb = im.convert("RGB")
+        if x0 == 0 and x1 >= rgb.size[0]:
+            rgb.save(dst, "JPEG", quality=page_source.JPEG_QUALITY)
+            return
+        rgb.crop((x0, 0, x1, rgb.size[1])).save(
+            dst, "JPEG", quality=page_source.JPEG_QUALITY
+        )
+
+
+def _transfer_pages(upload_id: str, slug: str, remote_work: str,
+                    plan: Optional[dict]) -> int:
+    """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu."""
+    src_path = prepress.source_path(upload_id)
+    if not src_path:
+        raise FileNotFoundError("Lähteallikat ei leitud: {}".format(upload_id))
+
+    source = page_source.open_page_source(src_path)
+    count = source.page_count()
+    work_dir = os.path.join(upload_state.upload_dir(upload_id), "apply_tmp")
+    os.makedirs(work_dir, exist_ok=True)
+
+    sftp = ocr_client.sftp_open(upload_id)
+    out_index = 0
+    try:
+        ocr_client.ensure_remote_dirs(sftp, (remote_work,))
+        for n in range(1, count + 1):
+            if prepress_plan.is_excluded(plan, n):
+                continue
+
+            full = os.path.join(work_dir, "full.jpg")
+            source.render_full(n, full)
+            try:
+                from PIL import Image
+                with Image.open(full) as im:
+                    width = im.size[0]
+
+                for (x0, x1) in prepress_plan.page_cuts(plan, n, width):
+                    out_index += 1
+                    name = remote_page_name(slug, out_index)
+                    cut = os.path.join(work_dir, name)
+                    try:
+                        _write_cut(full, x0, x1, cut)
+                        publish_atomic(sftp, cut, "{}/{}".format(remote_work, name))
+                    finally:
+                        if os.path.exists(cut):
+                            os.unlink(cut)
+            finally:
+                if os.path.exists(full):
+                    os.unlink(full)
+
+            upload_state.mutate_prepress(
+                upload_id, lambda p, n=n: p.update(applied_done=n)
+            )
+    finally:
+        try:
+            sftp.close()
+        except Exception:
+            pass
+        shutil.rmtree(work_dir, ignore_errors=True)
+
+    return out_index
+
+
+def apply_and_transfer(upload_id: str) -> None:
+    """Taustalõime siht. Eeldab, et try_begin_applying on juba loa andnud."""
+    state = upload_state.read_state(upload_id)
+    if not state:
+        return
+    slug = state["meta"]["slug"]
+    remote_work = "{}/{}".format(OCR_SERVER_PATH, state["remote_work_path"])
+    plan = state.get("prepress")
+
+    try:
+        with prepress.RENDER_SEMAPHORE:
+            sent = _transfer_pages(upload_id, slug, remote_work, plan)
+        upload_state.set_upload_state(
+            upload_id, status="processing", expected_pages=sent
+        )
+        logger.info("Prepress apply valmis: {} → {} lehte".format(upload_id, sent))
+    except Exception as e:
+        logger.error("Prepress apply {}: {}".format(upload_id, e))
+        upload_state.set_upload_state(
+            upload_id, status="error", error_message=str(e)
+        )
+
+
+def start_apply(upload_id: str) -> bool:
+    """CAS + taustalõim. False = töö juba käib (topeltklikk, retry, refresh)."""
+    if not upload_state.try_begin_applying(upload_id):
+        return False
+    threading.Thread(
+        target=apply_and_transfer, args=(upload_id,),
+        daemon=True, name="prepress-apply-{}".format(upload_id),
+    ).start()
+    return True
