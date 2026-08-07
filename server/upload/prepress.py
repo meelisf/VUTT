@@ -10,7 +10,7 @@ piirang.
 """
 import os
 import threading
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from ..config import get_logger
 from . import page_source, prepress_plan
@@ -73,12 +73,23 @@ def percentile_from_hist(hist: List[int], q: float) -> int:
     return 255
 
 
-def ink_score(preview_path_: str, x_frac: float, half_px: int = 2) -> float:
-    """Tindi osakaal veerus x_frac (±half_px), lehe keskmises 88% kõrguses.
+def ink_profile(preview_path_: str, x_frac: float,
+                half_px: int = 2) -> Tuple[float, float]:
+    """Tagastab (tindiosakaal, pidevus) veerus x_frac (±half_px).
 
-    Usaldusväärne AINULT kõrge väärtuse suunas: kõrge skoor = joon lõikab
-    kindlasti midagi; madal skoor EI tähenda õiget kohta (tühi veeris skoorib
-    samuti 0). Vt spetsi mõõtmisi.
+    **ink** — kui suur osa riba pikslitest on alla lehe enda tinditaseme.
+    **pidevus** — pikim JÄRJESTIKUSTE tumedate ridade jada / riba kõrgus.
+
+    Miks kaks arvu: ainult ink ei erista köitemurret tekstist. Mõõdetuna päris
+    kirikuraamatul (EAA-tüüp) andis õige poolituskoht — täpselt murdejoonel —
+    ink = 0,45, samal ajal kui 2% kõrvale (hele köitevahe) andis 0,09 ja
+    tekstiveerud 0,36. Ainult ink'i vaadates käivitunuks hoiatus just siis, kui
+    joon on ÕIGES kohas.
+
+    Pidevus eraldab need: köitemurre on katkematu tume joon ülalt alla
+    (pidevus → 1), tekstiread on katkendlikud (pidevus ≈ ühe rea kõrgus /
+    lehe kõrgus, tüüpiliselt < 0,05). Kõik skännid ei ole murdejoonega —
+    hele köitevahe annab madala ink'i ja pidevus ei loe.
     """
     from PIL import Image
 
@@ -87,7 +98,7 @@ def ink_score(preview_path_: str, x_frac: float, half_px: int = 2) -> float:
         width, height = gray.size
         y0, y1 = int(height * 0.06), int(height * 0.94)
         if y1 <= y0 or width == 0:
-            return 0.0
+            return 0.0, 0.0
 
         core = gray.crop((0, y0, width, y1))
         threshold = percentile_from_hist(core.histogram(), INK_PERCENTILE)
@@ -96,13 +107,40 @@ def ink_score(preview_path_: str, x_frac: float, half_px: int = 2) -> float:
         bx0 = max(0, x - half_px)
         bx1 = min(width, x + half_px + 1)
         band = core.crop((bx0, 0, bx1, y1 - y0))
+        band_w, band_h = band.size
+        if band_w == 0 or band_h == 0:
+            return 0.0, 0.0
+
         # Histogramm, mitte getdata() — sama tulemus (piksleid alla läve), aga
         # ilma pikslikaupa listi materialiseerimata (getdata on ka aegumas).
         band_hist = band.histogram()
         total = sum(band_hist)
-        if total == 0:
-            return 0.0
-        return sum(band_hist[:threshold]) / float(total)
+        ink = sum(band_hist[:threshold]) / float(total) if total else 0.0
+
+        # Rea kaupa: rida on "tume", kui vähemalt pool selle piksleist on all
+        # läve. tobytes() annab mode "L" korral täpselt band_w * band_h baiti.
+        data = band.tobytes()
+        need = max(1, band_w // 2)
+        longest = 0
+        run = 0
+        for row in range(band_h):
+            start = row * band_w
+            dark_px = sum(
+                1 for value in data[start:start + band_w] if value < threshold
+            )
+            if dark_px >= need:
+                run += 1
+                if run > longest:
+                    longest = run
+            else:
+                run = 0
+
+        return ink, longest / float(band_h)
+
+
+def ink_score(preview_path_: str, x_frac: float, half_px: int = 2) -> float:
+    """Ainult tindiosakaal. Ühilduvuskest ink_profile ümber."""
+    return ink_profile(preview_path_, x_frac, half_px)[0]
 
 
 # --- Eelvaate renderdus ---
@@ -133,12 +171,15 @@ def _render_previews(upload_id: str) -> None:
                     source.render_preview(n, dst)
 
                 default_x = 0.5
-                score = round(ink_score(dst, default_x), 3)
+                ink, cont = ink_profile(dst, default_x)
+                score = round(ink, 3)
+                continuity = round(cont, 3)
 
-                def _bump(plan, n=n, score=score):
+                def _bump(plan, n=n, score=score, continuity=continuity):
                     for entry in plan.get("pages", []):
                         if entry.get("n") == n:
                             entry["ink"] = score
+                            entry["ink_cont"] = continuity
                             break
                     plan["preview_done"] = n
 

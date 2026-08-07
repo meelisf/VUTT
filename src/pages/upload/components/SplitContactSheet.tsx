@@ -34,7 +34,7 @@ const SplitContactSheet: React.FC<Props> = ({
       className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]"
     >
       {plan.pages.map((page) => {
-        const level = inkLevel(page.ink);
+        const level = inkLevel(page.ink, page.ink_cont);
         const ready = isPreviewReady(plan, page.n);
         const splits = willSplit(plan, page.n);
         const x = page.mode === 'custom' && page.split_x != null
