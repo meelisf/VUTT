@@ -56,7 +56,10 @@ def poll_and_sync_thumbs(
     expected_pages = state.get("expected_pages")
 
     # Uploading/pending/collecting_images/error: SFTP-d pole vaja
-    if current_status in ("pending", "uploading", "error", "imported", "collecting_images"):
+    # PREPRESS_IDLE_STATUSES: fail on VUTT-i poolel, OCR-serveris pole veel midagi
+    if current_status in (
+        "pending", "uploading", "error", "imported", "collecting_images",
+    ) + upload_state.PREPRESS_IDLE_STATUSES:
         return {
             "status": current_status,
             "ready": 0,
