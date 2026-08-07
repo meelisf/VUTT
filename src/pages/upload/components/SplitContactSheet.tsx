@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { EyeOff, Eye, Maximize2, Loader2 } from 'lucide-react';
+import { EyeOff, Eye, Maximize2, Loader2, Droplet } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { inkLevel, isPreviewReady, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
@@ -85,9 +85,10 @@ const SplitContactSheet: React.FC<Props> = ({
               <span className="text-[10px] px-1 rounded bg-black/60 text-white">{page.n}</span>
               {level !== 'ok' && (
                 <span
-                  className="text-[10px] px-1 rounded bg-red-700 text-white"
-                  title={t('step3split.inkWarning')}
+                  className="flex items-center gap-0.5 rounded bg-red-700 px-1 text-[10px] text-white"
+                  title={`${t('step3split.inkWarning')} — ${t('step3split.inkLegend')} ${t('step3split.inkMeasuredAt')}`}
                 >
+                  <Droplet size={9} />
                   {page.ink?.toFixed(2)}
                 </span>
               )}

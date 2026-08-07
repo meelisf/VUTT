@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Droplet } from 'lucide-react';
 import {
   applyPrepress, getPrepress, savePrepress, startPrepress,
 } from '../uploadApi';
@@ -159,7 +159,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
             </label>
           </div>
 
-          <p className="mb-4 text-sm text-gray-700">
+          <p className="mb-2 text-sm text-gray-700">
             {t('step3split.summary', {
               pages: plan.page_count,
               split: summary.split,
@@ -167,6 +167,16 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
               output: summary.output,
             })}
           </p>
+
+          {plan.pages.some((p) => p.ink != null) && (
+            <p className="mb-4 flex items-start gap-2 rounded border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-600">
+              <Droplet size={14} className="mt-0.5 flex-shrink-0 text-red-700" />
+              <span>
+                {t('step3split.inkLegend')}{' '}
+                <span className="text-gray-500">{t('step3split.inkMeasuredAt')}</span>
+              </span>
+            </p>
+          )}
 
           <SplitContactSheet
             uploadId={uploadId}

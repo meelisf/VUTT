@@ -95,7 +95,9 @@
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
-    "isExcluded": "See leht jäetakse OCR-ist välja"
+    "isExcluded": "See leht jäetakse OCR-ist välja",
+    "inkLegend": "Punane number on tindiskoor: kui suur osa poolitusjoone kohal olevast kitsast ribast on tumedat pikslit (0–1). Kõrge väärtus tähendab, et joon lõikab kirja või köitevarju. Madal väärtus EI tõesta, et koht on õige — tühi veeris skoorib samuti 0.",
+    "inkMeasuredAt": "Skoor on mõõdetud vaikimisi joonel 50% ega arvutata joone nihutamisel ümber — pärast joone muutmist on see ajalooline vihje, mitte hinnang uuele kohale."
   },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",

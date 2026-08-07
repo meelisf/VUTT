@@ -95,7 +95,9 @@
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
-    "isExcluded": "This page is excluded from OCR"
+    "isExcluded": "This page is excluded from OCR",
+    "inkLegend": "The red number is the ink score: how much of the narrow strip at the split line is dark pixels (0–1). A high value means the line cuts through writing or the binding shadow. A low value does NOT prove the position is right — an empty margin also scores 0.",
+    "inkMeasuredAt": "The score is measured at the default 50% line and is not recalculated when you move the line — after adjusting, it is a historical hint, not a verdict on the new position."
   },
   "notice": {
     "title": "Upload and processing takes {{time}}",
