@@ -12,8 +12,7 @@ Plaani kuju (state.json → "prepress"):
       "preview_status": "idle",     # idle | rendering | ready | error
       "preview_done": 0,
       "pages": [
-        {"n": 1, "mode": "default", "split_x": None, "excluded": False,
-         "ink": None, "ink_cont": None}
+        {"n": 1, "mode": "default", "split_x": None, "excluded": False}
       ]
     }
 
@@ -32,8 +31,7 @@ def default_plan(page_count: int) -> dict:
         "preview_status": "idle",
         "preview_done": 0,
         "pages": [
-            {"n": n, "mode": "default", "split_x": None, "excluded": False,
-             "ink": None, "ink_cont": None}
+            {"n": n, "mode": "default", "split_x": None, "excluded": False}
             for n in range(1, page_count + 1)
         ],
     }

@@ -75,10 +75,6 @@ export interface PrepressPage {
   mode: PrepressMode;
   split_x: number | null;
   excluded: boolean;
-  /** Tindiosakaal joonel (0–1). Tõlgendatav ainult koos ink_cont-iga. */
-  ink: number | null;
-  /** Tindi vertikaalne pidevus: 1 = katkematu joon (köitemurre), 0 = katkendlik (kiri). */
-  ink_cont: number | null;
 }
 
 export interface PrepressPlan {

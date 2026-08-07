@@ -27,10 +27,10 @@ pildi-OCR teed pidi. OCR-serverit ei muudeta.
 - **`FULL_DPI = 300` ja `JPEG_QUALITY = 95` peavad kattuma** OCR-serveri
   `PDF_DPI` ja `quality=95` väärtustega (`qwen3.5/kataloogi-jalgimine-ja-ocr.py`).
   Kui need seal muutuvad, tuleb muuta ka `server/upload/page_source.py`.
-- **Automaatika on hoiataja, mitte pakkuja.** Tindiskoor on usaldusväärne
-  ainult kõrge väärtuse suunas: kõrge skoor = joon lõikab kindlasti kirja;
-  madal skoor ≠ õige koht (tühi veeris skoorib samuti 0). Köitevahe globaalne
-  tuvastamine mõõdeti ebausaldusväärseks (pakutav x hüppas 0,38–0,61 vahel).
+- **Automaatikat ei ole.** Köitevahe globaalne tuvastamine mõõdeti
+  ebausaldusväärseks (pakutav x hüppas 0,38–0,61 vahel) ja ka tindiskoor
+  eemaldati hiljem — vt revisjoni 2026-08-08. Admin otsustab silmaga;
+  kontaktleht näitab joone asendit kõigil lehtedel korraga.
 - **OCR-serverisse avaldatakse failipõhise `.tmp`+rename-ga.** Valvuril EI OLE
   piltide jaoks stabiilsuskontrolli — `wait_for_file_stable()` kutsutakse seal
   ainult PDF-ide peale. Kataloogi tervikuna ei varjata: valvur töötab pildi
@@ -79,9 +79,50 @@ Natiivse lahutuse idee ise jäi alles, aga ainult seal, kus seda kasutatakse:
 joone peale kärbituna. `w-auto` + fikseeritud kõrgus oleks kuivatanud selle
 ~53 px sliveriks — sama viga väiksemas mastaabis.
 
-Töövoog on nüüd kaheastmeline: kontaktleht (ülevaade + tindihoiatus) → üksikleht
+Töövoog on nüüd kaheastmeline: kontaktleht (ülevaade) → üksikleht
 (kontrolli ja paranda). Backend jäi muutmata — `/strip/` endpoint, `get_gutter_strip`
 ja LRU-vahemälu teenindavad endiselt üksiklehe paani.
+
+## Revisjon 2026-08-08: tindiskoor eemaldatud
+
+Algne invariant „automaatika on hoiataja, mitte pakkuja" eeldas, et tindiskoor
+on **usaldusväärne kõrge väärtuse suunas**. Päris materjalil see ei kehtinud ja
+skoor eemaldati tervikuna.
+
+**Esimene läbikukkumine — hoiatus käivitus õige vastuse peale.** Lehe 2 profiil
+(EAA-tüüpi kirikuraamat, 100 DPI eelvaade):
+
+| Koht | ink |
+|---|---|
+| Tekstiveerud | ~0,36 |
+| Köitevahe 0,48 / 0,52 | 0,109 / 0,086 |
+| **Murdekoht 0,50** | **0,451** |
+
+Skoor oli kõrgeim täpselt seal, kus poolitus on kõige õigem. Kõik kuus lehte
+said 0,40–0,52 ehk kogu teos märgiti punaseks, kuigi joon oli igal pool õige.
+
+**Katse päästa — pidevusmõõt.** `ink_profile()` hakkas tagastama ka tindi
+vertikaalset pidevust (pikim järjestikuste tumedate ridade jada / kõrgus)
+eeldusel, et murre on katkematu joon ja kiri katkendlik. See vähendas hoiatusi
+kuuelt kahele, aga ei lahendanud probleemi.
+
+**Teine läbikukkumine — absoluutväärtus ei mõõda lehte.** `INK_PERCENTILE = 0.35`
+seab läve nii, et **35% lehe pikslitest on definitsiooni järgi „tint"**. Suvalise
+veeru oodatav skoor on seega ~0,35 juba konstruktsiooni tõttu (mõõdetud
+tekstiveerud: 0,318–0,387, mediaan 0,36). Hoiatuslävi 0,25 jäi **allapoole seda
+baasjoont**, seega iga tekstiga leht ületas selle paratamatult. Lisaks: rea kaupa
+kõige tumedama veeru asukoht hüppas 65–121 px ulatuses, mis tähendab, et neil
+skännidel ei ole gutteris ühtset tumedat joont, mille külge pidevusmõõt haakuda
+saaks.
+
+**Otsus:** eemaldati `ink_score`, `ink_profile`, `percentile_from_hist`,
+`INK_PERCENTILE`, plaani väljad `ink`/`ink_cont`, frontendi `inkLevel` ja
+kontaktlehe värviraamid. Hoiatus, mis käivitub õige käitumise peale, õpetab
+kasutajat hoiatust eirama — see on halvem kui hoiatuse puudumine.
+
+**Kui automaatikat kunagi uuesti proovida:** absoluutne lävi ei tööta. Mõõta
+tuleks veeru skoori **suhtena lehe enda veergude jaotusesse** (kas x on tugev
+lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 
 ## Teadaolev, siin mitte parandatud
 

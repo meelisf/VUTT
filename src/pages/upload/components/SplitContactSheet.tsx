@@ -1,15 +1,9 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { EyeOff, Eye, Maximize2, Loader2, Droplet } from 'lucide-react';
+import { EyeOff, Eye, Maximize2, Loader2 } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
-import { inkLevel, isPreviewReady, willSplit } from '../prepressPlan';
+import { isPreviewReady, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
-
-const BORDER: Record<string, string> = {
-  ok: 'border-green-500',
-  warn: 'border-amber-500',
-  bad: 'border-red-600',
-};
 
 interface Props {
   uploadId: string;
@@ -20,8 +14,8 @@ interface Props {
 }
 
 /**
- * 100 DPI pisipiltide ruudustik. Tindiskoor tõstab kahtlased esile, aga
- * pisipilt ise ei tõesta midagi — klikk viib köitevahe-ribale või üksiklehele.
+ * 100 DPI pisipiltide ruudustik: ülevaade, kust näeb joone asendit kõigil
+ * lehtedel korraga. Klikk avab üksiklehe, kus joont saab nihutada.
  */
 const SplitContactSheet: React.FC<Props> = ({
   uploadId, token, plan, onPageChange, onOpenPage,
@@ -34,7 +28,6 @@ const SplitContactSheet: React.FC<Props> = ({
       className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(150px,1fr))]"
     >
       {plan.pages.map((page) => {
-        const level = inkLevel(page.ink, page.ink_cont);
         const ready = isPreviewReady(plan, page.n);
         const splits = willSplit(plan, page.n);
         const x = page.mode === 'custom' && page.split_x != null
@@ -44,7 +37,6 @@ const SplitContactSheet: React.FC<Props> = ({
           <div
             key={page.n}
             data-testid={`page-${page.n}`}
-            data-ink-level={level}
             data-excluded={page.excluded ? 'true' : 'false'}
             className={`relative ${page.excluded ? 'opacity-35' : ''}`}
           >
@@ -52,7 +44,7 @@ const SplitContactSheet: React.FC<Props> = ({
               type="button"
               data-testid={`open-${page.n}`}
               title={t('step3split.openPage')}
-              className={`block w-full border-2 ${BORDER[level]}`}
+              className="block w-full border-2 border-gray-300"
               disabled={!ready}
               onClick={() => onOpenPage(page.n)}
             >
@@ -83,15 +75,6 @@ const SplitContactSheet: React.FC<Props> = ({
 
             <div className="absolute top-1 left-1 flex gap-1">
               <span className="text-[10px] px-1 rounded bg-black/60 text-white">{page.n}</span>
-              {level !== 'ok' && (
-                <span
-                  className="flex items-center gap-0.5 rounded bg-red-700 px-1 text-[10px] text-white"
-                  title={`${t('step3split.inkWarning')} — ${t('step3split.inkLegend')} ${t('step3split.inkMeasuredAt')}`}
-                >
-                  <Droplet size={9} />
-                  {page.ink?.toFixed(2)}
-                </span>
-              )}
             </div>
 
             <div className="absolute top-1 right-1 flex gap-1">

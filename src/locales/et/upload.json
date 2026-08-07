@@ -86,7 +86,6 @@
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
     "summary": "{{pages}} lehest {{split}} poolitatakse, {{excluded}} jäetakse välja → OCR-i läheb {{output}} lehte",
-    "inkWarning": "Joon lõikab kirja",
     "exclude": "Jäta välja",
     "include": "Võta tagasi",
     "noSplit": "Ära poolita",
@@ -95,9 +94,7 @@
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
-    "isExcluded": "See leht jäetakse OCR-ist välja",
-    "inkLegend": "Punane number tähendab, et poolitusjoonel on tinti, mis EI ole köitemurre — tõenäoliselt lõikab joon kirja. Pidevat tumedat murdejoont ei märgita, sest just seal ongi õige poolituskoht; hele köitevahe samuti mitte.",
-    "inkMeasuredAt": "Mõõdetud vaikimisi joonel 50% ega arvutata joone nihutamisel ümber — pärast joone muutmist on see ajalooline vihje, mitte hinnang uuele kohale."
+    "isExcluded": "See leht jäetakse OCR-ist välja"
   },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",

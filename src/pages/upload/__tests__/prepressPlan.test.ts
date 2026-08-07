@@ -3,7 +3,6 @@ import {
   applyGlobalSplit,
   clampSplitX,
   countOutputPages,
-  inkLevel,
   isPreviewReady,
   summarizePlan,
   willSplit,
@@ -21,9 +20,9 @@ function plan(overrides: Partial<PrepressPlan> = {}): PrepressPlan {
     trivial: false,
     status: 'awaiting_split',
     pages: [
-      { n: 1, mode: 'default', split_x: null, excluded: false, ink: 0.08, ink_cont: 0.02 },
-      { n: 2, mode: 'custom', split_x: 0.459, excluded: false, ink: 0.99, ink_cont: 0.97 },
-      { n: 3, mode: 'nosplit', split_x: null, excluded: false, ink: 0.02, ink_cont: 0.01 },
+      { n: 1, mode: 'default', split_x: null, excluded: false },
+      { n: 2, mode: 'custom', split_x: 0.459, excluded: false },
+      { n: 3, mode: 'nosplit', split_x: null, excluded: false },
     ],
     ...overrides,
   };
@@ -77,24 +76,6 @@ describe('summarizePlan', () => {
 
   it('enabled=false → ühtki lehte ei poolitata', () => {
     expect(summarizePlan(plan({ enabled: false })).split).toBe(0);
-  });
-});
-
-describe('inkLevel', () => {
-  it('mõõdetud väärtused päris materjalilt (EAA 1253)', () => {
-    expect(inkLevel(0.08)).toBe('ok');    // leht 1: puhas
-    expect(inkLevel(0.48)).toBe('warn');  // leht 2: kiri läheb joonest üle
-    expect(inkLevel(0.99)).toBe('bad');   // leht 3: joon on murdevarjus
-  });
-
-  it('arvutamata skoor on ok, mitte hoiatus', () => {
-    expect(inkLevel(null)).toBe('ok');
-  });
-
-  it('läved on kaasavad', () => {
-    expect(inkLevel(0.8)).toBe('bad');
-    expect(inkLevel(0.25)).toBe('warn');
-    expect(inkLevel(0.2499)).toBe('ok');
   });
 });
 
@@ -184,32 +165,3 @@ describe('willSplit', () => {
   });
 });
 
-describe('inkLevel + pidevus', () => {
-  it('tume murdejoon on OK, mitte hoiatus', () => {
-    // Mõõdetud päris skännil: õige poolituskoht murdejoonel andis ink 0.45.
-    // Ainult ink'i vaadates oleks hoiatus käivitunud ÕIGE vastuse peale.
-    expect(inkLevel(0.45, 0.95)).toBe('ok');
-    expect(inkLevel(0.99, 0.98)).toBe('ok');
-  });
-
-  it('katkendlik tint samal tasemel on hoiatus', () => {
-    expect(inkLevel(0.45, 0.04)).toBe('warn');
-    expect(inkLevel(0.9, 0.03)).toBe('bad');
-  });
-
-  it('madal ink on ok ka ilma pidevuseta — kõik skännid pole murdejoonega', () => {
-    expect(inkLevel(0.09, 0.0)).toBe('ok');
-    expect(inkLevel(0.09, 0.99)).toBe('ok');
-  });
-
-  it('pidevuse lävi', () => {
-    expect(inkLevel(0.5, 0.5)).toBe('ok');
-    expect(inkLevel(0.5, 0.4999)).toBe('warn');
-  });
-
-  it('mõõtmata pidevus langeb tagasi vanale käitumisele', () => {
-    // Vanad uploadid enne ink_cont välja lisamist.
-    expect(inkLevel(0.45, null)).toBe('warn');
-    expect(inkLevel(0.9, null)).toBe('bad');
-  });
-});

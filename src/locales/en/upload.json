@@ -86,7 +86,6 @@
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",
     "summary": "{{split}} of {{pages}} pages will be split, {{excluded}} excluded → {{output}} pages go to OCR",
-    "inkWarning": "The line cuts through writing",
     "exclude": "Exclude",
     "include": "Restore",
     "noSplit": "Don't split",
@@ -95,9 +94,7 @@
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
-    "isExcluded": "This page is excluded from OCR",
-    "inkLegend": "A red number means there is ink on the split line that is NOT the binding fold — the line probably cuts through writing. A continuous dark fold is not flagged, because that is exactly where the split belongs; neither is a light gutter.",
-    "inkMeasuredAt": "Measured at the default 50% line and not recalculated when you move the line — after adjusting, it is a historical hint, not a verdict on the new position."
+    "isExcluded": "This page is excluded from OCR"
   },
   "notice": {
     "title": "Upload and processing takes {{time}}",

@@ -35,34 +35,6 @@ export function countOutputPages(plan: PrepressPlan): number {
   }, 0);
 }
 
-/** Pidevuse lävi, millest alates tume riba loetakse köitemurdeks, mitte kirjaks. */
-const FOLD_CONTINUITY = 0.5;
-
-/**
- * Tindiskoori tase värvi jaoks, arvestades tindi PIDEVUST.
- *
- * Ainult ink ei erista köitemurret kirjast: mõõdetuna andis õige poolituskoht
- * (täpselt murdejoonel) ink 0,45 — hoiatus oleks käivitunud õige vastuse peale.
- * Pidev tume joon = murre = ok; katkendlik tint samal tasemel = kiri = hoiatus.
- *
- * Madal ink on alati ok — kõik skännid ei ole murdejoonega, hele köitevahe on
- * täiesti korrektne. Arvutamata skoor (null) on samuti `ok`, muidu oleks pool
- * kontaktlehest punane juba enne renderduse lõppu.
- */
-export function inkLevel(
-  ink: number | null,
-  continuity?: number | null,
-): 'ok' | 'warn' | 'bad' {
-  if (ink == null) return 'ok';
-  if (ink < 0.25) return 'ok';
-  // Pidev tume joon ülalt alla = köitemurre, mitte kiri. Just seal ONGI õige
-  // poolituskoht — mõõdetuna andis murdejoon ink 0,45 ja pidevus ~1,0, samal
-  // ajal kui tekst samal tinditasemel annab pidevuse < 0,05.
-  if (continuity != null && continuity >= FOLD_CONTINUITY) return 'ok';
-  if (ink >= 0.8) return 'bad';
-  return 'warn';
-}
-
 /**
  * Hoiab poolitusjoone vahemikus, kus mõlemad pooled jäävad sisukaks.
  * Vastab backendi `page_cuts` servapiirangule (`max(1, min(width - 1, …))`),
