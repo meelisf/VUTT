@@ -261,6 +261,7 @@ const UploadPage: React.FC = () => {
             replaceWorkTitle={wizard.replaceWorkTitle}
             fileUploading={wizard.fileUploading}
             ocrTimedOut={wizard.ocrTimedOut}
+            onBackToSplit={() => wizard.setStep(3)}
             estimatedTime={wizard.estimatedTime}
             importError={wizard.importError}
             canImport={wizard.canImport}

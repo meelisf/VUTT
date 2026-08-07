@@ -76,7 +76,9 @@
     "forceImport": "Import available pages",
     "importSuccess": "Work imported!",
     "importError": "Import failed",
-    "gitCommitWarning": "Work was imported, but the Git version-control commit failed."
+    "gitCommitWarning": "Work was imported, but the Git version-control commit failed.",
+    "transferFailed": "Sending the files to the OCR server failed",
+    "backToSplit": "Back to splitting"
   },
   "step3split": {
     "title": "Split double pages",

@@ -54,9 +54,14 @@ def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:
         )
 
 
-def _transfer_pages(upload_id: str, slug: str, remote_work: str,
-                    plan: Optional[dict]) -> int:
-    """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu."""
+def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
+                    remote_work: str, plan: Optional[dict]) -> int:
+    """Renderdab, lõikab ja saadab kõik lehed. Tagastab saadetud lehtede arvu.
+
+    `remote_dirs` on VANEM-ENNE järjekorras: work-kaust elab staging-kausta all
+    ja SFTP mkdir ei loo vanemaid ise — puuduv vanem annab ENOENT ja kogu
+    partii kukub läbi. Sama järjekord nagu `_prepare_image_upload` tagastab.
+    """
     src_path = prepress.source_path(upload_id)
     if not src_path:
         raise FileNotFoundError("Lähteallikat ei leitud: {}".format(upload_id))
@@ -69,7 +74,7 @@ def _transfer_pages(upload_id: str, slug: str, remote_work: str,
     sftp = ocr_client.sftp_open(upload_id)
     out_index = 0
     try:
-        ocr_client.ensure_remote_dirs(sftp, (remote_work,))
+        ocr_client.ensure_remote_dirs(sftp, remote_dirs)
         for n in range(1, count + 1):
             if prepress_plan.is_excluded(plan, n):
                 continue
@@ -114,12 +119,15 @@ def apply_and_transfer(upload_id: str) -> None:
     if not state:
         return
     slug = state["meta"]["slug"]
+    remote_staging = "{}/{}".format(OCR_SERVER_PATH, state["remote_staging_path"])
     remote_work = "{}/{}".format(OCR_SERVER_PATH, state["remote_work_path"])
     plan = state.get("prepress")
 
     try:
         with prepress.RENDER_SEMAPHORE:
-            sent = _transfer_pages(upload_id, slug, remote_work, plan)
+            sent = _transfer_pages(
+                upload_id, slug, (remote_staging, remote_work), remote_work, plan
+            )
         upload_state.set_upload_state(
             upload_id, status="processing", expected_pages=sent
         )

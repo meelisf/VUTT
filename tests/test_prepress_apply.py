@@ -8,24 +8,38 @@ from server.upload import prepress_apply
 
 
 class FakeSftp:
-    """Salvestab put/rename kutsed, et saaks kontrollida .tmp+rename mustrit."""
+    """Salvestab put/rename kutsed, et saaks kontrollida .tmp+rename mustrit.
 
-    def __init__(self):
+    mkdir käitub nagu PÄRIS SFTP: vanemkaust peab eksisteerima, muidu ENOENT.
+    Ilma selleta ei püüdnud test kinni seda, et prepress lõi ainult work-kausta
+    ja jättis staging-vanema loomata (tootmisviga 2026-08-08).
+    """
+
+    def __init__(self, existing=()):
         self.puts = []
         self.renames = []
+        self.dirs = set(existing)
         self.closed = False
 
     def put(self, local, remote, callback=None):
+        parent = remote.rsplit("/", 1)[0]
+        if parent not in self.dirs:
+            raise FileNotFoundError(2, "No such file", remote)
         self.puts.append(remote)
 
     def rename(self, src, dst):
         self.renames.append((src, dst))
 
     def stat(self, path):
-        raise FileNotFoundError(path)
+        if path not in self.dirs:
+            raise FileNotFoundError(path)
+        return object()
 
     def mkdir(self, path):
-        pass
+        parent = path.rsplit("/", 1)[0]
+        if parent and parent not in self.dirs:
+            raise FileNotFoundError(2, "No such file", path)
+        self.dirs.add(path)
 
     def close(self):
         self.closed = True
@@ -48,7 +62,7 @@ def test_publish_atomic_laeb_tmp_nimega_ja_nimetab_ymber(tmp_path):
     OCR-i. .jpg.tmp jääb valvuri EXTENSIONS filtrist välja."""
     local = tmp_path / "a.jpg"
     local.write_bytes(b"jpeg")
-    sftp = FakeSftp()
+    sftp = FakeSftp(existing=["/remote"])
     prepress_apply.publish_atomic(sftp, str(local), "/remote/x_pg_001.jpg")
     assert sftp.puts == ["/remote/x_pg_001.jpg.tmp"]
     assert sftp.renames == [("/remote/x_pg_001.jpg.tmp", "/remote/x_pg_001.jpg")]
@@ -81,36 +95,37 @@ def _plan(**over):
 
 def test_poolitatud_lehed_saadetakse_vasak_parem_jarjekorras(upload, monkeypatch):
     uid, base = upload
-    sftp = FakeSftp()
+    sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
-    prepress_apply._transfer_pages(uid, "kirik-abc", "/remote", _plan(enabled=True))
+    prepress_apply._transfer_pages(
+        uid, "kirik-abc", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
 
     assert sftp.renames == [
-        ("/remote/kirik-abc_pg_001.jpg.tmp", "/remote/kirik-abc_pg_001.jpg"),
-        ("/remote/kirik-abc_pg_002.jpg.tmp", "/remote/kirik-abc_pg_002.jpg"),
-        ("/remote/kirik-abc_pg_003.jpg.tmp", "/remote/kirik-abc_pg_003.jpg"),
-        ("/remote/kirik-abc_pg_004.jpg.tmp", "/remote/kirik-abc_pg_004.jpg"),
-        ("/remote/kirik-abc_pg_005.jpg.tmp", "/remote/kirik-abc_pg_005.jpg"),
-        ("/remote/kirik-abc_pg_006.jpg.tmp", "/remote/kirik-abc_pg_006.jpg"),
+        ("/remote/w/kirik-abc_pg_001.jpg.tmp", "/remote/w/kirik-abc_pg_001.jpg"),
+        ("/remote/w/kirik-abc_pg_002.jpg.tmp", "/remote/w/kirik-abc_pg_002.jpg"),
+        ("/remote/w/kirik-abc_pg_003.jpg.tmp", "/remote/w/kirik-abc_pg_003.jpg"),
+        ("/remote/w/kirik-abc_pg_004.jpg.tmp", "/remote/w/kirik-abc_pg_004.jpg"),
+        ("/remote/w/kirik-abc_pg_005.jpg.tmp", "/remote/w/kirik-abc_pg_005.jpg"),
+        ("/remote/w/kirik-abc_pg_006.jpg.tmp", "/remote/w/kirik-abc_pg_006.jpg"),
     ]
 
 
 def test_valjajaetud_lehte_ei_renderdata_ega_saadeta(upload, monkeypatch):
     uid, base = upload
-    sftp = FakeSftp()
+    sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
     plan = _plan(enabled=True)
     plan["pages"][1]["excluded"] = True
-    prepress_apply._transfer_pages(uid, "s", "/remote", plan)
+    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", plan)
     assert len(sftp.renames) == 4     # lehed 1 ja 3 poolitatud, leht 2 välja
 
 
 def test_ajutised_failid_kustutatakse_kohe(upload, monkeypatch):
     """Voogedastus: kogu teost ei materialiseerita lokaalselt."""
     uid, base = upload
-    sftp = FakeSftp()
+    sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
-    prepress_apply._transfer_pages(uid, "s", "/remote", _plan(enabled=True))
+    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
     work = base / "apply_tmp"
     assert not work.exists() or os.listdir(str(work)) == []
 
@@ -119,7 +134,7 @@ def test_poolituse_laius_tuleb_iga_lehe_enda_moodust(upload, monkeypatch):
     """Leht 1 on 400 px, leht 2 on 500 px — cut_px peab erinema."""
     uid, base = upload
     widths = []
-    sftp = FakeSftp()
+    sftp = FakeSftp(existing=["/remote"])
     monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
     orig = prepress_apply._write_cut
 
@@ -128,5 +143,23 @@ def test_poolituse_laius_tuleb_iga_lehe_enda_moodust(upload, monkeypatch):
         return orig(src_img, x0, x1, dst)
 
     monkeypatch.setattr(prepress_apply, "_write_cut", spy)
-    prepress_apply._transfer_pages(uid, "s", "/remote", _plan(enabled=True))
+    prepress_apply._transfer_pages(uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True))
     assert widths[:4] == [200, 200, 250, 250]
+
+
+def test_loob_koik_vanemkaustad_enne_saatmist(upload, monkeypatch):
+    """REGRESSIOON: work-kaust on staging-kausta ALL. Kui vanemat ei looda,
+    annab SFTP mkdir ENOENT ja kogu partii kukub läbi (tootmisviga 2026-08-08)."""
+    uid, _base = upload
+    # OCR-serveri jälgitav baaskaust on olemas; upload'i omad EI ole.
+    sftp = FakeSftp(existing=["/o/AUTO-OCR/hand"])
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+
+    prepress_apply._transfer_pages(
+        uid, "s", ("/o/AUTO-OCR/hand/u1", "/o/AUTO-OCR/hand/u1/s"),
+        "/o/AUTO-OCR/hand/u1/s", _plan(enabled=True),
+    )
+
+    assert "/o/AUTO-OCR/hand/u1" in sftp.dirs      # vanem loodi esimesena
+    assert "/o/AUTO-OCR/hand/u1/s" in sftp.dirs
+    assert len(sftp.renames) == 6

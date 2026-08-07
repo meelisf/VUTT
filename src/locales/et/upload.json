@@ -76,7 +76,9 @@
     "forceImport": "Impordi olemasolevad lehed",
     "importSuccess": "Teos imporditud!",
     "importError": "Importimine ebaõnnestus",
-    "gitCommitWarning": "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus."
+    "gitCommitWarning": "Teos imporditi, aga Git versioonihalduse commit ebaõnnestus.",
+    "transferFailed": "Failide saatmine OCR-serverisse ebaõnnestus",
+    "backToSplit": "Tagasi poolitamise juurde"
   },
   "step3split": {
     "title": "Topeltlehtede poolitamine",

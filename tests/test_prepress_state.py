@@ -113,3 +113,18 @@ def test_try_begin_applying_on_voistlusekindel(upload):
     for t in threads:
         t.join()
     assert results.count(True) == 1
+
+
+def test_try_begin_applying_lubab_uuesti_proovida_parast_viga(upload):
+    """Ebaõnnestunud edastuse järel peab saama uuesti proovida: lähtefail on
+    endiselt VUTT-i poolel (koristus käib alles impordil), seega kordus on
+    ohutu. Ilma selleta jääb upload igaveseks error-olekusse lukku."""
+    upload_state.set_upload_state(upload, status="error", error_message="ENOENT")
+    assert upload_state.try_begin_applying(upload) is True
+    assert _read(upload, "status") == "applying"
+
+
+def test_try_begin_applying_ei_luba_juba_tootlemisel_olevat(upload):
+    """Kui OCR juba töötleb, ei tohi teist partiid peale saata."""
+    upload_state.set_upload_state(upload, status="processing")
+    assert upload_state.try_begin_applying(upload) is False

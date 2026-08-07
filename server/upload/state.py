@@ -190,8 +190,15 @@ def mutate_prepress(upload_id: str, fn) -> Optional[dict]:
         return prepress
 
 
+# Staatused, millest tohib alustada (uut) edastust OCR-serverisse.
+# "error" on kaasas tahtlikult: lähtefail on endiselt VUTT-i poolel (koristus
+# käib alles impordil), seega ebaõnnestunud partiid peab saama uuesti proovida.
+# Ilma selleta jääks upload igaveseks error-olekusse lukku.
+APPLY_START_STATUSES = ("awaiting_split", "error")
+
+
 def try_begin_applying(upload_id: str) -> bool:
-    """CAS: awaiting_split → applying. Tagastab False, kui töö juba käib.
+    """CAS: awaiting_split | error → applying. False, kui töö juba käib.
 
     Tagab, et topeltklikk, retry või brauseri refresh ei käivita teist
     paralleelset 300 DPI renderdust ega SFTP-d.
@@ -199,7 +206,7 @@ def try_begin_applying(upload_id: str) -> bool:
     lock = get_upload_lock(upload_id)
     with lock:
         s = read_state(upload_id)
-        if not s or s.get("status") != "awaiting_split":
+        if not s or s.get("status") not in APPLY_START_STATUSES:
             return False
         s["status"] = "applying"
         write_state(upload_id, s)
