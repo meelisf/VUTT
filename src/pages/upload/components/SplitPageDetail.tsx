@@ -1,11 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { prepressPreviewUrl, prepressStripUrl } from '../uploadApi';
 import { clampSplitX } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
 
-const NUDGE = 0.005;      // ühe nupuvajutuse samm (0,5% laiusest)
 const STRIP_DEBOUNCE_MS = 400;
 
 interface Props {
@@ -14,6 +13,7 @@ interface Props {
   plan: PrepressPlan;
   pageNum: number;
   onPageChange: (n: number, patch: Partial<PrepressPage>) => void;
+  onNavigate: (n: number) => void;
   onClose: () => void;
 }
 
@@ -27,7 +27,7 @@ interface Props {
  * nägema ja käituma, sh lohistuse kuulamine aknast (kursor tohib pildilt välja).
  */
 const SplitPageDetail: React.FC<Props> = ({
-  uploadId, token, plan, pageNum, onPageChange, onClose,
+  uploadId, token, plan, pageNum, onPageChange, onNavigate, onClose,
 }) => {
   const { t } = useTranslation(['upload', 'common']);
   const page = plan.pages.find((p) => p.n === pageNum);
@@ -39,11 +39,21 @@ const SplitPageDetail: React.FC<Props> = ({
   const [dragging, setDragging] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
 
-  // Debounce: riba päritakse alles pärast pausi.
+  const index = plan.pages.findIndex((p) => p.n === pageNum);
+  const hasPrev = index > 0;
+  const hasNext = index >= 0 && index < plan.pages.length - 1;
+
+  const goTo = useCallback((i: number) => {
+    const target = plan.pages[i];
+    if (target) onNavigate(target.n);
+  }, [plan.pages, onNavigate]);
+
+  // Debounce: riba päritakse alles pärast pausi. pageNum on sõltuvuses, et
+  // lehe vahetusel ei jääks riba vana lehe x-i taha rippuma.
   useEffect(() => {
     const id = setTimeout(() => setStripX(liveX), STRIP_DEBOUNCE_MS);
     return () => clearTimeout(id);
-  }, [liveX]);
+  }, [liveX, pageNum]);
 
   const setX = (x: number) =>
     onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
@@ -74,12 +84,21 @@ const SplitPageDetail: React.FC<Props> = ({
     };
   }, [dragging]);
 
-  // Escape sulgeb — väikesel ekraanil on see sageli kiirem kui nupp.
+  // Klaviatuur: nooled vahetavad LEHTE (mitte joont), Escape sulgeb.
+  // Sama leping nagu Manage-lehe pildiredaktoris — ära kaaperda nooli,
+  // kui fookus on sisestusväljal.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (document.activeElement?.tagName || '').toUpperCase();
+      const role = (document.activeElement as HTMLElement | null)?.getAttribute('role');
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || role === 'slider') return;
+      if (e.key === 'ArrowLeft') goTo(index - 1);
+      else if (e.key === 'ArrowRight') goTo(index + 1);
+      else if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [goTo, index, onClose]);
 
   if (!page) return null;
 
@@ -91,7 +110,11 @@ const SplitPageDetail: React.FC<Props> = ({
       <div className="my-auto flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col rounded bg-white sm:max-h-[calc(100vh-2rem)]">
         <div className="flex flex-shrink-0 items-center justify-between gap-2 rounded-t border-b border-gray-200 bg-white px-4 py-3">
           <h3 className="font-semibold">
-            {pageNum} <span className="ml-2 text-sm font-normal text-gray-500">
+            {pageNum}
+            <span className="ml-1 text-sm font-normal text-gray-400">
+              / {plan.pages.length}
+            </span>
+            <span className="ml-3 text-sm font-normal text-gray-500">
               {Math.round(liveX * 1000) / 10}%
             </span>
           </h3>
@@ -145,31 +168,46 @@ const SplitPageDetail: React.FC<Props> = ({
             </div>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button
-              type="button" data-testid="nudge-left" className="rounded border p-1"
-              onClick={() => setX(liveX - NUDGE)}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              type="button" data-testid="nudge-right" className="rounded border p-1"
-              onClick={() => setX(liveX + NUDGE)}
-            >
-              <ChevronRight size={16} />
-            </button>
-            <button
-              type="button" className="rounded border px-3 py-1 text-sm"
-              onClick={() => onPageChange(pageNum, { mode: 'default', split_x: null })}
-            >
-              {t('step3split.resetToGlobal')}
-            </button>
-            <button
-              type="button" className="rounded border px-3 py-1 text-sm"
-              onClick={() => onPageChange(pageNum, { mode: 'nosplit', split_x: null })}
-            >
-              {t('step3split.noSplit')}
-            </button>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Lehe vahetus — sama kuju ja klahvid nagu Manage pildiredaktoris.
+                Joont nihutab kasutaja AINULT hiirega (käepide või klõps pildil). */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                data-testid="page-prev"
+                onClick={() => goTo(index - 1)}
+                disabled={!hasPrev}
+                title={t('common:buttons.previous')}
+                className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100 disabled:opacity-40"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                type="button"
+                data-testid="page-next"
+                onClick={() => goTo(index + 1)}
+                disabled={!hasNext}
+                title={t('common:buttons.next')}
+                className="rounded border border-gray-300 bg-white p-2 hover:bg-gray-100 disabled:opacity-40"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button" className="rounded border px-3 py-1 text-sm"
+                onClick={() => onPageChange(pageNum, { mode: 'default', split_x: null })}
+              >
+                {t('step3split.resetToGlobal')}
+              </button>
+              <button
+                type="button" className="rounded border px-3 py-1 text-sm"
+                onClick={() => onPageChange(pageNum, { mode: 'nosplit', split_x: null })}
+              >
+                {t('step3split.noSplit')}
+              </button>
+            </div>
           </div>
         </div>
       </div>

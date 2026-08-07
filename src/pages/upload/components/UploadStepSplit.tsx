@@ -226,6 +226,7 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
           plan={plan}
           pageNum={detailPage}
           onPageChange={handlePageChange}
+          onNavigate={setDetailPage}
           onClose={() => setDetailPage(null)}
         />
       )}
