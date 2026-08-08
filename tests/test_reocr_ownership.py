@@ -94,3 +94,23 @@ def test_varukoopia_tee_on_state_all_mitte_teose_kaustas(work_dir):
 
 def test_taastamine_ilma_varukoopiateta_on_ohutu(work_dir):
     assert reocr_ops._restore_backups("puudub") == 0
+
+
+# --- produced_pages: mida see töö PÄRISELT tootis ---
+
+def test_produced_pages_taidetakse_kirjutamise_hetkel():
+    """Loend peab kasvama siis, kui .ocr PÄRISELT kirjutatakse — mitte tööd
+    käivitades. Plaanitud ≠ toodetud."""
+    job = {"produced_pages": []}
+
+    reocr_ops._record_produced(job, "017.jpg")
+    reocr_ops._record_produced(job, "018.jpg")
+    reocr_ops._record_produced(job, "017.jpg")   # kordus ei tohi duplitseerida
+
+    assert job["produced_pages"] == ["017", "018"]
+
+
+def test_uus_too_algab_tuhja_produced_pages_iga():
+    job = {}
+    reocr_ops._record_produced(job, "001.jpg")
+    assert job["produced_pages"] == ["001"]

@@ -126,6 +126,19 @@ def _restore_backups(job_id: str) -> int:
     return restored
 
 
+def _record_produced(job: dict, page_filename: str) -> None:
+    """Märgib, et SEE töö kirjutas selle lehe .ocr faili.
+
+    Katkestamine kustutab ainult siit loendist tulevad lehed. Plaanitud lehtede
+    nimekiri (batch mapping) EI OLE omandi tõend — töö võib olla katkestatud
+    enne, kui ta plaani lõpuni jõudis (#217).
+    """
+    stem = os.path.splitext(os.path.basename(page_filename))[0]
+    produced = job.setdefault("produced_pages", [])
+    if stem not in produced:
+        produced.append(stem)
+
+
 def _drop_backups(job_id: str) -> None:
     """Kustutab varukoopiad (töö lõppes normaalselt / rakendati / visati ära)."""
     shutil.rmtree(_backup_dir(job_id), ignore_errors=True)
@@ -352,6 +365,8 @@ def _poll_batch_job(job_id: str) -> None:
                             if cur_entry.get("remote_txt_name") == entry["remote_txt_name"] and cur_entry.get("status") == "processing":
                                 cur_entry["status"] = "ready"
                                 current["last_progress_at"] = datetime.now().timestamp()
+                                # Omand: see töö kirjutas selle lehe .ocr faili (#217)
+                                _record_produced(current, entry["page_filename"])
                                 ready = True
                                 break
             except Exception as e:
@@ -800,6 +815,11 @@ def poll_reocr_job(job_id: str) -> dict:
             if page_fn:
                 try:
                     ocr_path = _write_ocr_file(log_job["slug"], page_fn, text, job_id)
+                    # Omand: see töö kirjutas selle lehe .ocr faili (#217)
+                    with _reocr_jobs_lock:
+                        live = _reocr_jobs.get(job_id)
+                        if live is not None:
+                            _record_produced(live, page_fn)
                     logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
                 except Exception as write_err:
                     logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
