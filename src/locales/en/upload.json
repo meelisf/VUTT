@@ -96,7 +96,8 @@
     "applying": "Processing and sending to OCR…",
     "continue": "Continue",
     "willNotSplit": "This page will not be split",
-    "isExcluded": "This page is excluded from OCR"
+    "isExcluded": "This page is excluded from OCR",
+    "backToOverview": "Back to overview"
   },
   "notice": {
     "title": "Upload and processing takes {{time}}",

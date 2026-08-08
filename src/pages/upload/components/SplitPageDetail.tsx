@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, ChevronLeft, ChevronRight, Ban, EyeOff } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Ban, EyeOff, LayoutGrid } from 'lucide-react';
 import { prepressPreviewUrl } from '../uploadApi';
 import { clampSplitX, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
@@ -179,9 +179,20 @@ const SplitPageDetail: React.FC<Props> = ({
         </div>
 
         <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 rounded-b border-t border-gray-200 bg-white px-4 py-3">
-            {/* Lehe vahetus — sama kuju ja klahvid nagu Manage pildiredaktoris.
+            {/* Väljapääs on tegevusribal SÕNADEGA. Päise X ja Escape üksi ei
+                ütle, KUHU nad viivad — kontaktleht ei ole ilmne sihtkoht.
+                Lehe vahetus — sama kuju ja klahvid nagu Manage pildiredaktoris.
                 Joont nihutab kasutaja AINULT hiirega (käepide või klõps pildil). */}
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-1">
+              <button
+                type="button"
+                data-testid="back-to-overview"
+                onClick={onClose}
+                className="mr-2 flex items-center gap-1.5 rounded border border-gray-300 bg-white px-3 py-2 text-sm hover:bg-gray-100"
+              >
+                <LayoutGrid size={15} />
+                {t('step3split.backToOverview')}
+              </button>
               <button
                 type="button"
                 data-testid="page-prev"

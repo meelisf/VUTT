@@ -96,7 +96,8 @@
     "applying": "Töötlen ja saadan OCR-i…",
     "continue": "Edasi",
     "willNotSplit": "Seda lehte ei poolitata",
-    "isExcluded": "See leht jäetakse OCR-ist välja"
+    "isExcluded": "See leht jäetakse OCR-ist välja",
+    "backToOverview": "Tagasi ülevaatesse"
   },
   "notice": {
     "title": "Üleslaadimine ja töötlemine võtab {{time}}",
