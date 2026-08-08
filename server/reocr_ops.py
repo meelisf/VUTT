@@ -195,6 +195,46 @@ def _persist_active_jobs() -> None:
     reocr_state.persist_active_jobs({**single, **batch})
 
 
+# `slow` on LIPP, mitte staatus — aeglase töö staatus jääb `processing`
+# (vt _mark_slow_if_stale), seega ta on siin juba kaetud.
+CANCELLABLE_STATUSES = ("uploading", "processing")
+
+
+def _try_begin_cancel(job_id: str) -> Optional[str]:
+    """CAS: aktiivne → cancelling. Tagastab "single"/"batch" või None.
+
+    See on ainus koht, kus katkestamine algab. `cancelling` on vaheolek, mis
+    vastab küsimusele „kes võitis": poller ei tohi pärast seda enam ühtki
+    tulemust kirjutada ega tööd `done`-ks märkida (#217).
+    """
+    in_single = job_id in _reocr_jobs
+    in_batch = job_id in _reocr_batch_jobs
+    if in_single and in_batch:
+        # job_id nimeruum on registrite vahel globaalne — sama generate_nanoid().
+        # Kokkulangevus on invariandi rikkumine; ära arva, kumb oli mõeldud.
+        raise RuntimeError("job_id {} esineb mõlemas registris".format(job_id))
+
+    if in_single:
+        with _reocr_jobs_lock:
+            job = _reocr_jobs.get(job_id)
+            if not job or job.get("status") not in CANCELLABLE_STATUSES:
+                return None
+            job["status"] = "cancelling"
+        _persist_active_jobs()
+        return "single"
+
+    if in_batch:
+        with _reocr_batch_jobs_lock:
+            job = _reocr_batch_jobs.get(job_id)
+            if not job or job.get("status") not in CANCELLABLE_STATUSES:
+                return None
+            job["status"] = "cancelling"
+        _persist_active_jobs()
+        return "batch"
+
+    return None
+
+
 def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
     """Sea slow=True esimest korda kui üle slow-läve. Debounce: teisel korral False."""
     if now - job.get("started_at", now) <= REOCR_PROCESSING_TIMEOUT:
@@ -354,6 +394,13 @@ def _poll_batch_job(job_id: str) -> None:
                 continue
             if text is None:
                 continue
+            # Olek võis allalaadimise ajal muutuda (DELETE käib teises lõimes).
+            # Poll on JAGATUD singleton-lõim — teda ei saa peatada, seega on see
+            # kontroll ainus, mis hoiab ära ghost-tulemuse pärast koristust (#217).
+            with _reocr_batch_jobs_lock:
+                cur = _reocr_batch_jobs.get(job_id)
+                if not cur or cur.get("status") != "processing":
+                    return
             ready = False
             try:
                 # AUTORITEETNE: kirje page_filename määrab sihtkoha

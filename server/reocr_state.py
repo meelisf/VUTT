@@ -14,7 +14,9 @@ from .config import STATE_DIR, get_logger
 logger = get_logger(__name__)
 
 REOCR_ACTIVE_FILE = os.path.join(STATE_DIR, "reocr_active.json")
-_ACTIVE_STATUSES = ("uploading", "processing")
+# `cancelling` PEAB siin olema: pooleli jäänud katkestamine tuleb restardi järel
+# üles leida ja lõpetada, muidu muutub töö taas aktiivseks ja lukustab teose (#217).
+_ACTIVE_STATUSES = ("uploading", "processing", "cancelling")
 _file_lock = threading.Lock()
 
 
