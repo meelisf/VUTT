@@ -226,13 +226,15 @@ Katte võtab üle `vutt_backup.py`, mis varundab `state/` tervikuna, sh isikupil
 (`state/prosopography/images/`). Serveri crontab'is on eemaldamise kohta selgitav
 kommentaar; varukoopia vanast crontab'ist: `vutt:~/crontab.bak-20260804`.
 
-> **HOIATUS — `state/prosopography/` EI OLE tervikuna surnud.** Külmunud on ainult
-> selle JSON-kaardid; sama kataloogi sees elab `images/` (isikupildid, `server/config.py`
-> → `PROSOPOGRAPHY_IMAGES_DIR`), mida iga isikukaardi `image_url` kasutab. Koristades
-> kustuta AINULT `state/prosopography/*.json` — **mitte kunagi kataloogi ennast**,
-> muidu jäävad kõik isikupildid 404-ks.
+> **2026-08-08 seisuga on prosopograafia ühes kohas.** `state/prosopography/` ja
+> `data/prosopography/` on kustutatud; kaardid ja pildid elavad
+> `data/config/prosopography/` all (pildid `images/` alamkaustas). Pildid ei ole
+> gitis — `data/.gitignore` ignoreerib `*.jpg` —, aga `vutt_backup.py` katab nad,
+> sest rsync ei vaata git'i. Vt issue #221.
 
-Vana sihtkataloog `data/prosopography/` (2244 faili, viimane commit 2026-05-25) on
-serveris ja `data/` repos endiselt alles ning läheb öise pushiga GitHubi. See on
-teadlik ootel-olek, mitte hooldusviga — koristus koos ülalmainitud JSON-idega ja
-`state/prosopography/`-le osutavate skriptidega, vt issue #221.
+Vahepealne seis oli ohtlik ja tasub teada, miks: `state/prosopography/` sisaldas
+külmunud JSON-kaarte JA elavaid isikupilte samas kataloogis, nii et ilmne koristus
+(`rm -rf state/prosopography`) oleks teinud kõik isikupildid 404-ks. Kolmas koopia
+`data/prosopography/images/` oli `rsync -a --delete` tõttu elav peegeldus kuni
+2026-08-04. Sellepärast on pildid nüüd kaartide kõrval ja
+`PROSOPOGRAPHY_IMAGES_DIR` tuletatakse `PROSOPOGRAPHY_DIR`-ist.
