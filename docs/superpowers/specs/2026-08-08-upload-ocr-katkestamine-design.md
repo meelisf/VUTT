@@ -77,8 +77,9 @@ AUTO-OCR/{model}/{upload_id}-{run_id}/{slug}
 ```
 
 `run_id` on uus nanoid iga `try_begin_applying` õnnestumise kohta. Lame kuju
-(`{upload_id}-{run_id}`, mitte pesastatud) on valitud sellepärast, et koristus eemaldab kogu
-jooksu ühe `rm -rf`-iga ega jäta tühje vanemkatalooge kogunema.
+(`{upload_id}-{run_id}`, mitte pesastatud) on valitud sellepärast, et reaper eemaldab kogu
+jooksu ühe `rm -rf`-iga ega jäta tühje vanemkatalooge kogunema — pesastatud kujul jääks
+`{upload_id}/` alles ka siis, kui kõik selle jooksud on koristatud.
 
 Vana lennusolev batch võib nüüd teha, mida tahab — ta kirjutab **oma** kataloogi, mida
 keegi ei loe.
@@ -125,11 +126,13 @@ kui workerit ei ole (processing/reviewing puhul tavaline):  jätka kohe
         ↓
 kui worker ikka elab:  503, jää `cancelling`
         ↓
-kaugkoristus: _ssh_rm_rf(state["remote_staging_path"])   ← SELLE jooksu tee
+kaugkoristus: kustuta FAILID selle jooksu teel, kataloog jääb (vt #225)
         ↓
 lokaalne koristus: reset_ocr_run_state()
         ↓
 lukk: CAS cancelling → awaiting_split
+        ↓
+(hiljem) reaper eemaldab tühja run-kataloogi
 ```
 
 `applying` ajal on apply-lõim (`prepress-apply-{upload_id}`) elus ja teeb 300 DPI renderdust
@@ -178,7 +181,7 @@ Tingimus on seega **kaheosaline**:
 cancelling_since > CANCEL_STUCK_TIMEOUT (300 s)
   JA  apply-worker puudub või ei ela
         ↓
-  best-effort kaugkoristus SELLE jooksu tee järgi
+  best-effort kaugkoristus SELLE jooksu tee järgi (failid, mitte kataloog — #225)
         ↓
   reset_ocr_run_state() → awaiting_split
 ```
@@ -196,6 +199,32 @@ kataloogis. ADR 0018 „kuni 4 lehte" piir kehtib ainult siis, kui `rm -rf` õnn
 
 Taastamine elab olemasolevas `upload-sync` taustalõimes (iga 60 s). `cancelling_since` on
 **persisteeritud väli** state'is.
+
+## Kaugkoristus: failid kohe, kataloog hiljem (#225)
+
+`rm -rf` kataloogile **kukutab OCR-teenuse**, kui katkestamise hetkel on batch juba GPU-s.
+Mõõdetud tootmises 2026-08-08: `process_batch` kirjutab tulemuse ilma veakäsitluseta, viga
+propageerub `main_loop`-ist mooduli tasemele, kus on `sys.exit(1)`. `Restart=on-failure`
+taastab ~1 min pärast, aga katkestab kõigi teiste kasutajate järjekorra.
+
+Seepärast on koristus **kaheastmeline**:
+
+1. **Kohe:** kustuta run-kataloogi *failid* (pildid + `.txt`). Piltide kustutamine peatab
+   GPU-töö endiselt — `process_batch` väljub enne mudeli kutsumist, kui ükski pilt ei avane.
+   Lennusoleva batchi `.txt` maandub olemasolevasse kataloogi ega kukuta midagi.
+2. **Hiljem:** reaper eemaldab tühja run-kataloogi, kui ükski batch ei saa enam lennus olla.
+
+**Armuaeg `RUN_DIR_REAP_GRACE = 600 s`.** Pärast piltide kustutamist on ainus võimalik
+kirjutaja see üks batch, mis oli juba mällu loetud; mõõdetud 4 lehte ≈ 100 s. Kümme minutit
+annab varu ka aeglasema mudeli ja suuremate lehtede jaoks.
+
+**Orbu ei jäeta.** Reaper elab `upload-sync` lõimes (iga 60 s) ja eemaldab run-kataloogid,
+mis on märgitud koristatuks ja mille armuaeg on täis. Kataloogid on jooksu kaupa eraldi
+(`{upload_id}-{run_id}`), seega on eemaldamine üheselt määratud ega puuduta ühtki elavat
+jooksu.
+
+Sama viga on `reocr_ops._cleanup_remote_job`-is ja `upload_ops.cancel_upload`-is, mõlemad
+tootmises — parandus tehakse issue #225 all ja B kasutab sama abifunktsiooni.
 
 ## Backend: `POST /admin/upload/{upload_id}/model`
 
@@ -266,6 +295,9 @@ i18n **mõlemas keeles** (`fallbackLng` väljas, ADR 0011).
 | Taastamine normaliseerib, kui worker on surnud ja aeg täis | Kinni jäänud katkestamine ei blokeeri |
 | **Taastamine proovib kaugkoristust enne normaliseerimist** | Järgmine apply EI kirjuta vana üle (run-id) |
 | Poller ei kirjuta pisipilti pärast `cancelling` algust | Thumbs ilmuvad koristuse järel tagasi |
+| **Koristus kustutab failid, AGA MITTE kataloogi** | #225: `rm -rf` kataloogile kukutab OCR-teenuse |
+| Reaper eemaldab tühja run-kataloogi alles armuaja järel | Orbu ei jäeta, aga lennusolev batch saab kirjutada |
+| Reaper EI eemalda kataloogi enne armuaega | Sama krahh teist teed pidi |
 | **Paralleelne `/model` ja apply → täpselt üks võidab** | TOCTOU: mudel ei muutu töötava ülekande alt |
 | `/model` `applying` ajal → 409 | Sama |
 | `imported` → 409 | Ei lõhu imporditud teost |
@@ -276,7 +308,8 @@ i18n **mõlemas keeles** (`fallbackLng` väljas, ADR 0011).
 | Risk | Leevendus |
 |---|---|
 | Kasutaja segab kaks nuppu | Eristuvad sildid + kinnitus, mis ütleb, mis säilib ja mis kaob |
-| Orvuks jäänud run-kataloogid kogunevad LOSSis | Koristus jooksu kaupa; taastamine proovib uuesti; lame `{upload_id}-{run_id}` kuju eemaldub ühe `rm -rf`-iga |
+| Orvuks jäänud run-kataloogid kogunevad LOSSis | Reaper eemaldab tühjad run-kataloogid armuaja järel; lame `{upload_id}-{run_id}` kuju on üheselt määratud |
+| Kataloogi kustutamine kukutab OCR-teenuse | #225: kustutatakse ainult failid; kataloog eemaldatakse alles siis, kui ükski batch ei saa enam lennus olla |
 | Kaugkoristus ebaõnnestub | Vana jooks võib LOSSis lõpuni joosta, aga tema väljund on eraldi run-kataloogis, mida VUTT ei loe |
-| Kuni 4 lehte jõuab LOSSis lõpuni | ADR 0018 piir — kehtib ainult õnnestunud `rm -rf` korral, muidu võivad lõpuni jõuda kõik |
+| Kuni 4 lehte jõuab LOSSis lõpuni | ADR 0018 piir — kehtib ainult õnnestunud failide kustutamise korral, muidu võivad lõpuni jõuda kõik. Nende `.txt` maandub orvuks jäänud run-kataloogi, mida VUTT ei loe |
 | `cancelling` upload jääb rippuma | Kaheosaline taastamistingimus (aeg JA surnud worker) |
