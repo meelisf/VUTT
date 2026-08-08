@@ -5,13 +5,21 @@ Isikukaardid mis kasutavad duplikaadi võtit → uuendatakse kanonoolisele.
 
 Käivita: python3 scripts/cleanup_place_duplicates.py [--dry-run]
 """
-import glob, json, os, sys
+import glob, json, os, sys, types
 from datetime import datetime, timezone
 
-DATA_ROOT = os.getenv("VUTT_DATA_DIR", "data")
-STATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "state")
-PROSOPO_DIR = os.path.join(STATE_DIR, "prosopography")
-PLACES_FILE = os.path.join(DATA_ROOT, "config", "places.json")
+# Teed tulevad server/config.py-st (#221). PROSOPO_DIR osutas varem state/-i,
+# kus kaardid on külmunud 2026-05-25 seisus — puhastus oleks parandanud
+# kohanimesid kaartidel, mida keegi ei loe.
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if "server" not in sys.modules:
+    _server_pkg = types.ModuleType("server")
+    _server_pkg.__path__ = [os.path.join(_PROJECT_ROOT, "server")]
+    _server_pkg.__package__ = "server"
+    sys.modules.setdefault("server", _server_pkg)
+sys.path.insert(0, _PROJECT_ROOT)
+
+from server.config import PLACES_FILE, PROSOPOGRAPHY_DIR as PROSOPO_DIR
 
 # (kanooniline võti, duplikaadi võti)
 DUPLICATES = [

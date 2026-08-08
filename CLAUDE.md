@@ -89,11 +89,12 @@ Kaks eraldi kausta serveril, mõlemad Dockerisse mountitud. Teed tulevad `server
 | Kaust (host) | Docker | Sisu | Git |
 |---|---|---|---|
 | `~/VUTT/data/` | `/data` | Teosed + leheküljed; `data/config/` konfiguratsioon | jah (`data/` oma sisemine git) |
-| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `user_settings/`, `notifications/`, `prosopography/images/` | ei |
+| `~/VUTT/state/` | `/app/state` | Runtime: `users.json`, sessioonid, tokenid, `reocr_log.json`, `user_settings/`, `notifications/` | ei |
 
 `data/config/` sisu: `collections.json`, `vocabularies.json`, `places.json`, `origin_groups.json`,
 `labels.json` (Q-kood → label), `person_aliases.json`, `archives.json`, **`prosopography/{nanoid}.json`**
-(~2200 isikukaarti; **kaardid ise on siin, ainult pildid on `state/`-is**) ning tuletatud indeksid
+(~2350 isikukaarti; **kaardid JA pildid (`prosopography/images/`) on siin** — pildid ei ole gitis,
+`data/.gitignore` ignoreerib `*.jpg`) ning tuletatud indeksid
 `prosopography_index.json`, `person_to_works.json`, `works_creators_index.json`, `work_collections_index.json`.
 
 Tuletatud indeksid on read-modelid — nullist taastatavad (`rebuild_indices()` jookseb serveri

@@ -102,9 +102,12 @@ ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")
 NOTIFICATIONS_DIR = os.path.join(_STATE_DIR, "notifications")
 
-# Prosopograafia isikukaardid (JSON failid — gitis, pildid — state-is)
+# Prosopograafia: ÜKS juur, selle all varatüübid (#221).
+# Kaardid on gitis, pildid mitte (data/.gitignore → *.jpg), aga MÕLEMAD elavad
+# siin — pildid olid varem state/-is ja see lahknemine tekitas kolm koopiat.
+# Pildi-tee tuletatakse juurest: kaks sõltumatut liitmist lahkneksid uuesti.
 PROSOPOGRAPHY_DIR = os.path.join(_DATA_CONFIG_DIR, "prosopography")
-PROSOPOGRAPHY_IMAGES_DIR = os.path.join(_STATE_DIR, "prosopography", "images")
+PROSOPOGRAPHY_IMAGES_DIR = os.path.join(PROSOPOGRAPHY_DIR, "images")
 
 # Album Academicum referentsandmed
 AA_FILE = os.path.join(_PROJECT_ROOT, "reference_data", "album_academicum.json")

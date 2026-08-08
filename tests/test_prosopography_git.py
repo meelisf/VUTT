@@ -6,20 +6,10 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 
-def test_prosopography_dir_is_under_data_config():
-    """PROSOPOGRAPHY_DIR peab olema DATA_CONFIG_DIR all."""
-    from server.config import PROSOPOGRAPHY_DIR, DATA_CONFIG_DIR
-    assert PROSOPOGRAPHY_DIR.startswith(DATA_CONFIG_DIR), (
-        f"PROSOPOGRAPHY_DIR ({PROSOPOGRAPHY_DIR}) peab olema DATA_CONFIG_DIR ({DATA_CONFIG_DIR}) all"
-    )
-
-
-def test_prosopography_images_dir_is_under_state():
-    """PROSOPOGRAPHY_IMAGES_DIR peab olema STATE_DIR all."""
-    from server.config import PROSOPOGRAPHY_IMAGES_DIR, STATE_DIR
-    assert PROSOPOGRAPHY_IMAGES_DIR.startswith(STATE_DIR), (
-        f"PROSOPOGRAPHY_IMAGES_DIR ({PROSOPOGRAPHY_IMAGES_DIR}) peab olema STATE_DIR ({STATE_DIR}) all"
-    )
+# Teekonstantide invariandid elavad nüüd tests/test_prosopography_paths.py-s —
+# üks koht, nagu teedki (#221). Siit eemaldati kaks testi: juure asukoha oma
+# (dubleeriv) ja `images` peab olema STATE_DIR all (lukustas 2026-05-25
+# lahknemise, mille see töö kaotab).
 
 
 def test_delete_file_from_git(tmp_path):
@@ -286,38 +276,3 @@ def test_compute_person_diff_used_in_diff_endpoint():
     assert result["status"] == "ok"
     fields = {c["field"] for c in result["changes"]}
     assert "name" in fields or "imm_year" in fields
-
-
-def test_migration_script(tmp_path):
-    """Migratsiooniskript kopeerib failid ja teeb git commit-i."""
-    import importlib.util, git, json
-    from unittest.mock import patch
-
-    state_prosopo = tmp_path / "state" / "prosopography"
-    state_prosopo.mkdir(parents=True)
-    data_config = tmp_path / "data" / "config"
-    data_config.mkdir(parents=True)
-
-    # Loo 2 isikufaili lähtekaustas
-    (state_prosopo / "abc123.json").write_text('{"id": "vutt:Pabc123"}', encoding="utf-8")
-    (state_prosopo / "xyz456.json").write_text('{"id": "vutt:Pxyz456"}', encoding="utf-8")
-
-    # Initsialiseeri git repo data/ all
-    repo = git.Repo.init(str(tmp_path / "data"))
-
-    with patch("server.config.PROSOPOGRAPHY_DIR", str(data_config / "prosopography")), \
-         patch("server.config.STATE_DIR", str(tmp_path / "state")), \
-         patch("server.git_ops.get_or_init_repo", return_value=repo), \
-         patch("server.git_ops.BASE_DIR", str(tmp_path / "data")):
-        spec = importlib.util.spec_from_file_location(
-            "migrate",
-            str(PROJECT_ROOT / "scripts" / "migrate_prosopography_to_git.py")
-        )
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        mod.migrate()
-
-    dst_dir = data_config / "prosopography"
-    assert (dst_dir / "abc123.json").exists()
-    assert (dst_dir / "xyz456.json").exists()
-    assert "migratsioon" in repo.head.commit.message.lower()

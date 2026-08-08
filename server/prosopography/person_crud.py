@@ -300,7 +300,7 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
 
 
 def _person_image_path(person_id: str, ext: str) -> str:
-    """Tagastab isiku pildi failitee (state/prosopography/images/ — ei ole gitis)."""
+    """Tagastab isiku pildi failitee (PROSOPOGRAPHY_IMAGES_DIR — ei ole gitis)."""
     sync_from_facade()
     nanoid = _safe_nanoid(person_id)
     path = os.path.join(state.PROSOPOGRAPHY_IMAGES_DIR, f"{nanoid}{ext}")

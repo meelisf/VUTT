@@ -16,15 +16,27 @@ Käivitus:
     python3 scripts/mass_enrich_prosopography.py [--dry-run] [--limit N]
 """
 
-import json, glob, os, sys, argparse, time
+import json, glob, os, sys, argparse, time, types
 from datetime import datetime, timezone
 
-BASE_DIR = '/home/meelisf/VUTT'
-PROSOPO_DIR = os.path.join(BASE_DIR, 'state', 'prosopography')
-INDEX_FILE = os.path.join(BASE_DIR, 'state', 'prosopography_index.json')
-ALIASES_FILE = os.path.join(BASE_DIR, 'state', 'person_aliases.json')
-
+# Teed tulevad server/config.py-st — ainuõige allikas (#221). Varem olid nad
+# siin käsitsi kokku pandud ja osutasid state/-i, kus andmed on külmunud
+# 2026-05-25 seisus: skript oleks rikastanud kaarte, mida keegi ei loe.
+# BASE_DIR arvutatakse faili asukohast; kõvakodeeritud /home/meelisf/VUTT
+# ei töötanud Dockeris ega üheski teises masinas.
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if "server" not in sys.modules:
+    _server_pkg = types.ModuleType("server")
+    _server_pkg.__path__ = [os.path.join(BASE_DIR, "server")]
+    _server_pkg.__package__ = "server"
+    sys.modules.setdefault("server", _server_pkg)
 sys.path.insert(0, BASE_DIR)
+
+from server.config import (
+    PERSON_ALIASES_FILE as ALIASES_FILE,
+    PROSOPOGRAPHY_DIR as PROSOPO_DIR,
+    PROSOPOGRAPHY_INDEX_FILE as INDEX_FILE,
+)
 # Impordi ainult enrichment ja ops — ei lähe läbi server/__init__.py
 import importlib.util
 
