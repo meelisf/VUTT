@@ -162,8 +162,13 @@ kasutajat hoiatust eirama — see on halvem kui hoiatuse puudumine.
 tuleks veeru skoori **suhtena lehe enda veergude jaotusesse** (kas x on tugev
 lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 
-## Teadaolev, siin mitte parandatud
+## Järeltöö: aatomiline avaldamine on nüüd jagatud (#220)
 
-`reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma
-`.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Vt issue #220.
+`reocr_ops` kirjutas OCR-serverisse otse sihtnimega ja jagas sedasama
+võistlusolukorda. 2026-08-08 tõsteti `publish_atomic` `prepress_apply.py`-st
+`upload/ocr_client.py`-sse ja mõlemad re-OCR teed (partii + üksik) kutsuvad
+nüüd sama teostust. `prepress_apply.publish_atomic` jäi re-ekspordiks.
+
+Valvur: `tests/test_reocr_atomic_publish.py` kontrollib nii mustrit ennast kui
+seda, et `reocr_ops` lähtekoodis ei oleks enam ühtki otse `sftp.put()` kutset.
 
