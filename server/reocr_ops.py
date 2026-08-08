@@ -37,7 +37,7 @@ def _append_to_log(job: dict, job_id: str):
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
     }
-    for _k in ("recovered", "original_status", "recovered_at"):
+    for _k in ("recovered", "original_status", "recovered_at", "remote_cleanup"):
         if _k in job:
             entry[_k] = job[_k]
     with _log_lock:
@@ -271,6 +271,116 @@ def _forget_cancel_state(job_id: str) -> None:
     _upload_threads.pop(job_id, None)
 
 
+def _cleanup_remote_job(job_id: str, job: dict) -> bool:
+    """Kustutab OCR-serverist selle töö pildid ja .txt-d. True = õnnestus.
+
+    Piltide kustutamine ON peatamismehhanism: valvuri process_batch väljub enne
+    mudeli kutsumist, kui ükski pilt ei avane. Kuni üks lennusolev batch
+    (BATCH_SIZE = 4) jõuab siiski lõpuni — teadlik piir, vt spekki (#217).
+    """
+    remote_work = job.get("remote_work")
+    if not remote_work:
+        return True
+    try:
+        sftp = _sftp_open(job_id)
+    except Exception as e:
+        logger.warning(f"Re-OCR {job_id} koristuse SFTP viga: {e}")
+        return False
+
+    work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
+    ok = True
+    try:
+        try:
+            for name in sftp.listdir(work_abs):
+                try:
+                    sftp.remove(f"{work_abs}/{name}")
+                except Exception as e:
+                    logger.warning(f"Re-OCR {job_id} {name} kustutus: {e}")
+                    ok = False
+        except FileNotFoundError:
+            pass          # kaust on juba kadunud — intsidendi kuju, mitte viga
+        remote_staging = job.get("remote_staging") or ""
+        for d in (work_abs, f"{OCR_SERVER_PATH}/{remote_staging}" if remote_staging else ""):
+            if not d:
+                continue
+            try:
+                sftp.rmdir(d)
+            except Exception:
+                pass      # mitte-tühi või puuduv kaust ei ole katkestamise viga
+    finally:
+        try:
+            sftp.close()
+        except Exception:
+            pass
+        close_ssh(job_id)
+    return ok
+
+
+def cancel_reocr_job(job_id: str) -> dict:
+    """Katkestab re-OCR töö. „Tööd ei olnud" — vt spekki (#217).
+
+    Järjekord ei ole vaba: koristus tohib alata alles siis, kui ühtki kirjutajat
+    enam ei ole. Vastasel juhul kirjutab pooleliolev üleslaadimine failid tagasi
+    kataloogi, mille just eemaldasime.
+    """
+    registry = _try_begin_cancel(job_id)
+    if registry is None:
+        if job_id in _reocr_jobs or job_id in _reocr_batch_jobs:
+            raise ValueError("Töö ei ole katkestatav")
+        raise KeyError(job_id)
+
+    jobs = _reocr_jobs if registry == "single" else _reocr_batch_jobs
+    lock = _reocr_jobs_lock if registry == "single" else _reocr_batch_jobs_lock
+    with lock:
+        job = dict(jobs.get(job_id) or {})
+
+    if not _quiesce_upload(job_id):
+        # Kirjutaja on veel elus — jäta töö `cancelling` olekusse, stardi-taaste
+        # korjab üles. Jääk kaugserveris on parem kui võistlus koristusega.
+        logger.error(
+            f"Re-OCR {job_id}: üleslaadimislõim ei peatunud, koristus edasi lükatud"
+        )
+        raise RuntimeError("Üleslaadimislõim ei peatunud")
+
+    remote_ok = _cleanup_remote_job(job_id, job)
+
+    slug = job.get("slug") or ""
+    deleted = 0
+    for stem in job.get("produced_pages", []):
+        path = os.path.join(BASE_DIR, slug, stem + ".ocr")
+        try:
+            os.unlink(path)
+            deleted += 1
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.warning(f"Re-OCR {job_id} {stem}.ocr kustutus: {e}")
+    restored = _restore_backups(job_id)
+
+    with lock:
+        current = jobs.pop(job_id, None)
+    if current is not None:
+        current["status"] = "cancelled"
+        current["finished_at"] = datetime.now().timestamp()
+        current["remote_cleanup"] = "ok" if remote_ok else "failed"
+        _append_to_log(current, job_id)
+
+    reocr_state.remove_batch_mapping(job_id)
+    _forget_cancel_state(job_id)
+    _persist_active_jobs()
+
+    logger.info(
+        f"Re-OCR {job_id} katkestatud: {deleted} .ocr kustutatud, "
+        f"{restored} taastatud, kaugkoristus={'ok' if remote_ok else 'failed'}"
+    )
+    return {
+        "status": "cancelled",
+        "remote_cleanup": "ok" if remote_ok else "failed",
+        "deleted_ocr": deleted,
+        "restored_ocr": restored,
+    }
+
+
 def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
     """Sea slow=True esimest korda kui üle slow-läve. Debounce: teisel korral False."""
     if now - job.get("started_at", now) <= REOCR_PROCESSING_TIMEOUT:
@@ -402,12 +512,18 @@ def _batch_inactive(job: Dict, now: float, timeout: int) -> bool:
     return (now - job.get("last_progress_at", job["started_at"])) > timeout
 
 
-def _finalize_batch_if_complete(job: Dict) -> None:
-    """Kui kõik lehed ready/error → märgi job done."""
+def _finalize_batch_if_complete(job: Dict, job_id: Optional[str] = None) -> None:
+    """Kui kõik lehed ready/error → märgi job done.
+
+    Normaalne lõpp kustutab varukoopiad: valminud töö tulemus ON nüüd kehtiv
+    ootel tulemus ja ülekirjutatud vanem versioon on lõplikult asendatud (#217).
+    """
     if all(e["status"] in ("ready", "error") for e in job["pages"]):
         if job["status"] != "done":
             job["status"] = "done"
             job["finished_at"] = datetime.now().timestamp()
+            if job_id:
+                _drop_backups(job_id)
 
 
 def _poll_batch_job(job_id: str) -> None:
@@ -421,7 +537,7 @@ def _poll_batch_job(job_id: str) -> None:
         remote_work = job["remote_work"]
         remote_staging = job.get("remote_staging", os.path.dirname(remote_work))
         if not pending:
-            _finalize_batch_if_complete(job)
+            _finalize_batch_if_complete(job, job_id)
             return
     try:
         sftp = _sftp_open(job_id)
@@ -501,7 +617,7 @@ def _poll_batch_job(job_id: str) -> None:
     with _reocr_batch_jobs_lock:
         current = _reocr_batch_jobs.get(job_id)
         if current:
-            _finalize_batch_if_complete(current)
+            _finalize_batch_if_complete(current, job_id)
 
 
 def _batch_poll_iteration(now: float) -> None:
@@ -903,6 +1019,9 @@ def poll_reocr_job(job_id: str) -> dict:
                 current_job["text"] = text
                 current_job["finished_at"] = datetime.now().timestamp()
                 log_job = dict(current_job)
+                # Normaalne lõpp: ülekirjutatud vanem tulemus on lõplikult
+                # asendatud, varukoopiat pole enam vaja hoida (#217).
+                _drop_backups(job_id)
         if log_job:
             logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
             _append_to_log(log_job, job_id)
