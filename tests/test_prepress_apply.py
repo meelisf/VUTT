@@ -163,3 +163,4 @@ def test_loob_koik_vanemkaustad_enne_saatmist(upload, monkeypatch):
     assert "/o/AUTO-OCR/hand/u1" in sftp.dirs      # vanem loodi esimesena
     assert "/o/AUTO-OCR/hand/u1/s" in sftp.dirs
     assert len(sftp.renames) == 6
+

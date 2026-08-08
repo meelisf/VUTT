@@ -41,7 +41,7 @@ def test_koik_prepress_teed_on_admin_all(client_admin):
     from server.routers import upload as upload_router
     prepress_routes = [
         r.path for r in upload_router.router.routes if "prepress" in r.path
-        or "/preview/" in r.path or "/strip/" in r.path
+        or "/preview/" in r.path
     ]
     assert prepress_routes, "prepress-endpointe ei leitud"
     assert all(p.startswith("/admin/") for p in prepress_routes)
@@ -53,25 +53,6 @@ def test_prepress_noual_admin_rolli(client_admin, login):
     editor = {"Authorization": "Bearer {}".format(login("editor", "editorpass"))}
     resp = client.get("/admin/upload/{}/prepress".format(upload_id), headers=editor)
     assert resp.status_code in (401, 403)
-
-
-def test_strip_valideerib_x_vahemiku(client_admin):
-    client, headers, upload_id = client_admin
-    for bad in ("0", "1", "-0.5", "1.5", "abc"):
-        resp = client.get(
-            "/admin/upload/{}/strip/1?x={}".format(upload_id, bad), headers=headers
-        )
-        assert resp.status_code == 400, "x={} oleks pidanud 400 andma".format(bad)
-
-
-def test_strip_valideerib_lehenumbri(client_admin):
-    client, headers, upload_id = client_admin
-    assert client.get(
-        "/admin/upload/{}/strip/0?x=0.5".format(upload_id), headers=headers
-    ).status_code == 400
-    assert client.get(
-        "/admin/upload/{}/strip/9999?x=0.5".format(upload_id), headers=headers
-    ).status_code == 404
 
 
 def test_apply_teine_kutse_annab_409(client_admin, monkeypatch):

@@ -122,10 +122,3 @@ export function applyPrepress(
 export function prepressPreviewUrl(uploadId: string, n: number, token: string | null): string {
   return `${FILE_API_URL}/admin/upload/${uploadId}/preview/${n}?token=${token ?? ''}`;
 }
-
-export function prepressStripUrl(
-  uploadId: string, n: number, x: number, token: string | null,
-): string {
-  return `${FILE_API_URL}/admin/upload/${uploadId}/strip/${n}`
-    + `?x=${x.toFixed(5)}&token=${token ?? ''}`;
-}

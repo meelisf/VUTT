@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, ChevronLeft, ChevronRight, Ban, EyeOff } from 'lucide-react';
-import { prepressPreviewUrl, prepressStripUrl } from '../uploadApi';
+import { prepressPreviewUrl } from '../uploadApi';
 import { clampSplitX, willSplit } from '../prepressPlan';
 import type { PrepressPage, PrepressPlan } from '../types';
-
-const STRIP_DEBOUNCE_MS = 400;
 
 interface Props {
   uploadId: string;
@@ -18,9 +16,11 @@ interface Props {
 }
 
 /**
- * Kolmas tase: üks leht suurelt, lohistatava joonega. Kõrval natiivse
- * lahutusega riba, mille päringut debounce'itakse — lohistamine ei tohi
- * tulistada iga pointermove'i peale uut 300 DPI renderdust.
+ * Teine tase: üks leht suurelt, lohistatava joonega.
+ *
+ * Natiivse lahutusega köitevahe-riba oli siin varem kõrval-paanina ja
+ * eemaldati: 100 DPI eelvaade näitab joone asukoha juba piisava täpsusega,
+ * riba aga tõi kaasa oma endpointi, x-kvantimise ja ketta-vahemälu.
  *
  * Joon ja käepide järgivad TAHTLIKULT sama kuju nagu Manage-lehe poolitamine
  * (`PageImageEditorModal`) — sama žest peab mõlemas kohas ühtemoodi välja
@@ -35,7 +35,6 @@ const SplitPageDetail: React.FC<Props> = ({
     ? page.split_x
     : plan.default_split_x;
 
-  const [stripX, setStripX] = useState(liveX);
   const [dragging, setDragging] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
 
@@ -53,13 +52,6 @@ const SplitPageDetail: React.FC<Props> = ({
     const target = plan.pages[i];
     if (target) onNavigate(target.n);
   }, [plan.pages, onNavigate]);
-
-  // Debounce: riba päritakse alles pärast pausi. pageNum on sõltuvuses, et
-  // lehe vahetusel ei jääks riba vana lehe x-i taha rippuma.
-  useEffect(() => {
-    const id = setTimeout(() => setStripX(liveX), STRIP_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [liveX, pageNum]);
 
   const setX = (x: number) =>
     onPageChange(pageNum, { mode: 'custom', split_x: clampSplitX(Number(x.toFixed(4))) });
@@ -138,10 +130,10 @@ const SplitPageDetail: React.FC<Props> = ({
         </div>
 
         <div className="min-h-0 flex-1 overflow-auto p-4">
-          <div className="flex flex-col gap-4 md:flex-row">
+          <div className="mx-auto max-w-3xl">
             <div
               ref={imageRef}
-              className={`relative flex-1 select-none touch-none ${splits ? 'cursor-col-resize' : ''}`}
+              className={`relative select-none touch-none ${splits ? 'cursor-col-resize' : ''}`}
               onPointerDown={(e) => { if (splits) xFromClient(e.clientX); }}
             >
               <img
@@ -182,34 +174,6 @@ const SplitPageDetail: React.FC<Props> = ({
                   </span>
                 </div>
               )}
-            </div>
-
-            {/* Piksli-tõe paan: object-none + object-center näitab riba TÄPSELT
-                1:1, keskele joone peale kärbituna. `w-auto` + fikseeritud kõrgus
-                skaleeriks 224 px laia riba ~53 px-le ja kogu natiivse lahutuse
-                mõte kaoks (sel põhjusel kadus eraldi ribavaade).
-
-                Pesa hoiab mõõdud ka siis, kui lõiget ei tehta — kui element
-                kaoks, laieneks pildiveerg ja vaade hüppaks lehti sirvides. */}
-            <div className="flex-none self-center md:self-start">
-              {splits ? (
-                <img
-                  data-testid="detail-strip"
-                  src={prepressStripUrl(uploadId, pageNum, stripX, token)}
-                  alt=""
-                  className="block h-[220px] w-[240px] border border-gray-300 bg-gray-100 object-none object-center md:h-[420px]"
-                />
-              ) : (
-                <div
-                  data-testid="detail-strip-empty"
-                  className="flex h-[220px] w-[240px] items-center justify-center rounded border border-dashed border-gray-300 bg-gray-50 md:h-[420px]"
-                >
-                  <Ban size={20} className="text-gray-300" />
-                </div>
-              )}
-              <div className="mt-1 text-center text-[11px] text-gray-400">
-                {splits ? '1:1' : '\u00a0'}
-              </div>
             </div>
           </div>
         </div>

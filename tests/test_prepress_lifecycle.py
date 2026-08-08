@@ -10,9 +10,7 @@ def upload(tmp_path, monkeypatch):
     uid = "u1"
     base = tmp_path / uid
     (base / "preview").mkdir(parents=True)
-    (base / "strips").mkdir()
     (base / "preview" / "pg_0001.jpg").write_bytes(b"x")
-    (base / "strips" / "0001_100.jpg").write_bytes(b"x")
     (base / "source.pdf").write_bytes(b"%PDF")
     (base / "thumbs").mkdir()
     (base / "thumbs" / "001.jpg").write_bytes(b"x")
@@ -21,11 +19,10 @@ def upload(tmp_path, monkeypatch):
     return uid, base
 
 
-def test_koristus_kustutab_preview_strips_ja_source(upload):
+def test_koristus_kustutab_preview_ja_source(upload):
     uid, base = upload
     prepress.cleanup_prepress_artifacts(uid)
     assert not (base / "preview").exists()
-    assert not (base / "strips").exists()
     assert not (base / "source.pdf").exists()
 
 

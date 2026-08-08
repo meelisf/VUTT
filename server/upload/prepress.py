@@ -1,4 +1,4 @@
-"""Prepress: eelvaade, köitevahe-riba ja 300 DPI läbikäik.
+"""Prepress: eelvaade ja 300 DPI läbikäik.
 
 Plaani puhas loogika on prepress_plan.py-s, pikslite hankimine
 page_source.py-s. Siin on I/O, taustalõimed ja oleku uuendamine.
@@ -20,18 +20,9 @@ logger = get_logger(__name__)
 
 RENDER_SEMAPHORE = threading.Semaphore(1)
 
-# Kui suur osa lehe laiusest köitevahe-ribal näidatakse (±5% joonest).
-STRIP_FRAC = 0.05
-
-# Mitu ribakaadrit lehe kohta vahemälus hoitakse (LRU).
-STRIP_CACHE_PER_PAGE = 6
 
 def preview_dir(upload_id: str) -> str:
     return os.path.join(upload_state.upload_dir(upload_id), "preview")
-
-
-def strips_dir(upload_id: str) -> str:
-    return os.path.join(upload_state.upload_dir(upload_id), "strips")
 
 
 def preview_path(upload_id: str, n: int) -> str:
@@ -117,77 +108,6 @@ def start_preview(upload_id: str) -> None:
     ).start()
 
 
-# --- Köitevahe-riba ---
-
-def quantize_x(x_frac: float, full_width: int) -> int:
-    """x → tegelik FULL_DPI pikslikoordinaat.
-
-    See on AINUS koht, kus x normaliseeritakse, ja sama väärtus on nii
-    renderduse argument kui vahemälu võti. Ilma selleta tekitaks joone
-    lohistamine (0.5001, 0.5002, …) sadu peaaegu identseid ribafaile.
-    """
-    x_px = int(round(full_width * x_frac))
-    return max(1, min(full_width - 1, x_px))
-
-
-def strip_cache_path(upload_id: str, n: int, x_px: int) -> str:
-    return os.path.join(strips_dir(upload_id), "{:04d}_{}.jpg".format(n, x_px))
-
-
-def prune_strip_cache(upload_id: str, n: int, keep: int = STRIP_CACHE_PER_PAGE) -> None:
-    """LRU: hoiab lehe kohta ainult `keep` uusimat riba.
-
-    Ilma selleta koguneksid strips/ failid uploads/ alla märkamatult, eriti
-    kui admin joont pikalt nihutab.
-    """
-    prefix = "{:04d}_".format(n)
-    directory = strips_dir(upload_id)
-    try:
-        entries = [f for f in os.listdir(directory) if f.startswith(prefix)]
-    except FileNotFoundError:
-        return
-    if len(entries) <= keep:
-        return
-    entries.sort(key=lambda f: os.path.getmtime(os.path.join(directory, f)))
-    for name in entries[:-keep]:
-        try:
-            os.unlink(os.path.join(directory, name))
-        except OSError:
-            pass
-
-
-def get_gutter_strip(upload_id: str, n: int, x_frac: float) -> str:
-    """Tagastab natiivse FULL_DPI riba tee, renderdades ainult vajadusel.
-
-    Riba on ±STRIP_FRAC joonest. Renderdatakse AINULT see piirkond
-    (pdftoppm -x -y -W -H), mitte terve leht — mõõdetuna 0,09 s/lk vs 0,47.
-    """
-    src = source_path(upload_id)
-    if not src:
-        raise FileNotFoundError("Uploadi lähteallikat ei leitud: {}".format(upload_id))
-
-    source = page_source.open_page_source(src)
-    full_width = source.full_width(n)
-    x_px = quantize_x(x_frac, full_width)
-
-    dst = strip_cache_path(upload_id, n, x_px)
-    if os.path.isfile(dst):
-        return dst
-
-    os.makedirs(strips_dir(upload_id), exist_ok=True)
-    half = max(1, int(round(full_width * STRIP_FRAC)))
-    region_x = max(0, x_px - half)
-    region_w = min(full_width - region_x, 2 * half)
-
-    tmp = dst + ".tmp"
-    with RENDER_SEMAPHORE:
-        source.render_region(n, region_x, region_w, tmp)
-    os.replace(tmp, dst)
-
-    prune_strip_cache(upload_id, n)
-    return dst
-
-
 def cleanup_prepress_artifacts(upload_id: str) -> None:
     """Kustutab prepress-artefaktid pärast importi.
 
@@ -197,7 +117,7 @@ def cleanup_prepress_artifacts(upload_id: str) -> None:
     import shutil
 
     base = upload_state.upload_dir(upload_id)
-    for name in ("preview", "strips", "apply_tmp", "source"):
+    for name in ("preview", "apply_tmp", "source"):
         shutil.rmtree(os.path.join(base, name), ignore_errors=True)
     try:
         os.unlink(os.path.join(base, "source.pdf"))

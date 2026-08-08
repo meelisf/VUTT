@@ -94,7 +94,7 @@ def _validate_split_x(value) -> float:
 
 @router.get("/admin/upload/{upload_id}/prepress")
 def admin_prepress_get(upload_id: str, user=Depends(require_role("admin"))):
-    """Plaan + tindiskoorid + eelvaate edenemine. Sync def — loeb ainult ketast."""
+    """Plaan + eelvaate edenemine. Sync def — loeb ainult ketast."""
     state, plan = _load_prepress(upload_id)
     page_count = len((plan or {}).get("pages", []))
     result = dict(plan or prepress_plan.default_plan(0))
@@ -127,27 +127,6 @@ def admin_prepress_preview(upload_id: str, page_num: int,
     path = prepress.preview_path(upload_id, page_num)
     if not os.path.isfile(path):
         raise HTTPException(status_code=404)
-    return FileResponse(path, media_type="image/jpeg")
-
-
-@router.get("/admin/upload/{upload_id}/strip/{page_num}")
-def admin_prepress_strip(upload_id: str, page_num: int, x: str = "0.5",
-                         user=Depends(require_role("admin"))):
-    """300 DPI köitevahe-riba. Sync def — pdftoppm on blokeeriv (ADR 0002)."""
-    state, plan = _load_prepress(upload_id)
-    x_frac = _validate_split_x(x)
-    page_count = len((plan or {}).get("pages", []))
-    if page_num < 1:
-        raise HTTPException(status_code=400, detail="Vigane lehenumber")
-    if page_num > page_count:
-        raise HTTPException(status_code=404, detail="Lehte ei ole")
-    try:
-        path = prepress.get_gutter_strip(upload_id, page_num, x_frac)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Lähteallikat ei leitud")
-    except RuntimeError as e:
-        logger.error("Riba renderdus {} lk {}: {}".format(upload_id, page_num, e))
-        raise HTTPException(status_code=500, detail="Riba renderdamine ebaõnnestus")
     return FileResponse(path, media_type="image/jpeg")
 
 

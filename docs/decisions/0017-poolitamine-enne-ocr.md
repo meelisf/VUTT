@@ -74,14 +74,34 @@ Sisuline põhjus kaalus tehnilise üles: üksikleht annab **sama info pluss
 tegutsemisvõimaluse** — joont saab kohe nihutada ja korraga näeb tervet lehte.
 Kitsam vaade ilma tegutsemisvõimaluseta ei teeni oma koodi.
 
-Natiivse lahutuse idee ise jäi alles, aga ainult seal, kus seda kasutatakse:
-üksiklehe kõrval-paan kuvab riba `object-none` + `object-center`-iga **1:1**,
-joone peale kärbituna. `w-auto` + fikseeritud kõrgus oleks kuivatanud selle
-~53 px sliveriks — sama viga väiksemas mastaabis.
+Natiivse lahutuse idee jäi esialgu alles üksiklehe kõrval-paanina (`object-none`
++ `object-center`, 1:1 joone peale kärbituna) — **ka see eemaldati, vt allpool.**
 
 Töövoog on nüüd kaheastmeline: kontaktleht (ülevaade) → üksikleht
-(kontrolli ja paranda). Backend jäi muutmata — `/strip/` endpoint, `get_gutter_strip`
-ja LRU-vahemälu teenindavad endiselt üksiklehe paani.
+(kontrolli ja paranda).
+
+## Revisjon 2026-08-08: köitevahe-riba eemaldatud tervikuna
+
+Ka üksiklehe kõrval-paan kadus. Otsuse alus on kasutuskogemus: 100 DPI eelvaade
+näitab joone asendit juba piisava täpsusega, et otsustada, kas poolitus on
+õiges kohas. Riba lisas selle otsuse kõrvale teise pildi, mida tuli eraldi
+tõlgendada, aga ei muutnud ühtki otsust.
+
+Hind oli ebaproportsionaalne — riba tõi endaga kaasa terve ahela:
+`/admin/upload/{id}/strip/{n}` endpoint, `get_gutter_strip`, `quantize_x`
+(x-kvantimine, et lohistamine ei tekitaks sadu peaaegu identseid faile),
+`prune_strip_cache` (LRU, et need failid ei koguneks), `strips/` kataloog
+koos oma koristusreegliga, `render_region` mõlemas `PageSource` teostuses ja
+frontendis 400 ms debounce koos oma olekuga. Kõik see teenindas ühte
+kõrvalpilti.
+
+`full_width` / `_pdfinfo_page_size_pts` kadusid ühtlasi — need eksisteerisid
+ainult riba x-koordinaadi arvutamiseks. `_transfer_pages` võtab laiuse
+renderdatud lehe enda pikslitest, nagu varemgi.
+
+**Õppetund:** natiivne lahutus oli tehniliselt õige lahendus küsimusele, mida
+kasutaja ei esitanud. Enne mehhanismi ehitamist tuleb kontrollida, kas ta
+muudab mõnda otsust.
 
 ## Revisjon 2026-08-08: tindiskoor eemaldatud
 
@@ -130,8 +150,5 @@ lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 `.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Eraldi issue.
 
 **`RENDER_SEMAPHORE` hoitakse terve partii vältel** (`_render_previews` ja
-`apply_and_transfer`), mitte lehe kaupa. Iga interaktiivne päring — nt
-köitevahe-riba — seisab seega kogu partii taga; 300-lehelise teose `apply`
-korral on see minuteid. Ettepanek on võtta semafor ühe lehe renderduse ümber,
-teadlikult lubades partiide põimumist (semafori eesmärk on CPU kaitse, mitte
-partiide järjestamine). Vt issue #219.
+`apply_and_transfer`), mitte lehe kaupa. Vt issue #219.
+

@@ -9,9 +9,8 @@ img.save(..., quality=95)). Kui need seal muutuvad, tuleb muuta ka siin.
 """
 import glob
 import os
-import re
 import subprocess
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from ..config import get_logger
 
@@ -53,24 +52,15 @@ class PageSource:
     def page_count(self) -> int:
         raise NotImplementedError
 
-    def full_width(self, n: int) -> int:
-        """Lehe laius pikslites FULL_DPI juures."""
-        raise NotImplementedError
-
     def render_preview(self, n: int, dst: str) -> None:
         raise NotImplementedError
 
     def render_full(self, n: int, dst: str) -> None:
         raise NotImplementedError
 
-    def render_region(self, n: int, x_px: int, w_px: int, dst: str) -> None:
-        """Renderdab vertikaalse riba [x_px, x_px + w_px) kogu lehe kõrguses."""
-        raise NotImplementedError
 
 
 # --- PDF ---
-
-_PAGE_SIZE_RE = re.compile(r"size:\s*([0-9.]+)\s*x\s*([0-9.]+)\s*pts")
 
 
 def _pdfinfo_page_count(pdf_path: str) -> int:
@@ -90,23 +80,8 @@ def _pdfinfo_page_count(pdf_path: str) -> int:
     raise RuntimeError("pdfinfo ei andnud lehtede arvu: {}".format(pdf_path))
 
 
-def _pdfinfo_page_size_pts(pdf_path: str, n: int) -> Tuple[float, float]:
-    """Lehe mõõdud punktides. Eraldi funktsioon, et testid saaksid patchida."""
-    result = subprocess.run(
-        ["pdfinfo", "-f", str(n), "-l", str(n), pdf_path],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30,
-    )
-    for line in result.stdout.decode("utf-8", "replace").splitlines():
-        if line.startswith("Page") and "size:" in line:
-            match = _PAGE_SIZE_RE.search(line)
-            if match:
-                return float(match.group(1)), float(match.group(2))
-    raise RuntimeError("pdfinfo ei andnud lehe {} mõõtu".format(n))
-
-
 class PdfPageSource(PageSource):
-    """pdftoppm-põhine allikas. `-x -y -W -H` võimaldab renderdada ainult
-    piirkonda — see on see, mis teeb natiivse lahutusega köitevahe-riba odavaks."""
+    """pdftoppm-põhine allikas."""
 
     def __init__(self, pdf_path: str):
         self.pdf_path = pdf_path
@@ -119,10 +94,6 @@ class PdfPageSource(PageSource):
         if self._count is None:
             self._count = _pdfinfo_page_count(self.pdf_path)
         return self._count
-
-    def full_width(self, n: int) -> int:
-        width_pts, _ = _pdfinfo_page_size_pts(self.pdf_path, n)
-        return int(round(width_pts * FULL_DPI / 72.0))
 
     def _base(self, dst: str) -> str:
         """pdftoppm lisab ise -NNN.jpg — anname talle prefiksi."""
@@ -155,16 +126,6 @@ class PdfPageSource(PageSource):
         ])
         self._finish(base, n, dst)
 
-    def render_region(self, n: int, x_px: int, w_px: int, dst: str) -> None:
-        base = self._base(dst)
-        nice_run([
-            "pdftoppm", "-jpeg", "-jpegopt", "quality=88",
-            "-r", str(FULL_DPI), "-f", str(n), "-l", str(n),
-            "-x", str(x_px), "-y", "0", "-W", str(w_px), "-H", "0",
-            self.pdf_path, base,
-        ])
-        self._finish(base, n, dst)
-
 
 # --- Pildikaust (mitmepildi-upload) ---
 
@@ -192,11 +153,6 @@ class ImageDirPageSource(PageSource):
     def page_count(self) -> int:
         return len(self._list())
 
-    def full_width(self, n: int) -> int:
-        from PIL import Image
-        with Image.open(self._path(n)) as im:
-            return im.size[0]
-
     def render_preview(self, n: int, dst: str) -> None:
         from PIL import Image
         with Image.open(self._path(n)) as im:
@@ -208,13 +164,6 @@ class ImageDirPageSource(PageSource):
         from PIL import Image
         with Image.open(self._path(n)) as im:
             im.convert("RGB").save(dst, "JPEG", quality=JPEG_QUALITY)
-
-    def render_region(self, n: int, x_px: int, w_px: int, dst: str) -> None:
-        from PIL import Image
-        with Image.open(self._path(n)) as im:
-            rgb = im.convert("RGB")
-            box = (x_px, 0, min(x_px + w_px, rgb.size[0]), rgb.size[1])
-            rgb.crop(box).save(dst, "JPEG", quality=88)
 
 
 def open_page_source(source_path: str) -> PageSource:
