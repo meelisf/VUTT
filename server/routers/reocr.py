@@ -11,6 +11,7 @@ from ..reocr_apply import apply_ocr_results, discard_ocr_results
 from ..reocr_ops import (
     REOCR_MAX_CONCURRENT,
     build_reocr_status,
+    cancel_reocr_job,
     get_active_batch_for_work,
     get_active_reocr_count,
     get_reocr_log,
@@ -249,3 +250,25 @@ async def admin_reocr_discard(
     page_filenames = _validate_apply_pages(data.get("page_filenames"))
     result = await run_in_threadpool(discard_ocr_results, path, page_filenames)
     return {"status": "success", **result}
+
+
+@router.delete("/admin/reocr/{job_id}")
+def admin_reocr_cancel(job_id: str, user=Depends(require_role("admin"))):
+    """Katkestab re-OCR töö (üksik või batch).
+
+    Sync def — kogu töö on blokeeriv I/O (SFTP + failisüsteem), ADR 0002.
+
+    200 garanteerib VUTT-i poole katkestamise: pollimist ei ole, teose lukk on
+    vaba, tulemust ei rakendata. Kui LOSSi koristus ebaõnnestus, võib
+    kaugserveris jääk edasi eksisteerida — vastuses `remote_cleanup: "failed"`.
+    """
+    try:
+        return cancel_reocr_job(job_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Tööd ei leitud")
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except RuntimeError as e:
+        # Kirjutaja ei peatunud — töö jääb `cancelling` olekusse, stardi-taaste
+        # korjab üles. Klient võib hiljem uuesti proovida.
+        raise HTTPException(status_code=503, detail=str(e))

@@ -118,7 +118,7 @@ def test_poll_processing_txt_ready_done(monkeypatch):
 
     written = {}
     monkeypatch.setattr(reocr_ops, "_write_ocr_file",
-                        lambda slug, page_fn, text: written.setdefault("call", (slug, page_fn, text)))
+                        lambda slug, page_fn, text, job_id: written.setdefault("call", (slug, page_fn, text)))
     monkeypatch.setattr(reocr_ops, "_append_to_log", lambda job, jid: None)
 
     reocr_ops._reocr_jobs["j1"] = _make_job(status="processing")

@@ -4,11 +4,15 @@ Re-OCR operatsioonid — olemasoleva lehekülje uuesti transkribeerimine OCR ser
 import io
 import json
 import os
+import shutil
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, get_logger
+from .config import (
+    BASE_DIR, OCR_SERVER_PATH, REOCR_BACKUPS_DIR, REOCR_LOG_FILE,
+    UPLOAD_ENABLED, get_logger,
+)
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
 from .upload.ocr_client import publish_atomic
@@ -33,7 +37,7 @@ def _append_to_log(job: dict, job_id: str):
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
     }
-    for _k in ("recovered", "original_status", "recovered_at"):
+    for _k in ("recovered", "original_status", "recovered_at", "remote_cleanup"):
         if _k in job:
             entry[_k] = job[_k]
     with _log_lock:
@@ -70,13 +74,75 @@ def get_reocr_log(offset: int = 0, limit: int = 50) -> dict:
 logger = get_logger(__name__)
 
 
-def _write_ocr_file(slug: str, page_filename: str, text: str) -> str:
-    """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging). Tagastab tee."""
+def _backup_dir(job_id: str) -> str:
+    """Selle töö ülekirjutatud .ocr failide varukoopiad."""
+    return os.path.join(REOCR_BACKUPS_DIR, job_id)
+
+
+def _write_ocr_file(slug: str, page_filename: str, text: str, job_id: str) -> str:
+    """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging).
+
+    Kui sihtkohas on juba ootel tulemus, varundatakse see ENNE ülekirjutamist.
+    Katkestamine taastab varukoopia — muidu hävitaks katkestatud töö varasema
+    kehtiva tulemuse, mida ta ise ei tootnud (#217).
+    """
     stem = os.path.splitext(os.path.basename(page_filename))[0]
     ocr_path = os.path.join(BASE_DIR, slug, stem + ".ocr")
+
+    if os.path.exists(ocr_path):
+        bdir = _backup_dir(job_id)
+        os.makedirs(bdir, exist_ok=True)
+        backup_path = os.path.join(bdir, stem + ".ocr")
+        # Ainult ESIMENE ülekirjutus varundatakse — muidu kirjutaks sama töö
+        # kordusjooks varukoopia enda tulemusega üle.
+        if not os.path.exists(backup_path):
+            shutil.copy2(ocr_path, backup_path)
+            reocr_state.add_backup_target(job_id, stem + ".ocr", ocr_path)
+
     with open(ocr_path, "w", encoding="utf-8") as f:
         f.write(text)
     return ocr_path
+
+
+def _restore_backups(job_id: str) -> int:
+    """Taastab selle töö ülekirjutatud .ocr failid. Tagastab taastatud arvu."""
+    bdir = _backup_dir(job_id)
+    if not os.path.isdir(bdir):
+        return 0
+    mapping = reocr_state.load_backup_targets(job_id)
+    restored = 0
+    for name in os.listdir(bdir):
+        target = mapping.get(name)
+        if not target:
+            logger.warning(f"Re-OCR {job_id}: varukoopial {name} puudub sihtkoht")
+            continue
+        try:
+            shutil.move(os.path.join(bdir, name), target)
+            restored += 1
+        except OSError as e:
+            logger.warning(f"Re-OCR {job_id}: varukoopia taaste {name}: {e}")
+    shutil.rmtree(bdir, ignore_errors=True)
+    reocr_state.remove_backup_targets(job_id)
+    return restored
+
+
+def _record_produced(job: dict, page_filename: str) -> None:
+    """Märgib, et SEE töö kirjutas selle lehe .ocr faili.
+
+    Katkestamine kustutab ainult siit loendist tulevad lehed. Plaanitud lehtede
+    nimekiri (batch mapping) EI OLE omandi tõend — töö võib olla katkestatud
+    enne, kui ta plaani lõpuni jõudis (#217).
+    """
+    stem = os.path.splitext(os.path.basename(page_filename))[0]
+    produced = job.setdefault("produced_pages", [])
+    if stem not in produced:
+        produced.append(stem)
+
+
+def _drop_backups(job_id: str) -> None:
+    """Kustutab varukoopiad (töö lõppes normaalselt / rakendati / visati ära)."""
+    shutil.rmtree(_backup_dir(job_id), ignore_errors=True)
+    reocr_state.remove_backup_targets(job_id)
 
 
 def _build_batch_pages(slug: str, pages: List[Tuple[str, Optional[int]]]) -> List[Dict]:
@@ -127,6 +193,222 @@ def _persist_active_jobs() -> None:
     with _reocr_batch_jobs_lock:
         batch = dict(_reocr_batch_jobs)
     reocr_state.persist_active_jobs({**single, **batch})
+
+
+# `slow` on LIPP, mitte staatus — aeglase töö staatus jääb `processing`
+# (vt _mark_slow_if_stale), seega ta on siin juba kaetud.
+CANCELLABLE_STATUSES = ("uploading", "processing")
+
+
+def _try_begin_cancel(job_id: str) -> Optional[str]:
+    """CAS: aktiivne → cancelling. Tagastab "single"/"batch" või None.
+
+    See on ainus koht, kus katkestamine algab. `cancelling` on vaheolek, mis
+    vastab küsimusele „kes võitis": poller ei tohi pärast seda enam ühtki
+    tulemust kirjutada ega tööd `done`-ks märkida (#217).
+    """
+    in_single = job_id in _reocr_jobs
+    in_batch = job_id in _reocr_batch_jobs
+    if in_single and in_batch:
+        # job_id nimeruum on registrite vahel globaalne — sama generate_nanoid().
+        # Kokkulangevus on invariandi rikkumine; ära arva, kumb oli mõeldud.
+        raise RuntimeError("job_id {} esineb mõlemas registris".format(job_id))
+
+    if in_single:
+        with _reocr_jobs_lock:
+            job = _reocr_jobs.get(job_id)
+            if not job or job.get("status") not in CANCELLABLE_STATUSES:
+                return None
+            job["status"] = "cancelling"
+        _persist_active_jobs()
+        return "single"
+
+    if in_batch:
+        with _reocr_batch_jobs_lock:
+            job = _reocr_batch_jobs.get(job_id)
+            if not job or job.get("status") not in CANCELLABLE_STATUSES:
+                return None
+            job["status"] = "cancelling"
+        _persist_active_jobs()
+        return "batch"
+
+    return None
+
+
+# Töö-põhised katkestuslipud ja üleslaadimislõimed. Poll-lõimi siin EI OLE —
+# need on jagatud singletonid ja neid vaigistab CAS (vt _try_begin_cancel).
+_cancel_events: Dict[str, threading.Event] = {}
+_upload_threads: Dict[str, threading.Thread] = {}
+
+
+def _cancel_event(job_id: str) -> threading.Event:
+    """Töö katkestuslipp (loob vajadusel)."""
+    ev = _cancel_events.get(job_id)
+    if ev is None:
+        ev = threading.Event()
+        _cancel_events[job_id] = ev
+    return ev
+
+
+def _quiesce_upload(job_id: str, timeout: float = 30.0) -> bool:
+    """Seab katkestuslipu ja OOTAB üleslaadimislõime lõpetamist.
+
+    Tagastab False, kui lõim ei peatunud. Sel juhul EI TOHI kaugkoristust teha:
+    pooleliolev sftp.put() kirjutaks pildid tagasi kataloogi, mille kustutasime.
+    Jääk kaugserveris on parem kui võistlus (#217).
+    """
+    _cancel_event(job_id).set()
+    t = _upload_threads.get(job_id)
+    if t is None or not t.is_alive():
+        return True
+    t.join(timeout)
+    return not t.is_alive()
+
+
+def _forget_cancel_state(job_id: str) -> None:
+    """Koristab katkestamise abistruktuurid."""
+    _cancel_events.pop(job_id, None)
+    _upload_threads.pop(job_id, None)
+
+
+def _cleanup_remote_job(job_id: str, job: dict) -> bool:
+    """Kustutab OCR-serverist selle töö pildid ja .txt-d. True = õnnestus.
+
+    Piltide kustutamine ON peatamismehhanism: valvuri process_batch väljub enne
+    mudeli kutsumist, kui ükski pilt ei avane. Kuni üks lennusolev batch
+    (BATCH_SIZE = 4) jõuab siiski lõpuni — teadlik piir, vt spekki (#217).
+    """
+    remote_work = job.get("remote_work")
+    if not remote_work:
+        return True
+    try:
+        sftp = _sftp_open(job_id)
+    except Exception as e:
+        logger.warning(f"Re-OCR {job_id} koristuse SFTP viga: {e}")
+        return False
+
+    work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
+    ok = True
+    try:
+        try:
+            for name in sftp.listdir(work_abs):
+                try:
+                    sftp.remove(f"{work_abs}/{name}")
+                except Exception as e:
+                    logger.warning(f"Re-OCR {job_id} {name} kustutus: {e}")
+                    ok = False
+        except FileNotFoundError:
+            pass          # kaust on juba kadunud — intsidendi kuju, mitte viga
+        remote_staging = job.get("remote_staging") or ""
+        for d in (work_abs, f"{OCR_SERVER_PATH}/{remote_staging}" if remote_staging else ""):
+            if not d:
+                continue
+            try:
+                sftp.rmdir(d)
+            except Exception:
+                pass      # mitte-tühi või puuduv kaust ei ole katkestamise viga
+    finally:
+        try:
+            sftp.close()
+        except Exception:
+            pass
+        close_ssh(job_id)
+    return ok
+
+
+def cancel_reocr_job(job_id: str) -> dict:
+    """Katkestab re-OCR töö. „Tööd ei olnud" — vt spekki (#217).
+
+    Järjekord ei ole vaba: koristus tohib alata alles siis, kui ühtki kirjutajat
+    enam ei ole. Vastasel juhul kirjutab pooleliolev üleslaadimine failid tagasi
+    kataloogi, mille just eemaldasime.
+    """
+    registry = _try_begin_cancel(job_id)
+    if registry is None:
+        if job_id in _reocr_jobs or job_id in _reocr_batch_jobs:
+            raise ValueError("Töö ei ole katkestatav")
+        raise KeyError(job_id)
+
+    jobs = _reocr_jobs if registry == "single" else _reocr_batch_jobs
+    lock = _reocr_jobs_lock if registry == "single" else _reocr_batch_jobs_lock
+    with lock:
+        job = dict(jobs.get(job_id) or {})
+
+    if not _quiesce_upload(job_id):
+        # Kirjutaja on veel elus — jäta töö `cancelling` olekusse, stardi-taaste
+        # korjab üles. Jääk kaugserveris on parem kui võistlus koristusega.
+        logger.error(
+            f"Re-OCR {job_id}: üleslaadimislõim ei peatunud, koristus edasi lükatud"
+        )
+        raise RuntimeError("Üleslaadimislõim ei peatunud")
+
+    remote_ok = _cleanup_remote_job(job_id, job)
+
+    slug = job.get("slug") or ""
+    deleted = 0
+    for stem in job.get("produced_pages", []):
+        path = os.path.join(BASE_DIR, slug, stem + ".ocr")
+        try:
+            os.unlink(path)
+            deleted += 1
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.warning(f"Re-OCR {job_id} {stem}.ocr kustutus: {e}")
+    restored = _restore_backups(job_id)
+
+    with lock:
+        current = jobs.pop(job_id, None)
+    if current is not None:
+        current["status"] = "cancelled"
+        current["finished_at"] = datetime.now().timestamp()
+        current["remote_cleanup"] = "ok" if remote_ok else "failed"
+        _append_to_log(current, job_id)
+
+    reocr_state.remove_batch_mapping(job_id)
+    _forget_cancel_state(job_id)
+    _persist_active_jobs()
+
+    logger.info(
+        f"Re-OCR {job_id} katkestatud: {deleted} .ocr kustutatud, "
+        f"{restored} taastatud, kaugkoristus={'ok' if remote_ok else 'failed'}"
+    )
+    return {
+        "status": "cancelled",
+        "remote_cleanup": "ok" if remote_ok else "failed",
+        "deleted_ocr": deleted,
+        "restored_ocr": restored,
+    }
+
+
+def _finish_interrupted_cancellations(jobs: dict) -> int:
+    """Lõpetab `cancelling` olekusse jäänud tööd (protsess suri koristuse ajal).
+
+    `cancelling` töö EI OLE aktiivne töö — ilma selleta jääks pooleli katkestatud
+    töö restardi järel teost lukustama, mis on täpselt see probleem, mille vastu
+    kogu see feature tehakse (#217).
+    """
+    lopetatud = 0
+    for job_id in [k for k, v in jobs.items() if v.get("status") == "cancelling"]:
+        job = jobs[job_id]
+        remote_ok = _cleanup_remote_job(job_id, job)
+        slug = job.get("slug") or ""
+        for stem in job.get("produced_pages", []):
+            try:
+                os.unlink(os.path.join(BASE_DIR, slug, stem + ".ocr"))
+            except OSError:
+                pass
+        _restore_backups(job_id)
+        job["status"] = "cancelled"
+        job["finished_at"] = datetime.now().timestamp()
+        job["remote_cleanup"] = "ok" if remote_ok else "failed"
+        _append_to_log(job, job_id)
+        jobs.pop(job_id, None)
+        reocr_state.remove_batch_mapping(job_id)
+        _forget_cancel_state(job_id)
+        lopetatud += 1
+        logger.info(f"Re-OCR {job_id}: pooleli jäänud katkestamine lõpetatud")
+    return lopetatud
 
 
 def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
@@ -195,6 +477,10 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
 
     def _upload():
         try:
+            # Katkestamine võis jõuda enne, kui lõim käivitus (#217).
+            if _cancel_event(job_id).is_set():
+                logger.info(f"Re-OCR {job_id}: üleslaadimine katkestatud")
+                return
             sftp = _sftp_open(job_id)
             staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
             work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
@@ -204,6 +490,9 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                 except FileNotFoundError:
                     sftp.mkdir(d)
             for entry in page_entries:
+                if _cancel_event(job_id).is_set():
+                    logger.info(f"Re-OCR batch {job_id}: üleslaadimine katkestatud")
+                    return
                 src = os.path.join(work_path, entry["page_filename"])
                 # .tmp+rename: valvur ei kontrolli piltide stabiilsust (#220)
                 publish_atomic(sftp, src, f"{work_abs}/{entry['remote_img_name']}")
@@ -231,7 +520,9 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                     current["finished_at"] = datetime.now().timestamp()
             _persist_active_jobs()
 
-    threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}").start()
+    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}")
+    _upload_threads[job_id] = _t
+    _t.start()
     return job_id
 
 
@@ -251,12 +542,18 @@ def _batch_inactive(job: Dict, now: float, timeout: int) -> bool:
     return (now - job.get("last_progress_at", job["started_at"])) > timeout
 
 
-def _finalize_batch_if_complete(job: Dict) -> None:
-    """Kui kõik lehed ready/error → märgi job done."""
+def _finalize_batch_if_complete(job: Dict, job_id: Optional[str] = None) -> None:
+    """Kui kõik lehed ready/error → märgi job done.
+
+    Normaalne lõpp kustutab varukoopiad: valminud töö tulemus ON nüüd kehtiv
+    ootel tulemus ja ülekirjutatud vanem versioon on lõplikult asendatud (#217).
+    """
     if all(e["status"] in ("ready", "error") for e in job["pages"]):
         if job["status"] != "done":
             job["status"] = "done"
             job["finished_at"] = datetime.now().timestamp()
+            if job_id:
+                _drop_backups(job_id)
 
 
 def _poll_batch_job(job_id: str) -> None:
@@ -270,7 +567,7 @@ def _poll_batch_job(job_id: str) -> None:
         remote_work = job["remote_work"]
         remote_staging = job.get("remote_staging", os.path.dirname(remote_work))
         if not pending:
-            _finalize_batch_if_complete(job)
+            _finalize_batch_if_complete(job, job_id)
             return
     try:
         sftp = _sftp_open(job_id)
@@ -288,10 +585,17 @@ def _poll_batch_job(job_id: str) -> None:
                 continue
             if text is None:
                 continue
+            # Olek võis allalaadimise ajal muutuda (DELETE käib teises lõimes).
+            # Poll on JAGATUD singleton-lõim — teda ei saa peatada, seega on see
+            # kontroll ainus, mis hoiab ära ghost-tulemuse pärast koristust (#217).
+            with _reocr_batch_jobs_lock:
+                cur = _reocr_batch_jobs.get(job_id)
+                if not cur or cur.get("status") != "processing":
+                    return
             ready = False
             try:
                 # AUTORITEETNE: kirje page_filename määrab sihtkoha
-                _write_ocr_file(slug, entry["page_filename"], text)
+                _write_ocr_file(slug, entry["page_filename"], text, job_id)
                 with _reocr_batch_jobs_lock:
                     current = _reocr_batch_jobs.get(job_id)
                     if current and current.get("status") == "processing":
@@ -299,6 +603,8 @@ def _poll_batch_job(job_id: str) -> None:
                             if cur_entry.get("remote_txt_name") == entry["remote_txt_name"] and cur_entry.get("status") == "processing":
                                 cur_entry["status"] = "ready"
                                 current["last_progress_at"] = datetime.now().timestamp()
+                                # Omand: see töö kirjutas selle lehe .ocr faili (#217)
+                                _record_produced(current, entry["page_filename"])
                                 ready = True
                                 break
             except Exception as e:
@@ -341,7 +647,7 @@ def _poll_batch_job(job_id: str) -> None:
     with _reocr_batch_jobs_lock:
         current = _reocr_batch_jobs.get(job_id)
         if current:
-            _finalize_batch_if_complete(current)
+            _finalize_batch_if_complete(current, job_id)
 
 
 def _batch_poll_iteration(now: float) -> None:
@@ -437,8 +743,9 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
     active: Dict[str, str] = {}
     errors: Dict[str, str] = {}
     progress: Optional[Dict] = None
+    active_job_id: Optional[str] = None   # katkestamiseks Manage-vaates (#217)
     with _reocr_batch_jobs_lock:
-        for j in _reocr_batch_jobs.values():
+        for jid, j in _reocr_batch_jobs.items():
             if j["work_id"] != work_id:
                 continue
             is_active = j["status"] in ("uploading", "processing")
@@ -456,6 +763,8 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
             # Eelista aktiivset batchi; muidu viimast nähtut
             if is_active or progress is None:
                 progress = summary
+            if is_active:
+                active_job_id = jid
     ocr_ready: List[str] = []
     try:
         for fn in os.listdir(work_path):
@@ -493,6 +802,8 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
         "progress": progress,
         "batch_ready": batch_ready,
         "batch_known": batch_known,
+        # Aktiivse batchi id — Manage-vaate katkestamisnupu jaoks (#217)
+        "active_job_id": active_job_id,
     }
 
 
@@ -635,6 +946,10 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
 
     def _upload():
         try:
+            # Katkestamine võis jõuda enne, kui lõim käivitus (#217).
+            if _cancel_event(job_id).is_set():
+                logger.info(f"Re-OCR {job_id}: üleslaadimine katkestatud")
+                return
             sftp = _sftp_open(job_id)
             staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
             work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
@@ -672,7 +987,9 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             except Exception:
                 pass
 
-    threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}").start()
+    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}")
+    _upload_threads[job_id] = _t
+    _t.start()
     return job_id
 
 
@@ -737,6 +1054,9 @@ def poll_reocr_job(job_id: str) -> dict:
                 current_job["text"] = text
                 current_job["finished_at"] = datetime.now().timestamp()
                 log_job = dict(current_job)
+                # Normaalne lõpp: ülekirjutatud vanem tulemus on lõplikult
+                # asendatud, varukoopiat pole enam vaja hoida (#217).
+                _drop_backups(job_id)
         if log_job:
             logger.info(f"Re-OCR {job_id} valmis ({len(text)} tähemärki)")
             _append_to_log(log_job, job_id)
@@ -746,7 +1066,12 @@ def poll_reocr_job(job_id: str) -> dict:
             page_fn = log_job.get("page_filename", "")
             if page_fn:
                 try:
-                    ocr_path = _write_ocr_file(log_job["slug"], page_fn, text)
+                    ocr_path = _write_ocr_file(log_job["slug"], page_fn, text, job_id)
+                    # Omand: see töö kirjutas selle lehe .ocr faili (#217)
+                    with _reocr_jobs_lock:
+                        live = _reocr_jobs.get(job_id)
+                        if live is not None:
+                            _record_produced(live, page_fn)
                     logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
                 except Exception as write_err:
                     logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")
@@ -829,7 +1154,15 @@ def start_reocr_background() -> Optional[threading.Thread]:
         _reocr_batch_jobs.update(batch)
     logger.info(f"Re-OCR taastatud mällu: {len(single)} üksik + {len(batch)} batch "
                 f"({revived} surnud upload-i → processing)")
-    if revived:
+
+    # Pooleli jäänud katkestamised ENNE reconciliation'i: `cancelling` töö ei ole
+    # aktiivne töö ja teda ei tohi orvuna "taastada" (#217).
+    lopetatud = (_finish_interrupted_cancellations(_reocr_jobs)
+                 + _finish_interrupted_cancellations(_reocr_batch_jobs))
+    if lopetatud:
+        logger.info(f"Re-OCR: lõpetatud {lopetatud} pooleli jäänud katkestamist")
+
+    if revived or lopetatud:
         _persist_active_jobs()  # kirjuta teisendatud staatus kohe tagasi
     thread = threading.Thread(target=_startup_recovery_and_reaper, daemon=True,
                               name="reocr-startup-recovery")

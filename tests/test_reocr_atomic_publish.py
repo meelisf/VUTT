@@ -83,16 +83,31 @@ def test_batch_reocr_avaldab_aatomiliselt(monkeypatch, tmp_path):
 
 
 def test_reocr_ops_ei_kasuta_enam_otse_put_i():
-    """Valvur: reocr_ops lähtekoodis ei tohi olla sftp.put() sihtnimega.
+    """Valvur: reocr_ops ei tohi kutsuda otse sftp.put().
 
-    See on tekstipõhine kontroll, sest mõlemad üleslaadimisteed elavad
-    taustalõimede sees, mida on kallis tervikuna käivitada.
+    Kontroll käib AST-i pealt, mitte tekstiotsinguga: docstring'id ja
+    kommentaarid räägivad `sftp.put()`-ist kui probleemist, ja tekstiotsing
+    langes nende peale valepositiiviga.
+
+    Mõlemad üleslaadimisteed elavad taustalõimede sees, mida on kallis
+    tervikuna käivitada — seepärast staatiline kontroll.
     """
+    import ast
     import inspect
 
     from server import reocr_ops
 
-    source = inspect.getsource(reocr_ops)
-    assert "sftp.put(" not in source, (
-        "reocr_ops kutsub veel otse sftp.put() — kasuta publish_atomic()"
+    puu = ast.parse(inspect.getsource(reocr_ops))
+    kutsed = [
+        node for node in ast.walk(puu)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "put"
+        and isinstance(node.func.value, ast.Name)
+        and "sftp" in node.func.value.id.lower()
+    ]
+    assert not kutsed, (
+        "reocr_ops kutsub otse sftp.put() ridadel {} — kasuta publish_atomic()".format(
+            [n.lineno for n in kutsed]
+        )
     )

@@ -14,7 +14,9 @@ from .config import STATE_DIR, get_logger
 logger = get_logger(__name__)
 
 REOCR_ACTIVE_FILE = os.path.join(STATE_DIR, "reocr_active.json")
-_ACTIVE_STATUSES = ("uploading", "processing")
+# `cancelling` PEAB siin olema: pooleli jäänud katkestamine tuleb restardi järel
+# üles leida ja lõpetada, muidu muutub töö taas aktiivseks ja lukustab teose (#217).
+_ACTIVE_STATUSES = ("uploading", "processing", "cancelling")
 _file_lock = threading.Lock()
 
 
@@ -100,3 +102,61 @@ def list_batch_mapping_ids() -> list:
         return [os.path.splitext(f)[0] for f in os.listdir(BATCH_MAPS_DIR) if f.endswith(".json")]
     except FileNotFoundError:
         return []
+
+
+# --- Ülekirjutatud .ocr tulemuste varukoopiate sihtkohad (#217) ---
+#
+# Varukoopia failinimi (017.ocr) ei ütle, MILLISE teose kausta ta kuulub —
+# taastamine vajab täisteed. Register hoiab seost varukoopia nime ja sihttee vahel.
+
+BACKUP_TARGETS_DIR = os.path.join(STATE_DIR, "reocr_backup_targets")
+
+
+def _backup_targets_path(job_id: str) -> str:
+    return os.path.join(BACKUP_TARGETS_DIR, f"{job_id}.json")
+
+
+def add_backup_target(job_id: str, backup_name: str, target_path: str) -> None:
+    """Seob varukoopia failinime tema teose-kausta sihtteega. Atomaarne."""
+    with _file_lock:
+        try:
+            os.makedirs(BACKUP_TARGETS_DIR, exist_ok=True)
+            path = _backup_targets_path(job_id)
+            data = {}
+            if os.path.exists(path):
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        loaded = json.load(f)
+                    if isinstance(loaded, dict):
+                        data = loaded
+                except (OSError, ValueError):
+                    data = {}
+            data[backup_name] = target_path
+            tmp = path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, path)
+        except Exception as e:
+            logger.warning(f"varukoopia sihtkoha kirjutamine ebaõnnestus ({job_id}): {e}")
+
+
+def load_backup_targets(job_id: str) -> Dict[str, str]:
+    """Varukoopia nimi → sihttee. Puuduv või vigane fail = tühi dict."""
+    with _file_lock:
+        try:
+            with open(_backup_targets_path(job_id), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+
+def remove_backup_targets(job_id: str) -> None:
+    """Kustuta selle töö varukoopia-register (best-effort)."""
+    with _file_lock:
+        try:
+            os.remove(_backup_targets_path(job_id))
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            logger.warning(f"varukoopia registri kustutamine ebaõnnestus ({job_id}): {e}")
