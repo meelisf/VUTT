@@ -235,6 +235,42 @@ def _try_begin_cancel(job_id: str) -> Optional[str]:
     return None
 
 
+# Töö-põhised katkestuslipud ja üleslaadimislõimed. Poll-lõimi siin EI OLE —
+# need on jagatud singletonid ja neid vaigistab CAS (vt _try_begin_cancel).
+_cancel_events: Dict[str, threading.Event] = {}
+_upload_threads: Dict[str, threading.Thread] = {}
+
+
+def _cancel_event(job_id: str) -> threading.Event:
+    """Töö katkestuslipp (loob vajadusel)."""
+    ev = _cancel_events.get(job_id)
+    if ev is None:
+        ev = threading.Event()
+        _cancel_events[job_id] = ev
+    return ev
+
+
+def _quiesce_upload(job_id: str, timeout: float = 30.0) -> bool:
+    """Seab katkestuslipu ja OOTAB üleslaadimislõime lõpetamist.
+
+    Tagastab False, kui lõim ei peatunud. Sel juhul EI TOHI kaugkoristust teha:
+    pooleliolev sftp.put() kirjutaks pildid tagasi kataloogi, mille kustutasime.
+    Jääk kaugserveris on parem kui võistlus (#217).
+    """
+    _cancel_event(job_id).set()
+    t = _upload_threads.get(job_id)
+    if t is None or not t.is_alive():
+        return True
+    t.join(timeout)
+    return not t.is_alive()
+
+
+def _forget_cancel_state(job_id: str) -> None:
+    """Koristab katkestamise abistruktuurid."""
+    _cancel_events.pop(job_id, None)
+    _upload_threads.pop(job_id, None)
+
+
 def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
     """Sea slow=True esimest korda kui üle slow-läve. Debounce: teisel korral False."""
     if now - job.get("started_at", now) <= REOCR_PROCESSING_TIMEOUT:
@@ -301,6 +337,10 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
 
     def _upload():
         try:
+            # Katkestamine võis jõuda enne, kui lõim käivitus (#217).
+            if _cancel_event(job_id).is_set():
+                logger.info(f"Re-OCR {job_id}: üleslaadimine katkestatud")
+                return
             sftp = _sftp_open(job_id)
             staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
             work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
@@ -310,6 +350,9 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                 except FileNotFoundError:
                     sftp.mkdir(d)
             for entry in page_entries:
+                if _cancel_event(job_id).is_set():
+                    logger.info(f"Re-OCR batch {job_id}: üleslaadimine katkestatud")
+                    return
                 src = os.path.join(work_path, entry["page_filename"])
                 # .tmp+rename: valvur ei kontrolli piltide stabiilsust (#220)
                 publish_atomic(sftp, src, f"{work_abs}/{entry['remote_img_name']}")
@@ -337,7 +380,9 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                     current["finished_at"] = datetime.now().timestamp()
             _persist_active_jobs()
 
-    threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}").start()
+    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-batch-{job_id}")
+    _upload_threads[job_id] = _t
+    _t.start()
     return job_id
 
 
@@ -750,6 +795,10 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
 
     def _upload():
         try:
+            # Katkestamine võis jõuda enne, kui lõim käivitus (#217).
+            if _cancel_event(job_id).is_set():
+                logger.info(f"Re-OCR {job_id}: üleslaadimine katkestatud")
+                return
             sftp = _sftp_open(job_id)
             staging_abs = f"{OCR_SERVER_PATH}/{remote_staging}"
             work_abs = f"{OCR_SERVER_PATH}/{remote_work}"
@@ -787,7 +836,9 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
             except Exception:
                 pass
 
-    threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}").start()
+    _t = threading.Thread(target=_upload, daemon=True, name=f"reocr-{job_id}")
+    _upload_threads[job_id] = _t
+    _t.start()
     return job_id
 
 
