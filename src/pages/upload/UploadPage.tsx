@@ -237,7 +237,7 @@ const UploadPage: React.FC = () => {
           <UploadStepSplit
             uploadId={wizard.uploadId}
             token={authToken}
-            onDone={() => wizard.setStep(4)}
+            onDone={wizard.handlePrepressApplied}
           />
         )}
 

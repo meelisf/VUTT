@@ -30,8 +30,15 @@ import {
 } from './uploadApi';
 import type { PollResult, SavedUpload } from './types';
 
-/** Staatused, mille korral fail on VUTT-i poolel ja poolitamise samm on avatud. */
-const PREPRESS_STATUSES = ['awaiting_split', 'prepping', 'applying'];
+/** Staatused, mille korral fail on VUTT-i poolel ja poolitamise samm on avatud.
+ *
+ * `applying` EI KUULU siia: apply on ühekordne (kordus annab 409), plaani ei
+ * saa enam muuta ja kasutaja kuulub juba ülevaatuse sammu, kus ta näeb
+ * edenemist. Siia jäetuna viskaks polling ta poolitamise vaatesse tagasi. */
+const PREPRESS_STATUSES = ['awaiting_split', 'prepping'];
+
+/** Staatused, mille korral OCR-i pool on käigus → viisardi 4. samm. */
+const REVIEW_STATUSES = ['applying', 'processing', 'reviewing', 'done'];
 
 export function useUploadWizard() {
   const { t } = useTranslation(['upload', 'common']);
@@ -206,7 +213,7 @@ export function useUploadWizard() {
           setStep(3);
           setFileUploading(false);
         }
-        if (['processing', 'reviewing', 'done'].includes(d.status)) {
+        if (REVIEW_STATUSES.includes(d.status)) {
           setStep(4);
           if (ocrStartedAt === null) setOcrStartedAt(Date.now());
         }
@@ -229,6 +236,25 @@ export function useUploadWizard() {
   );
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  /**
+   * Samm 3 → 4: apply on käivitatud, lehed lähevad OCR-serverisse.
+   *
+   * Polling tuleb siin KÄIVITADA. Sammu 3 ajal ei polli `/status`-t keegi
+   * (`awaiting_split` on prepress-idle ja UploadStepSplit küsib ainult
+   * `/prepress`-i), nii et ilma selleta jääks samm 4 igavesti spinnerisse:
+   * pisipildid, `ready/total` ja lõpetamise tuvastus tulevad AINULT
+   * `/status` vastusest. Lehe värskendamine „parandas" vea ära, sest
+   * handleResume käivitab pollingu — see peitis vea ära.
+   */
+  const handlePrepressApplied = useCallback(() => {
+    if (!uploadId) return;
+    setStep(4);
+    setFileUploading(true);   // näita „Sulge ja jälgi" — OCR käib taustal
+    if (ocrStartedAt === null) setOcrStartedAt(Date.now());
+    fetchStatus(uploadId);    // vahetu päring, et samm 4 ei ava tühjana
+    startPolling(uploadId, POLL_SLOW_MS);
+  }, [uploadId, ocrStartedAt, fetchStatus, startPolling]);
 
   // ---------------------------------------------------------------------------
   // Samm 1 — staging loomine
@@ -463,7 +489,7 @@ export function useUploadWizard() {
 
     if (PREPRESS_STATUSES.includes(saved.status)) {
       setStep(3); // poolitamise ootel — eelvaate olek loetakse UploadStepSplit'is
-    } else if (['reviewing', 'done', 'processing'].includes(saved.status)) {
+    } else if (REVIEW_STATUSES.includes(saved.status)) {
       setStep(4);
       setFileUploading(true);
       setOcrStartedAt(Date.now() - POLL_SLOW_MS); // Eeldame et on juba alustanud
@@ -547,5 +573,6 @@ export function useUploadWizard() {
     handleCancel,
     handleDeletePending,
     handleResume,
+    handlePrepressApplied,
   };
 }
