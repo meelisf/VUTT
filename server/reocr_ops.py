@@ -4,11 +4,15 @@ Re-OCR operatsioonid — olemasoleva lehekülje uuesti transkribeerimine OCR ser
 import io
 import json
 import os
+import shutil
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, get_logger
+from .config import (
+    BASE_DIR, OCR_SERVER_PATH, REOCR_BACKUPS_DIR, REOCR_LOG_FILE,
+    UPLOAD_ENABLED, get_logger,
+)
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
 from .upload.ocr_client import publish_atomic
@@ -70,13 +74,62 @@ def get_reocr_log(offset: int = 0, limit: int = 50) -> dict:
 logger = get_logger(__name__)
 
 
-def _write_ocr_file(slug: str, page_filename: str, text: str) -> str:
-    """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging). Tagastab tee."""
+def _backup_dir(job_id: str) -> str:
+    """Selle töö ülekirjutatud .ocr failide varukoopiad."""
+    return os.path.join(REOCR_BACKUPS_DIR, job_id)
+
+
+def _write_ocr_file(slug: str, page_filename: str, text: str, job_id: str) -> str:
+    """Kirjutab OCR-tulemuse {BASE_DIR}/{slug}/{stem}.ocr failina (püsiv staging).
+
+    Kui sihtkohas on juba ootel tulemus, varundatakse see ENNE ülekirjutamist.
+    Katkestamine taastab varukoopia — muidu hävitaks katkestatud töö varasema
+    kehtiva tulemuse, mida ta ise ei tootnud (#217).
+    """
     stem = os.path.splitext(os.path.basename(page_filename))[0]
     ocr_path = os.path.join(BASE_DIR, slug, stem + ".ocr")
+
+    if os.path.exists(ocr_path):
+        bdir = _backup_dir(job_id)
+        os.makedirs(bdir, exist_ok=True)
+        backup_path = os.path.join(bdir, stem + ".ocr")
+        # Ainult ESIMENE ülekirjutus varundatakse — muidu kirjutaks sama töö
+        # kordusjooks varukoopia enda tulemusega üle.
+        if not os.path.exists(backup_path):
+            shutil.copy2(ocr_path, backup_path)
+            reocr_state.add_backup_target(job_id, stem + ".ocr", ocr_path)
+
     with open(ocr_path, "w", encoding="utf-8") as f:
         f.write(text)
     return ocr_path
+
+
+def _restore_backups(job_id: str) -> int:
+    """Taastab selle töö ülekirjutatud .ocr failid. Tagastab taastatud arvu."""
+    bdir = _backup_dir(job_id)
+    if not os.path.isdir(bdir):
+        return 0
+    mapping = reocr_state.load_backup_targets(job_id)
+    restored = 0
+    for name in os.listdir(bdir):
+        target = mapping.get(name)
+        if not target:
+            logger.warning(f"Re-OCR {job_id}: varukoopial {name} puudub sihtkoht")
+            continue
+        try:
+            shutil.move(os.path.join(bdir, name), target)
+            restored += 1
+        except OSError as e:
+            logger.warning(f"Re-OCR {job_id}: varukoopia taaste {name}: {e}")
+    shutil.rmtree(bdir, ignore_errors=True)
+    reocr_state.remove_backup_targets(job_id)
+    return restored
+
+
+def _drop_backups(job_id: str) -> None:
+    """Kustutab varukoopiad (töö lõppes normaalselt / rakendati / visati ära)."""
+    shutil.rmtree(_backup_dir(job_id), ignore_errors=True)
+    reocr_state.remove_backup_targets(job_id)
 
 
 def _build_batch_pages(slug: str, pages: List[Tuple[str, Optional[int]]]) -> List[Dict]:
@@ -291,7 +344,7 @@ def _poll_batch_job(job_id: str) -> None:
             ready = False
             try:
                 # AUTORITEETNE: kirje page_filename määrab sihtkoha
-                _write_ocr_file(slug, entry["page_filename"], text)
+                _write_ocr_file(slug, entry["page_filename"], text, job_id)
                 with _reocr_batch_jobs_lock:
                     current = _reocr_batch_jobs.get(job_id)
                     if current and current.get("status") == "processing":
@@ -746,7 +799,7 @@ def poll_reocr_job(job_id: str) -> dict:
             page_fn = log_job.get("page_filename", "")
             if page_fn:
                 try:
-                    ocr_path = _write_ocr_file(log_job["slug"], page_fn, text)
+                    ocr_path = _write_ocr_file(log_job["slug"], page_fn, text, job_id)
                     logger.info(f"Re-OCR {job_id}: .ocr fail kirjutatud → {ocr_path}")
                 except Exception as write_err:
                     logger.warning(f"Re-OCR {job_id}: .ocr faili kirjutamine ebaõnnestus: {write_err}")

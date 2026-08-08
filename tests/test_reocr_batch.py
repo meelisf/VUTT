@@ -11,7 +11,7 @@ def test_write_ocr_file_kirjutab_stem_ocr(tmp_path, monkeypatch):
     work_dir = tmp_path / "1700-teos"
     work_dir.mkdir()
 
-    path = reocr_ops._write_ocr_file("1700-teos", "1700-teos-pg005.jpg", "Tekst siin.")
+    path = reocr_ops._write_ocr_file("1700-teos", "1700-teos-pg005.jpg", "Tekst siin.", "job1")
 
     assert path == str(work_dir / "1700-teos-pg005.ocr")
     assert (work_dir / "1700-teos-pg005.ocr").read_text(encoding="utf-8") == "Tekst siin."

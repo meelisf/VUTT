@@ -102,6 +102,11 @@ ARCHIVES_FILE = os.path.join(_DATA_CONFIG_DIR, "archives.json")
 USER_SETTINGS_DIR = os.path.join(_STATE_DIR, "user_settings")
 NOTIFICATIONS_DIR = os.path.join(_STATE_DIR, "notifications")
 
+# Re-OCR ülekirjutatud .ocr tulemuste varukoopiad (katkestamisel taastatakse).
+# EI TOHI olla teose kaustas: data/.gitignore ignoreerib *.ocr, aga varukoopia
+# nimi ei vastaks mustrile ja ilmuks git status'isse (#217).
+REOCR_BACKUPS_DIR = os.path.join(_STATE_DIR, "reocr_backups")
+
 # Prosopograafia: ÜKS juur, selle all varatüübid (#221).
 # Kaardid on gitis, pildid mitte (data/.gitignore → *.jpg), aga MÕLEMAD elavad
 # siin — pildid olid varem state/-is ja see lahknemine tekitas kolm koopiat.

@@ -147,7 +147,7 @@ def _recover_batch(sftp, base: str, job_id: str, mapping: dict, recovered: List[
             buf = io.BytesIO()
             sftp.getfo(f"{work_dir}/{fname}", buf)
             text = buf.getvalue().decode("utf-8", errors="replace")
-            reocr_ops._write_ocr_file(slug, info["page_filename"], text)
+            reocr_ops._write_ocr_file(slug, info["page_filename"], text, job_id)
             now = datetime.now().timestamp()
             reocr_ops._append_to_log(
                 {"work_id": work_id, "slug": slug, "page_filename": info["page_filename"],
@@ -218,7 +218,7 @@ def _recover_single(sftp, base: str, job_id: str, recovered: List[str], skipped:
             buf = io.BytesIO()
             sftp.getfo(txt_abs, buf)
             text = buf.getvalue().decode("utf-8", errors="replace")
-            reocr_ops._write_ocr_file(slug, meta["page_filename"], text)
+            reocr_ops._write_ocr_file(slug, meta["page_filename"], text, job_id)
             now = datetime.now().timestamp()
             reocr_ops._append_to_log(
                 {"work_id": meta.get("work_id"), "slug": slug, "page_filename": meta["page_filename"],
