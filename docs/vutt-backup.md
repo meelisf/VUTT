@@ -207,7 +207,7 @@ Pärast restore'i kontrolli õiguseid:
 ssh new-vutt 'chmod 700 ~/VUTT/state && cd ~/VUTT && docker compose ps'
 ```
 
-## Vana `backup_prosopography.sh` — KUSTUTATUD 2026-08-04
+## Vana `backup_prosopography.sh` — cron eemaldatud 2026-08-04, skript kustutatud 2026-08-08
 
 Kuni 2026-08-04 jooksis VUTT serveri cronist (`50 1 * * *`) skript
 `scripts/backup_prosopography.sh`, mis kopeeris `state/prosopography/` →
@@ -225,3 +225,14 @@ Vajadusel `git log -- scripts/backup_prosopography.sh`.
 Katte võtab üle `vutt_backup.py`, mis varundab `state/` tervikuna, sh isikupildid
 (`state/prosopography/images/`). Serveri crontab'is on eemaldamise kohta selgitav
 kommentaar; varukoopia vanast crontab'ist: `vutt:~/crontab.bak-20260804`.
+
+> **HOIATUS — `state/prosopography/` EI OLE tervikuna surnud.** Külmunud on ainult
+> selle JSON-kaardid; sama kataloogi sees elab `images/` (isikupildid, `server/config.py`
+> → `PROSOPOGRAPHY_IMAGES_DIR`), mida iga isikukaardi `image_url` kasutab. Koristades
+> kustuta AINULT `state/prosopography/*.json` — **mitte kunagi kataloogi ennast**,
+> muidu jäävad kõik isikupildid 404-ks.
+
+Vana sihtkataloog `data/prosopography/` (2244 faili, viimane commit 2026-05-25) on
+serveris ja `data/` repos endiselt alles ning läheb öise pushiga GitHubi. See on
+teadlik ootel-olek, mitte hooldusviga — koristus koos ülalmainitud JSON-idega ja
+`state/prosopography/`-le osutavate skriptidega, vt issue #221.
