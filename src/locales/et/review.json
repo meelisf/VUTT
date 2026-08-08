@@ -19,10 +19,20 @@
     "slow": "aeglane, töötab edasi",
     "elapsedMin": "töötab {{mins}} min",
     "elapsedLtMin": "töötab <1 min",
-    "queueAhead": "~{{count}} varasemat tööd"
+    "queueAhead": "~{{count}} varasemat tööd",
+    "cancelJob": "Katkesta töö",
+    "cancelConfirm": "Katkestada? Seni valmis saanud lehtede tulemused visatakse ära.",
+    "cancelConfirmYes": "Jah, katkesta",
+    "cancelling": "Katkestan...",
+    "cancelFailed": "Katkestamine ebaõnnestus",
+    "statusCancelled": "Katkestatud"
   },
   "ocr": {
-    "type": { "upload": "Üleslaadimine", "reocr": "Re-OCR", "batch": "Batch" },
+    "type": {
+      "upload": "Üleslaadimine",
+      "reocr": "Re-OCR",
+      "batch": "Batch"
+    },
     "statusKey": {
       "uploading": "üleslaadimine",
       "processing": "OCR töötleb",

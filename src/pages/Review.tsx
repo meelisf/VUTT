@@ -30,7 +30,8 @@ import {
   Wand2,
   CheckCircle,
   XCircle,
-  UserCircle
+  UserCircle,
+  Ban
 } from 'lucide-react';
 import Header from '../components/Header';
 import { FILE_API_URL } from '../config';
@@ -62,8 +63,10 @@ interface ReocrJob {
   page_filename: string;
   page_number: number | null;
   username: string;
-  status: 'uploading' | 'processing' | 'done' | 'error';
+  status: 'uploading' | 'processing' | 'done' | 'error' | 'cancelled';
   error: string | null;
+  /** Kas LOSSi koristus õnnestus. Ainult katkestatud töödel (#217). */
+  remote_cleanup?: 'ok' | 'failed';
   started_at: number | null;
   finished_at: number | null;
   slow?: boolean;
@@ -172,6 +175,32 @@ const Review: React.FC = () => {
       // eiramine
     } finally {
       if (showLoader) setReocrLoading(false);
+    }
+  };
+
+  // Töö katkestamine (#217). Kinnitus käib rea sees — sama muster nagu
+  // Manage-vaate batch-ribal; eraldi modaali see ei vääri.
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  const handleCancelJob = async (jobId: string) => {
+    if (!token) return;
+    setCancellingId(jobId);
+    setCancelError(null);
+    try {
+      const res = await fetchWithTimeout(`${FILE_API_URL}/admin/reocr/${jobId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+        timeout: 30000,   // koristus teeb SFTP-d, 10 s võib jääda napiks
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      setCancelConfirmId(null);
+      await loadReocrJobs();
+    } catch {
+      setCancelError(jobId);
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -647,6 +676,49 @@ const Review: React.FC = () => {
                             {isSlow ? t('reocr.slow') : t(`ocr.statusKey.${job.status_key}`)}
                           </span>
                         )}
+
+                        {/* Katkestamine ainult re-OCR töödel (#217): upload'i
+                            viisardil on oma katkestamine ja oma endpoint. */}
+                        {isActive && job.type !== 'upload' && (
+                          cancelConfirmId === job.id ? (
+                            <div className="flex shrink-0 items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleCancelJob(job.id)}
+                                disabled={cancellingId === job.id}
+                                title={t('reocr.cancelConfirm')}
+                                className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                              >
+                                {cancellingId === job.id
+                                  ? t('reocr.cancelling')
+                                  : t('reocr.cancelConfirmYes')}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setCancelConfirmId(null)}
+                                className="rounded border border-gray-300 px-2 py-1 text-xs hover:bg-gray-100"
+                              >
+                                {t('common:buttons.cancel')}
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              data-testid={`cancel-job-${job.id}`}
+                              onClick={() => setCancelConfirmId(job.id)}
+                              title={t('reocr.cancelJob')}
+                              className="shrink-0 rounded border border-gray-300 p-1.5 text-gray-500 hover:bg-red-50 hover:text-red-600"
+                            >
+                              <Ban size={14} />
+                            </button>
+                          )
+                        )}
+
+                        {cancelError === job.id && (
+                          <span className="shrink-0 text-xs text-red-600">
+                            {t('reocr.cancelFailed')}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -669,12 +741,17 @@ const Review: React.FC = () => {
                         <div
                           key={entry.job_id}
                           className={`flex items-center gap-4 px-4 py-2.5 rounded-lg border text-sm ${
-                            entry.status === 'done' ? 'border-green-100 bg-green-50/50' : 'border-red-100 bg-red-50/50'
+                            entry.status === 'done' ? 'border-green-100 bg-green-50/50' :
+                            entry.status === 'cancelled' ? 'border-gray-200 bg-gray-50' :
+                            'border-red-100 bg-red-50/50'
                           }`}
                         >
+                          {/* Katkestatud töö EI OLE viga — hall, mitte punane (#217) */}
                           <div className="shrink-0">
                             {entry.status === 'done'
                               ? <CheckCircle size={15} className="text-green-500" />
+                              : entry.status === 'cancelled'
+                              ? <Ban size={15} className="text-gray-400" />
                               : <XCircle size={15} className="text-red-400" />}
                           </div>
                           <div className="flex-1 min-w-0">

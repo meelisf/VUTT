@@ -19,10 +19,20 @@
     "slow": "slow, still running",
     "elapsedMin": "running {{mins}} min",
     "elapsedLtMin": "running <1 min",
-    "queueAhead": "~{{count}} earlier jobs"
+    "queueAhead": "~{{count}} earlier jobs",
+    "cancelJob": "Cancel job",
+    "cancelConfirm": "Cancel? Results for pages finished so far will be discarded.",
+    "cancelConfirmYes": "Yes, cancel",
+    "cancelling": "Cancelling...",
+    "cancelFailed": "Cancelling failed",
+    "statusCancelled": "Cancelled"
   },
   "ocr": {
-    "type": { "upload": "Upload", "reocr": "Re-OCR", "batch": "Batch" },
+    "type": {
+      "upload": "Upload",
+      "reocr": "Re-OCR",
+      "batch": "Batch"
+    },
     "statusKey": {
       "uploading": "uploading",
       "processing": "OCR running",

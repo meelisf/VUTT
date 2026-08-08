@@ -194,7 +194,12 @@
         "processing": "OCR töötab",
         "ready": "OCR valmis ülevaatamiseks",
         "error": "OCR ebaõnnestus"
-      }
+      },
+      "cancelJob": "Katkesta OCR-töö",
+      "cancelConfirm": "Seni valmis saanud lehtede tulemused visatakse ära.",
+      "cancelConfirmYes": "Jah, katkesta",
+      "cancelling": "Katkestan...",
+      "cancelFailed": "Katkestamine ebaõnnestus"
     },
     "tabs": {
       "replace": "Asenda leheküljed"

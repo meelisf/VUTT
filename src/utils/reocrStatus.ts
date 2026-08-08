@@ -9,6 +9,8 @@ export interface ReocrStatusResponse {
   ocr_ready: string[]; // stem'id (ilma laiendita)
   errors: Record<string, string>;
   progress: { total: number; ready: number; errors: number; active: boolean } | null;
+  /** Aktiivse batchi id — katkestamiseks. null, kui aktiivset tööd pole (#217). */
+  active_job_id?: string | null;
   /** Viimase batch-töö lehed, mille .ocr on kettal (stem'id). Puudub vanas backendis. */
   batch_ready?: string[];
   /** Kas batch-kirje leiti. False = server taaskäivitati → varuvariant. */

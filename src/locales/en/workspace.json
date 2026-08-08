@@ -194,7 +194,12 @@
         "processing": "OCR running",
         "ready": "OCR ready for review",
         "error": "OCR failed"
-      }
+      },
+      "cancelJob": "Cancel OCR job",
+      "cancelConfirm": "Results for pages finished so far will be discarded.",
+      "cancelConfirmYes": "Yes, cancel",
+      "cancelling": "Cancelling...",
+      "cancelFailed": "Cancelling failed"
     },
     "tabs": {
       "replace": "Replace pages"

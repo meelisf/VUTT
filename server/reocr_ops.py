@@ -743,8 +743,9 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
     active: Dict[str, str] = {}
     errors: Dict[str, str] = {}
     progress: Optional[Dict] = None
+    active_job_id: Optional[str] = None   # katkestamiseks Manage-vaates (#217)
     with _reocr_batch_jobs_lock:
-        for j in _reocr_batch_jobs.values():
+        for jid, j in _reocr_batch_jobs.items():
             if j["work_id"] != work_id:
                 continue
             is_active = j["status"] in ("uploading", "processing")
@@ -762,6 +763,8 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
             # Eelista aktiivset batchi; muidu viimast nähtut
             if is_active or progress is None:
                 progress = summary
+            if is_active:
+                active_job_id = jid
     ocr_ready: List[str] = []
     try:
         for fn in os.listdir(work_path):
@@ -799,6 +802,8 @@ def build_reocr_status(work_id: str, work_path: str) -> Dict:
         "progress": progress,
         "batch_ready": batch_ready,
         "batch_known": batch_known,
+        # Aktiivse batchi id — Manage-vaate katkestamisnupu jaoks (#217)
+        "active_job_id": active_job_id,
     }
 
 

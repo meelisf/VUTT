@@ -36,6 +36,7 @@ import {
   reorderWorkPages,
   replaceWorkPageImage,
   restoreDeletedWorkPage,
+  cancelReocrJob,
   startReocrBatch,
   WorkPageInfo,
 } from '../services/workApi';
@@ -116,6 +117,9 @@ const WorkManage: React.FC = () => {
   const [ocrModel, setOcrModel] = useState<'print' | 'hand'>('print');
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [batchError, setBatchError] = useState<string | null>(null);
+  // Batchi katkestamine (#217)
+  const [batchCancelConfirm, setBatchCancelConfirm] = useState(false);
+  const [batchCancelling, setBatchCancelling] = useState(false);
   const [reocrPollNonce, setReocrPollNonce] = useState(0); // batch-käivitusel taaskäivitab poll-effecti
 
   // Ootel re-OCR tulemuste hulgi-tegevused (kinnitus avaneb inline, nagu bulkDelete)
@@ -364,6 +368,23 @@ const WorkManage: React.FC = () => {
       setReocrPollNonce((n) => n + 1);
     } catch (e: any) {
       setBatchError(e.message || t('manage.reocr.error'));
+    }
+  };
+
+  const handleCancelBatch = async () => {
+    const jobId = reocrStatus?.active_job_id;
+    if (!authToken || !jobId) return;
+    setBatchCancelling(true);
+    setBatchError(null);
+    try {
+      await cancelReocrJob(jobId, authToken);
+      setBatchCancelConfirm(false);
+      // Nonce bump: status-fetch näitab, et aktiivset tööd enam pole
+      setReocrPollNonce((n) => n + 1);
+    } catch (e: any) {
+      setBatchError(e.message || t('manage.reocr.cancelFailed'));
+    } finally {
+      setBatchCancelling(false);
     }
   };
 
@@ -736,12 +757,52 @@ const WorkManage: React.FC = () => {
 
                 {/* Progress-kokkuvõte */}
                 {reocrStatus?.progress && reocrStatus.progress.total > 0 && (
-                  <div className="mx-4 mb-2 text-sm text-green-700">
-                    {t('manage.reocr.progress', {
-                      ready: reocrStatus.progress.ready,
-                      total: reocrStatus.progress.total,
-                      errors: reocrStatus.progress.errors,
-                    })}
+                  <div className="mx-4 mb-2 flex flex-wrap items-center gap-3 text-sm text-green-700">
+                    <span>
+                      {t('manage.reocr.progress', {
+                        ready: reocrStatus.progress.ready,
+                        total: reocrStatus.progress.total,
+                        errors: reocrStatus.progress.errors,
+                      })}
+                    </span>
+                    {/* Katkestamine (#217). `cancelled` EI OLE siin püsiv staatus:
+                        pärast katkestamist aktiivne töö kaob ja riba lihtsalt ei
+                        kuvata. Püsiv ajalugu elab Review-vaates. */}
+                    {reocrStatus.progress.active && reocrStatus.active_job_id && (
+                      batchCancelConfirm ? (
+                        <span className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={handleCancelBatch}
+                            disabled={batchCancelling}
+                            className="rounded bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            {batchCancelling
+                              ? t('manage.reocr.cancelling')
+                              : t('manage.reocr.cancelConfirmYes')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setBatchCancelConfirm(false)}
+                            className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                          >
+                            {t('common:buttons.cancel')}
+                          </button>
+                          <span className="text-xs text-gray-500">
+                            {t('manage.reocr.cancelConfirm')}
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          data-testid="cancel-batch"
+                          onClick={() => setBatchCancelConfirm(true)}
+                          className="rounded border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-red-50 hover:text-red-700"
+                        >
+                          {t('manage.reocr.cancelJob')}
+                        </button>
+                      )
+                    )}
                   </div>
                 )}
 

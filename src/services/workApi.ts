@@ -137,6 +137,19 @@ export function startReocrBatch(
   return apiPost<ApiStatusResponse>(`/admin/work/${workId}/reocr-batch`, body, authJson(token, { timeout: 30000 }));
 }
 
+export interface ReocrCancelResponse {
+  status: string;
+  /** "failed" = LOSSi koristus ei õnnestunud; VUTT-i pool on siiski katkestatud (#217). */
+  remote_cleanup: 'ok' | 'failed';
+  deleted_ocr: number;
+  restored_ocr: number;
+}
+
+/** Katkestab re-OCR töö (üksik või batch). Koristus teeb SFTP-d → pikem timeout. */
+export function cancelReocrJob(jobId: string, token: string): Promise<ReocrCancelResponse> {
+  return apiDelete<ReocrCancelResponse>(`/admin/reocr/${jobId}`, auth(token, { timeout: 30000 }));
+}
+
 export interface ReocrFailure {
   filename: string;
   error: string;
