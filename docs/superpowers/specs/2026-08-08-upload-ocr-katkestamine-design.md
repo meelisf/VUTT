@@ -94,18 +94,7 @@ Lõppolek on `awaiting_split` — **täpselt see, kus upload oli enne „Edasi" 
 Olemasolev `try_begin_applying` CAS (`APPLY_START_STATUSES = ("awaiting_split", "error")`)
 aktsepteerib seda muutmata; uut apply-teed ei ole vaja.
 
-## Backend: `POST /admin/upload/{upload_id}/model`
-
-Keha: `{"material_type": "hand" | "print"}`. Uuendab `meta.type` ja arvutab ümber
-`remote_staging_path` ning `remote_work_path`.
-
-**Liigub ainult mudeli-segment.** Tee on `AUTO-OCR/{model}/{upload_id}/{slug}` ja slug on
-püsiv identifikaator, mitte tuletis — seega ei muutu ta pealkirja muutmisest ega siin.
-
-Lubatud **ainult `awaiting_split`** olekus; muidu 409. Nii ei saa teed nihkuda töötava
-ülekande alt.
-
-### Kinni jäänud `cancelling` normaliseeritakse
+## Kinni jäänud `cancelling` normaliseeritakse
 
 Kui protsess sureb koristuse ajal (või `join` aegus ja keegi ei proovi uuesti), jääks upload
 `cancelling` olekusse, kus ta ei ole ei katkestatud ega töös.
@@ -118,6 +107,17 @@ normaliseerimine võistleks päris katkestamisega.
 `awaiting_split` on ohutu vaikeseis: plaan ja lähtefail on alles, kasutaja saab uuesti
 saata. Kaugserverisse võib jääda koristamata kataloog — see logitakse hoiatusena ja järgmine
 `apply` kirjutab samad failid niikuinii üle.
+
+## Backend: `POST /admin/upload/{upload_id}/model`
+
+Keha: `{"material_type": "hand" | "print"}`. Uuendab `meta.type` ja arvutab ümber
+`remote_staging_path` ning `remote_work_path`.
+
+**Liigub ainult mudeli-segment.** Tee on `AUTO-OCR/{model}/{upload_id}/{slug}` ja slug on
+püsiv identifikaator, mitte tuletis — seega ei muutu ta pealkirja muutmisest ega siin.
+
+Lubatud **ainult `awaiting_split`** olekus; muidu 409. Nii ei saa teed nihkuda töötava
+ülekande alt.
 
 ## Frontend
 
