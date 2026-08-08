@@ -165,5 +165,5 @@ lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 ## Teadaolev, siin mitte parandatud
 
 `reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma
-`.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Eraldi issue.
+`.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Vt issue #220.
 
