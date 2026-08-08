@@ -381,6 +381,36 @@ def cancel_reocr_job(job_id: str) -> dict:
     }
 
 
+def _finish_interrupted_cancellations(jobs: dict) -> int:
+    """Lõpetab `cancelling` olekusse jäänud tööd (protsess suri koristuse ajal).
+
+    `cancelling` töö EI OLE aktiivne töö — ilma selleta jääks pooleli katkestatud
+    töö restardi järel teost lukustama, mis on täpselt see probleem, mille vastu
+    kogu see feature tehakse (#217).
+    """
+    lopetatud = 0
+    for job_id in [k for k, v in jobs.items() if v.get("status") == "cancelling"]:
+        job = jobs[job_id]
+        remote_ok = _cleanup_remote_job(job_id, job)
+        slug = job.get("slug") or ""
+        for stem in job.get("produced_pages", []):
+            try:
+                os.unlink(os.path.join(BASE_DIR, slug, stem + ".ocr"))
+            except OSError:
+                pass
+        _restore_backups(job_id)
+        job["status"] = "cancelled"
+        job["finished_at"] = datetime.now().timestamp()
+        job["remote_cleanup"] = "ok" if remote_ok else "failed"
+        _append_to_log(job, job_id)
+        jobs.pop(job_id, None)
+        reocr_state.remove_batch_mapping(job_id)
+        _forget_cancel_state(job_id)
+        lopetatud += 1
+        logger.info(f"Re-OCR {job_id}: pooleli jäänud katkestamine lõpetatud")
+    return lopetatud
+
+
 def _mark_slow_if_stale(jid: str, job: dict, now: float) -> bool:
     """Sea slow=True esimest korda kui üle slow-läve. Debounce: teisel korral False."""
     if now - job.get("started_at", now) <= REOCR_PROCESSING_TIMEOUT:
@@ -1119,7 +1149,15 @@ def start_reocr_background() -> Optional[threading.Thread]:
         _reocr_batch_jobs.update(batch)
     logger.info(f"Re-OCR taastatud mällu: {len(single)} üksik + {len(batch)} batch "
                 f"({revived} surnud upload-i → processing)")
-    if revived:
+
+    # Pooleli jäänud katkestamised ENNE reconciliation'i: `cancelling` töö ei ole
+    # aktiivne töö ja teda ei tohi orvuna "taastada" (#217).
+    lopetatud = (_finish_interrupted_cancellations(_reocr_jobs)
+                 + _finish_interrupted_cancellations(_reocr_batch_jobs))
+    if lopetatud:
+        logger.info(f"Re-OCR: lõpetatud {lopetatud} pooleli jäänud katkestamist")
+
+    if revived or lopetatud:
         _persist_active_jobs()  # kirjuta teisendatud staatus kohe tagasi
     thread = threading.Thread(target=_startup_recovery_and_reaper, daemon=True,
                               name="reocr-startup-recovery")
