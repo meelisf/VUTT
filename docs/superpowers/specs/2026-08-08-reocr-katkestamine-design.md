@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-08-08
 **Issue:** #217
-**Staatus:** kinnitatud, ootab plaani
+**Staatus:** kinnitatud (ülevaatuse parandustega), ootab plaani
 
 ## Probleem
 
@@ -26,15 +26,13 @@ katkestust.
 
 `DELETE /admin/reocr/{job_id}` — üks endpoint nii üksik- kui batch-tööle.
 
-**Semantika: tööd ei olnud.** Katkestamine eemaldab lokaalse olekutega, koristab OCR-serveri,
-kustutab **selle töö** `.ocr` vahefailid ja kirjutab `reocr_log.json`-i kirje staatusega
-`cancelled`. Teose tegelikku teksti ei puudutata kunagi — re-OCR kirjutab ainult `.ocr`
-vahefaile, kuni admin need eraldi rakendab.
+**Semantika: tööd ei olnud.** Pärast katkestamist peab seis olema võimalikult lähedal
+seisule enne selle töö käivitamist. Teose tegelikku teksti ei puudutata kunagi — re-OCR
+kirjutab ainult `.ocr` vahefaile, kuni admin need eraldi rakendab.
 
-### Miks osalised tulemused kustutatakse
+### Miks selle töö osalised tulemused kustutatakse
 
-Kaalutud alternatiiv oli osalised `.ocr` failid alles jätta (olemasolev ülevaatuse voog
-oskaks neid juba käsitleda). Lükati tagasi:
+Kaalutud alternatiiv oli osalised `.ocr` failid alles jätta. Lükati tagasi:
 
 OCR jookseb **taustal** — katkestamine ei ole aktiivsest ootamisest pääsemine ega võida
 midagi peale suvalise algusprefiksi valmis lehtedest. Kui soovitakse väiksemat mahtu, tuleb
@@ -42,7 +40,56 @@ kohe vähem lehti OCR-i saata ja hiljem juurde lisada. Poolikute tulemuste alles
 soodustaks „katkestan ja vaatan, mis kätte jäi" mustrit, mis annab juhusliku lehekomplekti
 ilma selge tähenduseta.
 
-Seetõttu: katkestatud töö ei jäta jälge peale logikirje.
+## `.ocr` failide omand — kelle tulemus on kelle
+
+See on disaini kõige libedam koht ja esimene versioon sisaldas siin **andmekao viga**.
+
+Vale eeldus oli: „sama lehe uus töö kirjutas vana `.ocr` niikuinii üle, lisakadu ei teki".
+Vastunäide:
+
+1. lehel 17 on varasemast tööst `17.ocr`, mis on veel rakendamata;
+2. käivitatakse uus batch lehtedele 1–25;
+3. uus töö jõuab valmis teha ainult lehed 1–8;
+4. admin katkestab;
+5. `load_batch_mapping(job_id).pages` annab **plaanitud** lehed 1–25;
+6. kustutamine hävitaks `17.ocr`, mida katkestatud töö EI PUUTUNUD.
+
+Plaanitud lehtede nimekiri ei ole omandi tõend.
+
+### Otsus: tulemuse omand on jälgitav ja ülekirjutamine varundatakse
+
+**1. `produced_pages`** — töö kirje peab loendit lehtedest, mille `.ocr` see töö **päriselt
+kirjutas** (lisatakse siis, kui `_write_ocr_file` õnnestub, mitte tööd käivitades).
+Katkestamine kustutab ainult need.
+
+**2. Ülekirjutamise varundus** — kui `_write_ocr_file` leiab olemasoleva `.ocr` faili, siis
+see nihutatakse enne ülekirjutamist kohta
+
+```
+state/reocr_backups/{job_id}/{stem}.ocr
+```
+
+- katkestamine **taastab** varukoopiad tagasi teose kausta;
+- töö normaalne lõpp (`done`), `apply` või `discard` kustutab varukoopiad;
+- asukoht on `state/`, mitte teose kaust: `data/.gitignore` ignoreerib `*.ocr`, aga
+  `*.ocr.bak.{job_id}` EI vastaks sellele mustrile ja ilmuks `git status`-isse. Varukoopiad
+  on runtime-andmed ja kuuluvad `state/` alla (CLAUDE.md).
+
+Need kaks koos annavad „tööd ei olnud" semantika päriselt: puutumata lehed jäävad
+puutumata, ülekirjutatud lehed saavad oma eelmise sisu tagasi.
+
+### Tulevikusuund (mitte selles projektis)
+
+Arhitektuuriliselt puhtam oleks **töö-põhine tulemuste ala**:
+
+```
+state/reocr/{job_id}/{stem}.ocr     → apply promoveerib lehe tekstiks
+```
+
+Siis oleks katkestamine triviaalne (`rm -rf` töö kaust) ja omandiküsimust ei tekiks üldse.
+Sellest loobuti siin, sest see muudaks ka ülevaatuse voogu: praegu muutuvad lehed
+ülevaadatavaks **saabumise järjekorras** (`ocr_ready` stem'id), promoveerimismudel näitaks
+tulemusi alles töö lõpus. See on omaette projekt, mitte #217 kõrvalsaadus.
 
 ## LOSSi töö peatamine
 
@@ -69,7 +116,7 @@ järelejäänud batch neli ebaõnnestunud `open()` kutset — mikrosekundid, GPU
 Just seetõttu jõudis 2026-08-07 intsidendi töö kiiresti lõpuni, mitte ei jahvatanud 25 lehte
 inferentsi.
 
-**Kõva piir: `BATCH_SIZE = 4`.** `main_loop` teeb `rglob` **üks kord tsükli kohta** ja
+Kõva piir on `BATCH_SIZE = 4`. `main_loop` teeb `rglob` **üks kord tsükli kohta** ja
 itereerib seejärel selle külmutatud nimekirja üle. Kustutamine ei eemalda juba planeeritud
 kirjeid, vaid teeb nad avanematuks. Seega jõuab pärast katkestamist lõpuni **kuni üks
 lennusolev batch ehk 4 lehte** — need pildid olid mällu loetud enne kustutamist. Intsident
@@ -81,8 +128,6 @@ aga nõuaks teist deploy-teed marginaalse võidu eest.
 
 ### Sünkroniseerimismudel — mida VUTT LOSSist teab
 
-Aus kirjeldus, sest see määrab, mida katkestamine lubada saab:
-
 - **VUTT → LOSS** on ühesuunaline ja failipõhine. Katkestamine = piltide eemaldamine;
   valvuri järgmine `rglob` (iga 5 s) ei leia enam midagi.
 - **LOSS → VUTT staatust ei ole.** VUTT tuletab edenemist AINULT `.txt` failide pollimisest.
@@ -93,35 +138,104 @@ Aus kirjeldus, sest see määrab, mida katkestamine lubada saab:
 
 VUTT ei oota katkestamisel LOSSilt kinnitust. Kinnitust ei ole kellelt küsida.
 
+## Olekumasin: `cancelling` on vaheolek
+
+Katkestamine ei ole üks omistamine, vaid **kaheastmeline üleminek**:
+
+```
+uploading | processing | slow  →  cancelling  →  cancelled
+```
+
+`cancelling` ei pea UI-s nähtav olema; ta on olemas selleks, et vastata küsimusele „kes
+võitis".
+
+### Terminalüleminekud on vastastikku välistavad
+
+Ilma selleta on võistlus:
+
+```
+DELETE                              poller
+------                              ------
+kontrollib: processing
+                                    leiab viimase .txt
+                                    kirjutab .ocr
+                                    märgib done
+märgib cancelled
+kustutab .ocr
+```
+
+Nõue: `processing → done` ja `processing → cancelling` on **CAS-üleminekud sama luku all**
+(`_reocr_jobs_lock` / `_reocr_batch_jobs_lock`). Kumbki õnnestub ainult siis, kui olek on
+endiselt see, mida ta eeldas. Kui katkestamine võitis, EI TOHI ükski worker pärast seda
+minna `ready`/`done`/`error` olekusse ega kirjutada uut `.ocr` tulemust.
+
+## Workerite vaigistamine enne koristust
+
+Koostööline lipp üksi EI OLE piisav: lipu seadmine ei tähenda, et worker on lõpetanud.
+`sftp.put()` võib olla parajasti pooleli ja lõpetada kirjutamise pärast kaugkoristust —
+täpselt see olukord, mida see disain vältida tahab.
+
+Kaks workerit vajavad **erinevat** mehhanismi, sest nende elutsükkel on erinev:
+
+| Worker | Kuju | Vaigistamine |
+|---|---|---|
+| Üleslaadimine (`reocr-batch-{job_id}`, `reocr-{job_id}`) | **töö-põhine lõim** | `threading.Event` + endpoint teeb `join(timeout)` enne koristust |
+| Pollimine (`reocr-poll`, `reocr-batch-poll`) | **jagatud singleton-lõim**, üks iteratsioon iga 10 s kõigi tööde üle | EI SAA join'ida — see peataks kõik teised tööd. Selle asemel: `.ocr` kirjutamine ja olekuüleminek toimuvad **luku all koos oleku ülekontrolliga**; kui töö on `cancelling`, visatakse allalaaditud tekst ära |
+
+Poll-lõime osas teeb CAS seega topelttööd: ta ei lahenda ainult „kes võitis", vaid on ka
+ainus viis, kuidas jagatud loop saab olla katkestamise suhtes ohutu.
+
+Protokoll tervikuna:
+
+```
+CAS: aktiivne → cancelling  (persisteeritud)
+        ↓
+üleslaadimislõim näeb Event'i ja väljub  →  join(timeout)
+poll-lõim ei kirjuta enam midagi (CAS blokeerib)
+        ↓
+selle töö jaoks ei ole ühtki kirjutajat — ei lokaalselt ega kaugserveris
+        ↓
+koristus: kaugserver → .ocr (produced_pages) → varukoopiate taastamine
+        ↓
+CAS: cancelling → cancelled, registrist eemaldamine, logikirje
+```
+
+Kui `join` aegub, katkestamine EI JÄTKA kaugkoristusega: logitakse viga ja töö jääb
+`cancelling` olekusse, kust taasteloogika (allpool) selle üles korjab. Parem jätta jääk
+kaugserverisse kui kirjutada kataloogi, kuhu keegi veel kirjutab.
+
+## Krahhikindlus
+
+`cancelling` **persisteeritakse enne koristust** (`reocr_active.json`). Kui protsess sureb
+koristuse ajal, teab stardi-taaste (`_startup_recovery_and_reaper`):
+
+> `cancelling` olekus töö ei ole aktiivne töö. Lõpeta selle koristus best-effort ja kirjuta
+> `cancelled`.
+
+Ilma selleta jääks pooleli katkestatud töö pärast restarti taas aktiivseks — täpselt see
+probleem, mille vastu kogu see feature tehakse. See muudab katkestamise idempotentseks ja
+taastatavaks operatsiooniks.
+
 ## API
 
 `DELETE /admin/reocr/{job_id}`, `require_role("admin")`. Endpoint valib registri job_id järgi
 (`_reocr_jobs` vs `_reocr_batch_jobs`).
 
+**Invariant: job_id nimeruum on nende kahe registri vahel globaalne.** Mõlemad kasutavad
+sama `generate_nanoid()` generaatorit, seega kokkulangevus on teoreetiliselt võimalik. Kui
+sama id esineb mõlemas registris, on see invariandi rikkumine — logi viga ja tagasta 409,
+ära arva.
+
 | Töö staatus | Vastus |
 |---|---|
 | `uploading`, `processing`, `slow` | 200, töö katkestatakse |
+| `cancelling` | 409 — katkestamine juba käib |
 | `done`, `error` | 409 — ei ole aktiivne |
 | tundmatu id | 404 |
 
-### Tegevuste järjekord ja miks just see
-
-1. Märgi töö lokaalselt `cancelled` (koostööline lipp)
-2. Lase üleslaadimislõimel see märgata ja väljuda
-3. Koristada OCR-server (pildid + `.txt`, seejärel `rmdir` work ja staging)
-4. Kustuta selle töö `.ocr` failid. **Lehtede nimekiri tuleb töö enda kirjest**, mitte
-   kausta skaneerimisest: batch'il `reocr_state.load_batch_mapping(job_id)` `pages`, üksiktööl
-   job-kirje `remote_img`/`remote_txt`. Kaustapõhine kustutamine hävitaks teiste tööde
-   ootel tulemused.
-5. Eemalda `reocr_active.json` kirje ja `reocr_state.remove_batch_mapping(job_id)`
-6. Kirjuta `reocr_log.json`-i kirje `cancelled`
-
-Järjekord ei ole vaba: kui koristada enne lõime peatamist, kirjutab pooleliolev
-`for entry in page_entries` tsükkel pildid tagasi kataloogi, mille just eemaldasime.
-
-**Issue's kirjeldatud lahendus ei kata seda punkti** — „märgi töö lõpetatuks → poll lõpetab"
-peatab poll-lõime, aga mitte üleslaadimislõime. Vaja on koostöölist lippu, mida
-üleslaadimistsükkel lehtede vahel kontrollib.
+**Korduv DELETE annab 404**, sest töö on aktiivregistrist eemaldatud. Katkestamine EI OLE
+idempotentne HTTP mõttes; see on teadlik valik, sest idempotentsus nõuaks logi-lookup'i
+väärtuse eest, mida siin ei ole. Ajalugu elab `reocr_log.json`-is.
 
 ### Lokaalne katkestamine ei sõltu kaugserverist
 
@@ -129,24 +243,50 @@ SFTP tõrge logitakse hoiatusena, aga lokaalne katkestamine viiakse **ikka lõpu
 Intsident oli täpselt selline: VUTT rippus, LOSS oli juba edasi läinud. Katkestamine, mis
 nõuab tervet kaugserverit, ebaõnnestub just siis, kui teda vaja on.
 
+**Mida 200 seega tähendab.** `200 cancelled` garanteerib VUTT-i poole katkestamise:
+pollimist ei ole, teose lukk on vaba, tulemust ei rakendata, lokaalne töö on kadunud. Kui
+LOSSi koristus ebaõnnestus, võib kaugserveris töö või failijääk **edasi eksisteerida**.
+Logikirje ütleb selle välja:
+
+```json
+{ "status": "cancelled", "remote_cleanup": "failed" }
+```
+
+Nii on hilisem diagnostika võimalik ilma logi ridu kokku otsimata.
+
 ## Frontend
 
 - Nupp OCR-tööde paneelis (`src/pages/Review.tsx`, `/admin/ocr/jobs` loend) ja teose
   Manage-vaate batch-ribal
 - Kinnitusdialoog, mis ütleb otse, et osalised tulemused visatakse ära
-- `cancelled` staatus vajab kuvamist (Review + Manage) ja i18n võtmeid **mõlemas keeles**
-  korraga (`fallbackLng` on väljas, ADR 0011)
+- i18n võtmed **mõlemas keeles** korraga (`fallbackLng` on väljas, ADR 0011)
+
+**Kust `cancelled` pärast värskendust tuleb.** Andmemudel määrab siin vastuse:
+`cancelled` on **logi tasandi staatus, mitte elava töö oma** — töö on aktiivregistrist
+kadunud.
+
+- **Review** loeb `reocr_log.json`-i ja näitab `cancelled` kirjet ajaloos — püsiv.
+- **Manage batch-riba** põhineb aktiivsel tööl. Pärast katkestamist ei ole aktiivset tööd,
+  seega riba lihtsalt kaob. Kasutaja tagasiside on **transient toast**, mitte püsiv
+  „cancelled" silt.
+
+Nii ei luba UI rohkem, kui andmemudel kannab.
 
 ## Testid
 
 | Test | Mida kaitseb |
 |---|---|
 | Katkestamine eemaldab töö `reocr_active.json`-ist | Teos ei jää 12 h lukku |
-| Selle töö `.ocr` failid kustutatakse | „Tööd ei olnud" semantika |
-| **Teiste teoste `.ocr` failid jäävad puutumata** | Kustutamise ulatus tuleb batch-mapping'ust, mitte kaustast |
-| Üleslaadimislõim peatub partii keskel | Koostööline lipp toimib |
+| Ainult `produced_pages` `.ocr` failid kustutatakse | **Omand** — plaanitud ≠ toodetud |
+| **Varasem `.ocr` sihtlehel säilib, kui katkestatud töö seda ei tootnud** | Ülalkirjeldatud andmekao viga |
+| Ülekirjutatud `.ocr` taastatakse varukoopiast | „Tööd ei olnud" semantika täies ulatuses |
+| Teiste teoste `.ocr` failid jäävad puutumata | Kustutamise ulatus tuleb töö kirjest, mitte kaustast |
+| **Katkestamine samal ajal, kui poller saab viimase tulemuse** | `done`/`cancelled` võistlus — täpselt üks terminalolek võidab |
+| **Poller ei kirjuta `.ocr` pärast `cancelling` algust** | Ghost-tulemus pärast koristust |
+| **Üleslaadimislõim ei kirjuta kaugfaili pärast kaugkoristust** | Koristuse/üleslaadimise võistlus |
+| `cancelling` töö lõpetatakse pärast restarti | Krahhikindlus; teos ei jää lukku |
 | SFTP tõrge → lokaalne katkestamine ikka õnnestub | Intsidendi kuju |
-| `done` → 409 | Ei kustuta valmis töö tulemusi |
+| `done` → 409, tundmatu → 404 | Ei kustuta valmis töö tulemusi |
 | Töö, mille kaugfailid on juba kadunud, on katkestatav | Intsidendi kuju |
 
 ## Riskid
@@ -155,8 +295,9 @@ nõuab tervet kaugserverit, ebaõnnestub just siis, kui teda vaja on.
 |---|---|
 | Kuni 4 lehte jõuab pärast katkestamist lõpuni | Teadlik ja dokumenteeritud; nende `.txt` kaob koos kataloogiga |
 | Katkestamine kustutab kehtiva töö tulemused | Kinnitusdialoog ütleb selle otse välja; `done` tööd ei ole katkestatavad |
-| Kustutamine haarab kaasa varasema re-OCR ootel tulemuse | Sama lehe uus töö kirjutas vana `.ocr` niikuinii üle — lisakadu ei teki |
-| Lennusolev batch kirjutab `.txt` kustutatud kataloogi | Kirjutamine ebaõnnestub LOSSis, VUTT ei polli enam |
+| Kaugkoristus ebaõnnestub → jääk LOSSis | `200` semantika on dokumenteeritud; logis `remote_cleanup: failed` |
+| `join` aegub → koristust ei tehta | Töö jääb `cancelling`, taaste korjab üles; jääk on parem kui võistlus |
+| Varukoopiad kogunevad | Kustutatakse `done`/`apply`/`discard` juures; taaste koristab orvud |
 
 ## Järgnev projekt (eraldi spekk)
 
