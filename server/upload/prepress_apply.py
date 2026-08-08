@@ -24,20 +24,9 @@ def remote_page_name(slug: str, out_index: int) -> str:
     return "{}_pg_{:03d}.jpg".format(slug, out_index)
 
 
-def publish_atomic(sftp, local_path: str, remote_path: str) -> None:
-    """Laeb üles .tmp nimega ja nimetab alles siis ümber.
-
-    OCR-serveri valvuril EI OLE piltide jaoks stabiilsuskontrolli —
-    wait_for_file_stable() kutsutakse seal ainult PDF-ide peale. Pildid
-    korjatakse rglob-iga, filtrina EXTENSIONS = {".jpg", ".jpeg", ...}.
-    Poolik JPG satuks OCR-i; .jpg.tmp jääb filtrist välja.
-
-    Kataloogi tervikuna EI varjata: valvur töötab pildi kaupa, nii et poolik
-    kataloog on konveier, mille me tahame alles jätta.
-    """
-    tmp_remote = remote_path + ".tmp"
-    sftp.put(local_path, tmp_remote)
-    sftp.rename(tmp_remote, remote_path)
+# Aatomiline avaldamine elab ocr_client.py-s — sama teostust kasutab ka re-OCR
+# (#220). Nimi jääb siia re-ekspordina, sest kutsujad ja testid tunnevad seda.
+publish_atomic = ocr_client.publish_atomic
 
 
 def _write_cut(src_img_path: str, x0: int, x1: int, dst: str) -> None:

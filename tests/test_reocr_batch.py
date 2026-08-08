@@ -46,6 +46,9 @@ class _FakeSftp:
     def put(self, local, remote):
         with open(local, "rb") as f:
             self.store[remote] = f.read()
+    def rename(self, src, dst):
+        # Pildid avaldatakse .tmp+rename-ga (#220) — päris SFTPClient oskab seda.
+        self.store[dst] = self.store.pop(src)
     def close(self):
         pass
 

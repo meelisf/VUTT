@@ -149,6 +149,25 @@ def ensure_remote_dirs(sftp, remote_dirs):
             sftp.mkdir(remote_dir)
 
 
+def publish_atomic(sftp, local_path: str, remote_path: str) -> None:
+    """Laeb üles .tmp nimega ja nimetab alles siis ümber.
+
+    OCR-serveri valvuril EI OLE piltide jaoks stabiilsuskontrolli —
+    wait_for_file_stable() kutsutakse seal ainult PDF-ide peale. Pildid
+    korjatakse rglob-iga, filtrina EXTENSIONS = {".jpg", ".jpeg", ...}.
+    Poolik JPG satuks OCR-i; .jpg.tmp jääb filtrist välja.
+
+    Kataloogi tervikuna EI varjata: valvur töötab pildi kaupa, nii et poolik
+    kataloog on konveier, mille me tahame alles jätta.
+
+    Siin, mitte kummagi kutsuja juures: nii prepress (ADR 0017) kui re-OCR
+    (#220) avaldavad OCR-serverisse ja jagavad sama võistlusolukorda.
+    """
+    tmp_remote = remote_path + ".tmp"
+    sftp.put(local_path, tmp_remote)
+    sftp.rename(tmp_remote, remote_path)
+
+
 def close_sftp_and_unlink(sftp, tmp_path: str):
     """Taustalõime finally-puhastus: sulge SFTP seanss ja kustuta ajutine fail."""
     if sftp:

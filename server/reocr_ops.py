@@ -11,6 +11,7 @@ from typing import Dict, List, Optional, Tuple
 from .config import BASE_DIR, OCR_SERVER_PATH, REOCR_LOG_FILE, UPLOAD_ENABLED, get_logger
 from .utils import atomic_write_json, generate_nanoid
 from .upload_ops import _sftp_open, close_ssh
+from .upload.ocr_client import publish_atomic
 from . import reocr_state
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -204,7 +205,8 @@ def start_reocr_batch(work_id: str, slug: str, work_path: str,
                     sftp.mkdir(d)
             for entry in page_entries:
                 src = os.path.join(work_path, entry["page_filename"])
-                sftp.put(src, f"{work_abs}/{entry['remote_img_name']}")
+                # .tmp+rename: valvur ei kontrolli piltide stabiilsust (#220)
+                publish_atomic(sftp, src, f"{work_abs}/{entry['remote_img_name']}")
                 with _reocr_batch_jobs_lock:
                     current = _reocr_batch_jobs.get(job_id)
                     if current and current.get("status") == "uploading":
@@ -642,7 +644,8 @@ def start_reocr_job(work_id: str, slug: str, img_path: str, page_filename: str =
                 except FileNotFoundError:
                     sftp.mkdir(d)
             img_abs = f"{OCR_SERVER_PATH}/{remote_work}/{remote_img_name}"
-            sftp.put(img_path, img_abs)
+            # .tmp+rename: valvur ei kontrolli piltide stabiilsust (#220)
+            publish_atomic(sftp, img_path, img_abs)
             sftp.close()
             with _reocr_jobs_lock:
                 current = _reocr_jobs.get(job_id)
