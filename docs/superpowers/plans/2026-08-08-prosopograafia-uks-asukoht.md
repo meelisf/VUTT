@@ -521,6 +521,25 @@ Sisu on ajaloos commitis 3ea574c9b." -- prosopography && git log --oneline -1'
 
 Expected: uus commit, mis puudutab ainult `prosopography/` teed.
 
+- [ ] **Step 8b: Kahe ümbersuunatud skripti kuivkäivitus elavate andmete peal**
+
+Lokaalselt ei saanud neid lõpuni kontrollida — arendusmasina `data/` ei peegelda
+tootmist (`places.json` puudub). Siin on päris andmed olemas.
+
+```bash
+ssh vutt 'cd ~/VUTT && .venv/bin/python3 scripts/cleanup_place_duplicates.py --dry-run 2>&1 | tail -8'
+```
+
+Expected: loeb `data/config/places.json` ja elavaid kaarte, raporteerib
+duplikaadid, lõpetab „midagi ei kirjutatud" tüüpi teatega.
+
+```bash
+ssh vutt 'cd ~/VUTT && .venv/bin/python3 scripts/mass_enrich_prosopography.py --dry-run --limit 1 2>&1 | tail -8'
+```
+
+Expected: „Prosopograafia kirjeid: 2355" (mitte 0 ja mitte 2243) ja
+`[DRY RUN] Midagi ei kirjutatud.`
+
 - [ ] **Step 9: Vastuvõtukriteerium 3 — täpselt üks juur**
 
 ```bash
