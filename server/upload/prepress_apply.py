@@ -80,7 +80,12 @@ def _transfer_pages(upload_id: str, slug: str, remote_dirs: tuple,
                 continue
 
             full = os.path.join(work_dir, "full.jpg")
-            source.render_full(n, full)
+            # Semafor LEHE kaupa, mitte partii ümber (#219): kaitse eesmärk on
+            # üks rasteriseerimine korraga. Partii ümber hoituna seisaks teise
+            # uploadi eelvaade terve 300 DPI läbikäigu taga (minuteid). Lõikamine
+            # ja SFTP jäävad välja — võrguootel ei ole CPU-semaforis kohta.
+            with prepress.RENDER_SEMAPHORE:
+                source.render_full(n, full)
             try:
                 from PIL import Image
                 with Image.open(full) as im:
@@ -124,10 +129,9 @@ def apply_and_transfer(upload_id: str) -> None:
     plan = state.get("prepress")
 
     try:
-        with prepress.RENDER_SEMAPHORE:
-            sent = _transfer_pages(
-                upload_id, slug, (remote_staging, remote_work), remote_work, plan
-            )
+        sent = _transfer_pages(
+            upload_id, slug, (remote_staging, remote_work), remote_work, plan
+        )
         upload_state.set_upload_state(
             upload_id, status="processing", expected_pages=sent
         )

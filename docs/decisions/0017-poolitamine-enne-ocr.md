@@ -103,6 +103,24 @@ renderdatud lehe enda pikslitest, nagu varemgi.
 kasutaja ei esitanud. Enne mehhanismi ehitamist tuleb kontrollida, kas ta
 muudab mõnda otsust.
 
+## Revisjon 2026-08-08: RENDER_SEMAPHORE võetakse lehe kaupa (#219)
+
+Semafor võeti algselt **partii ümber** — `_render_previews` hoidis seda kogu
+eelvaate tsükli, `apply_and_transfer` kogu `_transfer_pages` vältel. Kood
+töötas, aga iga teine töö seisis terve partii taga: teise uploadi eelvaade
+ootas esimese 300 DPI läbikäigu ja SFTP taga, ehk minuteid.
+
+Semafor on nüüd ühe lehe renderduse ümber (`render_preview` / `render_full`).
+Lõikamine ja SFTP jäid välja — võrguootel ei ole CPU-semaforis kohta.
+
+Teadlik kompromiss: kaks partiid **põimuvad**, nii et kumbki ei lõpe nii
+kiiresti kui üksi joostes. See on soovitud käitumine — semafori eesmärk oli
+CPU kaitse (üks rasteriseerimine korraga), mitte partiide järjestamine. Iga
+üksik `pdftoppm` jääb endiselt serialiseerituks ja `nice(10)` on alles.
+`preview_done` / `applied_done` on upload'i-põhised, seega jäävad põimumise
+korral monotoonseks. Kaetud regressioonitestidega
+(`test_prepress_preview.py`, `test_prepress_apply.py::test_semafor_vabaneb_lehtede_vahel`).
+
 ## Revisjon 2026-08-08: tindiskoor eemaldatud
 
 Algne invariant „automaatika on hoiataja, mitte pakkuja" eeldas, et tindiskoor
@@ -148,7 +166,4 @@ lokaalne miinimum või maksimum), mitte fikseeritud protsentiili vastu.
 
 `reocr_ops.start_reocr_batch` kirjutab OCR-serverisse otse sihtnimega, ilma
 `.tmp`+rename-ta, ja jagab sedasama võistlusolukorda. Eraldi issue.
-
-**`RENDER_SEMAPHORE` hoitakse terve partii vältel** (`_render_previews` ja
-`apply_and_transfer`), mitte lehe kaupa. Vt issue #219.
 

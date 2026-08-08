@@ -164,3 +164,53 @@ def test_loob_koik_vanemkaustad_enne_saatmist(upload, monkeypatch):
     assert "/o/AUTO-OCR/hand/u1/s" in sftp.dirs
     assert len(sftp.renames) == 6
 
+
+# --- semafori ulatus (#219) ---
+
+def _vaba() -> bool:
+    """Kas RENDER_SEMAPHORE on HETKEL vaba? Ei jäta seda kinni hoidma."""
+    from server.upload import prepress
+
+    if prepress.RENDER_SEMAPHORE.acquire(blocking=False):
+        prepress.RENDER_SEMAPHORE.release()
+        return True
+    return False
+
+
+def test_semafor_vabaneb_lehtede_vahel(upload, monkeypatch):
+    """REGRESSIOON (#219): semafor võeti varem terve partii ümber, mistõttu
+    teise uploadi eelvaade seisis minuteid esimese 300 DPI läbikäigu taga.
+
+    Kaitse eesmärk on üks rasteriseerimine korraga — renderduse AJAL kinni,
+    lehtede VAHEL vaba."""
+    uid, _base = upload
+    sftp = FakeSftp(existing=["/remote"])
+    monkeypatch.setattr(prepress_apply.ocr_client, "sftp_open", lambda i: sftp)
+
+    renderdamise_ajal = []
+    saatmise_ajal = []
+
+    orig_render = prepress_apply.page_source.ImageDirPageSource.render_full
+
+    def spy_render(self, n, dst):
+        renderdamise_ajal.append(_vaba())
+        return orig_render(self, n, dst)
+
+    orig_publish = prepress_apply.publish_atomic
+
+    def spy_publish(sftp_, local, remote):
+        saatmise_ajal.append(_vaba())
+        return orig_publish(sftp_, local, remote)
+
+    monkeypatch.setattr(
+        prepress_apply.page_source.ImageDirPageSource, "render_full", spy_render
+    )
+    monkeypatch.setattr(prepress_apply, "publish_atomic", spy_publish)
+
+    prepress_apply._transfer_pages(
+        uid, "s", ("/remote", "/remote/w"), "/remote/w", _plan(enabled=True)
+    )
+
+    assert renderdamise_ajal == [False, False, False], "renderduse ajal peab kinni olema"
+    assert saatmise_ajal and all(saatmise_ajal), "SFTP ootel ei tohi semafori hoida"
+    assert _vaba(), "semafor peab pärast partiid vaba olema"

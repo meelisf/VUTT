@@ -52,39 +52,43 @@ def _render_previews(upload_id: str) -> None:
         )
         return
 
-    with RENDER_SEMAPHORE:
-        try:
-            source = page_source.open_page_source(src_path)
-            count = source.page_count()
-            os.makedirs(preview_dir(upload_id), exist_ok=True)
+    try:
+        source = page_source.open_page_source(src_path)
+        count = source.page_count()
+        os.makedirs(preview_dir(upload_id), exist_ok=True)
 
-            upload_state.mutate_prepress(
-                upload_id,
-                lambda p: p.update(preview_status="rendering", preview_done=0),
-            )
+        upload_state.mutate_prepress(
+            upload_id,
+            lambda p: p.update(preview_status="rendering", preview_done=0),
+        )
 
-            for n in range(1, count + 1):
-                dst = preview_path(upload_id, n)
-                if not os.path.isfile(dst):
+        for n in range(1, count + 1):
+            dst = preview_path(upload_id, n)
+            if not os.path.isfile(dst):
+                # Semafor LEHE kaupa, mitte partii ümber (#219). Eesmärk on
+                # CPU-kaitse — üks rasteriseerimine korraga —, mitte partiide
+                # järjestamine. Partii ümber hoituna seisaks teise uploadi
+                # eelvaade minuteid esimese 300 DPI läbikäigu taga.
+                with RENDER_SEMAPHORE:
                     source.render_preview(n, dst)
 
-                def _bump(plan, n=n):
-                    plan["preview_done"] = n
+            def _bump(plan, n=n):
+                plan["preview_done"] = n
 
-                upload_state.mutate_prepress(upload_id, _bump)
+            upload_state.mutate_prepress(upload_id, _bump)
 
-            upload_state.mutate_prepress(
-                upload_id, lambda p: p.update(preview_status="ready")
-            )
-            upload_state.set_upload_state(upload_id, status="awaiting_split")
-            logger.info("Prepress eelvaade valmis: {} ({} lk)".format(upload_id, count))
+        upload_state.mutate_prepress(
+            upload_id, lambda p: p.update(preview_status="ready")
+        )
+        upload_state.set_upload_state(upload_id, status="awaiting_split")
+        logger.info("Prepress eelvaade valmis: {} ({} lk)".format(upload_id, count))
 
-        except Exception as e:
-            logger.error("Prepress eelvaade {}: {}".format(upload_id, e))
-            upload_state.mutate_prepress(
-                upload_id, lambda p: p.update(preview_status="error")
-            )
-            upload_state.set_upload_state(upload_id, status="awaiting_split")
+    except Exception as e:
+        logger.error("Prepress eelvaade {}: {}".format(upload_id, e))
+        upload_state.mutate_prepress(
+            upload_id, lambda p: p.update(preview_status="error")
+        )
+        upload_state.set_upload_state(upload_id, status="awaiting_split")
 
 
 def start_preview(upload_id: str) -> None:
