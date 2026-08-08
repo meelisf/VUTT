@@ -123,7 +123,7 @@ Faili serverist alla tõmbamiseks: `scp vutt:~/VUTT/data/config/collections.json
 | `meili_doc.py` | Puhas `_metadata.json` → Meili-dokument kaardistus (side-effect-vaba) |
 | `meilisearch_ops.py` | Meili sünk, ThreadPoolExecutor, keep-warm |
 | `git_ops.py`, `auth.py`, `cache.py`, `rate_limit.py` | Versioonihaldus, autentimine, cache (TTL 5 min), rate-limit |
-| `upload/`, `upload_ops.py` | Upload-viisard + OCR-serveri integratsioon |
+| `upload/`, `upload_ops.py` | Upload-viisard + OCR-serveri integratsioon; poolitamine enne OCR-i elab `upload/prepress*.py` + `page_source.py` + `store_source.py` moodulites |
 | `marginalia_normalize.py` | `normalize_marginalia_tags()` — kutsutakse KÕIGIS kirjutusteedes |
 
 **Python 3.9 ühilduvus:** `Optional[dict]`, mitte `dict | None`.
@@ -203,6 +203,21 @@ allow-list (`p, strong, em, del, a, ul, ol, li, h1-h3, blockquote, code, br`), `
 blokeerib `javascript:`. GFM on sees AINULT autolinkimiseks. See on eraldi süsteem
 transkriptsiooni XML-märgendusest.
 
+**Poolitamine enne OCR-i (ADR 0017)** — prepress on tervikuna **opt-in**:
+puutumata lülitiga upload ei renderda ühtki pikslit ja käib tänast PDF-teed.
+`FULL_DPI`/`JPEG_QUALITY` (`server/upload/page_source.py`) PEAVAD kattuma
+OCR-serveri `PDF_DPI = 300` / `quality=95` väärtustega. OCR-serverisse
+avaldatakse **failipõhise `.tmp`+rename-ga** — valvuril pole piltidele
+stabiilsuskontrolli. `prepress` alamvälju muudetakse AINULT `mutate_prepress`
+kaudu (`set_upload_state(**extra)` seab terve ülemise taseme võtme ja pühiks
+paralleelse muudatuse). `apply` on ühekordne (`awaiting_split → applying` CAS,
+kordus = 409). Tindiskoor on hoiataja, mitte pakkuja.
+
+**z-index kihid** — `Header` on `sticky z-[1200]`. Täisekraani-modaal PEAB olema **`z-[1300]`**
+(nagu `PageImageEditorModal`), muidu katab päis modaali ülemise serva ja sulgemisnupp kaob
+väikesel ekraanil ära. Tegevusribad (`PageActionBar`, `DashboardBulkActionBar`) on `z-[1100]`
+ehk teadlikult päise all. `z-50` EI OLE piisav.
+
 **Frontend, muu** — number-sisenditel `type="text" + inputMode="numeric"` (mitte `type="number"`,
 tühjendamine katki). Salvestamata muudatuste jaoks on ÜKS dialoog (`UnsavedChangesDialog` +
 `useUnsavedChangesGuard`) — ära lisa uut confirm-varianti. Kerib AKEN, mitte konteiner (v.a
@@ -239,9 +254,12 @@ Login: kahekihiline rate-limit (nginx 1r/s + app 5/60s) + konto-lockout.
 (alati taastatav). Sama kehtib prosopograafia kaartidele (`save_with_git`). Admin taastab
 Workspace'i „Ajalugu" tabist. **Kommentaaride taaste = ÜKS git-commit** (`onCommentsRestored`).
 
-**Upload (admin, `/upload`)** — kolmeastmeline viisard: metaandmed → fail → ülevaatus.
-Failitüüp tuvastatakse magic byte'idest (mitte laiendist). PDF → `pdfinfo` → SFTP → OCR-server
-lõhub lehekülgedeks; JPG/PNG → SFTP otse. Import: SFTP alla → `_metadata.json` + lehe-JSON-id →
+**Upload (admin, `/upload`)** — neljaastmeline viisard: metaandmed → fail → **poolitamine**
+→ ülevaatus. Failitüüp tuvastatakse magic byte'idest (mitte laiendist). Fail salvestatakse
+esmalt VUTT-i poolele (`uploads/{id}/source.pdf` või `source/`) ja läheb OCR-serverisse alles
+sammu 3 otsuse järel: triviaalne plaan → originaal-PDF staging'usse (OCR-server lõhub ise
+lehekülgedeks), poolitustega plaan → 300 DPI JPG-d otse work-kausta. Import: SFTP alla →
+`_metadata.json` + lehe-JSON-id →
 git commit → **sünkroonne** Meili sünk → navigeerimine teosele. Staging `uploads/{upload_id}/`
 säilib üle seansi. Kausta nimi = `{slug}-{work_id}`.
 

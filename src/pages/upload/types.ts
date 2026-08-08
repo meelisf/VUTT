@@ -66,3 +66,31 @@ export interface UploadImportResponse {
   warning?: string;
   git_committed?: boolean;
 }
+
+export type PrepressMode = 'default' | 'custom' | 'nosplit';
+export type PreviewStatus = 'idle' | 'rendering' | 'ready' | 'error';
+
+export interface PrepressPage {
+  n: number;
+  mode: PrepressMode;
+  split_x: number | null;
+  excluded: boolean;
+}
+
+export interface PrepressPlan {
+  enabled: boolean;
+  default_split_x: number;
+  preview_status: PreviewStatus;
+  preview_done: number;
+  pages: PrepressPage[];
+  page_count: number;
+  output_page_count: number;
+  trivial: boolean;
+  status: string;
+}
+
+export interface PrepressSaveResult {
+  status: string;
+  output_page_count: number;
+  trivial: boolean;
+}

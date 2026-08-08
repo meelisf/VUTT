@@ -23,6 +23,7 @@ import StepIndicator from './components/StepIndicator';
 import UploadStepMeta from './components/UploadStepMeta';
 import UploadStepTransfer from './components/UploadStepTransfer';
 import UploadStepReview from './components/UploadStepReview';
+import UploadStepSplit from './components/UploadStepSplit';
 import { TYPE_HAND, TYPE_PRINT } from './constants';
 import { useUploadWizard } from './useUploadWizard';
 import { useUser } from '../../contexts/UserContext';
@@ -57,9 +58,10 @@ const UploadPage: React.FC = () => {
     return nameA.localeCompare(nameB, lang);
   });
 
-  const stepLabels: [string, string, string] = [
+  const stepLabels: [string, string, string, string] = [
     t('steps.metadata'),
     t('steps.upload'),
+    t('steps.split'),
     t('steps.review'),
   ];
 
@@ -89,7 +91,10 @@ const UploadPage: React.FC = () => {
                 <h2 className="font-semibold text-gray-800 mb-3 text-sm">{t('pending.title')}</h2>
                 <div className="space-y-2">
                   {wizard.pendingUploads.map((u) => {
-                    const canResume = ['pending', 'uploading', 'processing', 'reviewing', 'done'].includes(u.status);
+                    const canResume = [
+                      'pending', 'uploading', 'awaiting_split', 'prepping', 'applying',
+                      'processing', 'reviewing', 'done',
+                    ].includes(u.status);
                     const isError = u.status === 'error';
                     const isImported = u.status === 'imported';
                     return (
@@ -226,9 +231,20 @@ const UploadPage: React.FC = () => {
         )}
 
         {/* ------------------------------------------------------------------ */}
-        {/* SAMM 3: Ülevaatus                                                   */}
+        {/* SAMM 3: Topeltlehtede poolitamine (opt-in)                          */}
         {/* ------------------------------------------------------------------ */}
-        {wizard.step === 3 && (
+        {wizard.step === 3 && wizard.uploadId && (
+          <UploadStepSplit
+            uploadId={wizard.uploadId}
+            token={authToken}
+            onDone={wizard.handlePrepressApplied}
+          />
+        )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* SAMM 4: Ülevaatus                                                   */}
+        {/* ------------------------------------------------------------------ */}
+        {wizard.step === 4 && (
           <UploadStepReview
             status={wizard.status}
             pollResult={wizard.pollResult}
@@ -245,6 +261,7 @@ const UploadPage: React.FC = () => {
             replaceWorkTitle={wizard.replaceWorkTitle}
             fileUploading={wizard.fileUploading}
             ocrTimedOut={wizard.ocrTimedOut}
+            onBackToSplit={() => wizard.setStep(3)}
             estimatedTime={wizard.estimatedTime}
             importError={wizard.importError}
             canImport={wizard.canImport}

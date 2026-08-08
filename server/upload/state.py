@@ -143,3 +143,71 @@ def list_upload_states() -> list:
 
     result.sort(key=lambda s: s.get("created_at", ""), reverse=True)
     return result
+
+
+# Staatused, mille korral OCR-serveri SFTP-pollimist ei ole vaja: fail on
+# VUTT-i poolel ja OCR pole veel alanud.
+PREPRESS_IDLE_STATUSES = ("awaiting_split", "prepping", "applying")
+
+
+def init_prepress(upload_id: str, page_count: int) -> Optional[dict]:
+    """Loob prepress-plaani, kui seda veel pole. Idempotentne: olemasolevat
+    plaani EI lähtestata (admin võib olla juba jõudnud jooni seada)."""
+    from . import prepress_plan
+
+    lock = get_upload_lock(upload_id)
+    with lock:
+        s = read_state(upload_id)
+        if not s:
+            return None
+        if s.get("prepress") is None:
+            s["prepress"] = prepress_plan.default_plan(page_count)
+            write_state(upload_id, s)
+        return s["prepress"]
+
+
+def mutate_prepress(upload_id: str, fn) -> Optional[dict]:
+    """AINUS lubatud viis prepress-alamvälju muuta.
+
+    fn saab praeguse prepress-dikti ja muudab seda KOHAPEAL; lugemine,
+    muutmine ja kirjutamine käivad sama luku sees.
+
+    Miks mitte set_upload_state(prepress=...): see seab terve ülemise taseme
+    võtme. Kui eelvaate lõim kirjutaks eelarvutatud prepress-dikti tervikuna,
+    pühiks see admini äsja salvestatud custom joone maha (lost update).
+    """
+    lock = get_upload_lock(upload_id)
+    with lock:
+        s = read_state(upload_id)
+        if not s:
+            return None
+        prepress = s.get("prepress")
+        if prepress is None:
+            return None
+        fn(prepress)
+        s["prepress"] = prepress
+        write_state(upload_id, s)
+        return prepress
+
+
+# Staatused, millest tohib alustada (uut) edastust OCR-serverisse.
+# "error" on kaasas tahtlikult: lähtefail on endiselt VUTT-i poolel (koristus
+# käib alles impordil), seega ebaõnnestunud partiid peab saama uuesti proovida.
+# Ilma selleta jääks upload igaveseks error-olekusse lukku.
+APPLY_START_STATUSES = ("awaiting_split", "error")
+
+
+def try_begin_applying(upload_id: str) -> bool:
+    """CAS: awaiting_split | error → applying. False, kui töö juba käib.
+
+    Tagab, et topeltklikk, retry või brauseri refresh ei käivita teist
+    paralleelset 300 DPI renderdust ega SFTP-d.
+    """
+    lock = get_upload_lock(upload_id)
+    with lock:
+        s = read_state(upload_id)
+        if not s or s.get("status") not in APPLY_START_STATUSES:
+            return False
+        s["status"] = "applying"
+        write_state(upload_id, s)
+        return True

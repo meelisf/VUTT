@@ -70,6 +70,7 @@ interface UploadStepReviewProps {
   replaceWorkTitle: string | null;
   fileUploading: boolean;
   ocrTimedOut: boolean;
+  onBackToSplit?: () => void;
   estimatedTime: string;
   importError: string;
   canImport: boolean;
@@ -95,6 +96,7 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
   replaceWorkTitle,
   fileUploading,
   ocrTimedOut,
+  onBackToSplit,
   estimatedTime,
   importError,
   canImport,
@@ -107,7 +109,12 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
     <div className="flex items-center justify-between mb-5">
       <h2 className="text-lg font-semibold text-gray-900">{t('step3.title')}</h2>
       <div className="flex items-center gap-2 text-sm">
-        {status === 'done' ? (
+        {status === 'error' ? (
+          <span className="flex items-center gap-1 text-red-600 font-medium">
+            <AlertTriangle size={16} />
+            {t('status.error')}
+          </span>
+        ) : status === 'done' ? (
           <span className="flex items-center gap-1 text-green-600 font-medium">
             <CheckCircle size={16} />
             {t('step3.done')}
@@ -174,12 +181,38 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
       </div>
     )}
 
+    {/* Edastuse viga: EI tohi näidata "töötleb" spinnerit, kui midagi ei tööta */}
+    {status === 'error' && (
+      <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <div className="flex items-start gap-2">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">{t('step3.transferFailed')}</p>
+            {pollResult?.error && (
+              <p className="mt-1 font-mono text-xs text-red-700">{pollResult.error}</p>
+            )}
+            {onBackToSplit && (
+              <button
+                type="button"
+                onClick={onBackToSplit}
+                className="mt-2 rounded border border-red-300 bg-white px-3 py-1 text-sm font-medium text-red-700 hover:bg-red-100"
+              >
+                {t('step3.backToSplit')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* Pisipiltide ruudustik */}
     {filesWithLocalDeleted.length === 0 ? (
+      status === 'error' ? null : (
       <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
         <Loader2 size={20} className="animate-spin mr-2" />
         <span>{t('step2.processing')}</span>
       </div>
+      )
     ) : (
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 mb-6">
         {filesWithLocalDeleted.map((entry) =>

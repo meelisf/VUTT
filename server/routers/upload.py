@@ -2,11 +2,13 @@ import asyncio
 import os
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from ..config import UPLOAD_ENABLED, UPLOADS_DIR, get_logger
 from ..deps import get_json_data, require_role
+from ..upload import prepress, prepress_apply, prepress_plan, store_source
+from ..upload import state as upload_state
 from ..upload_ops import (
     add_image_page,
     cancel_upload,
@@ -64,6 +66,143 @@ async def admin_upload_thumb(upload_id: str, page_num: int, user=Depends(require
     if not os.path.isfile(path):
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/jpeg")
+
+
+# =========================================================
+# PREPRESS — poolitamine enne OCR-i (kõik /admin/ all)
+# =========================================================
+
+def _load_prepress(upload_id: str) -> tuple:
+    """Ühine eeltöö: valideeri upload_id, loe state ja plaan."""
+    if not _valid_upload_id(upload_id):
+        raise HTTPException(status_code=400, detail="Vigane upload_id")
+    state = upload_state.read_state(upload_id)
+    if not state:
+        raise HTTPException(status_code=404, detail="Uploadi ei leitud")
+    return state, state.get("prepress")
+
+
+def _validate_split_x(value) -> float:
+    try:
+        x = float(value)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Vigane x")
+    if not (0.0 < x < 1.0):
+        raise HTTPException(status_code=400, detail="x peab olema vahemikus (0, 1)")
+    return x
+
+
+@router.get("/admin/upload/{upload_id}/prepress")
+def admin_prepress_get(upload_id: str, user=Depends(require_role("admin"))):
+    """Plaan + eelvaate edenemine. Sync def — loeb ainult ketast."""
+    state, plan = _load_prepress(upload_id)
+    page_count = len((plan or {}).get("pages", []))
+    result = dict(plan or prepress_plan.default_plan(0))
+    result["page_count"] = page_count
+    result["output_page_count"] = prepress_plan.output_page_count(plan, page_count)
+    result["trivial"] = prepress_plan.is_trivial_plan(plan)
+    result["status"] = state.get("status")
+    return result
+
+
+@router.post("/admin/upload/{upload_id}/prepress/start")
+def admin_prepress_start(upload_id: str, user=Depends(require_role("admin"))):
+    """Lülitab prepressi sisse ja käivitab 100 DPI eelvaate.
+
+    Kuni seda ei kutsuta, EI renderdata ühtki pikslit — kogu prepress on opt-in.
+    """
+    state, plan = _load_prepress(upload_id)
+    if state.get("status") not in ("awaiting_split", "prepping"):
+        raise HTTPException(status_code=409, detail="Upload ei ole poolitamise ootel")
+    upload_state.mutate_prepress(upload_id, lambda p: p.update(enabled=True))
+    prepress.start_preview(upload_id)
+    return {"status": "started"}
+
+
+@router.get("/admin/upload/{upload_id}/preview/{page_num}")
+def admin_prepress_preview(upload_id: str, page_num: int,
+                           user=Depends(require_role("admin"))):
+    """100 DPI kontaktlehe pisipilt."""
+    _load_prepress(upload_id)
+    path = prepress.preview_path(upload_id, page_num)
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.post("/admin/upload/{upload_id}/prepress")
+async def admin_prepress_save(upload_id: str, request: Request,
+                              user=Depends(require_role("admin"))):
+    """Salvestab plaani. Kirjutab AINULT plaani välju (mutate_prepress)."""
+    data = await get_json_data(request)
+    _load_prepress(upload_id)
+
+    default_x = _validate_split_x(data.get("default_split_x", 0.5))
+    incoming = data.get("pages") or []
+    if not isinstance(incoming, list):
+        raise HTTPException(status_code=400, detail="pages peab olema list")
+
+    clean = {}
+    for entry in incoming:
+        if not isinstance(entry, dict):
+            raise HTTPException(status_code=400, detail="Vigane lehekirje")
+        mode = entry.get("mode", "default")
+        if mode not in ("default", "custom", "nosplit"):
+            raise HTTPException(status_code=400, detail="Vigane mode: {}".format(mode))
+        split_x = entry.get("split_x")
+        if mode == "custom":
+            split_x = _validate_split_x(split_x)
+        clean[entry.get("n")] = {
+            "mode": mode,
+            "split_x": split_x if mode == "custom" else None,
+            "excluded": bool(entry.get("excluded")),
+        }
+
+    enabled = bool(data.get("enabled"))
+
+    def _apply(plan):
+        plan["enabled"] = enabled
+        plan["default_split_x"] = default_x
+        for page in plan.get("pages", []):
+            update = clean.get(page.get("n"))
+            if update:
+                page.update(update)
+
+    plan = await run_in_threadpool(upload_state.mutate_prepress, upload_id, _apply)
+    if plan is None:
+        raise HTTPException(status_code=404, detail="Plaani ei leitud")
+    page_count = len(plan.get("pages", []))
+    return {
+        "status": "saved",
+        "output_page_count": prepress_plan.output_page_count(plan, page_count),
+        "trivial": prepress_plan.is_trivial_plan(plan),
+    }
+
+
+@router.post("/admin/upload/{upload_id}/prepress/apply")
+def admin_prepress_apply(upload_id: str, user=Depends(require_role("admin"))):
+    """Lõpetab sammu 3. Valib teekonna plaani järgi.
+
+    Sync def — try_begin_applying on blokeeriv faililukk (ADR 0002).
+    """
+    state, plan = _load_prepress(upload_id)
+
+    if prepress_plan.is_trivial_plan(plan):
+        # Tänane tee: originaalfail muutmata OCR-serverisse.
+        if not upload_state.try_begin_applying(upload_id):
+            return JSONResponse(
+                status_code=409,
+                content={"detail": "Töö juba käib", "status": state.get("status")},
+            )
+        store_source.transfer_stored_source(upload_id)
+        return {"status": "transferring", "path": "original"}
+
+    if not prepress_apply.start_apply(upload_id):
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Töö juba käib", "status": state.get("status")},
+        )
+    return {"status": "applying", "path": "split"}
 
 
 @router.post("/admin/upload/{upload_id}/files")

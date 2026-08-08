@@ -285,6 +285,14 @@ def import_as_work(
             s['work_id'] = work_id
             write_state_func(upload_id, s)
 
+    # Prepress-artefaktid ei ole enam vajalikud — preview/ ja eriti strips/
+    # koguneksid muidu uploads/ alla märkamatult.
+    try:
+        from .prepress import cleanup_prepress_artifacts
+        cleanup_prepress_artifacts(upload_id)
+    except Exception as e:
+        logger.warning(f"Prepress-artefaktide koristus ebaõnnestus {upload_id}: {e}")
+
     # Koristame OCR serveri (mitte kriitiline)
     remote_staging = f"{ocr_server_path}/{state['remote_staging_path']}"
     if ssh_rm_rf_func is not None:
