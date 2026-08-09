@@ -185,9 +185,14 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         const rawTags: string[] = isAnnotationBrowse ? ((hit as any)[tagsField] || hit.page_tags || []) : [];
         const showRawTags = isAnnotationBrowse && !hasHighlightedTags && rawTags.length > 0;
         const showRawComments = isAnnotationBrowse && (!highlightedComments || highlightedComments.length === 0);
-        // Annotatsiooniplokk ka vaikeulatuses, kui vaste TULI annotatsioonist — muidu
-        // näitab kaart lehekülje põhiteksti katkendit, kus vastet ei olegi.
-        const hasHighlightedAnnotations = ((hit._formatted as any)?.text_annotations_text || '').includes('<em');
+        // Annotatsioonid käituvad nagu kommentaarid: Meili tõstab `text_annotations[].comment`
+        // esile ka ilma seda otsitavaks tegemata, nii et iga plokk saab oma märgistuse.
+        // Annotatsiooni-ulatuses näidatakse kõiki lehe annotatsioone (nagu varem);
+        // mujal ainult siis, kui vaste TULI annotatsioonist — muidu näitaks kaart
+        // lehekülje põhiteksti katkendit, kus vastet ei olegi.
+        const highlightedAnnotations = (hit._formatted as any)?.text_annotations
+            ?.filter((ann: any) => (ann.comment || '').includes('<em'));
+        const hasHighlightedAnnotations = (highlightedAnnotations?.length ?? 0) > 0;
         const showTextAnnotations = (scopeParam === 'annotation' || hasHighlightedAnnotations)
             && (hit.text_annotations?.length ?? 0) > 0;
 
@@ -260,13 +265,16 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                         )}
                         {showTextAnnotations && (
                             <div className="space-y-2 mt-2">
-                                {hit.text_annotations!.map((ann, idx) => (
+                                {(hasHighlightedAnnotations ? highlightedAnnotations : hit.text_annotations!).map((ann: any, idx: number) => (
                                     <div key={idx} className="bg-amber-50 border border-amber-200 rounded p-2 text-xs text-gray-800">
                                         <div className="flex items-center gap-1 mb-1 font-bold text-amber-800">
                                             <SquarePen size={12} />
                                             <span>{t('results.textAnnotation', { author: ann.author })}</span>
                                         </div>
-                                        <div>{ann.comment}</div>
+                                        {hasHighlightedAnnotations
+                                            ? <SafeHtml kind="highlight" html={ann.comment} />
+                                            : <div>{ann.comment}</div>
+                                        }
                                     </div>
                                 ))}
                             </div>
