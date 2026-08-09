@@ -253,6 +253,59 @@ def test_unknown_work_returns_fallback(patch_find):
     assert "<html>" in html
 
 
+def _description_of(html: str) -> str:
+    import re
+    m = re.search(r'<meta name="description" content="([^"]*)"', html)
+    assert m, "description-meta puudub"
+    return m.group(1)
+
+
+def test_description_has_creators_year_place_and_publisher(patch_find):
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    registry["work001"] = _write_meta(tmp_path, FULL_META)
+    assert _description_of(build_meta_html("work001")) == (
+        "Johannes Gezelius, Petrus Schomerus. 1654. Tartu: Johannes Vogel"
+    )
+
+
+def test_description_without_creators_uses_year_and_place(patch_find):
+    """Anonüümne allikas (nt kirikuraamat) ei tohi saada üldist saidikirjeldust."""
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    meta = {
+        **FULL_META,
+        "id": "work010",
+        "creators": [],
+        "publisher": None,
+        "year": 1692,
+    }
+    registry["work010"] = _write_meta(tmp_path, meta)
+    assert _description_of(build_meta_html("work010")) == "1692. Tartu"
+
+
+def test_description_omits_missing_place_and_publisher(patch_find):
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    registry["work002"] = _write_meta(tmp_path, MANUSCRIPT_META)
+    assert _description_of(build_meta_html("work002")) == "Adam Lode. 1680"
+
+
+def test_description_falls_back_when_no_metadata(patch_find):
+    from server.metadata_handler import build_meta_html
+    registry, tmp_path = patch_find
+    meta = {
+        "id": "work011",
+        "title": "Tundmatu teos",
+        "creators": [],
+        "year": None,
+        "location": None,
+        "publisher": None,
+    }
+    registry["work011"] = _write_meta(tmp_path, meta)
+    assert "Tartu Ülikooli varauusaegseid" in _description_of(build_meta_html("work011"))
+
+
 def test_work_id_escaped_in_urls(patch_find):
     from server.metadata_handler import build_meta_html
     # work_id tundmatu — fallback haru
