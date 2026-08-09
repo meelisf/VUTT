@@ -636,7 +636,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
         facets: ['originaal_kataloog', 'work_id'],
         attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
         // Ei kasuta croppi - näitame kogu teksti
-        attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text'],
+        attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
         highlightPreTag: HIGHLIGHT_PRE_TAG,
         highlightPostTag: HIGHLIGHT_POST_TAG,
         attributesToSearchOn: attributesToSearchOn,
@@ -742,7 +742,7 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
           attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'tags_object', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators', 'collections', 'collections_hierarchy'],
           attributesToCrop: ['lehekylje_tekst', 'comments.text'],
           cropLength: 35,
-          attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text'],
+          attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
           highlightPreTag: HIGHLIGHT_PRE_TAG,
           highlightPostTag: HIGHLIGHT_POST_TAG,
           attributesToSearchOn: attributesToSearchOn
@@ -834,7 +834,7 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
       attributesToRetrieve: ['id', 'work_id', 'lehekylje_number', 'lehekylje_tekst', 'marginaalia_tekst', 'text_content', 'title', 'year', 'year_display', 'originaal_kataloog', 'lehekylje_pilt', 'tags', 'page_tags', 'page_tags_object', tagsField, 'comments', 'text_annotations', 'genre', 'genre_object', 'type', 'type_object', 'creators'],
       attributesToCrop: ['lehekylje_tekst', 'comments.text'],
       cropLength: 35,
-      attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text'],
+      attributesToHighlight: ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text', 'text_annotations'],
       highlightPreTag: HIGHLIGHT_PRE_TAG,
       highlightPostTag: HIGHLIGHT_POST_TAG,
       sort: ['lehekylje_number:asc'],

@@ -70,6 +70,14 @@ describe('annotatsiooni-vaste on kaardi jaoks tuvastatav', () => {
     expect(highlightedFields()).toContain('text_annotations_text');
   });
 
+  it('annotatsioonid on esiletõstetavad plokikaupa, nagu kommentaarid', async () => {
+    // Meili tõstab `text_annotations[].comment` esile ka ilma seda otsitavaks
+    // tegemata — nii saab kaart iga annotatsiooni eraldi märgistada
+    // (`comments.text` mustriga ühtlane), ilma indeksi seadeid muutmata.
+    await searchContent(mockIndex, 'käsu');
+    expect(highlightedFields()).toContain('text_annotations');
+  });
+
   it('iga otsitav tekstiväli on ka esiletõstetav', async () => {
     await searchContent(mockIndex, 'käsu');
     const searched = mockSearch.mock.calls[0][1].attributesToSearchOn;
