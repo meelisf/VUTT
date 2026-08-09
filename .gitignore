@@ -43,3 +43,6 @@ loss/state/prosopography/
 
 # Suured skännid reference_data-s ei kuulu reposse (txt/csv kuuluvad)
 reference_data/*.jpg
+
+# Skriptide väljundid (consolidate jsonl, OCR-loopide raport) — tuletatavad
+output/
