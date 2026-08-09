@@ -172,6 +172,34 @@ def cached_person_meta_html(person_id, cache_key, build_fn):
     return rendered
 
 
+def _build_work_description(meta: dict) -> str:
+    """Teose kirjeldus meta/og/twitter siltidele: loojad. aasta. koht: trükkal.
+
+    Iga osa jäetakse vahele, kui seda ei ole. Anonüümne allikas (nt kirikuraamat)
+    saab „1692. Tartu", mitte üldist saidikirjeldust. Tühi string = pole midagi öelda,
+    kutsuja langeb tagasi vaikekirjeldusele.
+    """
+    parts = []
+
+    creators = meta.get("creators") or []
+    creator_names = ", ".join(c.get("name", "") for c in creators if c.get("name"))
+    if creator_names:
+        parts.append(creator_names)
+
+    year = meta.get("year")
+    if year:
+        parts.append(str(year))
+
+    place = _label(meta.get("location"))
+    publisher = _label(meta.get("publisher"))
+    if place and publisher:
+        parts.append(f"{place}: {publisher}")
+    elif place or publisher:
+        parts.append(place or publisher)
+
+    return ". ".join(parts)
+
+
 def build_meta_html(work_id: str, creator_persons=None, include_text: bool = True) -> str:
     """Genereerib Google'ile ja sotsiaalmeedia robotitele HTML-i koos metaandmetega.
 
@@ -192,11 +220,7 @@ def build_meta_html(work_id: str, creator_persons=None, include_text: bool = Tru
                 with open(metadata_path, "r", encoding="utf-8") as f:
                     meta = json.load(f)
                 title = meta.get("title", title)
-                creators = meta.get("creators") or []
-                creator_names = ", ".join(c.get("name", "") for c in creators if c.get("name"))
-                year = meta.get("year", "")
-                if creator_names:
-                    description = f"{creator_names}. {year}" if year else creator_names
+                description = _build_work_description(meta) or description
             except Exception:
                 pass
         image_url = f"{SITE_URL}/api/images/{_escape(work_id)}/_og?v=2"
