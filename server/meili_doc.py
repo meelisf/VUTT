@@ -57,6 +57,38 @@ def split_marginalia(text):
     return main, "\n".join(notes)
 
 
+def normalize_eszett(text):
+    """Asendab ß → ss otsinguväljadel (#228).
+
+    Meilisearch voldib täpitähed ise (`Königsberg` == `Konigsberg`), aga ß-i mitte,
+    sest Unicode NFKD ei lagunda seda. Kirjaveataluvus ei kata auku: `daß` on 4 märki,
+    mille puhul Meili lubab null kirjaviga — korpuses on `daß` 12 386 korda, aga
+    „dass" otsimine leiaks neist murdosa.
+
+    Kehtib ka ladina materjalis, kus ß on pikk-s + s ligatuur (`auspicatißimos`).
+    Sama teisendus PEAB käima ka päringule (`normalizeSearchQuery`
+    `src/services/searchService.ts`-s) — ainult ühe poole normaliseerimine
+    tähendaks, et `Schluß` otsimine ei leiaks enam midagi.
+
+    NB: rakendub AINULT otsinguväljadele. `text_content` (toores redaktoritekst,
+    mida töölaud loeb) jääb puutumata.
+    """
+    if not text:
+        return ""
+    return text.replace("ß", "ss").replace("ẞ", "SS")
+
+
+def _normalize_comment_texts(comments):
+    """ß → ss kommentaaride tekstis (#228), ülejäänud väljad ja algne objekt puutumata."""
+    out = []
+    for c in comments or []:
+        if isinstance(c, dict) and c.get("text"):
+            out.append({**c, "text": normalize_eszett(c["text"])})
+        else:
+            out.append(c)
+    return out
+
+
 def clean_text_for_search(text):
     """Puhastab teksti otsinguindeksi jaoks, eemaldades vormindusmärgid ja liites poolitused.
 
@@ -87,7 +119,9 @@ def clean_text_for_search(text):
     # 4. Eemalda üleliigsed tühikud
     text = re.sub(r'\s+', ' ', text).strip()
 
-    return text
+    # 5. ß → ss (#228). Käib PÄRAST poolituste liitmist, et „gro⸗\nße" liidetaks
+    # enne normaliseerimist üheks sõnaks.
+    return normalize_eszett(text)
 
 
 def _clean_search_text(page_text):
@@ -348,7 +382,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
     doc = {
         "id": page_id,
         "work_id": work_ctx['work_id'],  # Nanoid (püsiv lühikood)
-        "title": work_ctx['title'],
+        "title": normalize_eszett(work_ctx['title']),   # OTSING+KUVA: ß→ss (#228)
         "autor": work_ctx['autor'],      # Filtreerimiseks (jääb)
         "respondens": work_ctx['respondens'],  # Filtreerimiseks (jääb)
         "aasta": work_ctx['year'],       # Filtreerimiseks ja sortimiseks (jääb)
@@ -378,7 +412,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         ],
         "page_tags_object": page_tags_data,
         "has_annotations": bool(page_tags_data or page_meta['comments'] or page_meta['text_annotations']),
-        "comments": page_meta['comments'],
+        "comments": _normalize_comment_texts(page_meta['comments']),
         "text_annotations": page_meta['text_annotations'],
         "history": page_meta['history'],
         "last_modified": int(os.path.getmtime(txt_path if os.path.exists(txt_path) else os.path.join(dir_path, img_name)) * 1000),
@@ -388,7 +422,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "tags_object": tags,
         "tags_search": get_all_labels(tags) + work_ctx['tag_aliases'],
         "tags_ids": get_all_ids(tags),
-        "notes": work_ctx.get('notes'),
+        "notes": normalize_eszett(work_ctx.get('notes')),
         "collections": work_ctx['work_collections'],
         "collections_hierarchy": work_ctx['collections_hierarchy'],
         "is_public": any(
@@ -417,7 +451,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
         "type_ids": get_all_ids(work_ctx['work_type']),
         "languages": work_ctx['languages'],
         "creators": creators,
-        "authors_text": work_ctx['authors_text'],
+        "authors_text": [normalize_eszett(a) for a in work_ctx['authors_text']],
         "author_names": list(dict.fromkeys(
             name for c in creators
             if c.get('name') and c.get('role') != 'respondens'
@@ -441,7 +475,7 @@ def _build_page_document(work_ctx, page_id, page_num, page_text, page_meta, img_
     # .get() — vanad work_ctx-id (nt osatestid) ei pruugi neid sisaldada.
     if work_ctx.get('series'):
         doc['series'] = work_ctx['series']
-        doc['series_title'] = work_ctx.get('series_title', '')
+        doc['series_title'] = normalize_eszett(work_ctx.get('series_title', ''))
     if work_ctx.get('relations'):
         doc['relations'] = work_ctx['relations']
 

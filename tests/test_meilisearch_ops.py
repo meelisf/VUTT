@@ -336,3 +336,43 @@ class TestSplitMarginalia:
         assert marg == ""
         # Sisu peab jääma otsingus kättesaadavaks (clean_text_for_search eemaldab rämpsu)
         assert "pooleli" in clean_text_for_search(main)
+
+
+# --- ß-normaliseerimine otsinguväljadel (#228) ---
+# Meili voldib täpitähed ise (Königsberg == Konigsberg), aga ß-i mitte, sest
+# Unicode NFKD ei lagunda seda. Kirjaveataluvus ei päästa: 'daß' on 4 märki,
+# mille puhul Meili lubab null kirjaviga. Normaliseerime MÕLEMAS otsas —
+# päringupool elab src/services/searchService.ts-s (vt normalizeSearchQuery).
+class TestNormalizeEszett:
+    def test_asendab_ss_iga(self):
+        from server.meili_doc import normalize_eszett
+        assert normalize_eszett("daß") == "dass"
+        assert normalize_eszett("nachließen") == "nachliessen"
+
+    def test_asendab_suurtähe(self):
+        from server.meili_doc import normalize_eszett
+        assert normalize_eszett("STRAẞE") == "STRASSE"
+
+    def test_ladina_ligatuur_samuti(self):
+        """Ladina materjalis on ß pikk-s + s ligatuur, mitte saksa eszett."""
+        from server.meili_doc import normalize_eszett
+        assert normalize_eszett("auspicatißimos") == "auspicatissimos"
+
+    def test_jätab_muu_puutumata(self):
+        from server.meili_doc import normalize_eszett
+        assert normalize_eszett("Königsberg") == "Königsberg"
+        assert normalize_eszett("") == ""
+        assert normalize_eszett(None) == ""
+
+    def test_clean_text_for_search_normaliseerib(self):
+        """Katab korraga lehekylje_tekst ja marginaalia_tekst — mõlemad käivad siit."""
+        assert "dass" in clean_text_for_search("vnd ist gewiß, daß der Herr")
+        assert "ß" not in clean_text_for_search("vnd ist gewiß, daß der Herr")
+
+    def test_normaliseerimine_ei_riku_poolitust(self):
+        """ß-asendus ei tohi segada reavahetuse sidekriipsude liitmist."""
+        assert "grosse" in clean_text_for_search("gro⸗\nße")
+
+    def test_marginaalia_normaliseeritakse_samuti(self):
+        main, marg = _clean_search_text("tekst\n<m>groß</m>")
+        assert marg == "gross"

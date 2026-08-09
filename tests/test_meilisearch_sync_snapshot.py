@@ -347,3 +347,68 @@ def test_last_modified_on_mtime_põhine(synced):
     """last_modified peab kajastama txt faili mtime (fikseeritud 1_000_000s → 1_000_000_000 ms)."""
     for d in synced["docs"]:
         assert d["last_modified"] == 1_000_000_000
+
+
+# =========================================================
+# ß-normaliseerimine metaandmete otsinguväljadel (#228)
+# =========================================================
+
+@pytest.fixture
+def synced_eszett(tmp_path, monkeypatch):
+    """Sama kui `synced`, aga ß-iga kõigil tekstipõhistel otsinguväljadel."""
+    work_dir = tmp_path / SLUG
+    work_dir.mkdir()
+    (work_dir / "_metadata.json").write_text(json.dumps({
+        "id": WORK_ID,
+        "slug": SLUG,
+        "title": "In auspicatißimos natales",
+        "year": 1690,
+        "notes": "Vrd. Schluß lk 12",
+        "creators": [{"name": "Andreas Koßkull sen.", "id": "Q123", "role": "auctor"}],
+        "languages": ["la"],
+        "collections": ["col-public"],
+    }, ensure_ascii=False), encoding="utf-8")
+
+    _write_page(
+        work_dir, f"{SLUG}-{WORK_ID}-001",
+        txt="vnd ist gewiß, daß der Herr\n<m>groß</m>",
+        sequence=100, status="Toores",
+        comments=[{"text": "kommentaaris on daß"}],
+    )
+    os.utime(work_dir / f"{SLUG}-{WORK_ID}-001.txt", (1_000_000, 1_000_000))
+
+    monkeypatch.setattr(ops, "BASE_DIR", str(tmp_path))
+    monkeypatch.setattr(ops, "ARCHIVES_FILE", str(tmp_path / "_archives.json"))
+    (tmp_path / "_archives.json").write_text(json.dumps(ARCHIVES), encoding="utf-8")
+    monkeypatch.setattr(ops, "load_collections", lambda: COLLECTIONS)
+    monkeypatch.setattr(ops, "load_people_aliases", lambda: PEOPLE)
+    monkeypatch.setattr(ops, "load_labels_store", lambda: LABELS)
+
+    captured = {"docs": None}
+    monkeypatch.setattr(ops, "send_to_meilisearch",
+                        lambda documents, wait=True: captured.__setitem__("docs", documents) or True)
+    monkeypatch.setattr(ops, "_delete_extra_pages", lambda work_id, new_count: None)
+
+    assert ops.sync_work_to_meilisearch(SLUG) is True
+    return captured
+
+
+def test_eszett_normaliseeritud_lehe_tekstis(synced_eszett):
+    doc = synced_eszett["docs"][0]
+    assert "gewiss, dass" in doc["lehekylje_tekst"]
+    assert doc["marginaalia_tekst"] == "gross"
+
+
+def test_eszett_normaliseeritud_metaandmete_valjadel(synced_eszett):
+    doc = synced_eszett["docs"][0]
+    assert doc["title"] == "In auspicatissimos natales"
+    assert doc["notes"] == "Vrd. Schluss lk 12"
+    assert "Andreas Kosskull sen." in doc["authors_text"]
+    assert doc["comments"][0]["text"] == "kommentaaris on dass"
+
+
+def test_text_content_jaab_puutumata(synced_eszett):
+    """Toores redaktoritekst on ainus, mida töölaud loeb — ß peab alles jääma."""
+    doc = synced_eszett["docs"][0]
+    assert "gewiß, daß" in doc["text_content"]
+    assert "<m>groß</m>" in doc["text_content"]
