@@ -613,7 +613,10 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
   const typeFacetField = 'type_ids';
   const tagsFacetField = 'tags_ids';
 
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'];
+  // „Terve dokument" katab KÕIK tekstiväljad — sh text_annotations_text.
+  // Selle puudumine tegi vaikeulatuse kitsamaks kui tema enda alamvalik
+  // „Ainult annotatsioonid", nii et annotatsiooni-vasted olid vaikevaates nähtamatud.
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst', 'marginaalia_tekst'];
   else if (options.scope === 'annotation') {
     attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
@@ -814,7 +817,10 @@ export const searchWorkHits = async (index: Index, rawQuery: string, workId: str
   if (options.catalog && options.catalog !== 'all') filter.push(`originaal_kataloog = "${options.catalog}"`);
 
   const tagsField = options.lang ? `page_tags_${options.lang}` : 'page_tags_et';
-  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text'];
+  // „Terve dokument" katab KÕIK tekstiväljad — sh text_annotations_text.
+  // Selle puudumine tegi vaikeulatuse kitsamaks kui tema enda alamvalik
+  // „Ainult annotatsioonid", nii et annotatsiooni-vasted olid vaikevaates nähtamatud.
+  let attributesToSearchOn: string[] = ['lehekylje_tekst', 'marginaalia_tekst', tagsField, 'comments.text', 'text_annotations_text'];
   if (options.scope === 'original') attributesToSearchOn = ['lehekylje_tekst', 'marginaalia_tekst'];
   else if (options.scope === 'annotation') {
     attributesToSearchOn = [tagsField, 'comments.text', 'text_annotations_text'];
