@@ -12,6 +12,21 @@ import { pickLabelByLang } from '../utils/labelUtils';
 import type { MatchingStrategies, Index } from 'meilisearch';
 import { HIGHLIGHT_PRE_TAG, HIGHLIGHT_POST_TAG } from '../utils/sanitizeHtml';
 
+/**
+ * ß → ss otsingupäringus (#228).
+ *
+ * Meilisearch voldib täpitähed ise (`Königsberg` == `Konigsberg`), aga ß-i mitte,
+ * sest Unicode NFKD ei lagunda seda. Kirjaveataluvus ei kata auku: `daß` on 4 märki,
+ * mille puhul Meili lubab null kirjaviga.
+ *
+ * Indeksipool teeb sama teisenduse (`normalize_eszett`, `server/meili_doc.py`).
+ * MÕLEMAD pooled on kohustuslikud — ainult indeksi normaliseerimine tähendaks,
+ * et `Schluß` otsimine ei leiaks enam midagi. Lihtne märgiasendus töötab ka
+ * fraasiotsingu jutumärkide sees. Filtreid see EI puuduta.
+ */
+export const normalizeSearchQuery = (query: string): string =>
+  (query || '').replace(/ß/g, 'ss').replace(/ẞ/g, 'SS');
+
 // Aastafilter vahemike kattuvusena: teose [year_start, year_end] kattub kasutaja vahemikuga.
 // Kattuvus: A.end >= B.start AND A.start <= B.end.
 // Aastata teosed (year_start=year_end=0) käituvad nagu varasem year=0.
@@ -316,8 +331,9 @@ export const getAuthorFacets = async (
 };
 
 // Dashboardi otsing: otsib teoseid
-export const searchWorks = async (index: Index, query: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
+export const searchWorks = async (index: Index, rawQuery: string, options?: DashboardSearchOptions): Promise<SearchWorksResult> => {
   checkMixedContent();
+  const query = normalizeSearchQuery(rawQuery);
 
   try {
     const filter: string[] = [];
@@ -553,8 +569,9 @@ async function fetchWorkLevelFacets(
 // Täisteksti otsing
 // Kui workId on määratud - otsib ainult sellest teosest (kõik vasted, ilma distinct'ita)
 // Muidu - tagastab 10 teost (distinct), iga teose kohta 1 esinduslik vaste
-export const searchContent = async (index: Index, query: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
+export const searchContent = async (index: Index, rawQuery: string, page: number = 1, options: ContentSearchOptions = {}): Promise<ContentSearchResponse> => {
   checkMixedContent();
+  const query = normalizeSearchQuery(rawQuery);
 
   const limit = options.workId ? 20 : 10; // Teose piires rohkem vasteid lehel
   const offset = (page - 1) * limit;
@@ -787,8 +804,9 @@ export const searchContent = async (index: Index, query: string, page: number = 
 };
 
 // Laadi ühe teose kõik otsingutulemused (akordioni avamiseks)
-export const searchWorkHits = async (index: Index, query: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
+export const searchWorkHits = async (index: Index, rawQuery: string, workId: string, options: ContentSearchOptions = {}): Promise<ContentSearchHit[]> => {
   checkMixedContent();
+  const query = normalizeSearchQuery(rawQuery);
 
   const filter: string[] = [`work_id = "${workId}"`];
 
