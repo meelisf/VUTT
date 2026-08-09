@@ -185,7 +185,11 @@ const SearchResults: React.FC<SearchResultsProps> = ({
         const rawTags: string[] = isAnnotationBrowse ? ((hit as any)[tagsField] || hit.page_tags || []) : [];
         const showRawTags = isAnnotationBrowse && !hasHighlightedTags && rawTags.length > 0;
         const showRawComments = isAnnotationBrowse && (!highlightedComments || highlightedComments.length === 0);
-        const showTextAnnotations = (scopeParam === 'annotation') && (hit.text_annotations?.length ?? 0) > 0;
+        // Annotatsiooniplokk ka vaikeulatuses, kui vaste TULI annotatsioonist — muidu
+        // näitab kaart lehekülje põhiteksti katkendit, kus vastet ei olegi.
+        const hasHighlightedAnnotations = ((hit._formatted as any)?.text_annotations_text || '').includes('<em');
+        const showTextAnnotations = (scopeParam === 'annotation' || hasHighlightedAnnotations)
+            && (hit.text_annotations?.length ?? 0) > 0;
 
         return (
             <div key={hit.id} className={`p-3 ${isAdditional ? 'bg-gray-50 border-t border-gray-100' : ''}`}>
