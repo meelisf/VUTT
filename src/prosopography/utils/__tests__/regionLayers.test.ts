@@ -1,10 +1,42 @@
+import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec';
 import { describe, expect, it, vi } from 'vitest';
 import {
   REGION_DETAIL_ZOOM,
   REGION_LAYERS,
+  REGION_SOURCE_ID,
   pickRegionFeature,
+  regionLayerSpecs,
   regionQueryLayers,
 } from '../regionLayers';
+
+describe('regionLayerSpecs', () => {
+  // Regressioon: varem oli 'fill-opacity' kujul ['case', hover, 0.42, ['interpolate',
+  // ['linear'], ['zoom'], ...]]. MapLibre nõuab, et ['zoom'] oleks TIPPTASEME
+  // interpolate/step sisend, ja lükkas kihi tagasi -> addLayer viskas erindi ->
+  // ühtki kihti ei tekkinud -> ei värve ega tooltipi. TypeScript seda ei püüa.
+  it('läbib MapLibre stiilispetsi valideerimise', () => {
+    const errors = validateStyleMin({
+      version: 8,
+      sources: {
+        [REGION_SOURCE_ID]: {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        },
+      },
+      layers: regionLayerSpecs(),
+      // Spetsid on tahtlikult laia tüübiga; valideerija ise on siin päris värav.
+    } as unknown as Parameters<typeof validateStyleMin>[0]);
+    expect(errors.map(error => `${error.message}`)).toEqual([]);
+  });
+
+  it('annab kuus kihti mõlemale haldustasemele', () => {
+    const ids = regionLayerSpecs().map(layer => layer.id);
+    expect(ids).toEqual([
+      REGION_LAYERS.l2Fill, REGION_LAYERS.l2Casing, REGION_LAYERS.l2Line,
+      REGION_LAYERS.l3Fill, REGION_LAYERS.l3Casing, REGION_LAYERS.l3Line,
+    ]);
+  });
+});
 
 describe('regionQueryLayers', () => {
   it('küsib väljasuumitult ainult katusüksuse kihti', () => {
