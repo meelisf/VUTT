@@ -155,16 +155,23 @@ function yearFromHistoricalDate(value: string): string {
   return String(Number(match[0]));
 }
 
+/** Nimi eelistatud keeles; puuduva tõlke korral teine keel ja lõpuks varunimi. */
+function localizedName(
+  lang: string,
+  labelEt: string | null,
+  labelEn: string | null,
+  fallback: string | null,
+): string | null {
+  return (lang === 'en' ? labelEn : labelEt) || labelEt || labelEn || fallback;
+}
+
 function regionTooltipContent(properties: HistoricalRegionProperties, lang: string): HTMLElement {
   const content = document.createElement('div');
   content.className = 'space-y-0.5';
 
   const name = document.createElement('div');
   name.className = 'font-semibold text-gray-900';
-  name.textContent = (lang === 'en' ? properties.label_en : properties.label_et)
-    || properties.label_et
-    || properties.label_en
-    || properties.name;
+  name.textContent = localizedName(lang, properties.label_et, properties.label_en, properties.name);
   content.appendChild(name);
 
   if (properties.start_date || properties.end_date) {
@@ -173,6 +180,22 @@ function regionTooltipContent(properties: HistoricalRegionProperties, lang: stri
     dates.textContent = `${properties.start_date ? yearFromHistoricalDate(properties.start_date) : '…'}–${properties.end_date ? yearFromHistoricalDate(properties.end_date) : '…'}`;
     content.appendChild(dates);
   }
+
+  // Vanem on lisainfo: kui backend jättis ta osalise kattuvuse tõttu määramata,
+  // ei kuvata rida üldse.
+  const parent = localizedName(
+    lang,
+    properties.parent_label_et,
+    properties.parent_label_en,
+    properties.parent_name,
+  );
+  if (parent) {
+    const parentRow = document.createElement('div');
+    parentRow.className = 'text-[11px] text-gray-400';
+    parentRow.textContent = parent;
+    content.appendChild(parentRow);
+  }
+
   return content;
 }
 
