@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 from collections import OrderedDict
-from typing import Dict, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import osm2geojson
 import requests
@@ -16,6 +16,7 @@ from shapely.geometry import LineString, mapping, shape
 from shapely.ops import polygonize, unary_union
 
 from ..config import get_logger
+from .region_hierarchy import find_parents
 
 logger = get_logger(__name__)
 
@@ -32,11 +33,29 @@ DISK_CACHE_MAX_ENTRIES = 100
 DISK_CACHE_DIR = os.path.join(os.getenv("VUTT_STATE_DIR", "state"), "historical_regions_cache")
 DEFAULT_SNAPSHOT_YEAR = 1650
 DEFAULT_SNAPSHOT_BBOX = (30, -40, 70, 80)
-DEFAULT_SNAPSHOT_KEY = (DEFAULT_SNAPSHOT_YEAR, *DEFAULT_SNAPSHOT_BBOX)
 DEFAULT_SNAPSHOT_REFRESH_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_SNAPSHOT_CHECK_SECONDS = 6 * 60 * 60
 MAX_BBOX_WIDTH = 140
 MAX_BBOX_HEIGHT = 90
+
+# Küsitavad OHM-i haldustasemed. VÄIKSEM arv = kõrgem tasand (2 = riik, 3 = selle osa).
+# Taseme muutmine invalideerib cache'i automaatselt CACHE_VARIANT-i kaudu.
+ADMIN_LEVELS = (2, 3)
+
+# Cache'i variant: skeemi, haldustasemete või lihtsustusprofiili muutus peab
+# vana cache'i automaatselt kehtetuks tegema. Vanad failid muutuvad leidmatuks
+# ja tõrjutakse DISK_CACHE_MAX_ENTRIES piiriga tavakorras välja.
+SCHEMA_VERSION = 2
+SIMPLIFY_PROFILE_VERSION = 1
+CACHE_VARIANT = (SCHEMA_VERSION, ADMIN_LEVELS, SIMPLIFY_PROFILE_VERSION)
+
+
+def _cache_key(year: int, bbox: Tuple[float, float, float, float]) -> Tuple:
+    """Cache võti kannab variandi, et andmeskeemi muutus ei serveeriks vana sisu."""
+    return (CACHE_VARIANT, year, *bbox)
+
+
+DEFAULT_SNAPSHOT_KEY = _cache_key(DEFAULT_SNAPSHOT_YEAR, DEFAULT_SNAPSHOT_BBOX)
 
 # Summutatud toonid: täite läbipaistvus määratakse frontendil.
 REGION_COLORS = (
@@ -180,11 +199,15 @@ def _validate_bbox(south: float, west: float, north: float, east: float) -> None
         raise ValueError("Kaardi ulatus on piirkonnakihi jaoks liiga suur")
 
 
+def _admin_level_regex() -> str:
+    return "^(" + "|".join(str(level) for level in ADMIN_LEVELS) + ")$"
+
+
 def _build_overpass_query(year: int, bbox: Tuple[float, float, float, float]) -> str:
     south, west, north, east = bbox
     date = f"{year:04d}-01-01"
     return f'''[out:json][timeout:60];
-relation["boundary"="administrative"]["admin_level"="2"]({south},{west},{north},{east})
+relation["boundary"="administrative"]["admin_level"~"{_admin_level_regex()}"]({south},{west},{north},{east})
 (if: (!is_tag("start_date") || t["start_date"] <= "{date}") && (!is_tag("end_date") || t["end_date"] >= "{date}"));
 out geom;'''
 
@@ -192,6 +215,15 @@ out geom;'''
 def _region_color(relation_id: int) -> str:
     digest = hashlib.sha256(str(relation_id).encode("ascii")).digest()
     return REGION_COLORS[int.from_bytes(digest[:2], "big") % len(REGION_COLORS)]
+
+
+def _admin_level(tags: dict) -> Optional[int]:
+    """Lubatud haldustase arvuna; muu tase või puuduv silt annab None."""
+    try:
+        level = int(tags.get("admin_level", ""))
+    except (TypeError, ValueError):
+        return None
+    return level if level in ADMIN_LEVELS else None
 
 
 def _localized_labels(tags: dict, wikidata_labels: dict = None) -> dict:
@@ -270,13 +302,17 @@ def _normalize_geojson(overpass_data: dict, tolerance: float, wikidata_labels: d
         for feature in converted.get("features", [])
         if feature.get("geometry")
     }
-    features = []
+    entries: List[dict] = []
 
     for element in overpass_data.get("elements", []):
         relation_id = element.get("id")
         tags = element.get("tags") or {}
         geometry_data = converted_geometries.get(relation_id)
         if not isinstance(relation_id, int):
+            continue
+
+        admin_level = _admin_level(tags)
+        if admin_level is None:
             continue
 
         try:
@@ -295,24 +331,48 @@ def _normalize_geojson(overpass_data: dict, tolerance: float, wikidata_labels: d
 
         qid = tags.get("wikidata")
         labels = _localized_labels(tags, (wikidata_labels or {}).get(qid, {}))
-        canonical_name = tags.get("name") or labels.get("en") or labels.get("et") or str(relation_id)
-        features.append({
-            "type": "Feature",
-            "id": relation_id,
-            "properties": {
-                "relation_id": relation_id,
-                "name": canonical_name,
-                "label_et": labels.get("et"),
-                "label_en": labels.get("en"),
-                "start_date": tags.get("start_date"),
-                "end_date": tags.get("end_date"),
-                "color": _region_color(relation_id),
-            },
-            "geometry": mapping(geometry),
+        entries.append({
+            "relation_id": relation_id,
+            "admin_level": admin_level,
+            "geometry": geometry,
+            "labels": labels,
+            "name": tags.get("name") or labels.get("en") or labels.get("et") or str(relation_id),
+            "start_date": tags.get("start_date"),
+            "end_date": tags.get("end_date"),
         })
 
-    # Suuremad üksused enne: väiksemad kattuvad alad jäävad nende peale nähtavaks.
-    features.sort(key=lambda item: shape(item["geometry"]).area, reverse=True)
+    # Suuremad üksused enne: väiksemad kattuvad alad jäävad nende peale nähtavaks
+    # ja tulevad seetõttu queryRenderedFeatures'is esimesena (vt spekk, §3).
+    entries.sort(key=lambda entry: entry["geometry"].area, reverse=True)
+
+    parents = find_parents(
+        [entry["admin_level"] for entry in entries],
+        [entry["geometry"] for entry in entries],
+    )
+
+    features = []
+    for index, entry in enumerate(entries):
+        parent_index = parents[index]
+        parent = entries[parent_index] if parent_index is not None else None
+        features.append({
+            "type": "Feature",
+            "id": entry["relation_id"],
+            "properties": {
+                "relation_id": entry["relation_id"],
+                "admin_level": entry["admin_level"],
+                "name": entry["name"],
+                "label_et": entry["labels"].get("et"),
+                "label_en": entry["labels"].get("en"),
+                "start_date": entry["start_date"],
+                "end_date": entry["end_date"],
+                "color": _region_color(entry["relation_id"]),
+                "parent_name": parent["name"] if parent else None,
+                "parent_label_et": parent["labels"].get("et") if parent else None,
+                "parent_label_en": parent["labels"].get("en") if parent else None,
+            },
+            "geometry": mapping(entry["geometry"]),
+        })
+
     return {"type": "FeatureCollection", "features": features}
 
 
@@ -389,7 +449,7 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
     _validate_bbox(south, west, north, east)
     bbox = _quantize_bbox(south, west, north, east)
     _validate_bbox(*bbox)
-    key = (year, *bbox)
+    key = _cache_key(year, bbox)
     now = time.time()
 
     pinned = _pinned_cache.get(key)

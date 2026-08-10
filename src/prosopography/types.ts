@@ -88,12 +88,17 @@ export interface ProsopoMapMarker {
 
 export interface HistoricalRegionProperties {
   relation_id: number;
+  admin_level: number;
   name: string;
   label_et: string | null;
   label_en: string | null;
   start_date: string | null;
   end_date: string | null;
   color: string;
+  /** Lähim ülemine haldustase; puudub, kui kattuvus jäi alla lävendi. */
+  parent_name: string | null;
+  parent_label_et: string | null;
+  parent_label_en: string | null;
 }
 
 export interface HistoricalRegionFeatureCollection {

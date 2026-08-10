@@ -52,12 +52,71 @@ def test_validate_bbox_rejects_invalid_or_excessive_extent():
             pass
 
 
-def test_overpass_query_filters_year_and_admin_level_two():
+def _empire_with_circle():
+    """Level-2 riik ja täielikult selle sees asuv level-3 alamüksus."""
+    def ring(west, south, east, north):
+        return [
+            {"lat": south, "lon": west},
+            {"lat": south, "lon": east},
+            {"lat": north, "lon": east},
+            {"lat": north, "lon": west},
+            {"lat": south, "lon": west},
+        ]
+
+    return {
+        "elements": [
+            {
+                "type": "relation",
+                "id": 1,
+                "members": [{"type": "way", "ref": 11, "role": "outer", "geometry": ring(10, 50, 20, 55)}],
+                "tags": {
+                    "type": "boundary", "boundary": "administrative", "admin_level": "2",
+                    "name": "Sacrum Imperium Romanum", "name:et": "Saksa-Rooma riik",
+                },
+            },
+            {
+                "type": "relation",
+                "id": 2,
+                "members": [{"type": "way", "ref": 22, "role": "outer", "geometry": ring(11, 51, 13, 53)}],
+                "tags": {
+                    "type": "boundary", "boundary": "administrative", "admin_level": "3",
+                    "name": "Bayerischer Reichskreis",
+                },
+            },
+        ],
+    }
+
+
+def test_overpass_query_filters_year_and_all_admin_levels():
     query = _build_overpass_query(1650, (50, 10, 65, 30))
-    assert '"admin_level"="2"' in query
+    assert '"admin_level"~"^(2|3)$"' in query
     assert '1650-01-01' in query
     assert '(50,10,65,30)' in query
     assert 'out geom' in query
+
+
+def test_normalize_geojson_adds_admin_level_and_parent():
+    result = _normalize_geojson(_empire_with_circle(), 0.001)
+    features = {feature["id"]: feature["properties"] for feature in result["features"]}
+
+    assert features[1]["admin_level"] == 2
+    assert features[1]["parent_name"] is None
+    assert features[2]["admin_level"] == 3
+    assert features[2]["parent_name"] == "Sacrum Imperium Romanum"
+    assert features[2]["parent_label_et"] == "Saksa-Rooma riik"
+
+
+def test_normalize_geojson_sorts_larger_regions_first():
+    result = _normalize_geojson(_empire_with_circle(), 0.001)
+    # Suurem enne: väiksem jääb peale ja tuleb queryRenderedFeatures'is esimesena.
+    assert [feature["id"] for feature in result["features"]] == [1, 2]
+
+
+def test_normalize_geojson_skips_levels_outside_admin_levels():
+    data = _empire_with_circle()
+    data["elements"][1]["tags"]["admin_level"] = "8"
+    result = _normalize_geojson(data, 0.001)
+    assert [feature["id"] for feature in result["features"]] == [1]
 
 
 def test_normalize_geojson_keeps_only_needed_localized_properties():
@@ -69,12 +128,16 @@ def test_normalize_geojson_keeps_only_needed_localized_properties():
     assert feature["geometry"]["type"] in ("Polygon", "MultiPolygon")
     assert feature["properties"] == {
         "relation_id": 123,
+        "admin_level": 2,
         "name": "Testimaa",
         "label_et": None,
         "label_en": "Testland",
         "start_date": "1600",
         "end_date": "1700",
         "color": _region_color(123),
+        "parent_name": None,
+        "parent_label_et": None,
+        "parent_label_en": None,
     }
 
 
@@ -165,3 +228,26 @@ def test_overpass_429_honors_retry_after(monkeypatch):
 def test_region_color_is_stable():
     assert _region_color(123) == _region_color(123)
     assert _region_color(123) != _region_color(124)
+
+
+def test_cache_key_carries_variant():
+    key = historical_regions._cache_key(1650, (30, -40, 70, 80))
+    assert key[0] == historical_regions.CACHE_VARIANT
+    assert key[1:] == (1650, 30, -40, 70, 80)
+
+
+def test_admin_levels_change_invalidates_disk_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    bbox = (30, -40, 70, 80)
+    historical_regions._write_disk_cache(historical_regions._cache_key(1650, bbox), {"year": 1650})
+
+    monkeypatch.setattr(historical_regions, "CACHE_VARIANT", (99, (2, 3, 4), 1))
+    assert historical_regions._read_disk_cache(historical_regions._cache_key(1650, bbox)) is None
+
+
+def test_default_snapshot_key_uses_cache_key():
+    assert historical_regions.DEFAULT_SNAPSHOT_KEY == (
+        historical_regions.CACHE_VARIANT,
+        historical_regions.DEFAULT_SNAPSHOT_YEAR,
+        *historical_regions.DEFAULT_SNAPSHOT_BBOX,
+    )
