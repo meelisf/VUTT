@@ -5,7 +5,7 @@ import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from 'map
 import { useMap } from 'react-leaflet';
 import { fetchHistoricalRegions } from '../services/prosopographyService';
 import type { HistoricalRegionProperties } from '../types';
-import { REGION_DETAIL_ZOOM, REGION_LAYERS, REGION_SOURCE_ID } from '../utils/regionLayers';
+import { REGION_DETAIL_ZOOM, REGION_LAYERS, REGION_SOURCE_ID, pickRegionFeature } from '../utils/regionLayers';
 import '@maplibre/maplibre-gl-leaflet';
 
 const HISTORICAL_STYLE_URL = 'https://www.openhistoricalmap.org/map-styles/historical/historical.json';
@@ -418,9 +418,14 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
     };
 
     const featureAt = (latlng: L.LatLng) => {
-      if (!mapLibre.getLayer(REGION_LAYERS.l2Fill)) return null;
       const point = mapLibre.project([latlng.lng, latlng.lat]);
-      return mapLibre.queryRenderedFeatures(point, { layers: [REGION_LAYERS.l2Fill] })[0] ?? null;
+      // Suum tuleb MapLibre'i kaardilt, et hit-test ja paint oleksid samas
+      // koordinaatsüsteemis — Leafleti suum võib sellest nihkes olla.
+      return pickRegionFeature(mapLibre.getZoom(), layerId => (
+        mapLibre.getLayer(layerId)
+          ? mapLibre.queryRenderedFeatures(point, { layers: [layerId] })
+          : []
+      ));
     };
 
     const showFeature = (latlng: L.LatLng, feature: ReturnType<typeof featureAt>) => {
@@ -440,22 +445,40 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
         .addTo(map);
     };
 
+    // Kui kasutaja hoiab hiirt paigal ja suumib üle lävendi, uut mousemove'i ei
+    // tule — vana esiletõst jääks külge vale tasemega. Suumi lõpus arvutame
+    // tabamuse viimase teadaoleva hiirekoha põhjal uuesti.
+    let lastLatLng: L.LatLng | null = null;
+
     const onMouseMove = (event: L.LeafletMouseEvent) => {
+      lastLatLng = event.latlng;
       showFeature(event.latlng, featureAt(event.latlng));
     };
     const onClick = (event: L.LeafletMouseEvent) => {
+      lastLatLng = event.latlng;
       showFeature(event.latlng, featureAt(event.latlng));
     };
-    const onMouseOut = () => clearHover();
+    const onMouseOut = () => {
+      lastLatLng = null;
+      clearHover();
+    };
+    const onZoomStart = () => clearHover();
+    const onZoomEnd = () => {
+      if (lastLatLng) showFeature(lastLatLng, featureAt(lastLatLng));
+    };
 
     map.on('mousemove', onMouseMove);
     map.on('click', onClick);
+    map.on('zoomstart', onZoomStart);
+    map.on('zoomend', onZoomEnd);
     map.getContainer().addEventListener('mouseleave', onMouseOut);
     return () => {
       clearHover();
       tooltip.remove();
       map.off('mousemove', onMouseMove);
       map.off('click', onClick);
+      map.off('zoomstart', onZoomStart);
+      map.off('zoomend', onZoomEnd);
       map.getContainer().removeEventListener('mouseleave', onMouseOut);
     };
   }, [lang, map, mapLibre]);
