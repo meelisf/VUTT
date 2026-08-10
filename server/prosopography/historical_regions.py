@@ -33,7 +33,6 @@ DISK_CACHE_MAX_ENTRIES = 100
 DISK_CACHE_DIR = os.path.join(os.getenv("VUTT_STATE_DIR", "state"), "historical_regions_cache")
 DEFAULT_SNAPSHOT_YEAR = 1650
 DEFAULT_SNAPSHOT_BBOX = (30, -40, 70, 80)
-DEFAULT_SNAPSHOT_KEY = (DEFAULT_SNAPSHOT_YEAR, *DEFAULT_SNAPSHOT_BBOX)
 DEFAULT_SNAPSHOT_REFRESH_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_SNAPSHOT_CHECK_SECONDS = 6 * 60 * 60
 MAX_BBOX_WIDTH = 140
@@ -42,6 +41,21 @@ MAX_BBOX_HEIGHT = 90
 # Küsitavad OHM-i haldustasemed. VÄIKSEM arv = kõrgem tasand (2 = riik, 3 = selle osa).
 # Taseme muutmine invalideerib cache'i automaatselt CACHE_VARIANT-i kaudu.
 ADMIN_LEVELS = (2, 3)
+
+# Cache'i variant: skeemi, haldustasemete või lihtsustusprofiili muutus peab
+# vana cache'i automaatselt kehtetuks tegema. Vanad failid muutuvad leidmatuks
+# ja tõrjutakse DISK_CACHE_MAX_ENTRIES piiriga tavakorras välja.
+SCHEMA_VERSION = 2
+SIMPLIFY_PROFILE_VERSION = 1
+CACHE_VARIANT = (SCHEMA_VERSION, ADMIN_LEVELS, SIMPLIFY_PROFILE_VERSION)
+
+
+def _cache_key(year: int, bbox: Tuple[float, float, float, float]) -> Tuple:
+    """Cache võti kannab variandi, et andmeskeemi muutus ei serveeriks vana sisu."""
+    return (CACHE_VARIANT, year, *bbox)
+
+
+DEFAULT_SNAPSHOT_KEY = _cache_key(DEFAULT_SNAPSHOT_YEAR, DEFAULT_SNAPSHOT_BBOX)
 
 # Summutatud toonid: täite läbipaistvus määratakse frontendil.
 REGION_COLORS = (
@@ -435,7 +449,7 @@ def get_historical_regions(year: int, south: float, west: float, north: float, e
     _validate_bbox(south, west, north, east)
     bbox = _quantize_bbox(south, west, north, east)
     _validate_bbox(*bbox)
-    key = (year, *bbox)
+    key = _cache_key(year, bbox)
     now = time.time()
 
     pinned = _pinned_cache.get(key)

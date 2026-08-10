@@ -228,3 +228,26 @@ def test_overpass_429_honors_retry_after(monkeypatch):
 def test_region_color_is_stable():
     assert _region_color(123) == _region_color(123)
     assert _region_color(123) != _region_color(124)
+
+
+def test_cache_key_carries_variant():
+    key = historical_regions._cache_key(1650, (30, -40, 70, 80))
+    assert key[0] == historical_regions.CACHE_VARIANT
+    assert key[1:] == (1650, 30, -40, 70, 80)
+
+
+def test_admin_levels_change_invalidates_disk_cache(tmp_path, monkeypatch):
+    monkeypatch.setattr(historical_regions, "DISK_CACHE_DIR", str(tmp_path))
+    bbox = (30, -40, 70, 80)
+    historical_regions._write_disk_cache(historical_regions._cache_key(1650, bbox), {"year": 1650})
+
+    monkeypatch.setattr(historical_regions, "CACHE_VARIANT", (99, (2, 3, 4), 1))
+    assert historical_regions._read_disk_cache(historical_regions._cache_key(1650, bbox)) is None
+
+
+def test_default_snapshot_key_uses_cache_key():
+    assert historical_regions.DEFAULT_SNAPSHOT_KEY == (
+        historical_regions.CACHE_VARIANT,
+        historical_regions.DEFAULT_SNAPSHOT_YEAR,
+        *historical_regions.DEFAULT_SNAPSHOT_BBOX,
+    )
