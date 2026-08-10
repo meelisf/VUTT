@@ -5,13 +5,11 @@ import type { FilterSpecification, GeoJSONSource, Map as MapLibreMap } from 'map
 import { useMap } from 'react-leaflet';
 import { fetchHistoricalRegions } from '../services/prosopographyService';
 import type { HistoricalRegionProperties } from '../types';
+import { REGION_DETAIL_ZOOM, REGION_LAYERS, REGION_SOURCE_ID } from '../utils/regionLayers';
 import '@maplibre/maplibre-gl-leaflet';
 
 const HISTORICAL_STYLE_URL = 'https://www.openhistoricalmap.org/map-styles/historical/historical.json';
 const OHM_ATTRIBUTION = '<a href="https://www.openhistoricalmap.org/">OpenHistoricalMap</a>';
-const REGION_SOURCE_ID = 'vutt-historical-regions';
-const REGION_FILL_LAYER_ID = 'vutt-historical-regions-fill';
-const REGION_LINE_LAYER_ID = 'vutt-historical-regions-line';
 const EMPTY_REGIONS: FeatureCollection = { type: 'FeatureCollection', features: [] };
 const REGION_YEAR_CACHE_MAX_ENTRIES = 5;
 const DEFAULT_REGION_YEAR = 1650;
@@ -101,6 +99,106 @@ function enhanceAdministrativeReadability(map: MapLibreMap): void {
   }
 }
 
+// Hover on ainus koht, kus kaart läheb värvilisemaks — baaspalett jääb puutumata.
+const HOVER_FILL_OPACITY = 0.42;
+const HOVER_LINE_WIDTH = 4;
+const HOVER_LINE_OPACITY = 0.95;
+const HOVER_CASING_WIDTH = 7;
+const HOVER_CASING_COLOR = 'rgba(255, 255, 255, 0.85)';
+
+interface LevelStyle {
+  fill: [number, number];
+  lineWidth: [number, number];
+  lineOpacity: [number, number];
+}
+
+// [väljasuumitult, sissesuumitult]. Katusüksuse täide läheb päriselt nulli:
+// läbipaistvus 0 EI peida feature'it queryRenderedFeatures'i eest, nii et
+// alamüksuseta augud säilitavad tooltipi ilma nähtava jäänuktäiteta.
+const LEVEL_STYLES: Record<number, LevelStyle> = {
+  2: { fill: [0.1, 0], lineWidth: [1, 1.8], lineOpacity: [0.5, 0.8] },
+  3: { fill: [0, 0.1], lineWidth: [0, 1], lineOpacity: [0, 0.5] },
+};
+
+function addLevelLayers(
+  map: MapLibreMap,
+  level: number,
+  ids: { fill: string; casing: string; line: string },
+  beforeId: string | undefined,
+): void {
+  const style = LEVEL_STYLES[level];
+  const filter = ['==', ['get', 'admin_level'], level] as FilterSpecification;
+  const fadeIn = REGION_DETAIL_ZOOM - 0.5;
+  const fadeOut = REGION_DETAIL_ZOOM + 0.5;
+
+  if (!map.getLayer(ids.fill)) {
+    map.addLayer({
+      id: ids.fill,
+      type: 'fill',
+      source: REGION_SOURCE_ID,
+      filter,
+      paint: {
+        'fill-color': ['get', 'color'],
+        'fill-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          HOVER_FILL_OPACITY,
+          ['interpolate', ['linear'], ['zoom'], fadeIn, style.fill[0], fadeOut, style.fill[1]],
+        ],
+      },
+    }, beforeId);
+  }
+
+  // Valge halo põhijoone all: ainult hover'il, et piir loeks reljeefse tausta peal.
+  if (!map.getLayer(ids.casing)) {
+    map.addLayer({
+      id: ids.casing,
+      type: 'line',
+      source: REGION_SOURCE_ID,
+      filter,
+      paint: {
+        'line-color': HOVER_CASING_COLOR,
+        'line-width': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          HOVER_CASING_WIDTH,
+          0,
+        ],
+        'line-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          1,
+          0,
+        ],
+      },
+    }, beforeId);
+  }
+
+  if (!map.getLayer(ids.line)) {
+    map.addLayer({
+      id: ids.line,
+      type: 'line',
+      source: REGION_SOURCE_ID,
+      filter,
+      paint: {
+        'line-color': ['get', 'color'],
+        'line-width': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          HOVER_LINE_WIDTH,
+          ['interpolate', ['linear'], ['zoom'], fadeIn, style.lineWidth[0], fadeOut, style.lineWidth[1]],
+        ],
+        'line-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          HOVER_LINE_OPACITY,
+          ['interpolate', ['linear'], ['zoom'], fadeIn, style.lineOpacity[0], fadeOut, style.lineOpacity[1]],
+        ],
+      },
+    }, beforeId);
+  }
+}
+
 function ensureRegionLayers(map: MapLibreMap): void {
   if (!map.getSource(REGION_SOURCE_ID)) {
     map.addSource(REGION_SOURCE_ID, { type: 'geojson', data: EMPTY_REGIONS });
@@ -109,44 +207,19 @@ function ensureRegionLayers(map: MapLibreMap): void {
   const beforeId = map.getLayer('admin_country_lines_z10_case')
     ? 'admin_country_lines_z10_case'
     : undefined;
-  if (!map.getLayer(REGION_FILL_LAYER_ID)) {
-    map.addLayer({
-      id: REGION_FILL_LAYER_ID,
-      type: 'fill',
-      source: REGION_SOURCE_ID,
-      paint: {
-        'fill-color': ['get', 'color'],
-        'fill-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          0.24,
-          0.1,
-        ],
-      },
-    }, beforeId);
-  }
-  if (!map.getLayer(REGION_LINE_LAYER_ID)) {
-    map.addLayer({
-      id: REGION_LINE_LAYER_ID,
-      type: 'line',
-      source: REGION_SOURCE_ID,
-      paint: {
-        'line-color': ['get', 'color'],
-        'line-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          0.95,
-          0.5,
-        ],
-        'line-width': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          2.5,
-          1,
-        ],
-      },
-    }, beforeId);
-  }
+
+  // Sama beforeId korral tekib lisamisjärjekorras virn alt üles:
+  // katusüksuse täide → halo → joon, seejärel alamüksuse samad kolm peale.
+  addLevelLayers(map, 2, {
+    fill: REGION_LAYERS.l2Fill,
+    casing: REGION_LAYERS.l2Casing,
+    line: REGION_LAYERS.l2Line,
+  }, beforeId);
+  addLevelLayers(map, 3, {
+    fill: REGION_LAYERS.l3Fill,
+    casing: REGION_LAYERS.l3Casing,
+    line: REGION_LAYERS.l3Line,
+  }, beforeId);
 }
 
 function yearFromHistoricalDate(value: string): string {
@@ -345,9 +418,9 @@ const HistoricalMapLayer: React.FC<HistoricalMapLayerProps> = ({ year, lang }) =
     };
 
     const featureAt = (latlng: L.LatLng) => {
-      if (!mapLibre.getLayer(REGION_FILL_LAYER_ID)) return null;
+      if (!mapLibre.getLayer(REGION_LAYERS.l2Fill)) return null;
       const point = mapLibre.project([latlng.lng, latlng.lat]);
-      return mapLibre.queryRenderedFeatures(point, { layers: [REGION_FILL_LAYER_ID] })[0] ?? null;
+      return mapLibre.queryRenderedFeatures(point, { layers: [REGION_LAYERS.l2Fill] })[0] ?? null;
     };
 
     const showFeature = (latlng: L.LatLng, feature: ReturnType<typeof featureAt>) => {
