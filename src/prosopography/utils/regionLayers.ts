@@ -21,8 +21,13 @@ export const REGION_LAYERS = {
 
 /**
  * Lävend MapLibre'i suumiskaalas — AINUS tõe allikas nii paint-avaldistele kui
- * hiire-tabamusele. Kalibreeritud nii, et vaikevaade (Leaflet zoom 5) näitab juba
- * alamüksusi ja kokkutõmbumine katusüksuseks toimub Euroopa-ülevaates.
+ * hiire-tabamusele.
+ *
+ * `maplibre-gl-leaflet` seab MapLibre'i suumiks alati `leafletZoom - 1`
+ * (leaflet-maplibre-gl.js). Seega vaikevaade (Leaflet 5) = ML 4 ja
+ * Euroopa-ülevaade (Leaflet 4) = ML 3. Väärtus 3,5 paneb ±0,5 üleminekuriba
+ * täpselt nende kahe vahele: Leaflet 4 näitab ainult katusüksust, Leaflet 5
+ * ainult alamüksusi.
  */
 export const REGION_DETAIL_ZOOM = 3.5;
 

@@ -265,6 +265,43 @@ seal, kus aluskaart ütleb „Churfürstenthum Baiern"), loetakse katse
 läbikukkunuks ja `ADMIN_LEVELS` muudetakse `(2, 4)`-ks. Cache invalideerub
 `CACHE_VARIANT`-i tõttu automaatselt.
 
+### Mõõdetud tulemused (2026-08-10)
+
+**Maht.** Euroopa 1650 snapshot **124,7 kB gzip** (varem 90 kB), 68 piirkonda:
+49 × level 2, 19 × level 3. Alla 180 kB lävendi — lihtsustusprofiili ei muudetud,
+`SIMPLIFY_PROFILE_VERSION` jääb 1.
+
+**Suumilävend.** `maplibre-gl-leaflet` seab MapLibre'i suumiks alati
+`leafletZoom - 1` (`leaflet-maplibre-gl.js`, viis kohta). Seega on
+`REGION_DETAIL_ZOOM = 3.5` **tuletatud, mitte kalibreeritud katse-eksituse teel**:
+±0,5 üleminekuriba katab ML 3,0…4,0, mis on täpselt Leaflet 4 (Euroopa-ülevaade,
+ainult katusüksus) → Leaflet 5 (vaikevaade, ainult alamüksused).
+
+**Vanema määramine.** 19-st level-3 üksusest sai vanema 14. Kontrollitud
+piirjuhud:
+
+| Üksus | Kattuvus | Tulemus |
+|---|---|---|
+| Brandenburg-Preußen | 0,61 HRR-iga | `None` ✓ — täpselt see juhtum, mille jaoks lävi tehti |
+| Korona Królestwa Polskiego | 0,71 Rzeczpospolitaga | `None` — ajalooliselt vale tagasilükkamine |
+| Lietuvos Didžioji Kunigaikštystė | — | `Rzeczpospolita Obojga Narodów` ✓ |
+| Bayerischer Reichskreis jt 7 ringkonda | — | `Sacrum Imperium Romanum` ✓ |
+| Herzogtum Kurland und Semgallen | — | `Rzeczpospolita Obojga Narodów` ✓ |
+| Svenska Ingermanland | — | `Konungariket Sverige` ✓ |
+| Regnum Neapolitanum, Zaporoże, Principatus Oneliae | 0,00–0,04 | `None` ✓ (tõesti ei kuulu ühegi L2 sisse) |
+
+**Otsus lävendi kohta:** `PARENT_MIN_CONTAINMENT` jääb **0,75**, kuigi see maksab
+Poola Krooni õige seose. Põhjus: 0,65 peale langetamine jätaks Brandenburgi
+0,61-ni vaid 4 punkti varu, ja üks OHM-i geomeetriaparandus võiks ta üle lävendi
+lükata — siis väidaks tooltip täpselt seda, mille vältimiseks reegel olemas on.
+Poola Krooni 29% lahknevus on OHM-i kahe polügooni servade erinevus, mitte
+ajalugu; õige parandus on ülesvoolu, mitte lävendi lõdvendamine.
+
+**Visuaalsed kontrollpunktid:** teadlikult jäetud päris kasutuse otsustada.
+Mõõdetav pool (maht, lävend, vanemate määramine) on kontrollitud; kas
+keisririigi ringkonnad on kasutajale mõistlik üksus, selgub tootmises. Kui ei
+ole, on järgmine samm `ADMIN_LEVELS = (2, 4)` — cache invalideerub ise.
+
 ## Testid
 
 **Backend** — `tests/test_historical_regions.py` laieneb:
