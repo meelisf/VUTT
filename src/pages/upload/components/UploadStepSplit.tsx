@@ -127,7 +127,8 @@ const UploadStepSplit: React.FC<Props> = ({ uploadId, token, onDone }) => {
         />
         <span>
           <span className="font-medium block">{t('step3split.optIn')}</span>
-          <span className="text-sm text-gray-600">{t('step3split.optInHint')}</span>
+          <span className="text-sm text-gray-600 block">{t('step3split.optInHint')}</span>
+          <span className="text-sm text-gray-600 block mt-1">{t('step3split.optInHintModel')}</span>
         </span>
       </label>
 

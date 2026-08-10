@@ -84,6 +84,7 @@
     "title": "Split double pages",
     "optIn": "Split double pages before OCR",
     "optInHint": "Turn this on only if a single scan holds two book pages. Otherwise just press Continue — everything works as before.",
+    "optInHintModel": "The handwriting recognition model works better on single pages — on a double page it can get confused and start repeating the same text endlessly.",
     "rendering": "Preparing preview: {{done}} / {{total}}",
     "renderError": "Preview generation failed",
     "globalLine": "Split line (% of width)",

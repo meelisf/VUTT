@@ -84,6 +84,7 @@
     "title": "Topeltlehtede poolitamine",
     "optIn": "Poolita topeltlehed enne OCR-i",
     "optInHint": "Lülita sisse ainult siis, kui skaneeringul on kaks lehekülge ühel pildil. Muidu vajuta lihtsalt Edasi — kõik käib nagu tavaliselt.",
+    "optInHintModel": "Käsikirja tuvastav mudel töötab paremini üksikute lehtedega — topeltlehe puhul võib see segadusse sattuda ja hakata sama teksti lõputult kordama.",
     "rendering": "Eelvaadet valmistatakse: {{done}} / {{total}}",
     "renderError": "Eelvaate valmistamine ebaõnnestus",
     "globalLine": "Poolitusjoon (% laiusest)",
