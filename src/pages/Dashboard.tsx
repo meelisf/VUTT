@@ -58,8 +58,14 @@ const Dashboard: React.FC = () => {
   const teoseTagsParam = searchParams.get('tags')?.split(',').filter(Boolean) || [];
   const genreParam = searchParams.get('genre') || null;
   const typeParam = searchParams.get('type') || null;
+  const langsParam = searchParams.get('langs')?.split(',').filter(Boolean) || [];
   const collectionParam = searchParams.get('collection') || null;
   const pageParam = parseInt(searchParams.get('page') || '1', 10);
+  // Loend-parameetrid stringiks: massiiv on iga renderdusega uus objekt, seega
+  // deps peab võrdlema sisu. Avaldis deps-massiivi sees ei ole staatiliselt
+  // kontrollitav (react-hooks/exhaustive-deps).
+  const teoseTagsKey = teoseTagsParam.join(',');
+  const langsKey = langsParam.join(',');
 
   const [inputValue, setInputValue] = useState(queryParam);
   const [works, setWorks] = useState<Work[]>([]);
@@ -79,6 +85,7 @@ const Dashboard: React.FC = () => {
   const [selectedGenre, setSelectedGenre] = useState<string | null>(genreParam);
   const [selectedType, setSelectedType] = useState<string | null>(typeParam);
   const [selectedStatus, setSelectedStatus] = useState<WorkStatus | null>(statusParam);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>(langsParam);
 
   // Wikidata rikastatud labelid — Q-koodid millel puudub praeguse keele label
   const [enrichedLabels, setEnrichedLabels] = useState<Record<string, Record<string, string>>>({});
@@ -211,8 +218,9 @@ const Dashboard: React.FC = () => {
     setSelectedTags(teoseTagsParam);
     setSelectedGenre(genreParam);
     setSelectedType(typeParam);
+    setSelectedLanguages(langsParam);
     setSelectedStatus(statusParam);
-  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsParam.join(','), genreParam, typeParam, statusParam]);
+  }, [queryParam, yearStartParam, yearEndParam, sortParam, teoseTagsKey, genreParam, typeParam, langsKey, statusParam]);
 
   // Sünkroniseeri lehekülje number URL parameetrist (nt tagasi-navigatsioon, otselink).
   // Serveripoolse lehekülgjaotuse tõttu käivitab currentPage nüüd uue päringu.
@@ -331,6 +339,18 @@ const Dashboard: React.FC = () => {
         resetPage = true;
       }
 
+      // Keeled (ISO 639-3 koodid — Q-koodi lahendust ei ole vaja)
+      const newLangsUrl = selectedLanguages.join(',');
+      if (newLangsUrl !== langsKey) {
+        if (newLangsUrl) {
+          newParams.set('langs', newLangsUrl);
+        } else {
+          newParams.delete('langs');
+        }
+        changed = true;
+        resetPage = true;
+      }
+
       // Staatus
       if (selectedStatus !== statusParam) {
         if (selectedStatus) {
@@ -353,7 +373,7 @@ const Dashboard: React.FC = () => {
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
+  }, [inputValue, yearStart, yearEnd, sort, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedStatus, setSearchParams, queryParam, yearStartParam, yearEndParam, sortParam, genreParam, typeParam, langsKey, statusParam, genreLabelToId, tagsLabelToId, typeLabelToId]);
 
   // Perform search when params change
   useEffect(() => {
@@ -381,6 +401,7 @@ const Dashboard: React.FC = () => {
           teoseTags: selectedTags.length > 0 ? selectedTags : undefined,
           genre: selectedGenre ? [selectedGenre] : undefined,
           type: selectedType ? [selectedType] : undefined,
+          languages: selectedLanguages.length > 0 ? selectedLanguages : undefined,
           collection: selectedCollection || undefined,
           onlyFirstPage: sort !== 'recent',
           lang: getLangCode(i18n.language),
@@ -417,7 +438,7 @@ const Dashboard: React.FC = () => {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [index, collectionsLoading, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedCollection, currentPage, refreshCounter, i18n.language]);
+  }, [index, collectionsLoading, queryParam, yearStart, yearEnd, sort, authorParam, respondensParam, printerParam, statusParam, selectedTags, selectedGenre, selectedType, selectedLanguages, selectedCollection, currentPage, refreshCounter, i18n.language]);
 
   // Multi-select helper funktsioonid
   // shift+klõps valib vahemiku viimasest ankrust nähtaval leheküljel (nagu manage-lehel)
@@ -757,6 +778,8 @@ const Dashboard: React.FC = () => {
                 onTagsChange={setSelectedTags}
                 onTypeChange={setSelectedType}
                 onStatusChange={setSelectedStatus}
+                selectedLanguages={selectedLanguages}
+                onLanguagesChange={setSelectedLanguages}
                 facets={facets}
                 genreIdMap={genreIdMap}
                 genreLabelToId={genreLabelToId}

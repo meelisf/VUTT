@@ -9,7 +9,7 @@
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Tag, Bookmark, FileType, CircleDot, Search, X, Languages } from 'lucide-react';
 import { getLangCode } from '../utils/getLangCode';
 import { isVuttId } from '../utils/qcodeUtils';
 import { FacetDistribution } from '../services/searchService';
@@ -25,11 +25,15 @@ interface AdvancedFiltersProps {
   selectedTags: string[];
   selectedType: string | null;
   selectedStatus: WorkStatus | null;
+  // Keeled on MITMIKVALIK (erinevalt žanrist/tüübist): teos kannab ADR 0019
+  // järgi mitut keelt korraga ja „kreeka VÕI heebrea" on mõttekas päring
+  selectedLanguages: string[];
   // Muutmise käsitlejad
   onGenreChange: (genre: string | null) => void;
   onTagsChange: (tags: string[]) => void;
   onTypeChange: (type: string | null) => void;
   onStatusChange: (status: WorkStatus | null) => void;
+  onLanguagesChange: (languages: string[]) => void;
   // Valikuline: kas panna alguses lahti
   defaultExpanded?: boolean;
   // Dünaamilised facetid otsingutulemustest (live counts)
@@ -138,10 +142,12 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   selectedTags,
   selectedType,
   selectedStatus,
+  selectedLanguages,
   onGenreChange,
   onTagsChange,
   onTypeChange,
   onStatusChange,
+  onLanguagesChange,
   defaultExpanded = false,
   facets,
   genreIdMap,
@@ -279,6 +285,21 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
       .sort((a, b) => b.count - a.count);
   }, [facets, tagsIdMap, tagsLabelToId]);
 
+  // Keeled: facet-väärtused on ISO 639-3 koodid, sildid tulevad sõnavarast.
+  // Q-koodi lahendust ei ole vaja, seega ka mergeFacetItems mitte.
+  // Loendur on TEOSEPÕHINE — searchWorks filtreerib `lehekylje_number = 1`.
+  const languageItems = useMemo<FilterItem[]>(() => {
+    const langData = facets?.['languages'];
+    if (!langData) return [];
+    return Object.entries(langData)
+      .map(([code, count]) => ({
+        value: code,
+        count,
+        label: vocabularies?.languages?.[code]?.[lang] || vocabularies?.languages?.[code]?.et || code
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [facets, vocabularies, lang]);
+
   const typeItems = useMemo<FilterItem[]>(() => {
     const typeData = facets?.['type_ids'];
     if (!typeData) return [];
@@ -349,7 +370,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   }, [effectiveSelectedTags, selectedTags]);
 
   // Kontrolli, kas on aktiivne filter
-  const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus;
+  const hasActiveFilters = selectedGenre || selectedTags.length > 0 || selectedType || selectedStatus || selectedLanguages.length > 0;
 
   // Automaatselt laienda kui on aktiivne filter
   useEffect(() => {
@@ -378,7 +399,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
           {t('filters.advanced', 'Täpsemad valikud')}
           {hasActiveFilters && (
             <span className="bg-primary-100 text-primary-700 text-xs px-2 py-0.5 rounded-full">
-              {[selectedGenre, selectedType, ...selectedTags].filter(Boolean).length}
+              {[selectedGenre, selectedType, ...selectedTags, ...selectedLanguages].filter(Boolean).length}
             </span>
           )}
         </span>
@@ -463,6 +484,22 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                 />
               )}
 
+              {/* Keel (languages) — mitmikvalik, OR-loogika */}
+              {languageItems.length > 0 && (
+                <FilterSection
+                  title={t('filters.languages', 'Keel')}
+                  icon={<Languages size={12} />}
+                  items={languageItems}
+                  selectedValues={selectedLanguages}
+                  onToggle={(val) => onLanguagesChange(
+                    selectedLanguages.includes(val)
+                      ? selectedLanguages.filter(l => l !== val)
+                      : [...selectedLanguages, val]
+                  )}
+                  searchPlaceholder={t('filters.searchLanguage', 'Otsi keelt...')}
+                />
+              )}
+
               {/* Aktiivsed filtrid + tühjenda */}
               {hasActiveFilters && (
                 <div className="pt-2 border-t border-gray-100 space-y-2">
@@ -500,6 +537,16 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                         <button onClick={() => onTypeChange(null)} className="hover:bg-sky-100 rounded-full p-0.5"><X size={11} /></button>
                       </span>
                     )}
+                    {selectedLanguages.map(code => (
+                      <span key={code} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                        <Languages size={11} />
+                        {vocabularies?.languages?.[code]?.[lang] || vocabularies?.languages?.[code]?.et || code}
+                        <button
+                          onClick={() => onLanguagesChange(selectedLanguages.filter(l => l !== code))}
+                          className="hover:bg-amber-100 rounded-full p-0.5"
+                        ><X size={11} /></button>
+                      </span>
+                    ))}
                   </div>
                   <button
                     onClick={() => {
@@ -507,6 +554,7 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
                       onTagsChange([]);
                       onTypeChange(null);
                       onStatusChange(null);
+                      onLanguagesChange([]);
                     }}
                     className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
                   >

@@ -112,7 +112,9 @@
     "tags": "Tags",
     "searchTag": "Search tag...",
     "type": "Type",
+    "languages": "Language",
     "searchType": "Search type...",
+    "searchLanguage": "Search language...",
     "clearAdvanced": "Clear advanced filters"
   }
 }
