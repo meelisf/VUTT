@@ -47,6 +47,7 @@ export function useSearchResults(urlParams: SearchUrlParams, lang: string, selec
                     pageTags: urlParams.pageTags.length > 0 ? urlParams.pageTags : undefined,
                     genre: urlParams.genres.length > 0 ? urlParams.genres : undefined,
                     type: urlParams.types.length > 0 ? urlParams.types : undefined,
+                    languages: urlParams.languages.length > 0 ? urlParams.languages : undefined,
                     author: urlParams.author || undefined,
                     subjectPerson: urlParams.subjectPerson || undefined,
                     collection: selectedCollection || undefined,
