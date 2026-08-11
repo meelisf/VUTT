@@ -61,3 +61,27 @@ def work_qualifies(pages: Dict[str, str]) -> Tuple[bool, List[str]]:
     """
     hits = sorted(name for name, text in pages.items() if page_is_greek(text))
     return bool(hits), hits
+
+
+def add_language(meta: dict, code: str) -> bool:
+    """Lisab keelekoodi `languages` massiivi. Muudab `meta`-t kohapeal.
+
+    Tagastab True, kui midagi muutus. RANGELT LISAV — olemasolevaid keeli
+    ei eemaldata kunagi. Idempotentne: teistkordne kutse tagastab False,
+    seega kordusjooks ei tekita git-commiti.
+    """
+    current = meta.get("languages")
+    if current is None:
+        current = []
+    elif isinstance(current, str):
+        # Vana andmestik võis kanda stringi massiivi asemel
+        current = [current]
+    elif not isinstance(current, list):
+        current = []
+
+    if code in current:
+        meta["languages"] = current
+        return False
+
+    meta["languages"] = current + [code]
+    return True

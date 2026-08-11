@@ -94,3 +94,46 @@ def test_work_qualifies_ilma_kreekata():
 def test_work_qualifies_tuhi_teos():
     from server.greek_detect import work_qualifies
     assert work_qualifies({}) == (False, [])
+
+
+def test_add_language_lisab_puuduva_valja():
+    from server.greek_detect import add_language
+    meta = {"title": "Oratio"}
+    assert add_language(meta, "grc") is True
+    assert meta["languages"] == ["grc"]
+
+
+def test_add_language_sailitab_olemasoleva_keele():
+    from server.greek_detect import add_language
+    meta = {"languages": ["lat"]}
+    assert add_language(meta, "grc") is True
+    assert meta["languages"] == ["lat", "grc"]
+
+
+def test_add_language_on_idempotentne():
+    from server.greek_detect import add_language
+    meta = {"languages": ["lat", "grc"]}
+    assert add_language(meta, "grc") is False
+    assert meta["languages"] == ["lat", "grc"]
+
+
+def test_add_language_tuhi_massiiv():
+    from server.greek_detect import add_language
+    meta = {"languages": []}
+    assert add_language(meta, "grc") is True
+    assert meta["languages"] == ["grc"]
+
+
+def test_add_language_none_vaartus():
+    from server.greek_detect import add_language
+    meta = {"languages": None}
+    assert add_language(meta, "grc") is True
+    assert meta["languages"] == ["grc"]
+
+
+def test_add_language_vigane_tuup_asendatakse():
+    from server.greek_detect import add_language
+    # Vana andmestik võib kanda stringi massiivi asemel
+    meta = {"languages": "lat"}
+    assert add_language(meta, "grc") is True
+    assert meta["languages"] == ["lat", "grc"]
