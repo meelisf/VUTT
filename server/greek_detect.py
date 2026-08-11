@@ -28,6 +28,17 @@ GREEK_RATIO_THRESHOLD = 0.20
 GREEK_MIN_CHARS = 20
 
 
+def letter_counts(text: str) -> Tuple[int, int]:
+    """Tagastab (kreeka tähtede arv, ladina tähtede arv).
+
+    Eraldi funktsioon, sest mitme lehe peale koguosakaalu arvutades on vaja
+    tähtede koguarvu. `greek_ratio` seda tagasi ei anna ja selle tuletamine
+    osakaalust jagab kreekata lehtedel nulliga — need jääksid nimetajast
+    välja ja koguosakaal oleks ülepaisutatud.
+    """
+    return len(_GREEK_RE.findall(text)), len(_LATIN_RE.findall(text))
+
+
 def greek_ratio(text: str) -> Tuple[int, float]:
     """Tagastab (kreeka tähemärkide arv, osakaal kreeka+ladina tähtedest).
 
@@ -35,8 +46,7 @@ def greek_ratio(text: str) -> Tuple[int, float]:
     tühikud jäetakse välja, sest need ei kanna keeleinfot ja nende osakaal
     kõigub lehe kujunduse järgi.
     """
-    greek = len(_GREEK_RE.findall(text))
-    latin = len(_LATIN_RE.findall(text))
+    greek, latin = letter_counts(text)
     total = greek + latin
     if total == 0:
         return 0, 0.0

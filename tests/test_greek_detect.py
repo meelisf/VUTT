@@ -137,3 +137,10 @@ def test_add_language_vigane_tuup_asendatakse():
     meta = {"languages": "lat"}
     assert add_language(meta, "grc") is True
     assert meta["languages"] == ["lat", "grc"]
+
+
+def test_letter_counts_eristab_kreeka_ja_ladina():
+    from server.greek_detect import letter_counts
+    assert letter_counts("λόγος Verbum") == (5, 6)
+    assert letter_counts("Disputatio") == (0, 10)
+    assert letter_counts("1648 —") == (0, 0)
