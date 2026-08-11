@@ -15,6 +15,7 @@ export interface FilterDraft {
     selectedPageTags: string[];
     selectedGenres: string[];
     selectedTypes: string[];
+    selectedLanguages: string[];
     selectedAuthor: string;
     authorInput: string;
     showAuthorSuggestions: boolean;
@@ -35,6 +36,7 @@ export interface FilterDraftActions {
     setSelectedPageTags: (v: string[] | ((prev: string[]) => string[])) => void;
     setSelectedGenres: (v: string[] | ((prev: string[]) => string[])) => void;
     setSelectedTypes: (v: string[] | ((prev: string[]) => string[])) => void;
+    setSelectedLanguages: (v: string[] | ((prev: string[]) => string[])) => void;
     setSelectedAuthor: (v: string) => void;
     setAuthorInput: (v: string) => void;
     setShowAuthorSuggestions: (v: boolean) => void;
@@ -71,6 +73,7 @@ export function useFilterDraft(
     const [selectedPageTags, setSelectedPageTags] = useState<string[]>(urlParams.pageTags);
     const [selectedGenres, setSelectedGenres] = useState<string[]>(urlParams.genres);
     const [selectedTypes, setSelectedTypes] = useState<string[]>(urlParams.types);
+    const [selectedLanguages, setSelectedLanguages] = useState<string[]>(urlParams.languages);
     const [selectedAuthor, setSelectedAuthor] = useState(urlParams.author);
     const [authorInput, setAuthorInput] = useState(urlParams.author);
     const [showAuthorSuggestions, setShowAuthorSuggestions] = useState(false);
@@ -78,6 +81,15 @@ export function useFilterDraft(
     const [personTagInput, setPersonTagInput] = useState(urlParams.subjectPerson);
     const [showPersonSuggestions, setShowPersonSuggestions] = useState(false);
     const [showFiltersMobile, setShowFiltersMobile] = useState(false);
+
+    // Loend-parameetrid stringiks ENNE effect'i — massiiv on iga renderdusega
+    // uus objekt, seega deps peab võrdlema sisu. Avaldis deps-massiivi sees
+    // ei ole staatiliselt kontrollitav (react-hooks/exhaustive-deps).
+    const teoseTagsKey = urlParams.teoseTags.join(',');
+    const pageTagsKey = urlParams.pageTags.join(',');
+    const genresKey = urlParams.genres.join(',');
+    const typesKey = urlParams.types.join(',');
+    const languagesKey = urlParams.languages.join(',');
 
     // Sünkroniseeri lokaalset state-i kui URL muutub (nt tagasinupp)
     useEffect(() => {
@@ -88,6 +100,7 @@ export function useFilterDraft(
         setSelectedPageTags(urlParams.pageTags);
         setSelectedGenres(urlParams.genres);
         setSelectedTypes(urlParams.types);
+        setSelectedLanguages(urlParams.languages);
         setSelectedAuthor(urlParams.author);
         setAuthorInput(urlParams.author);
         setSelectedPersonTag(urlParams.subjectPerson);
@@ -96,8 +109,7 @@ export function useFilterDraft(
             setPersonTagInput(urlParams.subjectPerson);
         }
     }, [urlParams.q, urlParams.scope, urlParams.workId,
-        urlParams.teoseTags.join(','), urlParams.pageTags.join(','),
-        urlParams.genres.join(','), urlParams.types.join(','),
+        teoseTagsKey, pageTagsKey, genresKey, typesKey, languagesKey,
         urlParams.author, urlParams.subjectPerson]);
 
     // Lahenda isiku ID → näidatav nimi kui availablePersonTags laadib (URL-ist avamine)
@@ -114,11 +126,12 @@ export function useFilterDraft(
         if (e) e.preventDefault();
         const hasFilters = yearStart || yearEnd || selectedScope !== 'all' || selectedWork ||
             selectedTeoseTags.length > 0 || selectedPageTags.length > 0 ||
-            selectedGenres.length > 0 || selectedTypes.length > 0 || selectedAuthor;
+            selectedGenres.length > 0 || selectedTypes.length > 0 ||
+            selectedLanguages.length > 0 || selectedAuthor;
 
         setSearchParams(prev => {
             if (!inputValue.trim() && !hasFilters) {
-                ['q', 'p', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author'].forEach(k => prev.delete(k));
+                ['q', 'p', 'ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'langs', 'author'].forEach(k => prev.delete(k));
             } else {
                 if (inputValue.trim()) prev.set('q', inputValue); else prev.delete('q');
                 prev.set('p', '1');
@@ -130,6 +143,8 @@ export function useFilterDraft(
                 if (selectedPageTags.length > 0) prev.set('pageTags', selectedPageTags.join(',')); else prev.delete('pageTags');
                 if (selectedGenres.length > 0) prev.set('genre', selectedGenres.map(g => genreLabelToId[g] || g).join(',')); else prev.delete('genre');
                 if (selectedTypes.length > 0) prev.set('type', selectedTypes.map(t => typeLabelToId[t] || t).join(',')); else prev.delete('type');
+                // Keelekoodid on juba ISO 639-3 — Q-koodi mappingut ei ole vaja
+                if (selectedLanguages.length > 0) prev.set('langs', selectedLanguages.join(',')); else prev.delete('langs');
                 if (selectedAuthor) prev.set('author', selectedAuthor); else prev.delete('author');
                 if (selectedPersonTag) prev.set('subjectPerson', selectedPersonTag); else prev.delete('subjectPerson');
             }
@@ -142,11 +157,11 @@ export function useFilterDraft(
         setYearStart(''); setYearEnd(''); setSelectedScope('all');
         setSelectedWork(''); setSelectedWorkInfo(null);
         setSelectedTeoseTags([]); setSelectedPageTags([]);
-        setSelectedGenres([]); setSelectedTypes([]);
+        setSelectedGenres([]); setSelectedTypes([]); setSelectedLanguages([]);
         setSelectedAuthor(''); setAuthorInput('');
         setSelectedPersonTag(''); setPersonTagInput('');
         setSearchParams(prev => {
-            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'author', 'subjectPerson'].forEach(k => prev.delete(k));
+            ['ys', 'ye', 'scope', 'work', 'teoseTags', 'pageTags', 'genre', 'type', 'langs', 'author', 'subjectPerson'].forEach(k => prev.delete(k));
             prev.set('p', '1');
             return prev;
         });
@@ -187,6 +202,7 @@ export function useFilterDraft(
         draft: {
             inputValue, yearStart, yearEnd, selectedScope, selectedWork, selectedWorkInfo,
             selectedTeoseTags, selectedPageTags, selectedGenres, selectedTypes,
+            selectedLanguages,
             selectedAuthor, authorInput, showAuthorSuggestions,
             selectedPersonTag, personTagInput, showPersonSuggestions,
             showFiltersMobile
@@ -194,7 +210,7 @@ export function useFilterDraft(
         actions: {
             setInputValue, setYearStart, setYearEnd, setSelectedScope,
             setSelectedWork, setSelectedWorkInfo, setSelectedTeoseTags,
-            setSelectedPageTags, setSelectedGenres, setSelectedTypes,
+            setSelectedPageTags, setSelectedGenres, setSelectedTypes, setSelectedLanguages,
             setSelectedAuthor, setAuthorInput, setShowAuthorSuggestions, setShowFiltersMobile,
             setPersonTagInput, setShowPersonSuggestions,
             commit, clearFilters, handleAuthorSelect, handleAuthorClear, handleWorkSelect,

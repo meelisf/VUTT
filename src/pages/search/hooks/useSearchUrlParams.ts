@@ -1,5 +1,10 @@
 import { useSearchParams } from 'react-router-dom';
 
+/** Komadega eraldatud URL-parameeter → massiiv. Tühjad osad kukuvad välja. */
+export function parseListParam(value: string | null): string[] {
+    return value?.split(',').filter(Boolean) || [];
+}
+
 export interface SearchUrlParams {
     q: string;
     page: number;
@@ -11,6 +16,7 @@ export interface SearchUrlParams {
     pageTags: string[];
     genres: string[];
     types: string[];
+    languages: string[];
     author: string;
     subjectPerson: string;
 }
@@ -24,10 +30,11 @@ export function useSearchUrlParams(): SearchUrlParams {
         yearStart: searchParams.get('ys') ? parseInt(searchParams.get('ys')!) : undefined,
         yearEnd: searchParams.get('ye') ? parseInt(searchParams.get('ye')!) : undefined,
         scope: (searchParams.get('scope') as 'all' | 'original' | 'annotation') || 'all',
-        teoseTags: searchParams.get('teoseTags')?.split(',').filter(Boolean) || [],
-        pageTags: searchParams.get('pageTags')?.split(',').filter(Boolean) || [],
-        genres: searchParams.get('genre')?.split(',').filter(Boolean) || [],
-        types: searchParams.get('type')?.split(',').filter(Boolean) || [],
+        teoseTags: parseListParam(searchParams.get('teoseTags')),
+        pageTags: parseListParam(searchParams.get('pageTags')),
+        genres: parseListParam(searchParams.get('genre')),
+        types: parseListParam(searchParams.get('type')),
+        languages: parseListParam(searchParams.get('langs')),
         author: searchParams.get('author') || '',
         subjectPerson: searchParams.get('subjectPerson') || '',
     };
