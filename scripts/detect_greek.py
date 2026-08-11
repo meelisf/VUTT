@@ -25,9 +25,20 @@ import json
 import os
 import subprocess
 import sys
+import types
 from typing import Optional
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+# Fake-package muster: registreerib `server` nimeruumi ILMA `server/__init__.py`
+# käivitamiseta. Muidu tõmbaks import kaasa FastAPI, gitpythoni ja kasutajate
+# cache'i — serveri hosti venv-is neid ei ole ja skript kukuks `jwt` puudumise
+# taha. `greek_detect` vajab ainult stdlib-i, `config` samuti.
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if "server" not in sys.modules:
+    _server_pkg = types.ModuleType("server")
+    _server_pkg.__path__ = [os.path.join(_PROJECT_ROOT, "server")]
+    _server_pkg.__package__ = "server"
+    sys.modules.setdefault("server", _server_pkg)
+sys.path.insert(0, _PROJECT_ROOT)
 
 from server.greek_detect import add_language, letter_counts, work_qualifies  # noqa: E402
 
@@ -114,13 +125,19 @@ def apply_work(work_dir: str) -> bool:
     return True
 
 
-def _git_commit(data_root: str, count: int) -> bool:
-    """Üks commit kogu partii kohta (ADR 0015 muster). Tagastab õnnestumise."""
-    message = f"feat(keeled): grc märgend {count} teosele (automaattuvastus)"
-    for cmd in (["git", "add", "-A"], ["git", "commit", "-m", message]):
+def _git_commit(data_root: str, paths: list) -> bool:
+    """Üks commit kogu partii kohta (ADR 0015 muster). Tagastab õnnestumise.
+
+    Laval AINULT need failid, mida see jooks muutis. `git add -A` oleks vale:
+    jooksev backend uuendab `data/config/` tuletatud indekseid pidevalt ja
+    need satuksid vaikselt keelemuudatuse commiti sisse — tagasipööre võtaks
+    siis maha ka midagi muud.
+    """
+    message = f"feat(keeled): grc märgend {len(paths)} teosele (automaattuvastus)"
+    for cmd in (["git", "add", "--"] + paths, ["git", "commit", "-m", message]):
         result = subprocess.run(cmd, cwd=data_root, capture_output=True, text=True)
         if result.returncode != 0:
-            print(f"VIGA: {' '.join(cmd)} ebaõnnestus: {result.stderr}", file=sys.stderr)
+            print(f"VIGA: {' '.join(cmd[:3])} ebaõnnestus: {result.stderr}", file=sys.stderr)
             return False
     return True
 
@@ -138,7 +155,7 @@ def main() -> int:
         return 1
 
     report = []
-    written = 0
+    written_paths = []
     failed = []
 
     for slug in sorted(os.listdir(data_root)):
@@ -153,7 +170,7 @@ def main() -> int:
         if args.apply and not row["already_tagged"]:
             try:
                 if apply_work(work_dir):
-                    written += 1
+                    written_paths.append(os.path.join(slug, "_metadata.json"))
             except (OSError, ValueError) as e:
                 print(f"VIGA: {slug} kirjutamine ebaõnnestus: {e}", file=sys.stderr)
                 failed.append(slug)
@@ -174,7 +191,7 @@ def main() -> int:
     print(f"\n{'[KUIVKÄIVITUS] ' if not args.apply else ''}Kokkuvõte:")
     print(f"  Reegli läbib:       {len(report)} teost")
     print(f"  Juba märgitud:      {already}")
-    print(f"  Kirjutatud:         {written}")
+    print(f"  Kirjutatud:         {len(written_paths)}")
     print(f"  Ebaõnnestus:        {len(failed)}")
     if failed:
         print("  Ebaõnnestunud teosed: " + ", ".join(failed))
@@ -183,8 +200,8 @@ def main() -> int:
         print("\n  Kirjutamiseks: --apply")
         return 0
 
-    if args.commit and written:
-        if not _git_commit(data_root, written):
+    if args.commit and written_paths:
+        if not _git_commit(data_root, written_paths):
             return 1
         print("  Git commit loodud.")
         print("\n  JÄRGMINE SAMM: ./scripts/server_seed_data.sh (Meili reindeks)")

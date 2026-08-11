@@ -118,3 +118,39 @@ def test_scan_work_koguosakaal_arvestab_ladinakeelseid_lehti(tmp_path):
     result = scan_work(d)
     # 60 kreeka / (60 kreeka + 40 ladina) = 0,6
     assert abs(result["work_ratio"] - 0.6) < 1e-9
+
+
+def _git(tmp_path, *args):
+    import subprocess
+    return subprocess.run(["git", *args], cwd=str(tmp_path), capture_output=True, text=True)
+
+
+def test_git_commit_ei_haara_voraid_muudatusi(tmp_path):
+    """Commit tohib sisaldada AINULT selle jooksu muudetud faile.
+
+    Regressioon: `git add -A` haaraks kaasa ka jooksva backendi uuendatud
+    tuletatud indeksid (data/config/*.json), mis on tootmises praktiliselt
+    alati muutunud. Keelemuudatuse tagasipööre võtaks siis maha midagi muud.
+    """
+    from detect_greek import _git_commit
+
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "t@t")
+    _git(tmp_path, "config", "user.name", "t")
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "index.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "1648-a").mkdir()
+    (tmp_path / "1648-a" / "_metadata.json").write_text('{"languages":["lat"]}', encoding="utf-8")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "algseis")
+
+    # Backend uuendab indeksit, meie skript uuendab metaandmeid
+    (tmp_path / "config" / "index.json").write_text('{"muutus": 1}', encoding="utf-8")
+    (tmp_path / "1648-a" / "_metadata.json").write_text('{"languages":["lat","grc"]}', encoding="utf-8")
+
+    assert _git_commit(str(tmp_path), ["1648-a/_metadata.json"]) is True
+
+    committed = _git(tmp_path, "show", "--name-only", "--format=", "HEAD").stdout.split()
+    assert committed == ["1648-a/_metadata.json"]
+    # Võõras muudatus peab jääma committimata
+    assert "config/index.json" in _git(tmp_path, "status", "--short").stdout
