@@ -73,8 +73,10 @@ jäetakse välja, sest maht on mõõtmata ja sama tsitaadi-probleem on valideeri
 
 ### 1. Tuvastusskript — `scripts/detect_greek.py`
 
-Jookseb serveris, **`.venv/bin/python3`** (süsteemi `python3`-l puuduvad
-sõltuvused). Teed tulevad `server/config.py`-st, mitte `os.path.join(__file__, …)`.
+Jookseb serveris Dockeris: `docker exec vutt-backend python3 scripts/detect_greek.py`.
+See on `server_seed_data.sh` ja `migrate_prosopo_status_labels.py` muster — konteineris
+lahenevad teed samamoodi nagu tootmises (`/data`). Teed tulevad `server/config.py`-st
+(`BASE_DIR`), mitte `os.path.join(__file__, …)`.
 
 Puhas tuvastusloogika eraldatakse eraldi funktsiooniks, et see oleks testitav
 ilma failisüsteemita:
@@ -87,11 +89,23 @@ ilma failisüsteemita:
 
 ### 2. Kirjutamine
 
-Skript ei kirjuta `_metadata.json`-i otse, vaid `save_work_metadata()` kaudu
-(`server/metadata_ops.py`) — see on ainus lubatud kirjutamistee ja hoolitseb
-git-commiti eest. Parameetrid: `sync_meili=False` (skript jookseb hostis,
-Dockeri-väline sünk on ebausaldusväärne), `call_ptw=False` (keel ei puuduta
-isikuid).
+Skript kirjutab `_metadata.json`-i **otse** ja teeb kogu partii kohta **ühe
+git-commiti** `data/` repos.
+
+See kaldub kõrvale CLAUDE.md invariandist „kõik `_metadata.json` uuendused käivad
+`save_work_metadata()` kaudu" ja see kõrvalekalle on tahtlik. Invariant kehtib
+*serveri kirjutusteede* kohta (routerid), kus loeb samaaegsus ja Meili sünk.
+Ühekordse massimigratsiooni jaoks annaks `save_work_metadata()` **112 eraldi
+git-commiti**, mis on täpselt see, mille ADR 0015 hulgi-vastuvõtu puhul tagasi
+lükkas („lehe kaupa commitimine ujutaks ajaloo üle"). Lisaks ei kasuta ükski
+olemasolev migratsiooniskript (`migrate_genres.py`, `migrate_collections.py`,
+`migrate_prosopo_status_labels.py`) `save_work_metadata()`-t — kõik kirjutavad
+otse ja commitivad partiina.
+
+Hind: skript ei läbi `ALLOWED_METADATA_FIELDS` filtrit ega v1→v2 transformi.
+Ühe massiivivälja täiendamisel ei ole kummalgi rolli. Samaaegse serveri-salvestuse
+risk on olemas ja aktsepteeritud — sama risk on kõigil olemasolevatel
+migratsiooniskriptidel.
 
 Kaks režiimi:
 
@@ -122,21 +136,29 @@ Pärast `--apply` jooksu: `./scripts/server_seed_data.sh`.
 
 ### 4. Otsingufilter
 
-Uus `CollapsibleSection` „Keel" `src/pages/search/SearchFilters.tsx`-is,
-sama muster nagu `type`-filtril, aga lihtsam: sildid tulevad otse
-`vocabularies.languages[kood][et|en]`-ist, seega Q-koodi ↔ labeli
-mappingut (`typeIdMap`/`typeLabelToId`) ei ole vaja. Kaheksa keelt, tavaline
-märkeruutude loend.
+Uus `CollapsibleSection` „Keel" `src/pages/search/SearchFilters.tsx`-is.
+Lihtsam kui `type`-filter kahel põhjusel:
+
+- **Sildid tulevad otse** `vocabularies.languages[kood][et|en]`-ist, seega
+  Q-koodi ↔ labeli mappingut (`typeIdMap`/`typeLabelToId`) ei ole vaja.
+- **Facet-loendureid ei tehta.** Sõnavara on kinnine kaheksa keelega, seega
+  loend renderdatakse tervikuna sõnavarast. Meili facetid loendavad
+  *lehekülgi*, mitte teoseid (`searchService.ts` kommentaar) — „grc 3915"
+  oleks eksitav. Seega ei puutu see `useSearchFacets.ts`-i üldse.
+
+URL-parameeter on **`langs`**, mitte `lang`: `searchContent` options-objektis on
+juba `lang` väli (UI keelekood), mille ülekirjutamine murraks sildilahenduse.
 
 Muudetavad failid:
 
 | Fail | Muudatus |
 |---|---|
-| `useSearchUrlParams.ts` | uus param `lang`, komadega eraldatud koodid |
+| `useSearchUrlParams.ts` | uus param `langs` → `languages: string[]` |
 | `useFilterDraft.ts` | `selectedLanguages` olek, URL-sünk, `clearFilters` |
 | `SearchFilters.tsx` | uus sektsioon + `onLanguageToggle` |
-| `SearchPage.tsx` | oleku edasiandmine |
-| `searchService.ts` | filtriklausel + `'languages'` facet-nimekirja |
+| `SearchPage.tsx` | oleku edasiandmine + aktiivse filtri kiip |
+| `useSearchResults.ts` | `languages` edasi `searchContent`-ile |
+| `searchService.ts` | `languages?: string[]` options-is + filtriklausel |
 | `src/locales/{et,en}/search.json` | `filters.languages` |
 
 Tõlkevõti läheb **mõlemasse keelde korraga** — `fallbackLng` on väljas (ADR 0011),
@@ -159,14 +181,21 @@ vaatajale välja nagu andmeviga.
 - lävendi käitumine piiril: 19,9 % ei läbi, 20,0 % läbib
 - tähemärgi-valvur: 19 tähemärki 100 % osakaaluga ei läbi
 - `work_qualifies` — üks kvalifitseeruv leht 200 mittekvalifitseeruva seas läbib
-- idempotentsus: `grc` juba olemas → `save_work_metadata` ei kutsuta
+- idempotentsus: `grc` juba olemas → faili ei kirjutata
 - olemasoleva keele säilimine: `["lat"]` → `["lat", "grc"]`, mitte `["grc"]`
+- `languages` võti puudub täielikult → tekib `["grc"]`
 
 **Frontend** (`npm test`):
 
-- `useSearchUrlParams` loeb `lang` parameetri
-- `useFilterDraft` kirjutab valiku URL-i ja `clearFilters` tühjendab
-- `searchService` ehitab õige filtriklausli mitme keele korral
+- `searchService` ehitab õige filtriklausli ühe ja mitme keele korral ega
+  sega options-objekti `lang` välja
+- `parseListParam` (eksporditud `useSearchUrlParams`-ist) parsib `langs`
+  parameetri
+
+Projektis **ei ole jsdom-i ega `@testing-library/react`-i** (`vitest.config.ts`:
+`environment: 'node'`). Hooke ei saa renderdada, seega `commit`/`clearFilters`
+juhtmestik kontrollitakse käsitsi brauseris. Uusi testisõltuvusi ei lisata —
+see ei kuulu ülesande skoopi.
 
 **Väravad enne lõpetamist:** `npm run typecheck`, `npm test`, `npm run lint:ci`,
 `.venv/bin/pytest tests/`.
@@ -175,9 +204,11 @@ vaatajale välja nagu andmeviga.
 
 - **Loetamatu `.txt`** — logi hoiatus, jäta leht vahele, ära katkesta jooksu.
 - **Puuduv `_metadata.json`** — logi hoiatus, jäta teos vahele.
-- **`save_work_metadata` viskab erindi** — logi teose slug ja jätka; lõpuks
-  kokkuvõte, mitu õnnestus ja mitu ebaõnnestus. Osaline jooks peab olema ohutu,
-  sest skript on idempotentne ja kordamine parandab poolikuse.
+- **Kirjutamine viskab erindi** — logi teose slug ja jätka; lõpuks kokkuvõte,
+  mitu õnnestus ja mitu ebaõnnestus. Osaline jooks peab olema ohutu, sest skript
+  on idempotentne ja kordamine parandab poolikuse.
+- **Git-commit ebaõnnestub** — failid on juba kirjutatud ja jäävad alles;
+  logi viga ja lõpeta nullist erineva väljumiskoodiga, et see silma jääks.
 - **Aruanne kirjutatakse alati**, ka siis kui osa teoseid ebaõnnestus.
 
 ## Skoobist väljas
