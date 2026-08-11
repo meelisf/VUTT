@@ -55,6 +55,7 @@ export interface DashboardSearchOptions {
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
   genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
   type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
+  languages?: string[]; // Teose keele filter (OR loogika, ISO 639-3: lat, grc, deu…)
   lang?: string; // UI keel (et, en) siltide lahendamiseks — MITTE teose keele filter
   signal?: AbortSignal; // Poolelioleva Meilisearchi päringu katkestamine
   offset?: number; // Serveripoolse lehekülgjaotuse algus
@@ -67,6 +68,9 @@ export interface FacetDistribution {
   type_ids?: Record<string, number>;  // Q-koodid, keeleneutraalne
   tags_ids?: Record<string, number>;  // Q-koodid, keeleneutraalne
   teose_staatus?: Record<string, number>;
+  // ISO 639-3 koodid. Loendur on teosepõhine AINULT siis, kui päring filtreeris
+  // `lehekylje_number = 1` (searchWorks vaikimisi) — muidu loeb see lehekülgi.
+  languages?: Record<string, number>;
 }
 
 // Otsingu vastuse tüüp koos facetidega
@@ -374,6 +378,10 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     if (options?.type && options.type.length > 0) {
       filter.push(buildMultiFilter(options.type, buildTypeFilter));
     }
+    // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
+    if (options?.languages && options.languages.length > 0) {
+      filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
+    }
 
     // Kasutame ID-põhiseid facet välju (Q-koodid) — keeleneutraalsed, ei tekita duplikaate
     const genreFacetField = 'genre_ids';
@@ -394,7 +402,10 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
       filter: filter,
       // Facetid arvutatakse kogu filtrile ka serveripoolse lehekülgjaotuse korral.
       // Küsime facetid dünaamiliseks filtrite uuendamiseks
-      facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus']
+      // `languages` loendur on siin TEOSEPÕHINE: filter `lehekylje_number = 1`
+      // annab ühe dokumendi teose kohta. SearchPage'il oleks sama loendur
+      // lehepõhine ja seetõttu eksitav — seal facetteid ei küsita.
+      facets: [genreFacetField, typeFacetField, tagsFacetField, 'teose_staatus', 'languages']
     };
 
     // Lehekülgjaotus: `page`/`hitsPerPage` annab TÄPSE `totalHits`, `offset`/`limit`

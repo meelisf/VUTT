@@ -112,7 +112,9 @@
     "tags": "Märksõnad",
     "searchTag": "Otsi märksõna...",
     "type": "Tüüp",
+    "languages": "Keel",
     "searchType": "Otsi tüüpi...",
+    "searchLanguage": "Otsi keelt...",
     "clearAdvanced": "Tühjenda täpsemad filtrid"
   }
 }
