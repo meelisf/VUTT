@@ -491,11 +491,15 @@ export const searchWorks = async (index: Index, rawQuery: string, options?: Dash
     const facetDistribution = response.facetDistribution || {};
     return {
       works,
+      // NB: iga uus facet tuleb lisada NII päringusse (`facets: [...]` ülal) KUI
+      // siia tagastusse. `as FacetDistribution` kast ei anna puuduvast väljast
+      // tüübiviga, seega mahajäänud väli kaob vaikselt ja UI ei renderda sektsiooni.
       facets: {
         genre_ids: facetDistribution['genre_ids'],
         type_ids: facetDistribution['type_ids'],
         tags_ids: facetDistribution['tags_ids'],
-        teose_staatus: facetDistribution['teose_staatus']
+        teose_staatus: facetDistribution['teose_staatus'],
+        languages: facetDistribution['languages']
       } as FacetDistribution,
       // page-režiimis täpne totalHits; offset-režiimis (ja vanemate vastuste korral)
       // estimatedTotalHits.

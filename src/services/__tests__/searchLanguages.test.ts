@@ -78,4 +78,22 @@ describe('keelefilter teoseotsingus (Dashboard)', () => {
     await searchWorks(mockIndex, '');
     expect(mockSearch.mock.calls[0][1].facets).toContain('languages');
   });
+
+  // Regressioon: facetide KÜSIMINE ei ole sama mis nende TAGASTAMINE.
+  // searchWorks loetleb tagastuses facet-väljad käsitsi ja `as FacetDistribution`
+  // kast peidab puuduva välja typecheck'i eest — languages jäi vaikselt maha ja
+  // Dashboard'i keelesektsioon ei renderdunud kunagi.
+  it('tagastab languages facetid vastusest edasi', async () => {
+    mockSearch.mockResolvedValue({
+      hits: [],
+      facetDistribution: {
+        genre_ids: { Q1: 5 },
+        languages: { lat: 1211, grc: 113 },
+      },
+      totalHits: 0,
+    });
+    const result = await searchWorks(mockIndex, '');
+    expect(result.facets.languages).toEqual({ lat: 1211, grc: 113 });
+    expect(result.facets.genre_ids).toEqual({ Q1: 5 });
+  });
 });
