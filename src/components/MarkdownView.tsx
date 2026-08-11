@@ -2,6 +2,7 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import { escapeAccidentalOrderedLists } from './markdownViewHelpers';
 
 // Piiratud, turvaline markdown-renderdus (märkmed, elulugu, kommentaarid).
 // Ainult markdown — toores HTML escape'itud (ei kasuta rehype-raw'd).
@@ -24,6 +25,8 @@ interface MarkdownViewProps {
 const MarkdownView: React.FC<MarkdownViewProps> = ({ content, className, softBreaks }) => {
   if (!content || !content.trim()) return null;
   const remarkPlugins = softBreaks ? [remarkGfm, remarkBreaks] : [remarkGfm];
+  // Aastaarvu/kuupäevaga algav lõik ei tohi muutuda nummerdatud loendiks.
+  const source = escapeAccidentalOrderedLists(content);
   return (
     <div className={['vutt-md', className].filter(Boolean).join(' ')}>
       <ReactMarkdown
@@ -36,7 +39,7 @@ const MarkdownView: React.FC<MarkdownViewProps> = ({ content, className, softBre
           ),
         }}
       >
-        {content}
+        {source}
       </ReactMarkdown>
     </div>
   );
