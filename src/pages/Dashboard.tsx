@@ -21,6 +21,7 @@ import BulkTagsPicker from '../components/BulkTagsPicker';
 import BulkGenrePicker from '../components/BulkGenrePicker';
 import { LinkedEntity } from '../types/LinkedEntity';
 import { getEntityLabelsCache } from '../services/entityLabelsService';
+import { getGenreLabelMap, getTagsLabelMap, getTypeLabelMap } from '../services/searchService';
 import { Link, useSearchParams } from 'react-router-dom';
 import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { bulkAssignCollection, bulkAssignGenre, bulkAssignTags } from '../services/workApi';
@@ -228,23 +229,76 @@ const Dashboard: React.FC = () => {
     setCurrentPage(pageParam);
   }, [pageParam]);
 
+  // Facet-koodide lünga-täide.
+  //
+  // `genreIdMap`/`tagsIdMap`/`typeIdMap` ehitatakse AINULT nähtava lehe 12 teosest
+  // + kanoonilisest registrist. Facetid katavad aga kogu korpust, seega Q-kood,
+  // mille ainus teos ei ole parajasti lehel JA mida registris ei ole, jäi
+  // lahendamata ja kuvati toore Q-koodina (nt Q259745 „Nõidus"). Klikkimine tõi
+  // teose lehele ja silt ilmus, tühjendamine viis ta ära ja number tuli tagasi.
+  //
+  // SearchPage teeb sama asja `useSearchFacets`-is; siin puudus see täiesti.
+  // `resolveLabelsFromRegistry` teeb päringu AINULT tegelike lünkade korral.
+  const [facetLabels, setFacetLabels] = useState<Record<string, Record<string, string>>>({});
+  const genreFacetKeys = Object.keys(facets.genre_ids || {}).join(',');
+  const tagsFacetKeys = Object.keys(facets.tags_ids || {}).join(',');
+  const typeFacetKeys = Object.keys(facets.type_ids || {}).join(',');
+
+  useEffect(() => {
+    if (!index) return;
+    const lang = getLangCode(i18n.language);
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const gather = async () => {
+      // Loeme koodid võtme-stringidest, MITTE `facets`-ist: nii ei sõltu effect
+      // objektiidentiteedist ja deps-massiiv on staatiliselt kontrollitav.
+      const split = (keys: string) => keys.split(',').filter(Boolean);
+      const jobs: [string[], (q: string[]) => Promise<Record<string, string>>][] = [
+        [split(genreFacetKeys), q => getGenreLabelMap(index, q, lang)],
+        [split(tagsFacetKeys), q => getTagsLabelMap(index, q, lang, controller.signal)],
+        [split(typeFacetKeys), q => getTypeLabelMap(index, q, lang, controller.signal)],
+      ];
+      const resolved: Record<string, Record<string, string>> = {};
+      for (const [codes, fn] of jobs) {
+        if (!codes.length) continue;
+        try {
+          for (const [id, label] of Object.entries(await fn(codes))) {
+            resolved[id] = { ...(resolved[id] || {}), [lang]: label };
+          }
+        } catch {
+          // Lünga-täide on parim-pingutus: vea korral jääb Q-kood nähtavaks
+          // nagu varem, ülejäänud filtrid töötavad edasi.
+        }
+      }
+      if (!cancelled && Object.keys(resolved).length > 0) setFacetLabels(resolved);
+    };
+    gather();
+    return () => { cancelled = true; controller.abort(); };
+  }, [index, genreFacetKeys, tagsFacetKeys, typeFacetKeys, i18n.language]);
+
+  // Register on kanooniline; lünga-täide lisab ainult selle, mida registris ei ole
+  const labelsForMaps = useMemo(
+    () => ({ ...facetLabels, ...enrichedLabels }),
+    [facetLabels, enrichedLabels]);
+
   // Genre kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: genreIdMap, labelToId: genreLabelToId } = useMemo(() => {
     const items = collectLinkedEntities(works, w => w.genre);
-    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
-  }, [works, i18n.language, enrichedLabels]);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), labelsForMaps);
+  }, [works, i18n.language, labelsForMaps]);
 
   // Tags kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: tagsIdMap, labelToId: tagsLabelToId } = useMemo(() => {
     const items = collectLinkedEntities(works, w => w.tags);
-    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
-  }, [works, i18n.language, enrichedLabels]);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), labelsForMaps);
+  }, [works, i18n.language, labelsForMaps]);
 
   // Type kaardid: Q-kood/label → praeguse keele label + label → Q-kood
   const { idToLabel: typeIdMap, labelToId: typeLabelToId } = useMemo(() => {
     const items = collectLinkedEntities(works, w => w.type);
-    return buildLinkedEntityMaps(items, getLangCode(i18n.language), enrichedLabels);
-  }, [works, i18n.language, enrichedLabels]);
+    return buildLinkedEntityMaps(items, getLangCode(i18n.language), labelsForMaps);
+  }, [works, i18n.language, labelsForMaps]);
 
   // Lae entity labels cache serverist (üks kord sessiooni jooksul)
   useEffect(() => {

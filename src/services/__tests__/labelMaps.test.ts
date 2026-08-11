@@ -24,7 +24,7 @@ vi.mock('../../config', () => ({
   FILE_API_URL: '/api/files',
 }));
 
-import { getGenreLabelMap, getTagsLabelMap } from '../searchService';
+import { getGenreLabelMap, getTagsLabelMap, getTypeLabelMap } from '../searchService';
 
 // Mock index antakse otse funktsiooni argumendina (dependency injection)
 const mockIndex = { search: mockSearch } as any;
@@ -155,5 +155,28 @@ describe('getTagsLabelMap — sama register, tags väljad (#179)', () => {
     expect(options.filter).toContain('tags_ids IN ["vutt:P7"]');
     expect(options.attributesToRetrieve).toEqual(['tags_object']);
     expect(result['vutt:P7']).toBe('Luden');
+  });
+});
+
+
+// Dashboard vajab sama lünga-täidet ka tüübi jaoks — seda abifunktsiooni
+// varem ei olnud, seega Dashboard'i tüübifiltris jäid registrist puuduvad
+// Q-koodid lahendamata.
+describe('getTypeLabelMap — sama register, type väljad', () => {
+  it('lahendab labeli registrist ilma Meili päringuta', async () => {
+    mockRegistry.mockResolvedValue({ Q1980247: { et: 'peatükk', en: 'chapter' } });
+    const result = await getTypeLabelMap(mockIndex, ['Q1980247'], 'et');
+    expect(result).toEqual({ Q1980247: 'Peatükk' });
+    expect(mockSearch).not.toHaveBeenCalled();
+  });
+
+  it('täidab registri lüngad type_object dokumendipäringust', async () => {
+    mockRegistry.mockResolvedValue({});
+    mockSearch.mockReturnValue(makeResponse([
+      { type_object: [{ id: 'Q189279', labels: { et: 'katekismus', en: 'catechism' } }] },
+    ]));
+    const result = await getTypeLabelMap(mockIndex, ['Q189279'], 'et');
+    expect(result).toEqual({ Q189279: 'Katekismus' });
+    expect(mockSearch.mock.calls[0][1].filter).toContain('type_ids IN ["Q189279"]');
   });
 });
