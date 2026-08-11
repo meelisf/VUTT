@@ -284,6 +284,15 @@ export const getGenreLabelMap = (
  * esinevad märksõnad, seega facetist tulnud harvem esinev märksõna võis jääda ilma
  * labelita. Register katab kõik ja on juba mälus.
  */
+export const getTypeLabelMap = (
+  index: Index,
+  qcodes: string[],
+  lang: string = 'et',
+  signal?: AbortSignal
+): Promise<Record<string, string>> =>
+  resolveLabelsFromRegistry(index, qcodes, lang,
+    { idsField: 'type_ids', objectField: 'type_object' }, signal);
+
 export const getTagsLabelMap = (
   index: Index,
   qcodes: string[],
