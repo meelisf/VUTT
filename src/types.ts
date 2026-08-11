@@ -287,7 +287,8 @@ export interface ContentSearchOptions {
   genre?: string[];       // V2: žanri filter (mitu valikut OR loogikaga)
   type?: string[];        // V2: tüübi filter (mitu valikut OR loogikaga)
   collection?: string;    // V2: kollektsiooni filter (collections_hierarchy kaudu)
-  lang?: string;          // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
+  languages?: string[];   // Teose keele filter (OR loogika, ISO 639-3: lat, grc, deu…)
+  lang?: string;          // UI keel (et, en) siltide lahendamiseks — MITTE teose keele filter
   author?: string;        // V2: autori filter (creators massiivist)
   subjectPerson?: string; // VUTT isiku ID (vutt:Pxxxxxx) teema-filtrina (tags_ids kaudu)
   pageTags?: string[];    // Lehekülje märksõnad (AND loogika, page_tags_ids)

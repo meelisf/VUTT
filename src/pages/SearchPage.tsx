@@ -3,7 +3,7 @@ import { useSearchParams, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { getWorkMetadata } from '../services/workService';
 import { getCollectionColorClasses } from '../services/collectionService';
-import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar } from 'lucide-react';
+import { Search, Filter, Library, FileText, User, X, Layers, Tag, Bookmark, FileType, Calendar, Languages } from 'lucide-react';
 import Header from '../components/Header';
 import { useCollection } from '../contexts/CollectionContext';
 import { useMeiliIndex } from '../contexts/MeilisearchContext';
@@ -143,6 +143,7 @@ const SearchPage: React.FC = () => {
                         {/* Aktiivsed filtrid otsinguriba all */}
                         {(draft.selectedAuthor || draft.selectedPersonTag || draft.selectedWork || selectedCollection || urlParams.scope !== 'all' ||
                             urlParams.pageTags.length > 0 || urlParams.genres.length > 0 || urlParams.types.length > 0 ||
+                            urlParams.languages.length > 0 ||
                             urlParams.teoseTags.length > 0 || urlParams.yearStart !== undefined || urlParams.yearEnd !== undefined) && (
                             <div className="flex flex-wrap items-center gap-1.5 mt-3">
                                 {/* Ajavahemik */}
@@ -213,6 +214,25 @@ const SearchPage: React.FC = () => {
                                                 setSearchParams(prev => { if (next.length > 0) prev.set('type', next.join(',')); else prev.delete('type'); prev.set('p', '1'); return prev; });
                                             }}
                                             className="ml-0.5 hover:bg-sky-100 rounded-full p-0.5"
+                                            title={t('filters.removeFilter')}
+                                        >
+                                            <X size={11} />
+                                        </button>
+                                    </div>
+                                ))}
+                                {/* Keeled */}
+                                {urlParams.languages.map(code => (
+                                    <div key={code} className="flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded-full text-xs font-medium border border-amber-200">
+                                        <Languages size={11} />
+                                        <span>{facets.vocabularies?.languages?.[code]?.[langCode] || code}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const next = urlParams.languages.filter(x => x !== code);
+                                                actions.setSelectedLanguages(next);
+                                                setSearchParams(prev => { if (next.length > 0) prev.set('langs', next.join(',')); else prev.delete('langs'); prev.set('p', '1'); return prev; });
+                                            }}
+                                            className="ml-0.5 hover:bg-amber-100 rounded-full p-0.5"
                                             title={t('filters.removeFilter')}
                                         >
                                             <X size={11} />
@@ -351,6 +371,10 @@ const SearchPage: React.FC = () => {
                     onTypeToggle={(v) => {
                         const key = /^Q\d+$/.test(v) ? v : (typeLabelToId[v] || typeLabelToId[v[0]?.toUpperCase() + v.slice(1)] || v);
                         actions.setSelectedTypes(prev => prev.includes(key) ? prev.filter(t => t !== key) : [...prev, key]);
+                    }}
+                    onLanguageToggle={(v) => {
+                        // Keelekoodid on ISO 639-3, Q-koodi lahendust ei ole vaja
+                        actions.setSelectedLanguages(prev => prev.includes(v) ? prev.filter(l => l !== v) : [...prev, v]);
                     }}
                     onTagToggle={(v) => {
                         const key = /^Q\d+$/.test(v) ? v : (tagsLabelToId[v] || tagsLabelToId[v[0]?.toUpperCase() + v.slice(1)] || v);

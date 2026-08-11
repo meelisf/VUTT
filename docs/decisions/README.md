@@ -37,3 +37,5 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0015](0015-reocr-hulgi-vastuvott.md) | Batch re-OCR tulemused võetakse vastu hulgi, ühe git-commiti ja ühe Meili sünkina | kehtib |
 | [0016](0016-rikastuse-allikatel-on-varuteed.md) | Igal välisel rikastusallikal on varutee ja lühike timeout | kehtib |
 | [0017](0017-poolitamine-enne-ocr.md) | Topeltlehtede poolitamine enne OCR-i: VUTT rasteriseerib ise, prepress on opt-in | kehtib |
+| [0018](0018-reocr-katkestamine.md) | Re-OCR töö katkestamine | kehtib |
+| [0019](0019-languages-esinevad-keeled.md) | `languages` loetleb teoses sisuliselt esinevad keeled, mitte põhikeelt | kehtib |

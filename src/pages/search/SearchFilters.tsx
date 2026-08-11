@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Vocabularies } from '../../services/collectionService';
 import CollapsibleSection from '../../components/CollapsibleSection';
 import SearchableFilterList from './SearchableFilterList';
-import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText } from 'lucide-react';
+import { Layers, Calendar, BookOpen, Tag, FileType, User, FileText, Languages } from 'lucide-react';
 import { getLangCode } from '../../utils/getLangCode';
 import { mergeFacetItems } from '../../utils/facetUtils';
 import { isVuttId } from '../../utils/qcodeUtils';
@@ -35,6 +35,7 @@ export interface FilterDraftProps {
     selectedPageTags: string[];
     selectedGenres: string[];
     selectedTypes: string[];
+    selectedLanguages: string[];
     selectedAuthor: string;
     authorInput: string;
     showAuthorSuggestions: boolean;
@@ -77,6 +78,7 @@ export interface SearchFiltersProps {
     onYearEndChange: (year: string) => void;
     onGenreToggle: (value: string) => void;
     onTypeToggle: (value: string) => void;
+    onLanguageToggle: (value: string) => void;
     onTagToggle: (value: string) => void;
     onAuthorInputChange: (value: string) => void;
     onShowAuthorSuggestions: (show: boolean) => void;
@@ -95,7 +97,7 @@ export interface SearchFiltersProps {
 const SearchFilters: React.FC<SearchFiltersProps> = ({
     draft, facets, qCodeMaps,
     onScopeChange, onYearStartChange, onYearEndChange,
-    onGenreToggle, onTypeToggle, onTagToggle,
+    onGenreToggle, onTypeToggle, onLanguageToggle, onTagToggle,
     onAuthorInputChange, onShowAuthorSuggestions,
     onAuthorSelect, onAuthorClear,
     onPersonTagInputChange, onShowPersonSuggestions, onPersonTagSelect, onPersonTagClear,
@@ -107,7 +109,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
     const { enrichedLabels, genreIdMap, genreLabelToId, typeIdMap, typeLabelToId, tagsIdMap, tagsLabelToId, availablePersonTags = [] } = qCodeMaps;
     const { availableGenres, availableTypes, availableTeoseTags, availableAuthors, availableWorks, vocabularies, aliasMap, tagLabels, loading } = facets;
-    const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedPersonTag, personTagInput, showPersonSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
+    const { selectedScope, yearStart, yearEnd, selectedGenres, selectedTypes, selectedLanguages, selectedTeoseTags, selectedAuthor, authorInput, showAuthorSuggestions, selectedPersonTag, personTagInput, showPersonSuggestions, selectedWork, selectedWorkInfo, showFiltersMobile } = draft;
 
     // Q-kood → label: enrichedLabels (labels.json) primaarne, seejärel idToLabel map
     const resolveLabel = (qCode: string, idToLabel?: Record<string, string>) =>
@@ -279,6 +281,36 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
                             onToggle={onTypeToggle}
                             placeholder={t('filters.searchType', 'Otsi tüüpi...')}
                         />
+                    </CollapsibleSection>
+                )}
+
+                {/* Keele filter — sõnavarast, ilma facet-loenduriteta.
+                    Meili facetid loendavad lehekülgi, mitte teoseid, seega
+                    loendur oleks eksitav. Sõnavara on kinnine (8 keelt).
+                    NB: languages loetleb esinevad keeled, mitte põhikeelt (ADR 0019). */}
+                {vocabularies?.languages && Object.keys(vocabularies.languages).length > 0 && (
+                    <CollapsibleSection
+                        title={t('filters.languages')}
+                        icon={<Languages size={14} />}
+                        defaultOpen={selectedLanguages.length > 0}
+                        badge={selectedLanguages.length || undefined}
+                    >
+                        <div className="space-y-1">
+                            {Object.entries(vocabularies.languages).map(([code, data]) => (
+                                <label
+                                    key={code}
+                                    className="flex items-center gap-2 px-1 py-0.5 text-sm text-gray-700 hover:bg-gray-50 rounded cursor-pointer"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedLanguages.includes(code)}
+                                        onChange={() => onLanguageToggle(code)}
+                                        className="rounded text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <span>{data[lang] || data.et || code}</span>
+                                </label>
+                            ))}
+                        </div>
                     </CollapsibleSection>
                 )}
 

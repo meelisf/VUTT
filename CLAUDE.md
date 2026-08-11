@@ -232,6 +232,12 @@ Workspace). `LoginModal` `isOpen` EI TOHI olla seotud `sessionExpired`-iga.
 Label-resolutsioon `et→en→la→de`, register `data/config/labels.json`, abiline `useEntityLabel`.
 Prosopograafia massiiviväljad (`statuses[]`, `confessions[]`) kannavad inline `labels{et,en}`.
 
+**Keeled (ADR 0019)** — `languages` loetleb teoses **sisuliselt esinevad** keeled, MITTE põhikeelt.
+Keel kuulub loendisse, kui vähemalt ühe lehekülje tähtedest on ≥20 % selles keeles. Ladinakeelne
+disputatsioon kreekakeelse gratulatsiooniga kannab nii `lat` kui `grc` — see ei ole viga.
+Semantika on kõigil koodidel sama; põhikeelt ei kanna praegu ükski väli.
+Kreeka automaattuvastus: `scripts/detect_greek.py` (kuivkäivitus vaikimisi).
+
 **Kollektsioonid** — hierarhilised, `data/config/collections.json`; olek `CollectionContext`.
 Värvid on Tailwindi värvinimed (vaikimisi `indigo`):
 

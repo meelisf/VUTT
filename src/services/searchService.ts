@@ -55,7 +55,7 @@ export interface DashboardSearchOptions {
   collection?: string; // Kollektsiooni filter (filtreerib collections_hierarchy järgi)
   genre?: string[]; // Žanri filter (OR loogika - mitu valikut lubatud)
   type?: string[]; // Tüübi filter (OR loogika - mitu valikut lubatud)
-  lang?: string; // Keele filter (et, en) - kasutatakse genre/type/tags väljadega
+  lang?: string; // UI keel (et, en) siltide lahendamiseks — MITTE teose keele filter
   signal?: AbortSignal; // Poolelioleva Meilisearchi päringu katkestamine
   offset?: number; // Serveripoolse lehekülgjaotuse algus
   limit?: number; // Serveripoolse lehekülje suurus
@@ -599,6 +599,10 @@ export const searchContent = async (index: Index, rawQuery: string, page: number
   // V2: Tüübi filter
   if (options.type && options.type.length > 0) {
     filter.push(buildMultiFilter(options.type, buildTypeFilter));
+  }
+  // Keele filter — languages on massiiv, seega üks väärtus ühtib massiivi liikmega
+  if (options.languages && options.languages.length > 0) {
+    filter.push(buildMultiFilter(options.languages, (l) => `languages = "${l}"`));
   }
   // V2: Autori filter (kõik creators: author_names + respondens_names)
   if (options.author) {
