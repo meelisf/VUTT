@@ -74,7 +74,7 @@ katkedes jääks seis pooleldi rakendatuks. Lükati tagasi.
 
 ## Viited
 
-- Spets: `docs/superpowers/specs/2026-08-07-reocr-hulgi-vastuvott-design.md`
+- Spets: `docs/_archive/superpowers/specs/done/2026-08-07-reocr-hulgi-vastuvott-design.md`
 - `server/reocr_apply.py` — `apply_ocr_results`, `discard_ocr_results`
 - `server/routers/reocr.py` — `/admin/work/{work_id}/reocr-apply`, `.../reocr-discard`
 - `src/utils/reocrStatus.ts` — `applicableReocrPages`

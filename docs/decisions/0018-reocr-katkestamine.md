@@ -2,7 +2,7 @@
 
 **Kuupäev:** 2026-08-08
 **Staatus:** vastu võetud
-**Issue:** #217 · **Spekk:** `docs/superpowers/specs/2026-08-08-reocr-katkestamine-design.md`
+**Issue:** #217 · **Spekk:** `docs/_archive/superpowers/specs/done/2026-08-08-reocr-katkestamine-design.md`
 
 ## Kontekst
 
