@@ -76,6 +76,28 @@ def test_lehekulgede_paring_ilma_vahemikuta_annab_koik():
     assert body["filter"] == 'work_id = "abc123"'
 
 
+def test_ulevaate_paring_kysib_metaandmed_ilma_tekstita():
+    """get_work vajab pealkirja/autorit/aastat, aga MITTE lehekülgede teksti.
+
+    Live-kontroll näitas tühja päist: page-päring ei sisalda metaandmevälju,
+    ja 43 lehekülje täistekst oli asjatu koormus.
+    """
+    body = queries.build_work_overview_body("abc123")
+    retrieve = body["attributesToRetrieve"]
+    for field in ("title", "autor", "aasta", "location", "genre", "languages"):
+        assert field in retrieve, f"{field} puudub ülevaate päringust"
+    assert "lehekylje_tekst" not in retrieve
+    assert "marginaalia_tekst" not in retrieve
+    assert body["sort"] == ["lehekylje_number:asc"]
+    assert 'work_id = "abc123"' in body["filter"]
+
+
+def test_ulevaate_paring_sisaldab_lehekulje_numbrit_ja_seisundit():
+    retrieve = queries.build_work_overview_body("abc")["attributesToRetrieve"]
+    assert "lehekylje_number" in retrieve
+    assert "status" in retrieve
+
+
 def test_facets_paring_ei_kysi_hitte():
     body = queries.build_facets_body("collections_hierarchy")
     assert body["limit"] == 0

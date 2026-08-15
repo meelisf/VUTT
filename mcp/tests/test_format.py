@@ -100,6 +100,100 @@ def test_format_pages_tuhi_vahemik():
     assert "ei ole" in fmt.format_pages([], base_url=BASE, work_id="abc")
 
 
-def test_seisundi_legend_selgitab_koiki_kolme():
-    for status in ("Toores", "Töös", "Valmis"):
+def test_seisundi_legend_selgitab_koiki_viit():
+    """Lehekülje staatuseid on VIIS — kolmene komplekt on teose koondstaatus."""
+    for status in ("Toores", "Töös", "Parandatud", "Annoteeritud", "Valmis"):
         assert status in fmt.STATUS_LEGEND
+
+
+def test_pikk_pealkiri_kärbitakse_otsingutulemuses():
+    """Täisbibliograafiline kirje võib olla 500+ märki — otsingutulemuses
+    sööks see konteksti ära. get_work näitab täispikkuses."""
+    pikk = "Disputatio " + "verbosa " * 80
+    out = fmt.format_search_hits(
+        [dict(HIT, title=pikk)], total=1, base_url=BASE
+    )
+    title_line = out.splitlines()[3]
+    assert len(title_line) < 300
+    assert "…" in title_line
+
+
+def test_luhike_pealkiri_jaab_puutumata():
+    out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
+    title_line = out.splitlines()[3]
+    assert '"Disputatio politica de republica"' in title_line
+    assert "…" not in title_line  # kärpe-ellips ei tohi lühikest pealkirja puudutada
+
+
+# ── loojad ja rollid ──────────────────────────────────────────────────────
+
+CREATORS = [
+    {"name": "Andreas Virginius", "role": "praeses", "id": "vutt:Pky0a04"},
+    {"name": "Peter Götschen", "role": "respondens", "id": "vutt:P6e42i9"},
+    {"name": "Georg Mancelius", "role": "gratulator", "id": "vutt:P3emhpf"},
+    {"name": "Fridericus Menius", "role": "gratulator", "id": "vutt:P6yllay"},
+    {"name": "Johannes Weideling", "role": "aui", "id": "vutt:Pi874ih"},
+]
+
+
+def test_creators_grupeeritakse_rolli_kaupa():
+    out = fmt.format_creators(CREATORS)
+    assert "praeses: Andreas Virginius" in out
+    assert "respondens: Peter Götschen" in out
+    # sama rolli isikud ühel real (nime järel käib person_id)
+    gratulator_line = next(l for l in out.splitlines() if l.strip().startswith("gratulator:"))
+    assert "Georg Mancelius" in gratulator_line
+    assert "Fridericus Menius" in gratulator_line
+
+
+def test_creators_sisaldab_person_id_d():
+    """Agent peab saama isikult get_person'i juurde edasi minna."""
+    out = fmt.format_creators(CREATORS)
+    assert "vutt:Pky0a04" in out
+
+
+def test_creators_kanooniline_rollijarjestus():
+    out = fmt.format_creators(CREATORS)
+    assert out.index("praeses") < out.index("respondens") < out.index("gratulator")
+
+
+def test_aui_roll_on_selgitatud():
+    """`aui` on läbipaistmatu kood — eessõna/järelsõna autor."""
+    out = fmt.format_creators(CREATORS)
+    assert "aui" in out
+    assert "eessõna" in fmt.CREATOR_ROLE_LEGEND.lower()
+
+
+def test_legend_katab_koik_rollid():
+    for role in ("praeses", "respondens", "auctor", "gratulator",
+                 "dedicator", "editor", "aui"):
+        assert role in fmt.CREATOR_ROLE_LEGEND
+
+
+def test_tundmatu_roll_ei_kao_ara():
+    out = fmt.format_creators([{"name": "X", "role": "uus_roll", "id": "vutt:P1"}])
+    assert "uus_roll: X" in out
+
+
+def test_creators_tuhi():
+    assert fmt.format_creators([]) == ""
+
+
+def test_otsingutulemus_naitab_peamise_looja_rolli():
+    hit = dict(HIT, creators=CREATORS)
+    out = fmt.format_search_hits([hit], total=1, base_url=BASE)
+    assert "Andreas Virginius (praeses)" in out
+    assert "Peter Götschen (respondens)" in out
+
+
+def test_otsingutulemus_ilma_creatorsita_kasutab_autori_valja():
+    out = fmt.format_search_hits([HIT], total=1, base_url=BASE)
+    assert "Ludenius, Laurentius" in out
+
+
+def test_ilma_loojata_teosel_pole_rippuvat_eraldajat():
+    hit = {k: v for k, v in HIT.items() if k != "autor"}
+    out = fmt.format_search_hits([hit], total=1, base_url=BASE)
+    title_line = out.splitlines()[3]
+    assert "]  · " not in title_line
+    assert title_line.startswith('[1] "Disputatio')

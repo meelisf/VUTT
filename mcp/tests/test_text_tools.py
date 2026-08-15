@@ -136,3 +136,37 @@ async def test_get_work_naitab_metaandmed(server_with):
     out = await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
     assert "pealkiri: Disputatio politica" in out
     assert "koht: Tartu" in out
+
+
+async def test_get_work_kysib_metaandmevaljad_paringus(server_with):
+    """Päringu tasandi kontroll — võltsandmetes on väljad olemas ka siis,
+    kui päring neid ei küsi. Live-kontroll näitas tühja päist just seetõttu."""
+    server, client = server_with([{"hits": [_hit(page=1)], "totalHits": 1}])
+    await _call(server, "get_work", {"work_id": "v7Kq2mXp"})
+    retrieve = client.bodies[0]["attributesToRetrieve"]
+    assert "title" in retrieve and "autor" in retrieve and "aasta" in retrieve
+    # praeses, gratulandid ja eessõna autor elavad creators-massiivis
+    assert "creators" in retrieve
+    # ülevaade ei vaja lehekülgede teksti
+    assert "lehekylje_tekst" not in retrieve
+
+
+async def test_get_work_naitab_praeses_ja_gratulandid(server_with):
+    creators = [
+        {"name": "Andreas Virginius", "role": "praeses", "id": "vutt:Pky0a04"},
+        {"name": "Peter Götschen", "role": "respondens", "id": "vutt:P6e42i9"},
+        {"name": "Georg Mancelius", "role": "gratulator", "id": "vutt:P3emhpf"},
+        {"name": "Johannes Weideling", "role": "aui", "id": "vutt:Pi874ih"},
+    ]
+    server, _ = server_with([{"hits": [_hit(page=1, creators=creators)], "totalHits": 1}])
+    out = await _call(server, "get_work", {"work_id": "d9noh9"})
+    assert "praeses: Andreas Virginius" in out
+    assert "gratulator: Georg Mancelius" in out
+    assert "aui: Johannes Weideling" in out
+    assert "eessõna" in out.lower()  # aui-koodi selgitus
+
+
+async def test_search_pages_kysib_creatorsit(server_with):
+    server, client = server_with([{"hits": [], "totalHits": 0}])
+    await _call(server, "search_pages", {"query": "x"})
+    assert "creators" in client.bodies[0]["attributesToRetrieve"]

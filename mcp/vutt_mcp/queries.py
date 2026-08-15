@@ -29,6 +29,7 @@ SEARCH_RETRIEVE_FIELDS = [
     "languages",
     "location",
     "genre",
+    "creators",
 ]
 
 # Väljad, mida lehekülje lugemisel küsime
@@ -37,6 +38,29 @@ PAGE_RETRIEVE_FIELDS = [
     "lehekylje_number",
     "lehekylje_tekst",
     "marginaalia_tekst",
+    "status",
+    "teose_lehekylgede_arv",
+]
+
+# Teose ülevaade (get_work): metaandmed + lehekülgede loend, AGA ILMA tekstita.
+# Tekst oleks siin puhas koormus — ülevaade näitab ainult numbrit ja seisundit.
+WORK_OVERVIEW_RETRIEVE_FIELDS = [
+    "work_id",
+    "title",
+    "autor",
+    "respondens",
+    "aasta",
+    "year_display",
+    "location",
+    "publisher",
+    "genre",
+    "languages",
+    "collections",
+    "notes",
+    # praeses, gratulandid ja eessõna autor elavad AINULT siin — tuletatud
+    # väljad `autor`/`respondens` neid ei kata.
+    "creators",
+    "lehekylje_number",
     "status",
     "teose_lehekylgede_arv",
 ]
@@ -159,6 +183,21 @@ def build_work_pages_body(
         "filter": " AND ".join(clauses),
         "sort": ["lehekylje_number:asc"],
         "attributesToRetrieve": PAGE_RETRIEVE_FIELDS,
+        "limit": int(limit),
+    }
+
+
+def build_work_overview_body(work_id: str, limit: int = 1000) -> dict:
+    """Teose ülevaade: metaandmed + lehekülgede loend, ilma tekstita.
+
+    Eraldi `build_work_pages_body`-st, sest see küsib teisi välju: metaandmed
+    tulevad esimesest hitist ja lehekülje teksti siin ei taheta.
+    """
+    return {
+        "q": "",
+        "filter": f"work_id = {_quote(work_id)}",
+        "sort": ["lehekylje_number:asc"],
+        "attributesToRetrieve": WORK_OVERVIEW_RETRIEVE_FIELDS,
         "limit": int(limit),
     }
 

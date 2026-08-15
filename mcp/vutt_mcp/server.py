@@ -119,7 +119,7 @@ def _register_text_tools(mcp: MCPServer, client, base_url: str) -> None:
         work_id on teose püsiv lühikood (nanoid), mille saad search_works'ist
         või search_pages'ist.
         """
-        data = client.meili_search(queries.build_work_pages_body(work_id))
+        data = client.meili_search(queries.build_work_overview_body(work_id))
         hits = data.get("hits", [])
         if not hits:
             raise VuttNotFound(
@@ -200,8 +200,6 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
     work_id = first.get("work_id", "")
     header = fmt.format_fields([
         ("pealkiri", first.get("title")),
-        ("autor", first.get("autor")),
-        ("respondens", first.get("respondens")),
         ("aasta", first.get("aasta") or first.get("year_display")),
         ("koht", first.get("location")),
         ("žanr", first.get("genre")),
@@ -211,7 +209,20 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
         ("lehekülgi", first.get("teose_lehekylgede_arv") or len(hits)),
         ("vaata", fmt.work_url(work_id, base_url=base_url)),
     ])
-    lines = [header, "", fmt.STATUS_LEGEND, "", "Leheküljed:"]
+    lines = [header]
+
+    # Loojad rollidega: praeses, gratulandid ja eessõna autor (aui) elavad
+    # AINULT `creators`-massiivis — tuletatud `autor`/`respondens` neid ei kata.
+    creators = fmt.format_creators(first.get("creators") or [])
+    if creators:
+        lines += ["", "Isikud:", creators, "", fmt.CREATOR_ROLE_LEGEND]
+    elif first.get("autor") or first.get("respondens"):
+        lines += ["", fmt.format_fields([
+            ("autor", first.get("autor")),
+            ("respondens", first.get("respondens")),
+        ])]
+
+    lines += ["", fmt.STATUS_LEGEND, "", "Leheküljed:"]
     for hit in hits:
         num = hit.get("lehekylje_number")
         lines.append(

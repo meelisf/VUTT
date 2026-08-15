@@ -23,7 +23,12 @@ LIST_RESPONSE = {
         "gender": "M",
         "work_count": 156,
         "biography_snippet": "Lorenz Luden (ladina keele professor)",
-        "occupations": ["professor"],
+        # Tootmises on need LinkedEntity-objektid, MITTE stringid — vt
+        # test_occupations_objektidena. Võltsandmed peavad päris kuju peegeldama.
+        "occupations": [
+            {"id": "Q1622272", "label": "õppejõud",
+             "labels": {"et": "õppejõud", "en": "university teacher"}},
+        ],
         "origin_place": "Braunschweig",
     }],
     "total": 1,
@@ -57,6 +62,17 @@ def test_search_naitab_eluaastad_ja_teoste_arvu():
     assert "1592" in out and "1654" in out
     assert "156" in out
     assert f"{BASE}/persons/vutt:Pfxxxsc" in out
+
+
+def test_occupations_objektidena():
+    """Listingu occupations on {id, label, labels{}} — mitte string.
+
+    Live-test püüdis selle: stringidega võltsandmed lasid vea läbi
+    ("sequence item 0: expected str instance, dict found").
+    """
+    client = FakeClient({"/prosopography": LIST_RESPONSE})
+    out = persons.search(client, BASE, q="Ludenius")
+    assert "amet=õppejõud" in out
 
 
 def test_search_jatab_tuhjad_filtrid_paringust_valja():

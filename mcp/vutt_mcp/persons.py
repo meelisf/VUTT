@@ -38,8 +38,11 @@ def search(client, base_url: str, **filters) -> str:
         meta = [f"person_id={person.get('id', '')}"]
         if person.get("work_count") is not None:
             meta.append(f"teoseid={person['work_count']}")
-        if person.get("occupations"):
-            meta.append("amet=" + ", ".join(person["occupations"][:3]))
+        # NB: listingu `occupations` on LinkedEntity-objektide massiiv
+        # ({id, label, labels{}}), mitte stringide oma — _labels() käsitleb mõlemat.
+        occupations = _labels(person.get("occupations"))[:3]
+        if occupations:
+            meta.append("amet=" + ", ".join(occupations))
         if person.get("origin_place"):
             meta.append(f"päritolu={person['origin_place']}")
 
