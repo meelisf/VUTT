@@ -10,6 +10,7 @@ ei tea, peab kirjeldusest aru saama, mis on work_id ja mida „Toores" tähendab
 from mcp.server.mcpserver import MCPServer
 
 from . import format as fmt
+from . import persons
 from . import queries
 from .client import VuttClient
 from .config import load_settings
@@ -221,4 +222,57 @@ def _format_work(hits: list[dict], *, base_url: str) -> str:
 
 
 def _register_person_tools(mcp: MCPServer, client, base_url: str) -> None:
-    """Prosopograafia tööriistad — täidetakse Task 7-s."""
+    @mcp.tool(structured_output=False)
+    async def search_persons(
+        q: str | None = None,
+        gender: str | None = None,
+        occupation: str | None = None,
+        origin_group: str | None = None,
+        institution: str | None = None,
+        status_id: str | None = None,
+        source: str | None = None,
+        imm_year_from: int | None = None,
+        imm_year_to: int | None = None,
+        collection: str | None = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> str:
+        """Otsib VUTT-i prosopograafia andmebaasist (~2350 varauusaegset isikut:
+        professorid, üliõpilased, trükkalid, autorid).
+
+        Nimevariandid on kaetud: „Ludenius" leiab ka „Lorenz Luden" — otsing
+        arvestab ladina- ja saksapäraseid nimekujusid.
+
+        imm_year on Tartu ülikooli immatrikuleerumise aasta.
+        """
+        return persons.search(
+            client,
+            base_url,
+            q=q,
+            gender=gender,
+            occupation=occupation,
+            origin_group=origin_group,
+            institution=institution,
+            status_id=status_id,
+            source=source,
+            imm_year_from=imm_year_from,
+            imm_year_to=imm_year_to,
+            collection=collection,
+            limit=min(int(limit), 50),
+            offset=offset,
+        )
+
+    @mcp.tool(structured_output=False)
+    async def get_person(person_id: str, include_relations: bool = False) -> str:
+        """Tagastab ühe isiku täisandmed: elukäik, haridus, ametid, päritolu ja
+        seotud teosed rollidega (autor, praeses, respondens jne).
+
+        person_id on kujul „vutt:Pfxxxsc" — saad selle search_persons'ist.
+
+        include_relations=true lisab teostest tuletatud isiku-isiku seosed
+        (kellega on ühiseid teoseid).
+
+        Väljundi maht on piiratud: seotud teoseid näidatakse kuni 50 (koguarv
+        on alati näha) — produktiivsel professoril võib neid olla üle 170.
+        """
+        return persons.detail(client, base_url, person_id, include_relations)

@@ -22,8 +22,7 @@ class _FakeClient:
 async def test_server_registreerib_koik_tooriistad():
     server = build_server(client=_FakeClient(), base_url="https://x.test")
     names = {t.name for t in await server.list_tools()}
-    # NB: Task 8 lõpus taasta assert names == EXPECTED_TOOLS
-    assert names == EXPECTED_TOOLS - {"search_persons", "get_person"}
+    assert names == EXPECTED_TOOLS
 
 
 async def test_build_server_ilma_kliendita_nouab_votit(monkeypatch):

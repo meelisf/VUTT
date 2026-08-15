@@ -30,16 +30,16 @@ class VuttClient:
         headers = {"Authorization": f"Bearer {self._settings.meili_key}"}
         return self._request("POST", url, headers=headers, json=body)
 
-    def api_get(self, path: str, params: dict | None = None) -> dict:
+    def api_get(self, path: str, params: dict | None = None) -> dict | list:
         url = f"{self._settings.base_url}/api/files{path}"
         return self._request("GET", url, params=params)
 
-    def api_post(self, path: str, json_body: dict) -> dict:
+    def api_post(self, path: str, json_body: dict) -> dict | list:
         url = f"{self._settings.base_url}/api/files{path}"
         return self._request("POST", url, json=json_body)
 
     # ── sisemine ───────────────────────────────────────────────────────────
-    def _request(self, method: str, url: str, **kwargs) -> dict:
+    def _request(self, method: str, url: str, **kwargs) -> dict | list:
         """Üks kordusekatse 5xx / 429 / timeout / ühendusvea korral."""
         last_exc: Exception | None = None
         for attempt in (1, 2):
@@ -75,7 +75,7 @@ class VuttClient:
             time.sleep(delay)
 
     @staticmethod
-    def _handle(response: httpx.Response) -> dict:
+    def _handle(response: httpx.Response) -> dict | list:
         code = response.status_code
         if code == 200:
             return response.json()
