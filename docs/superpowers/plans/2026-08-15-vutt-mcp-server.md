@@ -48,7 +48,14 @@ oleta, kontrolli paigaldatud paketist.**
 
 **Files:**
 - Create: `mcp/pyproject.toml`, `mcp/vutt_mcp/__init__.py`, `mcp/vutt_mcp/server.py`, `mcp/vutt_mcp/__main__.py`
-- Create: `mcp/tests/__init__.py`, `mcp/tests/test_server_smoke.py`
+- Create: `mcp/tests/test_server_smoke.py`
+
+> **`mcp/tests/` EI TOHI sisaldada `__init__.py`-d.** Teostuses proovitud ja
+> tagasi võetud: pakett `mcp.tests` paneb pytesti lisama `<repo>/mcp` sys.path'i
+> algusesse, mille järel `mcp/tests` varjutab repo enda `tests` paketi ja
+> `from tests.conftest import …` kukub (5 testi). Repo `mcp/` kaust ise on
+> ohutu — ilma `__init__.py`-ta on see ainult nimeruumi-kandidaat ja
+> site-packages'i päris `mcp` SDK võidab.
 - Modify: `requirements-dev.txt`, `pytest.ini`
 
 **Interfaces:**
