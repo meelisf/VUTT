@@ -15,9 +15,17 @@ import {
   POLL_FAST_MS,
   POLL_SLOW_MS,
 } from './constants';
-import { ocrEstimate, sanitizeSlug, prepareMultiImages, computeReviewDerived } from './utils';
+import {
+  ocrEstimate,
+  sanitizeSlug,
+  prepareMultiImages,
+  computeReviewDerived,
+  estimateRemainingSeconds,
+  formatEta,
+} from './utils';
 import {
   ApiError,
+  UploadStalledError,
   createUpload,
   deleteUpload,
   getReplaceWorkMetadata,
@@ -76,6 +84,9 @@ export function useUploadWizard() {
   const [dragging, setDragging] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [fileUploading, setFileUploading] = useState(false); // lipp: fail on valitud ja upload käib
+  // Brauser → VUTT saatmise edenemine; null = seda faasi ei käi (edasi räägib polling)
+  const [sendProgress, setSendProgress] = useState<{ bytes_sent: number; bytes_total: number } | null>(null);
+  const sendStartedAtRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Multi-image üleslaadimine ---
@@ -312,6 +323,7 @@ export function useUploadWizard() {
    *  413 → fail liiga suur; muu ApiError → serveri detailne teade (nt SFTP
    *  timeout); võrguviga → üldine teade. */
   function uploadErrorMessage(e: unknown): string {
+    if (e instanceof UploadStalledError) return t('errors.uploadStalled');
     if (e instanceof ApiError) {
       return e.status === 413 ? t('errors.fileTooLarge') : e.message;
     }
@@ -333,13 +345,21 @@ export function useUploadWizard() {
     // Alusta kiire pollinguga saatmise ajaks
     startPolling(uploadId, POLL_FAST_MS);
 
+    sendStartedAtRef.current = Date.now();
     try {
-      await uploadSingleFile(uploadId, file, authToken);
+      await uploadSingleFile(uploadId, file, authToken, {
+        onProgress: ({ loaded, total }) =>
+          setSendProgress({ bytes_sent: loaded, bytes_total: total }),
+      });
       // 202 — SFTP transfer algas taustal, polling jätkab
     } catch (e) {
       setUploadError(uploadErrorMessage(e));
       setFileUploading(false);
       stopPolling();
+    } finally {
+      // Edasi raporteerib edenemist polling (VUTT → OCR-server)
+      setSendProgress(null);
+      sendStartedAtRef.current = null;
     }
   }
 
@@ -525,8 +545,25 @@ export function useUploadWizard() {
   // ---------------------------------------------------------------------------
   // Arvutused (puhas tuletus utils-ist)
   // ---------------------------------------------------------------------------
-  const review = computeReviewDerived(pollResult, localDeleted, ocrStartedAt, importLoading);
+  const review = computeReviewDerived(
+    pollResult, localDeleted, ocrStartedAt, importLoading, Date.now(), sendProgress,
+  );
   const estimatedTime = ocrEstimate(pollResult?.expected_pages);
+
+  // Saatmise faas (brauser → VUTT): kestus tuleb kasutaja ühendusest, mitte
+  // lehekülgede arvust, seega mõõdame selle ise. `sending` juhib ka seda, et
+  // "võid lahkuda" / "Sulge" ei tohi selles faasis paista — lahkumine tapaks
+  // XHR-i ja juba saadetud baidid läheksid kaotsi.
+  const sending = sendProgress !== null;
+  const sendEtaSeconds =
+    sendProgress && sendStartedAtRef.current
+      ? estimateRemainingSeconds(
+          sendProgress.bytes_sent,
+          sendProgress.bytes_total,
+          Date.now() - sendStartedAtRef.current,
+        )
+      : null;
+  const sendEta = sendEtaSeconds === null ? null : formatEta(sendEtaSeconds);
 
   return {
     // Olek
@@ -560,6 +597,8 @@ export function useUploadWizard() {
     ocrTimedOut: review.ocrTimedOut,
     canImport: review.canImport,
     estimatedTime,
+    sending,
+    sendEta,
 
     // Tegevused
     handleReplaceDismiss,

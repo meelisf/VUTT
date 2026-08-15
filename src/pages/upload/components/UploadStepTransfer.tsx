@@ -18,7 +18,12 @@ interface UploadStepTransferProps {
   status: string;
   progress?: UploadProgress;
   progressPct: number;
-  estimatedTime: string;
+  /** OCR-i ajahinnang, või null kui lehekülgede arv on veel teadmata. */
+  estimatedTime: string | null;
+  /** Fail liigub praegu brauserist serverisse — lehelt lahkumine katkestaks selle. */
+  sending: boolean;
+  /** Mõõdetud jäänud aeg saatmisele (nt "43 min"); null kui veel mõõtmata. */
+  sendEta: string | null;
   uploadError: string;
   dragging: boolean;
   setDragging: (value: boolean) => void;
@@ -42,6 +47,8 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
   progress,
   progressPct,
   estimatedTime,
+  sending,
+  sendEta,
   uploadError,
   dragging,
   setDragging,
@@ -74,14 +81,25 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
               ? t('step2.uploadingMulti')
                   .replace('{{current}}', String(multiCurrentNum))
                   .replace('{{total}}', String(multiTotalNum))
+              : sending
+              ? t('step2.sendingToServer')
               : status === 'uploading'
               ? t('step2.uploading')
               : t('step2.processing')}
           </p>
         </div>
 
-        {/* Multi-image: ära lahku hoiatus */}
-        {multiTotalNum > 1 ? (
+        {/* Saatmise faas: lehelt lahkumine KATKESTAB — teistsugune teade kui hiljem */}
+        {sending ? (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
+            <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+            <span>
+              {sendEta
+                ? t('step2.sendingNote', { time: sendEta })
+                : t('step2.sendingNoteNoEta')}
+            </span>
+          </div>
+        ) : multiTotalNum > 1 ? (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
             <span>{t('step2.multipleImagesNote')}</span>
@@ -89,7 +107,11 @@ const UploadStepTransfer: React.FC<UploadStepTransferProps> = ({
         ) : (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
             <Info size={16} className="shrink-0 mt-0.5" />
-            <span>{t('step2.canLeaveNote', { time: estimatedTime })}</span>
+            <span>
+              {estimatedTime
+                ? t('step2.canLeaveNote', { time: estimatedTime })
+                : t('step2.canLeaveNoteUnknown')}
+            </span>
           </div>
         )}
 

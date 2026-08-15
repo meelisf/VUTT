@@ -42,10 +42,14 @@
     "dropzoneActive": "Drop it!",
     "accepted": "PDF received, transferring to OCR server...",
     "uploading": "Transferring to OCR server...",
+    "sendingToServer": "Sending file to the server…",
+    "sendingNote": "Do not close or leave this page — the file is being sent from your machine to the server. About {{time}} left. OCR starts only after that.",
+    "sendingNoteNoEta": "Do not close or leave this page — the file is being sent from your machine to the server. OCR starts only after that.",
     "uploadingMulti": "Transferring file {{current}}/{{total}} to OCR server...",
     "processing": "OCR server is processing...",
     "waitNote": "This may take a few minutes.",
     "canLeaveNote": "Upload and OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved.",
+    "canLeaveNoteUnknown": "The file is on the server and OCR is running in the background. The duration depends on the page count (approx. 2–3 pages/min) and becomes exact once the server has counted the pages. You can leave this page and return later — your progress is saved.",
     "progressLabel": "Transfer: {{pct}}%",
     "multipleImagesNote": "Multiple images are uploaded sequentially — do not close this page.",
     "collectingImages": "Images not fully uploaded — please select all files again.",
@@ -64,6 +68,7 @@
     "done": "OCR complete",
     "processing": "OCR running...",
     "canLeaveNote": "OCR processing runs in the background — this takes {{time}}. You can safely leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
+    "canLeaveNoteUnknown": "OCR processing runs in the background; the duration depends on the page count (approx. 2–3 pages/min). You can leave this page and return later, your progress is saved. You can also click \"Close\" below to start adding the next work right away.",
     "editMetaTitle": "Fill in metadata while OCR is running",
     "editMetaNote": "Data is saved to staging and will be imported with the work.",
     "metaSaveBtn": "Save changes",
@@ -101,8 +106,8 @@
     "backToOverview": "Back to overview"
   },
   "notice": {
-    "title": "Upload and processing takes {{time}}",
-    "body": "After adding the PDF, OCR processing runs in the background. You can leave this page and return later — your progress is saved automatically."
+    "title": "Uploading happens in two stages",
+    "body": "First the file travels from your machine to the server — this depends on your connection speed and is shown on the progress bar. Do not leave the page during this stage or the upload will be cut off. Then the OCR server processes the pages in the background (approx. 2–3 pages/min) — at that point you can leave freely and return later, your progress is saved."
   },
   "closeAndMonitor": "Close — I'll check progress later",
   "cancelUpload": "Cancel upload and delete",
@@ -112,6 +117,7 @@
   "errors": {
     "createFailed": "Failed to create staging",
     "uploadFailed": "File upload failed",
+    "uploadStalled": "Upload stalled — the connection dropped. The part already sent was lost; please try again.",
     "fileTooLarge": "File is too large (max 500 MB). For very large files, upload as individual images.",
     "networkError": "Network error — please try again",
     "invalidPdf": "Invalid PDF — file cannot be read"

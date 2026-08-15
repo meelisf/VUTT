@@ -39,3 +39,4 @@ lisa uus kirje, mis viitab vanale („asendab 000X").
 | [0017](0017-poolitamine-enne-ocr.md) | Topeltlehtede poolitamine enne OCR-i: VUTT rasteriseerib ise, prepress on opt-in | kehtib |
 | [0018](0018-reocr-katkestamine.md) | Re-OCR töö katkestamine | kehtib |
 | [0019](0019-languages-esinevad-keeled.md) | `languages` loetleb teoses sisuliselt esinevad keeled, mitte põhikeelt | kehtib |
+| [0020](0020-uleslaadimine-seisak-mitte-kogulagi.md) | Üleslaadimist piirab seisak, mitte kogupäringu lagi; UI räägib faasist, mitte serveri staatusest | kehtib |
