@@ -71,7 +71,8 @@ interface UploadStepReviewProps {
   fileUploading: boolean;
   ocrTimedOut: boolean;
   onBackToSplit?: () => void;
-  estimatedTime: string;
+  /** OCR-i ajahinnang, või null kui lehekülgede arv on veel teadmata. */
+  estimatedTime: string | null;
   importError: string;
   canImport: boolean;
   importLoading: boolean;
@@ -169,7 +170,11 @@ const UploadStepReview: React.FC<UploadStepReviewProps> = ({
     {fileUploading && !ocrTimedOut && (
       <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 flex items-start gap-2">
         <Info size={16} className="shrink-0 mt-0.5" />
-        <span>{t('step3.canLeaveNote', { time: estimatedTime })}</span>
+        <span>
+          {estimatedTime
+            ? t('step3.canLeaveNote', { time: estimatedTime })
+            : t('step3.canLeaveNoteUnknown')}
+        </span>
       </div>
     )}
 

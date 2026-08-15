@@ -42,10 +42,14 @@
     "dropzoneActive": "Lase lahti!",
     "accepted": "PDF vastu võetud, edastatakse OCR serverisse...",
     "uploading": "Edastatakse OCR serverisse...",
+    "sendingToServer": "Saadan faili serverisse…",
+    "sendingNote": "Ära sulge seda lehekülge ega lahku sellelt — fail liigub praegu sinu masinast serverisse. Jäänud umbes {{time}}. OCR algab alles pärast seda.",
+    "sendingNoteNoEta": "Ära sulge seda lehekülge ega lahku sellelt — fail liigub praegu sinu masinast serverisse. OCR algab alles pärast seda.",
     "uploadingMulti": "Edastatakse faili {{current}}/{{total}} OCR serverisse...",
     "processing": "OCR server töötleb...",
     "waitNote": "See võib võtta mõne minuti.",
     "canLeaveNote": "Üleslaadimine ja OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse.",
+    "canLeaveNoteUnknown": "Fail on serveris ja OCR töötlemine käib taustal. Kestus sõltub lehekülgede arvust (u 2–3 lk/min) ja täpsustub, kui server on lehed üle lugenud. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse.",
     "progressLabel": "Edastus: {{pct}}%",
     "multipleImagesNote": "Mitu pilti laetakse üles järjestikuselt — ärge sulgege lehte.",
     "collectingImages": "Pildid üles laadimata — vali kõik failid uuesti.",
@@ -64,6 +68,7 @@
     "done": "OCR lõpetatud",
     "processing": "OCR käib...",
     "canLeaveNote": "OCR töötlemine käib taustal — see võtab {{time}}. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
+    "canLeaveNoteUnknown": "OCR töötlemine käib taustal; kestus sõltub lehekülgede arvust (u 2–3 lk/min). Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla, progress salvestatakse. Saad ka kohe allpool \"Sulge\" klõpsates järgmise teose lisamist alustada.",
     "editMetaTitle": "Täienda metaandmeid OCR ootamise ajal",
     "editMetaNote": "Andmed salvestatakse staging'usse ja imporditakse koos teosega.",
     "metaSaveBtn": "Salvesta muudatused",
@@ -101,8 +106,8 @@
     "backToOverview": "Tagasi ülevaatesse"
   },
   "notice": {
-    "title": "Üleslaadimine ja töötlemine võtab {{time}}",
-    "body": "Pärast PDF-i lisamist käivitub OCR töötlemine taustal. Võid sellelt leheküljelt lahkuda ja hiljem tagasi tulla — progress salvestatakse automaatselt."
+    "title": "Üleslaadimine käib kahes järgus",
+    "body": "Kõigepealt liigub fail sinu masinast serverisse — kestus sõltub sinu ühenduse kiirusest ja seda näidatakse edenemisribal. Selle ajal ära lehelt lahku, muidu üleslaadimine katkeb. Seejärel töötleb OCR-server lehti taustal (u 2–3 lk/min) — siis võid vabalt lahkuda ja hiljem tagasi tulla, progress salvestatakse."
   },
   "closeAndMonitor": "Sulge — vaatan progressi hiljem",
   "cancelUpload": "Katkesta üleslaadimine ja kustuta",
@@ -112,6 +117,7 @@
   "errors": {
     "createFailed": "Staging loomine ebaõnnestus",
     "uploadFailed": "Faili üleslaadimine ebaõnnestus",
+    "uploadStalled": "Üleslaadimine seiskus — ühendus katkes. Juba saadetud osa läks kaotsi, proovi uuesti.",
     "fileTooLarge": "Fail on liiga suur (max 500 MB). Väga suurte failide korral lae üles üksikute piltidena.",
     "networkError": "Võrgu viga — proovi uuesti",
     "invalidPdf": "Vigane PDF — faili ei saa lugeda"

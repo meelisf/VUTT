@@ -6,8 +6,11 @@ const SLUG_MAX_LEN = 80;
 const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.tif', '.tiff'];
 
 /** Arvutab OCR ajahinnangu lehekülgede arvu põhjal. */
-export function ocrEstimate(pages: number | null | undefined): string {
-  if (!pages) return '~10 min';
+/** OCR-i ajahinnang lehekülgede arvust, või null kui arv on veel teadmata.
+ *  Teadmata korral EI pakuta numbrit — vale hinnang on halvem kui hinnangu
+ *  puudumine (kutsuja kuvab siis numbrita sõnastuse). */
+export function ocrEstimate(pages: number | null | undefined): string | null {
+  if (!pages) return null;
   const mins = Math.ceil(pages / OCR_PAGES_PER_MIN);
   return `~${mins} min`;
 }
@@ -41,6 +44,32 @@ export function prepareMultiImages(files: File[]): File[] | null {
   return [...images].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Jäänud aeg sekundites mõõdetud keskmise kiiruse põhjal, või null kui mõõta
+ *  pole veel millegi pealt. Keskmine (mitte hetkkiirus) on tunni pikkusel
+ *  üleslaadimisel stabiilsem — hetkkiirus hüppab ja number vilguks. */
+export function estimateRemainingSeconds(
+  bytesSent: number,
+  bytesTotal: number,
+  elapsedMs: number,
+): number | null {
+  if (bytesSent >= bytesTotal) return 0;
+  if (bytesSent <= 0 || elapsedMs < 3000) return null;
+  const bytesPerSecond = bytesSent / (elapsedMs / 1000);
+  if (bytesPerSecond <= 0) return null;
+  return (bytesTotal - bytesSent) / bytesPerSecond;
+}
+
+/** Inimloetav kestus. Ühikud on eesti ja inglise keeles samad ("min", "h"),
+ *  seega tõlkevõtit siia ei ole vaja — lause ümber tuleb i18n-ist. */
+export function formatEta(seconds: number): string {
+  const totalMinutes = Math.round(seconds / 60);
+  if (totalMinutes < 1) return '< 1 min';
+  if (totalMinutes < 60) return `${totalMinutes} min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
+}
+
 export interface ReviewDerived {
   filesWithLocalDeleted: FileEntry[];
   readyCount: number;
@@ -63,6 +92,7 @@ export function computeReviewDerived(
   ocrStartedAt: number | null,
   importLoading: boolean,
   now: number = Date.now(),
+  sendProgress: { bytes_sent: number; bytes_total: number } | null = null,
 ): ReviewDerived {
   const files = pollResult?.files ?? [];
   const filesWithLocalDeleted = files.map((f) => ({
@@ -70,12 +100,18 @@ export function computeReviewDerived(
     deleted: f.deleted || localDeleted.has(f.page),
   }));
   const readyCount = filesWithLocalDeleted.filter((f) => f.has_ocr && !f.deleted).length;
-  const progress = pollResult?.progress;
+  // Kaks järjestikust faasi: brauser → VUTT (sendProgress, kliendi mõõdetud) ja
+  // VUTT → OCR-server (pollResult.progress, backendi raporteeritud). Kui esimene
+  // veel käib, näitame seda — polling ei tea sel hetkel failist veel midagi.
+  const progress = sendProgress ?? pollResult?.progress;
   const progressPct =
     progress && progress.bytes_total > 0
       ? Math.round((progress.bytes_sent / progress.bytes_total) * 100)
       : 0;
-  const status = pollResult?.status ?? '';
+  // Saatmise ajal vastab polling "pending" — backend ei tea failist veel midagi,
+  // sest nginx puhverdab keha ja annab päringu edasi alles pärast viimast baiti.
+  // Kuvame kasutajale seda, mis TEMA jaoks toimub, mitte serveri teadmatust.
+  const status = sendProgress ? 'uploading' : pollResult?.status ?? '';
   const ocrTimeoutMs = pollResult?.expected_pages
     ? Math.max(5 * 60 * 1000, pollResult.expected_pages * OCR_MS_PER_PAGE)
     : OCR_TIMEOUT_MS_FALLBACK;

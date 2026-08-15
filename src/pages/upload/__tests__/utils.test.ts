@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeReviewDerived,
+  estimateRemainingSeconds,
+  formatEta,
   isImageFile,
   ocrEstimate,
   prepareMultiImages,
@@ -24,10 +26,13 @@ describe('sanitizeSlug', () => {
 });
 
 describe('ocrEstimate', () => {
-  it('tagastab varuhinnangu kui lehekülgi pole', () => {
-    expect(ocrEstimate(null)).toBe('~10 min');
-    expect(ocrEstimate(undefined)).toBe('~10 min');
-    expect(ocrEstimate(0)).toBe('~10 min');
+  // Varem tagastas see teadmata lehekülgede korral "~10 min" — huupi number,
+  // mida UI esitas faktina juba enne faili valimist. Teadmatust ei tohi
+  // maskeerida: null → kutsuja kuvab numbrita sõnastuse.
+  it('tagastab null, kui lehekülgede arv on teadmata', () => {
+    expect(ocrEstimate(null)).toBeNull();
+    expect(ocrEstimate(undefined)).toBeNull();
+    expect(ocrEstimate(0)).toBeNull();
   });
 
   it('arvutab minutid lehekülgede arvust (ümardab üles)', () => {
@@ -60,6 +65,38 @@ describe('prepareMultiImages', () => {
 
   it('tagastab null kui kasvõi üks fail pole pilt (nt PDF segus)', () => {
     expect(prepareMultiImages([mk('a.jpg'), mk('b.pdf')])).toBeNull();
+  });
+});
+
+describe('estimateRemainingSeconds', () => {
+  it('arvutab jäänud aja mõõdetud kiirusest', () => {
+    // 34,8 MB 160 MB-st 12 minutiga → ~47 kB/s → jäänud ~43 min
+    const sec = estimateRemainingSeconds(34_800_000, 160_070_484, 12 * 60_000);
+    expect(sec).not.toBeNull();
+    expect(Math.round(sec! / 60)).toBe(43);
+  });
+
+  it('tagastab null, kui mõõtmiseks on veel liiga vähe andmeid', () => {
+    expect(estimateRemainingSeconds(0, 160_000_000, 10_000)).toBeNull();
+    expect(estimateRemainingSeconds(5000, 160_000_000, 1_000)).toBeNull();
+  });
+
+  it('tagastab 0, kui kõik on saadetud', () => {
+    expect(estimateRemainingSeconds(160_000_000, 160_000_000, 60_000)).toBe(0);
+  });
+});
+
+describe('formatEta', () => {
+  it('kuvab alla minuti eraldi', () => {
+    expect(formatEta(20)).toBe('< 1 min');
+  });
+
+  it('kuvab minutid', () => {
+    expect(formatEta(2580)).toBe('43 min');
+  });
+
+  it('kuvab tunnid ja minutid', () => {
+    expect(formatEta(3900)).toBe('1 h 5 min');
   });
 });
 
@@ -120,6 +157,44 @@ describe('computeReviewDerived', () => {
       progress: { bytes_sent: 50, bytes_total: 200 },
     };
     expect(computeReviewDerived(poll, new Set(), null, false).progressPct).toBe(25);
+  });
+
+  // Brauser → VUTT faas: polling ei tea sellest midagi (backend pole faili veel
+  // saanud), aga aeglases võrgus on see just see faas, mis kestab tunni.
+  it('eelistab brauseri saatmise edenemist, kui fail on veel teel serverisse', () => {
+    const poll: PollResult = {
+      status: 'uploading', ready: 0, total: 0, expected_pages: null, files: [],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false, Date.now(), {
+      bytes_sent: 16_000_000,
+      bytes_total: 160_000_000,
+    });
+    expect(out.progressPct).toBe(10);
+    expect(out.progress?.bytes_total).toBe(160_000_000);
+  });
+
+  // Polling vastab saatmise ajal "pending" (backend pole faili veel näinud) ja
+  // kirjutas optimistliku "uploading" olekut üle → riba kadus ja tekst hüppas
+  // "OCR server töötleb…" peale, kuigi fail alles liikus brauserist serverisse.
+  it('hoiab kuvatava staatuse "uploading" senikaua kuni brauser veel saadab', () => {
+    const poll: PollResult = {
+      status: 'pending', ready: 0, total: 0, expected_pages: null, files: [],
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false, Date.now(), {
+      bytes_sent: 11_378_688,
+      bytes_total: 160_070_484,
+    });
+    expect(out.status).toBe('uploading');
+    expect(out.canImport).toBe(false);
+  });
+
+  it('läheb tagasi serveri edastuse progressile, kui brauseri saatmine on lõpetatud', () => {
+    const poll: PollResult = {
+      status: 'uploading', ready: 0, total: 0, expected_pages: null, files: [],
+      progress: { bytes_sent: 30, bytes_total: 200 },
+    };
+    const out = computeReviewDerived(poll, new Set(), null, false, Date.now(), null);
+    expect(out.progressPct).toBe(15);
   });
 
   it('tagastab tühjad väärtused kui pollResult on null', () => {

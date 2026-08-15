@@ -166,7 +166,7 @@ const UploadPage: React.FC = () => {
           <div className="mb-6 p-4 bg-blue-50 border border-blue-300 rounded-xl text-sm text-blue-900 flex items-start gap-3 shadow-sm">
             <Info size={18} className="shrink-0 mt-0.5 text-blue-600" />
             <div>
-              <p className="font-semibold mb-0.5">{t('notice.title', { time: wizard.estimatedTime })}</p>
+              <p className="font-semibold mb-0.5">{t('notice.title')}</p>
               <p className="text-blue-800">{t('notice.body')}</p>
             </div>
           </div>
@@ -218,6 +218,8 @@ const UploadPage: React.FC = () => {
             progress={wizard.progress}
             progressPct={wizard.progressPct}
             estimatedTime={wizard.estimatedTime}
+            sending={wizard.sending}
+            sendEta={wizard.sendEta}
             uploadError={wizard.uploadError}
             dragging={wizard.dragging}
             setDragging={wizard.setDragging}
@@ -276,8 +278,11 @@ const UploadPage: React.FC = () => {
         {wizard.step > 1 && (
           <div className="mt-4 space-y-2">
             {wizard.fileUploading ? (
-              /* Upload käib taustal — näita "Sulge" ja "Katkesta" eraldi */
+              /* Upload käib taustal — näita "Sulge" ja "Katkesta" eraldi.
+                 Saatmise ajal (brauser → server) "Sulge" EI TOHI paista: see
+                 lahkuks lehelt ja katkestaks poolelioleva üleslaadimise. */
               <>
+                {!wizard.sending && (
                 <button
                   onClick={wizard.handleClose}
                   className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-700 hover:bg-primary-50 font-medium py-2.5 px-4 rounded-lg transition-colors text-sm"
@@ -285,6 +290,7 @@ const UploadPage: React.FC = () => {
                   <ListTodo size={15} />
                   {t('closeAndMonitor')}
                 </button>
+                )}
                 <div className="flex justify-center">
                   <button
                     onClick={wizard.handleCancel}
