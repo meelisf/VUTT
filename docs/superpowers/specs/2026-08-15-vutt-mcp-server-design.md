@@ -25,8 +25,18 @@ kohanimede register, sõnavarad, arhiivide register.
 
 ### `is_public` ja skaneeringud — täpne piir
 
-`is_public` (tuletatud kollektsiooni nähtavusest) reguleerib **üksnes
-skaneeringu piltide avalikkust**. Tekstikiht on VUTT-i avaliku otsingu osa.
+Omaniku otsus: `is_public` (tuletatud kollektsiooni nähtavusest) on mõeldud
+**skaneeringu piltide kaitseks**; tekstikiht ei ole samal määral tundlik.
+
+**NB — MCP näeb rohkem kui anonüümne brauser.** Frontend ei kasuta toorest
+otsinguvõtit, vaid backendi genereeritud tenant-tokenit, ja anonüümne token
+kannab filtrit `is_public = true` (`meilisearch_ops.py:584`; admin saab
+piiranguta tokeni). MCP-server kasutab toorest `MEILI_SEARCH_KEY`-d ja on
+seetõttu piiranguteta — nagu admin.
+
+Alus ei ole seega „tekst on niikuinii avalik", vaid **„server jookseb
+lokaalselt omaniku võtmega"**. Kui MCP kunagi avalikuks või jagatuks muutub,
+tuleb see rida uuesti läbi vaadata ja tõenäoliselt tenant-tokenile üle minna.
 
 Sellest järeldub kolm reeglit:
 
