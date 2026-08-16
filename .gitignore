@@ -46,3 +46,6 @@ reference_data/*.jpg
 
 # Skriptide väljundid (consolidate jsonl, OCR-loopide raport) — tuletatavad
 output/
+
+# Ajutised töömaterjalid (artiklid, mustandid) — ei kuulu avalikku reposse
+docs/tmp/
