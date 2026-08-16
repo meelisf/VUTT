@@ -150,7 +150,7 @@ To rebuild Meilisearch index from source files manually:
 # 1. Generate JSONL from filesystem (reads data/ folder structure)
 python3 1-1_consolidate_data.py   # Output: output/meilisearch_data_per_page.jsonl
 
-# 2. Upload to Meilisearch (requires .env with MEILISEARCH_URL, MEILISEARCH_MASTER_KEY)
+# 2. Upload to Meilisearch (requires .env with MEILI_URL, MEILI_MASTER_KEY)
 python3 2-1_upload_to_meili.py    # Recreates 'teosed' index
 ```
 

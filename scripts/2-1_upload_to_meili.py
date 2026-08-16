@@ -23,8 +23,9 @@ from server.meili_settings import (  # noqa: E402
 # Lae .env fail kindlast asukohast
 load_dotenv(dotenv_path=ENV_PATH)
 
-MEILI_URL = os.getenv("MEILISEARCH_URL") or os.getenv("MEILI_URL") or "http://127.0.0.1:7700"
-MEILI_MASTER_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY") or os.getenv("MEILI_SEARCH_API_KEY")
+# Kanoonilised nimed, üks kummagi kohta (ADR 0021)
+MEILI_URL = os.getenv("MEILI_URL") or "http://127.0.0.1:7700"
+MEILI_MASTER_KEY = os.getenv("MEILI_MASTER_KEY")
 JSONL_FILE_PATH = 'output/meilisearch_data_per_page.jsonl' 
 INDEX_NAME = 'teosed'
 # --- LÕPP ---

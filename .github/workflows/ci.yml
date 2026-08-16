@@ -38,7 +38,7 @@ jobs:
       - name: Run backend tests
         env:
           VUTT_ENV: dev
-          MEILISEARCH_URL: http://127.0.0.1:7700
+          MEILI_URL: http://127.0.0.1:7700
           MEILI_MASTER_KEY: ci-meili-master-key
           IMAGE_TOKEN_SECRET: ci-image-token-secret
         run: pytest tests/ mcp/tests/

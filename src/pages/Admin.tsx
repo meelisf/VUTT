@@ -8,7 +8,6 @@ import { useUser } from '../contexts/UserContext';
 import { fetchWithTimeout, getAuthHeaders } from '../utils/fetchWithTimeout';
 import { FILE_API_URL } from '../config';
 
-const FILE_SERVER = import.meta.env.VITE_FILE_SERVER_URL;
 
 interface AdminCard {
   key: string;
@@ -36,12 +35,20 @@ const Admin: React.FC = () => {
 
   useEffect(() => {
     if (!authToken) return;
-    fetchWithTimeout(`${FILE_SERVER}/registrations`, {
-      headers: getAuthHeaders(authToken),
+    // Sama muster nagu UserMenu.tsx-is: POST + `data.registrations`.
+    // Varem oli siin `${FILE_SERVER}/registrations`, kus FILE_SERVER tuli
+    // muutujast VITE_FILE_SERVER_URL — seda ei ole üheski .env failis, nii et
+    // päring läks aadressile "undefined/registrations" ja catch neelas vea:
+    // taotluste loendur näitas alati 0.
+    fetchWithTimeout(`${FILE_API_URL}/admin/registrations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders(authToken) },
+      body: JSON.stringify({}),
     })
       .then(r => r.json())
       .then(data => {
-        const pending = (data || []).filter((r: any) => r.status === 'pending').length;
+        const registrations = Array.isArray(data?.registrations) ? data.registrations : [];
+        const pending = registrations.filter((r: { status?: string }) => r.status === 'pending').length;
         setPendingCount(pending);
       })
       .catch(() => {});

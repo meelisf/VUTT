@@ -17,15 +17,11 @@ export VUTT_MEILI_SEARCH_KEY=…  # tootmise otsinguvõti
 | `VUTT_BASE_URL` | `https://vutt.utlib.ut.ee` |
 | `VUTT_MEILI_SEARCH_KEY` | — (kohustuslik) |
 
-Võti on kõikjal sama väärtus, aga **nimi erineb faili kaupa** — see on kõige
-kergem koht eksida:
-
-| Asukoht | Nimi |
-|---|---|
-| repo `.env.local` | `MEILI_SEARCH_KEY` |
-| repo `.env` | `VITE_MEILI_SEARCH_API_KEY` |
-| serveri `~/VUTT/.env` | `MEILI_SEARCH_KEY` |
-| MCP-server ise | `VUTT_MEILI_SEARCH_KEY` |
+Võti on repo `.env`-is nime all `MEILI_SEARCH_KEY` (ADR 0021 — üks nimi ühe
+seade kohta). MCP-server ise loeb `VUTT_MEILI_SEARCH_KEY`; see on teadlik
+erand, sest `vutt-mcp` paigaldatakse pipx-iga globaalselt ega loe repo
+`.env`-i, ja prefiks väldib kollisiooni kasutaja shellis oleva võõra
+`MEILI_SEARCH_KEY`-ga. Väärtus on sama.
 
 ## Kliendi seadistus
 
@@ -33,7 +29,7 @@ Serverit **ei anta agendile kaustana** — see registreeritakse kliendile üks
 kord, misjärel tööriistad on olemas igas seansis, ükskõik millises kataloogis.
 `mcp/` kaust on ainult paigalduse allikas.
 
-Käsuasendus loeb võtme `.env.local`-ist, et väärtus ei satuks shelli-ajalukku
+Käsuasendus loeb võtme repo `.env`-ist, et väärtus ei satuks shelli-ajalukku
 ega agendi transkripti. **Jooksuta iga rida tervikuna ühe käsuna** — kui
 tõstad `$(...)` eraldi `KEY=`-reale, kaob see teise käsu ajaks (nt Claude
 Code'i `!`-käsud käivad igaüks omas shellis) ja server registreeritakse
@@ -41,13 +37,13 @@ tühja võtmega.
 
 ```bash
 # Claude Code — kättesaadav igas projektis sellel masinal
-claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env.local | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Codex CLI
-codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env.local | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Gemini CLI — `-s user` on oluline, vaikimisi on scope `project`
-gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env.local | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
+gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
 ```
 
 `^MEILI_SEARCH_KEY=` lõpu-`=` on tahtlik — ilma selleta haaraks grep kaasa ka

@@ -1,12 +1,14 @@
 import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // Backend server IP arenduses (muuda vastavalt oma võrgule)
 const DEV_BACKEND = '172.17.120.146';
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
+// `loadEnv` on tahtlikult importimata (ADR 0021) — build ei loe `.env`-i
+// üldse. Kliendile mõeldud seaded tulevad `VITE_`-prefiksiga
+// `import.meta.env` kaudu; saladusi frontendi ei süstita.
+export default defineConfig(() => {
     return {
       server: {
         port: 3000,
@@ -30,11 +32,13 @@ export default defineConfig(({ mode }) => {
         },
       },
       plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.MEILI_API_KEY': JSON.stringify(env.MEILI_API_KEY)
-      },
+      // `define`-plokki EI OLE tahtlikult (ADR 0021). Siin süstiti varem
+      // Gemini ja Meili võtmeid `process.env.*` alla; üks neist oli Meili
+      // MASTER-võti. Ükski komponent neile ei viidanud, nii et dist/-i need
+      // ei jõudnud — aga üks tulevane viide oleks pannud master-võtme
+      // avalikku bundle'isse. Saladused ei kuulu frontendi: otsinguks küsib
+      // klient backendilt runtime'is tenant-tokeni
+      // (`meilisearch_ops.create_tenant_token`).
       resolve: {
         alias: {
           '@': path.resolve(__dirname, 'src'),

@@ -16,19 +16,84 @@ from datetime import timedelta
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _LOGS_DIR = os.path.join(_PROJECT_ROOT, "logs")
 
-# Lae .env fail os.environ-isse (enne kõiki os.getenv() kutseid)
-# Süsteemi muutujad on prioriteetsemad — .env kirjutab ainult puuduvad
-_env_path = os.path.join(_PROJECT_ROOT, ".env")
-if os.path.exists(_env_path):
-    with open(_env_path, 'r') as _f:
-        for _line in _f:
-            _line = _line.strip()
-            if _line and '=' in _line and not _line.startswith('#'):
-                _k, _v = _line.split('=', 1)
-                _k = _k.strip()
-                _v = _v.strip().strip('"').strip("'")
-                if _k not in os.environ:
-                    os.environ[_k] = _v
+
+def _read_dotenv() -> dict:
+    """Loeb projekti `.env` faili sõnastikuks. Puuduv fail → {}.
+
+    `VUTT_DOTENV_DIR` on ainult testide seam (import toimub üks kord, nii et
+    faili teed ei saa hiljem monkeypatch'ida). Tootmises seda ei seata.
+    """
+    root = os.getenv("VUTT_DOTENV_DIR") or _PROJECT_ROOT
+    path = os.path.join(root, ".env")
+    values = {}
+    if not os.path.exists(path):
+        return values
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
+# ÜKS lugeja (ADR 0021). Varem oli neid kaks — see siin ja `load_env_file()`
+# allpool — eri reeglitega, mis oli üks põhjus, miks nimede segadus püsis.
+_DOTENV = _read_dotenv()
+
+
+# ADR 0021: üks nimi ühe seade kohta. Vana nimi → uus; None = surnud väli,
+# mille väärtust ei loe keegi.
+_LEGACY_ENV_NAMES = {
+    "MEILISEARCH_URL": "MEILI_URL",
+    "MEILISEARCH_MASTER_KEY": "MEILI_MASTER_KEY",
+    # Nimi valetas: `config.py` omistas selle master-võtme pesasse.
+    "MEILI_SEARCH_API_KEY": "MEILI_MASTER_KEY",
+    # Ainus tarbija oli `vite.config.ts` define, mida ükski komponent ei kasutanud.
+    "MEILI_API_KEY": None,
+    # Frontend ei loe Meili võtit — ta küsib backendilt runtime'is tenant-tokeni.
+    "VITE_MEILI_SEARCH_API_KEY": None,
+}
+
+
+def _fail_on_legacy_env_names():
+    """Peatab käivituse, kui keskkonnas või `.env`-is on ADR 0021 eelne nimi.
+
+    Vaikne fallback-ahel oli juurpõhjus: vale nimi ei andnud kunagi viga,
+    vaid halvimal juhul jooksis backend otsinguvõtmega master-võtme pesas.
+    Vali viga on parem kui vaikselt valede õigustega server.
+
+    Käib ENNE os.environ-i süstimist — muidu jõuaks tagasi lükatud nimi
+    protsessi keskkonda ja jääks sinna ka pärast veateadet.
+    """
+    found = []
+    for legacy, canonical in sorted(_LEGACY_ENV_NAMES.items()):
+        if legacy in os.environ or legacy in _DOTENV:
+            target = canonical if canonical else "(surnud väli — eemalda)"
+            found.append(f"  - {legacy} → {target}")
+    if found:
+        sys.exit(
+            "FATAL: kasutusel on aegunud keskkonnamuutuja nimi (ADR 0021).\n"
+            + "\n".join(found)
+            + "\nParanda .env / docker-compose.yml ja käivita uuesti."
+        )
+
+
+_fail_on_legacy_env_names()
+
+# Süstime puuduvad väärtused os.environ-i, sest osa mooduleid ja teeke loeb
+# otse sealt. Süsteemi muutujad jäävad ülimuslikuks.
+for _k, _v in _DOTENV.items():
+    if _k not in os.environ:
+        os.environ[_k] = _v
+
+
+def env(name: str, default: str = "") -> str:
+    """Seade väärtus: süsteemi keskkond → projekti `.env` → vaikeväärtus."""
+    return os.getenv(name) or _DOTENV.get(name) or default
+
+
 os.makedirs(_LOGS_DIR, exist_ok=True)
 
 # Logging formaat
@@ -183,52 +248,18 @@ UPLOADS_DIR = os.path.join(_PROJECT_ROOT, "uploads")
 # Vaikimisi väärtused (arenduseks)
 _DEFAULT_MEILI_URL = "http://127.0.0.1:7700"
 
-# 1. Proovime lugeda süsteemi keskkonnamuutujatest (Docker/Production eelistatud)
-MEILI_URL = os.getenv("MEILISEARCH_URL")
-MEILI_KEY = os.getenv("MEILISEARCH_MASTER_KEY") or os.getenv("MEILI_MASTER_KEY")
-MEILI_SEARCH_KEY = os.getenv("MEILI_SEARCH_KEY", "")
-MEILI_SEARCH_KEY_UID = os.getenv("MEILI_SEARCH_KEY_UID", "")
 INDEX_NAME = "teosed"
 
+
+MEILI_URL = env("MEILI_URL", _DEFAULT_MEILI_URL)
+MEILI_KEY = env("MEILI_MASTER_KEY")
+MEILI_SEARCH_KEY = env("MEILI_SEARCH_KEY")
+MEILI_SEARCH_KEY_UID = env("MEILI_SEARCH_KEY_UID")
+
 # Pildi-HMAC allkirjastamise saladus (image_server + main.py jagavad sama saladust)
-# Tootmises sea IMAGE_TOKEN_SECRET keskkonnamuutujaga
-IMAGE_TOKEN_SECRET = os.getenv("IMAGE_TOKEN_SECRET", "dev-image-secret-change-in-production")
+IMAGE_TOKEN_SECRET = env("IMAGE_TOKEN_SECRET", "dev-image-secret-change-in-production")
 
-def load_env_file():
-    """
-    Laeb .env failist seaded, kui süsteemi muutujad puuduvad.
-    Mõeldud lokaalseks arenduseks.
-    """
-    global MEILI_URL, MEILI_KEY
-    
-    # Kui mõlemad on juba olemas (nt Dockerist), siis me EI loe .env faili
-    if MEILI_URL and MEILI_KEY:
-        print(f"Meilisearch: Kasutan süsteemi keskkonnamutujaid (URL: {MEILI_URL})")
-        return
-
-    env_path = os.path.join(_PROJECT_ROOT, ".env")
-    if os.path.exists(env_path):
-        print(f"Meilisearch: Loen seadeid failist {env_path}")
-        with open(env_path, 'r') as f:
-            for line in f:
-                if '=' in line and not line.startswith('#'):
-                    key, value = line.strip().split('=', 1)
-                    value = value.strip('"').strip("'")
-                    if key == "MEILISEARCH_URL" and not MEILI_URL:
-                        MEILI_URL = value
-                    elif key in ["MEILISEARCH_MASTER_KEY", "MEILI_MASTER_KEY"] and not MEILI_KEY:
-                        MEILI_KEY = value
-                    elif key == "MEILI_SEARCH_API_KEY" and not MEILI_KEY:
-                        MEILI_KEY = value
-
-    # Kui ikka pole, kasuta vaikimisi URL-i
-    if not MEILI_URL:
-        MEILI_URL = _DEFAULT_MEILI_URL
-    
-    print(f"Meilisearch: URL={MEILI_URL}, Key={'määratud' if MEILI_KEY else 'puudu'}")
-
-# Lae seaded kohe mooduli importimisel
-load_env_file()
+print(f"Meilisearch: URL={MEILI_URL}, master-võti={'määratud' if MEILI_KEY else 'puudu'}")
 
 
 # =========================================================
@@ -257,7 +288,7 @@ def check_production_secrets(exit_on_fail=True):
 
     problems = []
     checks = [
-        ("MEILISEARCH master key (MEILISEARCH_MASTER_KEY / MEILI_MASTER_KEY)", MEILI_KEY),
+        ("MEILI_MASTER_KEY", MEILI_KEY),
         ("IMAGE_TOKEN_SECRET", IMAGE_TOKEN_SECRET),
     ]
     for name, val in checks:

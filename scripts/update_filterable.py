@@ -9,14 +9,11 @@ from dotenv import load_dotenv
 # Lae .env fail
 load_dotenv()
 
-# Otsi võtit erinevate nimede alt
-MEILI_KEY = os.environ.get('MEILISEARCH_MASTER_KEY') or \
-            os.environ.get('MEILI_MASTER_KEY') or \
-            os.environ.get('MEILI_SEARCH_API_KEY')
+# Kanooniline nimi, üks (ADR 0021)
+MEILI_KEY = os.environ.get('MEILI_MASTER_KEY')
 
 # Võimalikud URL-id
 MEILI_URLS = [
-    os.environ.get('MEILISEARCH_URL'),
     os.environ.get('MEILI_URL'),
     'http://localhost:7700',
     'http://meilisearch:7700',
