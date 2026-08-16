@@ -278,6 +278,11 @@ ID, `people_ops.py` tõmbab taustal aliased (`et, en, de, la`) → `person_alias
 localStorage `vutt_user`, `vutt_token`. `contributor` muudatused lähevad ülevaatusele.
 Login: kahekihiline rate-limit (nginx 1r/s + app 5/60s) + konto-lockout.
 
+`GET /prosopography/{id}` on **autentimata avalik** ja tagastab salvestatud kaardi JSON-i.
+Seepärast filtreerib `person_crud.get_person` väljad `SECRET_FIELDS` (`auth_token`, `token`)
+**lugemisel** (#237) — kirjutustee popid üksi ei puhastanud juba salvestatud kirjeid.
+Uus tundlik väli lisa `SECRET_FIELDS`-i, mitte ainult kirjutusteele.
+
 **Git-versioonihaldus** — iga salvestus commitib `.txt` + `.json`; esimene commit = originaal-OCR
 (alati taastatav). Sama kehtib prosopograafia kaartidele (`save_with_git`). Admin taastab
 Workspace'i „Ajalugu" tabist. **Kommentaaride taaste = ÜKS git-commit** (`onCommentsRestored`).

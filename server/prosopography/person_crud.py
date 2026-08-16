@@ -20,6 +20,12 @@ def _indices():
     return indices
 
 
+# Sessioonitokenid, mis on kunagi PUT-keha kaudu kaardile salvestunud (#237).
+# Filtreeritakse NII kirjutamisel (update_person) kui lugemisel (get_person) —
+# kirjutusteel üksi ei puhasta juba salvestatud kirjeid.
+SECRET_FIELDS = ("auth_token", "token")
+
+
 # Lubatud nanoid-märgid: generate_nanoid annab [a-z0-9], lubame ka legacy variandid
 # (A-Z, _, -). EI sisalda path-ohtlikke märke (., /, \) → kaitseb path traversal'i eest.
 _NANOID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -57,7 +63,12 @@ def _make_snippet(person: dict) -> str:
 
 
 def get_person(person_id: str) -> Optional[dict]:
-    """Laeb isiku faili. Tagastab None kui ei leitud või kui ID on vigane."""
+    """Laeb isiku faili. Tagastab None kui ei leitud või kui ID on vigane.
+
+    Salajased väljad filtreeritakse LUGEMISEL (#237) — avalik
+    `GET /prosopography/{id}` tagastab selle tulemuse otse. Failis olevat
+    väärtust ei muudeta; salvestatud kirjed puhastab `scripts/strip_person_auth_tokens.py`.
+    """
     sync_from_facade()
     try:
         path = _id_to_path(person_id)
@@ -67,9 +78,13 @@ def get_person(person_id: str) -> Optional[dict]:
         return None
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            person = json.load(f)
     except Exception:
         return None
+    if isinstance(person, dict):
+        for key in SECRET_FIELDS:
+            person.pop(key, None)
+    return person
 
 
 def create_person(data: dict, username: str) -> dict:
@@ -230,7 +245,7 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
 
         now = datetime.now(timezone.utc).isoformat()
         for key in ("id", "created_at", "created_by", "schema_version",
-                    "import_batch_ids", "merged_into", "auth_token", "token"):
+                    "import_batch_ids", "merged_into") + SECRET_FIELDS:
             data.pop(key, None)
 
         person.update(data)
