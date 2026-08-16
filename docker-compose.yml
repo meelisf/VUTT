@@ -19,8 +19,8 @@ services:
       # Sea .env failis VUTT_ENV=production tootmises; arenduses jäta määramata (dev).
       - VUTT_ENV=${VUTT_ENV:-dev}
       - VUTT_DATA_DIR=/data
-      - MEILISEARCH_URL=http://meilisearch:7700
-      - MEILISEARCH_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
+      - MEILI_URL=http://meilisearch:7700
+      - MEILI_MASTER_KEY=${MEILI_MASTER_KEY:-vutt_master_key}
       - MEILI_SEARCH_KEY=${MEILI_SEARCH_KEY:-}
       - MEILI_SEARCH_KEY_UID=${MEILI_SEARCH_KEY_UID:-}
       - IMAGE_TOKEN_SECRET=${IMAGE_TOKEN_SECRET:-dev-image-secret-change-in-production}

@@ -35,9 +35,9 @@ except ImportError:
     pass  # dotenv pole kohustuslik kui keskkonnamuutujad on seadistatud
 
 # --- SEADISTUS ---
-# NB: Docker sees on MEILISEARCH_URL=http://meilisearch:7700
+# NB: Docker sees on MEILI_URL=http://meilisearch:7700
 #     Otse serveris käivitades kasuta vaikimisi localhost
-_env_url = os.environ.get('MEILISEARCH_URL', 'http://localhost:7700')
+_env_url = os.environ.get('MEILI_URL', 'http://localhost:7700')
 # Kui .env sisaldab Dockeri hostname'd, kasuta localhost (serveris otse käivitades)
 MEILI_URL = _env_url.replace('http://meilisearch:', 'http://localhost:')
 MEILI_KEY = os.environ.get('MEILI_MASTER_KEY', '')

@@ -26,7 +26,7 @@ def test_dev_env_skips_check(monkeypatch):
 def test_production_default_meili_key_flagged(monkeypatch):
     _setup(monkeypatch, "production", "vutt_master_key", "a-real-strong-secret")
     problems = cfg.check_production_secrets(exit_on_fail=False)
-    assert any("MEILISEARCH master key" in p for p in problems)
+    assert any("MEILI_MASTER_KEY" in p for p in problems)
     assert len(problems) == 1
 
 

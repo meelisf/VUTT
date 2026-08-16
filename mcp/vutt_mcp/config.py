@@ -1,7 +1,9 @@
 """Env-muutujate lugemine ja valideerimine.
 
-Muutujanimed on MCP-serveri omad, sõltumatud VUTT-i sisemistest nimedest
-(serveris kannab sama väärtus nime MEILI_SEARCH_KEY / VITE_MEILI_SEARCH_API_KEY).
+`VUTT_MEILI_SEARCH_KEY` on ADR 0021 teadlik erand „üks nimi ühe seade kohta"
+reeglist: VUTT-is kannab sama väärtus nime `MEILI_SEARCH_KEY`, aga see server
+paigaldatakse pipx-iga globaalselt ega loe repo `.env`-i — prefiks väldib
+kollisiooni kasutaja shellis oleva võõra `MEILI_SEARCH_KEY`-ga.
 """
 import os
 from dataclasses import dataclass
