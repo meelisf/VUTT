@@ -26,28 +26,30 @@ Serverit **ei anta agendile kaustana** — see registreeritakse kliendile üks
 kord, misjärel tööriistad on olemas igas seansis, ükskõik millises kataloogis.
 `mcp/` kaust on ainult paigalduse allikas.
 
-Allolev `$KEY` loeb võtme repo `.env`-ist, et väärtus ei satuks
-shelli-ajalukku ega agendi transkripti:
-
-```bash
-KEY=$(grep '^VITE_MEILI_SEARCH_API_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')
-```
+Käsuasendus loeb võtme repo `.env`-ist, et väärtus ei satuks shelli-ajalukku
+ega agendi transkripti. **Jooksuta iga rida tervikuna ühe käsuna** — kui
+tõstad `$(...)` eraldi `KEY=`-reale, kaob see teise käsu ajaks (nt Claude
+Code'i `!`-käsud käivad igaüks omas shellis) ja server registreeritakse
+tühja võtmega. Sümptom: `Failed to connect — CONNECTION_CLOSED`.
 
 ```bash
 # Claude Code — kättesaadav igas projektis sellel masinal
-claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$KEY" -- vutt-mcp
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^VITE_MEILI_SEARCH_API_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Codex CLI
-codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$KEY" -- vutt-mcp
+codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^VITE_MEILI_SEARCH_API_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Gemini CLI — `-s user` on oluline, vaikimisi on scope `project`
-gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$KEY" vutt vutt-mcp
+gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^VITE_MEILI_SEARCH_API_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
 ```
 
 Antigravity: oma UI kaudu (Settings → MCP), sama käsk `vutt-mcp` ja sama
 keskkonnamuutuja.
 
 Kontroll: `claude mcp list` / `codex mcp list` / `gemini mcp list`.
+Kui ühendus ebaõnnestub, vaata võtit — `claude mcp get vutt` näitab, kas
+`VUTT_MEILI_SEARCH_KEY` on tühi. Käsitsi: `vutt-mcp </dev/null` kirjutab
+konfiguratsioonivea `stderr`-i.
 
 Kolm asja, mis üllatavad:
 
