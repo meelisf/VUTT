@@ -48,6 +48,7 @@ logger = get_logger(__name__)
 
 # Meilisearch päringu timeout sekundites
 MEILI_TIMEOUT = 10
+from .meili_settings import RUNTIME_REQUIRED_FILTERABLE
 from .git_ops import commit_new_work_to_git
 from .heartbeat import mark_error, mark_success, register_job
 
@@ -433,7 +434,7 @@ def _ensure_filterable_attributes():
     try:
         with urllib.request.urlopen(req, timeout=10) as r:
             current = json.loads(r.read())
-        needed = {"is_public", "shareable", "collections_hierarchy", "collections", "year_start", "year_end"}
+        needed = RUNTIME_REQUIRED_FILTERABLE
         if not needed.issubset(set(current)):
             new_attrs = list(set(current) | needed)
             patch_req = urllib.request.Request(

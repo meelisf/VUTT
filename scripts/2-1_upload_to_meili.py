@@ -1,5 +1,6 @@
 import meilisearch
 import os
+import sys
 import json
 import time
 from dotenv import load_dotenv
@@ -8,6 +9,16 @@ from dotenv import load_dotenv
 # Leia projekti juurkaust (kaks taset kõrgemal scripts/ kaustast)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_PATH = os.path.join(BASE_DIR, '.env')
+
+# Atribuudinimekirjad tulevad server/meili_settings.py-st — ÜKS tõene allikas,
+# mida jagab ka runtime (meilisearch_ops._ensure_filterable_attributes).
+sys.path.insert(0, BASE_DIR)
+from server.meili_settings import (  # noqa: E402
+    FILTERABLE_ATTRIBUTES,
+    MAX_VALUES_PER_FACET,
+    SEARCHABLE_ATTRIBUTES,
+    SORTABLE_ATTRIBUTES,
+)
 
 # Lae .env fail kindlast asukohast
 load_dotenv(dotenv_path=ENV_PATH)
@@ -42,73 +53,9 @@ def main():
     
     # UUENDUS: Lisasime V3 väljad ja täiendavad seaded
     task = client.index(INDEX_NAME).update_settings({
-        'searchableAttributes': [
-            'title',
-            'authors_text',
-            'year',
-            'location_search',
-            'publisher_search',
-            'genre_search',
-            'tags_search',
-            'notes',
-            'series_title',
-            'lehekylje_tekst',
-            'marginaalia_tekst',
-            'page_tags',
-            'page_tags_et',
-            'page_tags_en',
-            'comments.text',
-            'archive_refs_text',
-            'text_annotations_text',
-        ],
-        'filterableAttributes': [
-            'work_id',
-            'year',
-            'year_start',
-            'year_end',
-            'title',
-            'location_id',
-            'location',
-            'publisher_id',
-            'publisher',
-            'genre_ids',
-            'tags_ids',
-            'type_ids',
-            'creator_ids',
-            'creators',
-            'type',
-            'type_et', 'type_en',
-            'genre',
-            'genre_et', 'genre_en',
-            'collection',
-            'collections',
-            'collections_hierarchy',
-            'authors_text',
-            'author_names',
-            'respondens_names',
-            'languages',
-            'lehekylje_number',
-            'originaal_kataloog',
-            'page_tags',
-            'page_tags_et',
-            'page_tags_en',
-            'page_tags_ids',
-            'page_tags_suggest_et',
-            'page_tags_suggest_en',
-            'has_annotations',
-            'status',
-            'teose_staatus',
-            'tags',
-            'tags_et', 'tags_en',
-            'is_public',
-            'shareable',
-        ],
-        'sortableAttributes': [
-            'year', 
-            'lehekylje_number',
-            'last_modified',
-            'title'
-        ],
+        'searchableAttributes': SEARCHABLE_ATTRIBUTES,
+        'filterableAttributes': FILTERABLE_ATTRIBUTES,
+        'sortableAttributes': SORTABLE_ATTRIBUTES,
         'rankingRules': [
             "exactness",
             "words",
@@ -118,7 +65,7 @@ def main():
             "sort"
         ],
         'faceting': {
-            'maxValuesPerFacet': 5000
+            'maxValuesPerFacet': MAX_VALUES_PER_FACET
         },
         'pagination': {
             'maxTotalHits': 10000
