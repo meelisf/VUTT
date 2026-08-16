@@ -22,13 +22,42 @@ MCP-server loeb ainult oma nime, väärtus on sama.
 
 ## Kliendi seadistus
 
+Serverit **ei anta agendile kaustana** — see registreeritakse kliendile üks
+kord, misjärel tööriistad on olemas igas seansis, ükskõik millises kataloogis.
+`mcp/` kaust on ainult paigalduse allikas.
+
+Allolev `$KEY` loeb võtme repo `.env`-ist, et väärtus ei satuks
+shelli-ajalukku ega agendi transkripti:
+
 ```bash
-# Claude Code — kättesaadav igas projektis sellel masinal
-claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY=… -- vutt-mcp
+KEY=$(grep '^VITE_MEILI_SEARCH_API_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')
 ```
 
-Codex CLI, Gemini CLI ja Antigravity: lisa oma MCP-konfi stdio-server käsuga
-`vutt-mcp` ja sama keskkonnamuutujaga.
+```bash
+# Claude Code — kättesaadav igas projektis sellel masinal
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$KEY" -- vutt-mcp
+
+# Codex CLI
+codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$KEY" -- vutt-mcp
+
+# Gemini CLI — `-s user` on oluline, vaikimisi on scope `project`
+gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$KEY" vutt vutt-mcp
+```
+
+Antigravity: oma UI kaudu (Settings → MCP), sama käsk `vutt-mcp` ja sama
+keskkonnamuutuja.
+
+Kontroll: `claude mcp list` / `codex mcp list` / `gemini mcp list`.
+
+Kolm asja, mis üllatavad:
+
+- **Editable install** (`pipx install -e`) tähendab, et pipx-venv osutab tagasi
+  repo `mcp/` kausta. Kausta liigutamine või kustutamine lõhub serveri.
+  `git pull` jõustub kohe, aga klient peab serveri taaskäivitama (uus seanss).
+- **README-d agent lugema ei pea** — tööriistade kirjeldused tulevad protokolli
+  kaudu kaasa. See fail on inimesele.
+- Server käib **avaliku HTTPS-API vastu**, mitte lokaalse backendi vastu.
+  Lokaalse vastu testimiseks lisa `--env VUTT_BASE_URL=http://localhost:8002`.
 
 ## Tööriistad
 
