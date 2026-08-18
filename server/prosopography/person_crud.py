@@ -77,11 +77,42 @@ def _id_to_path(person_id: str) -> str:
     return path
 
 
+# Markdowni süntaks, mis tuleb snippetist välja võtta. Biograafia on Markdown
+# (ADR 0008), snippet läheb kaardile lihttekstina — ilma selle sammuta jõudis
+# `**Carl Lund**` ekraanile toorelt (#240).
+#
+# Kaks asja, mida SIIN korpuses ei tohi ära rikkuda:
+#   `*1617`  — tärn on sünnisümbol, mitte rõhutuse algus (nõuame tähte järel);
+#   `1759.`  — rea alguses on aastaarv, mitte loendimarker (nummerdatud
+#              loendi markerit seetõttu EI eemaldata, vrd
+#              `escapeAccidentalOrderedLists` frontendis).
+_MD_ASENDUSED = (
+    (re.compile(r"!\[([^\]]*)\]\([^)]*\)"), r"\1"),                    # pilt
+    (re.compile(r"\[([^\]]+)\]\([^)]*\)"), r"\1"),                     # link
+    (re.compile(r"`([^`\n]+)`"), r"\1"),                                 # koodijupp
+    (re.compile(r"\*\*([^\n]+?)\*\*"), r"\1"),                          # **paks**
+    (re.compile(r"__([^\n]+?)__"), r"\1"),                               # __paks__
+    (re.compile(r"~~([^\n]+?)~~"), r"\1"),                               # ~~maha~~
+    (re.compile(r"\*(?=[^\W\d_])([^*\n]*?)(?<=\S)\*"), r"\1"),          # *kaldu*
+    (re.compile(r"(?<!\w)_(?=[^\W\d_])([^_\n]*?)(?<=\S)_(?!\w)"), r"\1"),  # _kaldu_
+    (re.compile(r"^\s{0,3}#{1,6}\s+", re.M), ""),                        # pealkiri
+    (re.compile(r"^\s{0,3}>\s?", re.M), ""),                             # tsitaat
+    (re.compile(r"^\s{0,3}[-+*]\s+", re.M), ""),                         # loendirida
+)
+
+
 def _strip_markup(text: str) -> str:
-    """Eemaldab VUTT XML-tägid biography_snippet jaoks."""
+    """Taandab biograafia/märkmed lihttekstiks biography_snippet jaoks.
+
+    Eemaldab nii VUTT XML-tägid kui Markdowni süntaksi ja lamedab
+    reavahetused tühikuks — snippet on kaardil ühel real.
+    """
     if not text:
         return ""
-    return re.sub(r"<[^>]+>", "", text).strip()
+    out = re.sub(r"<[^>]+>", "", text)
+    for pattern, repl in _MD_ASENDUSED:
+        out = pattern.sub(repl, out)
+    return re.sub(r"\s+", " ", out).strip()
 
 
 def _make_snippet(person: dict) -> str:
