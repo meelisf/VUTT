@@ -20,6 +20,7 @@ import { getCollectionColorClasses } from '../../services/collectionService';
 import type { ProsopoRecord, HistoricalDate } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import WorkRelationsCard from '../components/WorkRelationsCard';
+import { mergedRedirectTarget } from '../utils/mergedRedirect';
 
 // =========================================================
 // Abifunktsioonid
@@ -342,6 +343,13 @@ const PersonDetailPage: React.FC = () => {
     setLoading(true);
     getPerson(id, token)
       .then(data => {
+        // Liidendatud kaart: backend suunas järglasele, paranda ka marsruut,
+        // muidu jääb aadressiribale surnud ID (#240)
+        const merged = mergedRedirectTarget(id, data?.id);
+        if (merged) {
+          navigate(`/persons/${encodeURIComponent(merged)}`, { replace: true });
+          return;
+        }
         setPerson(data);
         setError(null);
         const uniqueWorkIds = [...new Set((data.works ?? []).map((w: { work_id: string }) => w.work_id).filter(Boolean))];
