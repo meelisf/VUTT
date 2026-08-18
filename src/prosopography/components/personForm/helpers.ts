@@ -3,6 +3,7 @@ import type { FormDraft, DateDraft, EducationDraft } from './types';
 import { emptyDateDraft } from './types';
 import { isQCode } from '../../../utils/qcodeUtils';
 import type { VocabularySeisusItem } from '../../../services/collectionService';
+import { normalizeExtId } from '../../utils/externalIds';
 
 function isoStringToDraft(iso: string): DateDraft {
   const [y, m, d] = iso.split('-').map(Number);
@@ -246,11 +247,9 @@ export function draftToPayload(
   ];
   const identifiers = schemes
     .map(({ scheme, key }) => {
-      let val = (draft[key] as string).trim();
+      // Kanooniline kuju kõigile skeemidele — vt utils/externalIds.ts (#240)
+      const val = normalizeExtId(scheme, draft[key] as string);
       if (!val) return null;
-      // Eemalda skeemi eesliide (nt "gnd:12345" → "12345", "AA:123" → "123")
-      if (scheme === 'gnd') val = val.replace(/^gnd:/i, '');
-      if (scheme === 'album_academicum') val = val.replace(/^aa:/i, '');
       const found = existing.find(i => i.scheme === scheme);
       return { scheme, id: val, checked_at: found?.checked_at ?? null };
     })

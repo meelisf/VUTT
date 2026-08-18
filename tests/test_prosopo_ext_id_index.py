@@ -224,3 +224,29 @@ def test_indeks_ei_lange_kokku_kadunud_failiga(prosopo_dir):
     (prosopo_dir / "aaa.json").unlink()
 
     assert person_crud._find_by_external_id("wikidata", "Q42") is None
+
+
+# ─────────────────────────────────────────────────────────────
+# Identifikaatori vorming ei tohi dublikaadikontrolli lõhkuda (#240)
+# ─────────────────────────────────────────────────────────────
+
+def test_prefiksiga_salvestatud_id_leitakse_paljale_kujule_otsides(prosopo_dir):
+    """Andmetes on nii `GND:1029967695` kui `1029967695` — sama isik."""
+    from server.prosopography import ext_id_index
+    _write_person(prosopo_dir, "aaa", [{"scheme": "gnd", "id": "GND:1029967695"}])
+
+    assert ext_id_index.find_person_id("gnd", "1029967695") == "vutt:Paaa"
+
+
+def test_paljalt_salvestatud_id_leitakse_prefiksiga_otsides(prosopo_dir):
+    from server.prosopography import ext_id_index
+    _write_person(prosopo_dir, "bbb", [{"scheme": "viaf", "id": "316024504"}])
+
+    assert ext_id_index.find_person_id("viaf", "VIAF:316024504") == "vutt:Pbbb"
+
+
+def test_aa_prefiks_ja_tyhikud_ei_tekita_eri_votit(prosopo_dir):
+    from server.prosopography import ext_id_index
+    _write_person(prosopo_dir, "ccc", [{"scheme": "album_academicum", "id": " 243"}])
+
+    assert ext_id_index.find_person_id("album_academicum", "AA:243") == "vutt:Pccc"

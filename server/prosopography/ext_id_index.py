@@ -22,6 +22,7 @@ from typing import Dict, Optional, Tuple
 
 from . import state
 from ._compat import sync_from_facade
+from .ext_ids import normalize_ext_id
 from ..config import get_logger
 
 logger = get_logger(__name__)
@@ -32,7 +33,15 @@ _index_dir: Optional[str] = None             # kaust, mille pealt ehitati
 
 
 def _key(scheme: str, ext_id: str) -> str:
-    return f"{scheme}:{ext_id}"
+    """Võti kanoonilisel kujul (#240).
+
+    Andmetes on sama identifikaator kahel kujul (`GND:123` ja `123`). Ilma
+    normaliseerimiseta on need eri võtmed, mistõttu `_find_by_external_id` ei
+    leidnud olemasolevat kaarti ja kirjutustee tegi selle asemel uue —
+    dublikaat. Normaliseerimine SIIN tähendab, et vana andmestik on kaetud
+    ilma migratsioonita: nii indeksi ehitus kui otsing käivad sama reegli alt.
+    """
+    return f"{scheme}:{normalize_ext_id(scheme, ext_id)}"
 
 
 def _person_keys(person: dict) -> list:
