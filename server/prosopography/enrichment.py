@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import unicodedata
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
@@ -88,6 +89,40 @@ _WD_GENDER = {
 }
 
 
+# Väljad, mille väärtus on HULK, mitte skalaar: allika variandid ei tühista
+# kohalikke, vaid lisanduvad. Konfliktiks lugemine tähendas, et kaardil, millel
+# juba oli mõni nimevariant, ei saanud allika omi üldse salvestada — rikastuse
+# vaade näitab konflikte ainult loetavatena (#240).
+_HULGA_VÄLJAD = ("name.aliases",)
+
+
+def _ühenda_variandid(local_val, remote_val) -> Optional[list]:
+    """Kohalikud variandid ees, uued allika omad järele. None = midagi uut ei ole.
+
+    Võrdlus käib NFC-normaliseeritud ja trimmitud kujul: GND annab täpitähed
+    NFD-na, kaardil on NFC — sama nimi ei tohi teist korda listi tulla.
+    """
+    def _võti(v):
+        return unicodedata.normalize("NFC", str(v)).strip().casefold()
+
+    olemas = [v for v in (local_val or []) if str(v).strip()]
+    nähtud = {_võti(v) for v in olemas}
+
+    lisandub = []
+    for v in (remote_val or []):
+        if not str(v).strip():
+            continue
+        k = _võti(v)
+        if k in nähtud:
+            continue
+        nähtud.add(k)
+        lisandub.append(str(v).strip())
+
+    if not lisandub:
+        return None
+    return olemas + lisandub
+
+
 def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E501
     """
     Küsib allika andmed ja võrdleb kohaliku kirjega.
@@ -128,6 +163,12 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
             local_obj = local_obj.get(part) or {}
         last = parts[-1]
         local_val = local_obj.get(last) if isinstance(local_obj, dict) else None
+
+        if field_path in _HULGA_VÄLJAD:
+            ühend = _ühenda_variandid(local_val, remote_val)
+            if ühend is not None:
+                auto_filled[field_path] = ühend
+            return
 
         if local_val is None or local_val == "" or local_val == []:
             auto_filled[field_path] = remote_val
