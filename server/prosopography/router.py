@@ -37,6 +37,7 @@ from ..git_ops import get_file_git_history, get_file_at_commit, get_or_init_repo
 from ..rate_limit import get_client_ip, check_rate_limit
 from ..utils import find_directory_by_id
 from ..access_ops import is_work_public
+from urllib.parse import quote
 
 logger = get_logger(__name__)
 
@@ -796,11 +797,17 @@ def prosopography_get(
     person = get_person_with_works(person_id)
     if person is None:
         raise HTTPException(status_code=404, detail=f"Isikut ei leitud: {person_id}")
-    # Redirectid: merged_into
+    # Redirectid: merged_into.
+    # Location on SUHTELINE (`./{id}`): backend on nginxi taga `/api/files/`
+    # all, nii et absoluutne `/prosopography/...` lahendus brauseris saidi
+    # juure vastu ja maandus SPA marsruudil (`text/html`) — `fetch` järgis
+    # selle vaikselt ja `resp.json()` kukkus. `./` ees on vajalik: ilma
+    # selleta tõlgendataks `vutt:P...` skeemiks (#240).
     if person.get("merged_into"):
+        target = quote(person["merged_into"], safe="")
         raise HTTPException(
             status_code=301,
-            headers={"Location": f"/prosopography/{person['merged_into']}"},
+            headers={"Location": f"./{target}"},
             detail=f"Kirje on liidendatud: {person['merged_into']}",
         )
     return person
