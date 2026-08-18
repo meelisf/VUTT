@@ -10,8 +10,35 @@ from typing import Optional
 from . import state
 from . import ext_id_index
 from ._compat import sync_from_facade
+from .ext_ids import normalize_ext_id
 from .locks import person_lock
 from ..entity_labels_ops import fill_person_labels_from_registry
+
+
+def _normalize_identifiers(identifiers) -> list:
+    """Taandab välised ID-d kanoonilisele kujule ja eemaldab tekkinud kordused (#240).
+
+    Vorming tuli varem otse kliendilt (`GND:123` vs `123`), mis lõhkus nii
+    rikastuse URL-i kui dublikaadikontrolli — vt `ext_ids.normalize_ext_id`.
+    """
+    if not isinstance(identifiers, list):
+        return identifiers
+    out = []
+    seen = set()
+    for ident in identifiers:
+        if not isinstance(ident, dict):
+            out.append(ident)
+            continue
+        scheme = ident.get("scheme")
+        ext_id = normalize_ext_id(scheme, ident.get("id"))
+        if not ext_id:
+            continue
+        key = (scheme, ext_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({**ident, "id": ext_id})
+    return out
 
 
 def _indices():
@@ -96,7 +123,7 @@ def create_person(data: dict, username: str) -> dict:
 
     person = {
         "id": person_id,
-        "identifiers": data.get("identifiers", []),
+        "identifiers": _normalize_identifiers(data.get("identifiers", [])),
         "merged_into": None,
         "import_batch_ids": [],
         "schema_version": 1,
@@ -248,6 +275,8 @@ def update_person(person_id: str, data: dict, username: str) -> dict:
                     "import_batch_ids", "merged_into") + SECRET_FIELDS:
             data.pop(key, None)
 
+        if "identifiers" in data:
+            data["identifiers"] = _normalize_identifiers(data["identifiers"])
         person.update(data)
         person["updated_at"] = now
         person["updated_by"] = username
@@ -284,12 +313,14 @@ def add_identifier(person_id: str, scheme: str, ext_id: str, username: str) -> t
     from .enrichment import fetch_and_diff
 
     sync_from_facade()
+    ext_id = normalize_ext_id(scheme, ext_id)
     with person_lock(person_id):
         person = get_person(person_id)
         if person is None:
             raise KeyError(person_id)
 
-        existing = person.get("identifiers") or []
+        existing = _normalize_identifiers(person.get("identifiers") or [])
+        person["identifiers"] = existing
         for ident in existing:
             if ident.get("scheme") == scheme and ident.get("id") == ext_id:
                 break
@@ -489,6 +520,9 @@ def ensure_prosopo_for_entity(entity: dict, username: str) -> dict:
         return entity
 
     scheme = source
+    eid = normalize_ext_id(scheme, eid)
+    if not eid:
+        return entity
     existing = _find_by_external_id(scheme, eid)
     if existing:
         return {**entity, "id": existing["id"]}

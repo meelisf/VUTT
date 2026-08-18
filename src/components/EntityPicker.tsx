@@ -10,6 +10,7 @@ import { getLabel } from '../utils/metadataUtils';
 import { getEntityUrl } from '../utils/entityUrl';
 import { listPersons, createPerson } from '../prosopography/services/prosopographyService';
 import type { ProsopoIndexEntry } from '../prosopography/types';
+import { normalizeExtId } from '../prosopography/utils/externalIds';
 
 interface SuggestionItem {
   label: string;
@@ -371,7 +372,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
         // Person-režiimis: loo prosopograafia kirje GND identifikaatoriga
         try {
           const gndId = result.id.replace(/^GND:/i, '');
-          const record = await createPerson({ name: label, identifiers: [{ scheme: 'gnd', id: gndId }] } as any, token);
+          const record = await createPerson({ name: label, identifiers: [{ scheme: 'gnd', id: normalizeExtId('gnd', gndId) }] } as any, token);
           entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: { et: record.name.label } };
         } catch {
           entity = { id: result.id, label, source: 'gnd', labels: { et: label } };
@@ -384,7 +385,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       if (isPersonSearch && token) {
         try {
           const viafId = result.id.replace(/^VIAF:/i, '');
-          const record = await createPerson({ name: label, identifiers: [{ scheme: 'viaf', id: viafId }] } as any, token);
+          const record = await createPerson({ name: label, identifiers: [{ scheme: 'viaf', id: normalizeExtId('viaf', viafId) }] } as any, token);
           entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: { et: record.name.label } };
         } catch {
           entity = { id: result.id, label, source: 'viaf', labels: { et: label } };
@@ -411,7 +412,7 @@ const EntityPicker: React.FC<EntityPickerProps> = ({
       if (isPersonSearch && token) {
         // Person-režiimis: loo prosopograafia kirje Wikidata identifikaatoriga
         try {
-          const record = await createPerson({ name: bestLabel, identifiers: [{ scheme: 'wikidata', id: result.id }] } as any, token);
+          const record = await createPerson({ name: bestLabel, identifiers: [{ scheme: 'wikidata', id: normalizeExtId('wikidata', result.id) }] } as any, token);
           entity = { id: record.id, label: record.name.label, source: 'local', entity_type: 'person', labels: multilingualLabels };
         } catch {
           entity = { id: result.id, label: bestLabel, source: 'wikidata', labels: multilingualLabels };

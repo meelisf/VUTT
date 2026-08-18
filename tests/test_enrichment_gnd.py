@@ -29,13 +29,6 @@ DNB_NODES = [
 ]
 
 
-def test_nimi_ja_variandid():
-    result = _parse_dnb_jsonld(DNB_NODES, "122483294")
-    assert result["name.label"] == "Kühlstaedt, Karl"
-    assert "Kühlstaedt, Carl Gotthard" in result["name.aliases"]
-    assert len(result["name.aliases"]) == 3
-
-
 def test_kuupaeva_tapsus_aasta():
     result = _parse_dnb_jsonld(DNB_NODES, "122483294")
     assert result["birth.date"] == "1805"
@@ -70,3 +63,45 @@ def test_aliaste_arv_on_piiratud():
         f"{GND}variantNameForThePerson": [{"@value": f"Nimi {i}"} for i in range(30)],
     }]
     assert len(_parse_dnb_jsonld(nodes, "1")["name.aliases"]) == 10
+
+
+# ─────────────────────────────────────────────────────────────
+# Nimekuju: GND annab pööratud kuju, kaardile läheb loomulik (issue #240)
+# ─────────────────────────────────────────────────────────────
+
+def test_dnb_nimi_ja_variandid_loomulikus_jarjekorras():
+    result = _parse_dnb_jsonld(DNB_NODES, "122483294")
+    assert result["name.label"] == "Karl Kühlstaedt"
+    assert result["name.aliases"] == [
+        "Carl Kühlstädt",
+        "Carolus Kühlstaedt",
+        "Carl Gotthard Kühlstaedt",
+    ]
+
+
+def test_lobid_nimi_ja_variandid_loomulikus_jarjekorras():
+    from server.prosopography.enrichment import _parse_lobid
+
+    result = _parse_lobid({
+        "preferredName": "Ludenius, Laurentius",
+        "variantName": ["Luden, Lorenz", "Ludenius, Laurentius"],
+    })
+    assert result["name.label"] == "Laurentius Ludenius"
+    assert result["name.aliases"] == ["Lorenz Luden", "Laurentius Ludenius"]
+
+
+def test_lobid_koht_ja_amet_sailivad():
+    """Nimekuju muutus ei tohi ülejäänud kaardistust ära lõhkuda."""
+    from server.prosopography.enrichment import _parse_lobid
+
+    result = _parse_lobid({
+        "dateOfBirth": ["1592-03-11"],
+        "placeOfBirth": [{"label": "Stockholm"}],
+        "gender": [{"id": "https://d-nb.info/standards/vocab/gnd/gender#male", "label": "Männlich"}],
+        "professionOrOccupation": [{"label": "Hochschullehrer"}],
+    })
+    assert result["birth.date"] == "1592-03-11"
+    assert result["birth.precision"] == "day"
+    assert result["birth.place"] == {"id": None, "label": "Stockholm"}
+    assert result["gender"] == "M"
+    assert result["_occupations"] == [{"id": None, "label": "Hochschullehrer"}]

@@ -12,11 +12,72 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 from typing import Optional
 
+from .ext_ids import normalize_ext_id
+
 logger = logging.getLogger(__name__)
 
 HEADERS = {
     "User-Agent": "VUTT-Historical-Archive/1.0 (https://vutt.utlib.ut.ee; vutt@utlib.ut.ee)"
 }
+
+# GND kasutab koma ka tiitli ees ("Innocentius XII, Papst") — neid ei tohi
+# pöörata, muidu tuleb "Papst Innocentius XII".
+_NIMETIITLID = {
+    "papst", "könig", "königin", "kaiser", "kaiserin", "herzog", "herzogin",
+    "graf", "gräfin", "fürst", "fürstin", "bischof", "erzbischof", "landgraf",
+    "markgraf", "kurfürst", "kurfürstin", "prinz", "prinzessin", "pfalzgraf",
+    "freiherr", "freifrau", "ritter", "abt", "äbtissin", "heiliger", "heilige",
+}
+
+
+def _ylataseme_komad(name: str) -> list:
+    """Komade positsioonid, mis EI ole sulgudes.
+
+    AA kirjutab nimevariandid sulgudesse — "Ekebrodd (Ekeberg, Ekebärg),
+    Laurentius" — ja seal olev koma ei ole nime jaotuskoht.
+    """
+    depth = 0
+    positions = []
+    for i, ch in enumerate(name):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth = max(0, depth - 1)
+        elif ch == "," and depth == 0:
+            positions.append(i)
+    return positions
+
+
+def natural_name_order(name: str, strict: bool = True) -> str:
+    """Pöörab "Perekonnanimi, Eesnimi" loomulikku järjekorda (issue #240).
+
+    GND annab nime pööratult, Wikidata loomulikult — ilma selleta sõltus
+    kaardil olev nimekuju sellest, millisest allikast keegi rikastas.
+
+    `strict=True` (GND, VIAF) pöörab ainult ühe ülataseme koma korral ja jätab
+    tiitlid rahule: "Gustav II Adolf, Schweden, König" ega "Innocentius XII,
+    Papst" ei ole perekonnanimi + eesnimi.
+
+    `strict=False` (AA) pöörab esimese ülataseme koma pealt — AA kirje kuju on
+    teada ja alati "Perekonnanimi, Eesnimed".
+    """
+    if not name:
+        return name
+    positions = _ylataseme_komad(name)
+    if not positions or (strict and len(positions) > 1):
+        return name
+
+    cut = positions[0]
+    family = name[:cut].strip()
+    given = name[cut + 1:].strip()
+    if strict and given.lower() in _NIMETIITLID:
+        return name
+    if not given:
+        return family
+    if not family:
+        return given
+    return f"{given} {family}"
+
 
 # Wikidata soo koodid → meie skeem
 _WD_GENDER = {
@@ -34,6 +95,10 @@ def fetch_and_diff(scheme: str, ext_id: str, person: dict) -> dict:  # noqa: E50
       auto_filled: {field_path: value}  — kohalik null, allikas täidab
       conflicts:   [{field, local, remote}]  — mõlemal väärtus, aga erinevad
     """
+    # Vorming kanooniliseks ENNE päringut: `lobid.org/gnd/GND:123` andis 404 ja
+    # rikastus ebaõnnestus vaikselt (#240).
+    ext_id = normalize_ext_id(scheme, ext_id)
+
     if scheme == "wikidata":
         remote = _fetch_wikidata(ext_id)
     elif scheme == "gnd":
@@ -284,11 +349,11 @@ def _parse_dnb_jsonld(nodes: list, gnd_id: str) -> dict:
 
     preferred = _values("preferredNameForThePerson")
     if preferred:
-        result["name.label"] = preferred[0]
+        result["name.label"] = natural_name_order(preferred[0])
 
     variants = _values("variantNameForThePerson")
     if variants:
-        result["name.aliases"] = variants[:10]
+        result["name.aliases"] = [natural_name_order(v) for v in variants[:10]]
 
     for prop, field in (("dateOfBirth", "birth"), ("dateOfDeath", "death")):
         dates = _values(prop)
@@ -325,34 +390,21 @@ def _fetch_gnd_dnb(gnd_id: str) -> Optional[dict]:
         return None
 
 
-def _fetch_gnd(gnd_id: str) -> Optional[dict]:
-    """Küsib GND andmed lobid.org REST API kaudu, tõrke korral d-nb.info-st.
-
-    lobid annab rohkem (kohad ja ametid siltidega), aga on üksik veapunkt —
-    2026-08-07 oli päev otsa täiesti kättesaamatu.
-    """
-    url = f"https://lobid.org/gnd/{gnd_id}.json"
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=_LOBID_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except Exception as e:
-        logger.warning("GND rikastus lobid.org kaudu ebaõnnestus (%s): %s — proovin d-nb.info", url, e)
-        return _fetch_gnd_dnb(gnd_id)
-
-    result = {}
+def _parse_lobid(data: dict) -> dict:
+    """Sõelub lobid.org JSON-vastuse. Eraldi funktsioon, et olla ilma võrguta testitav."""
+    result: dict = {}
 
     try:
         preferred = data.get("preferredName")
         if preferred:
-            result["name.label"] = preferred
+            result["name.label"] = natural_name_order(preferred)
     except Exception:
         pass
 
     try:
         variants = data.get("variantName") or []
         if variants:
-            result["name.aliases"] = variants[:10]
+            result["name.aliases"] = [natural_name_order(v) for v in variants[:10]]
     except Exception:
         pass
 
@@ -395,10 +447,13 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
     try:
         gender_list = data.get("gender") or []
         if gender_list:
-            g_id = (gender_list[0].get("id") or "").split("/")[-1]
-            if "Female" in g_id or "weiblich" in g_id.lower():
+            # lobid annab "…/gnd/gender#male" (väike täht) — varasem
+            # tõstutundlik võrdlus ei sobitunud kunagi ja sugu jäi täitmata.
+            g = ((gender_list[0].get("id") or "").rsplit("#", 1)[-1] + " "
+                 + (gender_list[0].get("label") or "")).lower()
+            if "female" in g or "weiblich" in g:
                 result["gender"] = "F"
-            elif "Male" in g_id or "männlich" in g_id.lower():
+            elif "male" in g or "männlich" in g:
                 result["gender"] = "M"
     except Exception:
         pass
@@ -416,6 +471,24 @@ def _fetch_gnd(gnd_id: str) -> Optional[dict]:
         pass
 
     return result
+
+
+def _fetch_gnd(gnd_id: str) -> Optional[dict]:
+    """Küsib GND andmed lobid.org REST API kaudu, tõrke korral d-nb.info-st.
+
+    lobid annab rohkem (kohad ja ametid siltidega), aga on üksik veapunkt —
+    2026-08-07 oli päev otsa täiesti kättesaamatu.
+    """
+    url = f"https://lobid.org/gnd/{gnd_id}.json"
+    try:
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=_LOBID_TIMEOUT) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        logger.warning("GND rikastus lobid.org kaudu ebaõnnestus (%s): %s — proovin d-nb.info", url, e)
+        return _fetch_gnd_dnb(gnd_id)
+
+    return _parse_lobid(data)
 
 
 # =========================================================
@@ -551,12 +624,7 @@ def _fetch_aa(aa_id: str) -> Optional[dict]:
 
     # Nimi: "Last, First" → "First Last"
     try:
-        full = name_obj.get("full") or ""
-        if "," in full:
-            parts = full.split(",", 1)
-            canonical = f"{parts[1].strip()} {parts[0].strip()}"
-        else:
-            canonical = full.strip()
+        canonical = natural_name_order((name_obj.get("full") or "").strip(), strict=False)
         if canonical:
             result["name.label"] = canonical
     except Exception:
