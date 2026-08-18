@@ -11,10 +11,13 @@ function isoStringToDraft(iso: string): DateDraft {
 }
 
 function historicalDateToDraft(h: any): DateDraft {
+  // `0000` on jäänuk sellest, et tühja aastat ei saanud salvestada — laeme
+  // selle tühjana, et kaardi avamine ja salvestamine välja päriselt puhastaks.
+  const aasta = h.date && h.date.slice(0, 4) !== '0000' ? h.date.slice(0, 4) : '';
   return {
-    year: h.date ? h.date.slice(0, 4) : '',
-    month: h.date && h.precision !== 'year' ? String(parseInt(h.date.slice(5, 7))) : '',
-    day: h.date && h.precision === 'day' ? String(parseInt(h.date.slice(8, 10))) : '',
+    year: aasta,
+    month: aasta && h.precision !== 'year' ? String(parseInt(h.date.slice(5, 7))) : '',
+    day: aasta && h.precision === 'day' ? String(parseInt(h.date.slice(8, 10))) : '',
     circa: h.is_circa ?? false,
     bound: h.bound ?? '',
     calendar: h.calendar ?? '',
@@ -143,28 +146,9 @@ export function recordToDraft(p: ProsopoRecord): FormDraft {
     name_qualifier: p.name.qualifier ?? '',
     name_aliases: p.name.aliases ?? [],
     gender: p.gender ?? '',
-    birth: {
-      year: p.birth?.date ? p.birth.date.slice(0, 4) : '',
-      month: p.birth?.date && p.birth.precision !== 'year' ? String(parseInt(p.birth.date.slice(5, 7))) : '',
-      day: p.birth?.date && p.birth.precision === 'day' ? String(parseInt(p.birth.date.slice(8, 10))) : '',
-      circa: p.birth?.is_circa ?? false,
-      bound: p.birth?.bound ?? '',
-      calendar: (p.birth?.calendar ?? '') as DateDraft['calendar'],
-      place: p.birth?.place?.label
-        ? { label: p.birth.place.label, id: p.birth.place.id ?? null, labels: (p.birth.place as any).labels ?? null, source: 'wikidata' as const }
-        : null,
-    },
-    death: {
-      year: p.death?.date ? p.death.date.slice(0, 4) : '',
-      month: p.death?.date && p.death.precision !== 'year' ? String(parseInt(p.death.date.slice(5, 7))) : '',
-      day: p.death?.date && p.death.precision === 'day' ? String(parseInt(p.death.date.slice(8, 10))) : '',
-      circa: p.death?.is_circa ?? false,
-      bound: p.death?.bound ?? '',
-      calendar: (p.death?.calendar ?? '') as DateDraft['calendar'],
-      place: p.death?.place?.label
-        ? { label: p.death.place.label, id: p.death.place.id ?? null, labels: (p.death.place as any).labels ?? null, source: 'wikidata' as const }
-        : null,
-    },
+    // Sama teisendus mis haridus-/ametikuupäevadel — sh `0000` tühjaks (#240)
+    birth: p.birth ? historicalDateToDraft(p.birth) : emptyDateDraft(),
+    death: p.death ? historicalDateToDraft(p.death) : emptyDateDraft(),
     floruit_from: p.floruit?.year_from ? String(p.floruit.year_from) : '',
     floruit_to: p.floruit?.year_to ? String(p.floruit.year_to) : '',
     statuses: (p.statuses ?? []).map(s => s.id).filter(Boolean) as string[],
@@ -269,8 +253,11 @@ export function draftToPayload(
       first_name_variants: original?.name?.first_name_variants ?? [],
     },
     gender: (draft.gender || null) as 'M' | 'F' | null,
-    birth: buildDatePayload(draft.birth) ?? (original?.birth ?? null as any),
-    death: buildDatePayload(draft.death) ?? (original?.death ?? null as any),
+    // EI tohi langeda tagasi `original`-ile: tühi mustand ON kustutamise soov.
+    // Varem taastas `?? original.birth` vana väärtuse, nii et ainus viis välja
+    // tühjendada oli kirjutada sinna `0000` (#240).
+    birth: buildDatePayload(draft.birth),
+    death: buildDatePayload(draft.death),
     statuses: (draft.statuses ?? []).map(qId => {
       const vocabItem = seisusedVocab.find(s => s.id === qId);
       // Salvesta mitmekeelne labels-objekt → useEntityLabel kuvab UI-keeles
