@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { formatLifeDate, formatFloruit } from '../utils/personDates';
 import MarkdownView from '../../components/MarkdownView';
 import {
   ArrowLeft, ExternalLink, Edit3, ChevronDown, ChevronRight,
@@ -17,7 +18,7 @@ import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
 import { useMeiliIndex } from '../../contexts/MeilisearchContext';
 import { getCollectionColorClasses } from '../../services/collectionService';
-import type { ProsopoRecord, HistoricalDate } from '../types';
+import type { ProsopoRecord } from '../types';
 import { formatEntryPeriod, institutionLabel } from '../utils/entryPeriod';
 import WorkRelationsCard from '../components/WorkRelationsCard';
 import { mergedRedirectTarget } from '../utils/mergedRedirect';
@@ -25,28 +26,6 @@ import { mergedRedirectTarget } from '../utils/mergedRedirect';
 // =========================================================
 // Abifunktsioonid
 // =========================================================
-
-function formatHistoricalDate(
-  d: HistoricalDate | null | undefined,
-  symbol: string,
-  boundLabels: { before: string; after: string },
-  lang: string = 'et',
-): string {
-  if (!d) return '';
-  const year = d.date ? d.date.slice(0, 4) : null;
-  if (!year) return '';
-  const circa = d.is_circa ? '~' : '';
-  const bound = d.bound === 'before' ? `${boundLabels.before} ` : d.bound === 'after' ? `${boundLabels.after} ` : '';
-  const historical = d.place?.label || '';
-  const modern = d.place?.labels
-    ? (d.place.labels[lang] ?? d.place.labels['et'] ?? d.place.labels['en'] ?? Object.values(d.place.labels)[0] ?? '')
-    : '';
-  const placeStr = historical
-    ? (modern && modern !== historical ? `${historical} (${modern})` : historical)
-    : '';
-  const place = placeStr ? `, ${placeStr}` : '';
-  return `${symbol}${bound}${circa}${year}${place}`;
-}
 
 function formatImmDate(dateStr: string | null | undefined, lang: string): string {
   if (!dateStr) return '';
@@ -435,8 +414,12 @@ const PersonDetailPage: React.FC = () => {
 
   // ── Andmed ───────────────────────────────────────────────
   const boundLabels = { before: t('dateField.beforeShort'), after: t('dateField.afterShort') };
-  const birth = formatHistoricalDate(person.birth, '*', boundLabels, lang);
-  const death = formatHistoricalDate(person.death, '†', boundLabels, lang);
+  const birth = formatLifeDate(person.birth, boundLabels, lang);
+  const death = formatLifeDate(person.death, boundLabels, lang);
+  // Sünni-/surmaaasta puudumisel jääks plokk tühjaks — näita tegutsemisperioodi
+  const floruit = (!birth && !death)
+    ? formatFloruit(person.floruit?.year_from, person.floruit?.year_to)
+    : '';
   // Sorteerimisaasta: number-väli, muidu year_display vahemiku keskpaik (nt "ca. 1750", "19. saj")
   const sortYear = (workId: string): number => {
     const meta = workTitles[workId];
@@ -518,7 +501,7 @@ const PersonDetailPage: React.FC = () => {
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
                       {t('born', 'Sündinud')}
                     </span>
-                    <p className="text-gray-900">{birth.replace('*', '')}</p>
+                    <p className="text-gray-900">{birth}</p>
                   </div>
                 )}
                 {death && (
@@ -526,9 +509,18 @@ const PersonDetailPage: React.FC = () => {
                     <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
                       {t('died', 'Surnud')}
                     </span>
-                    <p className="text-gray-900">{death.replace('†', '')}</p>
+                    <p className="text-gray-900">{death}</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {floruit && (
+              <div>
+                <span className="text-gray-500 block text-xs uppercase tracking-wide mb-1">
+                  {t('form.floruit')}
+                </span>
+                <p className="text-gray-900">{floruit}</p>
               </div>
             )}
 

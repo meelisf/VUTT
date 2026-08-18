@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { MapPin, ShieldPlus } from 'lucide-react';
 import type { ProsopoIndexEntry } from '../types';
 import type { VocabularySeisusItem } from '../../services/collectionService';
+import { formatFloruit } from '../utils/personDates';
 
 interface PersonCardProps {
   person: ProsopoIndexEntry;
@@ -250,6 +251,9 @@ const PersonCard: React.FC<PersonCardProps> = ({ person, selectMode, selected, o
     if (b && d) return <>{b}{'  '}{d}</>;
     if (b) return b;
     if (d) return d;
+    // Eluaastate puudumisel tegutsemisperiood, et lahter ei jääks tühjaks (#240)
+    const fl = formatFloruit(person.floruit_year_from, person.floruit_year_to);
+    if (fl) return <><span className={sym}>{t('floruitShort')}</span>{fl}</>;
     return <span>{t('unknownYears', 'eluaastad teadm.')}</span>;
   })();
 

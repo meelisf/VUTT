@@ -13,6 +13,7 @@
   "totalCount": "{{count}} isikut",
   "filteredCount": "{{filtered}} / {{total}} isikut",
   "unknownYears": "eluaastad teadm.",
+  "floruitShort": "fl. ",
   "advancedTitle": "Täpsemad valikud",
   "clearAllFilters": "Tühjenda kõik filtrid",
   "works_one": "teos",
