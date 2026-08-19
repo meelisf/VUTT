@@ -27,6 +27,9 @@ interface PersonsMapProps {
   };
   token?: string;
   focusPlace?: string;
+  // Fookus-isiku andmed (ainult related_to päringul) antakse vanemale tagasi,
+  // et otsinguriba all saaks kuvada nimega filtri-pilli.
+  onFocusChange?: (focus: ProsopoMapResponse['focus'] | null) => void;
 }
 
 function resolveLabel(labels: Record<string, string> | null | undefined, lang: string): string | null {
@@ -99,7 +102,7 @@ const FitMapToMarkers: React.FC<{ markers: ProsopoMapMarker[]; focusPlace?: stri
   return null;
 };
 
-const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) => {
+const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace, onFocusChange }) => {
   const { t, i18n } = useTranslation(['prosopography', 'common']);
   const { setSelectedCollection, getCollectionName } = useCollection();
   const lang = i18n.language?.slice(0, 2) ?? 'et';
@@ -140,6 +143,12 @@ const PersonsMap: React.FC<PersonsMapProps> = ({ filters, token, focusPlace }) =
     // laadimisvälke iga vanema renderduse peale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey, token, t]);
+
+  // Vastuse `focus` objekti identiteet on stabiilne (elab `data` state'is),
+  // seega vanema setState teeb korduskutsel bail-out'i — tsüklit ei teki.
+  useEffect(() => {
+    onFocusChange?.(data?.focus ?? null);
+  }, [data, onFocusChange]);
 
   const focusedMarker = useMemo(() => {
     if (!focusPlace || !data) return null;
