@@ -28,6 +28,12 @@ def build_server(client=None, base_url: str | None = None) -> MCPServer:
     mcp = MCPServer("vutt")
     _register_text_tools(mcp, client, base_url)
     _register_person_tools(mcp, client, base_url)
+
+    # Valikuline kirjanduskogu: registreerub ainult siis, kui indeks on olemas.
+    from .library.config import load_library_settings
+    from .library.tools import register_library_tools
+
+    register_library_tools(mcp, load_library_settings())
     return mcp
 
 

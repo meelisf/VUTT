@@ -37,13 +37,13 @@ tühja võtmega.
 
 ```bash
 # Claude Code — kättesaadav igas projektis sellel masinal
-claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Codex CLI
-codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Gemini CLI — `-s user` on oluline, vaikimisi on scope `project`
-gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
+gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
 ```
 
 `^MEILI_SEARCH_KEY=` lõpu-`=` on tahtlik — ilma selleta haaraks grep kaasa ka
@@ -87,6 +87,39 @@ esinema). `relax_matching=true` lülitab Meili vaikekäitumisele.
 
 Lehekülje­numeratsioon on VUTT-i sisemine 1-põhine skaneeringute järjestus —
 mitte trükise paginatsioon ega foliatsioon.
+
+## Kirjanduskogu (valikuline, lokaalne)
+
+Lokaalne sekundaarkirjanduse kogu Zotero põhjal. **Tööriistad tekivad ainult
+siis, kui indeksifail on olemas** — teisel paigaldajal neid ei ole.
+
+```bash
+vutt-library index     # loeb Zotero kollektsiooni „VUTT kirjandus", ehitab indeksi
+vutt-library status    # mis kogus on
+```
+
+| Muutuja | Vaikimisi |
+|---|---|
+| `VUTT_LIBRARY_DB` | `~/.local/share/vutt-library/library.db` |
+| `VUTT_LIBRARY_COLLECTION` | `VUTT kirjandus` (nimi või Zotero key) |
+| `VUTT_LIBRARY_ZOTERO_DIR` | `~/.zotero/Zotero` (ainult `storage/` jaoks) |
+| `VUTT_LIBRARY_ZOTERO_API` | `http://127.0.0.1:23119/api/users/0` |
+
+| Tööriist | Mida teeb |
+|---|---|
+| `list_literature` | Kogu sisu: doc_id, viide, lehekülgede arv |
+| `search_literature` | Täistekstiotsing → katked + tsiteeritav viide |
+| `get_literature_pages` | Lehevahemiku täistekst (`page_ref` on kohustuslik) |
+
+Kolm asja, mis üllatavad:
+
+- **Zotero peab indekseerimise ajal jooksma** ja Local API olema lubatud
+  (Settings → Advanced). Otse `zotero.sqlite` lugemine ei ole võimalik —
+  jooksev Zotero hoiab baasi lukus nii, et isegi read-only ühendus kukub.
+- **`page_ref` on kohustuslik.** Trükise lehekülg ja PDF-i leht ei ole samad;
+  vaikimisi valik oleks vaikne viga.
+- **Kogusse pane ainult kvaliteetse OCR-iga PDF-e.** Indekseerija ei hinda
+  tekstikvaliteeti ja lagunenud OCR jääb otsingust vaikselt välja.
 
 ### Loojad ja rollid
 
