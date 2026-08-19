@@ -101,3 +101,58 @@ def manus(key, parent, *, link_mode="imported_file", filename=None, path=None,
     if deleted:
         d["deleted"] = 1
     return {"key": key, "data": d}
+
+
+def make_pdf(path, pages, labels=None):
+    """Minimaalne PDF ilma väliste sõltuvusteta.
+
+    pages: list[str] — iga lehe tekst (reavahetus = uus rida lehel).
+    labels: [(lehe_indeks, stiil, algus)] — stiil 'r' (rooma väike),
+            'D' (araabia), 'A' (suur täht). Nt [(0,'r',None), (12,'D',1)].
+    """
+    objs, n = {}, len(pages)
+    kids = " ".join(f"{4 + 2 * i} 0 R" for i in range(n))
+    pl = ""
+    if labels:
+        nums = " ".join(
+            f"{idx} << /S /{style}" + (f" /St {start}" if start else "") + " >>"
+            for idx, style, start in labels
+        )
+        pl = f" /PageLabels << /Nums [ {nums} ] >>"
+    objs[1] = f"<< /Type /Catalog /Pages 2 0 R{pl} >>"
+    objs[2] = f"<< /Type /Pages /Kids [ {kids} ] /Count {n} >>"
+    objs[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"
+    for i, text in enumerate(pages):
+        lines = "".join(
+            f"BT /F1 12 Tf 50 {700 - 15 * j} Td ({_esc(ln)}) Tj ET\n"
+            for j, ln in enumerate(text.split("\n"))
+        )
+        objs[4 + 2 * i] = (
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] "
+            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {5 + 2 * i} 0 R >>"
+        )
+        objs[5 + 2 * i] = ("STREAM", lines)
+
+    out, offsets = bytearray(b"%PDF-1.4\n"), {}
+    for num in sorted(objs):
+        offsets[num] = len(out)
+        body = objs[num]
+        if isinstance(body, tuple):
+            data = body[1].encode("latin-1")
+            out += f"{num} 0 obj\n<< /Length {len(data)} >>\nstream\n".encode()
+            out += data + b"\nendstream\nendobj\n"
+        else:
+            out += f"{num} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    top = max(objs) + 1
+    out += f"xref\n0 {top}\n0000000000 65535 f \n".encode()
+    for num in range(1, top):
+        out += (f"{offsets[num]:010d} 00000 n \n".encode() if num in offsets
+                else b"0000000000 65535 f \n")
+    out += f"trailer\n<< /Size {top} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+    Path(path).write_bytes(bytes(out))
+    return Path(path)
+
+
+def _esc(s):
+    return s.replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
