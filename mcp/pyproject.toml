@@ -7,6 +7,7 @@ dependencies = ["mcp>=2,<3", "httpx>=0.28.0", "pypdf>=5.0.0"]
 
 [project.scripts]
 vutt-mcp = "vutt_mcp.__main__:main"
+vutt-library = "vutt_mcp.library.cli:main"
 
 [build-system]
 requires = ["hatchling"]

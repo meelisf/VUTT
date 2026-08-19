@@ -88,6 +88,39 @@ esinema). `relax_matching=true` lülitab Meili vaikekäitumisele.
 Lehekülje­numeratsioon on VUTT-i sisemine 1-põhine skaneeringute järjestus —
 mitte trükise paginatsioon ega foliatsioon.
 
+## Kirjanduskogu (valikuline, lokaalne)
+
+Lokaalne sekundaarkirjanduse kogu Zotero põhjal. **Tööriistad tekivad ainult
+siis, kui indeksifail on olemas** — teisel paigaldajal neid ei ole.
+
+```bash
+vutt-library index     # loeb Zotero kollektsiooni „VUTT kirjandus", ehitab indeksi
+vutt-library status    # mis kogus on
+```
+
+| Muutuja | Vaikimisi |
+|---|---|
+| `VUTT_LIBRARY_DB` | `~/.local/share/vutt-library/library.db` |
+| `VUTT_LIBRARY_COLLECTION` | `VUTT kirjandus` (nimi või Zotero key) |
+| `VUTT_LIBRARY_ZOTERO_DIR` | `~/.zotero/Zotero` (ainult `storage/` jaoks) |
+| `VUTT_LIBRARY_ZOTERO_API` | `http://127.0.0.1:23119/api/users/0` |
+
+| Tööriist | Mida teeb |
+|---|---|
+| `list_literature` | Kogu sisu: doc_id, viide, lehekülgede arv |
+| `search_literature` | Täistekstiotsing → katked + tsiteeritav viide |
+| `get_literature_pages` | Lehevahemiku täistekst (`page_ref` on kohustuslik) |
+
+Kolm asja, mis üllatavad:
+
+- **Zotero peab indekseerimise ajal jooksma** ja Local API olema lubatud
+  (Settings → Advanced). Otse `zotero.sqlite` lugemine ei ole võimalik —
+  jooksev Zotero hoiab baasi lukus nii, et isegi read-only ühendus kukub.
+- **`page_ref` on kohustuslik.** Trükise lehekülg ja PDF-i leht ei ole samad;
+  vaikimisi valik oleks vaikne viga.
+- **Kogusse pane ainult kvaliteetse OCR-iga PDF-e.** Indekseerija ei hinda
+  tekstikvaliteeti ja lagunenud OCR jääb otsingust vaikselt välja.
+
 ### Loojad ja rollid
 
 `get_work` näitab kogu `creators`-massiivi rollide kaupa. Tuletatud väljad
