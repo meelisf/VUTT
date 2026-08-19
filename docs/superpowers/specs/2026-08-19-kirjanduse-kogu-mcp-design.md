@@ -4,7 +4,8 @@ Kuupäev: 2026-08-19
 Seis: kinnitatud disain, ootab teostusplaani
 Muudetud: 2026-08-19 (ülevaate järel — värskuse tuvastus, leheküljemudel,
 kollektsiooni identifitseerimine, indeksi aatomilisus, otsingu normaliseerimine,
-privaatsuse sõnastus)
+privaatsuse sõnastus; seejärel Zotero lugemine Local API peale — nii snapshot
+kui varukoopia osutusid kehvemaks)
 
 ## Probleem
 
@@ -69,7 +70,7 @@ avalikud".
 
 ```
 Zotero (~/.zotero/Zotero/zotero.sqlite + storage/)
-   │  SQLite snapshot; kollektsioon „VUTT kirjandus" + alamkollektsioonid
+   │  Local API (port 23119); kollektsioon + alamkollektsioonid
    ▼
 vutt-library index          ← konsoolikäsk, kirjutav, käib omaniku käsul
    │  pdftotext -layout, lehekülg kaupa
@@ -104,7 +105,8 @@ lokaalse oleku. Erand läheb ADR-i, mitte ainult vestlusesse.
 | Näitaja | Väärtus |
 |---|---|
 | Andmekataloog | `~/.zotero/Zotero/` (flatpak-paigaldus, andmed siin) |
-| `zotero.sqlite` | 433 MB, aktiivselt kasutuses |
+| `zotero.sqlite` | 433 MB, `journal_mode=delete`, jooksva Zotero poolt **lukus** |
+| Local API | `http://127.0.0.1:23119/api/users/0`, lubatud 2026-08-19 |
 | `storage/` | 15 GB, 2803 kataloogi, 1269 PDF-faili |
 | PDF-manuseid kokku | 1319 |
 | Skeemiversioon (`userdata`) | 125 |
@@ -112,19 +114,40 @@ lokaalse oleku. Erand läheb ADR-i, mitte ainult vestlusesse.
 | Prügikastis kirjeid | 59 |
 | Vanemkirjeid 2+ PDF-manusega | 19 |
 
-### Snapshot, mitte `cp`
+### Miks Local API, mitte zotero.sqlite
 
-`zotero.sqlite` on WAL-režiimis ja aktiivselt kasutuses. **Tavaline
-failikopeerimine on keelatud** — see annab viimase checkpointi seisu ja jätab
-`-wal` sisu välja, mille tulemus on vaikselt aegunud või ebajärjekindel vaade.
+Mõõdetud tegelikkus (2026-08-19), mis välistas otsese faililugemise:
 
-Invariant: **koopia tehakse SQLite'i enda snapshot-mehhanismiga**
-(`sqlite3.Connection.backup()`), lugedes originaali `mode=ro` URI-ga. Snapshot
-on hetkeline ja järjekindel sõltumata sellest, mida Zotero parajasti teeb.
+- Zotero kasutab `journal_mode=delete`, mitte WAL-i.
+- **Jooksev Zotero hoiab baasi lukus nii, et isegi `mode=ro` ühendus kukub**
+  („database is locked"). Ka SQLite enda snapshot-mehhanism
+  (`Connection.backup()`) on seetõttu kasutamatu.
+- Lihtne `cp` ei ole ohutu asendus: kõrval elab `zotero.sqlite-journal`, mille
+  abil rollback-transaktsioon tagasi keritakse.
+- Zotero enda varukoopiad (`zotero.sqlite.bak`) on loetavad, aga kuni mitu tundi
+  vanad — ja aegunud metaandmed on täpselt see, mida tsiteeritavus ei kannata.
 
-Üks praktiline eeldus: WAL-baasi read-only avamine nõuab kirjutusõigust
-**kataloogile** (`-shm` mäppimiseks). Omaniku masinas see kehtib; kui ei kehti,
-peab jooks kukkuma selge veateatega, mitte vaikselt vanema koopia peale minema.
+**Zotero Local API** (`http://127.0.0.1:23119/api/users/0`) lahendab kõik neli
+korraga. Kontrollitud päris raamatukogu vastu:
+
+| Vajadus | API annab |
+|---|---|
+| Kollektsioonid | `/collections`, `Total-Results` + `start` pagineerimine |
+| Alamkollektsioonid | `/collections/{key}/collections` |
+| Kirjed | `/collections/{key}/items`, bibliokirje valmis `data`-objektina |
+| Manuse tüüp | `linkMode` **sõnena** (`imported_file`, `linked_file`, …) |
+| Failitee | `path` absoluutsena (lingitud), `filename` (imporditud) |
+| Prügikast | `/items/trash` eraldi; kollektsioonivaade ei sisalda kustutatuid |
+
+Kaotatud haprus: lukukäsitlus, varukoopia-varutee, seotus sisemise
+skeemiversiooniga 125, `deletedItems` käsitsi väljajätt ja kolm SQL-liitmist.
+
+**Hind:** indekseerimise ajal peab **Zotero jooksma** ja Local API olema lubatud
+(Settings → Advanced). Kättesaamatu API annab selge juhise, mitte segase vea.
+
+Prügikasti väljajätu kohta: omaniku prügikast oli mõõtmise hetkel tühi, seega on
+„kollektsioonivaade ei näita kustutatuid" **Zotero API lepingu põhjal väide, mitte
+mõõtmine**. Indekseerija filtreerib `data.deleted` peale ka ise.
 
 ### Kollektsiooni identifitseerimine
 
@@ -150,12 +173,12 @@ disain mujal väldib. Aruanne näitab kaasatud alamkollektsioonid nimeliselt.
 
 `itemAttachments.linkMode` määrab, kust fail leida:
 
-| `linkMode` | Tähendus | Arv | Kust fail |
-|---|---|---|---|
-| 0 | `imported_file` | 820 | `storage/{manuse_key}/{failinimi}` |
-| 1 | `imported_url` | 473 | sama |
-| 2 | `linked_file` | 25 | `path` = absoluutne tee |
-| 3 | `linked_url` | 1 | faili ei ole — vahele |
+| `linkMode` | Arv | Kust fail |
+|---|---|---|
+| `imported_file` | 820 | `storage/{manuse_key}/{filename}` |
+| `imported_url` | 473 | sama |
+| `linked_file` | 25 | `path` = absoluutne tee |
+| `linked_url` | 1 | faili ei ole — vahele |
 
 **Lingitud failid on juba täna osaliselt katki: 25-st eksisteerib 18, seitse
 mitte** (vana kasutajanimi `/home/meelis/…`, liigutatud failid). Katkised lingid
@@ -169,14 +192,14 @@ jäta faili vaikselt vahele.
 
 ### Päringu reeglid
 
-- Puudutame ainult neid tabeleid: `collections`, `collectionItems`, `items`,
-  `itemAttachments`, `itemData`, `itemDataValues`, `fields`, `itemCreators`,
-  `creators`, `creatorTypes`, `deletedItems`.
-- **Prügikast välistatakse** (`deletedItems`) — nii kirje kui manuse tasandil.
-- **Skeemiversiooni kontroll** (`version.schema='userdata'`, ootus 125):
-  tundmatu versioon annab **valju vea**, mitte vaikse osalise tulemuse.
+- Kõik loendid pagineeritakse lõpuni (`Total-Results` + `start`) — osaline
+  esimene leht oleks vaikselt puudulik kogu.
+- **Prügikast välistatakse** kaks korda: API kollektsioonivaade ei tohiks
+  kustutatuid anda, ja me filtreerime `data.deleted` peale ka ise.
 - Duplikaadid tõrjutakse manuse `key` järgi (sama fail võib olla mitmes
   kollektsioonis, sh ülem- ja alamkollektsioonis korraga).
+- Orb manus ilma vanemkirjeta jäetakse välja — ilma bibliokirjeta ei ole ta
+  tsiteeritav.
 
 ### Bibliokirje
 
@@ -414,7 +437,8 @@ Lisakäsk: `vutt-library status` (mis kogus on, kus indeks asub, mis on aegunud)
 |---|---|
 | `VUTT_LIBRARY_DB` | `~/.local/share/vutt-library/library.db` |
 | `VUTT_LIBRARY_COLLECTION` | `VUTT kirjandus` (nimi või `key`) |
-| `VUTT_LIBRARY_ZOTERO_DIR` | `~/.zotero/Zotero` |
+| `VUTT_LIBRARY_ZOTERO_DIR` | `~/.zotero/Zotero` (ainult `storage/` jaoks) |
+| `VUTT_LIBRARY_ZOTERO_API` | `http://127.0.0.1:23119/api/users/0` |
 
 **Aktiveerimine ei sõltu keskkonnamuutujast** — tööriistad registreeruvad, kui
 indeksifail on olemas.
@@ -436,8 +460,11 @@ Kaetavad juhud:
 - kõik neli `linkMode` väärtust;
 - katkine link → aruandesse, jooks ei kuku;
 - `attachments:` tee → **kukub valjult**;
-- prügikastis kirje → välja jäetud;
-- tundmatu skeemiversioon → **kukub**;
+- prügikastis kirje (`data.deleted`) → välja jäetud;
+- **väljalülitatud Local API** (200 + „Local API is not enabled") → kukub juhisega;
+- **kättesaamatu Zotero** (ühendus keeldub) → kukub juhisega;
+- pagineerimine: üle ühe lehe mahtuv kogu loetakse lõpuni;
+- orb manus ilma vanemkirjeta → välja jäetud;
 - **kaks sama nimega kollektsiooni → kukub**, loetleb kandidaadid;
 - alamkollektsioonid kaasatud rekursiivselt, duplikaat loetud üks kord;
 - **üks vanemkirje, kaks PDF-manust** → kaks eraldi `doc_id`-d, sama bibliokirje.
@@ -471,6 +498,9 @@ Kaetavad juhud:
   lisamist.
 - **Zotero baasikataloogi (`attachments:`) tugi** — null kasutust, ehitatakse
   siis, kui vaja.
+- **Indekseerimine suletud Zoteroga** — Local API nõuab töötavat Zoterot. Kui
+  see praktikas segama hakkab, on varutee `zotero.sqlite` otselugemine (mis
+  ÕNNESTUB just siis, kui Zotero on kinni).
 - **Sidumine VUTT-iga** — „mida sekundaarkirjandus ütleb selle teose või isiku
   kohta". Loomulik järgmine samm, aga eeldab kogu olemasolu.
 - **VUTT-i `acad-sekundaar` kollektsioon** jääb puutumata. Kaalusime Teringi
