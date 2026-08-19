@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { isAtLeast } from '../../utils/roleUtils';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
-import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List } from 'lucide-react';
+import { ArrowDownAZ, Search, UserPlus, Users, CheckSquare, Square, GitMerge, X, Map, List, Waypoints } from 'lucide-react';
 import Header from '../../components/Header';
 import Pagination from '../../components/Pagination';
 import PersonCard from '../components/PersonCard';
@@ -12,7 +12,7 @@ import { getPersonFacets, listPersons, mergePersons } from '../services/prosopog
 import { getVocabularies } from '../../services/collectionService';
 import { useUser } from '../../contexts/UserContext';
 import { useCollection } from '../../contexts/CollectionContext';
-import type { ProsopoIndexEntry } from '../types';
+import type { ProsopoIndexEntry, ProsopoMapResponse } from '../types';
 
 const LIMIT = 48;
 // Unit Separator — märksõna ise võib sisaldada tühikuid ja komasid
@@ -119,6 +119,20 @@ const PersonsPage: React.FC = () => {
         n.delete('focus_place');
         n.delete('related_to');
       }
+      n.delete('offset');
+      return n;
+    }, { replace: true });
+
+  // Seoste-filtri (related_to) fookus-isik: nime teab kaardi-vastus, mitte URL.
+  const [focusPerson, setFocusPerson] = useState<ProsopoMapResponse['focus'] | null>(null);
+  const handleFocusChange = useCallback((focus: ProsopoMapResponse['focus'] | null) => {
+    setFocusPerson(focus ?? null);
+  }, []);
+  const clearRelatedTo = () =>
+    setSearchParams(p => {
+      const n = new URLSearchParams(p);
+      n.delete('related_to');
+      n.delete('focus_place');
       n.delete('offset');
       return n;
     }, { replace: true });
@@ -370,6 +384,29 @@ const PersonsPage: React.FC = () => {
             )}
           </div>
 
+          {/* Aktiivne seoste-filter otsinguriba all */}
+          {relatedTo && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-200">
+                <Waypoints size={11} />
+                <span className="truncate max-w-xs">
+                  {t('map.relationsFilter', 'Seosed: {{name}}', {
+                    name: (focusPerson?.id === relatedTo && focusPerson?.label) || t('map.thisPerson', 'See isik'),
+                  })}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearRelatedTo}
+                  className="ml-0.5 hover:bg-primary-100 rounded-full p-0.5"
+                  title={t('map.clearRelationsFilter', 'Eemalda seoste filter')}
+                  aria-label={t('map.clearRelationsFilter', 'Eemalda seoste filter')}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Täpsemad filtrid */}
           <PersonAdvancedFilters
             originGroup={originGroup}
@@ -478,6 +515,7 @@ const PersonsPage: React.FC = () => {
               filters={mapFilters}
               token={token}
               focusPlace={focusPlace || undefined}
+              onFocusChange={handleFocusChange}
             />
           </React.Suspense>
         )}
