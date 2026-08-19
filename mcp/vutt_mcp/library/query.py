@@ -113,3 +113,91 @@ def search(conn: sqlite3.Connection, query: str, *, doc_id: str | None = None,
             excerpt=make_excerpt(r["text"], tokenid), doc=_doc_row(r))
         for r in read
     ]
+
+
+class PageRefError(Exception):
+    """Lehevahemikku ei saa üheselt lahendada."""
+
+
+@dataclass(frozen=True)
+class PageRow:
+    pdf_page: int
+    printed_page: str | None
+    text: str
+
+
+def _sildid(conn: sqlite3.Connection, doc_id: str) -> list:
+    return [r["printed_page"] for r in conn.execute(
+        "SELECT printed_page FROM pages WHERE doc_id = ? ORDER BY pdf_page",
+        (doc_id,))]
+
+
+def resolve_page_range(conn: sqlite3.Connection, doc_id: str, from_page: str,
+                       to_page: str, page_ref: str) -> tuple:
+    """Sisendvahemik → (pdf_from, pdf_to).
+
+    `printed` on TEKST-silt, seega vahemikku EI SAA võtta võrdlusoperaatoriga:
+    algusest võetakse väikseim ja lõpust suurim vastav pdf_page. Tundmatu silt
+    KUKUB — lähimat lehte ei valita vaikselt.
+    """
+    if page_ref not in ("printed", "pdf"):
+        raise PageRefError("page_ref peab olema 'printed' või 'pdf'")
+
+    if page_ref == "pdf":
+        try:
+            algus, lopp = int(from_page), int(to_page)
+        except ValueError as e:
+            raise PageRefError("PDF-numeratsioonis peab sisend olema täisarv") from e
+        olemas = conn.execute(
+            "SELECT MIN(pdf_page), MAX(pdf_page) FROM pages WHERE doc_id = ?",
+            (doc_id,)).fetchone()
+        if olemas[0] is None:
+            raise PageRefError(f"dokumendil {doc_id} ei ole indekseeritud lehti")
+        if algus < olemas[0] or lopp > olemas[1]:
+            raise PageRefError(
+                f"PDF-vahemik {algus}–{lopp} on väljaspool dokumenti "
+                f"(olemas {olemas[0]}–{olemas[1]})")
+        return algus, lopp
+
+    def leia(silt: str, funktsioon: str) -> int | None:
+        rida = conn.execute(
+            f"SELECT {funktsioon}(pdf_page) FROM pages "
+            "WHERE doc_id = ? AND printed_page = ?", (doc_id, str(silt))).fetchone()
+        return rida[0]
+
+    algus, lopp = leia(from_page, "MIN"), leia(to_page, "MAX")
+    puuduvad = [s for s, v in ((from_page, algus), (to_page, lopp)) if v is None]
+    if puuduvad:
+        koik = [s for s in _sildid(conn, doc_id) if s]
+        naide = ", ".join(koik[:5] + (["…"] if len(koik) > 5 else []))
+        raise PageRefError(
+            f"trükitud lehekülge {', '.join(map(str, puuduvad))} ei ole "
+            f"dokumendis {doc_id}. Olemasolevad sildid algavad: {naide or '(puuduvad)'}. "
+            "Kasuta page_ref='pdf', kui trükitud numeratsioon on teadmata."
+        )
+    if algus > lopp:
+        raise PageRefError(f"vahemiku algus {from_page} on lõpust {to_page} tagapool")
+    return algus, lopp
+
+
+def fetch_pages(conn: sqlite3.Connection, doc_id: str, pdf_from: int, pdf_to: int,
+                *, max_pages: int = 20, max_chars: int = 60000) -> tuple:
+    """Leheküljed vahemikus. Kaks lage: lehtede arv JA märgimaht."""
+    read = conn.execute(
+        "SELECT pdf_page, printed_page, text FROM pages "
+        "WHERE doc_id = ? AND pdf_page BETWEEN ? AND ? ORDER BY pdf_page",
+        (doc_id, pdf_from, pdf_to)).fetchall()
+
+    tulem, margid, karbitud = [], 0, False
+    for r in read:
+        if len(tulem) >= max_pages:
+            karbitud = True
+            break
+        if tulem and margid + len(r["text"]) > max_chars:
+            karbitud = True
+            break
+        tulem.append(PageRow(r["pdf_page"], r["printed_page"], r["text"]))
+        margid += len(r["text"])
+    if len(read) > len(tulem):
+        karbitud = True
+    return tulem, karbitud
