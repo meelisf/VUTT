@@ -8,9 +8,12 @@ Hind: indekseerimise ajal peab Zotero jooksma ja Local API olema lubatud
 (Settings → Advanced).
 """
 import json
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
+from pathlib import Path
 
 AJALIMIIT = 30
 LEHE_SUURUS = 100
@@ -110,3 +113,120 @@ def collection_tree(base_url: str, root_key: str) -> list:
         alamad = fetch_all(base_url, f"/collections/{key}/collections")
         jarjekord.extend(a["key"] for a in alamad)
     return tulem
+
+
+# Zotero API väljanimi → meie Bib väli.
+BIB_VALJAD = {
+    "title": "title", "date": "year", "place": "place", "publisher": "publisher",
+    "publicationTitle": "publication", "volume": "volume", "issue": "issue",
+    "pages": "pages", "series": "series", "edition": "edition",
+    "ISBN": "isbn", "DOI": "doi",
+}
+
+
+@dataclass(frozen=True)
+class Bib:
+    creators: list
+    title: str
+    year: str | None = None
+    place: str | None = None
+    publisher: str | None = None
+    publication: str | None = None
+    volume: str | None = None
+    issue: str | None = None
+    pages: str | None = None
+    series: str | None = None
+    edition: str | None = None
+    isbn: str | None = None
+    doi: str | None = None
+
+
+@dataclass(frozen=True)
+class ZoteroDoc:
+    doc_id: str
+    parent_key: str
+    path: Path | None
+    link_mode: str
+    file_missing: bool
+    bib: Bib
+
+
+def _bib_kirjest(data: dict) -> Bib:
+    vaartused = {
+        meie: data[zotero]
+        for zotero, meie in BIB_VALJAD.items()
+        if data.get(zotero)
+    }
+    # Zotero `date` on vabatekst („1984-05", „u. 1984") — võtame aastaarvu.
+    if "year" in vaartused:
+        leid = re.search(r"\b(1[0-9]{3}|20[0-9]{2})\b", str(vaartused["year"]))
+        if leid:
+            vaartused["year"] = leid.group(1)
+
+    loojad = []
+    for c in data.get("creators", []):
+        nimi = c.get("name") or " ".join(
+            x for x in (c.get("firstName"), c.get("lastName")) if x)
+        if nimi:
+            loojad.append([nimi, c.get("creatorType", "author")])
+    return Bib(creators=loojad, title=vaartused.pop("title", "(pealkirjata)"),
+               **vaartused)
+
+
+def _lahenda_tee(data: dict, storage_dir: Path) -> Path | None:
+    link_mode = data.get("linkMode")
+    if link_mode == "linked_url":
+        return None
+    if link_mode == "linked_file":
+        tee = data.get("path") or ""
+        if tee.startswith("attachments:"):
+            raise ZoteroError(
+                f"manus {data['key']} kasutab Zotero baasikataloogi teed "
+                f"({tee!r}). Baasikataloogi tugi on tahtlikult ehitamata "
+                "(mõõdetult 0 kasutust) — sea absoluutne tee või ehita tugi."
+            )
+        return Path(tee) if tee else None
+    failinimi = data.get("filename")
+    if not failinimi:
+        return None
+    return Path(storage_dir) / data["key"] / failinimi
+
+
+def iter_documents(base_url: str, storage_dir: Path,
+                   collection_keys: list) -> list:
+    """PDF-manused antud kollektsioonides.
+
+    Prügikast: API kollektsioonivaade ei tohiks kustutatuid anda, aga me
+    filtreerime `data.deleted` peale ka ise — lepingut ei usalda pimesi.
+    """
+    dokumendid, nahtud, vanemad = [], set(), {}
+    manused = []
+    for key in collection_keys:
+        for kirje_ in fetch_all(base_url, f"/collections/{key}/items"):
+            data = kirje_["data"]
+            if data.get("deleted"):
+                continue
+            if data.get("itemType") == "attachment":
+                manused.append(data)
+            else:
+                vanemad[kirje_["key"]] = data
+
+    for data in manused:
+        if data.get("contentType") != "application/pdf":
+            continue
+        if data["key"] in nahtud:
+            continue
+        nahtud.add(data["key"])
+        tee = _lahenda_tee(data, storage_dir)
+        if tee is None:
+            continue
+        vanem_key = data.get("parentItem")
+        vanem = vanemad.get(vanem_key)
+        if vanem is None:
+            continue  # orb manus ilma kirjeta — ei ole tsiteeritav
+        dokumendid.append(ZoteroDoc(
+            doc_id=data["key"], parent_key=vanem_key, path=tee,
+            link_mode=data.get("linkMode", ""), file_missing=not tee.exists(),
+            bib=_bib_kirjest(vanem),
+        ))
+    return dokumendid
