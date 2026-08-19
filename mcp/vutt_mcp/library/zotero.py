@@ -60,3 +60,53 @@ def fetch_all(base_url: str, path: str, params: dict | None = None) -> list:
 def check_api(base_url: str) -> None:
     """Kukub selge juhisega, kui API ei ole kättesaadav või on välja lülitatud."""
     _get(base_url, "/collections", {"limit": 1})
+
+
+def resolve_collection(base_url: str, wanted: str) -> tuple:
+    """Nimi VÕI key → (key, nimi).
+
+    Nimi ei ole püsiv identifikaator — omaniku raamatukogus on mõõdetult mitu
+    duplikaat-nime. 0 või >1 vaste korral kukume, et vaikselt vale kogu ei
+    indekseeriks.
+    """
+    kogud = fetch_all(base_url, "/collections")
+    otse = [c for c in kogud if c["key"] == wanted]
+    if otse:
+        return otse[0]["key"], otse[0]["data"]["name"]
+
+    nime_jargi = [c for c in kogud if c["data"]["name"] == wanted]
+    if not nime_jargi:
+        raise ZoteroError(
+            f"ei leidnud kollektsiooni {wanted!r} "
+            f"({len(kogud)} kollektsiooni raamatukogus)"
+        )
+    if len(nime_jargi) > 1:
+        kandidaadid = "\n".join(
+            f"  {c['key']}  (ülem: {c['data'].get('parentCollection') or '-'})"
+            for c in nime_jargi
+        )
+        raise ZoteroError(
+            f"kollektsiooni nimi {wanted!r} ei ole üheselt määratud "
+            f"({len(nime_jargi)} vastet). Kirjuta konfiguratsiooni nime asemel "
+            f"key:\n{kandidaadid}"
+        )
+    return nime_jargi[0]["key"], nime_jargi[0]["data"]["name"]
+
+
+def collection_tree(base_url: str, root_key: str) -> list:
+    """Juur + kõik alamkollektsioonid rekursiivselt, [(key, nimi)].
+
+    Kaasamine on tahtlik: kasvav kureeritud kogu saab alamkaustu ja nende
+    vaikne väljajätmine tähendaks otsingust puuduvat materjali.
+    """
+    kogud = {c["key"]: c["data"]["name"] for c in fetch_all(base_url, "/collections")}
+    tulem, jarjekord, nahtud = [], [root_key], set()
+    while jarjekord:
+        key = jarjekord.pop(0)
+        if key in nahtud:
+            continue
+        nahtud.add(key)
+        tulem.append((key, kogud.get(key, key)))
+        alamad = fetch_all(base_url, f"/collections/{key}/collections")
+        jarjekord.extend(a["key"] for a in alamad)
+    return tulem
