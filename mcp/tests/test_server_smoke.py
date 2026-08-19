@@ -22,6 +22,7 @@ class _FakeClient:
 async def test_server_registreerib_koik_tooriistad():
     server = build_server(client=_FakeClient(), base_url="https://x.test")
     names = {t.name for t in await server.list_tools()}
+    # Kirjanduskogu tööriistad on väravatud (vt conftest fixture'it).
     assert names == EXPECTED_TOOLS
 
 
@@ -34,3 +35,25 @@ async def test_build_server_ilma_kliendita_nouab_votit(monkeypatch):
     monkeypatch.delenv("VUTT_MEILI_SEARCH_KEY", raising=False)
     with pytest.raises(VuttConfigError):
         build_server()
+
+
+LIBRARY_TOOLS = {"list_literature", "search_literature", "get_literature_pages"}
+
+
+async def test_kirjanduskogu_tooriistu_ei_ole_ilma_indeksita():
+    """Vaikimisi ei tohi kogu tööriistu olla — indeksifaili pole."""
+    server = build_server(client=_FakeClient(), base_url="https://x.test")
+    names = {t.name for t in await server.list_tools()}
+    assert names & LIBRARY_TOOLS == set()
+
+
+async def test_kirjanduskogu_tooriistad_tekivad_indeksiga(monkeypatch, tmp_path):
+    from vutt_mcp.library.schema import connect, create_schema
+
+    db = tmp_path / "library.db"
+    create_schema(connect(db))
+    monkeypatch.setenv("VUTT_LIBRARY_DB", str(db))
+
+    server = build_server(client=_FakeClient(), base_url="https://x.test")
+    names = {t.name for t in await server.list_tools()}
+    assert LIBRARY_TOOLS <= names
