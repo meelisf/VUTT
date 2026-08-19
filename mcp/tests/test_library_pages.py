@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from library_fixtures import make_pdf
 
 from vutt_mcp.library.pages import (
@@ -75,3 +76,32 @@ def test_liiga_luhike_jada_jaetakse_uskumata():
     """Alla MIN_JADA järjestikuse numbri = juhus, mitte numeratsioon."""
     lehed = ["tiitel", "tyhi"] + [f"sisu\n\n{n}" for n in range(1, 4)]
     assert detect_from_text(lehed) is None
+
+
+def test_ebausutavad_pagelabelsid_lukatakse_tagasi(tmp_path):
+    """pypdf ekstrapoleerib puuduva 0-kirje korral tagasi: -4, -3, -2…
+
+    Selline silt jõuaks muidu viitesse kujul „lk -4" — parem teadmata.
+    """
+    pdf = make_pdf(tmp_path / "a.pdf", ["a", "b", "c"], labels=[(2, "D", 1)])
+    m = from_pdf_labels(pdf, 3)
+    assert m is None or all(
+        s is None or not s.lstrip("-").isdigit() or int(s) > 0 for s in m.labels)
+
+
+def test_katkine_sidecar_annab_selge_vea(tmp_path):
+    from vutt_mcp.library.pages import SidecarError
+
+    sc = tmp_path / "A.override.json"
+    sc.write_text("{ see ei ole JSON")
+    with pytest.raises(SidecarError, match="A.override.json"):
+        from_sidecar(sc, 3)
+
+
+def test_sidecar_ilma_printed_from_vialjata_annab_selge_vea(tmp_path):
+    from vutt_mcp.library.pages import SidecarError
+
+    sc = tmp_path / "A.override.json"
+    sc.write_text(json.dumps({"ranges": [{"pdf_from": 1, "pdf_to": 2}]}))
+    with pytest.raises(SidecarError, match="printed_from"):
+        from_sidecar(sc, 3)

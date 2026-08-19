@@ -59,3 +59,9 @@ def test_fetch_ilma_karpimiseta(conn):
     read, karbitud = fetch_pages(conn, "A", 1, 3, max_pages=20, max_chars=10**6)
     assert len(read) == 3 and karbitud is False
     assert read[0].printed_page == "i"
+
+
+def test_tagurpidi_pdf_vahemik_kukub(conn):
+    """`printed` haru kukub sellega juba; `pdf` andis vaikselt tühja tulemuse."""
+    with pytest.raises(PageRefError):
+        resolve_page_range(conn, "A", "4", "2", "pdf")

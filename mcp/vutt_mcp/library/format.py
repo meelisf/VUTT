@@ -7,6 +7,9 @@ from .query import DocRow
 
 ZOTERO_LINK = "zotero://select/library/items/{key}"
 
+# Alla selle osakaalu on tuvastatud numeratsioon pigem erand kui reegel.
+OSALISE_LAVI = 0.5
+
 
 def _perenimi(nimi: str) -> str:
     return nimi.split()[-1] if nimi else ""
@@ -33,6 +36,14 @@ def format_list(docs: list) -> str:
         markused = []
         if d.page_mapping_source in (None, "none"):
             markused.append("trükitud numeratsioon teadmata")
+        elif (d.page_mapping_source == "detected"
+              and d.page_mapping_confidence < OSALISE_LAVI):
+            # Ilma selleta paistab 400-leheline köide, millest tuvastati viis
+            # lehte, loendis normaalselt kaardistatuna.
+            markused.append(
+                "trükitud numeratsioon tuvastatud osaliselt "
+                f"({round(d.page_mapping_confidence * 100)}% lehtedest) — "
+                "ülejäänule kasuta page_ref='pdf'")
         if d.file_missing:
             markused.append("algfail puudub")
         saba = f"  [{'; '.join(markused)}]" if markused else ""

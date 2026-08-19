@@ -6,6 +6,7 @@ from library_fixtures import FakeZoteroAPI, kirje, kollektsioon, make_pdf, manus
 from vutt_mcp.library.config import LibrarySettings
 from vutt_mcp.library.indexer import IndexLock, IndexLocked, run_index
 from vutt_mcp.library.schema import connect
+from vutt_mcp.library.zotero import ZoteroError
 
 KOGUD = [kollektsioon("K1", "VUTT kirjandus")]
 VANEM = kirje("ITEM0001", title="Teos", date="1984",
@@ -19,8 +20,8 @@ def _pdf(tmp_path, att_key, lehed, labels=None):
     make_pdf(kaust / "f.pdf", lehed, labels=labels)
 
 
-def _settings(tmp_path, base):
-    return LibrarySettings(db_path=tmp_path / "library.db",
+def _settings(tmp_path, base, db_dir=None):
+    return LibrarySettings(db_path=(db_dir or tmp_path) / "library.db",
                            collection="VUTT kirjandus", zotero_dir=tmp_path,
                            api_base=base)
 
@@ -144,3 +145,52 @@ def test_katkestatud_jooks_jatab_eelmise_indeksi_terveks(tmp_path, monkeypatch):
             run_index(s)
     conn = connect(tmp_path / "library.db", read_only=True)
     assert conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0] == 1
+
+
+def test_kadunud_fail_ei_kordu_igas_aruandes(tmp_path):
+    """Puuduv fail loeti varem IGAL jooksul uuesti „uuendatuks"."""
+    _pdf(tmp_path, "ATT00001", ["Ludenius"])
+    items = {"K1": [VANEM, manus("ATT00001", "ITEM0001", filename="f.pdf")]}
+    with FakeZoteroAPI(collections=KOGUD, items=items) as base:
+        s = _settings(tmp_path, base)
+        run_index(s)
+        (tmp_path / "storage" / "ATT00001" / "f.pdf").unlink()
+        esimene = run_index(s)
+        teine = run_index(s)
+    assert esimene.updated == 1
+    assert teine.updated == 0 and teine.skipped == 1
+    assert "ATT00001" in teine.broken_links  # katkine link on ikka nähtav
+
+
+def test_katkine_sidecar_ei_katkesta_kogu_jooksu(tmp_path):
+    _pdf(tmp_path, "ATT00001", ["esimene"])
+    _pdf(tmp_path, "ATT00002", ["teine"])
+    items = {"K1": [VANEM,
+                    manus("ATT00001", "ITEM0001", filename="f.pdf"),
+                    manus("ATT00002", "ITEM0001", filename="f.pdf")]}
+    with FakeZoteroAPI(collections=KOGUD, items=items) as base:
+        s = _settings(tmp_path, base)
+        sc = s.db_path.parent / "sidecar" / "ATT00001.override.json"
+        sc.parent.mkdir(parents=True, exist_ok=True)
+        sc.write_text("{ katki")
+        aruanne = run_index(s)
+    assert any("ATT00001" in x for x in aruanne.bad_sidecar)
+    assert aruanne.added == 1  # teine dokument indekseeriti ikka
+
+
+def test_puuduv_storage_kaust_kukub_selgelt(tmp_path):
+    items = {"K1": [VANEM, manus("ATT00001", "ITEM0001", filename="f.pdf")]}
+    with FakeZoteroAPI(collections=KOGUD, items=items) as base:
+        s = _settings(tmp_path / "vale-koht", base, db_dir=tmp_path)
+        with pytest.raises(ZoteroError, match="storage"):
+            run_index(s)
+
+
+def test_full_ehitab_indeksi_uuesti(tmp_path):
+    _pdf(tmp_path, "ATT00001", ["a", "b"])
+    items = {"K1": [VANEM, manus("ATT00001", "ITEM0001", filename="f.pdf")]}
+    with FakeZoteroAPI(collections=KOGUD, items=items) as base:
+        s = _settings(tmp_path, base)
+        run_index(s)
+        aruanne = run_index(s, full=True)
+    assert aruanne.added == 1 and aruanne.skipped == 0

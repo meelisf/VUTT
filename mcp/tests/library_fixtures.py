@@ -17,11 +17,13 @@ class FakeZoteroAPI:
     """
 
     def __init__(self, collections=(), subcollections=None, items=None,
-                 enabled=True):
+                 enabled=True, total_header="Total-Results"):
         self.collections = list(collections)
         self.subcollections = subcollections or {}
         self.items = items or {}
         self.enabled = enabled
+        # None = jäta päis saatmata (mõni Zotero-tee ei anna koguarvu).
+        self.total_header = total_header
         self.server = None
 
     def __enter__(self):
@@ -54,7 +56,8 @@ class FakeZoteroAPI:
                 keha = json.dumps(tykk).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
-                self.send_header("Total-Results", str(len(andmed)))
+                if fake.total_header:
+                    self.send_header(fake.total_header, str(len(andmed)))
                 self.send_header("Content-Length", str(len(keha)))
                 self.end_headers()
                 self.wfile.write(keha)

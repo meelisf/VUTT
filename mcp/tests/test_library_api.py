@@ -27,3 +27,17 @@ def test_kattesaamatu_zotero_annab_juhise():
 def test_toimiv_api_labib():
     with FakeZoteroAPI(collections=[kollektsioon("K1", "Kogu")]) as base:
         check_api(base)  # ei tohi visata
+
+
+def test_pagineerimine_ei_soltu_paise_tostust():
+    """HTTP-päised on tõstutundetud — `dict()` teeks otsingu tõstutundlikuks."""
+    kogud = [kollektsioon(f"K{i:04d}", f"Kogu {i}") for i in range(120)]
+    with FakeZoteroAPI(collections=kogud, total_header="total-results") as base:
+        assert len(fetch_all(base, "/collections", {"limit": 50})) == 120
+
+
+def test_ilma_koguarvu_paiseta_ei_katkestata_esimese_lehe_jarel():
+    """Puuduv Total-Results ei tohi vaikselt tähendada „ongi kõik"."""
+    kogud = [kollektsioon(f"K{i:04d}", f"Kogu {i}") for i in range(120)]
+    with FakeZoteroAPI(collections=kogud, total_header=None) as base:
+        assert len(fetch_all(base, "/collections", {"limit": 50})) == 120

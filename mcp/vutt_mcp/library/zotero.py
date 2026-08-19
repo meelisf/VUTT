@@ -28,7 +28,8 @@ def _get(base_url: str, path: str, params: dict) -> tuple:
     try:
         with urllib.request.urlopen(url, timeout=AJALIMIIT) as vastus:
             toores = vastus.read()
-            paised = dict(vastus.headers)
+            # HTTP-päised on tõstutundetud; `dict()` kaotaks selle omaduse ära.
+            paised = vastus.headers
     except urllib.error.URLError as e:
         raise ZoteroError(
             f"Zotero Local API ei vasta aadressil {base_url} ({e.reason}). "
@@ -46,17 +47,28 @@ def _get(base_url: str, path: str, params: dict) -> tuple:
 
 
 def fetch_all(base_url: str, path: str, params: dict | None = None) -> list:
-    """Kogub kõik lehed. Zotero annab Total-Results päise ja võtab `start`-i."""
+    """Kogub kõik lehed. Zotero annab Total-Results päise ja võtab `start`-i.
+
+    Kui koguarvu päist EI ole, ei tohi seda lugeda kui „ongi kõik" — muidu
+    jääks kogust vaikselt puudu kõik peale esimese lehe. Siis pagineerime
+    seni, kuni server annab täislehest lühema vastuse.
+    """
     params = dict(params or {})
     params.setdefault("limit", LEHE_SUURUS)
+    limiit = int(params["limit"])
     kogutud, algus = [], 0
     while True:
         params["start"] = algus
         tykk, paised = _get(base_url, path, params)
         kogutud.extend(tykk)
-        kokku = int(paised.get("Total-Results", len(kogutud)))
         algus += len(tykk)
-        if not tykk or algus >= kokku:
+        if not tykk:
+            return kogutud
+        kokku = paised.get("Total-Results")
+        if kokku is not None:
+            if algus >= int(kokku):
+                return kogutud
+        elif len(tykk) < limiit:
             return kogutud
 
 

@@ -26,6 +26,11 @@ def _teata(aruanne) -> None:
         print(f"\nTEKSTIKIHITA ({len(aruanne.no_text)}) — vaja OCR-i:")
         for doc_id in aruanne.no_text:
             print(f"  {doc_id}")
+    if aruanne.bad_sidecar:
+        print(f"\nVIGANE SIDECAR ({len(aruanne.bad_sidecar)}) — "
+              "dokument JÄI INDEKSEERIMATA, paranda fail ja jooksuta uuesti:")
+        for rida in aruanne.bad_sidecar:
+            print(f"  {rida}")
     if aruanne.no_mapping:
         print(f"\nTRÜKITUD NUMERATSIOON TUVASTAMATA ({len(aruanne.no_mapping)}) — "
               "lisa sidecar, kui tahad täpset viitamist:")
@@ -36,7 +41,10 @@ def _teata(aruanne) -> None:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="vutt-library")
     alam = parser.add_subparsers(dest="kask", required=True)
-    alam.add_parser("index", help="indekseeri Zotero kollektsioon")
+    index_parser = alam.add_parser("index", help="indekseeri Zotero kollektsioon")
+    index_parser.add_argument(
+        "--full", action="store_true",
+        help="ehita indeks nullist uuesti (tuletatud read-model, vt ADR 0023)")
     alam.add_parser("status", help="näita kogu seisu")
     args = parser.parse_args(argv)
 
@@ -57,7 +65,7 @@ def main(argv=None) -> int:
         return 0
 
     try:
-        aruanne = run_index(settings)
+        aruanne = run_index(settings, full=getattr(args, "full", False))
     except (ZoteroError, IndexLocked) as e:
         print(str(e), file=sys.stderr)
         return 1

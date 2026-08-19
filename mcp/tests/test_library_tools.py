@@ -56,3 +56,20 @@ def test_tooriistad_registreeritakse_kui_indeks_olemas(tmp_path):
     assert register_library_tools(mcp, s) is True
     assert sorted(mcp.tools) == [
         "get_literature_pages", "list_literature", "search_literature"]
+
+
+def test_nork_tuvastus_saab_loendis_hoiatuse():
+    """`detected` + madal kaetus = enamik lehti ilma trükitud numbrita.
+
+    Ilma hoiatuseta paistab teos loendis normaalselt kaardistatuna ja mudel
+    tsiteerib `page_ref="printed"`, mis 99% lehtedest kukub.
+    """
+    from vutt_mcp.library.format import format_list
+
+    nork = DocRow(doc_id="B", title="Paks köide", year="1889", creators=[],
+                  page_count=400, page_mapping_source="detected",
+                  page_mapping_confidence=0.02, file_missing=False)
+    valjund = format_list([nork])
+    assert "%" in valjund or "osaliselt" in valjund
+    # Terve kaardistus ei tohi hoiatust saada.
+    assert "osaliselt" not in format_list([DOC])

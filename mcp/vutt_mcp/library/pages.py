@@ -16,6 +16,10 @@ ROOMA = [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"),
          (5, "v"), (4, "iv"), (1, "i")]
 
 
+class SidecarError(Exception):
+    """Käsitsi kirjutatud sidecar on vigane — vaikselt ignoreerida ei tohi."""
+
+
 @dataclass(frozen=True)
 class PageMapping:
     labels: list          # list[str | None], pikkus == lehtede arv
@@ -65,9 +69,23 @@ def from_pdf_labels(pdf_path: Path, page_count: int) -> PageMapping | None:
         sildid = [str(x) for x in lugeja.page_labels][:page_count]
     except Exception:
         return None
-    if not sildid:
+    if not sildid or not _usutavad_sildid(sildid):
         return None
     return PageMapping(sildid, "pagelabels", 1.0, _kokkuvote(sildid))
+
+
+def _usutavad_sildid(sildid: list) -> bool:
+    """Null või negatiivne araabia silt tähendab katkist /PageLabels-puud.
+
+    pypdf ekstrapoleerib puuduva 0-kirje korral tagasi (−4, −3, −2…) ja need
+    jõuaksid muidu viitesse kujul „lk -4". Terve puu on parem tagasi lükata
+    kui poolikut usaldada: tuvastus ja „teadmata" on mõlemad ausamad.
+    """
+    for silt in sildid:
+        puhas = silt.strip()
+        if re.fullmatch(r"-?\d+", puhas) and int(puhas) < 1:
+            return False
+    return True
 
 
 def detect_from_text(pages: list) -> PageMapping | None:
@@ -114,15 +132,33 @@ def from_sidecar(sidecar_path: Path, page_count: int) -> PageMapping | None:
     sidecar_path = Path(sidecar_path)
     if not sidecar_path.exists():
         return None
-    andmed = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    try:
+        andmed = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        raise SidecarError(f"{sidecar_path} ei ole loetav JSON: {e}") from e
     sildid = [None] * page_count
     for vahemik in andmed.get("ranges", []):
-        algus, lopp = int(vahemik["pdf_from"]), int(vahemik["pdf_to"])
+        try:
+            algus, lopp = int(vahemik["pdf_from"]), int(vahemik["pdf_to"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise SidecarError(
+                f"{sidecar_path}: vahemikus puudub või on vigane "
+                f"pdf_from/pdf_to ({vahemik!r})") from e
         if "printed" in vahemik and vahemik["printed"] is None:
             continue  # nummerdamata
         stiil = vahemik.get("style", "arabic")
+        if "printed_from" not in vahemik:
+            raise SidecarError(
+                f"{sidecar_path}: vahemikul puudub printed_from "
+                f"(nummerdamata vahemik kirjuta kujul \"printed\": null) "
+                f"({vahemik!r})")
         esimene = str(vahemik["printed_from"])
-        n = _rooma_arvuks(esimene) if stiil == "roman" else int(esimene)
+        try:
+            n = _rooma_arvuks(esimene) if stiil == "roman" else int(esimene)
+        except (KeyError, ValueError) as e:
+            raise SidecarError(
+                f"{sidecar_path}: printed_from {esimene!r} ei sobi "
+                f"stiiliga {stiil!r}") from e
         for offset, pdf in enumerate(range(algus, lopp + 1)):
             if 1 <= pdf <= page_count:
                 vaartus = n + offset

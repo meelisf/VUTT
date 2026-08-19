@@ -68,3 +68,17 @@ def test_doc_id_piirab(conn):
     conn.commit()
     assert len(search(conn, "Ludenius")) == 3
     assert len(search(conn, "Ludenius", doc_id="A")) == 2
+
+
+def test_negatiivne_limit_ei_ava_kogu_korpust(conn):
+    """`limit` tuleb mudelilt: -1 tähendaks SQLite'is „piiranguta"."""
+    assert len(search(conn, "Ludenius", limit=-1)) == 2
+
+
+def test_null_limit_ei_valeta_tuhja_tulemust(conn):
+    """limit=0 andis varem 0 vastet → „ei leidnud" ka siis, kui vasted on."""
+    assert len(search(conn, "Ludenius", limit=0)) == 2
+
+
+def test_liiga_suur_limit_kaetakse(conn):
+    assert len(search(conn, "Ludenius", limit=10**6)) == 2

@@ -13,10 +13,11 @@ from pathlib import Path
 
 from .config import EXTRACTOR_VERSION, INDEXER_SCHEMA_VERSION, LibrarySettings
 from .extract import ExtractError, extract_pages, normalize_for_search
-from .pages import resolve_mapping
+from .pages import SidecarError, resolve_mapping
 from .schema import connect, create_schema
 from .zotero import (
     ZoteroDoc,
+    ZoteroError,
     check_api,
     collection_tree,
     iter_documents,
@@ -61,6 +62,7 @@ class IndexReport:
     broken_links: list = field(default_factory=list)
     no_mapping: list = field(default_factory=list)
     no_text: list = field(default_factory=list)
+    bad_sidecar: list = field(default_factory=list)
     subcollections: list = field(default_factory=list)
     source: str = ""
 
@@ -136,12 +138,19 @@ def run_index(settings: LibrarySettings, *, full: bool = False) -> IndexReport:
     aruanne = IndexReport(source=settings.api_base)
     with IndexLock(settings.db_path):
         check_api(settings.api_base)
+        storage = settings.zotero_dir / "storage"
+        if not storage.is_dir():
+            # Ilma selle kontrollita „õnnestuks" jooks 100% katkiste linkidega.
+            raise ZoteroError(
+                f"Zotero storage-kausta ei ole: {storage}. Sea "
+                "VUTT_LIBRARY_ZOTERO_DIR andmekataloogile, mille all on "
+                "storage/ (Zotero → Settings → Advanced → Files and Folders)."
+            )
         coll_key, _ = resolve_collection(settings.api_base, settings.collection)
         puu = collection_tree(settings.api_base, coll_key)
         aruanne.subcollections = [nimi for _, nimi in puu]
         dokumendid = iter_documents(
-            settings.api_base, settings.zotero_dir / "storage",
-            [key for key, _ in puu])
+            settings.api_base, storage, [key for key, _ in puu])
 
         conn = connect(settings.db_path)
         create_schema(conn)
@@ -162,16 +171,21 @@ def run_index(settings: LibrarySettings, *, full: bool = False) -> IndexReport:
             )
             fp = fingerprint(doc, sc_hash)
             if doc.doc_id in olemas and olemas[doc.doc_id] == fp:
+                if doc.file_missing:
+                    # Sõrmejälg on sama, aga katkine link peab JÄÄMA nähtavaks.
+                    aruanne.broken_links.append(doc.doc_id)
                 aruanne.skipped += 1
                 continue
 
             if doc.file_missing:
                 aruanne.broken_links.append(doc.doc_id)
                 if doc.doc_id in olemas:
-                    # Fail kadus, kirje jääb kogusse: tekst SÄILIB.
+                    # Fail kadus, kirje jääb kogusse: tekst SÄILIB. Sõrmejälg
+                    # tuleb kaasa uuendada, muidu loeb iga järgmine jooks sama
+                    # dokumendi uuesti „uuendatuks".
                     conn.execute(
-                        "UPDATE documents SET file_missing = 1 WHERE doc_id = ?",
-                        (doc.doc_id,))
+                        "UPDATE documents SET file_missing = 1, fingerprint = ? "
+                        "WHERE doc_id = ?", (fp, doc.doc_id))
                     conn.commit()
                     aruanne.updated += 1
                 continue
@@ -185,7 +199,14 @@ def run_index(settings: LibrarySettings, *, full: bool = False) -> IndexReport:
                 aruanne.no_text.append(doc.doc_id)
                 continue
 
-            mapping = resolve_mapping(doc.path, lehed, sc if sc.exists() else None)
+            try:
+                mapping = resolve_mapping(doc.path, lehed,
+                                          sc if sc.exists() else None)
+            except SidecarError as e:
+                # Käsitsi kirjutatud fail ei tohi tervet jooksu maha võtta,
+                # aga vale numeratsiooniga indekseerimine oleks vaikne vale.
+                aruanne.bad_sidecar.append(f"{doc.doc_id}: {e}")
+                continue
             if mapping.source == "none":
                 aruanne.no_mapping.append(doc.doc_id)
 

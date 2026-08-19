@@ -24,6 +24,7 @@ class DocRow:
     page_count: int
     page_mapping_source: str | None
     file_missing: bool
+    page_mapping_confidence: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,7 @@ def _doc_row(rida: sqlite3.Row) -> DocRow:
         year=rida["year"], page_count=rida["page_count"] or 0,
         page_mapping_source=rida["page_mapping_source"],
         file_missing=bool(rida["file_missing"]),
+        page_mapping_confidence=rida["page_mapping_confidence"] or 0.0,
     )
 
 
@@ -85,8 +87,19 @@ def make_excerpt(text: str, tokens: list, width: int = 240) -> str:
     return text[:width].strip() + ("…" if len(text) > width else "")
 
 
+VAIKE_LIMIT = 10
+MAX_LIMIT = 50
+
+
 def search(conn: sqlite3.Connection, query: str, *, doc_id: str | None = None,
            relax: bool = False, limit: int = 10) -> list:
+    # `limit` tuleb mudelilt: negatiivne tähendaks SQLite'is „piiranguta"
+    # (terve korpus vastusesse), 0 aga „ei leidnud ühtki vastet" — vale vastus,
+    # mitte tühi. Mõttetu väärtus taandub VAIKEväärtusele, mitte ühele reale:
+    # ka „1 vaste" oleks alaraporteerimine. Klammerdus on siin, et kõik
+    # kutsujad oleksid kaetud.
+    limit = int(limit)
+    limit = VAIKE_LIMIT if limit < 1 else min(limit, MAX_LIMIT)
     match = build_match(query, relax)
     tokenid = tokenize(query)
     parameetrid = [match]
@@ -157,6 +170,9 @@ def resolve_page_range(conn: sqlite3.Connection, doc_id: str, from_page: str,
             raise PageRefError(
                 f"PDF-vahemik {algus}–{lopp} on väljaspool dokumenti "
                 f"(olemas {olemas[0]}–{olemas[1]})")
+        if algus > lopp:
+            raise PageRefError(
+                f"vahemiku algus {algus} on lõpust {lopp} tagapool")
         return algus, lopp
 
     def leia(silt: str, funktsioon: str) -> int | None:
