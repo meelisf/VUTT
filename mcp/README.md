@@ -37,13 +37,13 @@ tühja võtmega.
 
 ```bash
 # Claude Code — kättesaadav igas projektis sellel masinal
-claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+claude mcp add --scope user vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Codex CLI
-codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
+codex mcp add vutt --env VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" -- vutt-mcp
 
 # Gemini CLI — `-s user` on oluline, vaikimisi on scope `project`
-gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /path/to/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
+gemini mcp add -s user -e VUTT_MEILI_SEARCH_KEY="$(grep '^MEILI_SEARCH_KEY=' /home/mf/LLM/VUTT/.env | cut -d= -f2- | tr -d '"')" vutt vutt-mcp
 ```
 
 `^MEILI_SEARCH_KEY=` lõpu-`=` on tahtlik — ilma selleta haaraks grep kaasa ka

@@ -18,6 +18,29 @@ MCP SDK v2, pytest.
 
 **Spec:** `docs/superpowers/specs/2026-08-19-kirjanduse-kogu-mcp-design.md`
 
+## Kust jätkata (seis 2026-08-19)
+
+Plaan on kirjutatud ja kinnitatud, **koodi ei ole veel kirjutatud**. Task 1 on
+esimene samm. Haru: `feat/kirjanduse-kogu-mcp`.
+
+**Enne esimest päris indekseerimist tee Zoteros ära:**
+
+1. Loo kollektsioon **„VUTT kirjandus"** (praegu seda ei ole — kontrollitud,
+   106 kollektsiooni, seda nime nende seas pole).
+2. Lohista sinna teatmeteosed, **mille OCR on kvaliteetne** — indekseerija ei
+   hinda tekstikvaliteeti ja lagunenud OCR jääb otsingust vaikselt välja.
+3. Local API on juba lubatud (Settings → Advanced, sisse lülitatud 2026-08-19).
+   **Zotero peab indekseerimise ajal jooksma.**
+
+**Teostusviis on valimata.** Kaks võimalust: subagent-driven (värske subagent
+ülesande kohta, ülevaatus vahepeal — soovitatud) või inline selles seansis.
+
+**Mõõdetud faktid, mida ei pea uuesti välja kaevama** (kõik plaani sees):
+Zotero `storage/` = 1319 PDF-manust, `linkMode` jaotus 820/473/25/1, lingitud
+failidest 7 on juba katki, kollektsioone 113 (80 alamkollektsiooni), kolm
+duplikaat-nime. PDF-fixture'i generaator ja Local API kuju on jooksutatud, mitte
+oletatud.
+
 ## Global Constraints
 
 - **Koodikommentaarid ja veateated eesti keeles** (CLAUDE.md).
