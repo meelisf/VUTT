@@ -3,7 +3,7 @@ name = "vutt-mcp"
 version = "0.1.0"
 description = "MCP-server VUTT-i varauusaegsete tekstide ja prosopograafia jaoks"
 requires-python = ">=3.10"
-dependencies = ["mcp>=2,<3", "httpx>=0.28.0"]
+dependencies = ["mcp>=2,<3", "httpx>=0.28.0", "pypdf>=5.0.0"]
 
 [project.scripts]
 vutt-mcp = "vutt_mcp.__main__:main"
