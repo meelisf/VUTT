@@ -10,7 +10,7 @@ import shutil
 
 from ..config import BASE_DIR, OCR_SERVER_PATH, get_logger
 from ..marginalia_normalize import normalize_marginalia_tags
-from ..utils import generate_nanoid
+from ..utils import generate_nanoid, derive_year_fields
 from .file_detection import extract_page_num, page_base_name
 from .state import get_upload_lock, read_state, write_state
 
@@ -109,10 +109,11 @@ def import_as_work(
     slug = meta['slug']
     work_collections = meta.get('collections') or []
     languages = meta.get('languages') or []
-    try:
-        year = int(str(meta.get('year', '')))
-    except (ValueError, TypeError):
-        year = None
+    # Samm 1 aastalahter on vabatekst ("1634-1653", "ca. 1650", "17. saj") —
+    # `int()` kukuks ja aasta läheks vaikselt kaotsi (teos sai aastaks 0).
+    year, derived_year_display = derive_year_fields(
+        meta.get('year'), meta.get('year_display')
+    )
 
     # Filtreeri: ainult OCR-iga, mitte-kustutatud lehed
     importable = [f for f in state.get('files', []) if f.get('has_ocr') and not f.get('deleted')]
@@ -209,6 +210,8 @@ def import_as_work(
     }
     if year is not None:
         metadata["year"] = year
+    if derived_year_display:
+        metadata["year_display"] = derived_year_display
     for field in optional_meta_fields:
         if field in meta and meta[field] not in (None, [], ""):
             metadata[field] = meta[field]
